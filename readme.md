@@ -1,18 +1,8 @@
-## ESP-Miner
+# ESP-Miner
 
 ESP-Miner is bitcoin miner software designed to run on the ESP32. It mines on ASICs such as the Bitmain BM1397. The [Bitaxe](https://github.com/skot/bitaxe/) is a handy board for this!
 
-![esp-miner block diagram](doc/diagram.png)
-
-## Architecture
-- Uses the ESP-IDF Framework, which is based on FreeRTOS (no Linux involved)
-- Uses the ESP32 WiFi to connect to the network
-- The ESP32 is provisioned to the local WiFi over BLE using ESP SmartConfig
-
-### Firmware
-- ESP-Miner connects to and verifies the attached mining ASIC.
-    - Setting the baud rate, hashing frequency, and filling in some other mystery registers
-    - This startup sequence for the BM1387 and BM1397 can be found in cgminer the Kano edition in [driver-gekko.c](https://github.com/kanoi/cgminer/blob/master/driver-gekko.c)
+## Overview
 
 - ESP-Miner connects to your pool or stratum server and subscribes to get the latest work.
     - This is done with [JSON-RPC](https://www.jsonrpc.org)
@@ -25,13 +15,40 @@ ESP-Miner is bitcoin miner software designed to run on the ESP32. It mines on AS
         - I have started on this.. [check this](bm1397_protocol.md)
 - ESP-Miner sends this work to the mining ASIC over serial.
 
-- The Mining ASIC will report back any when it finds a hash over the difficulty (which)?
-    - The catch here is that if it doesn't find a hash over the difficulty, it will not report back at all. So you need to keep track of the hashing frequency and the time so that you can send a new block header to be hashed.
+### Hardware Required
 
-- ESP-Miner will report back to the pool over Stratum the results of mining.
+To run this example, you should have one ESP32, ESP32-S or ESP32-C based development board as well as a MPU9250. MPU9250 is a inertial measurement unit, which contains a accelerometer, gyroscope as well as a magnetometer, for more information about it, you can read the [PDF](https://invensense.tdk.com/wp-content/uploads/2015/02/PS-MPU-9250A-01-v1.1.pdf) of this sensor.
 
-- All of the administrative stuff of running a miner like;
-     - Set the BM1397 core voltage and current.
-     - check the fan speed
-     - check the BM1397 temperature
-     - optimize the hashing frequency and core voltage for max efficiency
+#### Pin Assignment:
+
+**Note:** The following pin assignments are used by default, you can change these in the `menuconfig` .
+
+|                  | SDA             | SCL           |
+| ---------------- | -------------- | -------------- |
+| ESP I2C Master   | I2C_MASTER_SDA | I2C_MASTER_SCL |
+| MPU9250 Sensor   | SDA            | SCL            |
+
+
+For the actual default value of `I2C_MASTER_SDA` and `I2C_MASTER_SCL` see `Example Configuration` in `menuconfig`.
+
+**Note: ** There’s no need to add an external pull-up resistors for SDA/SCL pin, because the driver will enable the internal pull-up resistors.
+
+### Build and Flash
+
+Enter `idf.py -p PORT flash monitor` to build, flash and monitor the project.
+
+(To exit the serial monitor, type ``Ctrl-]``.)
+
+See the [Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for full steps to configure and use ESP-IDF to build projects.
+
+## Example Output
+
+```bash
+I (328) i2c-simple-example: I2C initialized successfully
+I (338) i2c-simple-example: WHO_AM_I = 71
+I (338) i2c-simple-example: I2C unitialized successfully
+```
+
+## Troubleshooting
+
+(For any technical queries, please open an [issue](https://github.com/espressif/esp-idf/issues) on GitHub. We will get back to you as soon as possible.)
