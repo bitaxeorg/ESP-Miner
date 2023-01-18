@@ -18,33 +18,43 @@
 #include "esp_log.h"
 #include "driver/i2c.h"
 
+// Include FreeRTOS for delay
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include "led_controller.h"
 #include "DS4432U.h"
+#include "EMC2101.h"
 
 static const char *TAG = "i2c-test";
 
 void app_main(void) {
 
     //test the LEDs
-    ESP_LOGI(TAG, "Init LEDs!");
-
-    ledc_init();
-    led_set();
+    // ESP_LOGI(TAG, "Init LEDs!");
+    // ledc_init();
+    // led_set();
 
     ESP_ERROR_CHECK(i2c_master_init());
     ESP_LOGI(TAG, "I2C initialized successfully");
 
-    DS4432U_read();
+    // DS4432U_read();
 
-    DS4432U_set(0x00);
-    float core_voltage = 1.0;
-    uint8_t reg_setting;
+    // DS4432U_set(0x00);
+    // float core_voltage = 1.0;
+    // uint8_t reg_setting;
 
-    reg_setting = voltage_to_reg(core_voltage);
+    // reg_setting = voltage_to_reg(core_voltage);
 
-    ESP_LOGI(TAG, "Test set %.3fV = 0x%02X", core_voltage, reg_setting);
+    // ESP_LOGI(TAG, "Test set %.3fV = 0x%02X", core_voltage, reg_setting);
 
-    DS4432U_set(reg_setting); ///eek!
+    // DS4432U_set(reg_setting); ///eek!
+
+    EMC2101_read();
+    EMC2101_set_config(0x04); //set the tach input
+    EMC2101_set_fan_speed(0.5);
+    vTaskDelay(2000 / portTICK_RATE_MS);
+    EMC2101_get_fan_speed();
 
     ESP_ERROR_CHECK(i2c_master_delete());
     ESP_LOGI(TAG, "I2C unitialized successfully");
