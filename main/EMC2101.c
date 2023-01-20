@@ -48,10 +48,10 @@ void EMC2101_set_fan_speed(float percent) {
 }
 
 //RPM = 5400000/reading
-uint32_t EMC2101_get_fan_speed(void) {
+uint16_t EMC2101_get_fan_speed(void) {
     uint8_t tach_lsb, tach_msb;
     uint16_t reading;
-    uint32_t RPM;
+    uint16_t RPM;
 
     ESP_ERROR_CHECK(register_read(EMC2101_TACH_LSB, &tach_lsb, 1));
     ESP_ERROR_CHECK(register_read(EMC2101_TACH_MSB, &tach_msb, 1));
@@ -61,7 +61,7 @@ uint32_t EMC2101_get_fan_speed(void) {
     reading = tach_lsb | (tach_msb << 8);
     RPM = 5400000/reading;
 
-    ESP_LOGI(TAG, "Fan Speed = %d RPM", RPM);
+    //ESP_LOGI(TAG, "Fan Speed = %d RPM", RPM);
     return RPM;
 }
 

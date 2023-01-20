@@ -56,13 +56,13 @@ void app_main(void) {
     EMC2101_set_config(0x04); //set the tach input
     EMC2101_read();
     EMC2101_set_fan_speed(0.5);
-    vTaskDelay(1000 / portTICK_RATE_MS);
-    EMC2101_get_fan_speed();
+    vTaskDelay(500 / portTICK_RATE_MS);
+    ESP_LOGI(TAG, "Fan Speed: %d RPM", EMC2101_get_fan_speed());
 
     //Current Sensor tests
-    ESP_LOGI(TAG, "Current: %.2fmA", INA260_read_current());
-    ESP_LOGI(TAG, "Voltage: %.2fV", INA260_read_voltage());
-    ESP_LOGI(TAG, "Power: %.2fW", INA260_read_power());
+    ESP_LOGI(TAG, "Current: %.1f mA", INA260_read_current());
+    ESP_LOGI(TAG, "Voltage: %.1f mV", INA260_read_voltage());
+    ESP_LOGI(TAG, "Power: %.1f mW", INA260_read_power());
 
     ESP_ERROR_CHECK(i2c_master_delete());
     ESP_LOGI(TAG, "I2C unitialized successfully");
