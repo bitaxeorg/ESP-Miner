@@ -33,7 +33,7 @@ static esp_err_t register_write_byte(uint8_t reg_addr, uint8_t data) {
     return ret;
 }
 
-float INA260_read_current(void) {
+uint16_t INA260_read_current(void) {
   uint8_t data[2];
 
   ESP_ERROR_CHECK(register_read(INA260_REG_CURRENT, data, 2));
@@ -42,7 +42,7 @@ float INA260_read_current(void) {
   return (uint16_t)(data[0] | (data[1] << 8)) * 1.25;
 }
 
-float INA260_read_voltage(void) {
+uint16_t INA260_read_voltage(void) {
     uint8_t data[2];
 
     ESP_ERROR_CHECK(register_read(INA260_REG_BUSVOLTAGE, data, 2));
@@ -51,11 +51,11 @@ float INA260_read_voltage(void) {
     return (uint16_t)(data[0] | (data[1] << 8)) * 1.25;
 }
 
-float INA260_read_power(void) {
+uint16_t INA260_read_power(void) {
     uint8_t data[2];
 
     ESP_ERROR_CHECK(register_read(INA260_REG_POWER, data, 2));
     //ESP_LOGI(TAG, "Raw Power = %02X %02X", data[1], data[0]);
 
-    return (uint16_t)(data[0] | (data[1] << 8)) * 10;
+    return (data[0] | (data[1] << 8)) * 10;
 }

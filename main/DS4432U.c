@@ -34,7 +34,7 @@ static const char *TAG = "DS4432U.c";
  * @brief voltage_to_reg takes a voltage and returns a register setting for the DS4432U to get that voltage on the TPS40305
  * careful with this one!!
  */
-uint8_t voltage_to_reg(float vout) {
+static uint8_t voltage_to_reg(float vout) {
 	float change;
     uint8_t reg;
 
@@ -110,7 +110,19 @@ void DS4432U_read(void) {
     ESP_LOGI(TAG, "DS4432U+ OUT1 = 0x%02X", data[0]);
 }
 
-void DS4432U_set(uint8_t val) {
+static void DS4432U_set(uint8_t val) {
     ESP_LOGI(TAG, "Writing 0x%02X", val);
     ESP_ERROR_CHECK(register_write_byte(DS4432U_OUT0_REG, val));
+}
+
+bool DS4432U_set_vcore(float core_voltage) {
+    uint8_t reg_setting;
+
+    reg_setting = voltage_to_reg(core_voltage);
+
+    ESP_LOGI(TAG, "Test set %.3fV = 0x%02X", core_voltage, reg_setting);
+
+    DS4432U_set(reg_setting); ///eek!
+
+    return true;
 }
