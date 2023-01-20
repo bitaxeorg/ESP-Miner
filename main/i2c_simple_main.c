@@ -25,6 +25,7 @@
 #include "led_controller.h"
 #include "DS4432U.h"
 #include "EMC2101.h"
+#include "INA260.h"
 
 static const char *TAG = "i2c-test";
 
@@ -50,11 +51,18 @@ void app_main(void) {
 
     // DS4432U_set(reg_setting); ///eek!
 
-    EMC2101_read();
+    
+    //Fan Tests
     EMC2101_set_config(0x04); //set the tach input
+    EMC2101_read();
     EMC2101_set_fan_speed(0.5);
-    vTaskDelay(2000 / portTICK_RATE_MS);
+    vTaskDelay(1000 / portTICK_RATE_MS);
     EMC2101_get_fan_speed();
+
+    //Current Sensor tests
+    ESP_LOGI(TAG, "Current: %.2fmA", INA260_read_current());
+    ESP_LOGI(TAG, "Voltage: %.2fV", INA260_read_voltage());
+    ESP_LOGI(TAG, "Power: %.2fW", INA260_read_power());
 
     ESP_ERROR_CHECK(i2c_master_delete());
     ESP_LOGI(TAG, "I2C unitialized successfully");
