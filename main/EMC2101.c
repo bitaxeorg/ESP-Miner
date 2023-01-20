@@ -33,8 +33,7 @@ static esp_err_t register_write_byte(uint8_t reg_addr, uint8_t data) {
     return ret;
 }
 
-
-//takes a fan speed percent
+//run this first. sets up the config register
 void EMC2101_init(void) {
 
     //set the TACH input
@@ -66,14 +65,6 @@ uint16_t EMC2101_get_fan_speed(void) {
     //ESP_LOGI(TAG, "Fan Speed = %d RPM", RPM);
     return RPM;
 }
-
-// void EMC2101_read(void) {
-//     uint8_t data;
-
-//     /* Read the EMC2101 WHO_AM_I register, on power up the register should have the value 0x16 or 0x28 */
-//     ESP_ERROR_CHECK(register_read(EMC2101_REG_CONFIG, &data, 1));
-//     ESP_LOGI(TAG, "EMC2101 Config register = 0x%02X", data);
-// }
 
 float EMC2101_get_chip_temp(void) {
     uint8_t temp_msb, temp_lsb;
