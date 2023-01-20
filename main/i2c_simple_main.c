@@ -46,11 +46,11 @@ void app_main(void) {
     DS4432U_set_vcore(1.25);
     
     //Fan Tests
-    EMC2101_set_config(0x04); //set the tach input
-    EMC2101_read();
+    EMC2101_init();
     EMC2101_set_fan_speed(0.5);
     vTaskDelay(500 / portTICK_RATE_MS);
     ESP_LOGI(TAG, "Fan Speed: %d RPM", EMC2101_get_fan_speed());
+    ESP_LOGI(TAG, "Chip Temp: %.2f C", EMC2101_get_chip_temp());
 
     //Current Sensor tests
     ESP_LOGI(TAG, "Current: %d mA", INA260_read_current());

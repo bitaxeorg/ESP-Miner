@@ -35,8 +35,10 @@ static esp_err_t register_write_byte(uint8_t reg_addr, uint8_t data) {
 
 
 //takes a fan speed percent
-void EMC2101_set_config(uint8_t reg) {
-    ESP_ERROR_CHECK(register_write_byte(EMC2101_REG_CONFIG, reg));
+void EMC2101_init(void) {
+
+    //set the TACH input
+    ESP_ERROR_CHECK(register_write_byte(EMC2101_REG_CONFIG, 0x04));
 }
 
 //takes a fan speed percent
@@ -65,10 +67,24 @@ uint16_t EMC2101_get_fan_speed(void) {
     return RPM;
 }
 
-void EMC2101_read(void) {
-    uint8_t data;
+// void EMC2101_read(void) {
+//     uint8_t data;
 
-    /* Read the EMC2101 WHO_AM_I register, on power up the register should have the value 0x16 or 0x28 */
-    ESP_ERROR_CHECK(register_read(EMC2101_REG_CONFIG, &data, 1));
-    ESP_LOGI(TAG, "EMC2101 Config register = 0x%02X", data);
+//     /* Read the EMC2101 WHO_AM_I register, on power up the register should have the value 0x16 or 0x28 */
+//     ESP_ERROR_CHECK(register_read(EMC2101_REG_CONFIG, &data, 1));
+//     ESP_LOGI(TAG, "EMC2101 Config register = 0x%02X", data);
+// }
+
+float EMC2101_get_chip_temp(void) {
+    uint8_t temp_msb, temp_lsb;
+    uint16_t reading;
+
+
+    ESP_ERROR_CHECK(register_read(EMC2101_EXTERNAL_TEMP_MSB, &temp_msb, 1));
+    ESP_ERROR_CHECK(register_read(EMC2101_EXTERNAL_TEMP_LSB, &temp_lsb, 1));
+
+    reading = temp_lsb | (temp_msb << 8);
+    reading >>= 5;
+
+    return (float)reading / 8.0;
 }

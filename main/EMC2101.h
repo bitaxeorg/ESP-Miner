@@ -57,8 +57,9 @@ typedef enum {
 } emc2101_rate_t;
 
 void EMC2101_set_fan_speed(float);
-void EMC2101_read(void);
+//void EMC2101_read(void);
 uint16_t EMC2101_get_fan_speed(void);
-void EMC2101_set_config(uint8_t);
+void EMC2101_init(void);
+float EMC2101_get_chip_temp(void);
 
 #endif /* EMC2101_H_ */
