@@ -34,16 +34,27 @@ TX: 55 AA 21 36 38 01 00 00 00 00 20 27 07 17 8A C0 DC 63 F3 CF F8 BF FF 89 BD 9
 How does this big work field break down?
 
 `55 AA` - (most) All of the commands to the BM1397 start with this
+
 `21` - always 21. like bitcoin, always 21 million coins?
+
 `36` - Length
+
 `38` - JobID
+
 `01` - Midstates
+
 `00 00 00 00` - always zero. Is this the starting nonce?
+
 `20 27 07 17` - nbits
+
 `8A C0 DC 63` - ntime → Fri Feb 03 2023 08:06:34 GMT
+
 `F3 CF F8 BF` - last 4 bytes of the merkle root
+
 `FF 89 BD 99 97 74 10 44 FF 84 D0 74 30 85 44 35 E3 DE 76 0B CC 28 54 A2 FA 12 42 98 00 00 00 00` - midstate computed from the first 64 bytes of the header
+
 `00 00 00 00 92 C7 00 00 FB 7A BB 8C 33 75 29 7C D8 F6 7E 14 1B D3 0F 2F D1 A0 82 66 00 00 00 20` - uhoh, what's this?
+
 `7F D3` - checksum
 
 - for the checksum use crc16_false() on all bytes except for `55 AA`
