@@ -1,29 +1,28 @@
 ## BM1397 protocol
 notes from sniffing BM1397 communication and trying to match it up with cgminer
 
-It looks like this setting up the BM1397:
+It looks like this setting up the BM1397: 
+(TX is _to_ the BM1397, RX is _from_ the BM1397)
 ```
-TX: 55 AA 52 05 00 00 0A // also "chippy"??
-
+TX: 55 AA 52 05 00 00 0A //chippy
 RX: AA 55 13 97 18 00 00 00 06 //response from the BM1397
-
 TX: 55 AA 53 05 00 00 03 //chain inactive
 TX: 55 AA 53 05 00 00 03 //chain inactive
 TX: 55 AA 53 05 00 00 03 //chain inactive
-TX: 55 AA 40 05 00 00 1C //"chippy"??
-TX: 55 AA 51 09 00 80 00 00 00 00 1C //init1
-TX: 55 AA 51 09 00 84 00 00 00 00 11 //init2
-TX: 55 AA 51 09 00 20 00 00 00 01 02 //init3
-TX: 55 AA 51 09 00 3C 80 00 80 74 10 //init4
-TX: 55 AA 51 09 00 14 00 00 00 00 1C //set_ticket
-TX: 55 AA 51 09 00 68 C0 70 01 11 00 //init5
-TX: 55 AA 51 09 00 68 C0 70 01 11 00 //init5 (second one)
-TX: 55 AA 51 09 00 28 06 00 00 0F 18 //init6
-TX: 55 AA 51 09 00 18 00 00 7A 31 15 //baudrate
-TX: 55 AA 51 09 00 70 0F 0F 0F 00 19 //prefreq
-TX: 55 AA 51 09 00 70 0F 0F 0F 00 19 //prefreq
-TX: 55 AA 51 09 00 08 40 A0 02 25 16 //freqbuf
-TX: 55 AA 51 09 00 08 40 A0 02 25 16 //freqbuf
+TX: 55 AA 40 05 00 00 1C //chippy
+TX: 55 AA 51 09 00 80 00 00 00 00 1C //init1 - clock_order_control0
+TX: 55 AA 51 09 00 84 00 00 00 00 11 //init2 - clock_order_control1
+TX: 55 AA 51 09 00 20 00 00 00 01 02 //init3 - ordered_clock_enable
+TX: 55 AA 51 09 00 3C 80 00 80 74 10 //init4 - init_4_?
+TX: 55 AA 51 09 00 14 00 00 00 00 1C //set_ticket - ticket_mask
+TX: 55 AA 51 09 00 68 C0 70 01 11 00 //init5 - pll3_parameter
+TX: 55 AA 51 09 00 68 C0 70 01 11 00 //init5 - pll3_parameter
+TX: 55 AA 51 09 00 28 06 00 00 0F 18 //init6 - fast_uart_configuration
+TX: 55 AA 51 09 00 18 00 00 7A 31 15 //baudrate - misc_control
+TX: 55 AA 51 09 00 70 0F 0F 0F 00 19 //prefreq - pll0_divider
+TX: 55 AA 51 09 00 70 0F 0F 0F 00 19 //prefreq - pll0_divider
+TX: 55 AA 51 09 00 08 40 A0 02 25 16 //freqbuf - pll0_parameter
+TX: 55 AA 51 09 00 08 40 A0 02 25 16 //freqbuf - pll0_parameter
 ```
 
 Sending work to the BM1397 looks like this;
