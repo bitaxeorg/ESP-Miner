@@ -28,7 +28,7 @@ TX: 55 AA 51 09 00 08 40 A0 02 25 16 //freqbuf
 
 Sending work to the BM1397 looks like this;
 ```
-TX: 55 AA 21 36 38 01 00 00 00 00 20 27 07 17 8A C0 DC 63 F3 CF F8 BF FF 89 BD 99 97 74 10 44 FF 84 D0 74 30 85 44 35 E3 DE 76 0B CC 28 54 A2 FA 12 42 98 00 00 00 00 00 00 00 00 92 C7 00 00 FB 7A BB 8C 33 75 29 7C D8 F6 7E 14 1B D3 0F 2F D1 A0 82 66 00 00 00 20 7F D3
+55 AA 21 96 04 04 00 00 00 00 A3 89 06 17 2F A8 0A 64 6F 1C C5 E8 99 CE 15 A2 DE DF 61 49 77 90 69 84 1C 8A 0C E0 A0 30 E4 0A CB A6 A5 FB 33 19 30 5D E2 46 EF 18 1D 63 63 EB E7 BA D9 8D 4B CA FE 9C 4F 45 F6 45 FA 71 A0 1E 8C B8 2D 68 DC 6C B8 4E 25 39 8C 50 FA 7E 2E C6 C8 08 61 B9 A5 89 90 71 C4 75 56 E4 78 85 35 22 65 51 EA 68 EB F8 96 B0 CA 40 77 D4 0C AF 1B D4 47 37 85 BB 39 6A 22 C3 9C 23 56 E7 CE B6 57 4C 1F A3 A9 9A D3 C1 A0 17 79 1F BC 38 8C 24
 ```
 
 How does this big work field break down?
@@ -37,25 +37,29 @@ How does this big work field break down?
 
 `21` - always 21. like bitcoin, always 21 million coins?
 
-`36` - Length
+`96` - Length
 
-`38` - JobID
+`04` - JobID
 
-`01` - Midstates
+`04` - Midstates
 
 `00 00 00 00` - always zero. Is this the starting nonce?
 
-`20 27 07 17` - nbits
+`A3 89 06 17` - nbits
 
-`8A C0 DC 63` - ntime → Fri Feb 03 2023 08:06:34 GMT
+`2F A8 0A 64` - ntime → Fri Mar 10 2023 03:46:55 GMT
 
-`F3 CF F8 BF` - last 4 bytes of the merkle root
+`6F 1C C5 E8` - last 4 bytes of the merkle root
 
-`FF 89 BD 99 97 74 10 44 FF 84 D0 74 30 85 44 35 E3 DE 76 0B CC 28 54 A2 FA 12 42 98 00 00 00 00` - midstate computed from the first 64 bytes of the header
+`99 CE 15 A2 DE DF 61 49 77 90 69 84 1C 8A 0C E0 A0 30 E4 0A CB A6 A5 FB 33 19 30 5D E2 46 EF 18` - midstate computed from the first 64 bytes of the header
 
-`00 00 00 00 92 C7 00 00 FB 7A BB 8C 33 75 29 7C D8 F6 7E 14 1B D3 0F 2F D1 A0 82 66 00 00 00 20` - uhoh, what's this?
+`1D 63 63 EB E7 BA D9 8D 4B CA FE 9C 4F 45 F6 45 FA 71 A0 1E 8C B8 2D 68 DC 6C B8 4E 25 39 8C 50` - midstate 2
 
-`7F D3` - checksum
+`FA 7E 2E C6 C8 08 61 B9 A5 89 90 71 C4 75 56 E4 78 85 35 22 65 51 EA 68 EB F8 96 B0 CA 40 77 D4` - midstate 3
+
+`0C AF 1B D4 47 37 85 BB 39 6A 22 C3 9C 23 56 E7 CE B6 57 4C 1F A3 A9 9A D3 C1 A0 17 79 1F BC 38` - midstate 4
+
+`8C 24` - checksum
 
 - for the checksum use crc16_false() on all bytes except for `55 AA`
 
@@ -64,6 +68,6 @@ when the BM1397 finds a nonce that makes a hash below the difficulty (which diff
 ```
 AA 55 00 03 EA 0F 02 20 9C
 ```
-this means the Nonce `0003ea0f` was found for JobID `20`
+this means the Nonce `0003EA0F` was found for JobID `20`
 
 If the BM1397 _doesn't_ find a good nonce in the whole nonce space, it just goes off into lalaland. It's up to the miner to keep track of what the ASIC is doing and send it more work if this happens. If you look at the hashing frequency you should be able to time this.
