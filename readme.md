@@ -1,6 +1,6 @@
 ## ESP-Miner
 
-ESP-Miner is bitcoin miner software designed to run on the ESP32. It mines on ASICs such as the Bitmain BM1397. The [BitaxeMax](https://github.com/skot/bitaxe/tree/max) is a handy board for this!
+ESP-Miner is bitcoin miner software designed to run on the ESP32. It mines on ASICs such as the Bitmain BM1397. The [Bitaxe](https://github.com/skot/bitaxe/) is a handy board for this!
 
 ![esp-miner block diagram](doc/diagram.png)
 
