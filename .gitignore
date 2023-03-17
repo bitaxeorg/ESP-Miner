@@ -3,7 +3,11 @@ sdkconfig
 sdkconfig.old
 
 # Production folder
-build/
+build/*
+!build/config
+build/config/*
+!build/config/kconfig_menus.json
+!build/config/sdkconfig.json
 
 # HTML documentation
 html_doc/
