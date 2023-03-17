@@ -7,9 +7,9 @@
 #define LEDX_R      GPIO_NUM_35
 #define LEDX_G      GPIO_NUM_36
 #define LEDX_B      GPIO_NUM_37
-#define LEDZ_R      GPIO_NUM_38
-#define LEDZ_G      GPIO_NUM_39
-#define LEDZ_B      GPIO_NUM_40
+#define LEDZ_R      GPIO_NUM_5
+#define LEDZ_G      GPIO_NUM_6
+#define LEDZ_B      GPIO_NUM_7
 
 void initLEDs(void) {
     gpio_set_direction(LEDX_R, GPIO_MODE_OUTPUT);
