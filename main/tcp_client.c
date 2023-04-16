@@ -35,15 +35,15 @@
 
 #define PORT CONFIG_EXAMPLE_PORT
 
-static const char *TAG = "example";
-static const char *payload = "Message from ESP32 ";
+#define BUFFER_SIZE 8192
+
+static const char *TAG = "stratum client";
 
 TaskHandle_t sysTaskHandle = NULL;
 TaskHandle_t serialTaskHandle = NULL;
 
 static void tcp_client_task(void *pvParameters)
 {
-    char rx_buffer[128];
     char host_ip[] = HOST_IP_ADDR;
     int addr_family = 0;
     int ip_protocol = 0;
@@ -81,28 +81,29 @@ static void tcp_client_task(void *pvParameters)
             break;
         }
         ESP_LOGI(TAG, "Successfully connected");
+        // Subscribe
+        char subscribe_msg[] = "{\"id\": 1, \"method\": \"mining.subscribe\", \"params\": []}\n";
+        write(sock, subscribe_msg, strlen(subscribe_msg));
 
+        // Authorize
+        char authorize_msg[] = "{\"id\": 2, \"method\": \"mining.authorize\", \"params\": [\"johnny9.esp\", \"x\"]}\n";
+        write(sock, authorize_msg, strlen(authorize_msg));
+
+
+        char* json_buffer = malloc(BUFFER_SIZE);
+
+        int received = 0;
         while (1) {
-            int err = send(sock, payload, strlen(payload), 0);
-            if (err < 0) {
-                ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
-                break;
-            }
-
-            int len = recv(sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
+            int len = recv(sock, json_buffer, BUFFER_SIZE - 1, 0);
             // Error occurred during receiving
             if (len < 0) {
                 ESP_LOGE(TAG, "recv failed: errno %d", errno);
                 break;
+            } else {
+                json_buffer[len] = '\0';
+                ESP_LOGI(TAG, "%s", json_buffer);
+                received = 0;
             }
-            // Data received
-            else {
-                rx_buffer[len] = 0; // Null-terminate whatever we received and treat like a string
-                ESP_LOGI(TAG, "Received %d bytes from %s:", len, host_ip);
-                ESP_LOGI(TAG, "%s", rx_buffer);
-            }
-
-            vTaskDelay(2000 / portTICK_PERIOD_MS);
         }
 
         if (sock != -1) {
