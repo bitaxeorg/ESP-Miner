@@ -36,91 +36,14 @@
 
 #define PORT CONFIG_EXAMPLE_PORT
 
-#define BUFFER_SIZE 1024
-
 static const char *TAG = "stratum client";
 
 TaskHandle_t sysTaskHandle = NULL;
 TaskHandle_t serialTaskHandle = NULL;
 
-static char *json_rpc_buffer = NULL;
-size_t json_rpc_buffer_size = 0;
-
-void initialize_buffer()
-{
-    json_rpc_buffer = malloc(BUFFER_SIZE); // Allocate memory dynamically
-    json_rpc_buffer_size = BUFFER_SIZE;
-    memset(json_rpc_buffer, 0, BUFFER_SIZE);
-    if (json_rpc_buffer == NULL)
-    {
-        printf("Error: Failed to allocate memory for buffer\n");
-        exit(1); // Handle error case
-    }
-}
-
-static void realloc_json_buffer(size_t len)
-{
-    size_t old, new;
-
-    old = strlen(json_rpc_buffer);
-    new = old + len + 1;
-
-    if (new < json_rpc_buffer_size)
-    {
-        return;
-    }
-
-    new = new + (BUFFER_SIZE - (new % BUFFER_SIZE));
-    void *new_sockbuf = realloc(json_rpc_buffer, new);
-
-    if (new_sockbuf == NULL)
-    {
-        fprintf(stderr, "Error: realloc failed in recalloc_sock()\n");
-        exit(EXIT_FAILURE);
-    }
-
-    json_rpc_buffer = new_sockbuf;
-    memset(json_rpc_buffer + old, 0, new - old);
-    json_rpc_buffer_size = new;
-}
-
-char *recv_line(int sockfd)
-{
-    char *line, *tok = NULL;
-    char recv_buffer[BUFFER_SIZE];
-    int nbytes;
-    size_t buflen = 0;
-
-    if (!strstr(json_rpc_buffer, "\n"))
-    {
-        do
-        {
-            memset(recv_buffer, 0, BUFFER_SIZE);
-            nbytes = recv(sockfd, recv_buffer, BUFFER_SIZE - 1, 0);
-            if (nbytes == -1)
-            {
-                perror("recv");
-                exit(EXIT_FAILURE);
-            }
-
-            realloc_json_buffer(nbytes);
-            strncat(json_rpc_buffer, recv_buffer, nbytes);
-        } while (!strstr(json_rpc_buffer, "\n"));
-    }
-    buflen = strlen(json_rpc_buffer);
-    tok = strtok(json_rpc_buffer, "\n");
-    line = strdup(tok);
-    int len = strlen(line);
-    if (buflen > len + 1)
-        memmove(json_rpc_buffer, json_rpc_buffer + len + 1, buflen - len + 1);
-    else
-        strcpy(json_rpc_buffer, "");
-    return line;
-}
-
 static void tcp_client_task(void *pvParameters)
 {
-    initialize_buffer();
+    initialize_stratum_buffer();
     char host_ip[] = HOST_IP_ADDR;
     int addr_family = 0;
     int ip_protocol = 0;
@@ -161,9 +84,7 @@ static void tcp_client_task(void *pvParameters)
             break;
         }
         ESP_LOGI(TAG, "Successfully connected");
-        // Subscribe
-        char subscribe_msg[] = "{\"id\": 1, \"method\": \"mining.subscribe\", \"params\": []}\n";
-        write(sock, subscribe_msg, strlen(subscribe_msg));
+
 
         // Authorize
         char authorize_msg[] = "{\"id\": 2, \"method\": \"mining.authorize\", \"params\": [\"johnny9.esp\", \"x\"]}\n";
@@ -171,10 +92,10 @@ static void tcp_client_task(void *pvParameters)
 
         while (1)
         {
-            char *line = recv_line(sock);
+            char *line = receive_jsonrpc_line(sock);
             // Error occurred during receiving
             ESP_LOGI(TAG, "Json: %s", line);
-            stratum_message parsed_message = parse_stratum_message(line);
+            stratum_message parsed_message = parse_stratum_notify_message(line);
             if (parsed_message.method == STRATUM_UNKNOWN) {
                 ESP_LOGI(TAG, "UNKNOWN MESSAGE");
             } else {

@@ -15,6 +15,14 @@ typedef struct {
     char * method_str;
 } stratum_message;
 
-stratum_message parse_stratum_message(const char * stratum_json);
+void initialize_stratum_buffer();
+
+char * receive_jsonrpc_line(int sockfd);
+
+int subscribe_to_stratum(int socket);
+
+stratum_message parse_stratum_notify_message(const char * stratum_json);
+
+int auth_to_stratum(int socket, const char * username, const char * passwork);
 
 #endif // STRATUM_API_H
