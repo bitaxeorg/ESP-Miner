@@ -34,7 +34,7 @@ How does this big work field break down?
 
 `55 AA` - (most) All of the commands to the BM1397 start with this
 
-`21` - always 21. like bitcoin, always 21 million coins?
+`21` - Header fields -> (TYPE_JOB | GROUP_SINGLE | CMD_WRITE)
 
 `96` - Length
 
