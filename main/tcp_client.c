@@ -22,6 +22,7 @@
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 #include "stratum_api.h"
+#include "work_queue.h"
 
 #include "system.h"
 #include "serial.h"
@@ -40,6 +41,32 @@ static const char *TAG = "stratum client";
 
 TaskHandle_t sysTaskHandle = NULL;
 TaskHandle_t serialTaskHandle = NULL;
+
+static work_queue g_queue;
+
+static void stratum_worker_task(void *pvParameters)
+{
+    int termination_flag = 0;
+    while(true) {
+        work next_work = queue_dequeue(&g_queue, &termination_flag);
+        ESP_LOGI(TAG, "New Work Dequeued");
+        // TODO: dequeue work from work_queue
+
+        // TODO: Construct the coinbase transaction and compute the merkle root
+        // TODO: Prepare the block header and start mining
+
+        // TODO: Increment the nonce
+
+        // TODO: Update the block header with the new nonce
+        // TODO: Hash the block header using SHA256 twice (double SHA256)
+        // TODO: Check if the hash meets the target specified by nbits
+
+        // TODO: If hash meets target, submit shares
+        // snprintf(submit_msg, BUFFER_SIZE,
+        //          "{\"id\": 4, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%s\", \"%08x\"]}\n",
+        //          user, job_id, ntime, extranonce2, nonce);
+    }
+}
 
 static void tcp_client_task(void *pvParameters)
 {
@@ -83,12 +110,10 @@ static void tcp_client_task(void *pvParameters)
             ESP_LOGE(TAG, "Socket unable to connect: errno %d", errno);
             break;
         }
-        ESP_LOGI(TAG, "Successfully connected");
 
+        auth_to_stratum(sock, "johnny9.esp");
 
-        // Authorize
-        char authorize_msg[] = "{\"id\": 2, \"method\": \"mining.authorize\", \"params\": [\"johnny9.esp\", \"x\"]}\n";
-        write(sock, authorize_msg, strlen(authorize_msg));
+        subscribe_to_stratum(sock);
 
         while (1)
         {
@@ -100,6 +125,9 @@ static void tcp_client_task(void *pvParameters)
                 ESP_LOGI(TAG, "UNKNOWN MESSAGE");
             } else {
                 ESP_LOGI(TAG, "method: %s", parsed_message.method_str);
+                if (parsed_message.method == MINING_NOTIFY) {
+                    queue_enqueue(&g_queue, parsed_message.notify_work);
+                }
             }
             free(line);
         }
@@ -129,5 +157,9 @@ void app_main(void)
 
     xTaskCreate(SysTask, "System_Task", 4096, NULL, 10, &sysTaskHandle);
     xTaskCreate(SerialTask, "serial_test", 4096, NULL, 10, &serialTaskHandle);
-    xTaskCreate(tcp_client_task, "tcp_client", 4096, NULL, 5, NULL);
+
+    queue_init(&g_queue);
+
+    xTaskCreate(tcp_client_task, "tcp_client", 8192, NULL, 5, NULL);
+    xTaskCreate(stratum_worker_task, "miner", 8192, NULL, 5, NULL);
 }

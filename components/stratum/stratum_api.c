@@ -2,9 +2,12 @@
 #include "cJSON.h"
 #include <string.h>
 #include <stdio.h>
+#include "esp_log.h"
 #include "lwip/sockets.h"
 
+
 #define BUFFER_SIZE 1024
+static const char *TAG = "stratum client";
 
 static char *json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
@@ -78,6 +81,7 @@ char * receive_jsonrpc_line(int sockfd)
 
             realloc_json_buffer(nbytes);
             strncat(json_rpc_buffer, recv_buffer, nbytes);
+            ESP_LOGI(TAG, "Current buffer %s", json_rpc_buffer);
         } while (!strstr(json_rpc_buffer, "\n"));
     }
     buflen = strlen(json_rpc_buffer);
@@ -89,6 +93,62 @@ char * receive_jsonrpc_line(int sockfd)
     else
         strcpy(json_rpc_buffer, "");
     return line;
+}
+
+static uint8_t hex2val(char c)
+{
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    } else if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    } else if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    } else {
+        return 0;
+    }
+}
+
+static size_t hex2bin(const char *hex, uint8_t *bin, size_t bin_len)
+{
+    size_t len = 0;
+
+    while (*hex && len < bin_len) {
+        bin[len] = hex2val(*hex++) << 4;
+
+        if (!*hex) {
+            len++;
+            break;
+        }
+
+        bin[len++] |= hex2val(*hex++);
+    }
+
+    return len;
+}
+
+work parse_notify_work(cJSON * params) {
+    work new_work;
+    new_work.job_id = (uint32_t) strtoul(cJSON_GetArrayItem(params, 0)->valuestring, NULL, 16);
+    hex2bin(cJSON_GetArrayItem(params, 1)->valuestring, new_work.prev_block_hash, PREV_BLOCK_HASH_SIZE * 2);
+
+    char *coinb1 = cJSON_GetArrayItem(params, 2)->valuestring;
+    char *coinb2 = cJSON_GetArrayItem(params, 3)->valuestring;
+    hex2bin(coinb1, new_work.coinbase_1, strlen(coinb1) / 2);
+    new_work.coinbase_1_len = strlen(coinb1) / 2;
+    hex2bin(coinb2, new_work.coinbase_2, strlen(coinb2) / 2);
+    new_work.coinbase_2_len = strlen(coinb2) / 2;
+
+    cJSON *merkle_branch = cJSON_GetArrayItem(params, 4);
+    new_work.n_merkle_branches = cJSON_GetArraySize(merkle_branch);
+    if (new_work.n_merkle_branches > MAX_MERKLE_BRANCHES) {
+        printf("Too many Merkle branches.\n");
+        abort();
+    }
+    for (size_t i = 0; i < new_work.n_merkle_branches; i++) {
+        hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work.merkle_branches[i], PREV_BLOCK_HASH_SIZE * 2);
+    }
+
+    return new_work;
 }
 
 stratum_message parse_stratum_notify_message(const char * stratum_json)
@@ -108,6 +168,7 @@ stratum_message parse_stratum_notify_message(const char * stratum_json)
         output.method_str = strdup(method->valuestring);
         if (strcmp("mining.notify", method->valuestring) == 0) {
             output.method = MINING_NOTIFY;
+            output.notify_work = parse_notify_work(cJSON_GetObjectItem(json, "params"));
         } else if (strcmp("mining.set_difficulty", method->valuestring) == 0) {
             output.method = MINING_SET_DIFFICULTY;
         } else {
@@ -123,10 +184,34 @@ int subscribe_to_stratum(int socket)
 {
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];
-    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": []}", send_uid++);
+    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": []}\n", send_uid++);
+    ESP_LOGI(TAG, "Subscribe: %s", subscribe_msg);
     write(socket, subscribe_msg, strlen(subscribe_msg));
     char * line;
     line = receive_jsonrpc_line(socket);
+
+    ESP_LOGI(TAG, "Received result %s", line);
+
+    free(line);
+
+    return 1;
+}
+
+int auth_to_stratum(int socket, const char * username)
+{
+    char authorize_msg[BUFFER_SIZE];
+    sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"x\"]}\n",
+            send_uid++, username);
+    ESP_LOGI(TAG, "Authorize: %s", authorize_msg);
+   
+    write(socket, authorize_msg, strlen(authorize_msg));
+    char * line;
+    line = receive_jsonrpc_line(socket);
+
+    ESP_LOGI(TAG, "Received result %s", line);
+    
+    // TODO: Parse authorize results
+
     free(line);
 
     return 1;

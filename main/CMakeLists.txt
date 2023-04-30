@@ -20,6 +20,5 @@ idf_component_register(SRCS
 "crc.c"
 "pretty.c"
 "tcp_client.c"
-"stratum_api.c"
 "work_queue.c"
 INCLUDE_DIRS ".")
