@@ -180,7 +180,42 @@ stratum_message parse_stratum_notify_message(const char * stratum_json)
     return output;
 }
 
-int subscribe_to_stratum(int socket)
+int parse_stratum_subscribe_result_message(const char * result_json_str,
+                                           char ** extranonce,
+                                           int * extranonce2_len)
+{
+    cJSON * root = cJSON_Parse(result_json_str);
+    if (root == NULL) {
+       ESP_LOGE(TAG, "Unable to parse %s", result_json_str);
+       return -1;
+    }
+    cJSON * result = cJSON_GetObjectItem(root, "result");
+    if (result == NULL) {
+       ESP_LOGE(TAG, "Unable to parse subscribe result %s", result_json_str);
+       return -1;
+    }
+
+    cJSON * extranonce2_len_json = cJSON_GetArrayItem(result, 2);
+    if (extranonce2_len_json == NULL) {
+       ESP_LOGE(TAG, "Unable to parse extranonce2_len: %s", result->valuestring);
+       return -1;
+    }
+    *extranonce2_len = extranonce2_len_json->valueint;
+
+    cJSON * extranonce_json = cJSON_GetArrayItem(result, 1);
+    if (extranonce_json == NULL) {
+       ESP_LOGE(TAG, "Unable parse extranonce: %s", result->valuestring);
+       return -1;
+    }
+    *extranonce = malloc(strlen(extranonce_json->valuestring) + 1);
+    strcpy(*extranonce, extranonce_json->valuestring);
+
+    cJSON_Delete(root);
+
+    return 0;
+}
+
+int subscribe_to_stratum(int socket, char ** extranonce, int * extranonce2_len)
 {
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];
@@ -191,6 +226,8 @@ int subscribe_to_stratum(int socket)
     line = receive_jsonrpc_line(socket);
 
     ESP_LOGI(TAG, "Received result %s", line);
+
+    parse_stratum_subscribe_result_message(line, extranonce, extranonce2_len);
 
     free(line);
 

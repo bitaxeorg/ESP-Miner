@@ -45,9 +45,13 @@ void initialize_stratum_buffer();
 
 char * receive_jsonrpc_line(int sockfd);
 
-int subscribe_to_stratum(int socket);
+int subscribe_to_stratum(int socket, char ** extranonce, int * extranonce2_len);
 
 stratum_message parse_stratum_notify_message(const char * stratum_json);
+
+int parse_stratum_subscribe_result_message(const char * result_json_str,
+                                           char ** extranonce,
+                                           int * extranonce2_len);
 
 int auth_to_stratum(int socket, const char * username);
 

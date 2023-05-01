@@ -13,3 +13,19 @@ TEST_CASE("Check can parse json", "[mining.notify]")
     stratum_message message = parse_stratum_notify_message(json_string);
     TEST_ASSERT_EQUAL(MINING_NOTIFY, message.method);
 }
+
+TEST_CASE("Test mining.subcribe result parsing", "[mining.subscribe]")
+{
+    const char * json_string = "{\"result\":["
+        "[[\"mining.set_difficulty\",\"731ec5e0649606ff\"],"
+        "[\"mining.notify\",\"731ec5e0649606ff\"]],"
+        "\"e9695791\",4],"
+        "\"id\":1,\"error\":null}";
+
+    char * extranonce = NULL;
+    int extranonce2_len = 0;
+    int result = parse_stratum_subscribe_result_message(json_string, &extranonce, &extranonce2_len);
+    TEST_ASSERT_EQUAL(result, 0);
+    TEST_ASSERT_EQUAL_STRING(extranonce, "e9695791");
+    TEST_ASSERT_EQUAL_INT(extranonce2_len, 4);
+}
