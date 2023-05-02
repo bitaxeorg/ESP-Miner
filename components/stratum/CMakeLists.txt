@@ -1,3 +1,3 @@
-idf_component_register(SRCS "stratum_api.c"
+idf_component_register(SRCS "mining.c" "stratum_api.c"
                     INCLUDE_DIRS "include"
                     REQUIRES json)
