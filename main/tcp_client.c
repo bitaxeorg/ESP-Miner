@@ -113,7 +113,10 @@ static void tcp_client_task(void *pvParameters)
 
         auth_to_stratum(sock, "johnny9.esp");
 
-        subscribe_to_stratum(sock);
+        char * extranonce_str;
+        int extranonce_2_len;
+
+        subscribe_to_stratum(sock, &extranonce_str, &extranonce_2_len);
 
         while (1)
         {
