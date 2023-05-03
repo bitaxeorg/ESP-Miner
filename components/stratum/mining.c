@@ -1,4 +1,5 @@
 #include <string.h>
+#include "mining.h"
 
 char * construct_coinbase_tx(const char * coinbase_1, const char * coinbase_2,
                              const char * extranonce, int extranonce_2_len)
@@ -17,4 +18,9 @@ char * construct_coinbase_tx(const char * coinbase_1, const char * coinbase_2,
     coinbase_tx[coinbase_tx_len - 1] = '\0';
 
     return coinbase_tx;
+}
+
+char * calculate_merkle_hash(const char * coinbase_tx, const uint8_t ** merkle_branches)
+{
+    return NULL;
 }

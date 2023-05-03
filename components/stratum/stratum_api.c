@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "esp_log.h"
 #include "lwip/sockets.h"
+#include "utils.h"
 
 
 #define BUFFER_SIZE 1024
@@ -93,37 +94,6 @@ char * receive_jsonrpc_line(int sockfd)
     else
         strcpy(json_rpc_buffer, "");
     return line;
-}
-
-static uint8_t hex2val(char c)
-{
-    if (c >= '0' && c <= '9') {
-        return c - '0';
-    } else if (c >= 'a' && c <= 'f') {
-        return c - 'a' + 10;
-    } else if (c >= 'A' && c <= 'F') {
-        return c - 'A' + 10;
-    } else {
-        return 0;
-    }
-}
-
-static size_t hex2bin(const char *hex, uint8_t *bin, size_t bin_len)
-{
-    size_t len = 0;
-
-    while (*hex && len < bin_len) {
-        bin[len] = hex2val(*hex++) << 4;
-
-        if (!*hex) {
-            len++;
-            break;
-        }
-
-        bin[len++] |= hex2val(*hex++);
-    }
-
-    return len;
 }
 
 work parse_notify_work(cJSON * params) {
