@@ -19,6 +19,6 @@ idf_component_register(SRCS
 "bm1397.c"
 "crc.c"
 "pretty.c"
-"tcp_client.c"
+"miner.c"
 "work_queue.c"
 INCLUDE_DIRS ".")
