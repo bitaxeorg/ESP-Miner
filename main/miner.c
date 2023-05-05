@@ -1,11 +1,3 @@
-/* BSD Socket API Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include <string.h>
 #include <sys/param.h>
 #include "freertos/FreeRTOS.h"
@@ -36,6 +28,9 @@
 #endif
 
 #define PORT CONFIG_EXAMPLE_PORT
+
+#define STRATUM_USERNAME "johnny9.esp"
+
 
 static const char *TAG = "stratum client";
 
@@ -111,7 +106,7 @@ static void admin_task(void *pvParameters)
             break;
         }
 
-        auth_to_stratum(sock, "johnny9.esp");
+        auth_to_stratum(sock, STRATUM_USERNAME);
 
         char * extranonce_str;
         int extranonce_2_len;
