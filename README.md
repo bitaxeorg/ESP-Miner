@@ -31,7 +31,7 @@ Set following parameters under Example Connection Configuration Options:
 
 For more information about the example_connect() method used here, check out https://github.com/espressif/esp-idf/blob/master/examples/protocols/README.md.
 
-Username is currently hardcoded in miner.c. Modify the defines to change these.
+Username is currently hardcoded in miner.c. Modify the define to change.
 
 ```
 #define STRATUM_USERNAME "johnny9.esp"
