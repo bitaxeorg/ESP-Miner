@@ -8,10 +8,11 @@ char * construct_coinbase_tx(const char * coinbase_1, const char * coinbase_2,
     int coinbase_tx_len = strlen(coinbase_1) + strlen(coinbase_2)
         + strlen(extranonce) + extranonce_2_len * 2 + 1;
 
-    char extranonce_2[extranonce_2_len * 2];
+    char extranonce_2[extranonce_2_len * 2 + 1];
     memset(extranonce_2, '9', extranonce_2_len * 2);
+    extranonce_2[extranonce_2_len * 2] = '\0';
 
-    char * coinbase_tx = malloc(coinbase_tx_len * sizeof(char));
+    char * coinbase_tx = malloc(coinbase_tx_len);
     strcpy(coinbase_tx, coinbase_1);
     strcat(coinbase_tx, extranonce);
     strcat(coinbase_tx, extranonce_2);
