@@ -4,12 +4,7 @@
 #include <pthread.h>
 #include "stratum_api.h"
 
-
 #define QUEUE_SIZE 10
-
-#define MAX_MERKLE_BRANCHES 32
-#define PREV_BLOCK_HASH_SIZE 32
-#define COINBASE_SIZE 100
 
 typedef struct {
     work buffer[QUEUE_SIZE];

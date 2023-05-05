@@ -21,7 +21,7 @@ char * construct_coinbase_tx(const char * coinbase_1, const char * coinbase_2,
     return coinbase_tx;
 }
 
-char * calculate_merkle_root_hash(const char * coinbase_tx, const uint8_t ** merkle_branches, const int num_merkle_branches)
+char * calculate_merkle_root_hash(const char * coinbase_tx, const uint8_t merkle_branches[][32], const int num_merkle_branches)
 {
     size_t coinbase_tx_bin_len = strlen(coinbase_tx) / 2;
     uint8_t * coinbase_tx_bin = malloc(coinbase_tx_bin_len);
@@ -33,13 +33,13 @@ char * calculate_merkle_root_hash(const char * coinbase_tx, const uint8_t ** mer
     free(new_root);
     for (int i = 0; i < num_merkle_branches; i++)
     {
-        memcpy(both_merkles + 32, merkle_branches + 32*i, 32);
+        memcpy(both_merkles + 32, merkle_branches[i], 32);
         uint8_t * new_root = double_sha256_bin(both_merkles, 64);
         memcpy(both_merkles, new_root, 32);
         free(new_root);
     }
 
-    char * merkle_root_hash = malloc(33);
-    bin2hex(both_merkles, 32, merkle_root_hash, 33);
+    char * merkle_root_hash = malloc(65);
+    bin2hex(both_merkles, 32, merkle_root_hash, 65);
     return merkle_root_hash;
 }
