@@ -10,20 +10,18 @@
 #define COINBASE2_SIZE 128
 
 typedef struct {
-    uint32_t job_id;
-    uint8_t prev_block_hash[HASH_SIZE];
-    uint8_t coinbase_1[COINBASE_SIZE];
-    size_t coinbase_1_len;
-    uint8_t coinbase_2[COINBASE2_SIZE];
-    size_t coinbase_2_len;
-    uint8_t merkle_branches[MAX_MERKLE_BRANCHES][HASH_SIZE];
+    char * job_id;
+    char * prev_block_hash;
+    char * coinbase_1;
+    char * coinbase_2;
+    uint8_t * merkle_branches;
     size_t n_merkle_branches;
     uint32_t version;
     uint32_t curtime;
     uint32_t bits;
     uint32_t target;
     uint32_t nonce;
-} work;
+} mining_notify;
 
 typedef enum {
     STRATUM_UNKNOWN,
@@ -31,23 +29,17 @@ typedef enum {
     MINING_SET_DIFFICULTY
 } stratum_method;
 
-typedef struct {
-    int id;
-    stratum_method method;
-    char * method_str;
-    union {
-        work notify_work;
-        uint32_t notify_difficulty;
-    };
-} stratum_message;
-
 void initialize_stratum_buffer();
 
 char * receive_jsonrpc_line(int sockfd);
 
 int subscribe_to_stratum(int socket, char ** extranonce, int * extranonce2_len);
 
-stratum_message parse_stratum_notify_message(const char * stratum_json);
+stratum_method parse_stratum_method(const char * stratum_json);
+
+mining_notify parse_mining_notify_message(const char * stratum_json);
+
+void free_mining_notify(mining_notify params);
 
 int parse_stratum_subscribe_result_message(const char * result_json_str,
                                            char ** extranonce,

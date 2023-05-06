@@ -14,6 +14,7 @@
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 #include "stratum_api.h"
+#include "mining.h"
 #include "work_queue.h"
 
 #include "system.h"
@@ -39,15 +40,39 @@ TaskHandle_t serialTaskHandle = NULL;
 
 static work_queue g_queue;
 
+static char * extranonce_str = NULL;
+static int extranonce_2_len = 0;
+
 static void mining_task(void *pvParameters)
 {
     int termination_flag = 0;
     while(true) {
-        work next_work = queue_dequeue(&g_queue, &termination_flag);
+        uint32_t free_heap_size = esp_get_free_heap_size();
+        ESP_LOGI(TAG, "miner heap free size: %u bytes", free_heap_size);
+        char * next_notify_json_str = queue_dequeue(&g_queue, &termination_flag);
         ESP_LOGI(TAG, "New Work Dequeued");
-        // TODO: dequeue work from work_queue
+        ESP_LOGI(TAG, "Notify json: %s", next_notify_json_str);
 
-        // TODO: Construct the coinbase transaction and compute the merkle root
+        mining_notify params = parse_mining_notify_message(next_notify_json_str);
+
+        char * coinbase_tx = construct_coinbase_tx(params.coinbase_1, params.coinbase_2,
+                                                   extranonce_str, extranonce_2_len);
+        ESP_LOGI(TAG, "Coinbase tx: %s", coinbase_tx);
+
+        char * merkle_root = calculate_merkle_root_hash(coinbase_tx,
+                                                        (uint8_t(*)[32]) params.merkle_branches,
+                                                        params.n_merkle_branches);
+        ESP_LOGI(TAG, "Merkle root: %s", merkle_root);
+
+        free_mining_notify(params);
+        free(coinbase_tx);
+        free(merkle_root);
+        vPortFree(next_notify_json_str);
+
+
+        free_heap_size = esp_get_free_heap_size();
+        ESP_LOGI(TAG, "miner heap free size: %u bytes", free_heap_size);
+
         // TODO: Prepare the block header and start mining
 
         // TODO: Increment the nonce
@@ -108,26 +133,24 @@ static void admin_task(void *pvParameters)
 
         auth_to_stratum(sock, STRATUM_USERNAME);
 
-        char * extranonce_str;
-        int extranonce_2_len;
-
         subscribe_to_stratum(sock, &extranonce_str, &extranonce_2_len);
+        ESP_LOGI(TAG, "Extranonce: %s", extranonce_str);
+        ESP_LOGI(TAG, "Extranonce 2 length: %d", extranonce_2_len);
 
         while (1)
         {
-            char *line = receive_jsonrpc_line(sock);
-            // Error occurred during receiving
-            ESP_LOGI(TAG, "Json: %s", line);
-            stratum_message parsed_message = parse_stratum_notify_message(line);
-            if (parsed_message.method == STRATUM_UNKNOWN) {
-                ESP_LOGI(TAG, "UNKNOWN MESSAGE");
+            uint32_t free_heap_size = esp_get_free_heap_size();
+            ESP_LOGI(TAG, "before receive heap free size: %u bytes", free_heap_size);
+            char * line = receive_jsonrpc_line(sock);
+            free_heap_size = esp_get_free_heap_size();
+            ESP_LOGI(TAG, "after receive heap free size: %u bytes", free_heap_size);
+
+            stratum_method method = parse_stratum_method(line);
+            if (method == MINING_NOTIFY) {
+                queue_enqueue(&g_queue, line);
             } else {
-                ESP_LOGI(TAG, "method: %s", parsed_message.method_str);
-                if (parsed_message.method == MINING_NOTIFY) {
-                    queue_enqueue(&g_queue, parsed_message.notify_work);
-                }
+                vPortFree(line);
             }
-            free(line);
         }
 
         if (sock != -1)

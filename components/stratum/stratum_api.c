@@ -17,13 +17,13 @@ static int send_uid = 1;
 
 void initialize_stratum_buffer()
 {
-    json_rpc_buffer = malloc(BUFFER_SIZE); // Allocate memory dynamically
+    json_rpc_buffer = malloc(BUFFER_SIZE);
     json_rpc_buffer_size = BUFFER_SIZE;
     memset(json_rpc_buffer, 0, BUFFER_SIZE);
     if (json_rpc_buffer == NULL)
     {
         printf("Error: Failed to allocate memory for buffer\n");
-        exit(1); // Handle error case
+        exit(1);
     }
 }
 
@@ -56,6 +56,7 @@ static void realloc_json_buffer(size_t len)
     json_rpc_buffer = new_sockbuf;
     memset(json_rpc_buffer + old, 0, new - old);
     json_rpc_buffer_size = new;
+    ESP_LOGI(TAG, "Current json rpc buffer size: %d", json_rpc_buffer_size);
 }
 
 char * receive_jsonrpc_line(int sockfd)
@@ -96,58 +97,59 @@ char * receive_jsonrpc_line(int sockfd)
     return line;
 }
 
-work parse_notify_work(cJSON * params) {
-    work new_work;
-    new_work.job_id = (uint32_t) strtoul(cJSON_GetArrayItem(params, 0)->valuestring, NULL, 16);
-    hex2bin(cJSON_GetArrayItem(params, 1)->valuestring, new_work.prev_block_hash, PREV_BLOCK_HASH_SIZE * 2);
+stratum_method parse_stratum_method(const char * stratum_json)
+{
+    cJSON * json = cJSON_Parse(stratum_json);
+    cJSON * method_json = cJSON_GetObjectItem(json, "method");
+    stratum_method result = STRATUM_UNKNOWN;
+    if (method_json != NULL && cJSON_IsString(method_json)) {
+        if (strcmp("mining.notify", method_json->valuestring) == 0) {
+            result = MINING_NOTIFY;
+        } else if (strcmp("mining.set_difficulty", method_json->valuestring) == 0) {
+            result = MINING_SET_DIFFICULTY;
+        }
+    }
 
-    char *coinb1 = cJSON_GetArrayItem(params, 2)->valuestring;
-    char *coinb2 = cJSON_GetArrayItem(params, 3)->valuestring;
-    hex2bin(coinb1, new_work.coinbase_1, strlen(coinb1) / 2);
-    new_work.coinbase_1_len = strlen(coinb1) / 2;
-    hex2bin(coinb2, new_work.coinbase_2, strlen(coinb2) / 2);
-    new_work.coinbase_2_len = strlen(coinb2) / 2;
+    cJSON_Delete(json);
+    return result;
+}
 
-    cJSON *merkle_branch = cJSON_GetArrayItem(params, 4);
+mining_notify parse_mining_notify_message(const char * stratum_json)
+{
+    cJSON * json = cJSON_Parse(stratum_json);
+    cJSON * method = cJSON_GetObjectItem(json, "method");
+    if (method != NULL && cJSON_IsString(method)) {
+        assert(strcmp("mining.notify", method->valuestring) == 0);
+    }
+
+    mining_notify new_work;
+    cJSON * params = cJSON_GetObjectItem(json, "params");
+    new_work.job_id = strdup(cJSON_GetArrayItem(params, 0)->valuestring);
+    new_work.prev_block_hash = strdup(cJSON_GetArrayItem(params, 1)->valuestring);
+    new_work.coinbase_1 = strdup(cJSON_GetArrayItem(params, 2)->valuestring);
+    new_work.coinbase_2 = strdup(cJSON_GetArrayItem(params, 3)->valuestring);
+
+    cJSON * merkle_branch = cJSON_GetArrayItem(params, 4);
     new_work.n_merkle_branches = cJSON_GetArraySize(merkle_branch);
     if (new_work.n_merkle_branches > MAX_MERKLE_BRANCHES) {
         printf("Too many Merkle branches.\n");
         abort();
     }
+    new_work.merkle_branches = malloc(HASH_SIZE * new_work.n_merkle_branches);
     for (size_t i = 0; i < new_work.n_merkle_branches; i++) {
-        hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work.merkle_branches[i], PREV_BLOCK_HASH_SIZE * 2);
-    }
-
-    return new_work;
-}
-
-stratum_message parse_stratum_notify_message(const char * stratum_json)
-{
-    stratum_message output;
-    output.method = STRATUM_UNKNOWN;
-    cJSON *json = cJSON_Parse(stratum_json);
-
-    cJSON *id = cJSON_GetObjectItem(json, "id");
-    cJSON *method = cJSON_GetObjectItem(json, "method");
-
-    if (id != NULL && cJSON_IsNumber(id)) {
-        output.id = id->valueint;
-    }
-
-    if (method != NULL && cJSON_IsString(method)) {
-        output.method_str = strdup(method->valuestring);
-        if (strcmp("mining.notify", method->valuestring) == 0) {
-            output.method = MINING_NOTIFY;
-            output.notify_work = parse_notify_work(cJSON_GetObjectItem(json, "params"));
-        } else if (strcmp("mining.set_difficulty", method->valuestring) == 0) {
-            output.method = MINING_SET_DIFFICULTY;
-        } else {
-            output.method = STRATUM_UNKNOWN;
-        }
+        hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work.merkle_branches + HASH_SIZE * i, HASH_SIZE * 2);
     }
 
     cJSON_Delete(json);
-    return output;
+    return new_work;
+}
+
+void free_mining_notify(mining_notify params)
+{
+    free(params.prev_block_hash);
+    free(params.coinbase_1);
+    free(params.coinbase_2);
+    free(params.merkle_branches);
 }
 
 int parse_stratum_subscribe_result_message(const char * result_json_str,

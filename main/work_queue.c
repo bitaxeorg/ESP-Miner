@@ -9,7 +9,7 @@ void queue_init(work_queue *queue) {
     pthread_cond_init(&queue->not_full, NULL);
 }
 
-void queue_enqueue(work_queue *queue, work new_work) {
+void queue_enqueue(work_queue *queue, char * new_work) {
     pthread_mutex_lock(&queue->lock);
 
     while (queue->count == QUEUE_SIZE) {
@@ -24,19 +24,18 @@ void queue_enqueue(work_queue *queue, work new_work) {
     pthread_mutex_unlock(&queue->lock);
 }
 
-work queue_dequeue(work_queue *queue, int *termination_flag) {
+char * queue_dequeue(work_queue *queue, int *termination_flag) {
     pthread_mutex_lock(&queue->lock);
 
     while (queue->count == 0) {
         if (*termination_flag) {
             pthread_mutex_unlock(&queue->lock);
-            work empty_work = { 0 };
-            return empty_work;
+            return NULL;
         }
         pthread_cond_wait(&queue->not_empty, &queue->lock);
     }
 
-    work next_work = queue->buffer[queue->head];
+    char * next_work = queue->buffer[queue->head];
     queue->head = (queue->head + 1) % QUEUE_SIZE;
     queue->count--;
 
