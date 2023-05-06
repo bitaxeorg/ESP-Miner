@@ -45,7 +45,7 @@ static void realloc_json_buffer(size_t len)
     }
 
     new = new + (BUFFER_SIZE - (new % BUFFER_SIZE));
-    void *new_sockbuf = realloc(json_rpc_buffer, new);
+    void * new_sockbuf = realloc(json_rpc_buffer, new);
 
     if (new_sockbuf == NULL)
     {
@@ -146,6 +146,7 @@ mining_notify parse_mining_notify_message(const char * stratum_json)
 
 void free_mining_notify(mining_notify params)
 {
+    free(params.job_id);
     free(params.prev_block_hash);
     free(params.coinbase_1);
     free(params.coinbase_2);
