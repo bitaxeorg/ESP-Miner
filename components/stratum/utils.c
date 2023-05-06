@@ -80,6 +80,7 @@ void print_hex(const uint8_t * b, size_t len,
         prefix = "";
     }
 
+    printf( "%s", prefix );
     while( b < end )
     {
         if( ++i > in_line )

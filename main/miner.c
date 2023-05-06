@@ -16,6 +16,7 @@
 #include "stratum_api.h"
 #include "mining.h"
 #include "work_queue.h"
+#include "utils.h"
 
 #include "system.h"
 #include "serial.h"
@@ -64,20 +65,24 @@ static void mining_task(void *pvParameters)
                                                         params.n_merkle_branches);
         ESP_LOGI(TAG, "Merkle root: %s", merkle_root);
 
+        bm_job next_job = construct_bm_job(params.version, params.prev_block_hash, merkle_root,
+                                           params.ntime, params.target);
+
+        ESP_LOGI(TAG, "bm_job: ");
+        print_hex((uint8_t *) &next_job.target, 4, 4, "target: ");
+        print_hex((uint8_t *) &next_job.ntime, 4, 4, "ntime: ");
+        print_hex((uint8_t *) &next_job.merkle_root_end, 4, 4, "merkle root end: ");
+        print_hex(next_job.midstate, 32, 32, "midstate: ");
+
         free_mining_notify(params);
         free(coinbase_tx);
         free(merkle_root);
         free(next_notify_json_str);
 
-        // TODO: Prepare the block header and start mining
+        // TODO: Process BM Job / Loop until nonce range consumed or we need
+        // to grab the latest notify
 
-        // TODO: Increment the nonce
-
-        // TODO: Update the block header with the new nonce
-        // TODO: Hash the block header using SHA256 twice (double SHA256)
-        // TODO: Check if the hash meets the target specified by nbits
-
-        // TODO: If hash meets target, submit shares
+        // TODO: When nonce found, submit shares
         // snprintf(submit_msg, BUFFER_SIZE,
         //          "{\"id\": 4, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%s\", \"%08x\"]}\n",
         //          user, job_id, ntime, extranonce2, nonce);
