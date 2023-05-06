@@ -61,8 +61,7 @@ bm_job construct_bm_job(uint32_t version, const char * prev_block_hash, const ch
     memcpy(midstate_data, &version, 4);
     hex2bin(prev_block_hash, midstate_data + 4, 32);
     memcpy(midstate_data + 36, merkle_root_bin, 28);
-    print_hex(midstate_data, 64, 64, "midstate data");
-    single_sha256_bin(midstate_data, 64, &new_job.midstate);
+    single_sha256_bin(midstate_data, 64, new_job.midstate);
 
     memcpy(&new_job.merkle_root_end, merkle_root_bin + 28, 4);
 
