@@ -46,7 +46,7 @@ char * calculate_merkle_root_hash(const char * coinbase_tx, const uint8_t merkle
     return merkle_root_hash;
 }
 
-bm_job construct_bm_job(const char * version, const char * prev_block_hash, const char * merkle_root,
+bm_job construct_bm_job(uint32_t version, const char * prev_block_hash, const char * merkle_root,
                         uint32_t ntime, uint32_t target)
 {
     bm_job new_job;
@@ -58,7 +58,7 @@ bm_job construct_bm_job(const char * version, const char * prev_block_hash, cons
     hex2bin(merkle_root, merkle_root_bin, 32);
 
     uint8_t midstate_data[64];
-    hex2bin(version, midstate_data, 4);
+    memcpy(midstate_data, &version, 4);
     hex2bin(prev_block_hash, midstate_data + 4, 32);
     memcpy(midstate_data + 36, merkle_root_bin, 28);
     print_hex(midstate_data, 64, 64, "midstate data");
