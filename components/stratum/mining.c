@@ -30,6 +30,7 @@ char * calculate_merkle_root_hash(const char * coinbase_tx, const uint8_t merkle
 
     uint8_t both_merkles[64];
     uint8_t * new_root = double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len);
+    free(coinbase_tx_bin);
     memcpy(both_merkles, new_root, 32);
     free(new_root);
     for (int i = 0; i < num_merkle_branches; i++)
