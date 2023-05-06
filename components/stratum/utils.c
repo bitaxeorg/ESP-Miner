@@ -69,11 +69,11 @@ size_t hex2bin(const char *hex, uint8_t *bin, size_t bin_len)
     return len;
 }
 
-static void print_hex( const uint8_t *b, size_t len,
-                const size_t in_line, const char *prefix )
+void print_hex(const uint8_t * b, size_t len,
+               const size_t in_line, const char * prefix)
 {
     size_t i = 0;
-    const uint8_t *end = b + len;
+    const uint8_t * end = b + len;
 
     if( prefix == NULL )
     {
@@ -120,4 +120,9 @@ uint8_t * double_sha256_bin(const uint8_t * data, const size_t data_len)
     mbedtls_sha256(first_hash_output, 32, second_hash_output, 0);
 
     return second_hash_output;
+}
+
+void single_sha256_bin( const uint8_t * data, const size_t data_len, uint8_t * dest)
+{
+    mbedtls_sha256(data, data_len, dest, 0);
 }

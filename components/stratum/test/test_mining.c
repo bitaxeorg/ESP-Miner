@@ -36,3 +36,19 @@ TEST_CASE("Validate merkle root calculation", "[mining]")
     TEST_ASSERT_EQUAL_STRING("adbcbc21e20388422198a55957aedfa0e61be0b8f2b87d7c08510bb9f099a893", root_hash);
     free(root_hash);
 }
+
+TEST_CASE("Validate bm job construction", "[mining]")
+{
+    const char * merkle_root = "adbcbc21e20388422198a55957aedfa0e61be0b8f2b87d7c08510bb9f099a893";
+    const char * prev_block_hash = "ef4b9a48c7986466de4adc002f7337a6e121bc43000376ea0000000000000000";
+    char * version = "40000002";
+    uint32_t target = 0x39c70517;
+    uint32_t ntime = 0x22554964;
+    printf("%lu", ntime);
+    bm_job job = construct_bm_job(version, prev_block_hash, merkle_root, ntime, target);
+    TEST_ASSERT_EQUAL_UINT32(job.merkle_root_end, 0x93a899f0);
+
+    uint8_t expected_midstate_bin[32];
+    hex2bin("64f147e5e5fbc24e9b3bb8208b300b685fde34fcaea7fd2496981a16916f343f", expected_midstate_bin, 32);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_midstate_bin, job.midstate, 32);
+}

@@ -47,11 +47,11 @@ static void mining_task(void *pvParameters)
 {
     int termination_flag = 0;
     while(true) {
-        uint32_t free_heap_size = esp_get_free_heap_size();
-        ESP_LOGI(TAG, "miner heap free size: %u bytes", free_heap_size);
         char * next_notify_json_str = queue_dequeue(&g_queue, &termination_flag);
         ESP_LOGI(TAG, "New Work Dequeued");
         ESP_LOGI(TAG, "Notify json: %s", next_notify_json_str);
+        uint32_t free_heap_size = esp_get_free_heap_size();
+        ESP_LOGI(TAG, "miner heap free size: %lu bytes", free_heap_size);
 
         mining_notify params = parse_mining_notify_message(next_notify_json_str);
 
@@ -67,11 +67,7 @@ static void mining_task(void *pvParameters)
         free_mining_notify(params);
         free(coinbase_tx);
         free(merkle_root);
-        vPortFree(next_notify_json_str);
-
-
-        free_heap_size = esp_get_free_heap_size();
-        ESP_LOGI(TAG, "miner heap free size: %u bytes", free_heap_size);
+        free(next_notify_json_str);
 
         // TODO: Prepare the block header and start mining
 
@@ -139,17 +135,15 @@ static void admin_task(void *pvParameters)
 
         while (1)
         {
-            uint32_t free_heap_size = esp_get_free_heap_size();
-            ESP_LOGI(TAG, "before receive heap free size: %u bytes", free_heap_size);
             char * line = receive_jsonrpc_line(sock);
-            free_heap_size = esp_get_free_heap_size();
-            ESP_LOGI(TAG, "after receive heap free size: %u bytes", free_heap_size);
+            ESP_LOGI(TAG, "Received line: %s", line);
+            ESP_LOGI(TAG, "Received line length: %d", strlen(line));
 
             stratum_method method = parse_stratum_method(line);
             if (method == MINING_NOTIFY) {
                 queue_enqueue(&g_queue, line);
             } else {
-                vPortFree(line);
+                free(line);
             }
         }
 
