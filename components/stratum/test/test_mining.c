@@ -13,6 +13,7 @@ TEST_CASE("Check coinbase tx construction", "[mining]")
     free(coinbase_tx);
 }
 
+// Values calculated from esp-miner/components/stratum/test/verifiers/merklecalc.py
 TEST_CASE("Validate merkle root calculation", "[mining]")
 {
     const char * coinbase_tx = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff20020862062f503253482f04b8864e5008e969579199999999072f736c7573682f000000000100f2052a010000001976a914d23fcdf86f7e756a64a7a9688ef9903327048ed988ac00000000";
