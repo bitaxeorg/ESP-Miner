@@ -37,7 +37,14 @@ Username is currently hardcoded in miner.c. Modify the define to change.
 #define STRATUM_USERNAME "johnny9.esp"
 ```
 
+## Run Unit tests
 
+The unit tests for the project use the unity test framework and currently require actual esp32 hardware to run.
+
+```
+cd ./test/
+idf.py -p PORT flash monitor
+```
 
 ## Build and Flash
 
