@@ -140,6 +140,10 @@ mining_notify parse_mining_notify_message(const char * stratum_json)
         hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work.merkle_branches + HASH_SIZE * i, HASH_SIZE * 2);
     }
 
+    new_work.version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
+    new_work.target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
+    new_work.ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
+
     cJSON_Delete(json);
     return new_work;
 }

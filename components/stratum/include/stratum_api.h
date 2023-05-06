@@ -17,10 +17,8 @@ typedef struct {
     uint8_t * merkle_branches;
     size_t n_merkle_branches;
     uint32_t version;
-    uint32_t curtime;
-    uint32_t bits;
     uint32_t target;
-    uint32_t nonce;
+    uint32_t ntime;
 } mining_notify;
 
 typedef enum {
