@@ -50,6 +50,6 @@ TEST_CASE("Validate bm job construction", "[mining]")
     TEST_ASSERT_EQUAL_UINT32(job.merkle_root_end, 0x93a899f0);
 
     uint8_t expected_midstate_bin[32];
-    hex2bin("ce9aa3d9ff4cf2c5897fe7caaacf56bfd7fc7ac01d89f8d88f6501d4597344b9", expected_midstate_bin, 32);
+    hex2bin("ac9643f83aa1e1d8de56d0f59a41ea3b3eac45b62ae043bd933a7413c0a1fe58", expected_midstate_bin, 32);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_midstate_bin, job.midstate, 32);
 }

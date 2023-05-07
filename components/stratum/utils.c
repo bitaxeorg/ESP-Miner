@@ -127,3 +127,21 @@ void single_sha256_bin( const uint8_t * data, const size_t data_len, uint8_t * d
 {
     mbedtls_sha256(data, data_len, dest, 0);
 }
+
+void swap_endian_words(const char * hex_words, uint8_t * output) {
+    size_t hex_length = strlen(hex_words);
+    if (hex_length % 8 != 0) {
+        fprintf(stderr, "Must be 4-byte word aligned\n");
+        exit(EXIT_FAILURE);
+    }
+
+    size_t binary_length = hex_length / 2;
+
+    for (size_t i = 0; i < binary_length; i += 4) {
+        for (int j = 0; j < 4; j++) {
+            unsigned int byte_val;
+            sscanf(hex_words + (i + j) * 2, "%2x", &byte_val);
+            output[i + (3 - j)] = byte_val;
+        }
+    }
+}
