@@ -41,6 +41,8 @@ Username is currently hardcoded in miner.c. Modify the define to change.
 
 The unit tests for the project use the unity test framework and currently require actual esp32 hardware to run.
 
+They are located at https://github.com/johnny9/esp-miner/tree/master/components/stratum/test
+
 ```
 cd ./test/
 idf.py -p PORT flash monitor
