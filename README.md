@@ -44,6 +44,18 @@ Username is currently hardcoded in miner.c. Modify the define to change.
 #define STRATUM_USERNAME "johnny9.esp"
 ```
 
+## Build and Flash
+
+Build the project and flash it to the board, then run monitor tool to view serial output:
+
+```
+idf.py -p PORT flash monitor
+```
+
+(To exit the serial monitor, type ``Ctrl-]``.)
+
+See the Getting Started Guide for full steps to configure and use ESP-IDF to build projects.
+
 ## Run Unit tests
 
 The unit tests for the project use the unity test framework and currently require actual esp32 hardware to run.
@@ -56,14 +68,3 @@ idf.py set-target esp32s3
 idf.py -p PORT flash monitor
 ```
 
-## Build and Flash
-
-Build the project and flash it to the board, then run monitor tool to view serial output:
-
-```
-idf.py -p PORT flash monitor
-```
-
-(To exit the serial monitor, type ``Ctrl-]``.)
-
-See the Getting Started Guide for full steps to configure and use ESP-IDF to build projects.
