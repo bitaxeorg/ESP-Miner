@@ -48,3 +48,19 @@ TEST_CASE("Test mining.subcribe result parsing", "[mining.subscribe]")
     TEST_ASSERT_EQUAL_STRING(extranonce, "e9695791");
     TEST_ASSERT_EQUAL_INT(extranonce2_len, 4);
 }
+
+TEST_CASE("Test mining.notify abandon old work", "[mining.notify]")
+{
+    const char * mining_notify_false = "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"\",\"\",\"\",\"\",[\"\"],\"\",\"\",\"\",false]}";
+    const char * mining_notify_true = "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"\",\"\",\"\",\"\",[\"\"],\"\",\"\",\"\",true]}";
+    const char * mining_notify_invalid = "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"\",\"\",\"\",\"\",[\"\"],\"\",\"\",\"\",3]}";
+    const char * mining_notify_invalid_2 = "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+        "[\"\",\"\",\"\",\"\",[\"\"],\"\",\"\",\"\"]}";
+    TEST_ASSERT_EQUAL_INT(0, should_abandon_work(mining_notify_false));
+    TEST_ASSERT_EQUAL_INT(1, should_abandon_work(mining_notify_true));
+    TEST_ASSERT_EQUAL_INT(0, should_abandon_work(mining_notify_invalid));
+    TEST_ASSERT_EQUAL_INT(0, should_abandon_work(mining_notify_invalid_2));
+}

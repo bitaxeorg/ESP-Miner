@@ -1,6 +1,6 @@
 import hashlib
 
-version = b'\x04\x00\x00\x20'  # little-endian encoding of version 1
+version = b'\x04\x00\x00\x20'  # little-endian encoding of version
 prev_block_hash = bytes.fromhex('ef4b9a48c7986466de4adc002f7337a6e121bc43000376ea0000000000000000')
 merkle_root = bytes.fromhex('adbcbc21e20388422198a55957aedfa0e61be0b8f2b87d7c08510bb9f099a893')
 timestamp = b'\x64\x49\x55\x22'  # little-endian encoding of Unix timestamp 1683385928

@@ -230,3 +230,12 @@ int auth_to_stratum(int socket, const char * username)
 
     return 1;
 }
+
+int should_abandon_work(const char * mining_notify_json_str)
+{
+    cJSON * root = cJSON_Parse(mining_notify_json_str);
+    cJSON * params = cJSON_GetObjectItem(root, "params");
+    int value = cJSON_IsTrue(cJSON_GetArrayItem(params, 8));
+    cJSON_Delete(root);
+    return value;
+}

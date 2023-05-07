@@ -45,4 +45,6 @@ int parse_stratum_subscribe_result_message(const char * result_json_str,
 
 int auth_to_stratum(int socket, const char * username);
 
+int should_abandon_work(const char * mining_notify_json_str);
+
 #endif // STRATUM_API_H
