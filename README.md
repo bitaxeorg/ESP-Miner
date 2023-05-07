@@ -10,6 +10,13 @@ This example can be run on any commonly available ESP32 development board.
 
 ## Configure the project
 
+Set the target
+
+```
+idf.py set-target esp32s3
+```
+
+Use menuconfig to set the stratum server address/port and WiFi SSID/Password
 ```
 idf.py menuconfig
 ```
