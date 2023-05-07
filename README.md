@@ -52,6 +52,7 @@ They are located at https://github.com/johnny9/esp-miner/tree/master/components/
 
 ```
 cd ./test/
+idf.py set-target esp32s3
 idf.py -p PORT flash monitor
 ```
 
