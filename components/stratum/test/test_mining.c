@@ -38,6 +38,23 @@ TEST_CASE("Validate merkle root calculation", "[mining]")
     free(root_hash);
 }
 
+TEST_CASE("Validate another merkle root calculation", "[mining]")
+{
+    const char * coinbase_tx = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff2503777d07062f503253482f0405b8c75208f800880e000000000b2f436f696e48756e74722f0000000001603f352a010000001976a914c633315d376c20a973a758f7422d67f7bfed9c5888ac00000000";
+    uint8_t merkles[5][32];
+    int num_merkles = 5;
+
+    hex2bin("f0dbca1ee1a9f6388d07d97c1ab0de0e41acdf2edac4b95780ba0a1ec14103b3", merkles[0], 32);
+    hex2bin("8e43fd2988ac40c5d97702b7e5ccdf5b06d58f0e0d323f74dd5082232c1aedf7", merkles[1], 32);
+    hex2bin("1177601320ac928b8c145d771dae78a3901a089fa4aca8def01cbff747355818", merkles[2], 32);
+    hex2bin("9f64f3b0d9edddb14be6f71c3ac2e80455916e207ffc003316c6a515452aa7b4", merkles[3], 32);
+    hex2bin("2d0b54af60fad4ae59ec02031f661d026f2bb95e2eeb1e6657a35036c017c595", merkles[4], 32);
+
+    char * root_hash = calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles);
+    TEST_ASSERT_EQUAL_STRING("5cc58f5e84aafc740d521b92a7bf72f4e56c4cc3ad1c2159f1d094f97ac34eee", root_hash);
+    free(root_hash);
+}
+
 // Values calculated from esp-miner/components/stratum/test/verifiers/midstatecalc.py
 TEST_CASE("Validate bm job construction", "[mining]")
 {
