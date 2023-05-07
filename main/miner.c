@@ -146,6 +146,9 @@ static void admin_task(void *pvParameters)
 
             stratum_method method = parse_stratum_method(line);
             if (method == MINING_NOTIFY) {
+                if (should_abandon_work(line)) {
+                    queue_clear(&g_queue);
+                }
                 queue_enqueue(&g_queue, line);
             } else {
                 free(line);

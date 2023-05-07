@@ -1,6 +1,6 @@
 #include "work_queue.h"
 
-void queue_init(work_queue *queue) {
+void queue_init(work_queue * queue) {
     queue->head = 0;
     queue->tail = 0;
     queue->count = 0;
@@ -9,7 +9,7 @@ void queue_init(work_queue *queue) {
     pthread_cond_init(&queue->not_full, NULL);
 }
 
-void queue_enqueue(work_queue *queue, char * new_work) {
+void queue_enqueue(work_queue * queue, char * new_work) {
     pthread_mutex_lock(&queue->lock);
 
     while (queue->count == QUEUE_SIZE) {
@@ -24,7 +24,7 @@ void queue_enqueue(work_queue *queue, char * new_work) {
     pthread_mutex_unlock(&queue->lock);
 }
 
-char * queue_dequeue(work_queue *queue, int *termination_flag) {
+char * queue_dequeue(work_queue * queue, int *termination_flag) {
     pthread_mutex_lock(&queue->lock);
 
     while (queue->count == 0) {
@@ -43,4 +43,20 @@ char * queue_dequeue(work_queue *queue, int *termination_flag) {
     pthread_mutex_unlock(&queue->lock);
 
     return next_work;
+}
+
+void queue_clear(work_queue * queue)
+{
+    pthread_mutex_lock(&queue->lock);
+
+    while (queue->count > 0)
+    {
+        char * next_work = queue->buffer[queue->head];
+        free(next_work);
+        queue->head = (queue->head + 1) % QUEUE_SIZE;
+        queue->count--;
+    }
+
+    pthread_cond_signal(&queue->not_full);
+    pthread_mutex_unlock(&queue->lock);
 }
