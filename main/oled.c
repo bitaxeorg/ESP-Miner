@@ -28,7 +28,7 @@
 
 
 #define I2C_TIMEOUT 1000
-#define OLED_FLIP 0
+#define OLED_FLIP 1
 #define OLED_INVERT 0
 #define I2C_MASTER_NUM              0                          /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
 
@@ -96,7 +96,7 @@ bool OLED_init(void) {
     // if (oled_i2c == NULL) {
     //     return false;
     // }
-    // oled_active = true;
+    oled_active = true;
 
     write(oled32_initbuf, sizeof(oled32_initbuf));
 

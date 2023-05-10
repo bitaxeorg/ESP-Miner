@@ -62,27 +62,44 @@ void app_main(void) {
     //oled
     if (OLED_init()) {
         OLED_fill(0); // fill with black
-        snprintf(oled_buf, 20, "Hello!");
+        snprintf(oled_buf, 20, "The Bitaxe");
         OLED_writeString(0, 0, oled_buf);
     } else {
         ESP_LOGI(TAG, "OLED did not init!\n");
     }
 
     while (1) {
-        ESP_LOGI(TAG, "Fan Speed: %d RPM", EMC2101_get_fan_speed());
-        ESP_LOGI(TAG, "Chip Temp: %.2f C", EMC2101_get_chip_temp());
+        uint16_t fan_speed = EMC2101_get_fan_speed();
+        float chip_temp = EMC2101_get_chip_temp();
+        float current = INA260_read_current();
+        float voltage = INA260_read_voltage();
+        float power = INA260_read_power();
+        uint16_t vcore = ADC_get_vcore();
+
+        ESP_LOGI(TAG, "Fan Speed: %d RPM", fan_speed);
+        ESP_LOGI(TAG, "Chip Temp: %.2f C", chip_temp);
 
         //Current Sensor tests
-        ESP_LOGI(TAG, "Current: %.2f mA", INA260_read_current());
-        ESP_LOGI(TAG, "Voltage: %.2f mV", INA260_read_voltage());
-        ESP_LOGI(TAG, "Power: %.2f mW", INA260_read_power());
+        ESP_LOGI(TAG, "Current: %.2f mA", current);
+        ESP_LOGI(TAG, "Voltage: %.2f mV", voltage);
+        ESP_LOGI(TAG, "Power: %.2f mW", power);
 
         //ESP32 ADC tests
-        ESP_LOGI(TAG, "Vcore: %d mV\n", ADC_get_vcore());
+        ESP_LOGI(TAG, "Vcore: %d mV\n", vcore);
 
         if (OLED_status()) {
             memset(oled_buf, 0, 20);
-            snprintf(oled_buf, 20, "SWARM Running ");
+            snprintf(oled_buf, 20, "Fan: %d RPM", fan_speed);
+            OLED_clearLine(1);
+            OLED_writeString(0, 1, oled_buf);
+
+            memset(oled_buf, 0, 20);
+            snprintf(oled_buf, 20, "Temp: %.2f C", chip_temp);
+            OLED_clearLine(2);
+            OLED_writeString(0, 2, oled_buf);
+
+            memset(oled_buf, 0, 20);
+            snprintf(oled_buf, 20, "Pwr: %.2f mW", power);
             OLED_clearLine(3);
             OLED_writeString(0, 3, oled_buf);
         }
