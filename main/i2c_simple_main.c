@@ -15,6 +15,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 #include <stdio.h>
+#include <string.h>
 #include "esp_log.h"
 #include "driver/i2c.h"
 #include "driver/gpio.h"
@@ -28,10 +29,12 @@
 #include "EMC2101.h"
 #include "INA260.h"
 #include "adc.h"
+#include "oled.h"
 
 static const char *TAG = "i2c-test";
 
 void app_main(void) {
+    char oled_buf[20];
 
     //test the LEDs
     // ESP_LOGI(TAG, "Init LEDs!");
@@ -56,6 +59,15 @@ void app_main(void) {
     EMC2101_set_fan_speed(0.5);
     vTaskDelay(500 / portTICK_RATE_MS);
 
+    //oled
+    if (OLED_init()) {
+        OLED_fill(0); // fill with black
+        snprintf(oled_buf, 20, "Hello!");
+        OLED_writeString(0, 0, oled_buf);
+    } else {
+        ESP_LOGI(TAG, "OLED did not init!\n");
+    }
+
     while (1) {
         ESP_LOGI(TAG, "Fan Speed: %d RPM", EMC2101_get_fan_speed());
         ESP_LOGI(TAG, "Chip Temp: %.2f C", EMC2101_get_chip_temp());
@@ -67,6 +79,13 @@ void app_main(void) {
 
         //ESP32 ADC tests
         ESP_LOGI(TAG, "Vcore: %d mV\n", ADC_get_vcore());
+
+        if (OLED_status()) {
+            memset(oled_buf, 0, 20);
+            snprintf(oled_buf, 20, "SWARM Running ");
+            OLED_clearLine(3);
+            OLED_writeString(0, 3, oled_buf);
+        }
 
         vTaskDelay(5000 / portTICK_RATE_MS);
     }

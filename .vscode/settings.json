@@ -8,7 +8,7 @@
         "interface/ftdi/esp32_devkitj_v1.cfg",
         "target/esp32s3.cfg"
     ],
-    "idf.port": "/dev/cu.usbserial-1464301",
+    "idf.port": "/dev/cu.usbserial-1464401",
     "idf.pythonBinPath": "/Users/skot/.espressif/python_env/idf4.4_py3.9_env/bin/python",
     "idf.toolsPath": "/Users/skot/.espressif",
     "files.associations": {
@@ -16,7 +16,9 @@
         "string": "c",
         "string_view": "c",
         "ds4432u.h": "c",
-        "led_controller.h": "c"
+        "led_controller.h": "c",
+        "*.tcc": "c",
+        "*.ipp": "c"
     },
     "idf.flashType": "UART"
 }
