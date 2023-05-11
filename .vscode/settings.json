@@ -19,7 +19,9 @@
         "led_controller.h": "c",
         "*.tcc": "c",
         "*.ipp": "c",
-        "complex": "cpp"
+        "complex": "cpp",
+        "uart_struct.h": "c",
+        "task.h": "c"
     },
     "idf.flashType": "UART"
 }

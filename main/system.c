@@ -42,6 +42,10 @@ void init_system(void) {
     //oled
     if (!OLED_init()) {
         ESP_LOGI(TAG, "OLED init failed!");
+    } else {
+        ESP_LOGI(TAG, "OLED init success!");
+        //clear the oled screen
+        OLED_fill(0);
     }
 }
 
@@ -55,16 +59,16 @@ void get_stats(void) {
     float power = INA260_read_power();
     uint16_t vcore = ADC_get_vcore();
 
-    ESP_LOGI(TAG, "Fan Speed: %d RPM", fan_speed);
-    ESP_LOGI(TAG, "Chip Temp: %.2f C", chip_temp);
+    // ESP_LOGI(TAG, "Fan Speed: %d RPM", fan_speed);
+    // ESP_LOGI(TAG, "Chip Temp: %.2f C", chip_temp);
 
-    //Current Sensor tests
-    ESP_LOGI(TAG, "Current: %.2f mA", current);
-    ESP_LOGI(TAG, "Voltage: %.2f mV", voltage);
-    ESP_LOGI(TAG, "Power: %.2f mW", power);
+    // //Current Sensor tests
+    // ESP_LOGI(TAG, "Current: %.2f mA", current);
+    // ESP_LOGI(TAG, "Voltage: %.2f mV", voltage);
+    // ESP_LOGI(TAG, "Power: %.2f mW", power);
 
-    //ESP32 ADC tests
-    ESP_LOGI(TAG, "Vcore: %d mV\n", vcore);
+    // //ESP32 ADC tests
+    // ESP_LOGI(TAG, "Vcore: %d mV\n", vcore);
 
     if (OLED_status()) {
         memset(oled_buf, 0, 20);
