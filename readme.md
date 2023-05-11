@@ -41,14 +41,3 @@ Enter `idf.py -p PORT flash monitor` to build, flash and monitor the project.
 
 See the [Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for full steps to configure and use ESP-IDF to build projects.
 
-## Example Output
-
-```bash
-I (328) i2c-simple-example: I2C initialized successfully
-I (338) i2c-simple-example: WHO_AM_I = 71
-I (338) i2c-simple-example: I2C unitialized successfully
-```
-
-## Troubleshooting
-
-(For any technical queries, please open an [issue](https://github.com/espressif/esp-idf/issues) on GitHub. We will get back to you as soon as possible.)

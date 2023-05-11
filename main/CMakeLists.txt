@@ -6,7 +6,7 @@ idf_component_register(SRCS
 "adc.c" 
 "INA260.c" 
 "EMC2101.c" 
-"bitaxe.c" 
+"main.c" 
 "led_controller.c" 
 "DS4432U.c" 
 "EMC2101.c" 
