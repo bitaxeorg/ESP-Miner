@@ -20,6 +20,7 @@
 
 #include "system.h"
 #include "serial.h"
+#include "bm1397.h"
 
 #if defined(CONFIG_EXAMPLE_IPV4)
 #define HOST_IP_ADDR CONFIG_EXAMPLE_IPV4_ADDR
@@ -40,24 +41,80 @@ TaskHandle_t sysTaskHandle = NULL;
 TaskHandle_t serialTaskHandle = NULL;
 
 static work_queue g_queue;
+static work_queue g_bm_queue;
 
 static char * extranonce_str = NULL;
 static int extranonce_2_len = 0;
 
-static void mining_task(void *pvParameters)
+static int sock;
+
+static void AsicTask(void * pvParameters)
+{
+    init_serial();
+
+    init_BM1397();
+
+    //reset the bm1397
+    reset_BM1397();
+
+    //send the init command
+    send_read_address();
+
+    //read back response
+    debug_serial_rx();
+
+    //send the init commands
+    send_init();
+
+    int termination_flag = 0;
+    uint8_t buf[CHUNK_SIZE];
+    memset(buf, 0, 1024);
+
+    while (1) {
+        int id = 1;
+        bm_job * next_bm_job = (bm_job *) queue_dequeue(&g_bm_queue, &termination_flag);
+        struct job_packet job;
+        job.job_id = id++;
+        job.num_midstates = 1;
+        memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
+        memcpy(&job.nbits, &next_bm_job->target, 4);
+        memcpy(&job.ntime, &next_bm_job->ntime, 4);
+        memcpy(&job.merkle4, &next_bm_job->merkle_root_end, 4);
+        memcpy(&job.midstate, &next_bm_job->midstate, 32);
+
+        send_work(&job);
+        uint16_t received = serial_rx(buf);
+        if (received > 0) {
+            ESP_LOGI(TAG, "Received %d bytes from bm1397", received);
+            struct nonce_response nonce;
+            memcpy((void *) &nonce, buf, sizeof(struct nonce_response));
+            //reverse_bytes((uint8_t *) &nonce.nonce, 4);
+            print_hex((uint8_t *) &nonce.nonce, 4, 4, "nonce: ");
+            memset(buf, 0, 1024);
+            submit_share(sock, STRATUM_USERNAME, next_bm_job->jobid,
+                         next_bm_job->ntime, next_bm_job->extranonce2, nonce.nonce);
+        }
+    }
+}
+
+static void mining_task(void * pvParameters)
 {
     int termination_flag = 0;
-    while(true) {
-        char * next_notify_json_str = queue_dequeue(&g_queue, &termination_flag);
+    while (1) {
+        char * next_notify_json_str = (char *) queue_dequeue(&g_queue, &termination_flag);
         ESP_LOGI(TAG, "New Work Dequeued");
         ESP_LOGI(TAG, "Notify json: %s", next_notify_json_str);
         uint32_t free_heap_size = esp_get_free_heap_size();
-        ESP_LOGI(TAG, "miner heap free size: %lu bytes", free_heap_size);
+        ESP_LOGI(TAG, "miner heap free size: %u bytes", free_heap_size);
 
         mining_notify params = parse_mining_notify_message(next_notify_json_str);
 
+        char extranonce_2[extranonce_2_len * 2 + 1];
+        memset(extranonce_2, '9', extranonce_2_len * 2);
+        extranonce_2[extranonce_2_len * 2] = '\0';
+
         char * coinbase_tx = construct_coinbase_tx(params.coinbase_1, params.coinbase_2,
-                                                   extranonce_str, extranonce_2_len);
+                                                   extranonce_str, extranonce_2);
         ESP_LOGI(TAG, "Coinbase tx: %s", coinbase_tx);
 
         char * merkle_root = calculate_merkle_root_hash(coinbase_tx,
@@ -67,25 +124,23 @@ static void mining_task(void *pvParameters)
 
         bm_job next_job = construct_bm_job(params.version, params.prev_block_hash, merkle_root,
                                            params.ntime, params.target);
-
+        
         ESP_LOGI(TAG, "bm_job: ");
         print_hex((uint8_t *) &next_job.target, 4, 4, "target: ");
         print_hex((uint8_t *) &next_job.ntime, 4, 4, "ntime: ");
         print_hex((uint8_t *) &next_job.merkle_root_end, 4, 4, "merkle root end: ");
         print_hex(next_job.midstate, 32, 32, "midstate: ");
 
+        bm_job * queued_next_job = malloc(sizeof(bm_job));
+        memcpy(queued_next_job, &next_job, sizeof(bm_job));
+        queued_next_job->extranonce2 = strdup(extranonce_2);
+        queued_next_job->jobid = strdup(params.job_id);
+        queue_enqueue(&g_bm_queue, queued_next_job);
+
         free_mining_notify(params);
         free(coinbase_tx);
         free(merkle_root);
         free(next_notify_json_str);
-
-        // TODO: Process BM Job / Loop until nonce range consumed or we need
-        // to grab the latest notify
-
-        // TODO: When nonce found, submit shares
-        // snprintf(submit_msg, BUFFER_SIZE,
-        //          "{\"id\": 4, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%s\", \"%08x\"]}\n",
-        //          user, job_id, ntime, extranonce2, nonce);
     }
 }
 
@@ -117,7 +172,7 @@ static void admin_task(void *pvParameters)
         struct sockaddr_storage dest_addr = {0};
         ESP_ERROR_CHECK(get_addr_from_stdin(PORT, SOCK_STREAM, &ip_protocol, &addr_family, &dest_addr));
 #endif
-        int sock = socket(addr_family, SOCK_STREAM, ip_protocol);
+        sock = socket(addr_family, SOCK_STREAM, ip_protocol);
         if (sock < 0)
         {
             ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
@@ -179,10 +234,11 @@ void app_main(void)
     ESP_ERROR_CHECK(example_connect());
 
     xTaskCreate(SysTask, "System_Task", 4096, NULL, 10, &sysTaskHandle);
-    xTaskCreate(SerialTask, "serial_test", 4096, NULL, 10, &serialTaskHandle);
 
     queue_init(&g_queue);
+    queue_init(&g_bm_queue);
 
     xTaskCreate(admin_task, "stratum admin", 8192, NULL, 5, NULL);
     xTaskCreate(mining_task, "stratum miner", 8192, NULL, 5, NULL);
+    xTaskCreate(AsicTask, "asic", 4096, NULL, 10, &serialTaskHandle);
 }

@@ -40,7 +40,7 @@ struct __attribute__((__packed__)) job_packet {
   uint8_t nbits[4];
   uint8_t ntime[4];
   uint8_t merkle4[4];
-  uint8_t midstates[4][32];
+  uint8_t midstate[32];
 };
 
 struct __attribute__((__packed__)) nonce_response {

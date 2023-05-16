@@ -231,6 +231,16 @@ int auth_to_stratum(int socket, const char * username)
     return 1;
 }
 
+void submit_share(int socket, const char * username, const char * jobid,
+                 const uint32_t ntime, const char * extranonce_2, const uint32_t nonce)
+{
+    char submit_msg[BUFFER_SIZE];
+    sprintf(submit_msg, "{\"id\": %d, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%08x\", \"%08x\"]}\n",
+            send_uid++, username, jobid, extranonce_2, ntime, nonce);
+    ESP_LOGI(TAG, "Submit: %s", submit_msg);
+    write(socket, submit_msg, strlen(submit_msg));
+}
+
 int should_abandon_work(const char * mining_notify_json_str)
 {
     cJSON * root = cJSON_Parse(mining_notify_json_str);

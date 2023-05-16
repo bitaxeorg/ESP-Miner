@@ -48,7 +48,7 @@ void parse_job_response(unsigned char *buf, int len) {
     nonce = (struct nonce_response *)buf;
 
     printf("nonce: %08X @ %02X\n", flip32(nonce->nonce), nonce->job_id);
-
+    return;
 }
 
 void parse_cmd_packet(unsigned char *buf, int len) {

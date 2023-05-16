@@ -3,14 +3,10 @@
 #include "utils.h"
 
 char * construct_coinbase_tx(const char * coinbase_1, const char * coinbase_2,
-                             const char * extranonce, int extranonce_2_len)
+                             const char * extranonce, const char * extranonce_2)
 {
     int coinbase_tx_len = strlen(coinbase_1) + strlen(coinbase_2)
-        + strlen(extranonce) + extranonce_2_len * 2 + 1;
-
-    char extranonce_2[extranonce_2_len * 2 + 1];
-    memset(extranonce_2, '9', extranonce_2_len * 2);
-    extranonce_2[extranonce_2_len * 2] = '\0';
+        + strlen(extranonce) + strlen(extranonce_2) + 1;
 
     char * coinbase_tx = malloc(coinbase_tx_len);
     strcpy(coinbase_tx, coinbase_1);
@@ -59,10 +55,10 @@ bm_job construct_bm_job(uint32_t version, const char * prev_block_hash, const ch
 
     uint8_t midstate_data[64];
     memcpy(midstate_data, &version, 4);
-    swap_endian_words(prev_block_hash, midstate_data + 4);
+    //swap_endian_words(prev_block_hash, midstate_data + 4);
     memcpy(midstate_data + 36, merkle_root_bin, 28);
     single_sha256_bin(midstate_data, 64, new_job.midstate);
-
+    //reverse_bytes(new_job.midstate, 32);
     memcpy(&new_job.merkle_root_end, merkle_root_bin + 28, 4);
 
     return new_job;

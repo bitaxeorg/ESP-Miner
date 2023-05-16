@@ -145,3 +145,11 @@ void swap_endian_words(const char * hex_words, uint8_t * output) {
         }
     }
 }
+
+void reverse_bytes(uint8_t * data, size_t len) {
+    for (int i = 0; i < len / 2; ++i) {
+        uint8_t temp = data[i];
+        data[i] = data[len - 1 - i];
+        data[len - 1 - i] = temp;
+    }
+}

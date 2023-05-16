@@ -23,4 +23,6 @@ void single_sha256_bin(const uint8_t * data, const size_t data_len, uint8_t * de
 
 void swap_endian_words(const char * hex,  uint8_t * output);
 
+void reverse_bytes(uint8_t * data, size_t len);
+
 #endif // STRATUM_UTILS_H
