@@ -5,6 +5,39 @@
 
 #include "mbedtls/sha256.h"
 
+#ifndef bswap_16
+#define bswap_16(a) ((((uint16_t) (a) << 8) & 0xff00) | (((uint16_t) (a) >> 8) & 0xff))
+#endif
+
+#ifndef bswap_32
+#define bswap_32(a) ((((uint32_t) (a) << 24) & 0xff000000) | \
+		     (((uint32_t) (a) << 8) & 0xff0000) | \
+     		     (((uint32_t) (a) >> 8) & 0xff00) | \
+     		     (((uint32_t) (a) >> 24) & 0xff))
+#endif
+
+uint32_t swab32(uint32_t v) {
+    return bswap_32(v);
+}
+
+void flip64bytes(void *dest_p, const void *src_p) {
+    uint32_t *dest = dest_p;
+    const uint32_t *src = src_p;
+    int i;
+
+    for (i = 0; i < 16; i++)
+        dest[i] = swab32(src[i]);
+}
+
+void flip32bytes(void *dest_p, const void *src_p) {
+    uint32_t *dest = dest_p;
+    const uint32_t *src = src_p;
+    int i;
+
+    for (i = 0; i < 8; i++)
+        dest[i] = swab32(src[i]);
+}
+
 
 int hex2char(uint8_t x, char *c)
 {
@@ -151,7 +184,8 @@ void midstate_sha256_bin( const uint8_t * data, const size_t data_len, uint8_t *
     mbedtls_sha256_starts_ret(&midstate, 0);
     mbedtls_sha256_update_ret(&midstate, data, 64);
 
-    memcpy(dest, midstate.state, 32);
+    //memcpy(dest, midstate.state, 32);
+    flip32bytes(dest, midstate.state);
 
 }
 
