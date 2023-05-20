@@ -125,7 +125,34 @@ uint8_t * double_sha256_bin(const uint8_t * data, const size_t data_len)
 
 void single_sha256_bin( const uint8_t * data, const size_t data_len, uint8_t * dest)
 {
-    mbedtls_sha256(data, data_len, dest, 0);
+    //mbedtls_sha256(data, data_len, dest, 0);
+
+    // Initialize SHA256 context
+    mbedtls_sha256_context sha256_ctx;
+    mbedtls_sha256_init(&sha256_ctx);
+    mbedtls_sha256_starts(&sha256_ctx, 0);
+
+    // Compute first SHA256 hash of header
+    mbedtls_sha256_update(&sha256_ctx, data, 64);
+    unsigned char hash[32];
+    mbedtls_sha256_finish(&sha256_ctx, hash);
+
+    // Compute midstate from hash
+    memcpy(dest, hash, 32);
+
+}
+
+void midstate_sha256_bin( const uint8_t * data, const size_t data_len, uint8_t * dest)
+{
+    mbedtls_sha256_context midstate;
+
+    //Calculate midstate
+    mbedtls_sha256_init(&midstate); 
+    mbedtls_sha256_starts_ret(&midstate, 0);
+    mbedtls_sha256_update_ret(&midstate, data, 64);
+
+    memcpy(dest, midstate.state, 32);
+
 }
 
 void swap_endian_words(const char * hex_words, uint8_t * output) {

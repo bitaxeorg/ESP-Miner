@@ -196,7 +196,7 @@ int subscribe_to_stratum(int socket, char ** extranonce, int * extranonce2_len)
 {
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];
-    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": []}\n", send_uid++);
+    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe v2.2\"]}\n", send_uid++);
     ESP_LOGI(TAG, "Subscribe: %s", subscribe_msg);
     write(socket, subscribe_msg, strlen(subscribe_msg));
     char * line;

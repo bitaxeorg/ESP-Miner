@@ -13,6 +13,9 @@
 #include "addr_from_stdin.h"
 #include "lwip/err.h"
 #include "lwip/sockets.h"
+#include "lwip/inet.h"
+#include "lwip/ip4_addr.h"
+#include "lwip/dns.h"
 #include "stratum_api.h"
 #include "mining.h"
 #include "work_queue.h"
@@ -31,8 +34,10 @@
 #endif
 
 #define PORT CONFIG_EXAMPLE_PORT
+#define STRATUM_URL CONFIG_EXAMPLE_STRATUM_URL
+#define STRATUM_USER CONFIG_EXAMPLE_STRATUM_USER
+#define STRATUM_PW CONFIG_EXAMPLE_STRATUM_PW
 
-#define STRATUM_USERNAME "johnny9.esp"
 
 
 static const char *TAG = "stratum client";
@@ -91,7 +96,13 @@ static void AsicTask(void * pvParameters)
             //reverse_bytes((uint8_t *) &nonce.nonce, 4);
             print_hex((uint8_t *) &nonce.nonce, 4, 4, "nonce: ");
             memset(buf, 0, 1024);
-            submit_share(sock, STRATUM_USERNAME, next_bm_job->jobid,
+            //check the nonce difficulty
+            if (nonce.nonce < next_bm_job->target) {
+                ESP_LOGI(TAG, "Nonce is valid");
+            } else {
+                ESP_LOGI(TAG, "Nonce is invalid");
+            }
+            submit_share(sock, STRATUM_USER, next_bm_job->jobid,
                          next_bm_job->ntime, next_bm_job->extranonce2, nonce.nonce);
         }
     }
@@ -126,9 +137,9 @@ static void mining_task(void * pvParameters)
                                            params.ntime, params.target);
         
         ESP_LOGI(TAG, "bm_job: ");
-        print_hex((uint8_t *) &next_job.target, 4, 4, "target: ");
-        print_hex((uint8_t *) &next_job.ntime, 4, 4, "ntime: ");
-        print_hex((uint8_t *) &next_job.merkle_root_end, 4, 4, "merkle root end: ");
+        // print_hex((uint8_t *) &next_job.target, 4, 4, "nbits: ");
+        // print_hex((uint8_t *) &next_job.ntime, 4, 4, "ntime: ");
+        // print_hex((uint8_t *) &next_job.merkle_root_end, 4, 4, "merkle root end: ");
         print_hex(next_job.midstate, 32, 32, "midstate: ");
 
         bm_job * queued_next_job = malloc(sizeof(bm_job));
@@ -144,34 +155,52 @@ static void mining_task(void * pvParameters)
     }
 }
 
+    ip_addr_t ip_Addr;
+    bool bDNSFound = false;
+
+void dns_found_cb(const char *name, const ip_addr_t *ipaddr, void *callback_arg)
+{
+    ip_Addr = *ipaddr;
+    bDNSFound = true;
+}
+
 static void admin_task(void *pvParameters)
 {
     initialize_stratum_buffer();
-    char host_ip[] = HOST_IP_ADDR;
+    char host_ip[20];
     int addr_family = 0;
     int ip_protocol = 0;
 
-    while (1)
-    {
-#if defined(CONFIG_EXAMPLE_IPV4)
+    //get ip address from hostname
+
+    IP_ADDR4( &ip_Addr, 0,0,0,0 );
+    printf("Get IP for URL: %s\n", STRATUM_URL);
+    dns_gethostbyname(STRATUM_URL, &ip_Addr, dns_found_cb, NULL );
+    while( !bDNSFound );
+
+    //make IP address string from ip_Addr
+    snprintf( host_ip, sizeof(host_ip), "%d.%d.%d.%d", 
+        ip4_addr1(&ip_Addr.u_addr.ip4), 
+        ip4_addr2(&ip_Addr.u_addr.ip4), 
+        ip4_addr3(&ip_Addr.u_addr.ip4), 
+        ip4_addr4(&ip_Addr.u_addr.ip4) );
+    printf( "Connecting to: stratum+tcp://%s:%d (%s)\n", STRATUM_URL, PORT, host_ip);
+        
+    // printf( "DNS found: %i.%i.%i.%i\n", 
+    //     ip4_addr1(&ip_Addr.u_addr.ip4), 
+    //     ip4_addr2(&ip_Addr.u_addr.ip4), 
+    //     ip4_addr3(&ip_Addr.u_addr.ip4), 
+    //     ip4_addr4(&ip_Addr.u_addr.ip4) );
+
+    while (1) {
+
         struct sockaddr_in dest_addr;
         dest_addr.sin_addr.s_addr = inet_addr(host_ip);
         dest_addr.sin_family = AF_INET;
         dest_addr.sin_port = htons(PORT);
         addr_family = AF_INET;
         ip_protocol = IPPROTO_IP;
-#elif defined(CONFIG_EXAMPLE_IPV6)
-        struct sockaddr_in6 dest_addr = {0};
-        inet6_aton(host_ip, &dest_addr.sin6_addr);
-        dest_addr.sin6_family = AF_INET6;
-        dest_addr.sin6_port = htons(PORT);
-        dest_addr.sin6_scope_id = esp_netif_get_netif_impl_index(EXAMPLE_INTERFACE);
-        addr_family = AF_INET6;
-        ip_protocol = IPPROTO_IPV6;
-#elif defined(CONFIG_EXAMPLE_SOCKET_IP_INPUT_STDIN)
-        struct sockaddr_storage dest_addr = {0};
-        ESP_ERROR_CHECK(get_addr_from_stdin(PORT, SOCK_STREAM, &ip_protocol, &addr_family, &dest_addr));
-#endif
+
         sock = socket(addr_family, SOCK_STREAM, ip_protocol);
         if (sock < 0)
         {
@@ -186,10 +215,10 @@ static void admin_task(void *pvParameters)
             ESP_LOGE(TAG, "Socket unable to connect: errno %d", errno);
             break;
         }
-
-        auth_to_stratum(sock, STRATUM_USERNAME);
-
         subscribe_to_stratum(sock, &extranonce_str, &extranonce_2_len);
+
+        auth_to_stratum(sock, STRATUM_USER);
+
         ESP_LOGI(TAG, "Extranonce: %s", extranonce_str);
         ESP_LOGI(TAG, "Extranonce 2 length: %d", extranonce_2_len);
 

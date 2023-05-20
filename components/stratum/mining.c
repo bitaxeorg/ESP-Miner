@@ -1,6 +1,8 @@
 #include <string.h>
+#include <stdio.h>
 #include "mining.h"
 #include "utils.h"
+#include "../../main/pretty.h"
 
 char * construct_coinbase_tx(const char * coinbase_1, const char * coinbase_2,
                              const char * extranonce, const char * extranonce_2)
@@ -51,14 +53,30 @@ bm_job construct_bm_job(uint32_t version, const char * prev_block_hash, const ch
     new_job.ntime = ntime;
 
     uint8_t merkle_root_bin[32];
+    uint8_t prev_block_bin[32];
     hex2bin(merkle_root, merkle_root_bin, 32);
+    hex2bin(prev_block_hash, prev_block_bin, 32);
 
     uint8_t midstate_data[64];
-    memcpy(midstate_data, &version, 4);
-    //swap_endian_words(prev_block_hash, midstate_data + 4);
-    memcpy(midstate_data + 36, merkle_root_bin, 28);
-    single_sha256_bin(midstate_data, 64, new_job.midstate);
-    //reverse_bytes(new_job.midstate, 32);
+
+    //print the header
+    printf("header: %08x%s%s%08x%08x000000000000008000000000000000000000000000000000000000000000000000000000\n", version, prev_block_hash, merkle_root, ntime, target);
+
+    memcpy(midstate_data, &version, 4); //copy version
+    // midstate_data[3] = version & 0xff;
+    // midstate_data[2] = (version >> 8) & 0xff;
+    // midstate_data[1] = (version >> 16) & 0xff;
+    // midstate_data[0] = (version >> 24) & 0xff;
+    swap_endian_words(prev_block_hash, midstate_data + 4);
+    //memcpy(midstate_data + 4, prev_block_bin, 32);
+    swap_endian_words(merkle_root, midstate_data + 36);
+    //memcpy(midstate_data + 36, merkle_root_bin, 28);
+    printf("midstate_data: ");
+    prettyHex(midstate_data, 64);
+    printf("\n");   
+    //single_sha256_bin(midstate_data, 64, new_job.midstate);
+    midstate_sha256_bin(midstate_data, 64, new_job.midstate);
+    reverse_bytes(new_job.midstate, 32);
     memcpy(&new_job.merkle_root_end, merkle_root_bin + 28, 4);
 
     return new_job;
