@@ -49,12 +49,12 @@ menu "Example Configuration"
         help
             The example will connect to this IPV6 address.
 
-    config EXAMPLE_PORT
-        int "Port"
+    config EXAMPLE_STRATUM_PORT
+        int "Stratum Port"
         range 0 65535
         default 3333
         help
-            The remote port to which the client example will connect to.
+            The stratum server port to connect to.
 
     config EXAMPLE_STRATUM_USER
         string "Stratum username"
