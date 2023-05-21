@@ -64,7 +64,7 @@ bm_job construct_bm_job(uint32_t version, const char * prev_block_hash, const ch
 
     memcpy(midstate_data, &version, 4); //copy version
     swap_endian_words(prev_block_hash, midstate_data + 4); //copy prev_block_hash
-    swap_endian_words(merkle_root, midstate_data + 36); //copy merkle_root
+    memcpy(midstate_data + 36, merkle_root_bin, 28); //copy merkle_root
     // printf("midstate_data: ");
     // prettyHex(midstate_data, 64);
     // printf("\n");   

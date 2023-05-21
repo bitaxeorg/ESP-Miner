@@ -55,18 +55,20 @@ TEST_CASE("Validate another merkle root calculation", "[mining]")
     free(root_hash);
 }
 
-// Values calculated from esp-miner/components/stratum/test/verifiers/midstatecalc.py
+// Values calculated from esp-miner/components/stratum/test/verifiers/bm1397.py
 TEST_CASE("Validate bm job construction", "[mining]")
 {
-    const char * merkle_root = "adbcbc21e20388422198a55957aedfa0e61be0b8f2b87d7c08510bb9f099a893";
-    const char * prev_block_hash = "ef4b9a48c7986466de4adc002f7337a6e121bc43000376ea0000000000000000";
+    const char * merkle_root = "cd1be82132ef0d12053dcece1fa0247fcfdb61d4dbd3eb32ea9ef9b4c604a846";
+    const char * prev_block_hash = "bf44fd3513dc7b837d60e5c628b572b448d204a8000007490000000000000000";
     uint32_t version = 0x20000004;
-    uint32_t target = 0x1705c739;
-    uint32_t ntime = 0x64495522;
+    uint32_t target = 0x1705dd01;
+    uint32_t ntime = 0x64658bd8;
     bm_job job = construct_bm_job(version, prev_block_hash, merkle_root, ntime, target);
-    TEST_ASSERT_EQUAL_UINT32(job.merkle_root_end, 0x93a899f0);
+    TEST_ASSERT_EQUAL_UINT32(job.merkle_root_end, 0x46a804c6);
 
     uint8_t expected_midstate_bin[32];
-    hex2bin("ac9643f83aa1e1d8de56d0f59a41ea3b3eac45b62ae043bd933a7413c0a1fe58", expected_midstate_bin, 32);
+    hex2bin("91DFEA528A9F73683D0D495DD6DD7415E1CA21CB411759E3E05D7D5FF285314D", expected_midstate_bin, 32);
+    // bytes are reversed for the midstate on the bm job command packet
+    reverse_bytes(expected_midstate_bin, 32);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_midstate_bin, job.midstate, 32);
 }
