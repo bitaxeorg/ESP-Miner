@@ -56,7 +56,6 @@ static void realloc_json_buffer(size_t len)
     json_rpc_buffer = new_sockbuf;
     memset(json_rpc_buffer + old, 0, new - old);
     json_rpc_buffer_size = new;
-    ESP_LOGI(TAG, "Current json rpc buffer size: %d", json_rpc_buffer_size);
 }
 
 char * receive_jsonrpc_line(int sockfd)
@@ -83,7 +82,6 @@ char * receive_jsonrpc_line(int sockfd)
 
             realloc_json_buffer(nbytes);
             strncat(json_rpc_buffer, recv_buffer, nbytes);
-            ESP_LOGI(TAG, "Current buffer %s", json_rpc_buffer);
         } while (!strstr(json_rpc_buffer, "\n"));
     }
     buflen = strlen(json_rpc_buffer);
