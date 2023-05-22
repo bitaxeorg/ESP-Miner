@@ -37,6 +37,8 @@ stratum_method parse_stratum_method(const char * stratum_json);
 
 mining_notify parse_mining_notify_message(const char * stratum_json);
 
+uint32_t parse_mining_set_difficulty_message(const char * stratum_json);
+
 void free_mining_notify(mining_notify params);
 
 int parse_stratum_subscribe_result_message(const char * result_json_str,

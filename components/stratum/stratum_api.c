@@ -114,6 +114,21 @@ stratum_method parse_stratum_method(const char * stratum_json)
     return result;
 }
 
+uint32_t parse_mining_set_difficulty_message(const char * stratum_json)
+{
+    cJSON * json = cJSON_Parse(stratum_json);
+    cJSON * method = cJSON_GetObjectItem(json, "method");
+    if (method != NULL && cJSON_IsString(method)) {
+        assert(strcmp("mining.set_difficulty", method->valuestring) == 0);
+    }
+
+    cJSON * params = cJSON_GetObjectItem(json, "params");
+    uint32_t difficulty = cJSON_GetArrayItem(params, 0)->valueint;
+
+    cJSON_Delete(json);
+    return difficulty;
+}
+
 mining_notify parse_mining_notify_message(const char * stratum_json)
 {
     cJSON * json = cJSON_Parse(stratum_json);

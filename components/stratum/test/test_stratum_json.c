@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "stratum_api.h"
 
-TEST_CASE("Parse stratum method", "[mining.notify]")
+TEST_CASE("Parse stratum method", "[stratum]")
 {
     const char * json_string = "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
         "[\"1b4c3d9041\","
@@ -12,6 +12,17 @@ TEST_CASE("Parse stratum method", "[mining.notify]")
         "\"20000004\",\"1705c739\",\"64495522\",false]}";
     stratum_method method = parse_stratum_method(json_string);
     TEST_ASSERT_EQUAL(MINING_NOTIFY, method);
+
+    const char * json_string_2 = "{\"id\":null,\"method\":\"mining.set_difficulty\",\"params\":[1638]}";
+    stratum_method method_2 = parse_stratum_method(json_string_2);
+    TEST_ASSERT_EQUAL(MINING_SET_DIFFICULTY, method_2);
+}
+
+TEST_CASE("Parse stratum set_difficulty params", "[mining.set_difficulty]")
+{
+    const char * json_string = "{\"id\":null,\"method\":\"mining.set_difficulty\",\"params\":[1638]}";
+    uint32_t difficulty = parse_mining_set_difficulty_message(json_string);
+    TEST_ASSERT_EQUAL(1638, difficulty);
 }
 
 TEST_CASE("Parse stratum notify params", "[mining.notify]")
