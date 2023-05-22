@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <limits.h>
 #include "mining.h"
 #include "utils.h"
 #include "../../main/pretty.h"
@@ -75,4 +76,23 @@ bm_job construct_bm_job(uint32_t version, const char * prev_block_hash, const ch
     memcpy(&new_job.merkle_root_end, merkle_root_bin + 28, 4);
 
     return new_job;
+}
+
+static uint32_t extranonce_2;
+static uint32_t extranonce_2_max_number;
+static uint32_t extranonce_2_len;
+
+void init_extranonce_2_generation(uint32_t length, uint64_t starting_nonce)
+{
+    extranonce_2_len = length;
+    extranonce_2 = starting_nonce;
+    extranonce_2_max_number = UINT_MAX;
+}
+
+char * extranonce_2_generate()
+{
+    char * extranonce_2_str = malloc(extranonce_2_len * 2 + 1);
+    bin2hex((uint8_t *) &extranonce_2, extranonce_2_len, extranonce_2_str, extranonce_2_len * 2 + 1);
+    extranonce_2 = (extranonce_2 + 1) % (extranonce_2_max_number);
+    return extranonce_2_str;
 }

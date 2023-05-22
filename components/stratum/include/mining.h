@@ -21,4 +21,8 @@ char * calculate_merkle_root_hash(const char * coinbase_tx, const uint8_t merkle
 bm_job construct_bm_job(uint32_t version, const char * prev_block_hash, const char * merkle_root,
                         uint32_t ntime, uint32_t target);
 
+void init_extranonce_2_generation(uint32_t extranonce_2_length, uint64_t starting_nonce);
+
+char * extranonce_2_generate();
+
 #endif // MINING_H

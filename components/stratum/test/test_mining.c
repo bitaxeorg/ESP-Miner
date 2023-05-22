@@ -2,6 +2,8 @@
 #include "mining.h"
 #include "utils.h"
 
+#include <limits.h>
+
 TEST_CASE("Check coinbase tx construction", "[mining]")
 {
     const char * coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff20020862062f503253482f04b8864e5008";
@@ -71,4 +73,28 @@ TEST_CASE("Validate bm job construction", "[mining]")
     // bytes are reversed for the midstate on the bm job command packet
     reverse_bytes(expected_midstate_bin, 32);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_midstate_bin, job.midstate, 32);
+}
+
+TEST_CASE("Test extranonce 2 generation", "[mining extranonce2]")
+{
+    init_extranonce_2_generation(4, 0);
+    char * first = extranonce_2_generate();
+    TEST_ASSERT_EQUAL_STRING("00000000", first);
+
+    char * second = extranonce_2_generate();
+    TEST_ASSERT_EQUAL_STRING("01000000", second);
+
+    char * third = extranonce_2_generate();
+    TEST_ASSERT_EQUAL_STRING("02000000", third);
+
+    init_extranonce_2_generation(4, UINT_MAX - 1);
+    char * fourth = extranonce_2_generate();
+    TEST_ASSERT_EQUAL_STRING("feffffff", fourth);
+
+    char * fifth = extranonce_2_generate();
+    TEST_ASSERT_EQUAL_STRING("00000000", fifth);
+
+    init_extranonce_2_generation(6, UINT_MAX / 2);
+    char * sixth = extranonce_2_generate();
+    TEST_ASSERT_EQUAL_STRING("ffffff7f0000", sixth);
 }
