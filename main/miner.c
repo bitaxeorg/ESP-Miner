@@ -276,6 +276,6 @@ void app_main(void)
     queue_init(&g_bm_queue);
 
     xTaskCreate(admin_task, "stratum admin", 8192, NULL, 5, NULL);
-    xTaskCreate(mining_task, "stratum miner", 8192, NULL, 5, NULL);
-    xTaskCreate(AsicTask, "asic", 4096, NULL, 10, &serialTaskHandle);
+    xTaskCreate(mining_task, "stratum miner", 8192, NULL, 10, NULL);
+    xTaskCreate(AsicTask, "asic", 8192, NULL, 10, &serialTaskHandle);
 }
