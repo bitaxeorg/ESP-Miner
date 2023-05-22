@@ -75,31 +75,19 @@ bm_job construct_bm_job(uint32_t version, const char * prev_block_hash, const ch
     memcpy(midstate_data + 36, merkle_root_bin, 28); //copy merkle_root
     // printf("midstate_data: ");
     // prettyHex(midstate_data, 64);
-    // printf("\n");   
+    // printf("\n");
 
     midstate_sha256_bin(midstate_data, 64, new_job.midstate); //make the midstate hash
     reverse_bytes(new_job.midstate, 32); //reverse the midstate bytes for the BM job packet
-    
+
     memcpy(&new_job.merkle_root_end, merkle_root_bin + 28, 4);
 
     return new_job;
 }
 
-static uint32_t extranonce_2;
-static uint32_t extranonce_2_max_number;
-static uint32_t extranonce_2_len;
-
-void init_extranonce_2_generation(uint32_t length, uint64_t starting_nonce)
+char * extranonce_2_generate(uint32_t extranonce_2, uint32_t length)
 {
-    extranonce_2_len = length;
-    extranonce_2 = starting_nonce;
-    extranonce_2_max_number = UINT_MAX;
-}
-
-char * extranonce_2_generate()
-{
-    char * extranonce_2_str = malloc(extranonce_2_len * 2 + 1);
-    bin2hex((uint8_t *) &extranonce_2, extranonce_2_len, extranonce_2_str, extranonce_2_len * 2 + 1);
-    extranonce_2 = (extranonce_2 + 1) % (extranonce_2_max_number);
+    char * extranonce_2_str = malloc(length * 2 + 1);
+    bin2hex((uint8_t *) &extranonce_2, length, extranonce_2_str, length * 2 + 1);
     return extranonce_2_str;
 }

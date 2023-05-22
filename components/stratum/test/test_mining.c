@@ -77,24 +77,23 @@ TEST_CASE("Validate bm job construction", "[mining]")
 
 TEST_CASE("Test extranonce 2 generation", "[mining extranonce2]")
 {
-    init_extranonce_2_generation(4, 0);
-    char * first = extranonce_2_generate();
+    char * first = extranonce_2_generate(0, 4);
     TEST_ASSERT_EQUAL_STRING("00000000", first);
+    free(first);
 
-    char * second = extranonce_2_generate();
+    char * second = extranonce_2_generate(1, 4);
     TEST_ASSERT_EQUAL_STRING("01000000", second);
+    free(second);
 
-    char * third = extranonce_2_generate();
+    char * third = extranonce_2_generate(2, 4);
     TEST_ASSERT_EQUAL_STRING("02000000", third);
+    free(third);
 
-    init_extranonce_2_generation(4, UINT_MAX - 1);
-    char * fourth = extranonce_2_generate();
+    char * fourth = extranonce_2_generate(UINT_MAX - 1, 4);
     TEST_ASSERT_EQUAL_STRING("feffffff", fourth);
+    free(fourth);
 
-    char * fifth = extranonce_2_generate();
-    TEST_ASSERT_EQUAL_STRING("00000000", fifth);
-
-    init_extranonce_2_generation(6, UINT_MAX / 2);
-    char * sixth = extranonce_2_generate();
-    TEST_ASSERT_EQUAL_STRING("ffffff7f0000", sixth);
+    char * fifth = extranonce_2_generate(UINT_MAX / 2, 6);
+    TEST_ASSERT_EQUAL_STRING("ffffff7f0000", fifth);
+    free(fifth);
 }

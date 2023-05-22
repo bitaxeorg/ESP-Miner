@@ -46,6 +46,8 @@ static int extranonce_2_len = 0;
 
 static int sock;
 
+static int abandon_work = 0;
+
 static void AsicTask(void * pvParameters)
 {
     init_serial();
@@ -114,37 +116,48 @@ static void mining_task(void * pvParameters)
 
         mining_notify params = parse_mining_notify_message(next_notify_json_str);
 
-        char extranonce_2[extranonce_2_len * 2 + 1];
-        memset(extranonce_2, '9', extranonce_2_len * 2);
-        extranonce_2[extranonce_2_len * 2] = '\0';
+        uint32_t extranonce_2 = 0;
+        while (extranonce_2 < UINT_MAX || abandon_work == 1)
+        {
 
-        char * coinbase_tx = construct_coinbase_tx(params.coinbase_1, params.coinbase_2,
-                                                   extranonce_str, extranonce_2);
-        ESP_LOGI(TAG, "Coinbase tx: %s", coinbase_tx);
+            char * extranonce_2_str = extranonce_2_generate(extranonce_2, extranonce_2_len);
 
-        char * merkle_root = calculate_merkle_root_hash(coinbase_tx,
-                                                        (uint8_t(*)[32]) params.merkle_branches,
-                                                        params.n_merkle_branches);
-        ESP_LOGI(TAG, "Merkle root: %s", merkle_root);
+            char *coinbase_tx = construct_coinbase_tx(params.coinbase_1, params.coinbase_2,
+                                                      extranonce_str, extranonce_2_str);
+            //ESP_LOGI(TAG, "Coinbase tx: %s", coinbase_tx);
 
-        bm_job next_job = construct_bm_job(params.version, params.prev_block_hash, merkle_root,
-                                           params.ntime, params.target);
-        
-        ESP_LOGI(TAG, "bm_job: ");
-        // print_hex((uint8_t *) &next_job.target, 4, 4, "nbits: ");
-        // print_hex((uint8_t *) &next_job.ntime, 4, 4, "ntime: ");
-        // print_hex((uint8_t *) &next_job.merkle_root_end, 4, 4, "merkle root end: ");
-        print_hex(next_job.midstate, 32, 32, "midstate: ");
+            char *merkle_root = calculate_merkle_root_hash(coinbase_tx,
+                                                           (uint8_t(*)[32])params.merkle_branches,
+                                                           params.n_merkle_branches);
+            //ESP_LOGI(TAG, "Merkle root: %s", merkle_root);
 
-        bm_job * queued_next_job = malloc(sizeof(bm_job));
-        memcpy(queued_next_job, &next_job, sizeof(bm_job));
-        queued_next_job->extranonce2 = strdup(extranonce_2);
-        queued_next_job->jobid = strdup(params.job_id);
-        queue_enqueue(&g_bm_queue, queued_next_job);
+            bm_job next_job = construct_bm_job(params.version, params.prev_block_hash, merkle_root,
+                                               params.ntime, params.target);
+
+            //ESP_LOGI(TAG, "bm_job: ");
+            // print_hex((uint8_t *) &next_job.target, 4, 4, "nbits: ");
+            // print_hex((uint8_t *) &next_job.ntime, 4, 4, "ntime: ");
+            // print_hex((uint8_t *) &next_job.merkle_root_end, 4, 4, "merkle root end: ");
+            //print_hex(next_job.midstate, 32, 32, "midstate: ");
+
+            bm_job * queued_next_job = malloc(sizeof(bm_job));
+            memcpy(queued_next_job, &next_job, sizeof(bm_job));
+            queued_next_job->extranonce2 = strdup(extranonce_2_str);
+            queued_next_job->jobid = strdup(params.job_id);
+            queue_enqueue(&g_bm_queue, queued_next_job);
+
+            free(coinbase_tx);
+            free(merkle_root);
+            free(extranonce_2_str);
+            extranonce_2++;
+        }
+
+        if (abandon_work == 1) {
+            abandon_work = 0;
+            queue_clear(&g_bm_queue);
+        }
 
         free_mining_notify(params);
-        free(coinbase_tx);
-        free(merkle_root);
         free(next_notify_json_str);
     }
 }
@@ -226,6 +239,7 @@ static void admin_task(void *pvParameters)
             if (method == MINING_NOTIFY) {
                 if (should_abandon_work(line)) {
                     queue_clear(&g_queue);
+                    abandon_work = 1;
                 }
                 queue_enqueue(&g_queue, line);
             } else {
