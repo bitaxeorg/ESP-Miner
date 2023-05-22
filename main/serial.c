@@ -41,9 +41,9 @@ void init_serial(void) {
 }
 
 int send_serial(uint8_t *data, int len) {
-    printf("->");
-    prettyHex((unsigned char*)data, len);
-    printf("\n");
+    //printf("->");
+    //prettyHex((unsigned char*)data, len);
+    //printf("\n");
 
     return uart_write_bytes(UART_NUM_1, (const char *) data, len);
 }
