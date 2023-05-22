@@ -229,6 +229,8 @@ static void admin_task(void *pvParameters)
         ESP_LOGI(TAG, "Extranonce: %s", extranonce_str);
         ESP_LOGI(TAG, "Extranonce 2 length: %d", extranonce_2_len);
 
+        suggest_difficulty(sock, 100);
+
         while (1)
         {
             char * line = receive_jsonrpc_line(sock);

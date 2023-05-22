@@ -212,7 +212,7 @@ int subscribe_to_stratum(int socket, char ** extranonce, int * extranonce2_len)
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];
     sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe v2.2\"]}\n", send_uid++);
-    ESP_LOGI(TAG, "Subscribe: %s", subscribe_msg);
+    ESP_LOGI(TAG, "-> %s", subscribe_msg);
     write(socket, subscribe_msg, strlen(subscribe_msg));
     char * line;
     line = receive_jsonrpc_line(socket);
@@ -226,12 +226,28 @@ int subscribe_to_stratum(int socket, char ** extranonce, int * extranonce2_len)
     return 1;
 }
 
+int suggest_difficulty(int socket, uint32_t difficulty)
+{
+    char difficulty_msg[BUFFER_SIZE];
+    sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%d]}\n", send_uid++, difficulty);
+    ESP_LOGI(TAG, "-> %s", difficulty_msg);
+    write(socket, difficulty_msg, strlen(difficulty_msg));
+    char * line;
+    line = receive_jsonrpc_line(socket);
+
+    ESP_LOGI(TAG, "Received result %s", line);
+
+    free(line);
+
+    return 1;
+}
+
 int auth_to_stratum(int socket, const char * username)
 {
     char authorize_msg[BUFFER_SIZE];
     sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"x\"]}\n",
             send_uid++, username);
-    ESP_LOGI(TAG, "Authorize: %s", authorize_msg);
+    ESP_LOGI(TAG, "-> %s", authorize_msg);
    
     write(socket, authorize_msg, strlen(authorize_msg));
     char * line;
@@ -252,7 +268,7 @@ void submit_share(int socket, const char * username, const char * jobid,
     char submit_msg[BUFFER_SIZE];
     sprintf(submit_msg, "{\"id\": %d, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%08x\", \"%08x\"]}\n",
             send_uid++, username, jobid, extranonce_2, ntime, nonce);
-    ESP_LOGI(TAG, "Submit: %s", submit_msg);
+    ESP_LOGI(TAG, "-> %s", submit_msg);
     write(socket, submit_msg, strlen(submit_msg));
 }
 

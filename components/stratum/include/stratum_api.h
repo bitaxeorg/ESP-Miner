@@ -46,6 +46,7 @@ int parse_stratum_subscribe_result_message(const char * result_json_str,
                                            int * extranonce2_len);
 
 int auth_to_stratum(int socket, const char * username);
+int suggest_difficulty(int socket, uint32_t difficulty);
 
 void submit_share(int socket, const char * username, const char * jobid,
                  const uint32_t ntime, const char * extranonce_2, const uint32_t nonce);
