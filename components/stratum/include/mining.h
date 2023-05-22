@@ -13,6 +13,8 @@ typedef struct {
     char * extranonce2;
 } bm_job;
 
+void free_bm_job(bm_job * job);
+
 char * construct_coinbase_tx(const char * coinbase_1, const char * coinbase_2,
                              const char * extranonce, const char * extranonce_2);
 

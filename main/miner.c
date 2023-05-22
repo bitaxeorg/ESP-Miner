@@ -98,6 +98,7 @@ static void AsicTask(void * pvParameters)
             submit_share(sock, STRATUM_USER, next_bm_job->jobid,
                          next_bm_job->ntime, next_bm_job->extranonce2, nonce.nonce);
         }
+        free_bm_job(next_bm_job);
     }
 }
 
