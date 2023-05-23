@@ -54,10 +54,10 @@ void get_stats(void) {
 
     uint16_t fan_speed = EMC2101_get_fan_speed();
     float chip_temp = EMC2101_get_chip_temp();
-    float current = INA260_read_current();
-    float voltage = INA260_read_voltage();
+    //float current = INA260_read_current();
+    //float voltage = INA260_read_voltage();
     float power = INA260_read_power();
-    uint16_t vcore = ADC_get_vcore();
+    //uint16_t vcore = ADC_get_vcore();
 
     // ESP_LOGI(TAG, "Fan Speed: %d RPM", fan_speed);
     // ESP_LOGI(TAG, "Chip Temp: %.2f C", chip_temp);

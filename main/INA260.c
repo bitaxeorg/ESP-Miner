@@ -12,7 +12,7 @@
 #define I2C_MASTER_RX_BUF_DISABLE   0                          /*!< I2C master doesn't need buffer */
 #define I2C_MASTER_TIMEOUT_MS       1000
 
-static const char *TAG = "INA260.c";
+//static const char *TAG = "INA260.c";
 
 /**
  * @brief Read a sequence of I2C bytes
@@ -24,14 +24,14 @@ static esp_err_t register_read(uint8_t reg_addr, uint8_t *data, size_t len) {
 /**
  * @brief Write a byte to a I2C register
  */
-static esp_err_t register_write_byte(uint8_t reg_addr, uint8_t data) {
-    int ret;
-    uint8_t write_buf[2] = {reg_addr, data};
+// static esp_err_t register_write_byte(uint8_t reg_addr, uint8_t data) {
+//     int ret;
+//     uint8_t write_buf[2] = {reg_addr, data};
 
-    ret = i2c_master_write_to_device(I2C_MASTER_NUM, INA260_I2CADDR_DEFAULT, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_RATE_MS);
+//     ret = i2c_master_write_to_device(I2C_MASTER_NUM, INA260_I2CADDR_DEFAULT, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_RATE_MS);
 
-    return ret;
-}
+//     return ret;
+// }
 
 float INA260_read_current(void) {
   uint8_t data[2];

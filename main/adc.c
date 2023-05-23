@@ -1,7 +1,7 @@
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 
-static const char *TAG = "adc.c";
+//static const char *TAG = "adc.c";
 static esp_adc_cal_characteristics_t adc1_chars;
 
 //Sets up the ADC to read Vcore. Run this before ADC_get_vcore()

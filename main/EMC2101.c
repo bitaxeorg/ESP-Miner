@@ -12,7 +12,7 @@
 #define I2C_MASTER_RX_BUF_DISABLE   0                          /*!< I2C master doesn't need buffer */
 #define I2C_MASTER_TIMEOUT_MS       1000
 
-static const char *TAG = "EMC2101.c";
+//static const char *TAG = "EMC2101.c";
 
 /**
  * @brief Read a sequence of I2C bytes

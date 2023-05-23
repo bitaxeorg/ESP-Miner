@@ -79,7 +79,7 @@ static void AsicTask(void * pvParameters)
         memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
         memcpy(&job.nbits, &next_bm_job->target, 4);
         memcpy(&job.ntime, &next_bm_job->ntime, 4);
-        memcpy(&job.merkle4, &next_bm_job->merkle_root_end, 4);
+        memcpy(&job.merkle4, &next_bm_job->merkle_root + 28, 4);
         memcpy(&job.midstate, &next_bm_job->midstate, 32);
 
         send_work(&job);
@@ -92,13 +92,13 @@ static void AsicTask(void * pvParameters)
             print_hex((uint8_t *) &nonce.nonce, 4, 4, "nonce: ");
             memset(buf, 0, 1024);
             //check the nonce difficulty
-            if (nonce.nonce < next_bm_job->target) {
-                ESP_LOGI(TAG, "Nonce is valid");
-            } else {
-                ESP_LOGI(TAG, "Nonce is invalid");
+            double nonce_diff = test_nonce_value(next_bm_job, nonce.nonce);
+
+            ESP_LOGI(TAG, "Nonce difficulty: %f", nonce_diff);
+
+            if (nonce_diff > 100) {
+                submit_share(sock, STRATUM_USER, next_bm_job->jobid, next_bm_job->ntime, next_bm_job->extranonce2, nonce.nonce);
             }
-            submit_share(sock, STRATUM_USER, next_bm_job->jobid,
-                         next_bm_job->ntime, next_bm_job->extranonce2, nonce.nonce);
         }
         free_bm_job(next_bm_job);
     }
@@ -122,17 +122,13 @@ static void mining_task(void * pvParameters)
 
             char * extranonce_2_str = extranonce_2_generate(extranonce_2, extranonce_2_len);
 
-            char *coinbase_tx = construct_coinbase_tx(params.coinbase_1, params.coinbase_2,
-                                                      extranonce_str, extranonce_2_str);
+            char *coinbase_tx = construct_coinbase_tx(params.coinbase_1, params.coinbase_2, extranonce_str, extranonce_2_str);
             //ESP_LOGI(TAG, "Coinbase tx: %s", coinbase_tx);
 
-            char *merkle_root = calculate_merkle_root_hash(coinbase_tx,
-                                                           (uint8_t(*)[32])params.merkle_branches,
-                                                           params.n_merkle_branches);
+            char *merkle_root = calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])params.merkle_branches, params.n_merkle_branches);
             //ESP_LOGI(TAG, "Merkle root: %s", merkle_root);
 
-            bm_job next_job = construct_bm_job(params.version, params.prev_block_hash, merkle_root,
-                                               params.ntime, params.target);
+            bm_job next_job = construct_bm_job(&params, merkle_root);
 
             //ESP_LOGI(TAG, "bm_job: ");
             // print_hex((uint8_t *) &next_job.target, 4, 4, "nbits: ");

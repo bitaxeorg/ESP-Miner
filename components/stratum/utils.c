@@ -16,8 +16,25 @@
      		     (((uint32_t) (a) >> 24) & 0xff))
 #endif
 
+/*
+ * General byte order swapping functions.
+ */
+#define	bswap16(x)	__bswap16(x)
+#define	bswap32(x)	__bswap32(x)
+#define	bswap64(x)	__bswap64(x)
+
 uint32_t swab32(uint32_t v) {
     return bswap_32(v);
+}
+
+//takes 80 bytes and flips every 4 bytes
+void flip80bytes(void *dest_p, const void *src_p) {
+	uint32_t *dest = dest_p;
+	const uint32_t *src = src_p;
+	int i;
+
+	for (i = 0; i < 20; i++)
+		dest[i] = swab32(src[i]);
 }
 
 void flip64bytes(void *dest_p, const void *src_p) {
@@ -213,4 +230,25 @@ void reverse_bytes(uint8_t * data, size_t len) {
         data[i] = data[len - 1 - i];
         data[len - 1 - i] = temp;
     }
+}
+
+/* Converts a little endian 256 bit value to a double */
+double le256todouble(const void *target)
+{
+	uint64_t *data64;
+	double dcut64;
+
+	data64 = (uint64_t *)(target + 24);
+	dcut64 = bswap64(*data64) * 6277101735386680763835789423207666416102355444464034512896.0;
+
+	data64 = (uint64_t *)(target + 16);
+	dcut64 += bswap64(*data64) * 340282366920938463463374607431768211456.0;
+
+	data64 = (uint64_t *)(target + 8);
+	dcut64 += bswap64(*data64) * 18446744073709551616.0;
+
+	data64 = (uint64_t *)(target);
+	dcut64 += bswap64(*data64);
+
+	return dcut64;
 }

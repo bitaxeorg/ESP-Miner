@@ -78,7 +78,7 @@ void split_response(unsigned char *buf, int len) {
 
 //parse incoming packets
 void parse_packet(unsigned char *buf, int len) {
-    response_type_t response_type;
+    //response_type_t response_type;
 
     //debug the packet
     printf("<-");
@@ -88,10 +88,10 @@ void parse_packet(unsigned char *buf, int len) {
 
     //determine response type
     if (buf[len-1] & RESPONSE_JOB) {
-        response_type = JOB_RESP;
+        //response_type = JOB_RESP;
         parse_job_response(buf, len);
     } else {
-        response_type = CMD_RESP;
+        //response_type = CMD_RESP;
         parse_cmd_packet(buf, len);
     }
 
