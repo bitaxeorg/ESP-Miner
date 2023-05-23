@@ -70,8 +70,9 @@ static void AsicTask(void * pvParameters)
     uint8_t buf[CHUNK_SIZE];
     memset(buf, 0, 1024);
 
+    int id = 0;
+
     while (1) {
-        int id = 1;
         bm_job * next_bm_job = (bm_job *) queue_dequeue(&g_bm_queue, &termination_flag);
         struct job_packet job;
         job.job_id = id++;
@@ -117,8 +118,7 @@ static void mining_task(void * pvParameters)
         mining_notify params = parse_mining_notify_message(next_notify_json_str);
 
         uint32_t extranonce_2 = 0;
-        while (extranonce_2 < UINT_MAX || abandon_work == 1)
-        {
+        //while (extranonce_2 < UINT_MAX || abandon_work == 1) {
 
             char * extranonce_2_str = extranonce_2_generate(extranonce_2, extranonce_2_len);
 
@@ -146,7 +146,7 @@ static void mining_task(void * pvParameters)
             free(merkle_root);
             free(extranonce_2_str);
             extranonce_2++;
-        }
+        //}
 
         if (abandon_work == 1) {
             abandon_work = 0;
@@ -188,12 +188,6 @@ static void admin_task(void *pvParameters)
         ip4_addr3(&ip_Addr.u_addr.ip4), 
         ip4_addr4(&ip_Addr.u_addr.ip4) );
     printf( "Connecting to: stratum+tcp://%s:%d (%s)\n", STRATUM_URL, PORT, host_ip);
-        
-    // printf( "DNS found: %i.%i.%i.%i\n", 
-    //     ip4_addr1(&ip_Addr.u_addr.ip4), 
-    //     ip4_addr2(&ip_Addr.u_addr.ip4), 
-    //     ip4_addr3(&ip_Addr.u_addr.ip4), 
-    //     ip4_addr4(&ip_Addr.u_addr.ip4) );
 
     while (1) {
 

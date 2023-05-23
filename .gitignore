@@ -9,6 +9,9 @@ build/config/*
 !build/config/kconfig_menus.json
 !build/config/sdkconfig.json
 
+# Test folder
+test/build/*
+
 # HTML documentation
 html_doc/
 

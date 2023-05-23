@@ -40,10 +40,12 @@ void init_serial(void) {
     uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0);
 }
 
-int send_serial(uint8_t *data, int len) {
-    //printf("->");
-    //prettyHex((unsigned char*)data, len);
-    //printf("\n");
+int send_serial(uint8_t *data, int len, bool debug) {
+    if (debug) {
+        printf("->");
+        prettyHex((unsigned char*)data, len);
+        printf("\n");
+    }
 
     return uart_write_bytes(UART_NUM_1, (const char *) data, len);
 }
