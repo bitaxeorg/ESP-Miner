@@ -62,26 +62,30 @@ bm_job construct_bm_job(mining_notify * params, const char * merkle_root) {
     new_job.target = params->target;
     new_job.ntime = params->ntime;
 
-    hex2bin(merkle_root, new_job.merkle_root, 32);
-    hex2bin(params->prev_block_hash, new_job.prev_block_hash, 32);
+    swap_endian_words(params->prev_block_hash, new_job.prev_block_hash); //copy prev_block_hash
+    swap_endian_words(merkle_root, new_job.merkle_root); //copy merkle_root
 
     ////make the midstate hash
-    uint8_t midstate_data[64];
+    uint8_t midstate_data[68];
 
     //print the header
     printf("header: %08x%s%s%08x%08x000000000000008000000000000000000000000000000000000000000000000000000000\n", params->version, params->prev_block_hash, merkle_root, params->ntime, params->target);
 
     //copy 68 bytes header data into midstate (and deal with endianess)
     memcpy(midstate_data, &new_job.version, 4); //copy version
-    swap_endian_words(params->prev_block_hash, midstate_data + 4); //copy prev_block_hash
-    swap_endian_words(merkle_root, midstate_data + 36); //copy merkle_root
-
+    memcpy(midstate_data + 4, new_job.prev_block_hash, 32); //copy prev_block_hash
+    memcpy(midstate_data + 36, new_job.merkle_root, 32); //copy merkle_root
 
     printf("midstate_data: ");
     prettyHex(midstate_data, 64);
     printf("\n");   
 
     midstate_sha256_bin(midstate_data, 64, new_job.midstate); //make the midstate hash
+
+    printf("midstate_hash: ");
+    prettyHex(new_job.midstate, 32);
+    printf("\n");  
+
     reverse_bytes(new_job.midstate, 32); //reverse the midstate bytes for the BM job packet
 
     return new_job;
