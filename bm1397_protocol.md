@@ -69,4 +69,4 @@ AA 55 00 03 EA 0F 02 20 9C
 ```
 this means the Nonce `0003EA0F` was found for JobID `20`
 
-If the BM1397 _doesn't_ find a good nonce in the whole nonce space, it just goes off into lalaland. It's up to the miner to keep track of what the ASIC is doing and send it more work if this happens. If you look at the hashing frequency you should be able to time this.
+If the BM1397 _doesn't_ find a good nonce in the whole nonce space, it just starts over. This is super wasteful, so it's up to the miner to keep track of what the ASIC is doing and send it more work if this happens. If you look at the hashing frequency you should be able to time this.
