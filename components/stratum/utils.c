@@ -16,43 +16,25 @@
      		     (((uint32_t) (a) >> 24) & 0xff))
 #endif
 
-/*
- * General byte order swapping functions.
- */
-#define	bswap16(x)	__bswap16(x)
-#define	bswap32(x)	__bswap32(x)
-#define	bswap64(x)	__bswap64(x)
-
 uint32_t swab32(uint32_t v) {
     return bswap_32(v);
 }
 
-//takes 80 bytes and flips every 4 bytes
-void flip80bytes(void *dest_p, const void *src_p) {
+//takes num_bytes bytes and flips every 4 bytes
+void flip_bytes(void *dest_p, const void *src_p, uint8_t num_bytes) {
 	uint32_t *dest = dest_p;
 	const uint32_t *src = src_p;
 	int i;
+    uint8_t num_words = num_bytes / 4;
 
-	for (i = 0; i < 20; i++)
+    //make sure num_bytes is a multiple of 4
+    if (num_bytes % 4 != 0) {
+        fprintf(stderr, "num_bytes must be a multiple of 4\n");
+        exit(EXIT_FAILURE);
+    }
+
+	for (i = 0; i < num_words; i++)
 		dest[i] = swab32(src[i]);
-}
-
-void flip64bytes(void *dest_p, const void *src_p) {
-    uint32_t *dest = dest_p;
-    const uint32_t *src = src_p;
-    int i;
-
-    for (i = 0; i < 16; i++)
-        dest[i] = swab32(src[i]);
-}
-
-void flip32bytes(void *dest_p, const void *src_p) {
-    uint32_t *dest = dest_p;
-    const uint32_t *src = src_p;
-    int i;
-
-    for (i = 0; i < 8; i++)
-        dest[i] = swab32(src[i]);
 }
 
 
@@ -202,7 +184,7 @@ void midstate_sha256_bin( const uint8_t * data, const size_t data_len, uint8_t *
     mbedtls_sha256_update_ret(&midstate, data, 64);
 
     //memcpy(dest, midstate.state, 32);
-    flip32bytes(dest, midstate.state);
+    flip_bytes(dest, midstate.state, 32);
 
 }
 

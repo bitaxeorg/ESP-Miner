@@ -9,11 +9,11 @@
 
 void prettyHex(unsigned char * buf, int len) {
     int i;
-    for (i = 0; i < len; i++) {
-        if ((i > 0) && (buf[i] == 0xAA) && (buf[i+1] == 0x55))
-            printf("\n");
+    printf("[");
+    for (i = 0; i < len-1; i++) {
         printf("%02X ", buf[i]);
     }
+    printf("%02X]\n", buf[len-1]);
 }
 
 //flip byte order of a 32 bit integer

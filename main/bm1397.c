@@ -83,7 +83,6 @@ void parse_packet(unsigned char *buf, int len) {
     //debug the packet
     printf("<-");
     prettyHex(buf, len);
-    printf("\n");
 
 
     //determine response type
