@@ -60,13 +60,13 @@ TEST_CASE("Validate another merkle root calculation", "[mining]")
 // Values calculated from esp-miner/components/stratum/test/verifiers/bm1397.py
 TEST_CASE("Validate bm job construction", "[mining]")
 {
+    mining_notify notify_message;
+    notify_message.prev_block_hash = "bf44fd3513dc7b837d60e5c628b572b448d204a8000007490000000000000000";
+    notify_message.version = 0x20000004;
+    notify_message.target = 0x1705dd01;
+    notify_message.ntime = 0x64658bd8;
     const char * merkle_root = "cd1be82132ef0d12053dcece1fa0247fcfdb61d4dbd3eb32ea9ef9b4c604a846";
-    const char * prev_block_hash = "bf44fd3513dc7b837d60e5c628b572b448d204a8000007490000000000000000";
-    uint32_t version = 0x20000004;
-    uint32_t target = 0x1705dd01;
-    uint32_t ntime = 0x64658bd8;
-    bm_job job = construct_bm_job(version, prev_block_hash, merkle_root, ntime, target);
-    TEST_ASSERT_EQUAL_UINT32(job.merkle_root_end, 0x46a804c6);
+    bm_job job = construct_bm_job(&notify_message, merkle_root);
 
     uint8_t expected_midstate_bin[32];
     hex2bin("91DFEA528A9F73683D0D495DD6DD7415E1CA21CB411759E3E05D7D5FF285314D", expected_midstate_bin, 32);
@@ -110,4 +110,5 @@ TEST_CASE("Test nonce diff checking", "[mining test_nonce]")
 
     uint32_t nonce = 0x276E8947;
     double diff = test_nonce_value(&job, nonce);
-    TEST_ASSERT_EQUAL_INT(18, (int) diff);}
+    TEST_ASSERT_EQUAL_INT(18, (int) diff);
+}
