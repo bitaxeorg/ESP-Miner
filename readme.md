@@ -22,7 +22,7 @@ ESP-Miner is bitcoin miner software designed to run on the ESP32. It mines on AS
     - There isn't much change here except for computing the midstates, and shifting some bytes around
         - Beware of endianess!
         - How do we do this? Examples in cgminer Kano edition.
-        - I have started on this.. [check this](nm1397_protocol.md)
+        - I have started on this.. [check this](bm1397_protocol.md)
 - ESP-Miner sends this work to the mining ASIC over serial.
 
 - The Mining ASIC will report back any when it finds a hash over the difficulty (which)?
