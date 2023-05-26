@@ -69,14 +69,22 @@ bm_job construct_bm_job(mining_notify * params, const char * merkle_root) {
     uint8_t midstate_data[64];
 
     //print the header
-    printf("header: %08x%s%s%08x%08x000000000000008000000000000000000000000000000000000000000000000000000000\n", params->version, params->prev_block_hash, merkle_root, params->ntime, params->target);
+    printf("header: %08x%s%s%08x%08x00000000\n", params->version, params->prev_block_hash, merkle_root, params->ntime, params->target);
 
     //copy 68 bytes header data into midstate (and deal with endianess)
     memcpy(midstate_data, &new_job.version, 4); //copy version
     swap_endian_words(params->prev_block_hash, midstate_data + 4); //copy prev_block_hash
     memcpy(midstate_data + 36, new_job.merkle_root, 28); //copy merkle_root
 
+    printf("midstate_data: ");
+    prettyHex(midstate_data, 64);
+
     midstate_sha256_bin(midstate_data, 64, new_job.midstate); //make the midstate hash
+
+    //print the midstate
+    printf("midstate: ");
+    prettyHex(new_job.midstate, 32);
+
     reverse_bytes(new_job.midstate, 32); //reverse the midstate bytes for the BM job packet
 
     return new_job;
