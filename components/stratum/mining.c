@@ -102,15 +102,13 @@ double test_nonce_value(bm_job * job, uint32_t nonce) {
 	double d64, s64, ds;
     unsigned char header[80];
     uint8_t flipped_prev_block_hash[32];
-    uint8_t flipped_merkle_root[32];
 
     flip32bytes(flipped_prev_block_hash, job->prev_block_hash);
-    flip32bytes(flipped_merkle_root, job->merkle_root);
 
     //copy data from job to header
     memcpy(header, &job->version, 4);
     memcpy(header + 4, flipped_prev_block_hash, 32);
-    memcpy(header + 36, flipped_merkle_root, 32);
+    memcpy(header + 36, job->merkle_root, 32);
     memcpy(header + 68, &job->ntime, 4);
     memcpy(header + 72, &job->target, 4);
     memcpy(header + 76, &nonce, 4);
