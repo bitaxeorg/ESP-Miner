@@ -32,4 +32,6 @@ double le256todouble(const void *target);
 
 void prettyHex(unsigned char * buf, int len);
 
+uint32_t flip32(uint32_t val);
+
 #endif // STRATUM_UTILS_H

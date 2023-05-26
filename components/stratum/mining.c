@@ -3,7 +3,6 @@
 #include <limits.h>
 #include "mining.h"
 #include "utils.h"
-#include "../../main/pretty.h"
 #include "mbedtls/sha256.h"
 
 void free_bm_job(bm_job * job)

@@ -9,9 +9,9 @@
 #include "esp_log.h"
 #include "soc/uart_struct.h"
 
-#include "pretty.h"
 #include "bm1397.h"
 #include "serial.h"
+#include "utils.h"
 
 #define ECHO_TEST_TXD   (17)
 #define ECHO_TEST_RXD   (18)

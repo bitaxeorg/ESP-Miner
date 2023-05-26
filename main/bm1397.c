@@ -8,8 +8,8 @@
 #include "esp_log.h"
 
 #include "serial.h"
-#include "pretty.h"
 #include "bm1397.h"
+#include "utils.h"
 #include "crc.h"
 
 #define SLEEP_TIME 20

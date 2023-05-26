@@ -1,5 +1,4 @@
 idf_component_register(SRCS
-"pretty.c"
 "crc.c"
 "serial.c"
 "system.c"
@@ -18,7 +17,6 @@ idf_component_register(SRCS
 "serial"
 "bm1397.c"
 "crc.c"
-"pretty.c"
 "miner.c"
 "work_queue.c"
 INCLUDE_DIRS ".")
