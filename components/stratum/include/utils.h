@@ -36,4 +36,6 @@ void reverse_bytes(uint8_t * data, size_t len);
 
 double le256todouble(const void *target);
 
+void prettyHex(unsigned char * buf, int len);
+
 #endif // STRATUM_UTILS_H
