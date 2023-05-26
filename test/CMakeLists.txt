@@ -13,4 +13,7 @@ set(EXTRA_COMPONENT_DIRS "../components")
 set(TEST_COMPONENTS "stratum" CACHE STRING "List of components to test")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+
+set(IDF_TARGET "esp32s3")
+
 project(unit_test_stratum)
