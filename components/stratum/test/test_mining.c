@@ -105,7 +105,7 @@ TEST_CASE("Test nonce diff checking", "[mining test_nonce]")
     notify_message.version = 0x20000004;
     notify_message.target = 0x1705ae3a;
     notify_message.ntime = 0x646ff1a9;
-    const char * merkle_root = "C459036D054643519C5A2AC50B3474E0632C7CE4F93107843FDBF1EDD9CDB126";
+    const char * merkle_root = "C459036D054643519C5A2AC50B3474E0632C7CE4F93107843FDBF1EDD9CDB126646FF1A9";
     bm_job job = construct_bm_job(&notify_message, merkle_root);
 
     uint32_t nonce = 0x276E8947;

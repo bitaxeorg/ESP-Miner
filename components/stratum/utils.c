@@ -197,7 +197,7 @@ void midstate_sha256_bin( const uint8_t * data, const size_t data_len, uint8_t *
     mbedtls_sha256_context midstate;
 
     //Calculate midstate
-    mbedtls_sha256_init(&midstate); 
+    mbedtls_sha256_init(&midstate);
     mbedtls_sha256_starts_ret(&midstate, 0);
     mbedtls_sha256_update_ret(&midstate, data, 64);
 
@@ -232,6 +232,11 @@ void reverse_bytes(uint8_t * data, size_t len) {
     }
 }
 
+//static const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
+static const double bits192 = 6277101735386680763835789423207666416102355444464034512896.0;
+static const double bits128 = 340282366920938463463374607431768211456.0;
+static const double bits64 = 18446744073709551616.0;
+
 /* Converts a little endian 256 bit value to a double */
 double le256todouble(const void *target)
 {
@@ -239,16 +244,25 @@ double le256todouble(const void *target)
 	double dcut64;
 
 	data64 = (uint64_t *)(target + 24);
-	dcut64 = bswap64(*data64) * 6277101735386680763835789423207666416102355444464034512896.0;
+	dcut64 = *data64 * bits192;
 
 	data64 = (uint64_t *)(target + 16);
-	dcut64 += bswap64(*data64) * 340282366920938463463374607431768211456.0;
+	dcut64 += *data64 * bits128;
 
 	data64 = (uint64_t *)(target + 8);
-	dcut64 += bswap64(*data64) * 18446744073709551616.0;
+	dcut64 += *data64 * bits64;
 
 	data64 = (uint64_t *)(target);
-	dcut64 += bswap64(*data64);
+	dcut64 += *data64;
 
 	return dcut64;
+}
+
+void prettyHex(unsigned char * buf, int len) {
+    int i;
+    printf("[");
+    for (i = 0; i < len-1; i++) {
+        printf("%02X ", buf[i]);
+    }
+    printf("%02X]\n", buf[len-1]);
 }
