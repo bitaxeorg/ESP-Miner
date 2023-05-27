@@ -14,40 +14,11 @@ menu "Example Configuration"
         help
             GPIO number for I2C Master data line.
 
-    choice EXAMPLE_IP_MODE
-        prompt "IP Version"
-        depends on EXAMPLE_SOCKET_IP_INPUT_STRING
-        help
-            Example can use either IPV4 or IPV6.
-
-        config EXAMPLE_IPV4
-            bool "IPV4"
-
-        config EXAMPLE_IPV6
-            bool "IPV6"
-
-    endchoice
-
-    config EXAMPLE_IPV4_ADDR
-        string "IPV4 Address"
-        default "192.168.0.165"
-        depends on EXAMPLE_IPV4
-        help
-            The example will connect to this IPV4 address.
-
     config EXAMPLE_STRATUM_URL
         string "Stratum Address"
         default "solo.ckpool.org"
-        depends on EXAMPLE_IPV4
         help
             The example will connect to this Stratum pool address.
-
-    config EXAMPLE_IPV6_ADDR
-        string "IPV6 Address"
-        default "FE80::30AD:E57B:C212:68AD"
-        depends on EXAMPLE_IPV6
-        help
-            The example will connect to this IPV6 address.
 
     config EXAMPLE_STRATUM_PORT
         int "Stratum Port"
