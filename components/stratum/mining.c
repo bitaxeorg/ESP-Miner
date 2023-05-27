@@ -106,36 +106,59 @@ static const double truediffone = 2695953529101130949315647634472399133601089873
 double test_nonce_value(bm_job * job, uint32_t nonce) {
 	double d64, s64, ds;
     unsigned char header[80];
-    uint8_t flipped_prev_block_hash[32];
-    uint8_t flipped_merkle_root[32];
-
-    flip_bytes(flipped_prev_block_hash, job->prev_block_hash, 32);
-    flip_bytes(flipped_merkle_root, job->merkle_root, 32);
+    uint32_t flipped_nonce;
 
     //copy data from job to header
     memcpy(header, &job->version, 4);
-    memcpy(header + 4, flipped_prev_block_hash, 32);
-    memcpy(header + 36, flipped_merkle_root, 32);
+    memcpy(header + 4, job->prev_block_hash, 32);
+    memcpy(header + 36, job->merkle_root, 32);
     memcpy(header + 68, &job->ntime, 4);
     memcpy(header + 72, &job->target, 4);
-    memcpy(header + 76, &nonce, 4);
+    flipped_nonce = bswap32(nonce);
+    memcpy(header + 76, &flipped_nonce, 4);
 
-	unsigned char hash_buffer[32];
+	//unsigned char swapped_header[80];
+	// unsigned char hash_buffer[32];
     unsigned char hash_result[32];
+
+    //endian flip 80 bytes.
+    //version (4 bytes), prevhash (32 bytes), merkle (32 bytes), time (4 bytes), bits (4 bytes), nonce (4 bytes) = 80 bytes
+	// flip_bytes((uint32_t *)swapped_header, header, 80);
 
     printf("data32: ");
     prettyHex(header, 80);
 
-    //double hash the header
-	mbedtls_sha256(header, 80, hash_buffer, 0);
-	mbedtls_sha256(hash_buffer, 32, hash_result, 0);
+    mbedtls_sha256_context midstate, ctx;
+
+    //Calcular midstate
+    mbedtls_sha256_init(&midstate); 
+    mbedtls_sha256_starts_ret(&midstate, 0);
+    mbedtls_sha256_update_ret(&midstate, header, 64);
+
+    unsigned char *header64 = header + 64;
+  
+    mbedtls_sha256_clone(&ctx, &midstate); //Clonamos el contexto anterior para continuar el SHA desde allí
+    mbedtls_sha256_update_ret(&ctx, header64, 16);
+    mbedtls_sha256_finish_ret(&ctx, hash_result);
+
+    // Segundo SHA-256
+    mbedtls_sha256_starts_ret(&ctx, 0);
+    mbedtls_sha256_update_ret(&ctx, hash_result, 32);
+    mbedtls_sha256_finish_ret(&ctx, hash_result);
 
     printf("hash: ");
     prettyHex(hash_result, 32);
+    // //check that the last 4 bytes are 0
+	// if (*hash_32 != 0) {
+	// 	return 0.0;
+    // }
 
 	d64 = truediffone;
 	s64 = le256todouble(hash_result);
 	ds = d64 / s64;
+
+    mbedtls_sha256_free(&ctx);
+    mbedtls_sha256_free(&midstate);
 
 	return ds;
 }
