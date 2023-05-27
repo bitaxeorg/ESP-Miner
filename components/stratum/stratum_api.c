@@ -230,12 +230,15 @@ int suggest_difficulty(int socket, uint32_t difficulty)
     sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%d]}\n", send_uid++, difficulty);
     ESP_LOGI(TAG, "-> %s", difficulty_msg);
     write(socket, difficulty_msg, strlen(difficulty_msg));
+
+    /* TODO: fix race condition with first mining.notify message
     char * line;
     line = receive_jsonrpc_line(socket);
 
     ESP_LOGI(TAG, "Received result %s", line);
 
     free(line);
+    */
 
     return 1;
 }
