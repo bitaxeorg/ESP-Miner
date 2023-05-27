@@ -47,6 +47,7 @@ static int extranonce_2_len = 0;
 static int sock;
 
 static int abandon_work = 0;
+static uint32_t stratum_difficulty = 8192;
 
 static void AsicTask(void * pvParameters)
 {
@@ -97,7 +98,7 @@ static void AsicTask(void * pvParameters)
 
             ESP_LOGI(TAG, "Nonce difficulty: %f", nonce_diff);
 
-            if (nonce_diff > 100) {
+            if (nonce_diff > stratum_difficulty) {
                 submit_share(sock, STRATUM_USER, next_bm_job->jobid, next_bm_job->ntime, next_bm_job->extranonce2, nonce.nonce);
             }
         }
@@ -233,6 +234,9 @@ static void admin_task(void *pvParameters)
                     abandon_work = 1;
                 }
                 queue_enqueue(&g_queue, line);
+            } else if (method == MINING_SET_DIFFICULTY) {
+                stratum_difficulty = parse_mining_set_difficulty_message(line);
+                ESP_LOGI(TAG, "Set stratum difficulty: %d", stratum_difficulty);
             } else {
                 free(line);
             }
