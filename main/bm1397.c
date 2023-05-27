@@ -181,7 +181,7 @@ void send_init(void) {
     unsigned char init4[9] = {0x00, 0x3C, 0x80, 0x00, 0x80, 0x74}; //init4 - init_4_?
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, false);
 
-    unsigned char set_ticket[9] = {0x00, 0x14, 0x00, 0x00, 0x00, 0x00}; //set_ticket - ticket_mask
+    unsigned char set_ticket[9] = {0x00, 0x14, 0x00, 0x00, 0x80, 0xff}; //set_ticket - ticket_mask
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_ticket, 6, false);
 
     unsigned char init5[9] = {0x00, 0x68, 0xC0, 0x70, 0x01, 0x11}; //init5 - pll3_parameter
