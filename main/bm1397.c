@@ -159,8 +159,6 @@ void set_chip_address(uint8_t chipAddr) {
     send_BM1397((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, false);
 }
 
-
-
 void send_init(void) {
 
     //send serial data
@@ -181,7 +179,7 @@ void send_init(void) {
     unsigned char init4[9] = {0x00, 0x3C, 0x80, 0x00, 0x80, 0x74}; //init4 - init_4_?
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, false);
 
-    unsigned char set_ticket[9] = {0x00, 0x14, 0x00, 0x00, 0x80, 0xff}; //set_ticket - ticket_mask
+    unsigned char set_ticket[9] = {0x00, 0x14, 0x00, 0x00, 0x00, 0xff}; //set_ticket - ticket_mask
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_ticket, 6, false);
 
     unsigned char init5[9] = {0x00, 0x68, 0xC0, 0x70, 0x01, 0x11}; //init5 - pll3_parameter
@@ -201,11 +199,8 @@ void send_init(void) {
 
     unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x25}; //freqbuf - pll0_parameter
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
-    
 }
 
 void send_work(struct job_packet *job) {
-  
     send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t*)job, sizeof(struct job_packet), true);
-
 }
