@@ -80,8 +80,8 @@ static void AsicTask(void * pvParameters)
         memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
         memcpy(&job.nbits, &next_bm_job->target, 4);
         memcpy(&job.ntime, &next_bm_job->ntime, 4);
-        memcpy(&job.merkle4, &next_bm_job->merkle_root + 28, 4);
-        memcpy(&job.midstate, &next_bm_job->midstate, 32);
+        memcpy(&job.merkle4, next_bm_job->merkle_root + 28, 4);
+        memcpy(job.midstate, next_bm_job->midstate, 32);
 
         send_work(&job);
         uint16_t received = serial_rx(buf);
