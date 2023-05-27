@@ -42,9 +42,6 @@ Set following parameters under Example Connection Configuration Options:
 
 For more information about the example_connect() method used here, check out https://github.com/espressif/esp-idf/blob/master/examples/protocols/README.md.
 
-```
-#define STRATUM_USERNAME "johnny9.esp"
-```
 
 ## Build and Flash
 
