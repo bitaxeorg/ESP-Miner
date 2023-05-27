@@ -2,6 +2,9 @@
 sdkconfig
 sdkconfig.old
 
+# User specific VSCode
+.vscode/*
+
 # Production folder
 build/*
 !build/config
