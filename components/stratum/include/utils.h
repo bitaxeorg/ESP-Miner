@@ -4,19 +4,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/*
- * General byte order swapping functions.
- */
-#define	bswap16(x)	__bswap16(x)
-#define	bswap32(x)	__bswap32(x)
-#define	bswap64(x)	__bswap64(x)
-
 int hex2char(uint8_t x, char * c);
 
 size_t bin2hex(const uint8_t * buf, size_t buflen, char * hex, size_t hexlen);
 
 uint8_t hex2val(char c);
-void flip_bytes(void *dest_p, const void *src_p, uint8_t num_bytes);
+void flip80bytes(void *dest_p, const void *src_p);
 
 size_t hex2bin(const char * hex, uint8_t * bin, size_t bin_len);
 

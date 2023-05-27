@@ -111,7 +111,7 @@ static void mining_task(void * pvParameters)
     while (1) {
         char * next_notify_json_str = (char *) queue_dequeue(&g_queue, &termination_flag);
         ESP_LOGI(TAG, "New Work Dequeued");
-        //ESP_LOGI(TAG, "Notify json: %s", next_notify_json_str);
+        ESP_LOGI(TAG, "Notify json: %s", next_notify_json_str);
         uint32_t free_heap_size = esp_get_free_heap_size();
         ESP_LOGI(TAG, "miner heap free size: %u bytes", free_heap_size);
 
@@ -224,7 +224,8 @@ static void admin_task(void *pvParameters)
         while (1)
         {
             char * line = receive_jsonrpc_line(sock);
-            ESP_LOGI(TAG, "Received line [%d]: %s", strlen(line), line);
+            ESP_LOGI(TAG, "Received line: %s", line);
+            ESP_LOGI(TAG, "Received line length: %d", strlen(line));
 
             stratum_method method = parse_stratum_method(line);
             if (method == MINING_NOTIFY) {
