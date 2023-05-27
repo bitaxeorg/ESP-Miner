@@ -3,7 +3,7 @@
 
 #include <pthread.h>
 
-#define QUEUE_SIZE 3
+#define QUEUE_SIZE 12
 
 typedef struct {
     void * buffer[QUEUE_SIZE];
