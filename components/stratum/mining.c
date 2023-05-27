@@ -75,10 +75,6 @@ bm_job construct_bm_job(mining_notify * params, const char * merkle_root) {
     memcpy(midstate_data + 4, new_job.prev_block_hash, 32); //copy prev_block_hash
     memcpy(midstate_data + 36, new_job.merkle_root, 28); //copy merkle_root
 
-    printf("midstate_data: ");
-    prettyHex(midstate_data, 64);
-    printf("\n");
-
     midstate_sha256_bin(midstate_data, 64, new_job.midstate); //make the midstate hash
     reverse_bytes(new_job.midstate, 32); //reverse the midstate bytes for the BM job packet
 
@@ -118,15 +114,9 @@ double test_nonce_value(bm_job * job, uint32_t nonce) {
 	unsigned char hash_buffer[32];
     unsigned char hash_result[32];
 
-    printf("data32: ");
-    prettyHex(header, 80);
-
     //double hash the header
 	mbedtls_sha256(header, 80, hash_buffer, 0);
 	mbedtls_sha256(hash_buffer, 32, hash_result, 0);
-
-    printf("hash: ");
-    prettyHex(hash_result, 32);
 
 	d64 = truediffone;
 	s64 = le256todouble(hash_result);

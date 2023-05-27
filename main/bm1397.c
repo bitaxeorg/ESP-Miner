@@ -202,5 +202,5 @@ void send_init(void) {
 }
 
 void send_work(struct job_packet *job) {
-    send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t*)job, sizeof(struct job_packet), true);
+    send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t*)job, sizeof(struct job_packet), false);
 }
