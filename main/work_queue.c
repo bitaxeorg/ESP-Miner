@@ -24,14 +24,10 @@ void queue_enqueue(work_queue * queue, void * new_work) {
     pthread_mutex_unlock(&queue->lock);
 }
 
-void * queue_dequeue(work_queue * queue, int *termination_flag) {
+void * queue_dequeue(work_queue * queue) {
     pthread_mutex_lock(&queue->lock);
 
     while (queue->count == 0) {
-        if (*termination_flag) {
-            pthread_mutex_unlock(&queue->lock);
-            return NULL;
-        }
         pthread_cond_wait(&queue->not_empty, &queue->lock);
     }
 

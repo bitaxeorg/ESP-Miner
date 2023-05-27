@@ -17,7 +17,7 @@ typedef struct {
 
 void queue_init(work_queue * queue);
 void queue_enqueue(work_queue * queue, void * new_work);
-void * queue_dequeue(work_queue * queue, int * termination_flag);
+void * queue_dequeue(work_queue * queue);
 void queue_clear(work_queue * queue);
 
 #endif // WORK_QUEUE_H

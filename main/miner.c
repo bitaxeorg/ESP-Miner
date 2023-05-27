@@ -66,14 +66,14 @@ static void AsicTask(void * pvParameters)
     //send the init commands
     send_init();
 
-    int termination_flag = 0;
     uint8_t buf[CHUNK_SIZE];
     memset(buf, 0, 1024);
 
     int id = 0;
 
     while (1) {
-        bm_job * next_bm_job = (bm_job *) queue_dequeue(&g_bm_queue, &termination_flag);
+        int id = 1;
+        bm_job * next_bm_job = (bm_job *) queue_dequeue(&g_bm_queue);
         struct job_packet job;
         job.job_id = id++;
         job.num_midstates = 1;
@@ -107,9 +107,8 @@ static void AsicTask(void * pvParameters)
 
 static void mining_task(void * pvParameters)
 {
-    int termination_flag = 0;
     while (1) {
-        char * next_notify_json_str = (char *) queue_dequeue(&g_queue, &termination_flag);
+        char * next_notify_json_str = (char *) queue_dequeue(&g_queue);
         ESP_LOGI(TAG, "New Work Dequeued");
         ESP_LOGI(TAG, "Notify json: %s", next_notify_json_str);
         uint32_t free_heap_size = esp_get_free_heap_size();
