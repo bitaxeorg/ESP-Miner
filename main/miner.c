@@ -230,7 +230,7 @@ static void admin_task(void *pvParameters)
 
             stratum_method method = parse_stratum_method(line);
             if (method == MINING_NOTIFY) {
-                if (should_abandon_work(line)) {
+                if (should_abandon_work(line) && g_queue.count > 0) {
                     ESP_LOGI(TAG, "Should abandon work, clearing queues");
                     abandon_work = 1;
                     queue_clear(&g_queue);
