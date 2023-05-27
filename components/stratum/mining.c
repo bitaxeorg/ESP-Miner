@@ -78,15 +78,9 @@ bm_job construct_bm_job(mining_notify * params, const char * merkle_root) {
 
     printf("midstate_data: ");
     prettyHex(midstate_data, 64);
-    printf("\n");   
+    printf("\n");
 
     midstate_sha256_bin(midstate_data, 64, new_job.midstate); //make the midstate hash
-
-    //print the midstate
-    printf("midstate: ");
-    prettyHex(new_job.midstate, 32);
-    printf("\n");  
-
     reverse_bytes(new_job.midstate, 32); //reverse the midstate bytes for the BM job packet
 
     return new_job;
