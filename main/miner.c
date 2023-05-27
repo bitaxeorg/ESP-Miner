@@ -32,7 +32,6 @@
 #define STRATUM_PW CONFIG_EXAMPLE_STRATUM_PW
 
 
-
 static const char *TAG = "stratum client";
 
 TaskHandle_t sysTaskHandle = NULL;
@@ -118,7 +117,6 @@ static void mining_task(void * pvParameters)
         uint32_t extranonce_2 = 0;
         while (extranonce_2 < UINT_MAX && abandon_work == 0)
         {
-
             char * extranonce_2_str = extranonce_2_generate(extranonce_2, extranonce_2_len);
 
             char *coinbase_tx = construct_coinbase_tx(params.coinbase_1, params.coinbase_2, extranonce_str, extranonce_2_str);
@@ -157,16 +155,16 @@ static void mining_task(void * pvParameters)
     }
 }
 
-    ip_addr_t ip_Addr;
-    bool bDNSFound = false;
+ip_addr_t ip_Addr;
+bool bDNSFound = false;
 
-void dns_found_cb(const char *name, const ip_addr_t *ipaddr, void *callback_arg)
+void dns_found_cb(const char * name, const ip_addr_t * ipaddr, void * callback_arg)
 {
     ip_Addr = *ipaddr;
     bDNSFound = true;
 }
 
-static void admin_task(void *pvParameters)
+static void admin_task(void * pvParameters)
 {
     initialize_stratum_buffer();
     char host_ip[20];
@@ -174,22 +172,20 @@ static void admin_task(void *pvParameters)
     int ip_protocol = 0;
 
     //get ip address from hostname
-
-    IP_ADDR4( &ip_Addr, 0,0,0,0 );
+    IP_ADDR4(&ip_Addr, 0, 0, 0, 0);
     printf("Get IP for URL: %s\n", STRATUM_URL);
-    dns_gethostbyname(STRATUM_URL, &ip_Addr, dns_found_cb, NULL );
-    while( !bDNSFound );
+    dns_gethostbyname(STRATUM_URL, &ip_Addr, dns_found_cb, NULL);
+    while (!bDNSFound);
 
     //make IP address string from ip_Addr
-    snprintf( host_ip, sizeof(host_ip), "%d.%d.%d.%d", 
-        ip4_addr1(&ip_Addr.u_addr.ip4), 
-        ip4_addr2(&ip_Addr.u_addr.ip4), 
-        ip4_addr3(&ip_Addr.u_addr.ip4), 
-        ip4_addr4(&ip_Addr.u_addr.ip4) );
-    printf( "Connecting to: stratum+tcp://%s:%d (%s)\n", STRATUM_URL, PORT, host_ip);
+    snprintf(host_ip, sizeof(host_ip), "%d.%d.%d.%d",
+             ip4_addr1(&ip_Addr.u_addr.ip4),
+             ip4_addr2(&ip_Addr.u_addr.ip4),
+             ip4_addr3(&ip_Addr.u_addr.ip4),
+             ip4_addr4(&ip_Addr.u_addr.ip4));
+    printf("Connecting to: stratum+tcp://%s:%d (%s)\n", STRATUM_URL, PORT, host_ip);
 
     while (1) {
-
         struct sockaddr_in dest_addr;
         dest_addr.sin_addr.s_addr = inet_addr(host_ip);
         dest_addr.sin_family = AF_INET;
