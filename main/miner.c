@@ -118,7 +118,8 @@ static void mining_task(void * pvParameters)
         mining_notify params = parse_mining_notify_message(next_notify_json_str);
 
         uint32_t extranonce_2 = 0;
-        //while (extranonce_2 < UINT_MAX || abandon_work == 1) {
+        while (extranonce_2 < UINT_MAX && abandon_work == 0)
+        {
 
             char * extranonce_2_str = extranonce_2_generate(extranonce_2, extranonce_2_len);
 
@@ -146,7 +147,7 @@ static void mining_task(void * pvParameters)
             free(merkle_root);
             free(extranonce_2_str);
             extranonce_2++;
-        //}
+        }
 
         if (abandon_work == 1) {
             abandon_work = 0;
@@ -230,8 +231,14 @@ static void admin_task(void *pvParameters)
             stratum_method method = parse_stratum_method(line);
             if (method == MINING_NOTIFY) {
                 if (should_abandon_work(line)) {
-                    queue_clear(&g_queue);
+                    ESP_LOGI(TAG, "Should abandon work, clearing queues");
                     abandon_work = 1;
+                    queue_clear(&g_queue);
+                    queue_clear(&g_bm_queue);
+                }
+                if (g_queue.count == QUEUE_SIZE) {
+                    char * next_notify_json_str = (char *) queue_dequeue(&g_queue);
+                    free(next_notify_json_str);
                 }
                 queue_enqueue(&g_queue, line);
             } else if (method == MINING_SET_DIFFICULTY) {
