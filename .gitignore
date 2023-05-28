@@ -6,7 +6,8 @@ sdkconfig.old
 .vscode/*
 
 # Production folder
-build/*
+build/
+**/build/
 !build/config
 build/config/*
 !build/config/kconfig_menus.json
