@@ -69,8 +69,8 @@ static void AsicTask(void * pvParameters)
     uint8_t buf[CHUNK_SIZE];
     memset(buf, 0, 1024);
 
+    uint8_t id = 1;
     while (1) {
-        int id = 1;
         bm_job * next_bm_job = (bm_job *) queue_dequeue(&g_bm_queue);
         struct job_packet job;
         job.job_id = id++;
