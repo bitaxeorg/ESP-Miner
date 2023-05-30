@@ -15,7 +15,6 @@
 #define SLEEP_TIME 20
 
 static const char *TAG = "bm1397";
-static uint8_t initialized = 0;
 
 //reset the BM1397 via the RTS line
 void reset_BM1397(void) {
