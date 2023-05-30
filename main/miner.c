@@ -279,8 +279,9 @@ static void admin_task(void * pvParameters)
                     ESP_LOGI(TAG, "Should abandon work, clearing queues");
                     abandon_work = 1;
                     queue_clear(&g_queue);
-                    queue_clear(&g_bm_queue);
+
                     pthread_mutex_lock(&valid_jobs_lock);
+                    queue_clear(&g_bm_queue);
                     for (int i = 0; i < 128; i = i + 4) {
                         valid_jobs[i] = 0;
                     }
