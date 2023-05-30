@@ -160,7 +160,6 @@ static void mining_task(void * pvParameters)
     while (1) {
         char * next_notify_json_str = (char *) queue_dequeue(&g_queue);
         ESP_LOGI(TAG, "New Work Dequeued");
-        ESP_LOGI(TAG, "Notify json: %s", next_notify_json_str);
         uint32_t free_heap_size = esp_get_free_heap_size();
         ESP_LOGI(TAG, "miner heap free size: %u bytes", free_heap_size);
 
