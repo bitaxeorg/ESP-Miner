@@ -24,6 +24,7 @@
 #include "system.h"
 #include "serial.h"
 #include "bm1397.h"
+#include <pthread.h>
 
 
 #define PORT CONFIG_EXAMPLE_STRATUM_PORT
@@ -48,6 +49,10 @@ static int sock;
 static int abandon_work = 0;
 static uint32_t stratum_difficulty = 8192;
 
+bm_job ** active_jobs;
+uint8_t * valid_jobs;
+pthread_mutex_t valid_jobs_lock;
+
 static void AsicTask(void * pvParameters)
 {
     init_serial();
@@ -69,37 +74,84 @@ static void AsicTask(void * pvParameters)
     uint8_t buf[CHUNK_SIZE];
     memset(buf, 0, 1024);
 
-    uint8_t id = 1;
+    uint8_t id = 0;
+
+    active_jobs = malloc(sizeof(bm_job *) * 128);
+    valid_jobs = malloc(sizeof(uint8_t) * 128);
+    for (int i = 0; i < 128; i++) {
+		active_jobs[i] = NULL;
+        valid_jobs[i] = 0;
+	}
+
+    uint32_t prev_nonce = 0;
     while (1) {
         bm_job * next_bm_job = (bm_job *) queue_dequeue(&g_bm_queue);
         struct job_packet job;
-        job.job_id = id++;
+        // max job number is 128
+        id = (id + 4) % 128;
+        job.job_id = id;
         job.num_midstates = 1;
         memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
         memcpy(&job.nbits, &next_bm_job->target, 4);
         memcpy(&job.ntime, &next_bm_job->ntime, 4);
         memcpy(&job.merkle4, next_bm_job->merkle_root + 28, 4);
         memcpy(job.midstate, next_bm_job->midstate, 32);
+        if (active_jobs[id] != NULL) {
+            free(active_jobs[id]->jobid);
+            free(active_jobs[id]->extranonce2);
+            free(active_jobs[id]);
+        }
+        active_jobs[id] = next_bm_job;
+        pthread_mutex_lock(&valid_jobs_lock);
+        valid_jobs[id] = 1;
+        pthread_mutex_unlock(&valid_jobs_lock);
 
         send_work(&job);
-        uint16_t received = serial_rx(buf);
+        int received = serial_rx(buf);
         if (received > 0) {
             ESP_LOGI(TAG, "Received %d bytes from bm1397", received);
-            struct nonce_response nonce;
-            memcpy((void *) &nonce, buf, sizeof(struct nonce_response));
-            //reverse_bytes((uint8_t *) &nonce.nonce, 4);
-            print_hex((uint8_t *) &nonce.nonce, 4, 4, "nonce: ");
-            memset(buf, 0, 1024);
-            //check the nonce difficulty
-            double nonce_diff = test_nonce_value(next_bm_job, nonce.nonce);
+        }
 
-            ESP_LOGI(TAG, "Nonce difficulty: %f", nonce_diff);
+        uint8_t nonce_found = 0;
+        uint32_t first_nonce = 0;
+        for (int i = 0; i <= received - 9; i++)
+        {
+            if (buf[i] == 0xAA && buf[i + 1] == 0x55) {
+                struct nonce_response nonce;
+                memcpy((void *) &nonce, buf + i, sizeof(struct nonce_response));
 
-            if (nonce_diff > stratum_difficulty) {
-                submit_share(sock, STRATUM_USER, next_bm_job->jobid, next_bm_job->ntime, next_bm_job->extranonce2, nonce.nonce);
+                if (valid_jobs[nonce.job_id] == 0) {
+                    ESP_LOGI(TAG, "Invalid job nonce found");
+                }
+
+                print_hex((uint8_t *) &nonce.nonce, 4, 4, "nonce: ");
+                if (nonce_found == 0) {
+                    first_nonce = nonce.nonce;
+                    nonce_found = 1;
+                } else if (nonce.nonce == first_nonce) {
+                    // stop if we've already seen this nonce
+                    break;
+                }
+
+                if (nonce.nonce == prev_nonce) {
+                    continue;
+                } else {
+                    prev_nonce = nonce.nonce;
+                }
+
+                // check the nonce difficulty
+                double nonce_diff = test_nonce_value(active_jobs[nonce.job_id], nonce.nonce);
+
+                ESP_LOGI(TAG, "Nonce difficulty: %f", nonce_diff);
+
+                if (nonce_diff > stratum_difficulty)
+                {
+                    print_hex((uint8_t *)&job, sizeof(struct job_packet), sizeof(struct job_packet), "job: ");
+                    submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
+                                 active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
+                }
             }
         }
-        free_bm_job(next_bm_job);
     }
 }
 
@@ -229,6 +281,11 @@ static void admin_task(void * pvParameters)
                     abandon_work = 1;
                     queue_clear(&g_queue);
                     queue_clear(&g_bm_queue);
+                    pthread_mutex_lock(&valid_jobs_lock);
+                    for (int i = 0; i < 128; i = i + 4) {
+                        valid_jobs[i] = 0;
+                    }
+                    pthread_mutex_unlock(&valid_jobs_lock);
                 }
                 if (g_queue.count == QUEUE_SIZE) {
                     char * next_notify_json_str = (char *) queue_dequeue(&g_queue);
