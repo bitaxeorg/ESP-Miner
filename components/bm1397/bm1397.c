@@ -207,11 +207,11 @@ static void send_hash_frequency(float frequency) {
 
 	for (i = 0; i < 2; i++) {
         vTaskDelay(10 / portTICK_RATE_MS);
-        send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, true);
+        send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, false);
 	}
 	for (i = 0; i < 2; i++) {
         vTaskDelay(10 / portTICK_RATE_MS);
-        send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, true);
+        send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
 	}
 
     vTaskDelay(10 / portTICK_RATE_MS);

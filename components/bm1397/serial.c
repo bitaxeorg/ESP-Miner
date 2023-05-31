@@ -52,9 +52,10 @@ int send_serial(uint8_t *data, int len, bool debug) {
 
 /// @brief waits for a serial response from the device
 /// @param buf buffer to read data into
+/// @param buf number of ms to wait before timing out
 /// @return number of bytes read, or -1 on error
-int16_t serial_rx(uint8_t * buf) {
-    int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, BUF_SIZE, 20 / portTICK_RATE_MS);
+int16_t serial_rx(uint8_t * buf, uint16_t size, uint16_t timeout_ms) {
+    int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, size, timeout_ms / portTICK_RATE_MS);
     // if (bytes_read > 0) {
     //     printf("rx: ");
     //     prettyHex((unsigned char*) buf, bytes_read);
@@ -67,7 +68,7 @@ void debug_serial_rx(void) {
     int ret;
     uint8_t buf[CHUNK_SIZE];
 
-    ret = serial_rx(buf);
+    ret = serial_rx(buf, 100, 20);
     if (ret < 0) {
         fprintf(stderr, "unable to read data\n");
         return;
@@ -75,6 +76,10 @@ void debug_serial_rx(void) {
 
     memset(buf, 0, 1024);
 
+}
+
+void clear_serial_buffer(void) {
+    uart_flush(UART_NUM_1);
 }
 
 void SerialTask(void *arg) {

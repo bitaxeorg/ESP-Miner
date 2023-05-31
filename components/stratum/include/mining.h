@@ -12,6 +12,7 @@ typedef struct {
     uint32_t starting_nonce;
 
     uint8_t midstate[32];
+    uint32_t pool_diff;
     char * jobid;
     char * extranonce2;
 } bm_job;

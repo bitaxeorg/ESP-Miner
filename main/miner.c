@@ -34,6 +34,8 @@
 
 #define STRATUM_DIFFICULTY CONFIG_STRATUM_DIFFICULTY
 
+#define DEFAULT_JOB_TIMEOUT 20 //ms
+
 
 static const char *TAG = "miner";
 
@@ -108,11 +110,19 @@ static void AsicTask(void * pvParameters)
         valid_jobs[id] = 1;
         pthread_mutex_unlock(&valid_jobs_lock);
 
-        send_work(&job);
-        int received = serial_rx(buf);
-        // if (received > 0) {
-        //     ESP_LOGI(TAG, "Received %d bytes from bm1397", received);
-        // }
+        clear_serial_buffer();
+        send_work(&job); //send the job to the ASIC
+
+        //wait for a response
+        int received = serial_rx(buf, 9, DEFAULT_JOB_TIMEOUT); //TODO: this timeout should be related to the hash frequency
+
+        if (received < 0) {
+            ESP_LOGI(TAG, "Error in serial RX");
+            continue;
+        }
+        if (received == 0) {
+            continue;
+        }
 
         uint8_t nonce_found = 0;
         uint32_t first_nonce = 0;
@@ -144,9 +154,9 @@ static void AsicTask(void * pvParameters)
                 // check the nonce difficulty
                 double nonce_diff = test_nonce_value(active_jobs[nonce.job_id], nonce.nonce);
 
-                ESP_LOGI(TAG, "Nonce difficulty %.2f of %d", nonce_diff, stratum_difficulty);
+                ESP_LOGI(TAG, "Nonce difficulty %.2f of %d", nonce_diff, active_jobs[nonce.job_id]->pool_diff);
 
-                if (nonce_diff > stratum_difficulty)
+                if (nonce_diff > active_jobs[nonce.job_id]->pool_diff)
                 {
                     //print_hex((uint8_t *)&job, sizeof(struct job_packet), sizeof(struct job_packet), "job: ");
                     submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
@@ -180,6 +190,8 @@ static void mining_task(void * pvParameters)
 
             bm_job next_job = construct_bm_job(&params, merkle_root);
 
+            next_job.pool_diff = stratum_difficulty; //each job is tied to the _current_ difficulty
+
             //ESP_LOGI(TAG, "bm_job: ");
             // print_hex((uint8_t *) &next_job.target, 4, 4, "nbits: ");
             // print_hex((uint8_t *) &next_job.ntime, 4, 4, "ntime: ");
@@ -190,6 +202,7 @@ static void mining_task(void * pvParameters)
             memcpy(queued_next_job, &next_job, sizeof(bm_job));
             queued_next_job->extranonce2 = strdup(extranonce_2_str);
             queued_next_job->jobid = strdup(params.job_id);
+
             queue_enqueue(&g_bm_queue, queued_next_job);
 
             free(coinbase_tx);
