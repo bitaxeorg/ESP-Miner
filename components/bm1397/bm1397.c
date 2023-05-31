@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -13,8 +14,13 @@
 #include "crc.h"
 
 #define SLEEP_TIME 20
+#define FREQ_MULT 25.0
+
+#define BM1397_FREQUENCY CONFIG_BM1397_FREQUENCY
 
 static const char *TAG = "bm1397";
+
+static void send_hash_frequency(float frequency);
 
 //reset the BM1397 via the RTS line
 void reset_BM1397(void) {
@@ -135,13 +141,100 @@ void send_init(void) {
     unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0x7A, 0x31}; //baudrate - misc_control
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
 
-    unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; //prefreq - pll0_divider
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, false);
+    send_hash_frequency(BM1397_FREQUENCY);
 
-    unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x25}; //freqbuf - pll0_parameter
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
+    // unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; //prefreq - pll0_divider
+    // send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, false);
+
+    // unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x25}; //freqbuf - pll0_parameter
+    // send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
 }
 
 void send_work(struct job_packet *job) {
     send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t*)job, sizeof(struct job_packet), false);
+}
+
+
+// borrowed from cgminer driver-gekko.c calc_gsf_freq()
+static void send_hash_frequency(float frequency) {
+
+	//unsigned char prefreq[] = {0x51, 0x09, 0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00, 0x00};
+    unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; //prefreq - pll0_divider
+    // 
+
+	// default 200Mhz if it fails
+    unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x25}; //freqbuf - pll0_parameter
+	//unsigned char freqbuf[] = {0x51, 0x09, 0x00, 0x08, 0x40, -0xF0, -0x02, -0x65, 0x00};
+
+	float deffreq = 200.0;
+
+	float fa, fb, fc1, fc2, newf;
+	float f1, basef, famax = 0xf0, famin = 0x10;
+	int i;
+
+    //bound the frequency setting
+    if (frequency < 100) {
+        f1 = 100;
+    } else if (frequency > 800) {
+        f1 = 800;
+    } else {
+        f1 = frequency;
+    }
+
+
+	fb = 2; fc1 = 1; fc2 = 5; // initial multiplier of 10
+	if (f1 >= 500) {
+		// halve down to '250-400'
+		fb = 1;
+	} else if (f1 <= 150) {
+		// triple up to '300-450'
+		fc1 = 3;
+	} else if (f1 <= 250) {
+		// double up to '300-500'
+		fc1 = 2;
+	}
+	// else f1 is 250-500
+
+	// f1 * fb * fc1 * fc2 is between 2500 and 5000
+	// - so round up to the next 25 (freq_mult)
+	basef = FREQ_MULT * ceil(f1 * fb * fc1 * fc2 / FREQ_MULT);
+
+	// fa should be between 100 (0x64) and 200 (0xC8)
+	fa = basef / FREQ_MULT;
+
+	// code failure ... basef isn't 400 to 6000
+	if (fa < famin || fa > famax) {
+		newf = deffreq;
+	} else {
+		freqbuf[3] = (int)fa;
+		freqbuf[4] = (int)fb;
+		// fc1, fc2 'should' already be 1..15
+		freqbuf[5] = (((int)fc1 & 0xf) << 4) + ((int)fc2 & 0xf);
+
+		newf = basef / ((float)fb * (float)fc1 * (float)fc2);
+	}
+
+	for (i = 0; i < 2; i++) {
+		//cgsleep_ms(10);
+        vTaskDelay(10 / portTICK_RATE_MS);
+		//compac_send2(compac, prefreq, sizeof(prefreq), 8 * sizeof(prefreq) - 8, "prefreq");
+        send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, true);
+	}
+	for (i = 0; i < 2; i++) {
+		//cgsleep_ms(10);
+        vTaskDelay(10 / portTICK_RATE_MS);
+		//compac_send2(compac, freqbuf, sizeof(freqbuf), 8 * sizeof(freqbuf) - 8, "freq");
+        send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, true);
+	}
+	//cgsleep_ms(10);
+    vTaskDelay(10 / portTICK_RATE_MS);
+
+	// the freq wanted, which 'should' be the same
+	// info->asics[0].frequency = frequency;
+	// info->frequency = frequency;
+
+	// applog(LOG_INFO, "%d: %s %d - setting frequency to %.2fMHz (%.2f)" " (%.0f/%.0f/%.0f/%.0f)",
+	// 	compac->cgminer_id, compac->drv->name, compac->device_id, frequency, newf, fa, fb, fc1, fc2);
+    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
+
 }

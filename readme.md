@@ -21,7 +21,7 @@ Use menuconfig to set the stratum server address/port and WiFi SSID/Password
 ```
 idf.py menuconfig
 ```
-Set following parameters under Example Configuration Options, these will define the stratum server you connect to:
+Set following parameters under Stratum Configuration Options, these will define the stratum server you connect to:
 
 * Set `Stratum Address` to the stratum pool domain name. example "solo.ckpool.org"
 

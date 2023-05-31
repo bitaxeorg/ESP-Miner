@@ -6,6 +6,13 @@ menu "Bitaxe Configuration"
         default 1400
         help
             The core voltage to set the BM1397 ASIC to.
+
+    config BM1397_FREQUENCY
+        int "ASIC Hash Frequency (MHz)"
+        range 200 800
+        default 250
+        help
+            The BM1397 hash frequency
 endmenu
 
 menu "Stratum Configuration"

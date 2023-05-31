@@ -110,9 +110,9 @@ static void AsicTask(void * pvParameters)
 
         send_work(&job);
         int received = serial_rx(buf);
-        if (received > 0) {
-            ESP_LOGI(TAG, "Received %d bytes from bm1397", received);
-        }
+        // if (received > 0) {
+        //     ESP_LOGI(TAG, "Received %d bytes from bm1397", received);
+        // }
 
         uint8_t nonce_found = 0;
         uint32_t first_nonce = 0;
@@ -126,7 +126,7 @@ static void AsicTask(void * pvParameters)
                     ESP_LOGI(TAG, "Invalid job nonce found");
                 }
 
-                print_hex((uint8_t *) &nonce.nonce, 4, 4, "nonce: ");
+                //print_hex((uint8_t *) &nonce.nonce, 4, 4, "nonce: ");
                 if (nonce_found == 0) {
                     first_nonce = nonce.nonce;
                     nonce_found = 1;
@@ -144,7 +144,7 @@ static void AsicTask(void * pvParameters)
                 // check the nonce difficulty
                 double nonce_diff = test_nonce_value(active_jobs[nonce.job_id], nonce.nonce);
 
-                ESP_LOGI(TAG, "Nonce difficulty: %f", nonce_diff);
+                ESP_LOGI(TAG, "Nonce difficulty %.2f of %d", nonce_diff, stratum_difficulty);
 
                 if (nonce_diff > stratum_difficulty)
                 {
