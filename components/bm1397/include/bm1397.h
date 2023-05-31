@@ -55,8 +55,6 @@ struct __attribute__((__packed__)) nonce_response {
 void send_read_address(void);
 void send_init(void);
 void send_work(struct job_packet *job);
-void parse_packet(unsigned char *buf, int len);
-void split_response(unsigned char *buf, int len);
 void reset_BM1397(void);
 void init_BM1397(void);
 

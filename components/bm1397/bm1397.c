@@ -39,65 +39,6 @@ void init_BM1397(void) {
 
 }
 
-//parse job/nonce response
-void parse_job_response(unsigned char *buf, int len) {
-    struct nonce_response * nonce;
-
-    //get the response into the nonce struct
-    //memcpy((void *)&nonce, buf, len);
-    nonce = (struct nonce_response *)buf;
-
-    printf("nonce: %08X @ %02X\n", flip32(nonce->nonce), nonce->job_id);
-    return;
-}
-
-void parse_cmd_packet(unsigned char *buf, int len) {
-    printf("cmd packet\n");
-}
-
-//split the response packet into individual packets
-void split_response(unsigned char *buf, int len) {
-    int i;
-    int packet_len;
-    int packet_start = 0;
-
-    //split the response into individual packets
-    for (i = 1; i < len; i++) {
-        if ((buf[i] == 0xAA) && (buf[i+1] == 0x55)) {
-            packet_len = i - packet_start;
-            parse_packet(buf+packet_start, packet_len);
-            packet_start = i;
-        }
-    }
-
-    //parse the last packet
-    packet_len = i - packet_start;
-    parse_packet(buf+packet_start, packet_len);
-}
-
-
-//parse incoming packets
-void parse_packet(unsigned char *buf, int len) {
-    //response_type_t response_type;
-
-    //debug the packet
-    printf("<-");
-    prettyHex(buf, len);
-    printf("\n");
-
-
-    //determine response type
-    if (buf[len-1] & RESPONSE_JOB) {
-        //response_type = JOB_RESP;
-        parse_job_response(buf, len);
-    } else {
-        //response_type = CMD_RESP;
-        parse_cmd_packet(buf, len);
-    }
-
-}
-
-
 /// @brief 
 /// @param ftdi 
 /// @param header 

@@ -55,11 +55,11 @@ int send_serial(uint8_t *data, int len, bool debug) {
 /// @return number of bytes read, or -1 on error
 int16_t serial_rx(uint8_t * buf) {
     int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, BUF_SIZE, 20 / portTICK_RATE_MS);
-    if (bytes_read > 0) {
-        printf("bm rx\n");
-        prettyHex((unsigned char*) buf, bytes_read);
-        printf("\n");
-    }
+    // if (bytes_read > 0) {
+    //     printf("rx: ");
+    //     prettyHex((unsigned char*) buf, bytes_read);
+    //     printf("\n");
+    // }
     return bytes_read;
 }
 
@@ -71,10 +71,6 @@ void debug_serial_rx(void) {
     if (ret < 0) {
         fprintf(stderr, "unable to read data\n");
         return;
-    }
-
-    if (ret > 0) {
-        split_response(buf, ret);
     }
 
     memset(buf, 0, 1024);
