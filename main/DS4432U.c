@@ -3,8 +3,8 @@
 #include "esp_log.h"
 #include "driver/i2c.h"
 
-#define I2C_MASTER_SCL_IO           CONFIG_I2C_MASTER_SCL      /*!< GPIO number used for I2C master clock */
-#define I2C_MASTER_SDA_IO           CONFIG_I2C_MASTER_SDA      /*!< GPIO number used for I2C master data  */
+#define I2C_MASTER_SCL_IO           48      /*!< GPIO number used for I2C master clock */
+#define I2C_MASTER_SDA_IO           47      /*!< GPIO number used for I2C master data  */
 #define I2C_MASTER_NUM              0                          /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
 #define I2C_MASTER_FREQ_HZ          400000                     /*!< I2C master clock frequency */
 #define I2C_MASTER_TX_BUF_DISABLE   0                          /*!< I2C master doesn't need buffer */
@@ -120,7 +120,7 @@ bool DS4432U_set_vcore(float core_voltage) {
 
     reg_setting = voltage_to_reg(core_voltage);
 
-    ESP_LOGI(TAG, "Test set %.3fV = 0x%02X", core_voltage, reg_setting);
+    ESP_LOGI(TAG, "Set BM1397 voltage = %.3fV [0x%02X]", core_voltage, reg_setting);
 
     DS4432U_set(reg_setting); ///eek!
 

@@ -27,13 +27,15 @@
 #include <pthread.h>
 
 
-#define PORT CONFIG_EXAMPLE_STRATUM_PORT
-#define STRATUM_URL CONFIG_EXAMPLE_STRATUM_URL
-#define STRATUM_USER CONFIG_EXAMPLE_STRATUM_USER
-#define STRATUM_PW CONFIG_EXAMPLE_STRATUM_PW
+#define PORT CONFIG_STRATUM_PORT
+#define STRATUM_URL CONFIG_STRATUM_URL
+#define STRATUM_USER CONFIG_STRATUM_USER
+#define STRATUM_PW CONFIG_STRATUM_PW
+
+#define STRATUM_DIFFICULTY CONFIG_STRATUM_DIFFICULTY
 
 
-static const char *TAG = "stratum client";
+static const char *TAG = "miner";
 
 TaskHandle_t sysTaskHandle = NULL;
 TaskHandle_t serialTaskHandle = NULL;
@@ -146,7 +148,7 @@ static void AsicTask(void * pvParameters)
 
                 if (nonce_diff > stratum_difficulty)
                 {
-                    print_hex((uint8_t *)&job, sizeof(struct job_packet), sizeof(struct job_packet), "job: ");
+                    //print_hex((uint8_t *)&job, sizeof(struct job_packet), sizeof(struct job_packet), "job: ");
                     submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
                                  active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
                 }
@@ -265,13 +267,12 @@ static void admin_task(void * pvParameters)
         ESP_LOGI(TAG, "Extranonce: %s", extranonce_str);
         ESP_LOGI(TAG, "Extranonce 2 length: %d", extranonce_2_len);
 
-        suggest_difficulty(sock, 100);
+        suggest_difficulty(sock, STRATUM_DIFFICULTY);
 
         while (1)
         {
             char * line = receive_jsonrpc_line(sock);
-            ESP_LOGI(TAG, "Received line: %s", line);
-            ESP_LOGI(TAG, "Received line length: %d", strlen(line));
+            ESP_LOGI(TAG, "%s", line); //debug incoming stratum messages
 
             stratum_method method = parse_stratum_method(line);
             if (method == MINING_NOTIFY) {

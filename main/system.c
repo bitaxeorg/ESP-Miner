@@ -14,6 +14,8 @@
 
 static const char *TAG = "system";
 
+#define BM1397_VOLTAGE CONFIG_BM1397_VOLTAGE
+
 void init_system(void) {
     
     //test the LEDs
@@ -32,7 +34,7 @@ void init_system(void) {
     ADC_init();
 
     //DS4432U tests
-    DS4432U_set_vcore(1.4);
+    DS4432U_set_vcore(BM1397_VOLTAGE / 1000.0);
     
     //Fan Tests
     EMC2101_init();

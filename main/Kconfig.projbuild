@@ -1,43 +1,50 @@
-menu "Example Configuration"
+menu "Bitaxe Configuration"
 
-    config I2C_MASTER_SCL
-        int "SCL GPIO Num"
-        default 6 if IDF_TARGET_ESP32C3
-        default 48 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
+    config BM1397_VOLTAGE
+        int "ASIC Core Voltage (mV)"
+        range 1000 1800
+        default 1400
         help
-            GPIO number for I2C Master clock line.
+            The core voltage to set the BM1397 ASIC to.
+endmenu
 
-    config I2C_MASTER_SDA
-        int "SDA GPIO Num"
-        default 5 if IDF_TARGET_ESP32C3
-        default 47 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
-        help
-            GPIO number for I2C Master data line.
+menu "Stratum Configuration"
 
-    config EXAMPLE_STRATUM_URL
+    config STRATUM_URL
         string "Stratum Address"
         default "solo.ckpool.org"
         help
             The example will connect to this Stratum pool address.
 
-    config EXAMPLE_STRATUM_PORT
+    config STRATUM_PORT
         int "Stratum Port"
         range 0 65535
         default 3333
         help
             The stratum server port to connect to.
 
-    config EXAMPLE_STRATUM_USER
+    config STRATUM_USER
         string "Stratum username"
         default ""
         help
             Stratum user to use with pool
 
-    config EXAMPLE_STRATUM_PW
+    config STRATUM_PW
         string "Stratum password"
         default "x"
         help
             Stratum password to use with pool
+
+    config STRATUM_DIFFICULTY
+        int "Stratum default difficulty"
+        range 0 4294967296
+        default 1000
+        help
+            A starting difficulty to use with the pool.
+
+endmenu
+
+menu "Example Configuration"
 
     choice EXAMPLE_SOCKET_IP_INPUT
         prompt "Socket example source"
