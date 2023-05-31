@@ -43,20 +43,3 @@ menu "Stratum Configuration"
             A starting difficulty to use with the pool.
 
 endmenu
-
-menu "Example Configuration"
-
-    choice EXAMPLE_SOCKET_IP_INPUT
-        prompt "Socket example source"
-        default EXAMPLE_SOCKET_IP_INPUT_STRING
-        help
-            Selects the input source of the IP used in the example.
-
-        config EXAMPLE_SOCKET_IP_INPUT_STRING
-            bool "From string"
-
-        config EXAMPLE_SOCKET_IP_INPUT_STDIN
-            bool "From stdin"
-    endchoice
-
-endmenu
