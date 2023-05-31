@@ -142,12 +142,6 @@ void send_init(void) {
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
 
     send_hash_frequency(BM1397_FREQUENCY);
-
-    // unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; //prefreq - pll0_divider
-    // send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, false);
-
-    // unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x25}; //freqbuf - pll0_parameter
-    // send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
 }
 
 void send_work(struct job_packet *job) {
@@ -158,13 +152,10 @@ void send_work(struct job_packet *job) {
 // borrowed from cgminer driver-gekko.c calc_gsf_freq()
 static void send_hash_frequency(float frequency) {
 
-	//unsigned char prefreq[] = {0x51, 0x09, 0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00, 0x00};
     unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; //prefreq - pll0_divider
-    // 
 
 	// default 200Mhz if it fails
     unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x25}; //freqbuf - pll0_parameter
-	//unsigned char freqbuf[] = {0x51, 0x09, 0x00, 0x08, 0x40, -0xF0, -0x02, -0x65, 0x00};
 
 	float deffreq = 200.0;
 
@@ -215,26 +206,16 @@ static void send_hash_frequency(float frequency) {
 	}
 
 	for (i = 0; i < 2; i++) {
-		//cgsleep_ms(10);
         vTaskDelay(10 / portTICK_RATE_MS);
-		//compac_send2(compac, prefreq, sizeof(prefreq), 8 * sizeof(prefreq) - 8, "prefreq");
         send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, true);
 	}
 	for (i = 0; i < 2; i++) {
-		//cgsleep_ms(10);
         vTaskDelay(10 / portTICK_RATE_MS);
-		//compac_send2(compac, freqbuf, sizeof(freqbuf), 8 * sizeof(freqbuf) - 8, "freq");
         send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, true);
 	}
-	//cgsleep_ms(10);
+
     vTaskDelay(10 / portTICK_RATE_MS);
 
-	// the freq wanted, which 'should' be the same
-	// info->asics[0].frequency = frequency;
-	// info->frequency = frequency;
-
-	// applog(LOG_INFO, "%d: %s %d - setting frequency to %.2fMHz (%.2f)" " (%.0f/%.0f/%.0f/%.0f)",
-	// 	compac->cgminer_id, compac->drv->name, compac->device_id, frequency, newf, fa, fb, fc1, fc2);
     ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
 
 }
