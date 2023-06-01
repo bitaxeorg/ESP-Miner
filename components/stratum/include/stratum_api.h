@@ -24,7 +24,8 @@ typedef struct {
 typedef enum {
     STRATUM_UNKNOWN,
     MINING_NOTIFY,
-    MINING_SET_DIFFICULTY
+    MINING_SET_DIFFICULTY,
+    MINING_SET_VERSION_MASK
 } stratum_method;
 
 void initialize_stratum_buffer();
@@ -39,6 +40,8 @@ mining_notify parse_mining_notify_message(const char * stratum_json);
 
 uint32_t parse_mining_set_difficulty_message(const char * stratum_json);
 
+uint32_t parse_mining_set_version_mask_message(const char * stratum_json);
+
 void free_mining_notify(mining_notify params);
 
 int parse_stratum_subscribe_result_message(const char * result_json_str,
@@ -46,6 +49,9 @@ int parse_stratum_subscribe_result_message(const char * result_json_str,
                                            int * extranonce2_len);
 
 int auth_to_stratum(int socket, const char * username);
+
+void configure_version_rolling(int socket);
+
 int suggest_difficulty(int socket, uint32_t difficulty);
 
 void submit_share(int socket, const char * username, const char * jobid,

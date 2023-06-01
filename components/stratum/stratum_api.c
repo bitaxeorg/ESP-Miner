@@ -105,6 +105,8 @@ stratum_method parse_stratum_method(const char * stratum_json)
             result = MINING_NOTIFY;
         } else if (strcmp("mining.set_difficulty", method_json->valuestring) == 0) {
             result = MINING_SET_DIFFICULTY;
+        } else if (strcmp("mining.set_version_mask", method_json->valuestring) == 0) {
+            result = MINING_SET_VERSION_MASK;
         }
     }
 
@@ -125,6 +127,21 @@ uint32_t parse_mining_set_difficulty_message(const char * stratum_json)
 
     cJSON_Delete(json);
     return difficulty;
+}
+
+uint32_t parse_mining_set_version_mask_message(const char * stratum_json)
+{
+    cJSON * json = cJSON_Parse(stratum_json);
+    cJSON * method = cJSON_GetObjectItem(json, "method");
+    if (method != NULL && cJSON_IsString(method)) {
+        assert(strcmp("mining.set_version_mask", method->valuestring) == 0);
+    }
+
+    cJSON * params = cJSON_GetObjectItem(json, "params");
+    uint32_t version_mask = strtoul(cJSON_GetArrayItem(params, 0)->valuestring, NULL, 16);
+
+    cJSON_Delete(json);
+    return version_mask;
 }
 
 mining_notify parse_mining_notify_message(const char * stratum_json)
@@ -281,4 +298,20 @@ int should_abandon_work(const char * mining_notify_json_str)
     int value = cJSON_IsTrue(cJSON_GetArrayItem(params, 8));
     cJSON_Delete(root);
     return value;
+}
+
+void parse_stratum_configure_result_message(const char * line, uint32_t * version_mask)
+{
+    return;
+}
+
+void configure_version_rolling(int socket)
+{
+    // Configure
+    char configure_msg[BUFFER_SIZE * 2];
+    sprintf(configure_msg, "{\"id\": %d, \"method\": \"mining.configure\", \"params\": [[\"version-rolling\"], {\"version-rolling.mask\": \"ffffffff\"}]}\n", send_uid++);
+    ESP_LOGI(TAG, "-> %s", configure_msg);
+    write(socket, configure_msg, strlen(configure_msg));
+
+    return;
 }

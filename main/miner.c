@@ -273,7 +273,12 @@ static void admin_task(void * pvParameters)
             ESP_LOGE(TAG, "Socket unable to connect: errno %d", errno);
             break;
         }
+
+        uint32_t version_mask = 0;
+
         subscribe_to_stratum(sock, &extranonce_str, &extranonce_2_len);
+
+        configure_version_rolling(sock);
 
         auth_to_stratum(sock, STRATUM_USER);
 
@@ -309,6 +314,9 @@ static void admin_task(void * pvParameters)
             } else if (method == MINING_SET_DIFFICULTY) {
                 stratum_difficulty = parse_mining_set_difficulty_message(line);
                 ESP_LOGI(TAG, "Set stratum difficulty: %d", stratum_difficulty);
+            } else if (method == MINING_SET_VERSION_MASK) {
+                version_mask = parse_mining_set_version_mask_message(line);
+                ESP_LOGI(TAG, "Set version mask: %08x", version_mask);
             } else {
                 free(line);
             }
