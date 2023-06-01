@@ -114,7 +114,7 @@ static void AsicTask(void * pvParameters)
         send_work(&job); //send the job to the ASIC
 
         //wait for a response
-        int received = serial_rx(buf, 9, DEFAULT_JOB_TIMEOUT); //TODO: this timeout should be related to the hash frequency
+        int received = serial_rx(buf, 9, DEFAULT_JOB_TIMEOUT); //TODO: this timeout should be 2^32/hashrate
 
         if (received < 0) {
             ESP_LOGI(TAG, "Error in serial RX");
