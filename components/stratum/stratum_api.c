@@ -300,11 +300,6 @@ int should_abandon_work(const char * mining_notify_json_str)
     return value;
 }
 
-void parse_stratum_configure_result_message(const char * line, uint32_t * version_mask)
-{
-    return;
-}
-
 void configure_version_rolling(int socket)
 {
     // Configure
