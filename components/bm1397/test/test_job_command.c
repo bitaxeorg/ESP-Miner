@@ -45,7 +45,7 @@ TEST_CASE("Check known working midstate + job command", "[bm1397]")
     memset(buf, 0, 1024);
 
     send_work(&test_job);
-    uint16_t received = serial_rx(buf);
+    uint16_t received = serial_rx(buf, 9, 20);
     TEST_ASSERT_GREATER_OR_EQUAL_UINT16(sizeof(struct nonce_response), received);
 
     int i;
