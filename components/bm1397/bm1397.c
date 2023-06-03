@@ -16,7 +16,7 @@
 #define SLEEP_TIME 20
 #define FREQ_MULT 25.0
 
-#define BM1397_FREQUENCY CONFIG_BM1397_FREQUENCY
+
 
 static const char *TAG = "bm1397";
 

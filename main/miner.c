@@ -25,6 +25,10 @@
 #include "serial.h"
 #include "bm1397.h"
 #include <pthread.h>
+#include "EMC2101.h"
+#include "INA260.h"
+#include <stdint.h>
+#include <math.h>
 
 
 #define PORT CONFIG_STRATUM_PORT
@@ -33,9 +37,6 @@
 #define STRATUM_PW CONFIG_STRATUM_PW
 
 #define STRATUM_DIFFICULTY CONFIG_STRATUM_DIFFICULTY
-
-#define DEFAULT_JOB_TIMEOUT 20 //ms
-
 
 static const char *TAG = "miner";
 
@@ -114,55 +115,61 @@ static void AsicTask(void * pvParameters)
         send_work(&job); //send the job to the ASIC
 
         //wait for a response
-        int received = serial_rx(buf, 9, DEFAULT_JOB_TIMEOUT); //TODO: this timeout should be 2^32/hashrate
+        int received = serial_rx(buf, 9, BM1397_FULLSCAN_MS); //TODO: this timeout should be 2^32/hashrate
 
         if (received < 0) {
             ESP_LOGI(TAG, "Error in serial RX");
             continue;
+        } else if(received == 0){
+            // Didn't find a solution, restart and try again
+            continue;
         }
-        if (received == 0) {
+        
+        if(received != 9 || buf[0] != 0xAA || buf[1] != 0x55){
+            ESP_LOGI(TAG, "Serial RX invalid %i", received);
+            ESP_LOG_BUFFER_HEX(TAG, buf, received);
             continue;
         }
 
         uint8_t nonce_found = 0;
         uint32_t first_nonce = 0;
-        for (int i = 0; i <= received - 9; i++)
+
+        struct nonce_response nonce;
+        memcpy((void *) &nonce, buf, sizeof(struct nonce_response));
+
+        if (valid_jobs[nonce.job_id] == 0) {
+            ESP_LOGI(TAG, "Invalid job nonce found");
+        }
+
+        //print_hex((uint8_t *) &nonce.nonce, 4, 4, "nonce: ");
+        if (nonce_found == 0) {
+            first_nonce = nonce.nonce;
+            nonce_found = 1;
+        } else if (nonce.nonce == first_nonce) {
+            // stop if we've already seen this nonce
+            break;
+        }
+
+        if (nonce.nonce == prev_nonce) {
+            continue;
+        } else {
+            prev_nonce = nonce.nonce;
+        }
+
+        // check the nonce difficulty
+        double nonce_diff = test_nonce_value(active_jobs[nonce.job_id], nonce.nonce);
+
+        uint16_t fan_speed = EMC2101_get_fan_speed();
+        float chip_temp = EMC2101_get_chip_temp();
+        float power = INA260_read_power() / 1000;
+
+        ESP_LOGI(TAG, "Nonce difficulty %.2f of %d. Stats: Fan: %d RPM, Temp: %.1f C, Pwr: %.1f W", nonce_diff, active_jobs[nonce.job_id]->pool_diff, fan_speed, chip_temp, power);
+
+        if (nonce_diff > active_jobs[nonce.job_id]->pool_diff)
         {
-            if (buf[i] == 0xAA && buf[i + 1] == 0x55) {
-                struct nonce_response nonce;
-                memcpy((void *) &nonce, buf + i, sizeof(struct nonce_response));
-
-                if (valid_jobs[nonce.job_id] == 0) {
-                    ESP_LOGI(TAG, "Invalid job nonce found");
-                }
-
-                //print_hex((uint8_t *) &nonce.nonce, 4, 4, "nonce: ");
-                if (nonce_found == 0) {
-                    first_nonce = nonce.nonce;
-                    nonce_found = 1;
-                } else if (nonce.nonce == first_nonce) {
-                    // stop if we've already seen this nonce
-                    break;
-                }
-
-                if (nonce.nonce == prev_nonce) {
-                    continue;
-                } else {
-                    prev_nonce = nonce.nonce;
-                }
-
-                // check the nonce difficulty
-                double nonce_diff = test_nonce_value(active_jobs[nonce.job_id], nonce.nonce);
-
-                ESP_LOGI(TAG, "Nonce difficulty %.2f of %d", nonce_diff, active_jobs[nonce.job_id]->pool_diff);
-
-                if (nonce_diff > active_jobs[nonce.job_id]->pool_diff)
-                {
-                    //print_hex((uint8_t *)&job, sizeof(struct job_packet), sizeof(struct job_packet), "job: ");
-                    submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
-                                 active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
-                }
-            }
+            //print_hex((uint8_t *)&job, sizeof(struct job_packet), sizeof(struct job_packet), "job: ");
+            submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
+                            active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
         }
     }
 }
@@ -290,7 +297,7 @@ static void admin_task(void * pvParameters)
         while (1)
         {
             char * line = receive_jsonrpc_line(sock);
-            ESP_LOGI(TAG, "%s", line); //debug incoming stratum messages
+            //ESP_LOGI(TAG, "%s", line); //debug incoming stratum messages
 
             stratum_method method = parse_stratum_method(line);
             if (method == MINING_NOTIFY) {

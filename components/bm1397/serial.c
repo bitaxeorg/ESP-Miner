@@ -55,7 +55,7 @@ int send_serial(uint8_t *data, int len, bool debug) {
 /// @param buf number of ms to wait before timing out
 /// @return number of bytes read, or -1 on error
 int16_t serial_rx(uint8_t * buf, uint16_t size, uint16_t timeout_ms) {
-    int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, size, timeout_ms / portTICK_RATE_MS);
+    int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, size, timeout_ms / portTICK_PERIOD_MS);
     // if (bytes_read > 0) {
     //     printf("rx: ");
     //     prettyHex((unsigned char*) buf, bytes_read);

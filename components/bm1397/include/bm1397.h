@@ -23,6 +23,15 @@
 #define RESPONSE_JOB 0x80
 #define CRC5_MASK 0x1F
 
+static const u_int64_t BM1397_FREQUENCY = CONFIG_BM1397_FREQUENCY;
+static const u_int64_t BM1397_CORE_COUNT = 672;
+static const u_int64_t BM1397_HASHRATE_S = BM1397_FREQUENCY * BM1397_CORE_COUNT * 1000000;
+//2^32
+static const u_int64_t NONCE_SPACE = 4294967296;
+static const double  BM1397_FULLSCAN_MS = ((double)NONCE_SPACE / (double)BM1397_HASHRATE_S) * 1000; 
+
+
+
 typedef enum {
   JOB_PACKET = 0, 
   CMD_PACKET = 1,
