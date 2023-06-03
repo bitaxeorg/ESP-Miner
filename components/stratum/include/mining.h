@@ -2,6 +2,8 @@
 #define MINING_H
 
 #include "stratum_api.h"
+#include <stdbool.h>
+
 
 typedef struct {
     uint32_t version;
@@ -13,6 +15,8 @@ typedef struct {
 
     uint8_t midstate[32];
     uint32_t pool_diff;
+    // is the pool diff a power of 2?
+    bool pool_diff_pow2;
     char * jobid;
     char * extranonce2;
 } bm_job;

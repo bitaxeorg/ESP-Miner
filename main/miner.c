@@ -61,6 +61,8 @@ static void ASIC_task(void * pvParameters)
 
     init_BM1397();
 
+    ESP_LOGI(TAG, "Job wait time:%f", BM1397_FULLSCAN_MS);
+
     //reset the bm1397
     reset_BM1397();
 
@@ -86,6 +88,9 @@ static void ASIC_task(void * pvParameters)
 	}
 
     uint32_t prev_nonce = 0;
+
+
+    set_max_baud();
     while (1) {
         bm_job * next_bm_job = (bm_job *) queue_dequeue(&ASIC_jobs_queue);
         struct job_packet job;
@@ -112,7 +117,7 @@ static void ASIC_task(void * pvParameters)
         send_work(&job); //send the job to the ASIC
 
         //wait for a response
-        int received = serial_rx(buf, 9, BM1397_FULLSCAN_MS); //TODO: this timeout should be 2^32/hashrate
+        int received = serial_rx(buf, 9, BM1397_FULLSCAN_MS);
 
         if (received < 0) {
             ESP_LOGI(TAG, "Error in serial RX");
@@ -153,6 +158,15 @@ static void ASIC_task(void * pvParameters)
             prev_nonce = nonce.nonce;
         }
 
+        // If the pool diff is a power of 2, the ASIC won't return nonces lower than the diff
+        //  hence we can skip all the checking
+        if(active_jobs[nonce.job_id]->pool_diff_pow2){
+            submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
+                            active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
+            notify_system_submitted_share();
+            continue;
+        }
+
         // check the nonce difficulty
         double nonce_diff = test_nonce_value(active_jobs[nonce.job_id], nonce.nonce);
 
@@ -163,6 +177,7 @@ static void ASIC_task(void * pvParameters)
             //print_hex((uint8_t *)&job, sizeof(struct job_packet), sizeof(struct job_packet), "job: ");
             submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
                             active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
+            notify_system_submitted_share();
         }
     }
 }
@@ -191,6 +206,7 @@ static void create_jobs_task(void * pvParameters)
             bm_job next_job = construct_bm_job(&params, merkle_root);
 
             next_job.pool_diff = stratum_difficulty; //each job is tied to the _current_ difficulty
+            next_job.pool_diff_pow2 = (stratum_difficulty != 0 && (stratum_difficulty & (stratum_difficulty - 1)) == 0);
 
             //ESP_LOGI(TAG, "bm_job: ");
             // print_hex((uint8_t *) &next_job.target, 4, 4, "nbits: ");
@@ -314,6 +330,8 @@ static void stratum_task(void * pvParameters)
             } else if (method == MINING_SET_DIFFICULTY) {
                 stratum_difficulty = parse_mining_set_difficulty_message(line);
                 ESP_LOGI(TAG, "Set stratum difficulty: %d", stratum_difficulty);
+                set_job_difficulty_mask(stratum_difficulty);
+
             } else if (method == MINING_SET_VERSION_MASK) {
                 version_mask = parse_mining_set_version_mask_message(line);
                 ESP_LOGI(TAG, "Set version mask: %08x", version_mask);
@@ -339,7 +357,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    xTaskCreate(SysTask, "System_Task", 4096, NULL, 10, &sysTaskHandle);
+    xTaskCreate(system_task, "System_Task", 4096, NULL, 10, &sysTaskHandle);
 
     /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
      * Read "Establishing Wi-Fi or Ethernet Connection" section in

@@ -11,13 +11,24 @@
 #include "INA260.h"
 #include "adc.h"
 #include "oled.h"
+#include <time.h>
+
 
 static const char *TAG = "system";
 
 #define BM1397_VOLTAGE CONFIG_BM1397_VOLTAGE
 
+static int shares_submitted = 0;
+static time_t start_time, current_time;
+
+void notify_system_submitted_share(void){
+    shares_submitted++;
+}
+
 void init_system(void) {
     
+    start_time = time(NULL);
+
     //test the LEDs
     // ESP_LOGI(TAG, "Init LEDs!");
     // ledc_init();
@@ -51,7 +62,7 @@ void init_system(void) {
     }
 }
 
-void get_stats(void) {
+void update_system_info(void) {
     char oled_buf[20];
 
     uint16_t fan_speed = EMC2101_get_fan_speed();
@@ -61,42 +72,63 @@ void get_stats(void) {
     float power = INA260_read_power() / 1000;
     //uint16_t vcore = ADC_get_vcore();
 
-    // ESP_LOGI(TAG, "Fan Speed: %d RPM", fan_speed);
-    // ESP_LOGI(TAG, "Chip Temp: %.2f C", chip_temp);
-
-    // //Current Sensor tests
-    // ESP_LOGI(TAG, "Current: %.2f mA", current);
-    // ESP_LOGI(TAG, "Voltage: %.2f mV", voltage);
-    // ESP_LOGI(TAG, "Power: %.2f mW", power);
-
-    // //ESP32 ADC tests
-    // ESP_LOGI(TAG, "Vcore: %d mV\n", vcore);
-
     if (OLED_status()) {
+        OLED_clearLine(1);
+        OLED_clearLine(2);
+        OLED_clearLine(3);
+
         memset(oled_buf, 0, 20);
         snprintf(oled_buf, 20, "Fan: %d RPM", fan_speed);
-        OLED_clearLine(1);
         OLED_writeString(0, 1, oled_buf);
 
         memset(oled_buf, 0, 20);
         snprintf(oled_buf, 20, "Temp: %.2f C", chip_temp);
-        OLED_clearLine(2);
         OLED_writeString(0, 2, oled_buf);
 
         memset(oled_buf, 0, 20);
         snprintf(oled_buf, 20, "Pwr: %.2f W", power);
-        OLED_clearLine(3);
         OLED_writeString(0, 3, oled_buf);
     }
 
 }
 
-void SysTask(void *arg) {
+void update_system_performance(){
+    char oled_buf[20];
+    
+    // Get the current system time as the current time
+    current_time = time(NULL);
+
+    // Calculate the uptime in seconds
+    double uptime_in_seconds = difftime(current_time, start_time);
+
+    // Calculate the uptime in days and hours
+    int uptime_in_days = uptime_in_seconds / (3600 * 24);
+    int remaining_seconds = (int)uptime_in_seconds % (3600 * 24);
+    double uptime_in_hours = (double)remaining_seconds / 3600;
+
+    if (OLED_status()) {
+        OLED_clearLine(1);
+        OLED_clearLine(2);
+        OLED_clearLine(3);
+
+        memset(oled_buf, 0, 20);
+        snprintf(oled_buf, 20, "Shares: %i", shares_submitted);
+        OLED_writeString(0, 1, oled_buf);
+
+        memset(oled_buf, 0, 20);
+        snprintf(oled_buf, 20, "Uptime: %dd %.2fh", uptime_in_days, uptime_in_hours);
+        OLED_writeString(0, 2, oled_buf);
+    }
+}
+
+void system_task(void *arg) {
 
     init_system();
 
     while(1){
-        get_stats();
+        update_system_info();
+        vTaskDelay(5000 / portTICK_RATE_MS);
+        update_system_performance();
         vTaskDelay(5000 / portTICK_RATE_MS);
     }
 }

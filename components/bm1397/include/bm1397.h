@@ -66,6 +66,9 @@ void send_init(void);
 void send_work(struct job_packet *job);
 void reset_BM1397(void);
 void init_BM1397(void);
-
+void set_job_difficulty_mask(int);
+unsigned char reverseBits(unsigned char num);
+int largestPowerOfTwo(int num);
+void set_bm1397_max_baud(void);
 
 #endif /* BM1397_H_ */

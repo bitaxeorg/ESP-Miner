@@ -126,8 +126,9 @@ void send_init(void) {
     unsigned char init4[9] = {0x00, 0x3C, 0x80, 0x00, 0x80, 0x74}; //init4 - init_4_?
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, false);
 
-    unsigned char set_ticket[9] = {0x00, 0x14, 0x00, 0x00, 0x00, 0xff}; //set_ticket - ticket_mask
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_ticket, 6, false);
+    // Stratum will set this
+    // unsigned char ticket_mask[9] = {0x00, 0x14, 0x00, 0x00, 0x00, 0xff}; //set_ticket - ticket_mask
+    // send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), ticket_mask, 6, false);
 
     unsigned char init5[9] = {0x00, 0x68, 0xC0, 0x70, 0x01, 0x11}; //init5 - pll3_parameter
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5, 6, false);
@@ -139,10 +140,65 @@ void send_init(void) {
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6, 6, false);
 
     unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0x7A, 0x31}; //baudrate - misc_control
+    //unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0x70, 0x30}; //baudrate - misc_control
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
 
     send_hash_frequency(BM1397_FREQUENCY);
 }
+
+void set_bm1397_max_baud(void){
+    unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0x70, 0x30}; //baudrate - misc_control
+    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
+}
+
+void set_job_difficulty_mask(int difficulty){
+
+    // Default mask of 256 diff
+    unsigned char job_difficulty_mask[9] = {0x00, 0x14, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
+
+    // The mask must be a power of 2 so there are no holes
+    // Correct:  {0b00000000, 0b00000000, 0b11111111, 0b11111111}
+    // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
+    difficulty = largestPowerOfTwo(difficulty) -1;
+
+    // convert difficulty into char array
+    // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
+    // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
+     for (int i = 0; i < 4; i++) {
+        char value = (difficulty >> (8 * i)) & 0xFF;
+        //The char is read in backwards to the register so we need to reverse them
+        //So a mask of 512 looks like 0b00000000 00000000 00000001 1111111
+        //and not 0b00000000 00000000 10000000 1111111
+        //job_difficulty_mask[5 - i] = reverseBits(value);
+    }
+
+    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, false);
+}
+
+unsigned char reverseBits(unsigned char num) {
+    unsigned char reversed = 0;
+    int i;
+
+    for (i = 0; i < 8; i++) {
+        reversed <<= 1;     // Left shift the reversed variable by 1
+        reversed |= num & 1; // Use bitwise OR to set the rightmost bit of reversed to the current bit of num
+        num >>= 1;          // Right shift num by 1 to get the next bit
+    }
+
+    return reversed;
+}
+
+int largestPowerOfTwo(int num) {
+    int power = 0;
+
+    while (num > 1) {
+        num = num >> 1;
+        power++;
+    }
+
+    return 1 << power;
+}
+
 
 void send_work(struct job_packet *job) {
     send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t*)job, sizeof(struct job_packet), false);
