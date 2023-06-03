@@ -58,7 +58,7 @@ void get_stats(void) {
     float chip_temp = EMC2101_get_chip_temp();
     //float current = INA260_read_current();
     //float voltage = INA260_read_voltage();
-    float power = INA260_read_power();
+    float power = INA260_read_power() / 1000;
     //uint16_t vcore = ADC_get_vcore();
 
     // ESP_LOGI(TAG, "Fan Speed: %d RPM", fan_speed);
@@ -84,7 +84,7 @@ void get_stats(void) {
         OLED_writeString(0, 2, oled_buf);
 
         memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "Pwr: %.2f mW", power);
+        snprintf(oled_buf, 20, "Pwr: %.2f W", power);
         OLED_clearLine(3);
         OLED_writeString(0, 3, oled_buf);
     }
