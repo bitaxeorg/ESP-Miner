@@ -169,7 +169,7 @@ void set_job_difficulty_mask(int difficulty){
         //The char is read in backwards to the register so we need to reverse them
         //So a mask of 512 looks like 0b00000000 00000000 00000001 1111111
         //and not 0b00000000 00000000 10000000 1111111
-        //job_difficulty_mask[5 - i] = reverseBits(value);
+        job_difficulty_mask[5 - i] = reverseBits(value);
     }
 
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, false);

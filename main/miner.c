@@ -89,8 +89,8 @@ static void ASIC_task(void * pvParameters)
 
     uint32_t prev_nonce = 0;
 
-
-    set_max_baud();
+    // TODO
+    // set_max_baud();
     while (1) {
         bm_job * next_bm_job = (bm_job *) queue_dequeue(&ASIC_jobs_queue);
         struct job_packet job;
