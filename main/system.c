@@ -17,7 +17,7 @@
 static const char *TAG = "system";
 
 #define BM1397_VOLTAGE CONFIG_BM1397_VOLTAGE
-#define HISTORY_LENGTH 100
+#define HISTORY_LENGTH 10
 #define HISTORY_WINDOW_SIZE 5
 
 static char oled_buf[20];
@@ -26,8 +26,9 @@ static int screen_page = 0;
 static int shares_submitted = 0;
 static time_t start_time;
 
-static double last_found_nonce_time = 0;
+static double duration_start = 0;
 static int historical_hashrate_rolling_index = 0;
+static double historical_hashrate_time_stamps[HISTORY_LENGTH] = {0.0};
 static double historical_hashrate[HISTORY_LENGTH] = {0.0};
 static int historical_hashrate_init = 0;
 static double current_hashrate = 0;
@@ -77,42 +78,40 @@ void notify_system_submitted_share(void){
 
 void notify_system_found_nonce(double nonce_diff){
 
-    //init
-    if(last_found_nonce_time == 0){
-        last_found_nonce_time = esp_timer_get_time();
-        return;
-    }
+ 
 
     // Calculate the time difference in seconds with sub-second precision
-    double time_to_find = (double)(esp_timer_get_time() - last_found_nonce_time) / 1000000;
+    
 
 
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
     
-    historical_hashrate[historical_hashrate_rolling_index] = (nonce_diff * 4294967296 / time_to_find) / 1000000000;
-    ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, time_to_find, historical_hashrate[historical_hashrate_rolling_index]);
+    historical_hashrate[historical_hashrate_rolling_index] = nonce_diff;
+    historical_hashrate_time_stamps[historical_hashrate_rolling_index] = esp_timer_get_time();
+
+    historical_hashrate_rolling_index = (historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
+
+   //ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration, historical_hashrate[historical_hashrate_rolling_index]);
    
 
     if(historical_hashrate_init < HISTORY_LENGTH){
         historical_hashrate_init++;
+    }else{
+        duration_start = historical_hashrate_time_stamps[(historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
     }
     double sum = 0;
     for (int i = 0; i < historical_hashrate_init; i++) {
         sum += historical_hashrate[i];
     }
-    current_hashrate = sum / historical_hashrate_init;
 
+    double duration = (double)(esp_timer_get_time() - duration_start) / 1000000;
 
-    ESP_LOGI(TAG, "CH: %.1f", current_hashrate);
-
-    // Increment all the stuff
-    historical_hashrate_rolling_index = (historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
-
-    last_found_nonce_time = esp_timer_get_time();
+    current_hashrate = (sum * 4294967296) / (duration * 1000000000);
 
     update_hashrate();
 
     logArrayContents(historical_hashrate, HISTORY_LENGTH);
+    logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
     
 }
 
@@ -152,6 +151,8 @@ void init_system(void) {
         //clear the oled screen
         OLED_fill(0);
     }
+
+    duration_start = esp_timer_get_time();
 }
 
 void update_system_info(void) {

@@ -164,9 +164,10 @@ static void ASIC_task(void * pvParameters)
         double nonce_diff = test_nonce_value(active_jobs[nonce.job_id], nonce.nonce);
 
         ESP_LOGI(TAG, "Nonce difficulty %.2f of %d.", nonce_diff, active_jobs[nonce.job_id]->pool_diff);
-        notify_system_found_nonce(nonce_diff);
+        
         if (nonce_diff > active_jobs[nonce.job_id]->pool_diff)
         {
+            notify_system_found_nonce(active_jobs[nonce.job_id]->pool_diff);
             //print_hex((uint8_t *)&job, sizeof(struct job_packet), sizeof(struct job_packet), "job: ");
             submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
                             active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
