@@ -17,7 +17,7 @@
 static const char *TAG = "system";
 
 #define BM1397_VOLTAGE CONFIG_BM1397_VOLTAGE
-#define HISTORY_LENGTH 10
+#define HISTORY_LENGTH 100
 #define HISTORY_WINDOW_SIZE 5
 
 static char oled_buf[20];
@@ -34,18 +34,18 @@ static int historical_hashrate_init = 0;
 static double current_hashrate = 0;
 
 
-void logArrayContents(const double* array, size_t length) {
-    char logMessage[1024];  // Adjust the buffer size as needed
-    int offset = 0;
+// void logArrayContents(const double* array, size_t length) {
+//     char logMessage[1024];  // Adjust the buffer size as needed
+//     int offset = 0;
     
-    offset += snprintf(logMessage + offset, sizeof(logMessage) - offset, "Array Contents: [");
+//     offset += snprintf(logMessage + offset, sizeof(logMessage) - offset, "Array Contents: [");
     
-    for (size_t i = 0; i < length; i++) {
-        offset += snprintf(logMessage + offset, sizeof(logMessage) - offset, "%.1f%s", array[i], (i < length - 1) ? ", " : "]");
-    }
+//     for (size_t i = 0; i < length; i++) {
+//         offset += snprintf(logMessage + offset, sizeof(logMessage) - offset, "%.1f%s", array[i], (i < length - 1) ? ", " : "]");
+//     }
     
-    ESP_LOGI(TAG, "%s", logMessage);
-}
+//     ESP_LOGI(TAG, "%s", logMessage);
+// }
 
 void update_hashrate(void){
 
@@ -110,8 +110,8 @@ void notify_system_found_nonce(double nonce_diff){
 
     update_hashrate();
 
-    logArrayContents(historical_hashrate, HISTORY_LENGTH);
-    logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
+    // logArrayContents(historical_hashrate, HISTORY_LENGTH);
+    // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
     
 }
 
@@ -185,6 +185,31 @@ void update_system_info(void) {
 
 }
 
+void update_esp32_info(void) {
+    char oled_buf[20];
+
+    uint32_t free_heap_size = esp_get_free_heap_size();
+
+    if (OLED_status()) {
+        OLED_clearLine(1);
+        OLED_clearLine(2);
+        OLED_clearLine(3);
+
+        memset(oled_buf, 0, 20);
+        snprintf(oled_buf, 20, "FH: %u bytes", free_heap_size);
+        OLED_writeString(0, 1, oled_buf);
+
+        // memset(oled_buf, 0, 20);
+        // snprintf(oled_buf, 20, "Temp: %.2f C", chip_temp);
+        // OLED_writeString(0, 2, oled_buf);
+
+        // memset(oled_buf, 0, 20);
+        // snprintf(oled_buf, 20, "Pwr: %.2f W", power);
+        // OLED_writeString(0, 3, oled_buf);
+    }
+
+}
+
 void update_system_performance(){
     
     // Calculate the uptime in seconds
@@ -225,6 +250,10 @@ void system_task(void *arg) {
 
         screen_page = 1;
         update_system_info();
+        vTaskDelay(5000 / portTICK_RATE_MS);
+
+        screen_page = 2;
+        update_esp32_info();
         vTaskDelay(5000 / portTICK_RATE_MS);
         
     }
