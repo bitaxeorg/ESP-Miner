@@ -70,5 +70,6 @@ void set_job_difficulty_mask(int);
 unsigned char reverseBits(unsigned char num);
 int largestPowerOfTwo(int num);
 void set_bm1397_max_baud(void);
+void set_default_baud(void);
 
 #endif /* BM1397_H_ */

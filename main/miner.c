@@ -89,10 +89,8 @@ static void ASIC_task(void * pvParameters)
 
     uint32_t prev_nonce = 0;
 
-    // TODO
-    // set_max_baud();
+    set_max_baud();
 
-    ESP_LOGI(TAG, "Mining!");
     while (1) {
         bm_job * next_bm_job = (bm_job *) queue_dequeue(&ASIC_jobs_queue);
         struct job_packet job;
@@ -176,6 +174,7 @@ static void ASIC_task(void * pvParameters)
     }
 }
 
+
 static void create_jobs_task(void * pvParameters)
 {
     while (1) {
@@ -200,12 +199,8 @@ static void create_jobs_task(void * pvParameters)
             bm_job next_job = construct_bm_job(&params, merkle_root);
 
             next_job.pool_diff = stratum_difficulty; //each job is tied to the _current_ difficulty
-
-            //ESP_LOGI(TAG, "bm_job: ");
-            // print_hex((uint8_t *) &next_job.target, 4, 4, "nbits: ");
-            // print_hex((uint8_t *) &next_job.ntime, 4, 4, "ntime: ");
-            // print_hex((uint8_t *) &next_job.merkle_root_end, 4, 4, "merkle root end: ");
-            //print_hex(next_job.midstate, 32, 32, "midstate: ");
+            // Check if diff is a power of 2, we can skip stuff later if it is.
+            next_job.pool_diff_pow2 = (stratum_difficulty != 0 && (stratum_difficulty & (stratum_difficulty - 1)) == 0);
 
             bm_job * queued_next_job = malloc(sizeof(bm_job));
             memcpy(queued_next_job, &next_job, sizeof(bm_job));
@@ -327,6 +322,8 @@ static void stratum_task(void * pvParameters)
 
             } else if (method == MINING_SET_VERSION_MASK) {
                 version_mask = parse_mining_set_version_mask_message(line);
+
+                //1fffe000
                 ESP_LOGI(TAG, "Set version mask: %08x", version_mask);
             } else {
                 free(line);

@@ -139,15 +139,22 @@ void send_init(void) {
     unsigned char init6[9] = {0x00, 0x28, 0x06, 0x00, 0x00, 0x0F}; //init6 - fast_uart_configuration
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6, 6, false);
 
-    unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0x7A, 0x31}; //baudrate - misc_control
-    //unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0x70, 0x30}; //baudrate - misc_control
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
+    set_default_baud();
 
     send_hash_frequency(BM1397_FREQUENCY);
 }
 
+// Baud formula = 25M/((denominator+1)*8)
+// The denominator is 5 bits found in the misc_control (bits 9-13)
+void set_default_baud(void){
+    //default divider of 26 (11010) for 115,749
+    unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0b01111010, 0b00110001}; //baudrate - misc_control
+    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
+}
+
 void set_bm1397_max_baud(void){
-    unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0x70, 0x30}; //baudrate - misc_control
+    // divider of 0 for 3,125,000
+    unsigned char baudrate[9] = { 0x00, 0x18, 0x00, 0x00, 0b01100000, 0b00110001 };; //baudrate - misc_control
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
 }
 
