@@ -11,19 +11,109 @@
 #include "INA260.h"
 #include "adc.h"
 #include "oled.h"
-#include <time.h>
+#include <sys/time.h>
 
 
 static const char *TAG = "system";
 
 #define BM1397_VOLTAGE CONFIG_BM1397_VOLTAGE
+#define HISTORY_LENGTH 100
+#define HISTORY_WINDOW_SIZE 5
+
+static char oled_buf[20];
+static int screen_page = 0;
 
 static int shares_submitted = 0;
-static time_t start_time, current_time;
+static time_t start_time;
+
+static double last_found_nonce_time = 0;
+static int historical_hashrate_rolling_index = 0;
+static double historical_hashrate[HISTORY_LENGTH] = {0.0};
+static int historical_hashrate_init = 0;
+static double current_hashrate = 0;
+
+
+void logArrayContents(const double* array, size_t length) {
+    char logMessage[1024];  // Adjust the buffer size as needed
+    int offset = 0;
+    
+    offset += snprintf(logMessage + offset, sizeof(logMessage) - offset, "Array Contents: [");
+    
+    for (size_t i = 0; i < length; i++) {
+        offset += snprintf(logMessage + offset, sizeof(logMessage) - offset, "%.1f%s", array[i], (i < length - 1) ? ", " : "]");
+    }
+    
+    ESP_LOGI(TAG, "%s", logMessage);
+}
+
+void update_hashrate(void){
+
+        if(screen_page != 0){
+            return;
+        }
+
+        OLED_clearLine(1);
+        memset(oled_buf, 0, 20);
+        snprintf(oled_buf, 20, "GH/s%s: %.1f", historical_hashrate_init < HISTORY_LENGTH ? "*": "", current_hashrate);
+        OLED_writeString(0, 1, oled_buf);
+}
+
+void update_shares(void){
+    if(screen_page != 0){
+            return;
+    }
+    OLED_clearLine(2);
+    memset(oled_buf, 0, 20);
+    snprintf(oled_buf, 20, "Shares: %i", shares_submitted);
+    OLED_writeString(0, 2, oled_buf);
+}
 
 void notify_system_submitted_share(void){
     shares_submitted++;
+    update_shares();
 }
+
+
+
+void notify_system_found_nonce(double nonce_diff){
+
+    //init
+    if(last_found_nonce_time == 0){
+        last_found_nonce_time = esp_timer_get_time();
+        return;
+    }
+
+    // Calculate the time difference in seconds with sub-second precision
+    double time_to_find = (double)(esp_timer_get_time() - last_found_nonce_time) / 1000000;
+
+
+    // hashrate = (nonce_difficulty * 2^32) / time_to_find
+    historical_hashrate[historical_hashrate_rolling_index] = (nonce_diff * 4294967296) / (time_to_find * 1000000000);
+   
+
+    if(historical_hashrate_init < HISTORY_LENGTH){
+        historical_hashrate_init++;
+    }
+    double sum = 0;
+    for (int i = 0; i < historical_hashrate_init; i++) {
+        sum += historical_hashrate[i];
+    }
+    current_hashrate = sum / historical_hashrate_init;
+
+
+    ESP_LOGI(TAG, "CH: %.1f", current_hashrate);
+
+    // Increment all the stuff
+    historical_hashrate_rolling_index = (historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
+
+    last_found_nonce_time = esp_timer_get_time();
+
+    update_hashrate();
+
+    logArrayContents(historical_hashrate, HISTORY_LENGTH);
+    
+}
+
 
 void init_system(void) {
     
@@ -93,42 +183,46 @@ void update_system_info(void) {
 }
 
 void update_system_performance(){
-    char oled_buf[20];
     
-    // Get the current system time as the current time
-    current_time = time(NULL);
-
     // Calculate the uptime in seconds
-    double uptime_in_seconds = difftime(current_time, start_time);
-
-    // Calculate the uptime in days and hours
+    double uptime_in_seconds = difftime(time(NULL), start_time);
     int uptime_in_days = uptime_in_seconds / (3600 * 24);
     int remaining_seconds = (int)uptime_in_seconds % (3600 * 24);
-    double uptime_in_hours = (double)remaining_seconds / 3600;
+    int uptime_in_hours = remaining_seconds / 3600;
+    remaining_seconds %= 3600;
+    int uptime_in_minutes = remaining_seconds / 60;
+
 
     if (OLED_status()) {
-        OLED_clearLine(1);
-        OLED_clearLine(2);
+
+
         OLED_clearLine(3);
 
-        memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "Shares: %i", shares_submitted);
-        OLED_writeString(0, 1, oled_buf);
+        update_hashrate();
+        update_shares();
+
 
         memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "Uptime: %dd %.2fh", uptime_in_days, uptime_in_hours);
-        OLED_writeString(0, 2, oled_buf);
+        snprintf(oled_buf, 20, "UT: %dd %ih %im", uptime_in_days, uptime_in_hours, uptime_in_minutes);
+        OLED_writeString(0, 3, oled_buf);
     }
 }
+
+
+
 
 void system_task(void *arg) {
 
     init_system();
 
     while(1){
+        screen_page = 0;
+        update_system_performance();
+        vTaskDelay(30000 / portTICK_RATE_MS);
+
+        screen_page = 1;
         update_system_info();
         vTaskDelay(5000 / portTICK_RATE_MS);
-        update_system_performance();
-        vTaskDelay(5000 / portTICK_RATE_MS);
+        
     }
 }
