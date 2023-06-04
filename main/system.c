@@ -88,7 +88,9 @@ void notify_system_found_nonce(double nonce_diff){
 
 
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
-    historical_hashrate[historical_hashrate_rolling_index] = (nonce_diff * 4294967296) / (time_to_find * 1000000000);
+    
+    historical_hashrate[historical_hashrate_rolling_index] = (nonce_diff * 4294967296 / time_to_find) / 1000000000;
+    ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, time_to_find, historical_hashrate[historical_hashrate_rolling_index]);
    
 
     if(historical_hashrate_init < HISTORY_LENGTH){
