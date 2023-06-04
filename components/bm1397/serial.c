@@ -36,8 +36,9 @@ void init_serial(void) {
     uart_set_pin(UART_NUM_1, ECHO_TEST_TXD, ECHO_TEST_RXD, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
     //Install UART driver (we don't need an event queue here)
-    // Added buffers so uart_write_bytes returns immediately 
-    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, BUF_SIZE * 2, 0, NULL, 0);
+    //tx buffer 0 so the tx time doesn't overlap with the job wait time
+    // by returning before the job is written
+    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0);
 }
 
 void set_max_baud(void){
