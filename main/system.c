@@ -23,7 +23,8 @@ static const char *TAG = "system";
 static char oled_buf[20];
 static int screen_page = 0;
 
-static int shares_submitted = 0;
+static uint16_t shares_accepted = 0;
+static uint16_t shares_rejected = 0;
 static time_t start_time;
 
 static double duration_start = 0;
@@ -65,14 +66,19 @@ void update_shares(void){
     }
     OLED_clearLine(2);
     memset(oled_buf, 0, 20);
-    snprintf(oled_buf, 20, "Shares: %i", shares_submitted);
+    snprintf(oled_buf, 20, "A/R: %u/%u", shares_accepted, shares_rejected);
     OLED_writeString(0, 2, oled_buf);
 }
 
-void notify_system_submitted_share(void){
-    shares_submitted++;
+void notify_system_accepted_share(void){
+    shares_accepted++;
     update_shares();
 }
+void notify_system_rejected_share(void){
+    shares_rejected++;
+    update_shares();
+}
+
 
 
 

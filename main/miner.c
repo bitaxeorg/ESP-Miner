@@ -170,7 +170,7 @@ static void ASIC_task(void * pvParameters)
             //print_hex((uint8_t *)&job, sizeof(struct job_packet), sizeof(struct job_packet), "job: ");
             submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
                             active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
-            notify_system_submitted_share();
+            
         }
     }
 }
@@ -343,8 +343,10 @@ static void stratum_task(void * pvParameters)
                 int16_t parsed_id;
                 if (parse_stratum_result_message(line, &parsed_id)) {
                     ESP_LOGI(TAG, "message id %d result accepted", parsed_id);
+                    notify_system_accepted_share();
                 } else {
                     ESP_LOGI(TAG, "message id %d result rejected", parsed_id);
+                    notify_system_rejected_share();
             }
             } else {
                 free(line);
