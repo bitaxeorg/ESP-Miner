@@ -217,7 +217,7 @@ static void create_jobs_task(void * pvParameters)
 
         if (abandon_work == 1) {
             abandon_work = 0;
-            queue_clear(&ASIC_jobs_queue);
+            ASIC_jobs_queue_clear(&ASIC_jobs_queue);
         }
 
         free_mining_notify(params);
@@ -305,7 +305,7 @@ static void stratum_task(void * pvParameters)
                     queue_clear(&stratum_queue);
 
                     pthread_mutex_lock(&valid_jobs_lock);
-                    queue_clear(&ASIC_jobs_queue);
+                    ASIC_jobs_queue_clear(&ASIC_jobs_queue);
                     for (int i = 0; i < 128; i = i + 4) {
                         valid_jobs[i] = 0;
                     }

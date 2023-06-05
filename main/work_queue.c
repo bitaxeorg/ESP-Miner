@@ -56,3 +56,21 @@ void queue_clear(work_queue * queue)
     pthread_cond_signal(&queue->not_full);
     pthread_mutex_unlock(&queue->lock);
 }
+
+void ASIC_jobs_queue_clear(work_queue * queue)
+{
+    pthread_mutex_lock(&queue->lock);
+
+    while (queue->count > 0)
+    {
+        bm_job * next_work = queue->buffer[queue->head];
+        free(next_work->jobid);
+        free(next_work->extranonce2);
+        free(next_work);
+        queue->head = (queue->head + 1) % QUEUE_SIZE;
+        queue->count--;
+    }
+
+    pthread_cond_signal(&queue->not_full);
+    pthread_mutex_unlock(&queue->lock);
+}
