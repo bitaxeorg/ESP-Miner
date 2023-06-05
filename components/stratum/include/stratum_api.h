@@ -3,6 +3,7 @@
 
 #include "cJSON.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 #define MAX_MERKLE_BRANCHES 32
 #define HASH_SIZE 32
@@ -25,7 +26,8 @@ typedef enum {
     STRATUM_UNKNOWN,
     MINING_NOTIFY,
     MINING_SET_DIFFICULTY,
-    MINING_SET_VERSION_MASK
+    MINING_SET_VERSION_MASK,
+    STRATUM_RESULT
 } stratum_method;
 
 void initialize_stratum_buffer();
@@ -47,6 +49,8 @@ void free_mining_notify(mining_notify params);
 int parse_stratum_subscribe_result_message(const char * result_json_str,
                                            char ** extranonce,
                                            int * extranonce2_len);
+
+bool parse_stratum_result_message(const char * stratum_json, int16_t *);
 
 int auth_to_stratum(int socket, const char * username);
 

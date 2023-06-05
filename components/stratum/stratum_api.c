@@ -108,6 +108,12 @@ stratum_method parse_stratum_method(const char * stratum_json)
         } else if (strcmp("mining.set_version_mask", method_json->valuestring) == 0) {
             result = MINING_SET_VERSION_MASK;
         }
+    } else {
+        //parse results
+        cJSON * result_json = cJSON_GetObjectItem(json, "result");
+        if (result_json != NULL && cJSON_IsBool(result_json)) {
+            result = STRATUM_RESULT;
+        }
     }
 
     cJSON_Delete(json);
@@ -142,6 +148,27 @@ uint32_t parse_mining_set_version_mask_message(const char * stratum_json)
 
     cJSON_Delete(json);
     return version_mask;
+}
+
+bool parse_stratum_result_message(const char * stratum_json, int16_t * parsed_id)
+{
+    cJSON * json = cJSON_Parse(stratum_json);
+    cJSON * result_json = cJSON_GetObjectItem(json, "result");
+    cJSON * id_json = cJSON_GetObjectItem(json, "id");
+
+    if (id_json != NULL && cJSON_IsNumber(id_json)) {
+        *parsed_id = id_json->valueint;
+    } else {
+        *parsed_id = -1;
+    }
+
+    bool result = false;
+    if (result_json != NULL && cJSON_IsTrue(result_json)) {
+        result = true;
+    }
+
+    cJSON_Delete(json);
+    return result;
 }
 
 mining_notify parse_mining_notify_message(const char * stratum_json)
@@ -268,15 +295,6 @@ int auth_to_stratum(int socket, const char * username)
     ESP_LOGI(TAG, "-> %s", authorize_msg);
 
     write(socket, authorize_msg, strlen(authorize_msg));
-    /*
-    // TODO: Parse authorize results
-    char * line;
-    line = receive_jsonrpc_line(socket);
-
-    ESP_LOGI(TAG, "Received result %s", line);
-
-    free(line);
-    */
 
     return 1;
 }
@@ -289,6 +307,7 @@ void submit_share(int socket, const char * username, const char * jobid,
             send_uid++, username, jobid, extranonce_2, ntime, nonce);
     ESP_LOGI(TAG, "-> %s", submit_msg);
     write(socket, submit_msg, strlen(submit_msg));
+
 }
 
 int should_abandon_work(const char * mining_notify_json_str)

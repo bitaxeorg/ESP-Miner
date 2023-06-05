@@ -294,9 +294,10 @@ static void stratum_task(void * pvParameters)
         while (1)
         {
             char * line = receive_jsonrpc_line(sock);
-            //ESP_LOGI(TAG, "%s", line); //debug incoming stratum messages
+            ESP_LOGI(TAG, "stratum rx: %s", line); //debug incoming stratum messages
 
             stratum_method method = parse_stratum_method(line);
+
             if (method == MINING_NOTIFY) {
                 if (should_abandon_work(line) && stratum_queue.count > 0) {
                     ESP_LOGI(TAG, "Should abandon work, clearing queues");
@@ -325,6 +326,14 @@ static void stratum_task(void * pvParameters)
 
                 //1fffe000
                 ESP_LOGI(TAG, "Set version mask: %08x", version_mask);
+
+            } else if (method == STRATUM_RESULT) {
+                int16_t parsed_id;
+                if (parse_stratum_result_message(line, &parsed_id)) {
+                    ESP_LOGI(TAG, "message id %d result accepted", parsed_id);
+                } else {
+                    ESP_LOGI(TAG, "message id %d result rejected", parsed_id);
+            }
             } else {
                 free(line);
             }
