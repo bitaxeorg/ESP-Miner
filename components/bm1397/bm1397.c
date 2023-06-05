@@ -126,9 +126,7 @@ void send_init(void) {
     unsigned char init4[9] = {0x00, 0x3C, 0x80, 0x00, 0x80, 0x74}; //init4 - init_4_?
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, false);
 
-    // Stratum will set this
-    // unsigned char ticket_mask[9] = {0x00, 0x14, 0x00, 0x00, 0x00, 0xff}; //set_ticket - ticket_mask
-    // send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), ticket_mask, 6, false);
+    set_job_difficulty_mask(256);
 
     unsigned char init5[9] = {0x00, 0x68, 0xC0, 0x70, 0x01, 0x11}; //init5 - pll3_parameter
     send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5, 6, false);
@@ -161,7 +159,7 @@ void set_bm1397_max_baud(void){
 void set_job_difficulty_mask(int difficulty){
 
     // Default mask of 256 diff
-    unsigned char job_difficulty_mask[9] = {0x00, 0x14, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
+    unsigned char job_difficulty_mask[9] = {0x00, 0x14, 0b00000000, 0b00000000, 0b00000000, 0111111111};
 
     // The mask must be a power of 2 so there are no holes
     // Correct:  {0b00000000, 0b00000000, 0b11111111, 0b11111111}
