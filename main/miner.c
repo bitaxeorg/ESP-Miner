@@ -50,6 +50,7 @@ static int sock;
 
 static int abandon_work = 0;
 static uint32_t stratum_difficulty = 8192;
+static bool difficulty_changed = false;
 
 bm_job ** active_jobs;
 uint8_t * valid_jobs;
@@ -299,8 +300,15 @@ static void stratum_task(void * pvParameters)
             stratum_method method = parse_stratum_method(line);
 
             if (method == MINING_NOTIFY) {
-                if (should_abandon_work(line) && stratum_queue.count > 0) {
-                    ESP_LOGI(TAG, "Should abandon work, clearing queues");
+                if ((difficulty_changed || should_abandon_work(line)) && stratum_queue.count > 0) {
+
+                    if (difficulty_changed) {
+                        ESP_LOGI(TAG, "pool diff changed, clearing queues");
+                        difficulty_changed = false;
+                    } else {
+                        ESP_LOGI(TAG, "clean_jobs is true, clearing queues");
+                    }
+                    
                     abandon_work = 1;
                     queue_clear(&stratum_queue);
 
@@ -317,9 +325,13 @@ static void stratum_task(void * pvParameters)
                 }
                 queue_enqueue(&stratum_queue, line);
             } else if (method == MINING_SET_DIFFICULTY) {
-                stratum_difficulty = parse_mining_set_difficulty_message(line);
-                ESP_LOGI(TAG, "Set stratum difficulty: %d", stratum_difficulty);
-                set_job_difficulty_mask(stratum_difficulty);
+                uint32_t new_difficulty = parse_mining_set_difficulty_message(line);
+                if (new_difficulty != stratum_difficulty) {
+                    stratum_difficulty = new_difficulty;
+                    difficulty_changed = true;
+                    ESP_LOGI(TAG, "Set stratum difficulty: %d", stratum_difficulty);
+                    set_job_difficulty_mask(stratum_difficulty);
+                }
 
             } else if (method == MINING_SET_VERSION_MASK) {
                 version_mask = parse_mining_set_version_mask_message(line);
