@@ -54,20 +54,20 @@ void update_hashrate(void){
             return;
         }
 
-        OLED_clearLine(1);
+        OLED_clearLine(0);
         memset(oled_buf, 0, 20);
         snprintf(oled_buf, 20, "GH/s%s: %.1f", historical_hashrate_init < HISTORY_LENGTH ? "*": "", current_hashrate);
-        OLED_writeString(0, 1, oled_buf);
+        OLED_writeString(0, 0, oled_buf);
 }
 
 void update_shares(void){
     if(screen_page != 0){
             return;
     }
-    OLED_clearLine(2);
+    OLED_clearLine(1);
     memset(oled_buf, 0, 20);
     snprintf(oled_buf, 20, "A/R: %u/%u", shares_accepted, shares_rejected);
-    OLED_writeString(0, 2, oled_buf);
+    OLED_writeString(0, 1, oled_buf);
 }
 
 void notify_system_accepted_share(void){
@@ -161,31 +161,43 @@ void init_system(void) {
     duration_start = esp_timer_get_time();
 }
 
+
+void clear_display(void){
+    OLED_clearLine(0);
+    OLED_clearLine(1);
+    OLED_clearLine(2);
+    OLED_clearLine(3);
+}
+
+
 void update_system_info(void) {
-    char oled_buf[20];
+    char oled_buf[21];
 
     uint16_t fan_speed = EMC2101_get_fan_speed();
     float chip_temp = EMC2101_get_chip_temp();
     //float current = INA260_read_current();
-    //float voltage = INA260_read_voltage();
+    float voltage = INA260_read_voltage();
     float power = INA260_read_power() / 1000;
+    float current = INA260_read_current();
     //uint16_t vcore = ADC_get_vcore();
 
     if (OLED_status()) {
-        OLED_clearLine(1);
-        OLED_clearLine(2);
-        OLED_clearLine(3);
+        clear_display();
 
         memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "Fan: %d RPM", fan_speed);
+        snprintf(oled_buf, 20, " Fan: %d RPM", fan_speed);
+        OLED_writeString(0, 0, oled_buf);
+
+        memset(oled_buf, 0, 20);
+        snprintf(oled_buf, 20, "Temp: %.1f C", chip_temp);
         OLED_writeString(0, 1, oled_buf);
 
         memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "Temp: %.2f C", chip_temp);
+        snprintf(oled_buf, 20, " Pwr: %.3f W", power);
         OLED_writeString(0, 2, oled_buf);
 
         memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "Pwr: %.2f W", power);
+        snprintf(oled_buf, 20, " %i Mv: %i Ma",(int)voltage, (int)current);
         OLED_writeString(0, 3, oled_buf);
     }
 
@@ -197,21 +209,19 @@ void update_esp32_info(void) {
     uint32_t free_heap_size = esp_get_free_heap_size();
 
     if (OLED_status()) {
-        OLED_clearLine(1);
-        OLED_clearLine(2);
-        OLED_clearLine(3);
+        clear_display();
 
         memset(oled_buf, 0, 20);
         snprintf(oled_buf, 20, "FH: %u bytes", free_heap_size);
-        OLED_writeString(0, 1, oled_buf);
+        OLED_writeString(0, 0, oled_buf);
 
         // memset(oled_buf, 0, 20);
         // snprintf(oled_buf, 20, "Temp: %.2f C", chip_temp);
-        // OLED_writeString(0, 2, oled_buf);
+        // OLED_writeString(0, 1, oled_buf);
 
         // memset(oled_buf, 0, 20);
         // snprintf(oled_buf, 20, "Pwr: %.2f W", power);
-        // OLED_writeString(0, 3, oled_buf);
+        // OLED_writeString(0, 2, oled_buf);
     }
 
 }
@@ -229,19 +239,16 @@ void update_system_performance(){
 
     if (OLED_status()) {
 
-
-        OLED_clearLine(3);
-
+        clear_display();
+        
         update_hashrate();
         update_shares();
 
-
         memset(oled_buf, 0, 20);
         snprintf(oled_buf, 20, "UT: %dd %ih %im", uptime_in_days, uptime_in_hours, uptime_in_minutes);
-        OLED_writeString(0, 3, oled_buf);
+        OLED_writeString(0, 2, oled_buf);
     }
 }
-
 
 
 
@@ -252,15 +259,15 @@ void system_task(void *arg) {
     while(1){
         screen_page = 0;
         update_system_performance();
-        vTaskDelay(30000 / portTICK_RATE_MS);
+        vTaskDelay(40000 / portTICK_RATE_MS);
 
         screen_page = 1;
         update_system_info();
-        vTaskDelay(5000 / portTICK_RATE_MS);
+        vTaskDelay(10000 / portTICK_RATE_MS);
 
         screen_page = 2;
         update_esp32_info();
-        vTaskDelay(5000 / portTICK_RATE_MS);
+        vTaskDelay(10000 / portTICK_RATE_MS);
         
     }
 }
