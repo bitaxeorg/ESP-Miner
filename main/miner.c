@@ -338,10 +338,10 @@ static void stratum_task(void * pvParameters)
                 int16_t parsed_id;
                 if (parse_stratum_result_message(line, &parsed_id)) {
                     ESP_LOGI(TAG, "message id %d result accepted", parsed_id);
-                    SYSTEM_notify_accepted_share();
+                    SYSTEM_notify_accepted_share(&SYSTEM_MODULE);
                 } else {
                     ESP_LOGI(TAG, "message id %d result rejected", parsed_id);
-                    SYSTEM_notify_rejected_share();
+                    SYSTEM_notify_rejected_share(&SYSTEM_MODULE);
                 }
                 free(line);
             }  else {

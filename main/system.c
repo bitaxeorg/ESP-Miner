@@ -18,29 +18,19 @@
 static const char *TAG = "SystemModule";
 
 #define BM1397_VOLTAGE CONFIG_BM1397_VOLTAGE
-#define HISTORY_LENGTH 100
-#define HISTORY_WINDOW_SIZE 5
-
-static char oled_buf[20];
-static int screen_page = 0;
-
-static uint16_t shares_accepted = 0;
-static uint16_t shares_rejected = 0;
-static time_t start_time;
-
-
-static int historical_hashrate_rolling_index = 0;
-static double historical_hashrate_time_stamps[HISTORY_LENGTH] = {0.0};
-static double historical_hashrate[HISTORY_LENGTH] = {0.0};
-static int historical_hashrate_init = 0;
-static double current_hashrate = 0;
 
 
 static void _init_system(SystemModule* module) {
 
     module->duration_start = 0;
+    module->historical_hashrate_rolling_index = 0;
+    module->historical_hashrate_init = 0;
+    module->current_hashrate = 0;
+    module->screen_page = 0;
+    module->shares_accepted = 0;
+    module->shares_rejected = 0;
     
-    start_time = time(NULL);
+    module->start_time = time(NULL);
 
     //test the LEDs
     // ESP_LOGI(TAG, "Init LEDs!");
@@ -77,30 +67,31 @@ static void _init_system(SystemModule* module) {
 
 }
 
-static void _update_hashrate(void){
+static void _update_hashrate(SystemModule* module){
 
-        if(screen_page != 0){
+
+        if(module->screen_page != 0){
             return;
         }
 
         float power = INA260_read_power() / 1000;
 
-        float efficiency = power / (current_hashrate/1000.0);
+        float efficiency = power / (module->current_hashrate/1000.0);
 
         OLED_clearLine(0);
-        memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "Gh%s: %.1f W/Th: %.1f", historical_hashrate_init < HISTORY_LENGTH ? "*": "", current_hashrate, efficiency);
-        OLED_writeString(0, 0, oled_buf);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, "Gh%s: %.1f W/Th: %.1f", module->historical_hashrate_init < HISTORY_LENGTH ? "*": "", module->current_hashrate, efficiency);
+        OLED_writeString(0, 0, module->oled_buf);
 }
 
-static void _update_shares(void){
-    if(screen_page != 0){
+static void _update_shares(SystemModule* module){
+    if(module->screen_page != 0){
             return;
     }
     OLED_clearLine(1);
-    memset(oled_buf, 0, 20);
-    snprintf(oled_buf, 20, "A/R: %u/%u", shares_accepted, shares_rejected);
-    OLED_writeString(0, 1, oled_buf);
+    memset(module->oled_buf, 0, 20);
+    snprintf(module->oled_buf, 20, "A/R: %u/%u", module->shares_accepted, module->shares_rejected);
+    OLED_writeString(0, 1, module->oled_buf);
 }
 
 static void _clear_display(void){
@@ -111,8 +102,8 @@ static void _clear_display(void){
 }
 
 
-static void _update_system_info(void) {
-    char oled_buf[21];
+static void _update_system_info(SystemModule* module) {
+
 
     uint16_t fan_speed = EMC2101_get_fan_speed();
     float chip_temp = EMC2101_get_chip_temp();
@@ -122,27 +113,27 @@ static void _update_system_info(void) {
 
     if (OLED_status()) {
 
-        memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, " Fan: %d RPM", fan_speed);
-        OLED_writeString(0, 0, oled_buf);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, " Fan: %d RPM", fan_speed);
+        OLED_writeString(0, 0, module->oled_buf);
 
-        memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "Temp: %.1f C", chip_temp);
-        OLED_writeString(0, 1, oled_buf);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, "Temp: %.1f C", chip_temp);
+        OLED_writeString(0, 1, module->oled_buf);
 
-        memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, " Pwr: %.3f W", power);
-        OLED_writeString(0, 2, oled_buf);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, " Pwr: %.3f W", power);
+        OLED_writeString(0, 2, module->oled_buf);
 
-        memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, " %i mV: %i mA",(int)voltage, (int)current);
-        OLED_writeString(0, 3, oled_buf);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, " %i mV: %i mA",(int)voltage, (int)current);
+        OLED_writeString(0, 3, module->oled_buf);
     }
 
 }
 
-static void _update_esp32_info(void) {
-    char oled_buf[20];
+static void _update_esp32_info(SystemModule* module) {
+
 
     uint32_t free_heap_size = esp_get_free_heap_size();
 
@@ -150,13 +141,13 @@ static void _update_esp32_info(void) {
 
     if (OLED_status()) {
 
-        memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "FH: %u bytes", free_heap_size);
-        OLED_writeString(0, 0, oled_buf);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, "FH: %u bytes", free_heap_size);
+        OLED_writeString(0, 0, module->oled_buf);
 
-        memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "vCore: %u mV", vcore);
-        OLED_writeString(0, 1, oled_buf);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, "vCore: %u mV", vcore);
+        OLED_writeString(0, 1, module->oled_buf);
 
         // memset(oled_buf, 0, 20);
         // snprintf(oled_buf, 20, "Pwr: %.2f W", power);
@@ -165,10 +156,11 @@ static void _update_esp32_info(void) {
 
 }
 
-static void _update_system_performance(){
-    
+static void _update_system_performance(SystemModule* module){
+
+
     // Calculate the uptime in seconds
-    double uptime_in_seconds = difftime(time(NULL), start_time);
+    double uptime_in_seconds = difftime(time(NULL), module->start_time);
     int uptime_in_days = uptime_in_seconds / (3600 * 24);
     int remaining_seconds = (int)uptime_in_seconds % (3600 * 24);
     int uptime_in_hours = remaining_seconds / 3600;
@@ -178,12 +170,12 @@ static void _update_system_performance(){
 
     if (OLED_status()) {
         
-        _update_hashrate();
-        _update_shares();
+        _update_hashrate(module);
+        _update_shares(module);
 
-        memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "UT: %dd %ih %im", uptime_in_days, uptime_in_hours, uptime_in_minutes);
-        OLED_writeString(0, 2, oled_buf);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, "UT: %dd %ih %im", uptime_in_days, uptime_in_hours, uptime_in_minutes);
+        OLED_writeString(0, 2, module->oled_buf);
     }
 }
 
@@ -196,18 +188,18 @@ void SYSTEM_task(SystemModule* module) {
 
     while(1){
         _clear_display();
-        screen_page = 0;
-        _update_system_performance();
+        module->screen_page = 0;
+        _update_system_performance(module);
         vTaskDelay(40000 / portTICK_RATE_MS);
 
         _clear_display();
-        screen_page = 1;
-        _update_system_info();
+        module->screen_page = 1;
+        _update_system_info(module);
         vTaskDelay(10000 / portTICK_RATE_MS);
 
         _clear_display();
-        screen_page = 2;
-        _update_esp32_info();
+        module->screen_page = 2;
+        _update_esp32_info(module);
         vTaskDelay(10000 / portTICK_RATE_MS);
         
     }
@@ -215,13 +207,13 @@ void SYSTEM_task(SystemModule* module) {
 
 
 
-void SYSTEM_notify_accepted_share(void){
-    shares_accepted++;
-    _update_shares();
+void SYSTEM_notify_accepted_share(SystemModule* module){
+    module->shares_accepted++;
+    _update_shares(module);
 }
-void SYSTEM_notify_rejected_share(void){
-    shares_rejected++;
-    _update_shares();
+void SYSTEM_notify_rejected_share(SystemModule* module){
+    module->shares_rejected++;
+    _update_shares(module);
 }
 
 
@@ -239,35 +231,35 @@ void SYSTEM_notify_found_nonce(SystemModule* module, double nonce_diff){
 
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
     
-    historical_hashrate[historical_hashrate_rolling_index] = nonce_diff;
-    historical_hashrate_time_stamps[historical_hashrate_rolling_index] = esp_timer_get_time();
+    module->historical_hashrate[module->historical_hashrate_rolling_index] = nonce_diff;
+    module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time();
 
-    historical_hashrate_rolling_index = (historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
+    module->historical_hashrate_rolling_index = (module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
 
    //ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration, historical_hashrate[historical_hashrate_rolling_index]);
    
 
-    if(historical_hashrate_init < HISTORY_LENGTH){
-        historical_hashrate_init++;
+    if(module->historical_hashrate_init < HISTORY_LENGTH){
+        module->historical_hashrate_init++;
     }else{
-        module->duration_start = historical_hashrate_time_stamps[(historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
+        module->duration_start = module->historical_hashrate_time_stamps[(module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
     }
     double sum = 0;
-    for (int i = 0; i < historical_hashrate_init; i++) {
-        sum += historical_hashrate[i];
+    for (int i = 0; i < module->historical_hashrate_init; i++) {
+        sum += module->historical_hashrate[i];
     }
 
     double duration = (double)(esp_timer_get_time() - module->duration_start) / 1000000;
 
     double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
-    if(historical_hashrate_init < HISTORY_LENGTH){
-        current_hashrate = rolling_rate;
+    if(module->historical_hashrate_init < HISTORY_LENGTH){
+        module->current_hashrate = rolling_rate;
     }else{
         // More smoothing
-        current_hashrate = ((current_hashrate * 9) + rolling_rate)/10;
+        module->current_hashrate = ((module->current_hashrate * 9) + rolling_rate)/10;
     }
 
-    _update_hashrate();
+    _update_hashrate(module);
 
     // logArrayContents(historical_hashrate, HISTORY_LENGTH);
     // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);

@@ -16,6 +16,15 @@
 #define SLEEP_TIME 20
 #define FREQ_MULT 25.0
 
+#define CLOCK_ORDER_CONTROL_0 0x80
+#define CLOCK_ORDER_CONTROL_1 0x84
+#define ORDERED_CLOCK_ENABLE 0x20
+#define CORE_REGISTER_CONTROL 0x3C
+#define PLL3_PARAMETER 0x68
+#define FAST_UART_CONFIGURATION 0x28
+#define TICKET_MASK 0x14
+#define MISC_CONTROL 0x18
+
 static const char *TAG = "bm1397Module";
 
 /// @brief 
@@ -175,27 +184,24 @@ static void _send_init(void) {
 
     _set_chip_address(0x00);
 
-    unsigned char init[6] = {0x00, 0x80, 0x00, 0x00, 0x00, 0x00}; //init1 - clock_order_control0
+    unsigned char init[6] = {0x00, CLOCK_ORDER_CONTROL_0, 0x00, 0x00, 0x00, 0x00}; //init1 - clock_order_control0
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init, 6, false);
 
-    unsigned char init2[6] = {0x00, 0x84, 0x00, 0x00, 0x00, 0x00}; //init2 - clock_order_control1
+    unsigned char init2[6] = {0x00, CLOCK_ORDER_CONTROL_1, 0x00, 0x00, 0x00, 0x00}; //init2 - clock_order_control1
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init2, 6, false);
 
-    unsigned char init3[9] = {0x00, 0x20, 0x00, 0x00, 0x00, 0x01}; //init3 - ordered_clock_enable
+    unsigned char init3[9] = {0x00, ORDERED_CLOCK_ENABLE, 0x00, 0x00, 0x00, 0x01}; //init3 - ordered_clock_enable
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init3, 6, false);
 
-    unsigned char init4[9] = {0x00, 0x3C, 0x80, 0x00, 0x80, 0x74}; //init4 - init_4_?
+    unsigned char init4[9] = {0x00, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x80, 0x74}; //init4 - init_4_?
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, false);
 
     BM1397_set_job_difficulty_mask(256);
 
-    unsigned char init5[9] = {0x00, 0x68, 0xC0, 0x70, 0x01, 0x11}; //init5 - pll3_parameter
+    unsigned char init5[9] = {0x00, PLL3_PARAMETER, 0xC0, 0x70, 0x01, 0x11}; //init5 - pll3_parameter
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5, 6, false);
 
-    unsigned char init5_2[9] = {0x00, 0x68, 0xC0, 0x70, 0x01, 0x11}; //init5_2 - pll3_parameter
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5_2, 6, false);
-
-    unsigned char init6[9] = {0x00, 0x28, 0x06, 0x00, 0x00, 0x0F}; //init6 - fast_uart_configuration
+    unsigned char init6[9] = {0x00, FAST_UART_CONFIGURATION, 0x06, 0x00, 0x00, 0x0F}; //init6 - fast_uart_configuration
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6, 6, false);
 
     BM1397_set_default_baud();
@@ -253,20 +259,20 @@ void BM1397_init(void) {
 // The denominator is 5 bits found in the misc_control (bits 9-13)
 void BM1397_set_default_baud(void){
     //default divider of 26 (11010) for 115,749
-    unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0b01111010, 0b00110001}; //baudrate - misc_control
+    unsigned char baudrate[9] = {0x00, MISC_CONTROL, 0x00, 0x00, 0b01111010, 0b00110001}; //baudrate - misc_control
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
 }
 
 void BM1397_set_max_baud(void){
     // divider of 0 for 3,125,000
-    unsigned char baudrate[9] = { 0x00, 0x18, 0x00, 0x00, 0b01100000, 0b00110001 };; //baudrate - misc_control
+    unsigned char baudrate[9] = { 0x00, MISC_CONTROL, 0x00, 0x00, 0b01100000, 0b00110001 };; //baudrate - misc_control
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
 }
 
 void BM1397_set_job_difficulty_mask(int difficulty){
 
     // Default mask of 256 diff
-    unsigned char job_difficulty_mask[9] = {0x00, 0x14, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
+    unsigned char job_difficulty_mask[9] = {0x00, TICKET_MASK, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
 
     // The mask must be a power of 2 so there are no holes
     // Correct:  {0b00000000, 0b00000000, 0b11111111, 0b11111111}
