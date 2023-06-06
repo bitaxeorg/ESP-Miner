@@ -56,9 +56,11 @@ void update_hashrate(void){
 
         float power = INA260_read_power() / 1000;
 
+        float efficiency = power / (current_hashrate/1000.0);
+
         OLED_clearLine(0);
         memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "Gh%s: %.1f Gh/W: %.1f", historical_hashrate_init < HISTORY_LENGTH ? "*": "", current_hashrate, current_hashrate/power);
+        snprintf(oled_buf, 20, "Gh%s: %.1f W/Th: %.1f", historical_hashrate_init < HISTORY_LENGTH ? "*": "", current_hashrate, efficiency);
         OLED_writeString(0, 0, oled_buf);
 }
 
@@ -204,7 +206,7 @@ void update_system_info(void) {
         OLED_writeString(0, 2, oled_buf);
 
         memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, " %i Mv: %i Ma",(int)voltage, (int)current);
+        snprintf(oled_buf, 20, " %i mV: %i mA",(int)voltage, (int)current);
         OLED_writeString(0, 3, oled_buf);
     }
 
@@ -224,7 +226,7 @@ void update_esp32_info(void) {
         OLED_writeString(0, 0, oled_buf);
 
         memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "vCore: %u Mw", vcore);
+        snprintf(oled_buf, 20, "vCore: %u mV", vcore);
         OLED_writeString(0, 1, oled_buf);
 
         // memset(oled_buf, 0, 20);

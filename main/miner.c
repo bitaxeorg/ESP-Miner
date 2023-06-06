@@ -170,7 +170,7 @@ static void ASIC_task(void * pvParameters)
         if (nonce_diff > active_jobs[nonce.job_id]->pool_diff)
         {
             notify_system_found_nonce(active_jobs[nonce.job_id]->pool_diff);
-            //print_hex((uint8_t *)&job, sizeof(struct job_packet), sizeof(struct job_packet), "job: ");
+
             submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
                             active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
             
