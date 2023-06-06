@@ -19,7 +19,7 @@
 
 static const char *TAG = "serial";
 
-void init_serial(void) {
+void SERIAL_init(void) {
     ESP_LOGI(TAG, "Initializing serial");
     //Configure UART1 parameters
     uart_config_t uart_config = {
@@ -41,14 +41,12 @@ void init_serial(void) {
     uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0);
 }
 
-void set_max_baud(void){
-    ESP_LOGI("SERIAL", "SETTING CHIP MAX BAUD");
-    BM1397_set_max_baud();
-    ESP_LOGI("SERIAL", "SETTING UART MAX BAUD");
-    uart_set_baudrate(UART_NUM_1, 3125000);
+void SERIAL_set_baud(int baud){
+    ESP_LOGI(TAG, "Changing UART baud to %i", baud);
+    uart_set_baudrate(UART_NUM_1, baud);
 }
 
-int send_serial(uint8_t *data, int len, bool debug) {
+int SERIAL_send(uint8_t *data, int len, bool debug) {
     if (debug) {
         printf("->");
         prettyHex((unsigned char*)data, len);
@@ -62,7 +60,7 @@ int send_serial(uint8_t *data, int len, bool debug) {
 /// @param buf buffer to read data into
 /// @param buf number of ms to wait before timing out
 /// @return number of bytes read, or -1 on error
-int16_t serial_rx(uint8_t * buf, uint16_t size, uint16_t timeout_ms) {
+int16_t SERIAL_rx(uint8_t * buf, uint16_t size, uint16_t timeout_ms) {
     int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, size, timeout_ms / portTICK_PERIOD_MS);
     // if (bytes_read > 0) {
     //     printf("rx: ");
@@ -72,11 +70,11 @@ int16_t serial_rx(uint8_t * buf, uint16_t size, uint16_t timeout_ms) {
     return bytes_read;
 }
 
-void debug_serial_rx(void) {
+void SERIAL_debug_rx(void) {
     int ret;
     uint8_t buf[CHUNK_SIZE];
 
-    ret = serial_rx(buf, 100, 20);
+    ret = SERIAL_rx(buf, 100, 20);
     if (ret < 0) {
         fprintf(stderr, "unable to read data\n");
         return;
@@ -86,6 +84,6 @@ void debug_serial_rx(void) {
 
 }
 
-void clear_serial_buffer(void) {
+void SERIAL_clear_buffer(void) {
     uart_flush(UART_NUM_1);
 }

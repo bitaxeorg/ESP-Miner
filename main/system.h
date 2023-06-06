@@ -14,10 +14,10 @@ typedef struct {
     uint16_t shares_accepted;
     uint16_t shares_rejected;
     int screen_page;
-    char oled_buf[20]
+    char oled_buf[20];
 } SystemModule;
 
-void SYSTEM_task(SystemModule* module);
+void SYSTEM_task(void *parameters);
 
 
 void SYSTEM_notify_accepted_share(SystemModule* module);

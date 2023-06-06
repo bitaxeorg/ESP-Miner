@@ -62,7 +62,7 @@ static void _send_BM1397(uint8_t header, uint8_t * data, uint8_t data_len, bool 
     }
 
     //send serial data
-    send_serial(buf, total_length, debug);
+    SERIAL_send(buf, total_length, debug);
 
     free(buf);
 }
@@ -263,10 +263,12 @@ void BM1397_set_default_baud(void){
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
 }
 
-void BM1397_set_max_baud(void){
+int BM1397_set_max_baud(void){
     // divider of 0 for 3,125,000
+    ESP_LOGI(TAG, "Setting max baud");
     unsigned char baudrate[9] = { 0x00, MISC_CONTROL, 0x00, 0x00, 0b01100000, 0b00110001 };; //baudrate - misc_control
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
+    return 3125000;
 }
 
 void BM1397_set_job_difficulty_mask(int difficulty){

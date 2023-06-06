@@ -3,11 +3,11 @@
 
 #define CHUNK_SIZE 1024
 
-int send_serial(uint8_t *, int, bool);
-void init_serial(void);
-void debug_serial_rx(void);
-int16_t serial_rx(uint8_t *, uint16_t, uint16_t);
-void clear_serial_buffer(void);
-void set_max_baud(void);
+int SERIAL_send(uint8_t *, int, bool);
+void SERIAL_init(void);
+void SERIAL_debug_rx(void);
+int16_t SERIAL_rx(uint8_t *, uint16_t, uint16_t);
+void SERIAL_clear_buffer(void);
+void SERIAL_set_baud(int baud);
 
 #endif /* SERIAL_H_ */

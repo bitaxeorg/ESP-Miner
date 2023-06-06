@@ -61,7 +61,7 @@ static bm1397Module BM1397_MODULE;
 
 static void ASIC_task(void * pvParameters)
 {
-    init_serial();
+    SERIAL_init();
 
     BM1397_init();
 
@@ -79,7 +79,8 @@ static void ASIC_task(void * pvParameters)
 
     uint32_t prev_nonce = 0;
 
-    set_max_baud();
+    int baud = BM1397_set_max_baud();
+    SERIAL_set_baud(baud);
 
     SYSTEM_notify_mining_started(&SYSTEM_MODULE);
     ESP_LOGI(TAG, "Mining!");
@@ -106,11 +107,11 @@ static void ASIC_task(void * pvParameters)
         valid_jobs[job.job_id] = 1;
         pthread_mutex_unlock(&valid_jobs_lock);
 
-        clear_serial_buffer();
+        SERIAL_clear_buffer();
         BM1397_send_work(&job); //send the job to the ASIC
 
         //wait for a response
-        int received = serial_rx(buf, 9, BM1397_FULLSCAN_MS);
+        int received = SERIAL_rx(buf, 9, BM1397_FULLSCAN_MS);
 
         if (received < 0) {
             ESP_LOGI(TAG, "Error in serial RX");
@@ -368,7 +369,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, &SYSTEM_MODULE, 10, &sysTaskHandle);
+    xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void*)&SYSTEM_MODULE, 10, &sysTaskHandle);
 
     /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
      * Read "Establishing Wi-Fi or Ethernet Connection" section in
