@@ -54,9 +54,11 @@ void update_hashrate(void){
             return;
         }
 
+        float power = INA260_read_power() / 1000;
+
         OLED_clearLine(0);
         memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "GH/s%s: %.1f", historical_hashrate_init < HISTORY_LENGTH ? "*": "", current_hashrate);
+        snprintf(oled_buf, 20, "Gh%s: %.1f Gh/W: %.1f", historical_hashrate_init < HISTORY_LENGTH ? "*": "", current_hashrate, current_hashrate/power);
         OLED_writeString(0, 0, oled_buf);
 }
 
@@ -80,7 +82,9 @@ void notify_system_rejected_share(void){
 }
 
 
-
+void notify_system_mining_started(void){
+    duration_start = esp_timer_get_time();
+}
 
 void notify_system_found_nonce(double nonce_diff){
 
@@ -112,7 +116,13 @@ void notify_system_found_nonce(double nonce_diff){
 
     double duration = (double)(esp_timer_get_time() - duration_start) / 1000000;
 
-    current_hashrate = (sum * 4294967296) / (duration * 1000000000);
+    double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
+    if(historical_hashrate_init < HISTORY_LENGTH){
+        current_hashrate = rolling_rate;
+    }else{
+        // More smoothing
+        current_hashrate = ((current_hashrate * 9) + rolling_rate)/10;
+    }
 
     update_hashrate();
 
@@ -158,7 +168,7 @@ void init_system(void) {
         OLED_fill(0);
     }
 
-    duration_start = esp_timer_get_time();
+
 }
 
 
@@ -175,14 +185,11 @@ void update_system_info(void) {
 
     uint16_t fan_speed = EMC2101_get_fan_speed();
     float chip_temp = EMC2101_get_chip_temp();
-    //float current = INA260_read_current();
     float voltage = INA260_read_voltage();
     float power = INA260_read_power() / 1000;
     float current = INA260_read_current();
-    //uint16_t vcore = ADC_get_vcore();
 
     if (OLED_status()) {
-        clear_display();
 
         memset(oled_buf, 0, 20);
         snprintf(oled_buf, 20, " Fan: %d RPM", fan_speed);
@@ -208,16 +215,17 @@ void update_esp32_info(void) {
 
     uint32_t free_heap_size = esp_get_free_heap_size();
 
+    uint16_t vcore = ADC_get_vcore();
+
     if (OLED_status()) {
-        clear_display();
 
         memset(oled_buf, 0, 20);
         snprintf(oled_buf, 20, "FH: %u bytes", free_heap_size);
         OLED_writeString(0, 0, oled_buf);
 
-        // memset(oled_buf, 0, 20);
-        // snprintf(oled_buf, 20, "Temp: %.2f C", chip_temp);
-        // OLED_writeString(0, 1, oled_buf);
+        memset(oled_buf, 0, 20);
+        snprintf(oled_buf, 20, "vCore: %u Mw", vcore);
+        OLED_writeString(0, 1, oled_buf);
 
         // memset(oled_buf, 0, 20);
         // snprintf(oled_buf, 20, "Pwr: %.2f W", power);
@@ -238,8 +246,6 @@ void update_system_performance(){
 
 
     if (OLED_status()) {
-
-        clear_display();
         
         update_hashrate();
         update_shares();
@@ -257,14 +263,17 @@ void system_task(void *arg) {
     init_system();
 
     while(1){
+        clear_display();
         screen_page = 0;
         update_system_performance();
         vTaskDelay(40000 / portTICK_RATE_MS);
 
+        clear_display();
         screen_page = 1;
         update_system_info();
         vTaskDelay(10000 / portTICK_RATE_MS);
 
+        clear_display();
         screen_page = 2;
         update_esp32_info();
         vTaskDelay(10000 / portTICK_RATE_MS);
