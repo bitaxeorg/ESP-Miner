@@ -12,6 +12,7 @@
 #include "adc.h"
 #include "oled.h"
 #include <sys/time.h>
+#include "system.h"
 
 
 static const char *TAG = "system";
@@ -35,106 +36,7 @@ static int historical_hashrate_init = 0;
 static double current_hashrate = 0;
 
 
-// void logArrayContents(const double* array, size_t length) {
-//     char logMessage[1024];  // Adjust the buffer size as needed
-//     int offset = 0;
-    
-//     offset += snprintf(logMessage + offset, sizeof(logMessage) - offset, "Array Contents: [");
-    
-//     for (size_t i = 0; i < length; i++) {
-//         offset += snprintf(logMessage + offset, sizeof(logMessage) - offset, "%.1f%s", array[i], (i < length - 1) ? ", " : "]");
-//     }
-    
-//     ESP_LOGI(TAG, "%s", logMessage);
-// }
-
-void update_hashrate(void){
-
-        if(screen_page != 0){
-            return;
-        }
-
-        float power = INA260_read_power() / 1000;
-
-        float efficiency = power / (current_hashrate/1000.0);
-
-        OLED_clearLine(0);
-        memset(oled_buf, 0, 20);
-        snprintf(oled_buf, 20, "Gh%s: %.1f W/Th: %.1f", historical_hashrate_init < HISTORY_LENGTH ? "*": "", current_hashrate, efficiency);
-        OLED_writeString(0, 0, oled_buf);
-}
-
-void update_shares(void){
-    if(screen_page != 0){
-            return;
-    }
-    OLED_clearLine(1);
-    memset(oled_buf, 0, 20);
-    snprintf(oled_buf, 20, "A/R: %u/%u", shares_accepted, shares_rejected);
-    OLED_writeString(0, 1, oled_buf);
-}
-
-void notify_system_accepted_share(void){
-    shares_accepted++;
-    update_shares();
-}
-void notify_system_rejected_share(void){
-    shares_rejected++;
-    update_shares();
-}
-
-
-void notify_system_mining_started(void){
-    duration_start = esp_timer_get_time();
-}
-
-void notify_system_found_nonce(double nonce_diff){
-
- 
-
-    // Calculate the time difference in seconds with sub-second precision
-    
-
-
-    // hashrate = (nonce_difficulty * 2^32) / time_to_find
-    
-    historical_hashrate[historical_hashrate_rolling_index] = nonce_diff;
-    historical_hashrate_time_stamps[historical_hashrate_rolling_index] = esp_timer_get_time();
-
-    historical_hashrate_rolling_index = (historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
-
-   //ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration, historical_hashrate[historical_hashrate_rolling_index]);
-   
-
-    if(historical_hashrate_init < HISTORY_LENGTH){
-        historical_hashrate_init++;
-    }else{
-        duration_start = historical_hashrate_time_stamps[(historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
-    }
-    double sum = 0;
-    for (int i = 0; i < historical_hashrate_init; i++) {
-        sum += historical_hashrate[i];
-    }
-
-    double duration = (double)(esp_timer_get_time() - duration_start) / 1000000;
-
-    double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
-    if(historical_hashrate_init < HISTORY_LENGTH){
-        current_hashrate = rolling_rate;
-    }else{
-        // More smoothing
-        current_hashrate = ((current_hashrate * 9) + rolling_rate)/10;
-    }
-
-    update_hashrate();
-
-    // logArrayContents(historical_hashrate, HISTORY_LENGTH);
-    // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
-    
-}
-
-
-void init_system(void) {
+static void _init_system(void) {
     
     start_time = time(NULL);
 
@@ -173,8 +75,33 @@ void init_system(void) {
 
 }
 
+static void _update_hashrate(void){
 
-void clear_display(void){
+        if(screen_page != 0){
+            return;
+        }
+
+        float power = INA260_read_power() / 1000;
+
+        float efficiency = power / (current_hashrate/1000.0);
+
+        OLED_clearLine(0);
+        memset(oled_buf, 0, 20);
+        snprintf(oled_buf, 20, "Gh%s: %.1f W/Th: %.1f", historical_hashrate_init < HISTORY_LENGTH ? "*": "", current_hashrate, efficiency);
+        OLED_writeString(0, 0, oled_buf);
+}
+
+static void _update_shares(void){
+    if(screen_page != 0){
+            return;
+    }
+    OLED_clearLine(1);
+    memset(oled_buf, 0, 20);
+    snprintf(oled_buf, 20, "A/R: %u/%u", shares_accepted, shares_rejected);
+    OLED_writeString(0, 1, oled_buf);
+}
+
+static void _clear_display(void){
     OLED_clearLine(0);
     OLED_clearLine(1);
     OLED_clearLine(2);
@@ -182,7 +109,7 @@ void clear_display(void){
 }
 
 
-void update_system_info(void) {
+static void _update_system_info(void) {
     char oled_buf[21];
 
     uint16_t fan_speed = EMC2101_get_fan_speed();
@@ -212,7 +139,7 @@ void update_system_info(void) {
 
 }
 
-void update_esp32_info(void) {
+static void _update_esp32_info(void) {
     char oled_buf[20];
 
     uint32_t free_heap_size = esp_get_free_heap_size();
@@ -236,7 +163,7 @@ void update_esp32_info(void) {
 
 }
 
-void update_system_performance(){
+static void _update_system_performance(){
     
     // Calculate the uptime in seconds
     double uptime_in_seconds = difftime(time(NULL), start_time);
@@ -249,8 +176,8 @@ void update_system_performance(){
 
     if (OLED_status()) {
         
-        update_hashrate();
-        update_shares();
+        _update_hashrate();
+        _update_shares();
 
         memset(oled_buf, 0, 20);
         snprintf(oled_buf, 20, "UT: %dd %ih %im", uptime_in_days, uptime_in_hours, uptime_in_minutes);
@@ -259,26 +186,95 @@ void update_system_performance(){
 }
 
 
+void SYSTEM_task(void *arg) {
 
-void system_task(void *arg) {
-
-    init_system();
+    _init_system();
 
     while(1){
-        clear_display();
+        _clear_display();
         screen_page = 0;
-        update_system_performance();
+        _update_system_performance();
         vTaskDelay(40000 / portTICK_RATE_MS);
 
-        clear_display();
+        _clear_display();
         screen_page = 1;
-        update_system_info();
+        _update_system_info();
         vTaskDelay(10000 / portTICK_RATE_MS);
 
-        clear_display();
+        _clear_display();
         screen_page = 2;
-        update_esp32_info();
+        _update_esp32_info();
         vTaskDelay(10000 / portTICK_RATE_MS);
         
     }
 }
+
+
+
+void SYSTEM_notify_accepted_share(void){
+    shares_accepted++;
+    _update_shares();
+}
+void SYSTEM_notify_rejected_share(void){
+    shares_rejected++;
+    _update_shares();
+}
+
+
+void SYSTEM_notify_mining_started(void){
+    duration_start = esp_timer_get_time();
+}
+
+void SYSTEM_notify_found_nonce(double nonce_diff){
+
+ 
+
+    // Calculate the time difference in seconds with sub-second precision
+    
+
+
+    // hashrate = (nonce_difficulty * 2^32) / time_to_find
+    
+    historical_hashrate[historical_hashrate_rolling_index] = nonce_diff;
+    historical_hashrate_time_stamps[historical_hashrate_rolling_index] = esp_timer_get_time();
+
+    historical_hashrate_rolling_index = (historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
+
+   //ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration, historical_hashrate[historical_hashrate_rolling_index]);
+   
+
+    if(historical_hashrate_init < HISTORY_LENGTH){
+        historical_hashrate_init++;
+    }else{
+        duration_start = historical_hashrate_time_stamps[(historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
+    }
+    double sum = 0;
+    for (int i = 0; i < historical_hashrate_init; i++) {
+        sum += historical_hashrate[i];
+    }
+
+    double duration = (double)(esp_timer_get_time() - duration_start) / 1000000;
+
+    double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
+    if(historical_hashrate_init < HISTORY_LENGTH){
+        current_hashrate = rolling_rate;
+    }else{
+        // More smoothing
+        current_hashrate = ((current_hashrate * 9) + rolling_rate)/10;
+    }
+
+    _update_hashrate();
+
+    // logArrayContents(historical_hashrate, HISTORY_LENGTH);
+    // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
+    
+}
+
+
+
+
+
+
+
+
+

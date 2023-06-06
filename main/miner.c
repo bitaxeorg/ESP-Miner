@@ -92,7 +92,7 @@ static void ASIC_task(void * pvParameters)
 
     set_max_baud();
 
-    notify_system_mining_started();
+    SYSTEM_notify_mining_started();
     ESP_LOGI(TAG, "Mining!");
     while (1) {
         bm_job * next_bm_job = (bm_job *) queue_dequeue(&ASIC_jobs_queue);
@@ -169,7 +169,7 @@ static void ASIC_task(void * pvParameters)
         
         if (nonce_diff > active_jobs[nonce.job_id]->pool_diff)
         {
-            notify_system_found_nonce(active_jobs[nonce.job_id]->pool_diff);
+            SYSTEM_notify_found_nonce(active_jobs[nonce.job_id]->pool_diff);
 
             submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
                             active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
@@ -349,10 +349,10 @@ static void stratum_task(void * pvParameters)
                 int16_t parsed_id;
                 if (parse_stratum_result_message(line, &parsed_id)) {
                     ESP_LOGI(TAG, "message id %d result accepted", parsed_id);
-                    notify_system_accepted_share();
+                    SYSTEM_notify_accepted_share();
                 } else {
                     ESP_LOGI(TAG, "message id %d result rejected", parsed_id);
-                    notify_system_rejected_share();
+                    SYSTEM_notify_rejected_share();
                 }
                 free(line);
             }  else {
@@ -379,7 +379,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    xTaskCreate(system_task, "System_Task", 4096, NULL, 10, &sysTaskHandle);
+    xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, NULL, 10, &sysTaskHandle);
 
     /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
      * Read "Establishing Wi-Fi or Ethernet Connection" section in
