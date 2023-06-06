@@ -343,6 +343,7 @@ static void stratum_task(void * pvParameters)
 
                 //1fffe000
                 ESP_LOGI(TAG, "Set version mask: %08x", version_mask);
+                free(line);
 
             } else if (method == STRATUM_RESULT) {
                 int16_t parsed_id;
