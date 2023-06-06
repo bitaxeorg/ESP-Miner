@@ -159,7 +159,7 @@ void set_bm1397_max_baud(void){
 void set_job_difficulty_mask(int difficulty){
 
     // Default mask of 256 diff
-    unsigned char job_difficulty_mask[9] = {0x00, 0x14, 0b00000000, 0b00000000, 0b00000000, 0111111111};
+    unsigned char job_difficulty_mask[9] = {0x00, 0x14, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
 
     // The mask must be a power of 2 so there are no holes
     // Correct:  {0b00000000, 0b00000000, 0b11111111, 0b11111111}
