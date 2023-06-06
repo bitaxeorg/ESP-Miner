@@ -16,41 +16,14 @@
 #define SLEEP_TIME 20
 #define FREQ_MULT 25.0
 
-
-
-static const char *TAG = "bm1397";
-
-static void send_hash_frequency(float frequency);
-
-//reset the BM1397 via the RTS line
-void reset_BM1397(void) {
-    gpio_set_level(BM1397_RST_PIN, 0);
-
-    //delay for 100ms
-    vTaskDelay(100 / portTICK_RATE_MS);
-
-    //set the gpio pin high
-    gpio_set_level(BM1397_RST_PIN, 1);
-
-    //delay for 100ms
-    vTaskDelay(100 / portTICK_RATE_MS);
-
-}
-
-void init_BM1397(void) {
-    ESP_LOGI(TAG, "Initializing BM1397");
-
-    gpio_pad_select_gpio(BM1397_RST_PIN);
-    gpio_set_direction(BM1397_RST_PIN, GPIO_MODE_OUTPUT);
-
-}
+static const char *TAG = "bm1397Module";
 
 /// @brief 
 /// @param ftdi 
 /// @param header 
 /// @param data 
 /// @param len 
-void send_BM1397(uint8_t header, uint8_t * data, uint8_t data_len, bool debug) {
+static void _send_BM1397(uint8_t header, uint8_t * data, uint8_t data_len, bool debug) {
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len+6) : (data_len+5);
 
@@ -85,103 +58,21 @@ void send_BM1397(uint8_t header, uint8_t * data, uint8_t data_len, bool debug) {
     free(buf);
 }
 
-void send_read_address(void) {
+static void _send_chain_inactive(void) {
 
     unsigned char read_address[2] = {0x00, 0x00};
     //send serial data
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, false);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_INACTIVE), read_address, 2, false);
 }
 
-void send_chain_inactive(void) {
-
-    unsigned char read_address[2] = {0x00, 0x00};
-    //send serial data
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_INACTIVE), read_address, 2, false);
-}
-
-void set_chip_address(uint8_t chipAddr) {
+static void _set_chip_address(uint8_t chipAddr) {
 
     unsigned char read_address[2] = {chipAddr, 0x00};
     //send serial data
-    send_BM1397((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, false);
+    _send_BM1397((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, false);
 }
 
-void send_init(void) {
-
-    //send serial data
-    vTaskDelay(SLEEP_TIME / portTICK_RATE_MS);
-    send_chain_inactive();
-
-    set_chip_address(0x00);
-
-    unsigned char init[6] = {0x00, 0x80, 0x00, 0x00, 0x00, 0x00}; //init1 - clock_order_control0
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init, 6, false);
-
-    unsigned char init2[6] = {0x00, 0x84, 0x00, 0x00, 0x00, 0x00}; //init2 - clock_order_control1
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init2, 6, false);
-
-    unsigned char init3[9] = {0x00, 0x20, 0x00, 0x00, 0x00, 0x01}; //init3 - ordered_clock_enable
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init3, 6, false);
-
-    unsigned char init4[9] = {0x00, 0x3C, 0x80, 0x00, 0x80, 0x74}; //init4 - init_4_?
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, false);
-
-    set_job_difficulty_mask(256);
-
-    unsigned char init5[9] = {0x00, 0x68, 0xC0, 0x70, 0x01, 0x11}; //init5 - pll3_parameter
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5, 6, false);
-
-    unsigned char init5_2[9] = {0x00, 0x68, 0xC0, 0x70, 0x01, 0x11}; //init5_2 - pll3_parameter
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5_2, 6, false);
-
-    unsigned char init6[9] = {0x00, 0x28, 0x06, 0x00, 0x00, 0x0F}; //init6 - fast_uart_configuration
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6, 6, false);
-
-    set_default_baud();
-
-    send_hash_frequency(BM1397_FREQUENCY);
-}
-
-// Baud formula = 25M/((denominator+1)*8)
-// The denominator is 5 bits found in the misc_control (bits 9-13)
-void set_default_baud(void){
-    //default divider of 26 (11010) for 115,749
-    unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0b01111010, 0b00110001}; //baudrate - misc_control
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
-}
-
-void set_bm1397_max_baud(void){
-    // divider of 0 for 3,125,000
-    unsigned char baudrate[9] = { 0x00, 0x18, 0x00, 0x00, 0b01100000, 0b00110001 };; //baudrate - misc_control
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
-}
-
-void set_job_difficulty_mask(int difficulty){
-
-    // Default mask of 256 diff
-    unsigned char job_difficulty_mask[9] = {0x00, 0x14, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
-
-    // The mask must be a power of 2 so there are no holes
-    // Correct:  {0b00000000, 0b00000000, 0b11111111, 0b11111111}
-    // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
-    difficulty = largestPowerOfTwo(difficulty) -1; // (difficulty - 1) if it is a pow 2 then step down to second largest for more hashrate sampling
-
-    // convert difficulty into char array
-    // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
-    // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
-     for (int i = 0; i < 4; i++) {
-        char value = (difficulty >> (8 * i)) & 0xFF;
-        //The char is read in backwards to the register so we need to reverse them
-        //So a mask of 512 looks like 0b00000000 00000000 00000001 1111111
-        //and not 0b00000000 00000000 10000000 1111111
-        
-        job_difficulty_mask[5 - i] = reverseBits(value);
-    }
-
-    send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, false);
-}
-
-unsigned char reverseBits(unsigned char num) {
+static unsigned char _reverse_bits(unsigned char num) {
     unsigned char reversed = 0;
     int i;
 
@@ -194,7 +85,7 @@ unsigned char reverseBits(unsigned char num) {
     return reversed;
 }
 
-int largestPowerOfTwo(int num) {
+static int _largest_power_of_two(int num) {
     int power = 0;
 
     while (num > 1) {
@@ -205,14 +96,8 @@ int largestPowerOfTwo(int num) {
     return 1 << power;
 }
 
-
-void send_work(struct job_packet *job) {
-    send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t*)job, sizeof(struct job_packet), false);
-}
-
-
 // borrowed from cgminer driver-gekko.c calc_gsf_freq()
-static void send_hash_frequency(float frequency) {
+static void _send_hash_frequency(float frequency) {
 
     unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; //prefreq - pll0_divider
 
@@ -269,11 +154,11 @@ static void send_hash_frequency(float frequency) {
 
 	for (i = 0; i < 2; i++) {
         vTaskDelay(10 / portTICK_RATE_MS);
-        send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, false);
+        _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, false);
 	}
 	for (i = 0; i < 2; i++) {
         vTaskDelay(10 / portTICK_RATE_MS);
-        send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
+        _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
 	}
 
     vTaskDelay(10 / portTICK_RATE_MS);
@@ -281,3 +166,133 @@ static void send_hash_frequency(float frequency) {
     ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
 
 }
+
+static void _send_init(void) {
+
+    //send serial data
+    vTaskDelay(SLEEP_TIME / portTICK_RATE_MS);
+    _send_chain_inactive();
+
+    _set_chip_address(0x00);
+
+    unsigned char init[6] = {0x00, 0x80, 0x00, 0x00, 0x00, 0x00}; //init1 - clock_order_control0
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init, 6, false);
+
+    unsigned char init2[6] = {0x00, 0x84, 0x00, 0x00, 0x00, 0x00}; //init2 - clock_order_control1
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init2, 6, false);
+
+    unsigned char init3[9] = {0x00, 0x20, 0x00, 0x00, 0x00, 0x01}; //init3 - ordered_clock_enable
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init3, 6, false);
+
+    unsigned char init4[9] = {0x00, 0x3C, 0x80, 0x00, 0x80, 0x74}; //init4 - init_4_?
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, false);
+
+    BM1397_set_job_difficulty_mask(256);
+
+    unsigned char init5[9] = {0x00, 0x68, 0xC0, 0x70, 0x01, 0x11}; //init5 - pll3_parameter
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5, 6, false);
+
+    unsigned char init5_2[9] = {0x00, 0x68, 0xC0, 0x70, 0x01, 0x11}; //init5_2 - pll3_parameter
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5_2, 6, false);
+
+    unsigned char init6[9] = {0x00, 0x28, 0x06, 0x00, 0x00, 0x0F}; //init6 - fast_uart_configuration
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6, 6, false);
+
+    BM1397_set_default_baud();
+
+    _send_hash_frequency(BM1397_FREQUENCY);
+}
+
+
+//reset the BM1397 via the RTS line
+static void _reset(void) {
+    gpio_set_level(BM1397_RST_PIN, 0);
+
+    //delay for 100ms
+    vTaskDelay(100 / portTICK_RATE_MS);
+
+    //set the gpio pin high
+    gpio_set_level(BM1397_RST_PIN, 1);
+
+    //delay for 100ms
+    vTaskDelay(100 / portTICK_RATE_MS);
+
+}
+
+
+static void _send_read_address(void) {
+
+    unsigned char read_address[2] = {0x00, 0x00};
+    //send serial data
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, false);
+}
+
+
+void BM1397_init(void) {
+    ESP_LOGI(TAG, "Initializing BM1397");
+
+    gpio_pad_select_gpio(BM1397_RST_PIN);
+    gpio_set_direction(BM1397_RST_PIN, GPIO_MODE_OUTPUT);
+
+    //reset the bm1397
+    _reset();
+
+    //send the init command
+    _send_read_address();
+    
+    _send_init();
+
+
+}
+
+
+
+
+
+// Baud formula = 25M/((denominator+1)*8)
+// The denominator is 5 bits found in the misc_control (bits 9-13)
+void BM1397_set_default_baud(void){
+    //default divider of 26 (11010) for 115,749
+    unsigned char baudrate[9] = {0x00, 0x18, 0x00, 0x00, 0b01111010, 0b00110001}; //baudrate - misc_control
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
+}
+
+void BM1397_set_max_baud(void){
+    // divider of 0 for 3,125,000
+    unsigned char baudrate[9] = { 0x00, 0x18, 0x00, 0x00, 0b01100000, 0b00110001 };; //baudrate - misc_control
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
+}
+
+void BM1397_set_job_difficulty_mask(int difficulty){
+
+    // Default mask of 256 diff
+    unsigned char job_difficulty_mask[9] = {0x00, 0x14, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
+
+    // The mask must be a power of 2 so there are no holes
+    // Correct:  {0b00000000, 0b00000000, 0b11111111, 0b11111111}
+    // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
+    difficulty = _largest_power_of_two(difficulty) -1; // (difficulty - 1) if it is a pow 2 then step down to second largest for more hashrate sampling
+
+    // convert difficulty into char array
+    // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
+    // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
+     for (int i = 0; i < 4; i++) {
+        char value = (difficulty >> (8 * i)) & 0xFF;
+        //The char is read in backwards to the register so we need to reverse them
+        //So a mask of 512 looks like 0b00000000 00000000 00000001 1111111
+        //and not 0b00000000 00000000 10000000 1111111
+        
+        job_difficulty_mask[5 - i] = _reverse_bits(value);
+    }
+
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, false);
+}
+
+
+
+
+void BM1397_send_work(struct job_packet *job) {
+    _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t*)job, sizeof(struct job_packet), false);
+}
+
+

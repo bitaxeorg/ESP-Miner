@@ -15,7 +15,7 @@
 #include "system.h"
 
 
-static const char *TAG = "system";
+static const char *TAG = "SystemModule";
 
 #define BM1397_VOLTAGE CONFIG_BM1397_VOLTAGE
 #define HISTORY_LENGTH 100
@@ -28,7 +28,7 @@ static uint16_t shares_accepted = 0;
 static uint16_t shares_rejected = 0;
 static time_t start_time;
 
-static double duration_start = 0;
+
 static int historical_hashrate_rolling_index = 0;
 static double historical_hashrate_time_stamps[HISTORY_LENGTH] = {0.0};
 static double historical_hashrate[HISTORY_LENGTH] = {0.0};
@@ -36,7 +36,9 @@ static int historical_hashrate_init = 0;
 static double current_hashrate = 0;
 
 
-static void _init_system(void) {
+static void _init_system(SystemModule* module) {
+
+    module->duration_start = 0;
     
     start_time = time(NULL);
 
@@ -186,9 +188,11 @@ static void _update_system_performance(){
 }
 
 
-void SYSTEM_task(void *arg) {
+void SYSTEM_task(SystemModule* module) {
 
-    _init_system();
+
+
+    _init_system(module);
 
     while(1){
         _clear_display();
@@ -221,11 +225,11 @@ void SYSTEM_notify_rejected_share(void){
 }
 
 
-void SYSTEM_notify_mining_started(void){
-    duration_start = esp_timer_get_time();
+void SYSTEM_notify_mining_started(SystemModule* module){
+    module->duration_start = esp_timer_get_time();
 }
 
-void SYSTEM_notify_found_nonce(double nonce_diff){
+void SYSTEM_notify_found_nonce(SystemModule* module, double nonce_diff){
 
  
 
@@ -246,14 +250,14 @@ void SYSTEM_notify_found_nonce(double nonce_diff){
     if(historical_hashrate_init < HISTORY_LENGTH){
         historical_hashrate_init++;
     }else{
-        duration_start = historical_hashrate_time_stamps[(historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
+        module->duration_start = historical_hashrate_time_stamps[(historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
     }
     double sum = 0;
     for (int i = 0; i < historical_hashrate_init; i++) {
         sum += historical_hashrate[i];
     }
 
-    double duration = (double)(esp_timer_get_time() - duration_start) / 1000000;
+    double duration = (double)(esp_timer_get_time() - module->duration_start) / 1000000;
 
     double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
     if(historical_hashrate_init < HISTORY_LENGTH){

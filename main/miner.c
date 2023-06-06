@@ -56,25 +56,14 @@ bm_job ** active_jobs;
 uint8_t * valid_jobs;
 pthread_mutex_t valid_jobs_lock;
 
+static SystemModule SYSTEM_MODULE;
+static bm1397Module BM1397_MODULE;
+
 static void ASIC_task(void * pvParameters)
 {
     init_serial();
 
-    init_BM1397();
-
-    ESP_LOGI(TAG, "Job wait time:%f", BM1397_FULLSCAN_MS);
-
-    //reset the bm1397
-    reset_BM1397();
-
-    //send the init command
-    send_read_address();
-
-    //read back response
-    debug_serial_rx();
-
-    //send the init commands
-    send_init();
+    BM1397_init();
 
     uint8_t buf[CHUNK_SIZE];
     memset(buf, 0, 1024);
@@ -92,7 +81,7 @@ static void ASIC_task(void * pvParameters)
 
     set_max_baud();
 
-    SYSTEM_notify_mining_started();
+    SYSTEM_notify_mining_started(&SYSTEM_MODULE);
     ESP_LOGI(TAG, "Mining!");
     while (1) {
         bm_job * next_bm_job = (bm_job *) queue_dequeue(&ASIC_jobs_queue);
@@ -118,7 +107,7 @@ static void ASIC_task(void * pvParameters)
         pthread_mutex_unlock(&valid_jobs_lock);
 
         clear_serial_buffer();
-        send_work(&job); //send the job to the ASIC
+        BM1397_send_work(&job); //send the job to the ASIC
 
         //wait for a response
         int received = serial_rx(buf, 9, BM1397_FULLSCAN_MS);
@@ -169,7 +158,7 @@ static void ASIC_task(void * pvParameters)
         
         if (nonce_diff > active_jobs[nonce.job_id]->pool_diff)
         {
-            SYSTEM_notify_found_nonce(active_jobs[nonce.job_id]->pool_diff);
+            SYSTEM_notify_found_nonce(&SYSTEM_MODULE, active_jobs[nonce.job_id]->pool_diff);
 
             submit_share(sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
                             active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
@@ -334,7 +323,7 @@ static void stratum_task(void * pvParameters)
                     stratum_difficulty = new_difficulty;
                     difficulty_changed = true;
                     ESP_LOGI(TAG, "Set stratum difficulty: %d", stratum_difficulty);
-                    set_job_difficulty_mask(stratum_difficulty);
+                    BM1397_set_job_difficulty_mask(stratum_difficulty);
                 }
                 free(line);
 
@@ -379,7 +368,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, NULL, 10, &sysTaskHandle);
+    xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, &SYSTEM_MODULE, 10, &sysTaskHandle);
 
     /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
      * Read "Establishing Wi-Fi or Ethernet Connection" section in
@@ -394,3 +383,5 @@ void app_main(void)
     xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, NULL, 10, &serialTaskHandle);
 }
+
+

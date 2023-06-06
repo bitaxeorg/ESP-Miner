@@ -30,7 +30,9 @@ static const u_int64_t BM1397_HASHRATE_S = BM1397_FREQUENCY * BM1397_CORE_COUNT 
 static const u_int64_t NONCE_SPACE = 4294967296;
 static const double  BM1397_FULLSCAN_MS = ((double)NONCE_SPACE / (double)BM1397_HASHRATE_S) * 1000; 
 
+typedef struct {
 
+} bm1397Module;
 
 typedef enum {
   JOB_PACKET = 0, 
@@ -60,16 +62,12 @@ struct __attribute__((__packed__)) nonce_response {
     uint8_t crc;
 };
 
+void BM1397_init(void);
 
-void send_read_address(void);
-void send_init(void);
-void send_work(struct job_packet *job);
-void reset_BM1397(void);
-void init_BM1397(void);
-void set_job_difficulty_mask(int);
-unsigned char reverseBits(unsigned char num);
-int largestPowerOfTwo(int num);
-void set_bm1397_max_baud(void);
-void set_default_baud(void);
+void BM1397_send_init(void);
+void BM1397_send_work(struct job_packet *job);
+void BM1397_set_job_difficulty_mask(int);
+void BM1397_set_max_baud(void);
+void BM1397_set_default_baud(void);
 
 #endif /* BM1397_H_ */

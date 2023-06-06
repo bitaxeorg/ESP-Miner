@@ -43,7 +43,7 @@ void init_serial(void) {
 
 void set_max_baud(void){
     ESP_LOGI("SERIAL", "SETTING CHIP MAX BAUD");
-    set_bm1397_max_baud();
+    BM1397_set_max_baud();
     ESP_LOGI("SERIAL", "SETTING UART MAX BAUD");
     uart_set_baudrate(UART_NUM_1, 3125000);
 }

@@ -14,19 +14,11 @@ TEST_CASE("Check known working midstate + job command", "[bm1397]")
         init_serial();
         uart_initialized = 1;
 
-        init_BM1397();
-
-        // reset the bm1397
-        reset_BM1397();
-
-        // send the init command
-        send_read_address();
+        BM1397_init();
 
         // read back response
         debug_serial_rx();
 
-        // send the init commands
-        send_init();
     }
 
     uint8_t work1[50] = {
@@ -44,7 +36,7 @@ TEST_CASE("Check known working midstate + job command", "[bm1397]")
     uint8_t buf[1024];
     memset(buf, 0, 1024);
 
-    send_work(&test_job);
+    BM1397_send_work(&test_job);
     uint16_t received = serial_rx(buf, 9, 20);
     TEST_ASSERT_GREATER_OR_EQUAL_UINT16(sizeof(struct nonce_response), received);
 
