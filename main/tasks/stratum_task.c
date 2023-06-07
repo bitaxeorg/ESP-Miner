@@ -37,7 +37,7 @@ void stratum_task(void * pvParameters)
 
     //get ip address from hostname
     IP_ADDR4(&ip_Addr, 0, 0, 0, 0);
-    printf("Get IP for URL: %s\n", STRATUM_URL);
+    ESP_LOGI(TAG, "Get IP for URL: %s\n", STRATUM_URL);
     dns_gethostbyname(STRATUM_URL, &ip_Addr, dns_found_cb, NULL);
     while (!bDNSFound);
 
@@ -47,7 +47,7 @@ void stratum_task(void * pvParameters)
              ip4_addr2(&ip_Addr.u_addr.ip4),
              ip4_addr3(&ip_Addr.u_addr.ip4),
              ip4_addr4(&ip_Addr.u_addr.ip4));
-    printf("Connecting to: stratum+tcp://%s:%d (%s)\n", STRATUM_URL, PORT, host_ip);
+    ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)\n", STRATUM_URL, PORT, host_ip);
 
     while (1) {
         struct sockaddr_in dest_addr;
@@ -88,7 +88,7 @@ void stratum_task(void * pvParameters)
         while (1)
         {
             char * line = receive_jsonrpc_line( GLOBAL_STATE->sock);
-            ESP_LOGI(TAG, "stratum rx: %s", line); //debug incoming stratum messages
+            ESP_LOGI(TAG, "rx: %s", line); //debug incoming stratum messages
 
             stratum_method method = parse_stratum_method(line);
 
