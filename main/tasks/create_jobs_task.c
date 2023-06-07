@@ -19,8 +19,6 @@ void create_jobs_task(void * pvParameters)
     while (1) {
         char * next_notify_json_str = (char *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
         ESP_LOGI(TAG, "New Work Dequeued");
-        uint32_t free_heap_size = esp_get_free_heap_size();
-        ESP_LOGI(TAG, "miner heap free size: %u bytes", free_heap_size);
 
         mining_notify params = parse_mining_notify_message(next_notify_json_str);
 
