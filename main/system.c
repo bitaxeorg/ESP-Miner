@@ -180,9 +180,9 @@ static void _update_system_performance(SystemModule* module){
 }
 
 
-void SYSTEM_task(void *parameters) {
+void SYSTEM_task(void *pvParameters) {
 
-    SystemModule *module = (SystemModule*)parameters;
+    SystemModule *module = (SystemModule*)pvParameters;
     _init_system(module);
 
     while(1){

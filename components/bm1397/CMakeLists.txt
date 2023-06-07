@@ -1,3 +1,12 @@
-idf_component_register(SRCS "bm1397.c" "serial.c" "crc.c"
-                       INCLUDE_DIRS "include"
-                       REQUIRES freertos driver stratum)
+idf_component_register(
+SRCS 
+    "bm1397.c" 
+    "serial.c"  
+    "crc.c"
+INCLUDE_DIRS 
+    "include"
+REQUIRES 
+    freertos 
+    driver 
+    stratum
+)
