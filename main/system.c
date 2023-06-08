@@ -13,6 +13,7 @@
 #include "oled.h"
 #include <sys/time.h>
 #include "system.h"
+#include "math.h"
 
 
 static const char *TAG = "SystemModule";
@@ -29,7 +30,7 @@ static void _init_system(SystemModule* module) {
     module->screen_page = 0;
     module->shares_accepted = 0;
     module->shares_rejected = 0;
-    
+    module->best_nonce_diff = 0;
     module->start_time = time(NULL);
 
     //test the LEDs
@@ -92,6 +93,16 @@ static void _update_shares(SystemModule* module){
     memset(module->oled_buf, 0, 20);
     snprintf(module->oled_buf, 20, "A/R: %u/%u", module->shares_accepted, module->shares_rejected);
     OLED_writeString(0, 1, module->oled_buf);
+}
+
+static void _update_best_diff(SystemModule* module){
+        if(module->screen_page != 0){
+            return;
+    }
+    OLED_clearLine(3);
+    memset(module->oled_buf, 0, 20);
+    snprintf(module->oled_buf, 20, "BD: %u", module->best_nonce_diff);
+    OLED_writeString(0, 3, module->oled_buf);
 }
 
 static void _clear_display(void){
@@ -172,6 +183,7 @@ static void _update_system_performance(SystemModule* module){
         
         _update_hashrate(module);
         _update_shares(module);
+        _update_best_diff(module);
 
         memset(module->oled_buf, 0, 20);
         snprintf(module->oled_buf, 20, "UT: %dd %ih %im", uptime_in_days, uptime_in_hours, uptime_in_minutes);
@@ -204,7 +216,23 @@ void SYSTEM_task(void *pvParameters) {
     }
 }
 
+double _calculate_network_difficultiy(uint32_t nBits) {
+    uint32_t mantissa = nBits & 0x007fffff;       // Extract the mantissa from nBits
+    uint8_t exponent = (nBits >> 24) & 0xff;       // Extract the exponent from nBits
+    
+    double target = (double)mantissa * pow(253,(exponent - 3));   // Calculate the target value
+    
+    double difficulty = (pow(2, 208) * 65535) / target;    // Calculate the difficulty
+    
+    return difficulty;
+}
 
+
+void SYSTEM_notify_best_nonce_diff(SystemModule * module, uint32_t diff, uint32_t nbits){
+    module->best_nonce_diff = diff;
+    uint32_t network_diff = _calculate_network_difficultiy(nbits);
+    ESP_LOGI(TAG, "Network diff: %u", network_diff);
+}
 
 void SYSTEM_notify_accepted_share(SystemModule* module){
     module->shares_accepted++;

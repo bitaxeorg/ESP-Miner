@@ -14,9 +14,6 @@ void ASIC_task(void * pvParameters)
 
     GlobalState *GLOBAL_STATE = (GlobalState*)pvParameters;
 
-    SERIAL_init();
-
-    BM1397_init();
 
     uint8_t buf[CHUNK_SIZE];
     memset(buf, 0, 1024);
@@ -36,9 +33,17 @@ void ASIC_task(void * pvParameters)
     SERIAL_set_baud(baud);
 
     SYSTEM_notify_mining_started(&GLOBAL_STATE->SYSTEM_MODULE);
-    ESP_LOGI(TAG, "Mining!");
+    ESP_LOGI(TAG, "ASIC Ready!");
     while (1) {
         bm_job * next_bm_job = (bm_job *) queue_dequeue(&GLOBAL_STATE->ASIC_jobs_queue);
+
+        if(next_bm_job->pool_diff != GLOBAL_STATE->stratum_difficulty){
+            ESP_LOGI(TAG, "New difficulty %d", next_bm_job->pool_diff);
+            BM1397_set_job_difficulty_mask(next_bm_job->pool_diff);
+            GLOBAL_STATE->stratum_difficulty = next_bm_job->pool_diff;
+        }
+
+
         struct job_packet job;
         // max job number is 128
         id = (id + 4) % 128;
@@ -117,6 +122,10 @@ void ASIC_task(void * pvParameters)
             STRATUM_V1_submit_share(GLOBAL_STATE->sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
                             active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
             
+        }
+
+        if(nonce_diff > GLOBAL_STATE->SYSTEM_MODULE.best_nonce_diff){
+            SYSTEM_notify_best_nonce_diff(&GLOBAL_STATE->SYSTEM_MODULE, nonce_diff, next_bm_job->target);
         }
 
     }

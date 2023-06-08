@@ -293,6 +293,8 @@ void BM1397_set_job_difficulty_mask(int difficulty){
         job_difficulty_mask[5 - i] = _reverse_bits(value);
     }
 
+    ESP_LOGI(TAG, "Setting job ASIC mask to %d", difficulty);
+
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, false);
 }
 

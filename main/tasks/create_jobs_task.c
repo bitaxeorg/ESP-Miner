@@ -17,8 +17,8 @@ void create_jobs_task(void * pvParameters)
 
 
     while (1) {
-        mining_notify * params = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
-        ESP_LOGI(TAG, "New Work Dequeued %s", params->job_id);
+        mining_notify * mining_notification = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
+        ESP_LOGI(TAG, "New Work Dequeued %s", mining_notification->job_id);
 
         uint32_t extranonce_2 = 0;
         while (extranonce_2 < UINT_MAX && GLOBAL_STATE->abandon_work == 0)
@@ -26,15 +26,15 @@ void create_jobs_task(void * pvParameters)
             char * extranonce_2_str = extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len);
 
             
-            char *coinbase_tx = construct_coinbase_tx(params->coinbase_1, params->coinbase_2, GLOBAL_STATE->extranonce_str, extranonce_2_str);
+            char *coinbase_tx = construct_coinbase_tx(mining_notification->coinbase_1, mining_notification->coinbase_2, GLOBAL_STATE->extranonce_str, extranonce_2_str);
 
-            char *merkle_root = calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])params->merkle_branches, params->n_merkle_branches);
-            bm_job next_job = construct_bm_job(params, merkle_root);
+            char *merkle_root = calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])mining_notification->merkle_branches, mining_notification->n_merkle_branches);
+            bm_job next_job = construct_bm_job(mining_notification, merkle_root);
 
             bm_job * queued_next_job = malloc(sizeof(bm_job));
             memcpy(queued_next_job, &next_job, sizeof(bm_job));
             queued_next_job->extranonce2 = strdup(extranonce_2_str);
-            queued_next_job->jobid = strdup(params->job_id);
+            queued_next_job->jobid = strdup(mining_notification->job_id);
 
             queue_enqueue(&GLOBAL_STATE->ASIC_jobs_queue, queued_next_job);
 
@@ -49,7 +49,7 @@ void create_jobs_task(void * pvParameters)
             ASIC_jobs_queue_clear(&GLOBAL_STATE->ASIC_jobs_queue);
         }
 
-        STRATUM_V1_free_mining_notify(params);
+        STRATUM_V1_free_mining_notify(mining_notification);
     }
 }
 

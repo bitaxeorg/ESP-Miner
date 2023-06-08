@@ -10,12 +10,12 @@
 #include "asic_task.h"
 #include "create_jobs_task.h"
 #include "global_state.h"
+#include "serial.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL,
     .extranonce_2_len = 0,
-    .abandon_work = 0,
-    .stratum_difficulty = 8192
+    .abandon_work = 0
 };
 
 
@@ -39,6 +39,11 @@ void app_main(void)
 
     queue_init(&GLOBAL_STATE.stratum_queue);
     queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
+
+    
+    SERIAL_init();
+
+    BM1397_init();
 
     xTaskCreate(stratum_task, "stratum admin", 8192, (void*)&GLOBAL_STATE, 15, NULL);
     xTaskCreate(create_jobs_task, "stratum miner", 8192, (void*)&GLOBAL_STATE, 10, NULL);

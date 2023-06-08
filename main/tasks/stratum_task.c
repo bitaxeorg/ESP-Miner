@@ -5,7 +5,7 @@
 #include "work_queue.h"
 #include "bm1397.h"
 #include "global_state.h"
-
+#include "stratum_task.h"
 
 #define PORT CONFIG_STRATUM_PORT
 #define STRATUM_URL CONFIG_STRATUM_URL
@@ -19,6 +19,9 @@ static bool bDNSFound = false;
 
 static StratumApiV1Message stratum_api_v1_message = {};
 
+static SystemTaskModule SYSTEM_TASK_MODULE = {
+    .stratum_difficulty = 8192
+};
 
 void dns_found_cb(const char * name, const ip_addr_t * ipaddr, void * callback_arg)
 {
@@ -96,7 +99,7 @@ void stratum_task(void * pvParameters)
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
                 //ESP_LOGI(TAG, "Mining Notify");
-                if (stratum_api_v1_message.should_abandon_work && GLOBAL_STATE->stratum_queue.count > 0) {
+                if (stratum_api_v1_message.should_abandon_work) {
                     ESP_LOGI(TAG, "abandoning work");
 
                     GLOBAL_STATE->abandon_work = 1;
@@ -114,14 +117,13 @@ void stratum_task(void * pvParameters)
                     STRATUM_V1_free_mining_notify(next_notify_json_str);
                 }
 
-                stratum_api_v1_message.mining_notification->difficulty = GLOBAL_STATE->stratum_difficulty;
+                stratum_api_v1_message.mining_notification->difficulty = SYSTEM_TASK_MODULE.stratum_difficulty;
                 queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
 
             } else if (stratum_api_v1_message.method == MINING_SET_DIFFICULTY) {
-                if (stratum_api_v1_message.new_difficulty != GLOBAL_STATE->stratum_difficulty) {
-                    GLOBAL_STATE->stratum_difficulty = stratum_api_v1_message.new_difficulty;
-                    ESP_LOGI(TAG, "Set stratum difficulty: %d", GLOBAL_STATE->stratum_difficulty);
-                    BM1397_set_job_difficulty_mask(GLOBAL_STATE->stratum_difficulty);
+                if (stratum_api_v1_message.new_difficulty != SYSTEM_TASK_MODULE.stratum_difficulty) {
+                    SYSTEM_TASK_MODULE.stratum_difficulty = stratum_api_v1_message.new_difficulty;
+                    ESP_LOGI(TAG, "Set stratum difficulty: %d", SYSTEM_TASK_MODULE.stratum_difficulty);
                 }
 
             } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK) {
