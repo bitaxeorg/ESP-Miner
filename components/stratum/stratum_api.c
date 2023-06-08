@@ -262,7 +262,7 @@ int STRATUM_V1_subscribe(int socket, char ** extranonce, int * extranonce2_len)
 int STRATUM_V1_suggest_difficulty(int socket, uint32_t difficulty)
 {
     char difficulty_msg[BUFFER_SIZE];
-    sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.STRATUM_V1_suggest_difficulty\", \"params\": [%d]}\n", send_uid, difficulty);
+    sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%d]}\n", send_uid, difficulty);
     debug_stratum_tx(difficulty_msg);
     write(socket, difficulty_msg, strlen(difficulty_msg));
 
