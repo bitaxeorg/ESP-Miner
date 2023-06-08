@@ -49,7 +49,7 @@ void queue_clear(work_queue * queue)
     while (queue->count > 0)
     {
         mining_notify * next_work = queue->buffer[queue->head];
-        free_mining_notify(next_work);
+        STRATUM_V1_free_mining_notify(next_work);
         queue->head = (queue->head + 1) % QUEUE_SIZE;
         queue->count--;
     }

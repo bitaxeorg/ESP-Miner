@@ -4,6 +4,7 @@
 #include "work_queue.h"
 #include "bm1397.h"
 #include "system.h"
+#include "stratum_api.h"
 
 
 
@@ -16,6 +17,7 @@ typedef struct  {
 
     bm1397Module BM1397_MODULE;
     SystemModule SYSTEM_MODULE;
+
 
     char * extranonce_str;
     int extranonce_2_len;

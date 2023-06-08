@@ -17,6 +17,8 @@ static const char *TAG = "stratum_task";
 static ip_addr_t ip_Addr;
 static bool bDNSFound = false;
 
+static StratumApiV1Message stratum_api_v1_message = {};
+
 
 void dns_found_cb(const char * name, const ip_addr_t * ipaddr, void * callback_arg)
 {
@@ -30,7 +32,7 @@ void stratum_task(void * pvParameters)
 
     GlobalState *GLOBAL_STATE = (GlobalState*)pvParameters;
 
-    initialize_stratum_buffer();
+    STRATUM_V1_initialize_buffer();
     char host_ip[20];
     int addr_family = 0;
     int ip_protocol = 0;
@@ -72,31 +74,30 @@ void stratum_task(void * pvParameters)
             break;
         }
 
-        uint32_t version_mask = 0;
 
-        subscribe_to_stratum(GLOBAL_STATE->sock, &GLOBAL_STATE->extranonce_str, &GLOBAL_STATE->extranonce_2_len);
+        STRATUM_V1_subscribe(GLOBAL_STATE->sock, &GLOBAL_STATE->extranonce_str, &GLOBAL_STATE->extranonce_2_len);
 
-        configure_version_rolling(GLOBAL_STATE->sock);
+        STRATUM_V1_configure_version_rolling(GLOBAL_STATE->sock);
 
-        auth_to_stratum(GLOBAL_STATE->sock, STRATUM_USER);
+        STRATUM_V1_authenticate(GLOBAL_STATE->sock, STRATUM_USER);
 
         ESP_LOGI(TAG, "Extranonce: %s", GLOBAL_STATE->extranonce_str);
         ESP_LOGI(TAG, "Extranonce 2 length: %d", GLOBAL_STATE->extranonce_2_len);
 
-        suggest_difficulty(GLOBAL_STATE->sock, STRATUM_DIFFICULTY);
+        STRATUM_V1_suggest_difficulty(GLOBAL_STATE->sock, STRATUM_DIFFICULTY);
 
         while (1)
         {
-            char * line = receive_jsonrpc_line( GLOBAL_STATE->sock);
+            char * line = STRATUM_V1_receive_jsonrpc_line( GLOBAL_STATE->sock);
             ESP_LOGI(TAG, "rx: %s", line); //debug incoming stratum messages
+            STRATUM_V1_parse(&stratum_api_v1_message, line);
+            free(line);
 
-            stratum_method method = parse_stratum_method(line);
 
-            
-
-            if (method == MINING_NOTIFY) {
-                if (should_abandon_work(line) && GLOBAL_STATE->stratum_queue.count > 0) {
-                    ESP_LOGI(TAG, "pool diff changed, clearing queues");
+            if (stratum_api_v1_message.method == MINING_NOTIFY) {
+                //ESP_LOGI(TAG, "Mining Notify");
+                if (stratum_api_v1_message.should_abandon_work) { // I think this has concurrency issues? // && GLOBAL_STATE->stratum_queue.count > 0) {
+                    ESP_LOGI(TAG, "abandoning work");
 
                     GLOBAL_STATE->abandon_work = 1;
                     queue_clear(&GLOBAL_STATE->stratum_queue);
@@ -110,36 +111,35 @@ void stratum_task(void * pvParameters)
                 }
                 if ( GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
                     mining_notify * next_notify_json_str = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
-                    free_mining_notify(next_notify_json_str);
+                    STRATUM_V1_free_mining_notify(next_notify_json_str);
                 }
-                mining_notify * params = parse_mining_notify_message(line, GLOBAL_STATE->stratum_difficulty);
-                queue_enqueue(&GLOBAL_STATE->stratum_queue, params);
-            } else if (method == MINING_SET_DIFFICULTY) {
-                uint32_t new_difficulty = parse_mining_set_difficulty_message(line);
-                if (new_difficulty != GLOBAL_STATE->stratum_difficulty) {
-                    GLOBAL_STATE->stratum_difficulty = new_difficulty;
+
+                stratum_api_v1_message.mining_notification->difficulty = GLOBAL_STATE->stratum_difficulty;
+                queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
+
+            } else if (stratum_api_v1_message.method == MINING_SET_DIFFICULTY) {
+                if (stratum_api_v1_message.new_difficulty != GLOBAL_STATE->stratum_difficulty) {
+                    GLOBAL_STATE->stratum_difficulty = stratum_api_v1_message.new_difficulty;
                     ESP_LOGI(TAG, "Set stratum difficulty: %d", GLOBAL_STATE->stratum_difficulty);
                     BM1397_set_job_difficulty_mask(GLOBAL_STATE->stratum_difficulty);
                 }
 
-            } else if (method == MINING_SET_VERSION_MASK) {
-                version_mask = parse_mining_set_version_mask_message(line);
-
+            } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK) {
                 //1fffe000
-                ESP_LOGI(TAG, "Set version mask: %08x", version_mask);
+                ESP_LOGI(TAG, "Set version mask: %08x", stratum_api_v1_message.version_mask);
 
-            } else if (method == STRATUM_RESULT) {
-                int16_t parsed_id;
-                if (parse_stratum_result_message(line, &parsed_id)) {
-                    ESP_LOGI(TAG, "message id %d result accepted", parsed_id);
+            } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
+
+                if (stratum_api_v1_message.response_success) {
+                    ESP_LOGI(TAG, "message result accepted");
                     SYSTEM_notify_accepted_share(&GLOBAL_STATE->SYSTEM_MODULE);
                 } else {
-                    ESP_LOGI(TAG, "message id %d result rejected", parsed_id);
+                    ESP_LOGI(TAG, "message result rejected");
                     SYSTEM_notify_rejected_share(&GLOBAL_STATE->SYSTEM_MODULE);
                 }
             }  
 
-            free(line);
+          
 
         }
 

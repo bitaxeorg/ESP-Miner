@@ -17,7 +17,7 @@ static int send_uid = 1;
 
 static void debug_stratum_tx(const char *);
 
-void initialize_stratum_buffer()
+void STRATUM_V1_initialize_buffer()
 {
     json_rpc_buffer = malloc(BUFFER_SIZE);
     json_rpc_buffer_size = BUFFER_SIZE;
@@ -60,10 +60,10 @@ static void realloc_json_buffer(size_t len)
     json_rpc_buffer_size = new;
 }
 
-char * receive_jsonrpc_line(int sockfd)
+char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
 {
     if (json_rpc_buffer == NULL) {
-        initialize_stratum_buffer();
+        STRATUM_V1_initialize_buffer();
     }
     char *line, *tok = NULL;
     char recv_buffer[BUFFER_SIZE];
@@ -97,9 +97,19 @@ char * receive_jsonrpc_line(int sockfd)
     return line;
 }
 
-stratum_method parse_stratum_method(const char * stratum_json)
+
+void STRATUM_V1_parse(StratumApiV1Message* message, const char * stratum_json)
 {
     cJSON * json = cJSON_Parse(stratum_json);
+
+    cJSON * id_json = cJSON_GetObjectItem(json, "id");
+    int16_t parsed_id = -1;
+    if (id_json != NULL && cJSON_IsNumber(id_json)) {
+        parsed_id = id_json->valueint;
+    }
+    message->message_id = parsed_id;
+
+
     cJSON * method_json = cJSON_GetObjectItem(json, "method");
     stratum_method result = STRATUM_UNKNOWN;
     if (method_json != NULL && cJSON_IsString(method_json)) {
@@ -114,101 +124,75 @@ stratum_method parse_stratum_method(const char * stratum_json)
         //parse results
         cJSON * result_json = cJSON_GetObjectItem(json, "result");
         if (result_json != NULL && cJSON_IsBool(result_json)) {
+
             result = STRATUM_RESULT;
+
+            
+
+            bool response_success = false;
+            if (result_json != NULL && cJSON_IsTrue(result_json)) {
+                response_success = true;
+            }
+
+            message->response_success = response_success;
+            
         }
     }
 
-    cJSON_Delete(json);
-    return result;
-}
+    message->method = result;
 
-uint32_t parse_mining_set_difficulty_message(const char * stratum_json)
-{
-    cJSON * json = cJSON_Parse(stratum_json);
-    cJSON * method = cJSON_GetObjectItem(json, "method");
-    if (method != NULL && cJSON_IsString(method)) {
-        assert(strcmp("mining.set_difficulty", method->valuestring) == 0);
-    }
+    if (message->method == MINING_NOTIFY) {
 
-    cJSON * params = cJSON_GetObjectItem(json, "params");
-    uint32_t difficulty = cJSON_GetArrayItem(params, 0)->valueint;
+        mining_notify * new_work = malloc(sizeof(mining_notify));
+        //new_work->difficulty = difficulty;
+        cJSON * params = cJSON_GetObjectItem(json, "params");
+        new_work->job_id = strdup(cJSON_GetArrayItem(params, 0)->valuestring);
+        new_work->prev_block_hash = strdup(cJSON_GetArrayItem(params, 1)->valuestring);
+        new_work->coinbase_1 = strdup(cJSON_GetArrayItem(params, 2)->valuestring);
+        new_work->coinbase_2 = strdup(cJSON_GetArrayItem(params, 3)->valuestring);
 
-    cJSON_Delete(json);
-    return difficulty;
-}
+        cJSON * merkle_branch = cJSON_GetArrayItem(params, 4);
+        new_work->n_merkle_branches = cJSON_GetArraySize(merkle_branch);
+        if (new_work->n_merkle_branches > MAX_MERKLE_BRANCHES) {
+            printf("Too many Merkle branches.\n");
+            abort();
+        }
+        new_work->merkle_branches = malloc(HASH_SIZE * new_work->n_merkle_branches);
+        for (size_t i = 0; i < new_work->n_merkle_branches; i++) {
+            hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE * 2);
+        }
 
-uint32_t parse_mining_set_version_mask_message(const char * stratum_json)
-{
-    cJSON * json = cJSON_Parse(stratum_json);
-    cJSON * method = cJSON_GetObjectItem(json, "method");
-    if (method != NULL && cJSON_IsString(method)) {
-        assert(strcmp("mining.set_version_mask", method->valuestring) == 0);
-    }
+        new_work->version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
+        new_work->target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
+        new_work->ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
 
-    cJSON * params = cJSON_GetObjectItem(json, "params");
-    uint32_t version_mask = strtoul(cJSON_GetArrayItem(params, 0)->valuestring, NULL, 16);
+        message->mining_notification = new_work;
 
-    cJSON_Delete(json);
-    return version_mask;
-}
 
-bool parse_stratum_result_message(const char * stratum_json, int16_t * parsed_id)
-{
-    cJSON * json = cJSON_Parse(stratum_json);
-    cJSON * result_json = cJSON_GetObjectItem(json, "result");
-    cJSON * id_json = cJSON_GetObjectItem(json, "id");
+        int value = cJSON_IsTrue(cJSON_GetArrayItem(params, 8));
+        message->should_abandon_work = value;
+ 
 
-    if (id_json != NULL && cJSON_IsNumber(id_json)) {
-        *parsed_id = id_json->valueint;
-    } else {
-        *parsed_id = -1;
-    }
+    }else if (message->method == MINING_SET_DIFFICULTY) {
+        cJSON * params = cJSON_GetObjectItem(json, "params");
+        uint32_t difficulty = cJSON_GetArrayItem(params, 0)->valueint;
 
-    bool result = false;
-    if (result_json != NULL && cJSON_IsTrue(result_json)) {
-        result = true;
+        message->new_difficulty = difficulty;
+    } else if (message->method == MINING_SET_VERSION_MASK) {
+
+        cJSON * params = cJSON_GetObjectItem(json, "params");
+        uint32_t version_mask = strtoul(cJSON_GetArrayItem(params, 0)->valuestring, NULL, 16);
+        message->version_mask = version_mask;
+
     }
 
     cJSON_Delete(json);
-    return result;
+
 }
 
-mining_notify * parse_mining_notify_message(const char * stratum_json, uint32_t difficulty)
-{
-    cJSON * json = cJSON_Parse(stratum_json);
-    cJSON * method = cJSON_GetObjectItem(json, "method");
-    if (method != NULL && cJSON_IsString(method)) {
-        assert(strcmp("mining.notify", method->valuestring) == 0);
-    }
 
-    mining_notify * new_work = malloc(sizeof(mining_notify));
-    new_work->difficulty = difficulty;
-    cJSON * params = cJSON_GetObjectItem(json, "params");
-    new_work->job_id = strdup(cJSON_GetArrayItem(params, 0)->valuestring);
-    new_work->prev_block_hash = strdup(cJSON_GetArrayItem(params, 1)->valuestring);
-    new_work->coinbase_1 = strdup(cJSON_GetArrayItem(params, 2)->valuestring);
-    new_work->coinbase_2 = strdup(cJSON_GetArrayItem(params, 3)->valuestring);
 
-    cJSON * merkle_branch = cJSON_GetArrayItem(params, 4);
-    new_work->n_merkle_branches = cJSON_GetArraySize(merkle_branch);
-    if (new_work->n_merkle_branches > MAX_MERKLE_BRANCHES) {
-        printf("Too many Merkle branches.\n");
-        abort();
-    }
-    new_work->merkle_branches = malloc(HASH_SIZE * new_work->n_merkle_branches);
-    for (size_t i = 0; i < new_work->n_merkle_branches; i++) {
-        hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE * 2);
-    }
-
-    new_work->version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
-    new_work->target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
-    new_work->ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
-
-    cJSON_Delete(json);
-    return new_work;
-}
-
-void free_mining_notify(mining_notify * params)
+void STRATUM_V1_free_mining_notify(mining_notify * params)
 {
     free(params->job_id);
     free(params->prev_block_hash);
@@ -218,7 +202,7 @@ void free_mining_notify(mining_notify * params)
     free(params);
 }
 
-int parse_stratum_subscribe_result_message(const char * result_json_str,
+int _parse_stratum_subscribe_result_message(const char * result_json_str,
                                            char ** extranonce,
                                            int * extranonce2_len)
 {
@@ -253,7 +237,7 @@ int parse_stratum_subscribe_result_message(const char * result_json_str,
     return 0;
 }
 
-int subscribe_to_stratum(int socket, char ** extranonce, int * extranonce2_len)
+int STRATUM_V1_subscribe(int socket, char ** extranonce, int * extranonce2_len)
 {
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];
@@ -261,27 +245,27 @@ int subscribe_to_stratum(int socket, char ** extranonce, int * extranonce2_len)
     debug_stratum_tx(subscribe_msg);
     write(socket, subscribe_msg, strlen(subscribe_msg));
     char * line;
-    line = receive_jsonrpc_line(socket);
+    line = STRATUM_V1_receive_jsonrpc_line(socket);
 
     ESP_LOGI(TAG, "Received result %s", line);
 
-    parse_stratum_subscribe_result_message(line, extranonce, extranonce2_len);
+    _parse_stratum_subscribe_result_message(line, extranonce, extranonce2_len);
 
     free(line);
 
     return 1;
 }
 
-int suggest_difficulty(int socket, uint32_t difficulty)
+int STRATUM_V1_suggest_difficulty(int socket, uint32_t difficulty)
 {
     char difficulty_msg[BUFFER_SIZE];
-    sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%d]}\n", send_uid++, difficulty);
+    sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.STRATUM_V1_suggest_difficulty\", \"params\": [%d]}\n", send_uid++, difficulty);
     debug_stratum_tx(difficulty_msg);
     write(socket, difficulty_msg, strlen(difficulty_msg));
 
     /* TODO: fix race condition with first mining.notify message
     char * line;
-    line = receive_jsonrpc_line(socket);
+    line = STRATUM_V1_receive_jsonrpc_line(socket);
 
     ESP_LOGI(TAG, "Received result %s", line);
 
@@ -291,7 +275,7 @@ int suggest_difficulty(int socket, uint32_t difficulty)
     return 1;
 }
 
-int auth_to_stratum(int socket, const char * username)
+int STRATUM_V1_authenticate(int socket, const char * username)
 {
     char authorize_msg[BUFFER_SIZE];
     sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"x\"]}\n",
@@ -303,7 +287,7 @@ int auth_to_stratum(int socket, const char * username)
     return 1;
 }
 
-void submit_share(int socket, const char * username, const char * jobid,
+void STRATUM_V1_submit_share(int socket, const char * username, const char * jobid,
                  const uint32_t ntime, const char * extranonce_2, const uint32_t nonce)
 {
     char submit_msg[BUFFER_SIZE];
@@ -314,16 +298,8 @@ void submit_share(int socket, const char * username, const char * jobid,
 
 }
 
-int should_abandon_work(const char * mining_notify_json_str)
-{
-    cJSON * root = cJSON_Parse(mining_notify_json_str);
-    cJSON * params = cJSON_GetObjectItem(root, "params");
-    int value = cJSON_IsTrue(cJSON_GetArrayItem(params, 8));
-    cJSON_Delete(root);
-    return value;
-}
 
-void configure_version_rolling(int socket)
+void STRATUM_V1_configure_version_rolling(int socket)
 {
     // Configure
     char configure_msg[BUFFER_SIZE * 2];

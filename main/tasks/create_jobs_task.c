@@ -49,7 +49,7 @@ void create_jobs_task(void * pvParameters)
             ASIC_jobs_queue_clear(&GLOBAL_STATE->ASIC_jobs_queue);
         }
 
-        free_mining_notify(params);
+        STRATUM_V1_free_mining_notify(params);
     }
 }
 
