@@ -60,6 +60,7 @@ bm_job construct_bm_job(mining_notify * params, const char * merkle_root) {
     new_job.starting_nonce = 0;
     new_job.target = params->target;
     new_job.ntime = params->ntime;
+    new_job.pool_diff = params->difficulty;
 
     hex2bin(merkle_root, new_job.merkle_root, 32);
     swap_endian_words(params->prev_block_hash, new_job.prev_block_hash);

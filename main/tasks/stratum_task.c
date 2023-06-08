@@ -6,6 +6,7 @@
 #include "bm1397.h"
 #include "global_state.h"
 
+
 #define PORT CONFIG_STRATUM_PORT
 #define STRATUM_URL CONFIG_STRATUM_URL
 
@@ -15,7 +16,6 @@
 static const char *TAG = "stratum_task";
 static ip_addr_t ip_Addr;
 static bool bDNSFound = false;
-static bool difficulty_changed = false;
 
 
 void dns_found_cb(const char * name, const ip_addr_t * ipaddr, void * callback_arg)
@@ -92,16 +92,12 @@ void stratum_task(void * pvParameters)
 
             stratum_method method = parse_stratum_method(line);
 
-            if (method == MINING_NOTIFY) {
-                if ((difficulty_changed || should_abandon_work(line)) && GLOBAL_STATE->stratum_queue.count > 0) {
+            
 
-                    if (difficulty_changed) {
-                        ESP_LOGI(TAG, "pool diff changed, clearing queues");
-                        difficulty_changed = false;
-                    } else {
-                        ESP_LOGI(TAG, "clean_jobs is true, clearing queues");
-                    }
-                    
+            if (method == MINING_NOTIFY) {
+                if (should_abandon_work(line) && GLOBAL_STATE->stratum_queue.count > 0) {
+                    ESP_LOGI(TAG, "pool diff changed, clearing queues");
+
                     GLOBAL_STATE->abandon_work = 1;
                     queue_clear(&GLOBAL_STATE->stratum_queue);
 
@@ -113,26 +109,24 @@ void stratum_task(void * pvParameters)
                     pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
                 }
                 if ( GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
-                    char * next_notify_json_str = (char *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
-                    free(next_notify_json_str);
+                    mining_notify * next_notify_json_str = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
+                    free_mining_notify(next_notify_json_str);
                 }
-                queue_enqueue(&GLOBAL_STATE->stratum_queue, line);
+                mining_notify * params = parse_mining_notify_message(line, GLOBAL_STATE->stratum_difficulty);
+                queue_enqueue(&GLOBAL_STATE->stratum_queue, params);
             } else if (method == MINING_SET_DIFFICULTY) {
                 uint32_t new_difficulty = parse_mining_set_difficulty_message(line);
                 if (new_difficulty != GLOBAL_STATE->stratum_difficulty) {
                     GLOBAL_STATE->stratum_difficulty = new_difficulty;
-                    difficulty_changed = true;
                     ESP_LOGI(TAG, "Set stratum difficulty: %d", GLOBAL_STATE->stratum_difficulty);
                     BM1397_set_job_difficulty_mask(GLOBAL_STATE->stratum_difficulty);
                 }
-                free(line);
 
             } else if (method == MINING_SET_VERSION_MASK) {
                 version_mask = parse_mining_set_version_mask_message(line);
 
                 //1fffe000
                 ESP_LOGI(TAG, "Set version mask: %08x", version_mask);
-                free(line);
 
             } else if (method == STRATUM_RESULT) {
                 int16_t parsed_id;
@@ -143,12 +137,10 @@ void stratum_task(void * pvParameters)
                     ESP_LOGI(TAG, "message id %d result rejected", parsed_id);
                     SYSTEM_notify_rejected_share(&GLOBAL_STATE->SYSTEM_MODULE);
                 }
-                free(line);
-            }  else {
-                free(line);
-            }
-               
-            
+            }  
+
+            free(line);
+
         }
 
         if (GLOBAL_STATE->sock != -1)

@@ -265,7 +265,7 @@ void BM1397_set_default_baud(void){
 
 int BM1397_set_max_baud(void){
     // divider of 0 for 3,125,000
-    ESP_LOGI(TAG, "Setting max baud");
+    ESP_LOGI(TAG, "Setting max baud of 3125000");
     unsigned char baudrate[9] = { 0x00, MISC_CONTROL, 0x00, 0x00, 0b01100000, 0b00110001 };; //baudrate - misc_control
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
     return 3125000;

@@ -17,30 +17,24 @@ void create_jobs_task(void * pvParameters)
 
 
     while (1) {
-        char * next_notify_json_str = (char *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
-        ESP_LOGI(TAG, "New Work Dequeued");
-
-        mining_notify params = parse_mining_notify_message(next_notify_json_str);
+        mining_notify * params = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
+        ESP_LOGI(TAG, "New Work Dequeued %s", params->job_id);
 
         uint32_t extranonce_2 = 0;
         while (extranonce_2 < UINT_MAX && GLOBAL_STATE->abandon_work == 0)
         {
             char * extranonce_2_str = extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len);
 
-            char *coinbase_tx = construct_coinbase_tx(params.coinbase_1, params.coinbase_2, GLOBAL_STATE->extranonce_str, extranonce_2_str);
-            //ESP_LOGI(TAG, "Coinbase tx: %s", coinbase_tx);
+            
+            char *coinbase_tx = construct_coinbase_tx(params->coinbase_1, params->coinbase_2, GLOBAL_STATE->extranonce_str, extranonce_2_str);
 
-            char *merkle_root = calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])params.merkle_branches, params.n_merkle_branches);
-            //ESP_LOGI(TAG, "Merkle root: %s", merkle_root);
-
-            bm_job next_job = construct_bm_job(&params, merkle_root);
-
-            next_job.pool_diff = GLOBAL_STATE->stratum_difficulty; //each job is tied to the _current_ difficulty
+            char *merkle_root = calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])params->merkle_branches, params->n_merkle_branches);
+            bm_job next_job = construct_bm_job(params, merkle_root);
 
             bm_job * queued_next_job = malloc(sizeof(bm_job));
             memcpy(queued_next_job, &next_job, sizeof(bm_job));
             queued_next_job->extranonce2 = strdup(extranonce_2_str);
-            queued_next_job->jobid = strdup(params.job_id);
+            queued_next_job->jobid = strdup(params->job_id);
 
             queue_enqueue(&GLOBAL_STATE->ASIC_jobs_queue, queued_next_job);
 
@@ -56,7 +50,6 @@ void create_jobs_task(void * pvParameters)
         }
 
         free_mining_notify(params);
-        free(next_notify_json_str);
     }
 }
 

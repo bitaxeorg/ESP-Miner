@@ -4,7 +4,7 @@ sdkconfig.old
 dependencies.lock
 
 # User specific VSCode
-.vscode/*
+**/.vscode/*
 
 # Production folder
 build/

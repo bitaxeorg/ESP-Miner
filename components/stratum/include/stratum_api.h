@@ -20,6 +20,7 @@ typedef struct {
     uint32_t version;
     uint32_t target;
     uint32_t ntime;
+    uint32_t difficulty;
 } mining_notify;
 
 typedef enum {
@@ -38,13 +39,13 @@ int subscribe_to_stratum(int socket, char ** extranonce, int * extranonce2_len);
 
 stratum_method parse_stratum_method(const char * stratum_json);
 
-mining_notify parse_mining_notify_message(const char * stratum_json);
+mining_notify * parse_mining_notify_message(const char * stratum_json, uint32_t difficulty);
 
 uint32_t parse_mining_set_difficulty_message(const char * stratum_json);
 
 uint32_t parse_mining_set_version_mask_message(const char * stratum_json);
 
-void free_mining_notify(mining_notify params);
+void free_mining_notify(mining_notify * params);
 
 int parse_stratum_subscribe_result_message(const char * result_json_str,
                                            char ** extranonce,

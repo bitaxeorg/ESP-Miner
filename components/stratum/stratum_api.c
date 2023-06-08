@@ -173,7 +173,7 @@ bool parse_stratum_result_message(const char * stratum_json, int16_t * parsed_id
     return result;
 }
 
-mining_notify parse_mining_notify_message(const char * stratum_json)
+mining_notify * parse_mining_notify_message(const char * stratum_json, uint32_t difficulty)
 {
     cJSON * json = cJSON_Parse(stratum_json);
     cJSON * method = cJSON_GetObjectItem(json, "method");
@@ -181,39 +181,41 @@ mining_notify parse_mining_notify_message(const char * stratum_json)
         assert(strcmp("mining.notify", method->valuestring) == 0);
     }
 
-    mining_notify new_work;
+    mining_notify * new_work = malloc(sizeof(mining_notify));
+    new_work->difficulty = difficulty;
     cJSON * params = cJSON_GetObjectItem(json, "params");
-    new_work.job_id = strdup(cJSON_GetArrayItem(params, 0)->valuestring);
-    new_work.prev_block_hash = strdup(cJSON_GetArrayItem(params, 1)->valuestring);
-    new_work.coinbase_1 = strdup(cJSON_GetArrayItem(params, 2)->valuestring);
-    new_work.coinbase_2 = strdup(cJSON_GetArrayItem(params, 3)->valuestring);
+    new_work->job_id = strdup(cJSON_GetArrayItem(params, 0)->valuestring);
+    new_work->prev_block_hash = strdup(cJSON_GetArrayItem(params, 1)->valuestring);
+    new_work->coinbase_1 = strdup(cJSON_GetArrayItem(params, 2)->valuestring);
+    new_work->coinbase_2 = strdup(cJSON_GetArrayItem(params, 3)->valuestring);
 
     cJSON * merkle_branch = cJSON_GetArrayItem(params, 4);
-    new_work.n_merkle_branches = cJSON_GetArraySize(merkle_branch);
-    if (new_work.n_merkle_branches > MAX_MERKLE_BRANCHES) {
+    new_work->n_merkle_branches = cJSON_GetArraySize(merkle_branch);
+    if (new_work->n_merkle_branches > MAX_MERKLE_BRANCHES) {
         printf("Too many Merkle branches.\n");
         abort();
     }
-    new_work.merkle_branches = malloc(HASH_SIZE * new_work.n_merkle_branches);
-    for (size_t i = 0; i < new_work.n_merkle_branches; i++) {
-        hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work.merkle_branches + HASH_SIZE * i, HASH_SIZE * 2);
+    new_work->merkle_branches = malloc(HASH_SIZE * new_work->n_merkle_branches);
+    for (size_t i = 0; i < new_work->n_merkle_branches; i++) {
+        hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE * 2);
     }
 
-    new_work.version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
-    new_work.target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
-    new_work.ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
+    new_work->version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
+    new_work->target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
+    new_work->ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
 
     cJSON_Delete(json);
     return new_work;
 }
 
-void free_mining_notify(mining_notify params)
+void free_mining_notify(mining_notify * params)
 {
-    free(params.job_id);
-    free(params.prev_block_hash);
-    free(params.coinbase_1);
-    free(params.coinbase_2);
-    free(params.merkle_branches);
+    free(params->job_id);
+    free(params->prev_block_hash);
+    free(params->coinbase_1);
+    free(params->coinbase_2);
+    free(params->merkle_branches);
+    free(params);
 }
 
 int parse_stratum_subscribe_result_message(const char * result_json_str,
