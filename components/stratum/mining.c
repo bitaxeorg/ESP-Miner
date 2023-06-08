@@ -53,7 +53,7 @@ char * calculate_merkle_root_hash(const char * coinbase_tx, const uint8_t merkle
 }
 
 //take a mining_notify struct with ascii hex strings and convert it to a bm_job struct
-bm_job construct_bm_job(mining_notify * params, const char * merkle_root) {
+bm_job construct_bm_job(mining_notify * params, const char * merkle_root, const uint32_t version_mask) {
     bm_job new_job;
 
     new_job.version = params->version;
@@ -76,6 +76,26 @@ bm_job construct_bm_job(mining_notify * params, const char * merkle_root) {
     midstate_sha256_bin(midstate_data, 64, new_job.midstate); //make the midstate hash
     reverse_bytes(new_job.midstate, 32); //reverse the midstate bytes for the BM job packet
 
+    if (version_mask != 0) {
+        uint32_t rolled_version = increment_bitmask(new_job.version, version_mask);
+        memcpy(midstate_data, &rolled_version, 4);
+        midstate_sha256_bin(midstate_data, 64, new_job.midstate1);
+        reverse_bytes(new_job.midstate1, 32);
+
+        rolled_version = increment_bitmask(rolled_version, version_mask);
+        memcpy(midstate_data, &rolled_version, 4);
+        midstate_sha256_bin(midstate_data, 64, new_job.midstate2);
+        reverse_bytes(new_job.midstate2, 32);
+
+        rolled_version = increment_bitmask(rolled_version, version_mask);
+        memcpy(midstate_data, &rolled_version, 4);
+        midstate_sha256_bin(midstate_data, 64, new_job.midstate3);
+        reverse_bytes(new_job.midstate3, 32);
+        new_job.num_midstates = 4;
+    } else {
+        new_job.num_midstates = 1;
+    }
+
     return new_job;
 }
 
@@ -97,14 +117,18 @@ char * extranonce_2_generate(uint32_t extranonce_2, uint32_t length)
 static const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
 
 /* testing a nonce and return the diff - 0 means invalid */
-double test_nonce_value(bm_job * job, uint32_t nonce) {
+double test_nonce_value(const bm_job * job, const uint32_t nonce, const uint8_t midstate_index) {
 	double d64, s64, ds;
     unsigned char header[80];
 
-    //TODO: use the midstate hash instead of hashing the whole header
+    // TODO: use the midstate hash instead of hashing the whole header
+    uint32_t rolled_version = job->version;
+    for (int i = 0; i < midstate_index; i++) {
+        rolled_version = increment_bitmask(rolled_version, job->version_mask);
+    }
 
-    //copy data from job to header
-    memcpy(header, &job->version, 4);
+    // copy data from job to header
+    memcpy(header, &rolled_version, 4);
     memcpy(header + 4, job->prev_block_hash, 32);
     memcpy(header + 36, job->merkle_root, 32);
     memcpy(header + 68, &job->ntime, 4);
@@ -123,4 +147,21 @@ double test_nonce_value(bm_job * job, uint32_t nonce) {
 	ds = d64 / s64;
 
 	return ds;
+}
+
+uint32_t increment_bitmask(const uint32_t value, const uint32_t mask) {
+    // if mask is zero, just return the original value
+    if (mask == 0) return value;
+
+    uint32_t carry = (value & mask) + (mask & -mask); // increment the least significant bit of the mask
+    uint32_t overflow = carry & ~mask; // find overflowed bits that are not in the mask
+    uint32_t new_value = (value & ~mask) | (carry & mask); // set bits according to the mask
+
+    // Handle carry propagation
+    if (overflow > 0) {
+        uint32_t carry_mask = (overflow << 1); // shift left to get the mask where carry should be propagated
+        new_value = increment_bitmask(new_value, carry_mask); // recursively handle carry propagation
+    }
+
+    return new_value;
 }

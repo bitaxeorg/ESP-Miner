@@ -113,7 +113,7 @@ void stratum_task(void * pvParameters)
                     }
                     pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
                 }
-                if ( GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
+                if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
                     mining_notify * next_notify_json_str = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
                     STRATUM_V1_free_mining_notify(next_notify_json_str);
                 }

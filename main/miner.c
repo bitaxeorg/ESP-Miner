@@ -15,7 +15,8 @@
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL,
     .extranonce_2_len = 0,
-    .abandon_work = 0
+    .abandon_work = 0,
+    .version_mask = 0
 };
 
 
@@ -40,7 +41,6 @@ void app_main(void)
     queue_init(&GLOBAL_STATE.stratum_queue);
     queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
 
-    
     SERIAL_init();
 
     BM1397_init();

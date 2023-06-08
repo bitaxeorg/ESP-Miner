@@ -27,12 +27,11 @@ typedef struct  {
     pthread_mutex_t valid_jobs_lock;
 
     uint32_t stratum_difficulty;
+    uint32_t version_mask;
 
     int sock;
 
 } GlobalState;
-
-
 
 
 #endif /* GLOBAL_STATE_H_ */

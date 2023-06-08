@@ -52,6 +52,9 @@ struct __attribute__((__packed__)) job_packet {
   uint8_t ntime[4];
   uint8_t merkle4[4];
   uint8_t midstate[32];
+  uint8_t midstate1[32];
+  uint8_t midstate2[32];
+  uint8_t midstate3[32];
 };
 
 struct __attribute__((__packed__)) nonce_response {

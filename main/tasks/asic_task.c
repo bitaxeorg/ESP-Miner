@@ -7,7 +7,7 @@
 
 static const char *TAG = "ASIC_task";
 
-// static bm_job ** active_jobs; is required to keep track of the active jobs since the 
+// static bm_job ** active_jobs; is required to keep track of the active jobs since the
 // ASIC may not return the nonce in the same order as the jobs were sent
 // it also may return a previous nonce under some circumstances
 // so we keep a list of jobs indexed by the job id
@@ -16,8 +16,7 @@ static bm_job ** active_jobs;
 void ASIC_task(void * pvParameters)
 {
 
-    GlobalState *GLOBAL_STATE = (GlobalState*)pvParameters;
-
+    GlobalState *GLOBAL_STATE = (GlobalState*) pvParameters;
 
     uint8_t buf[CHUNK_SIZE];
     memset(buf, 0, 1024);
@@ -50,23 +49,31 @@ void ASIC_task(void * pvParameters)
 
         struct job_packet job;
         // max job number is 128
-        // there is still some really weird logic with the job id bits for the asic to sort out 
+        // there is still some really weird logic with the job id bits for the asic to sort out
         // so we have it limited to 128 and it has to increment by 4
         id = (id + 4) % 128;
+
         job.job_id = id;
-        job.num_midstates = 1;
+        job.num_midstates = next_bm_job->num_midstates;
         memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
         memcpy(&job.nbits, &next_bm_job->target, 4);
         memcpy(&job.ntime, &next_bm_job->ntime, 4);
         memcpy(&job.merkle4, next_bm_job->merkle_root + 28, 4);
         memcpy(job.midstate, next_bm_job->midstate, 32);
 
+        if (job.num_midstates == 4)
+        {
+            memcpy(job.midstate1, next_bm_job->midstate1, 32);
+            memcpy(job.midstate2, next_bm_job->midstate2, 32);
+            memcpy(job.midstate3, next_bm_job->midstate3, 32);
+        }
+
         if (active_jobs[job.job_id] != NULL) {
             free_bm_job(active_jobs[job.job_id]);
         }
-        
+
         active_jobs[job.job_id] = next_bm_job;
-   
+
         pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
         GLOBAL_STATE-> valid_jobs[job.job_id] = 1;
         pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
@@ -84,7 +91,7 @@ void ASIC_task(void * pvParameters)
             // Didn't find a solution, restart and try again
             continue;
         }
-        
+
         if(received != 9 || buf[0] != 0xAA || buf[1] != 0x55){
             ESP_LOGI(TAG, "Serial RX invalid %i", received);
             ESP_LOG_BUFFER_HEX(TAG, buf, received);
@@ -97,11 +104,13 @@ void ASIC_task(void * pvParameters)
         struct nonce_response nonce;
         memcpy((void *) &nonce, buf, sizeof(struct nonce_response));
 
-        if (GLOBAL_STATE->valid_jobs[nonce.job_id] == 0) {
-            ESP_LOGI(TAG, "Invalid job nonce found");
+        uint8_t rx_job_id = nonce.job_id & 0xfc;
+        uint8_t rx_midstate_index = nonce.job_id & 0x03;
+
+        if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0) {
+            ESP_LOGI(TAG, "Invalid job nonce found, id=%d", nonce.job_id);
         }
 
-        
         // ASIC may return the same nonce multiple times
         // or one that was already found
         // most of the time it behavies however
@@ -120,24 +129,28 @@ void ASIC_task(void * pvParameters)
         }
 
         // check the nonce difficulty
-        double nonce_diff = test_nonce_value(active_jobs[nonce.job_id], nonce.nonce);
+        double nonce_diff = test_nonce_value(active_jobs[rx_job_id], nonce.nonce, rx_midstate_index);
 
-        ESP_LOGI(TAG, "Nonce difficulty %.2f of %d.", nonce_diff, active_jobs[nonce.job_id]->pool_diff);
-        
-        if (nonce_diff > active_jobs[nonce.job_id]->pool_diff)
+        ESP_LOGI(TAG, "Nonce difficulty %.2f of %d.", nonce_diff, active_jobs[rx_job_id]->pool_diff);
+
+        if (nonce_diff > active_jobs[rx_job_id]->pool_diff)
         {
-            SYSTEM_notify_found_nonce(&GLOBAL_STATE->SYSTEM_MODULE, active_jobs[nonce.job_id]->pool_diff, nonce_diff, next_bm_job->target);
+            SYSTEM_notify_found_nonce(&GLOBAL_STATE->SYSTEM_MODULE, active_jobs[rx_job_id]->pool_diff, nonce_diff, next_bm_job->target);
+
+            uint32_t rolled_version = active_jobs[rx_job_id]->version;
+            for (int i = 0; i < rx_midstate_index; i++) {
+                rolled_version = increment_bitmask(rolled_version, active_jobs[rx_job_id]->version_mask);
+            }
 
             STRATUM_V1_submit_share(
-                GLOBAL_STATE->sock, 
-                STRATUM_USER, 
-                active_jobs[nonce.job_id]->jobid, 
-                active_jobs[nonce.job_id]->extranonce2,
-                active_jobs[nonce.job_id]->ntime, 
-                nonce.nonce
+                GLOBAL_STATE->sock,
+                STRATUM_USER,
+                active_jobs[rx_job_id]->jobid,
+                active_jobs[rx_job_id]->extranonce2,
+                active_jobs[rx_job_id]->ntime,
+                nonce.nonce,
+                rolled_version ^ active_jobs[rx_job_id]->version
             );
-            
         }
-
     }
 }
