@@ -115,12 +115,13 @@ void STRATUM_V1_parse(StratumApiV1Message* message, const char * stratum_json)
     if (method_json != NULL && cJSON_IsString(method_json)) {
         if (strcmp("mining.notify", method_json->valuestring) == 0) {
             result = MINING_NOTIFY;
+            send_uid++;
         } else if (strcmp("mining.set_difficulty", method_json->valuestring) == 0) {
             result = MINING_SET_DIFFICULTY;
         } else if (strcmp("mining.set_version_mask", method_json->valuestring) == 0) {
             result = MINING_SET_VERSION_MASK;
         }
-        send_uid++;
+        
     } else {
         //parse results
         cJSON * result_json = cJSON_GetObjectItem(json, "result");

@@ -220,7 +220,7 @@ double _calculate_network_difficultiy(uint32_t nBits) {
     uint32_t mantissa = nBits & 0x007fffff;       // Extract the mantissa from nBits
     uint8_t exponent = (nBits >> 24) & 0xff;       // Extract the exponent from nBits
     
-    double target = (double)mantissa * pow(253,(exponent - 3));   // Calculate the target value
+    double target = (double)mantissa * pow(256,(exponent - 3));   // Calculate the target value
     
     double difficulty = (pow(2, 208) * 65535) / target;    // Calculate the difficulty
     
@@ -230,8 +230,8 @@ double _calculate_network_difficultiy(uint32_t nBits) {
 
 void SYSTEM_notify_best_nonce_diff(SystemModule * module, uint32_t diff, uint32_t nbits){
     module->best_nonce_diff = diff;
-    uint32_t network_diff = _calculate_network_difficultiy(nbits);
-    ESP_LOGI(TAG, "Network diff: %u", network_diff);
+    // uint32_t network_diff = _calculate_network_difficultiy(nbits);
+    // ESP_LOGI(TAG, "Network diff: %u", network_diff);
 }
 
 void SYSTEM_notify_accepted_share(SystemModule* module){
