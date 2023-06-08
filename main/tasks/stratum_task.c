@@ -96,7 +96,7 @@ void stratum_task(void * pvParameters)
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
                 //ESP_LOGI(TAG, "Mining Notify");
-                if (stratum_api_v1_message.should_abandon_work) { // I think this has concurrency issues? // && GLOBAL_STATE->stratum_queue.count > 0) {
+                if (stratum_api_v1_message.should_abandon_work && GLOBAL_STATE->stratum_queue.count > 0) {
                     ESP_LOGI(TAG, "abandoning work");
 
                     GLOBAL_STATE->abandon_work = 1;
