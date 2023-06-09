@@ -7,6 +7,10 @@
 
 static const char *TAG = "ASIC_task";
 
+// static bm_job ** active_jobs; is required to keep track of the active jobs since the 
+// ASIC may not return the nonce in the same order as the jobs were sent
+// it also may return a previous nonce under some circumstances
+// so we keep a list of jobs indexed by the job id
 static bm_job ** active_jobs;
 
 void ASIC_task(void * pvParameters)
@@ -59,10 +63,10 @@ void ASIC_task(void * pvParameters)
             free_bm_job(active_jobs[job.job_id]);
         }
         
-       active_jobs[job.job_id] = next_bm_job;
+        active_jobs[job.job_id] = next_bm_job;
    
         pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
-       GLOBAL_STATE-> valid_jobs[job.job_id] = 1;
+        GLOBAL_STATE-> valid_jobs[job.job_id] = 1;
         pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
 
         SERIAL_clear_buffer();
@@ -95,7 +99,10 @@ void ASIC_task(void * pvParameters)
             ESP_LOGI(TAG, "Invalid job nonce found");
         }
 
-        //print_hex((uint8_t *) &nonce.nonce, 4, 4, "nonce: ");
+        
+        // ASIC may return the same nonce multiple times
+        // or one that was already found
+        // most of the time it behavies however
         if (nonce_found == 0) {
             first_nonce = nonce.nonce;
             nonce_found = 1;
