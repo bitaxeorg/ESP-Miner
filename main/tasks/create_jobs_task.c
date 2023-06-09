@@ -6,7 +6,7 @@
 #include <limits.h>
 #include "string.h"
 
-
+#include <sys/time.h>
 
 static const char *TAG = "create_jobs_task";
 
@@ -23,6 +23,18 @@ void create_jobs_task(void * pvParameters)
         uint32_t extranonce_2 = 0;
         while (extranonce_2 < UINT_MAX && GLOBAL_STATE->abandon_work == 0)
         {
+            
+            struct timeval tv;
+	        gettimeofday(&tv, NULL);
+            int job_time_sec = tv.tv_sec - mining_notification->ntime;
+
+            // Expire jobs after 5 minutes
+            // This seems to be an issue with some pools (ckpool)
+            if(job_time_sec > 60 * 5){
+                ESP_LOGI(TAG, "Job Expired");
+                break;
+            }
+
             char * extranonce_2_str = extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len);
 
             

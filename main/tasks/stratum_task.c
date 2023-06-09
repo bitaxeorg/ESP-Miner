@@ -6,6 +6,8 @@
 #include "bm1397.h"
 #include "global_state.h"
 #include "stratum_task.h"
+#include <esp_sntp.h>
+#include <time.h>
 
 #define PORT CONFIG_STRATUM_PORT
 #define STRATUM_URL CONFIG_STRATUM_URL
@@ -29,6 +31,33 @@ void dns_found_cb(const char * name, const ip_addr_t * ipaddr, void * callback_a
     bDNSFound = true;
 }
 
+void obtain_time(void)
+{
+    // Initialize SNTP
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, "pool.ntp.org");  // Set NTP server
+    sntp_init();
+
+    // Wait for the time to be set
+    time_t now = 0;
+    struct tm timeinfo = {0};
+    int retry = 0;
+    const int retry_count = 60;
+    while (timeinfo.tm_year < (2021 - 1900) && ++retry < retry_count) {
+        ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        time(&now);
+        localtime_r(&now, &timeinfo);
+    }
+
+    // Print the obtained time
+    if (retry < retry_count) {
+        ESP_LOGI(TAG, "System time is set.");
+        ESP_LOGI(TAG, "Current time: %s", asctime(&timeinfo));
+    } else {
+        ESP_LOGW(TAG, "Could not set system time.");
+    }
+}
 
 void stratum_task(void * pvParameters)
 {
@@ -77,6 +106,7 @@ void stratum_task(void * pvParameters)
             break;
         }
 
+        obtain_time();
 
         STRATUM_V1_subscribe(GLOBAL_STATE->sock, &GLOBAL_STATE->extranonce_str, &GLOBAL_STATE->extranonce_2_len);
 
@@ -99,7 +129,7 @@ void stratum_task(void * pvParameters)
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
                 //ESP_LOGI(TAG, "Mining Notify");
-                if (stratum_api_v1_message.should_abandon_work) {
+                if (stratum_api_v1_message.should_abandon_work && (GLOBAL_STATE->stratum_queue.count > 0 || GLOBAL_STATE->ASIC_jobs_queue.count > 0)) {
                     ESP_LOGI(TAG, "abandoning work");
 
                     GLOBAL_STATE->abandon_work = 1;
@@ -136,7 +166,7 @@ void stratum_task(void * pvParameters)
                     ESP_LOGI(TAG, "message result accepted");
                     SYSTEM_notify_accepted_share(&GLOBAL_STATE->SYSTEM_MODULE);
                 } else {
-                    ESP_LOGI(TAG, "message result rejected");
+                    ESP_LOGE(TAG, "message result rejected");
                     SYSTEM_notify_rejected_share(&GLOBAL_STATE->SYSTEM_MODULE);
                 }
             }  
