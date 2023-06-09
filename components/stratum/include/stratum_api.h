@@ -35,6 +35,7 @@ typedef struct {
 typedef struct {
 
     int16_t message_id;
+    //Indicates the type of request the message represents.
     stratum_method method;
 
     //mining.notify
