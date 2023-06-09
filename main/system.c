@@ -191,6 +191,27 @@ static void _update_system_performance(SystemModule* module){
     }
 }
 
+static double _calculate_network_difficultiy(uint32_t nBits) {
+    uint32_t mantissa = nBits & 0x007fffff;       // Extract the mantissa from nBits
+    uint8_t exponent = (nBits >> 24) & 0xff;       // Extract the exponent from nBits
+    
+    double target = (double)mantissa * pow(256,(exponent - 3));   // Calculate the target value
+    
+    double difficulty = (pow(2, 208) * 65535) / target;    // Calculate the difficulty
+    
+    return difficulty;
+}
+
+
+static void _check_for_best_diff(SystemModule * module, uint32_t diff, uint32_t nbits){
+    if(diff < module->best_nonce_diff){
+        return;
+    }
+    module->best_nonce_diff = diff;
+    uint32_t network_diff = _calculate_network_difficultiy(nbits);
+    ESP_LOGI(TAG, "Network diff: %u", network_diff);
+}
+
 
 void SYSTEM_task(void *pvParameters) {
 
@@ -216,23 +237,6 @@ void SYSTEM_task(void *pvParameters) {
     }
 }
 
-double _calculate_network_difficultiy(uint32_t nBits) {
-    uint32_t mantissa = nBits & 0x007fffff;       // Extract the mantissa from nBits
-    uint8_t exponent = (nBits >> 24) & 0xff;       // Extract the exponent from nBits
-    
-    double target = (double)mantissa * pow(256,(exponent - 3));   // Calculate the target value
-    
-    double difficulty = (pow(2, 208) * 65535) / target;    // Calculate the difficulty
-    
-    return difficulty;
-}
-
-
-void SYSTEM_notify_best_nonce_diff(SystemModule * module, uint32_t diff, uint32_t nbits){
-    module->best_nonce_diff = diff;
-    // uint32_t network_diff = _calculate_network_difficultiy(nbits);
-    // ESP_LOGI(TAG, "Network diff: %u", network_diff);
-}
 
 void SYSTEM_notify_accepted_share(SystemModule* module){
     module->shares_accepted++;
@@ -248,7 +252,7 @@ void SYSTEM_notify_mining_started(SystemModule* module){
     module->duration_start = esp_timer_get_time();
 }
 
-void SYSTEM_notify_found_nonce(SystemModule* module, double nonce_diff){
+void SYSTEM_notify_found_nonce(SystemModule* module, double nonce_diff, uint32_t nbits){
 
  
 
@@ -290,6 +294,8 @@ void SYSTEM_notify_found_nonce(SystemModule* module, double nonce_diff){
 
     // logArrayContents(historical_hashrate, HISTORY_LENGTH);
     // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
+
+    _check_for_best_diff(module, nonce_diff, 0);
     
 }
 

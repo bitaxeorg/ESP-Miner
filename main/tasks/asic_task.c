@@ -126,7 +126,7 @@ void ASIC_task(void * pvParameters)
         
         if (nonce_diff > active_jobs[nonce.job_id]->pool_diff)
         {
-            SYSTEM_notify_found_nonce(&GLOBAL_STATE->SYSTEM_MODULE, active_jobs[nonce.job_id]->pool_diff);
+            SYSTEM_notify_found_nonce(&GLOBAL_STATE->SYSTEM_MODULE, active_jobs[nonce.job_id]->pool_diff, next_bm_job->target);
 
             STRATUM_V1_submit_share(
                 GLOBAL_STATE->sock, 
@@ -137,10 +137,6 @@ void ASIC_task(void * pvParameters)
                 nonce.nonce
             );
             
-        }
-
-        if(nonce_diff > GLOBAL_STATE->SYSTEM_MODULE.best_nonce_diff){
-            SYSTEM_notify_best_nonce_diff(&GLOBAL_STATE->SYSTEM_MODULE, nonce_diff, next_bm_job->target);
         }
 
     }
