@@ -50,6 +50,8 @@ void ASIC_task(void * pvParameters)
 
         struct job_packet job;
         // max job number is 128
+        // there is still some really weird logic with the job id bits for the asic to sort out 
+        // so we have it limited to 128 and it has to increment by 4
         id = (id + 4) % 128;
         job.job_id = id;
         job.num_midstates = 1;

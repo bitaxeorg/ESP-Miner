@@ -1,3 +1,9 @@
+/******************************************************************************
+ *  *
+ * References:
+ *  1. Stratum Protocol - [link](https://reference.cash/mining/stratum-protocol)
+ *****************************************************************************/
+
 #include "stratum_api.h"
 #include "cJSON.h"
 #include <string.h>
@@ -291,6 +297,14 @@ int STRATUM_V1_authenticate(int socket, const char * username)
 
     return 1;
 }
+
+
+/// @param socket Socket to write to
+/// @param username The client’s user name.
+/// @param jobid The job ID for the work being submitted.
+/// @param ntime The hex-encoded time value use in the block header.
+/// @param extranonce_2 The hex-encoded value of extra nonce 2.
+/// @param nonce The hex-encoded nonce value to use in the block header.
 
 void STRATUM_V1_submit_share(int socket, const char * username, const char * jobid,
                  const uint32_t ntime, const char * extranonce_2, const uint32_t nonce)
