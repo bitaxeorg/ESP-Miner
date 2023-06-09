@@ -31,33 +31,6 @@ void dns_found_cb(const char * name, const ip_addr_t * ipaddr, void * callback_a
     bDNSFound = true;
 }
 
-void obtain_time(void)
-{
-    // Initialize SNTP
-    sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "pool.ntp.org");  // Set NTP server
-    sntp_init();
-
-    // Wait for the time to be set
-    time_t now = 0;
-    struct tm timeinfo = {0};
-    int retry = 0;
-    const int retry_count = 60;
-    while (timeinfo.tm_year < (2021 - 1900) && ++retry < retry_count) {
-        ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        time(&now);
-        localtime_r(&now, &timeinfo);
-    }
-
-    // Print the obtained time
-    if (retry < retry_count) {
-        ESP_LOGI(TAG, "System time is set.");
-        ESP_LOGI(TAG, "Current time: %s", asctime(&timeinfo));
-    } else {
-        ESP_LOGW(TAG, "Could not set system time.");
-    }
-}
 
 void stratum_task(void * pvParameters)
 {
@@ -106,8 +79,6 @@ void stratum_task(void * pvParameters)
             break;
         }
 
-        obtain_time();
-
         STRATUM_V1_subscribe(GLOBAL_STATE->sock, &GLOBAL_STATE->extranonce_str, &GLOBAL_STATE->extranonce_2_len);
 
         STRATUM_V1_configure_version_rolling(GLOBAL_STATE->sock);
@@ -128,7 +99,7 @@ void stratum_task(void * pvParameters)
 
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
-                //ESP_LOGI(TAG, "Mining Notify");
+                SYSTEM_notify_new_ntime(&GLOBAL_STATE->SYSTEM_MODULE, stratum_api_v1_message.mining_notification->ntime);
                 if (stratum_api_v1_message.should_abandon_work && (GLOBAL_STATE->stratum_queue.count > 0 || GLOBAL_STATE->ASIC_jobs_queue.count > 0)) {
                     ESP_LOGI(TAG, "abandoning work");
 

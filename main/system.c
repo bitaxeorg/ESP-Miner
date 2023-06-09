@@ -31,7 +31,8 @@ static void _init_system(SystemModule* module) {
     module->shares_accepted = 0;
     module->shares_rejected = 0;
     module->best_nonce_diff = 0;
-    module->start_time = time(NULL);
+    module->start_time = esp_timer_get_time();
+    module->lastClockSync = 0;
 
     //test the LEDs
     // ESP_LOGI(TAG, "Init LEDs!");
@@ -171,7 +172,7 @@ static void _update_system_performance(SystemModule* module){
 
 
     // Calculate the uptime in seconds
-    double uptime_in_seconds = difftime(time(NULL), module->start_time);
+    double uptime_in_seconds = (esp_timer_get_time() - module->start_time) / 1000000;
     int uptime_in_days = uptime_in_seconds / (3600 * 24);
     int remaining_seconds = (int)uptime_in_seconds % (3600 * 24);
     int uptime_in_hours = remaining_seconds / 3600;
@@ -250,6 +251,19 @@ void SYSTEM_notify_rejected_share(SystemModule* module){
 
 void SYSTEM_notify_mining_started(SystemModule* module){
     module->duration_start = esp_timer_get_time();
+}
+
+void SYSTEM_notify_new_ntime(SystemModule* module, uint32_t ntime){
+    // Hourly clock sync
+    if(module->lastClockSync + (60 * 60) > ntime){
+        return;
+    }
+    ESP_LOGI(TAG, "Syncing clock");
+    module->lastClockSync = ntime;
+    struct timeval tv;
+    tv.tv_sec = ntime;
+    tv.tv_usec = 0;
+    settimeofday(&tv, NULL);
 }
 
 void SYSTEM_notify_found_nonce(SystemModule* module, double pool_diff, double found_diff, uint32_t nbits){

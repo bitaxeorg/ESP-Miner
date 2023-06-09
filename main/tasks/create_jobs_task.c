@@ -30,6 +30,7 @@ void create_jobs_task(void * pvParameters)
 
             // Expire jobs after 5 minutes
             // This seems to be an issue with some pools (ckpool)
+            // ESP_LOGI(TAG, "job_time_sec %d", job_time_sec);
             if(job_time_sec > 60 * 5){
                 ESP_LOGI(TAG, "Job Expired");
                 break;
