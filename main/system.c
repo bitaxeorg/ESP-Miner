@@ -13,7 +13,9 @@
 #include "oled.h"
 #include <sys/time.h>
 #include "system.h"
-#include "math.h"
+#include <stdint.h>
+#include <math.h>
+#include <inttypes.h>
 
 
 static const char *TAG = "SystemModule";
@@ -33,6 +35,7 @@ static void _init_system(SystemModule* module) {
     module->best_nonce_diff = 0;
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
+    module->FOUND_BLOCK = false;
 
     //test the LEDs
     // ESP_LOGI(TAG, "Init LEDs!");
@@ -51,7 +54,7 @@ static void _init_system(SystemModule* module) {
 
     //DS4432U tests
     DS4432U_set_vcore(BM1397_VOLTAGE / 1000.0);
-    
+
     //Fan Tests
     EMC2101_init();
     EMC2101_set_fan_speed(0.75);
@@ -102,7 +105,7 @@ static void _update_best_diff(SystemModule* module){
     }
     OLED_clearLine(3);
     memset(module->oled_buf, 0, 20);
-    snprintf(module->oled_buf, 20, "BD: %u", module->best_nonce_diff);
+    snprintf(module->oled_buf, 20, module->FOUND_BLOCK ? "!!! BLOCK FOUND !!!" : "BD: %u",  module->best_nonce_diff);
     OLED_writeString(0, 3, module->oled_buf);
 }
 
@@ -181,7 +184,7 @@ static void _update_system_performance(SystemModule* module){
 
 
     if (OLED_status()) {
-        
+
         _update_hashrate(module);
         _update_shares(module);
         _update_best_diff(module);
@@ -192,25 +195,28 @@ static void _update_system_performance(SystemModule* module){
     }
 }
 
-static double _calculate_network_difficultiy(uint32_t nBits) {
+static double _calculate_network_difficulty(uint32_t nBits) {
     uint32_t mantissa = nBits & 0x007fffff;       // Extract the mantissa from nBits
     uint8_t exponent = (nBits >> 24) & 0xff;       // Extract the exponent from nBits
-    
+
     double target = (double)mantissa * pow(256,(exponent - 3));   // Calculate the target value
-    
+
     double difficulty = (pow(2, 208) * 65535) / target;    // Calculate the difficulty
-    
+
     return difficulty;
 }
 
-
-static void _check_for_best_diff(SystemModule * module, uint32_t diff, uint32_t nbits){
+static void _check_for_best_diff(SystemModule * module, double diff, uint32_t nbits){
     if(diff < module->best_nonce_diff){
         return;
     }
     module->best_nonce_diff = diff;
-    uint32_t network_diff = _calculate_network_difficultiy(nbits);
-    ESP_LOGI(TAG, "Network diff: %u", network_diff);
+    double network_diff = _calculate_network_difficulty(nbits);
+    if(diff > network_diff){
+        module->FOUND_BLOCK = true;
+        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
+    }
+    ESP_LOGI(TAG, "Network diff: %f", network_diff);
 }
 
 
@@ -234,7 +240,7 @@ void SYSTEM_task(void *pvParameters) {
         module->screen_page = 2;
         _update_esp32_info(module);
         vTaskDelay(10000 / portTICK_RATE_MS);
-        
+
     }
 }
 
@@ -268,21 +274,21 @@ void SYSTEM_notify_new_ntime(SystemModule* module, uint32_t ntime){
 
 void SYSTEM_notify_found_nonce(SystemModule* module, double pool_diff, double found_diff, uint32_t nbits){
 
- 
+
 
     // Calculate the time difference in seconds with sub-second precision
-    
+
 
 
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
-    
+
     module->historical_hashrate[module->historical_hashrate_rolling_index] = pool_diff;
     module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time();
 
     module->historical_hashrate_rolling_index = (module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
 
    //ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration, historical_hashrate[historical_hashrate_rolling_index]);
-   
+
 
     if(module->historical_hashrate_init < HISTORY_LENGTH){
         module->historical_hashrate_init++;
@@ -309,8 +315,8 @@ void SYSTEM_notify_found_nonce(SystemModule* module, double pool_diff, double fo
     // logArrayContents(historical_hashrate, HISTORY_LENGTH);
     // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
 
-    _check_for_best_diff(module, found_diff, 0);
-    
+    _check_for_best_diff(module, found_diff, nbits);
+
 }
 
 

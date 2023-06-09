@@ -16,6 +16,7 @@ typedef struct {
     int screen_page;
     char oled_buf[20];
     uint32_t best_nonce_diff;
+    bool FOUND_BLOCK;
 
     uint32_t lastClockSync;
 } SystemModule;
