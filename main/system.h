@@ -23,8 +23,8 @@ void SYSTEM_task(void *parameters);
 
 void SYSTEM_notify_accepted_share(SystemModule* module);
 void SYSTEM_notify_rejected_share(SystemModule* module);
-void SYSTEM_notify_found_nonce(SystemModule* module, double nonce_diff, uint32_t nbits);
+void SYSTEM_notify_found_nonce(SystemModule* module, double pool_diff, double found_diff, uint32_t nbits);
 void SYSTEM_notify_mining_started(SystemModule* module);
-void SYSTEM_notify_best_nonce_diff(SystemModule* module, uint32_t best_nonce_diff, uint32_t nbits);
+
 
 #endif /* SYSTEM_H_ */

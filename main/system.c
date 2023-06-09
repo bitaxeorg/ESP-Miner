@@ -252,7 +252,7 @@ void SYSTEM_notify_mining_started(SystemModule* module){
     module->duration_start = esp_timer_get_time();
 }
 
-void SYSTEM_notify_found_nonce(SystemModule* module, double nonce_diff, uint32_t nbits){
+void SYSTEM_notify_found_nonce(SystemModule* module, double pool_diff, double found_diff, uint32_t nbits){
 
  
 
@@ -262,7 +262,7 @@ void SYSTEM_notify_found_nonce(SystemModule* module, double nonce_diff, uint32_t
 
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
     
-    module->historical_hashrate[module->historical_hashrate_rolling_index] = nonce_diff;
+    module->historical_hashrate[module->historical_hashrate_rolling_index] = pool_diff;
     module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time();
 
     module->historical_hashrate_rolling_index = (module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
@@ -295,7 +295,7 @@ void SYSTEM_notify_found_nonce(SystemModule* module, double nonce_diff, uint32_t
     // logArrayContents(historical_hashrate, HISTORY_LENGTH);
     // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
 
-    _check_for_best_diff(module, nonce_diff, 0);
+    _check_for_best_diff(module, found_diff, 0);
     
 }
 
