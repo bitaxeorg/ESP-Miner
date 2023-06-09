@@ -128,8 +128,14 @@ void ASIC_task(void * pvParameters)
         {
             SYSTEM_notify_found_nonce(&GLOBAL_STATE->SYSTEM_MODULE, active_jobs[nonce.job_id]->pool_diff);
 
-            STRATUM_V1_submit_share(GLOBAL_STATE->sock, STRATUM_USER, active_jobs[nonce.job_id]->jobid, active_jobs[nonce.job_id]->ntime,
-                            active_jobs[nonce.job_id]->extranonce2, nonce.nonce);
+            STRATUM_V1_submit_share(
+                GLOBAL_STATE->sock, 
+                STRATUM_USER, 
+                active_jobs[nonce.job_id]->jobid, 
+                active_jobs[nonce.job_id]->extranonce2,
+                active_jobs[nonce.job_id]->ntime, 
+                nonce.nonce
+            );
             
         }
 
