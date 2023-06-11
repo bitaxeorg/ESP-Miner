@@ -127,12 +127,12 @@ void stratum_task(void * pvParameters)
                     ESP_LOGI(TAG, "Set stratum difficulty: %d", SYSTEM_TASK_MODULE.stratum_difficulty);
                 }
 
-            } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK) {
+            } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK || stratum_api_v1_message.method == STRATUM_RESULT_VERSION_MASK) {
                 //1fffe000
                 ESP_LOGI(TAG, "Set version mask: %08x", stratum_api_v1_message.version_mask);
+                GLOBAL_STATE->version_mask = stratum_api_v1_message.version_mask;
 
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
-
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "message result accepted");
                     SYSTEM_notify_accepted_share(&GLOBAL_STATE->SYSTEM_MODULE);
@@ -140,10 +140,7 @@ void stratum_task(void * pvParameters)
                     ESP_LOGE(TAG, "message result rejected");
                     SYSTEM_notify_rejected_share(&GLOBAL_STATE->SYSTEM_MODULE);
                 }
-            }  
-
-          
-
+            }
         }
 
         if (GLOBAL_STATE->sock != -1)

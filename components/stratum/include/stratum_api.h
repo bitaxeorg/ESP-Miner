@@ -16,7 +16,8 @@ typedef enum {
     MINING_NOTIFY,
     MINING_SET_DIFFICULTY,
     MINING_SET_VERSION_MASK,
-    STRATUM_RESULT
+    STRATUM_RESULT,
+    STRATUM_RESULT_VERSION_MASK
 } stratum_method;
 
 typedef struct {

@@ -128,7 +128,6 @@ void STRATUM_V1_parse(StratumApiV1Message* message, const char * stratum_json)
         } else if (strcmp("mining.set_version_mask", method_json->valuestring) == 0) {
             result = MINING_SET_VERSION_MASK;
         }
-        
     } else {
         //parse results
         cJSON * result_json = cJSON_GetObjectItem(json, "result");
@@ -136,15 +135,18 @@ void STRATUM_V1_parse(StratumApiV1Message* message, const char * stratum_json)
 
             result = STRATUM_RESULT;
 
-            
-
             bool response_success = false;
             if (result_json != NULL && cJSON_IsTrue(result_json)) {
                 response_success = true;
             }
 
             message->response_success = response_success;
-            
+        } else {
+            cJSON * mask = cJSON_GetObjectItem(result_json, "version-rolling.mask");
+            if (mask != NULL) {
+                result = STRATUM_RESULT_VERSION_MASK;
+                message->version_mask = strtoul(mask->valuestring, NULL, 16);
+            }
         }
     }
 
