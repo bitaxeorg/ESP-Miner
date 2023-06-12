@@ -1,6 +1,4 @@
 
-#include <arpa/inet.h>
-
 #include "esp_log.h"
 #include "addr_from_stdin.h"
 #include "lwip/dns.h"
@@ -44,11 +42,11 @@ void stratum_task(void * pvParameters)
     int addr_family = 0;
     int ip_protocol = 0;
 
-    //check to see if the stratum url is an ip address already
+    //check to see if the STRATUM_URL is an ip address already
     if (inet_pton(AF_INET, STRATUM_URL, &ip_Addr) == 1) {
         bDNSFound = true;
     } else {
-        //get ip address from hostname
+        //it's a hostname. Lookup the ip address.
         IP_ADDR4(&ip_Addr, 0, 0, 0, 0);
         ESP_LOGI(TAG, "Get IP for URL: %s\n", STRATUM_URL);
         dns_gethostbyname(STRATUM_URL, &ip_Addr, dns_found_cb, NULL);
