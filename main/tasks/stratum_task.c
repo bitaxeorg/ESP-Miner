@@ -1,6 +1,7 @@
 
 #include "esp_log.h"
-#include "addr_from_stdin.h"
+//#include "addr_from_stdin.h"
+#include "connect.h"
 #include "lwip/dns.h"
 #include "work_queue.h"
 #include "bm1397.h"

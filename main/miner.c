@@ -3,7 +3,8 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
-#include "protocol_examples_common.h"
+//#include "protocol_examples_common.h"
+#include "connect.h"
 
 
 #include "stratum_task.h"
