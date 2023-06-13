@@ -11,7 +11,7 @@
 
 #define POLL_RATE 1000/60
 #define MAX_TEMP 90.0
-#define THROTTLE_TEMP 70.0
+#define THROTTLE_TEMP 80.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
 
 static const char * TAG = "power_management";
