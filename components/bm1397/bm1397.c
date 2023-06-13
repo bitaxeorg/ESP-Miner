@@ -27,11 +27,11 @@
 
 static const char *TAG = "bm1397Module";
 
-/// @brief 
-/// @param ftdi 
-/// @param header 
-/// @param data 
-/// @param len 
+/// @brief
+/// @param ftdi
+/// @param header
+/// @param data
+/// @param len
 static void _send_BM1397(uint8_t header, uint8_t * data, uint8_t data_len, bool debug) {
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len+6) : (data_len+5);
@@ -106,7 +106,7 @@ static int _largest_power_of_two(int num) {
 }
 
 // borrowed from cgminer driver-gekko.c calc_gsf_freq()
-static void _send_hash_frequency(float frequency) {
+void BM1397_send_hash_frequency(float frequency) {
 
     unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; //prefreq - pll0_divider
 
@@ -120,10 +120,10 @@ static void _send_hash_frequency(float frequency) {
 	int i;
 
     //bound the frequency setting
-    if (frequency < 100) {
-        f1 = 100;
-    } else if (frequency > 800) {
-        f1 = 800;
+    if (frequency < 13) {
+        f1 = 13;
+    } else if (frequency > 500) {
+        f1 = 500;
     } else {
         f1 = frequency;
     }
@@ -206,7 +206,7 @@ static void _send_init(void) {
 
     BM1397_set_default_baud();
 
-    _send_hash_frequency(BM1397_FREQUENCY);
+    BM1397_send_hash_frequency(BM1397_FREQUENCY);
 }
 
 
@@ -245,7 +245,7 @@ void BM1397_init(void) {
 
     //send the init command
     _send_read_address();
-    
+
     _send_init();
 
 
@@ -289,7 +289,7 @@ void BM1397_set_job_difficulty_mask(int difficulty){
         //The char is read in backwards to the register so we need to reverse them
         //So a mask of 512 looks like 0b00000000 00000000 00000001 1111111
         //and not 0b00000000 00000000 10000000 1111111
-        
+
         job_difficulty_mask[5 - i] = _reverse_bits(value);
     }
 

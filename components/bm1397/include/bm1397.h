@@ -28,19 +28,19 @@ static const u_int64_t BM1397_CORE_COUNT = 672;
 static const u_int64_t BM1397_HASHRATE_S = BM1397_FREQUENCY * BM1397_CORE_COUNT * 1000000;
 //2^32
 static const u_int64_t NONCE_SPACE = 4294967296;
-static const double  BM1397_FULLSCAN_MS = ((double)NONCE_SPACE / (double)BM1397_HASHRATE_S) * 1000; 
+static const double  BM1397_FULLSCAN_MS = ((double)NONCE_SPACE / (double)BM1397_HASHRATE_S) * 1000;
 
 typedef struct {
-
+  float frequency;
 } bm1397Module;
 
 typedef enum {
-  JOB_PACKET = 0, 
+  JOB_PACKET = 0,
   CMD_PACKET = 1,
 } packet_type_t;
 
 typedef enum {
-  JOB_RESP = 0, 
+  JOB_RESP = 0,
   CMD_RESP = 1,
 } response_type_t;
 
@@ -72,5 +72,6 @@ void BM1397_send_work(struct job_packet *job);
 void BM1397_set_job_difficulty_mask(int);
 int BM1397_set_max_baud(void);
 void BM1397_set_default_baud(void);
+void BM1397_send_hash_frequency(float frequency);
 
 #endif /* BM1397_H_ */

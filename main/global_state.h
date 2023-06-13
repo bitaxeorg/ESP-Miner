@@ -6,7 +6,7 @@
 #include "system.h"
 #include "stratum_api.h"
 #include "asic_task.h"
-
+#include "power_management_task.h"
 
 
 #define STRATUM_USER CONFIG_STRATUM_USER
@@ -19,6 +19,7 @@ typedef struct  {
     bm1397Module BM1397_MODULE;
     SystemModule SYSTEM_MODULE;
     AsicTaskModule ASIC_TASK_MODULE;
+    PowerManagementModule POWER_MANAGEMENT_MODULE;
 
 
     char * extranonce_str;

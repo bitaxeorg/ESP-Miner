@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <inttypes.h>
+#include "global_state.h"
 
 
 static const char *TAG = "SystemModule";
@@ -117,31 +118,27 @@ static void _clear_display(void){
 }
 
 
-static void _update_system_info(SystemModule* module) {
+static void _update_system_info(GlobalState *GLOBAL_STATE) {
 
-
-    uint16_t fan_speed = EMC2101_get_fan_speed();
-    float chip_temp = EMC2101_get_chip_temp();
-    float voltage = INA260_read_voltage();
-    float power = INA260_read_power() / 1000;
-    float current = INA260_read_current();
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
     if (OLED_status()) {
 
         memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, " Fan: %d RPM", fan_speed);
+        snprintf(module->oled_buf, 20, " Fan: %d RPM", power_management->fan_speed);
         OLED_writeString(0, 0, module->oled_buf);
 
         memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "Temp: %.1f C", chip_temp);
+        snprintf(module->oled_buf, 20, "Temp: %.1f C", power_management->chip_temp);
         OLED_writeString(0, 1, module->oled_buf);
 
         memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, " Pwr: %.3f W", power);
+        snprintf(module->oled_buf, 20, " Pwr: %.3f W", power_management->power);
         OLED_writeString(0, 2, module->oled_buf);
 
         memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, " %i mV: %i mA",(int)voltage, (int)current);
+        snprintf(module->oled_buf, 20, " %i mV: %i mA",(int)power_management->voltage, (int)power_management->current);
         OLED_writeString(0, 3, module->oled_buf);
     }
 
@@ -222,7 +219,9 @@ static void _check_for_best_diff(SystemModule * module, double diff, uint32_t nb
 
 void SYSTEM_task(void *pvParameters) {
 
-    SystemModule *module = (SystemModule*)pvParameters;
+    GlobalState *GLOBAL_STATE = (GlobalState*)pvParameters;
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     _init_system(module);
 
     while(1){
@@ -233,7 +232,7 @@ void SYSTEM_task(void *pvParameters) {
 
         _clear_display();
         module->screen_page = 1;
-        _update_system_info(module);
+        _update_system_info(GLOBAL_STATE);
         vTaskDelay(10000 / portTICK_RATE_MS);
 
         _clear_display();
