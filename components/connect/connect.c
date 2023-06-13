@@ -26,8 +26,6 @@
 
 #define NR_OF_IP_ADDRESSES_TO_WAIT_FOR (s_active_interfaces)
 
-#define EXAMPLE_DO_CONNECT CONFIG_EXAMPLE_CONNECT_WIFI || CONFIG_EXAMPLE_CONNECT_ETHERNET
-
 #if CONFIG_EXAMPLE_WIFI_SCAN_METHOD_FAST
 #define EXAMPLE_WIFI_SCAN_METHOD WIFI_FAST_SCAN
 #elif CONFIG_EXAMPLE_WIFI_SCAN_METHOD_ALL_CHANNEL
@@ -87,11 +85,9 @@ static void start(void)
     s_example_esp_netif = wifi_start();
     s_active_interfaces++;
 
-
-#if EXAMPLE_DO_CONNECT
     /* create semaphore if at least one interface is active */
     s_semph_get_ip_addrs = xSemaphoreCreateCounting(NR_OF_IP_ADDRESSES_TO_WAIT_FOR, 0);
-#endif
+
 
 }
 
@@ -104,7 +100,6 @@ static void stop(void)
 
 }
 
-#if EXAMPLE_DO_CONNECT
 static esp_ip4_addr_t s_ip_addr;
 
 static void on_got_ip(void *arg, esp_event_base_t event_base,
@@ -119,16 +114,15 @@ static void on_got_ip(void *arg, esp_event_base_t event_base,
     memcpy(&s_ip_addr, &event->ip_info.ip, sizeof(s_ip_addr));
     xSemaphoreGive(s_semph_get_ip_addrs);
 }
-#endif
+
 
 
 esp_err_t wifi_connect(void)
 {
-#if EXAMPLE_DO_CONNECT
     if (s_semph_get_ip_addrs != NULL) {
         return ESP_ERR_INVALID_STATE;
     }
-#endif
+
     start();
     ESP_ERROR_CHECK(esp_register_shutdown_handler(&stop));
     ESP_LOGI(TAG, "Waiting for IP(s)");
