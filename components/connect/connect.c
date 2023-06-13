@@ -1,244 +1,149 @@
-/* Common functions for protocol examples, to establish Wi-Fi or Ethernet connection.
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
- */
 
 #include <string.h>
-//#include "protocol_examples_common.h"
-#include "connect.h"
-#include "sdkconfig.h"
-#include "esp_event.h"
-#include "esp_wifi.h"
-#include "esp_wifi_default.h"
-#include "esp_log.h"
-#include "esp_netif.h"
-#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+#include "esp_system.h"
+#include "esp_wifi.h"
+#include "esp_event.h"
+#include "esp_log.h"
+#include "nvs_flash.h"
+
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
 
-#define NR_OF_IP_ADDRESSES_TO_WAIT_FOR (s_active_interfaces)
+#define WIFI_SSD      CONFIG_ESP_WIFI_SSID
+#define WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
+#define MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
 
-#if CONFIG_EXAMPLE_WIFI_SCAN_METHOD_FAST
-#define EXAMPLE_WIFI_SCAN_METHOD WIFI_FAST_SCAN
-#elif CONFIG_EXAMPLE_WIFI_SCAN_METHOD_ALL_CHANNEL
-#define EXAMPLE_WIFI_SCAN_METHOD WIFI_ALL_CHANNEL_SCAN
+#if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
+#define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_HUNT_AND_PECK
+#define EXAMPLE_H2E_IDENTIFIER ""
+
+#elif CONFIG_ESP_WPA3_SAE_PWE_HASH_TO_ELEMENT
+#define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_HASH_TO_ELEMENT
+#define EXAMPLE_H2E_IDENTIFIER CONFIG_ESP_WIFI_PW_ID
+
+#elif CONFIG_ESP_WPA3_SAE_PWE_BOTH
+#define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_BOTH
+#define EXAMPLE_H2E_IDENTIFIER CONFIG_ESP_WIFI_PW_ID
 #endif
 
-#if CONFIG_EXAMPLE_WIFI_CONNECT_AP_BY_SIGNAL
-#define EXAMPLE_WIFI_CONNECT_AP_SORT_METHOD WIFI_CONNECT_AP_BY_SIGNAL
-#elif CONFIG_EXAMPLE_WIFI_CONNECT_AP_BY_SECURITY
-#define EXAMPLE_WIFI_CONNECT_AP_SORT_METHOD WIFI_CONNECT_AP_BY_SECURITY
+#if CONFIG_ESP_WIFI_AUTH_OPEN
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_OPEN
+#elif CONFIG_ESP_WIFI_AUTH_WEP
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WEP
+#elif CONFIG_ESP_WIFI_AUTH_WPA_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_PSK
+#elif CONFIG_ESP_WIFI_AUTH_WPA2_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_PSK
+#elif CONFIG_ESP_WIFI_AUTH_WPA_WPA2_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_WPA2_PSK
+#elif CONFIG_ESP_WIFI_AUTH_WPA3_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA3_PSK
+#elif CONFIG_ESP_WIFI_AUTH_WPA2_WPA3_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_WPA3_PSK
+#elif CONFIG_ESP_WIFI_AUTH_WAPI_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WAPI_PSK
 #endif
 
-#if CONFIG_EXAMPLE_WIFI_AUTH_OPEN
-#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_OPEN
-#elif CONFIG_EXAMPLE_WIFI_AUTH_WEP
-#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WEP
-#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA_PSK
-#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_PSK
-#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA2_PSK
-#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_PSK
-#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA_WPA2_PSK
-#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA_WPA2_PSK
-#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA2_ENTERPRISE
-#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_ENTERPRISE
-#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA3_PSK
-#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA3_PSK
-#elif CONFIG_EXAMPLE_WIFI_AUTH_WPA2_WPA3_PSK
-#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WPA2_WPA3_PSK
-#elif CONFIG_EXAMPLE_WIFI_AUTH_WAPI_PSK
-#define EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WAPI_PSK
-#endif
+/* FreeRTOS event group to signal when we are connected*/
+static EventGroupHandle_t s_wifi_event_group;
 
-static int s_active_interfaces = 0;
-static xSemaphoreHandle s_semph_get_ip_addrs;
-static esp_netif_t *s_example_esp_netif = NULL;
+/* The event group allows multiple bits for each event, but we only care about two events:
+ * - we are connected to the AP with an IP
+ * - we failed to connect after the maximum amount of retries */
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
 
-static const char *TAG = "example_connect";
+static const char *TAG = "wifi station";
 
-static esp_netif_t *wifi_start(void);
-static void wifi_stop(void);
+static int s_retry_num = 0;
 
 
-/**
- * @brief Checks the netif description if it contains specified prefix.
- * All netifs created withing common connect component are prefixed with the module TAG,
- * so it returns true if the specified netif is owned by this module
- */
-static bool is_our_netif(const char *prefix, esp_netif_t *netif)
+static void event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data)
 {
-    return strncmp(prefix, esp_netif_get_desc(netif), strlen(prefix) - 1) == 0;
-}
-
-/* set up connection, Wi-Fi and/or Ethernet */
-static void start(void)
-{
-
-    s_example_esp_netif = wifi_start();
-    s_active_interfaces++;
-
-    /* create semaphore if at least one interface is active */
-    s_semph_get_ip_addrs = xSemaphoreCreateCounting(NR_OF_IP_ADDRESSES_TO_WAIT_FOR, 0);
-
-
-}
-
-/* tear down connection, release resources */
-static void stop(void)
-{
-
-    wifi_stop();
-    s_active_interfaces--;
-
-}
-
-static esp_ip4_addr_t s_ip_addr;
-
-static void on_got_ip(void *arg, esp_event_base_t event_base,
-                      int32_t event_id, void *event_data)
-{
-    ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-    if (!is_our_netif(TAG, event->esp_netif)) {
-        ESP_LOGW(TAG, "Got IPv4 from another interface \"%s\": ignored", esp_netif_get_desc(event->esp_netif));
-        return;
-    }
-    ESP_LOGI(TAG, "Got IPv4 event: Interface \"%s\" address: " IPSTR, esp_netif_get_desc(event->esp_netif), IP2STR(&event->ip_info.ip));
-    memcpy(&s_ip_addr, &event->ip_info.ip, sizeof(s_ip_addr));
-    xSemaphoreGive(s_semph_get_ip_addrs);
-}
-
-
-
-esp_err_t wifi_connect(void)
-{
-    if (s_semph_get_ip_addrs != NULL) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    start();
-    ESP_ERROR_CHECK(esp_register_shutdown_handler(&stop));
-    ESP_LOGI(TAG, "Waiting for IP(s)");
-    for (int i = 0; i < NR_OF_IP_ADDRESSES_TO_WAIT_FOR; ++i) {
-        xSemaphoreTake(s_semph_get_ip_addrs, portMAX_DELAY);
-    }
-    // iterate over active interfaces, and print out IPs of "our" netifs
-    esp_netif_t *netif = NULL;
-    esp_netif_ip_info_t ip;
-    for (int i = 0; i < esp_netif_get_nr_of_ifs(); ++i) {
-        netif = esp_netif_next(netif);
-        if (is_our_netif(TAG, netif)) {
-            ESP_LOGI(TAG, "Connected to %s", esp_netif_get_desc(netif));
-            ESP_ERROR_CHECK(esp_netif_get_ip_info(netif, &ip));
-
-            ESP_LOGI(TAG, "- IPv4 address: " IPSTR, IP2STR(&ip.ip));
-
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        if (s_retry_num < MAXIMUM_RETRY) {
+            esp_wifi_connect();
+            s_retry_num++;
+            ESP_LOGI(TAG, "retry to connect to the AP");
+        } else {
+            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
+        ESP_LOGI(TAG,"connect to the AP fail");
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        s_retry_num = 0;
+        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
-    return ESP_OK;
 }
 
-esp_err_t example_disconnect(void)
+void wifi_init_sta(void)
 {
-    if (s_semph_get_ip_addrs == NULL) {
-        return ESP_ERR_INVALID_STATE;
-    }
-    vSemaphoreDelete(s_semph_get_ip_addrs);
-    s_semph_get_ip_addrs = NULL;
-    stop();
-    ESP_ERROR_CHECK(esp_unregister_shutdown_handler(&stop));
-    return ESP_OK;
-}
+    s_wifi_event_group = xEventGroupCreate();
 
+    ESP_ERROR_CHECK(esp_netif_init());
 
-static void on_wifi_disconnect(void *arg, esp_event_base_t event_base,
-                               int32_t event_id, void *event_data)
-{
-    ESP_LOGI(TAG, "Wi-Fi disconnected, trying to reconnect...");
-    esp_err_t err = esp_wifi_connect();
-    if (err == ESP_ERR_WIFI_NOT_STARTED) {
-        return;
-    }
-    ESP_ERROR_CHECK(err);
-}
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_netif_create_default_wifi_sta();
 
-static esp_netif_t *wifi_start(void)
-{
-    char *desc;
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_WIFI_STA();
-    // Prefix the interface description with the module TAG
-    // Warning: the interface desc is used in tests to capture actual connection details (IP, gw, mask)
-    asprintf(&desc, "%s: %s", TAG, esp_netif_config.if_desc);
-    esp_netif_config.if_desc = desc;
-    esp_netif_config.route_prio = 128;
-    esp_netif_t *netif = esp_netif_create_wifi(WIFI_IF_STA, &esp_netif_config);
-    free(desc);
-    esp_wifi_set_default_wifi_sta_handlers();
+    esp_event_handler_instance_t instance_any_id;
+    esp_event_handler_instance_t instance_got_ip;
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        &event_handler,
+                                                        NULL,
+                                                        &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+                                                        IP_EVENT_STA_GOT_IP,
+                                                        &event_handler,
+                                                        NULL,
+                                                        &instance_got_ip));
 
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &on_wifi_disconnect, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip, NULL));
-
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = CONFIG_EXAMPLE_WIFI_SSID,
-            .password = CONFIG_EXAMPLE_WIFI_PASSWORD,
-            .scan_method = EXAMPLE_WIFI_SCAN_METHOD,
-            .sort_method = EXAMPLE_WIFI_CONNECT_AP_SORT_METHOD,
-            .threshold.rssi = CONFIG_EXAMPLE_WIFI_SCAN_RSSI_THRESHOLD,
-            .threshold.authmode = EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD,
+            .ssid = WIFI_SSD,
+            .password = WIFI_PASS,
+            /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
+             * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
+             * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
+             * WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK standards.
+             */
+            .threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,
+            // .sae_pwe_h2e = ESP_WIFI_SAE_MODE,
+            // .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
         },
     };
-    ESP_LOGI(TAG, "Connecting to %s...", wifi_config.sta.ssid);
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-    esp_wifi_connect();
-    return netif;
-}
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    ESP_ERROR_CHECK(esp_wifi_start() );
 
-static void wifi_stop(void)
-{
-    esp_netif_t *wifi_netif = get_example_netif_from_desc("sta");
-    ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &on_wifi_disconnect));
-    ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip));
-    esp_err_t err = esp_wifi_stop();
-    if (err == ESP_ERR_WIFI_NOT_INIT) {
-        return;
+    ESP_LOGI(TAG, "wifi_init_sta finished.");
+
+    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
+     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+            pdFALSE,
+            pdFALSE,
+            portMAX_DELAY);
+
+    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
+     * happened. */
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAG, "Connected to SSID: %s", WIFI_SSD);
+    } else if (bits & WIFI_FAIL_BIT) {
+        ESP_LOGI(TAG, "Failed to connect to SSID: %s, password:%s", WIFI_SSD);
+    } else {
+        ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
-    ESP_ERROR_CHECK(err);
-    ESP_ERROR_CHECK(esp_wifi_deinit());
-    ESP_ERROR_CHECK(esp_wifi_clear_default_wifi_driver_and_handlers(wifi_netif));
-    esp_netif_destroy(wifi_netif);
-    s_example_esp_netif = NULL;
-}
-
-esp_netif_t *get_example_netif(void)
-{
-    return s_example_esp_netif;
-}
-
-esp_netif_t *get_example_netif_from_desc(const char *desc)
-{
-    esp_netif_t *netif = NULL;
-    char *expected_desc;
-    asprintf(&expected_desc, "%s: %s", TAG, desc);
-    while ((netif = esp_netif_next(netif)) != NULL) {
-        if (strcmp(esp_netif_get_desc(netif), expected_desc) == 0) {
-            free(expected_desc);
-            return netif;
-        }
-    }
-    free(expected_desc);
-    return netif;
 }

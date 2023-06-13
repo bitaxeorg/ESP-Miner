@@ -3,5 +3,5 @@ SRCS
     "connect.c"
 INCLUDE_DIRS 
     "include"
-PRIV_REQUIRES esp_netif
+REQUIRES nvs_flash
 )

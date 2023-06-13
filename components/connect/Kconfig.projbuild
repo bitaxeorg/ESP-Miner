@@ -1,84 +1,67 @@
-menu "WiFi Connection Configuration"
+menu "WiFi Configuration"
 
-    config EXAMPLE_WIFI_SSID
+    config ESP_WIFI_SSID
         string "WiFi SSID"
         default "myssid"
         help
             SSID (network name) for the example to connect to.
 
-    config EXAMPLE_WIFI_PASSWORD
+    config ESP_WIFI_PASSWORD
         string "WiFi Password"
         default "mypassword"
         help
             WiFi password (WPA or WPA2) for the example to use.
-            Can be left blank if the network has no security set.
 
-    choice EXAMPLE_WIFI_SCAN_METHOD
-        prompt "WiFi Scan Method"
-        default EXAMPLE_WIFI_SCAN_METHOD_ALL_CHANNEL
+    choice ESP_WIFI_SAE_MODE
+        prompt "WPA3 SAE mode selection"
+        default ESP_WPA3_SAE_PWE_BOTH
         help
-            WiFi scan method:
-
-            If "Fast" is selected, scan will end after find SSID match AP.
-
-            If "All Channel" is selected, scan will end after scan all the channel.
-
-        config EXAMPLE_WIFI_SCAN_METHOD_FAST
-            bool "Fast"
-        config EXAMPLE_WIFI_SCAN_METHOD_ALL_CHANNEL
-            bool "All Channel"
+            Select mode for SAE as Hunt and Peck, H2E or both.
+        config ESP_WPA3_SAE_PWE_HUNT_AND_PECK
+            bool "HUNT AND PECK"
+        config ESP_WPA3_SAE_PWE_HASH_TO_ELEMENT
+            bool "H2E"
+        config ESP_WPA3_SAE_PWE_BOTH
+            bool "BOTH"
     endchoice
 
-
-    config EXAMPLE_WIFI_SCAN_RSSI_THRESHOLD
-        int "WiFi minimum rssi"
-        range -127 0
-
-        default -127
+    config ESP_WIFI_PW_ID
+        string "PASSWORD IDENTIFIER"
+        depends on  ESP_WPA3_SAE_PWE_HASH_TO_ELEMENT|| ESP_WPA3_SAE_PWE_BOTH
+        default ""
         help
-            The minimum rssi to accept in the scan mode.
+            password identifier for SAE H2E
 
-    choice EXAMPLE_WIFI_SCAN_AUTH_MODE_THRESHOLD
+    config ESP_MAXIMUM_RETRY
+        int "Maximum retry"
+        default 5
+        help
+            Set the Maximum retry to avoid station reconnecting to the AP unlimited when the AP is really inexistent.
+
+    choice ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD
         prompt "WiFi Scan auth mode threshold"
-        default EXAMPLE_WIFI_AUTH_OPEN
+        default ESP_WIFI_AUTH_WPA2_PSK
         help
             The weakest authmode to accept in the scan mode.
+            This value defaults to ESP_WIFI_AUTH_WPA2_PSK incase password is present and ESP_WIFI_AUTH_OPEN is used.
+            Please select ESP_WIFI_AUTH_WEP/ESP_WIFI_AUTH_WPA_PSK incase AP is operating in WEP/WPA mode.
 
-        config EXAMPLE_WIFI_AUTH_OPEN
+        config ESP_WIFI_AUTH_OPEN
             bool "OPEN"
-        config EXAMPLE_WIFI_AUTH_WEP
+        config ESP_WIFI_AUTH_WEP
             bool "WEP"
-        config EXAMPLE_WIFI_AUTH_WPA_PSK
+        config ESP_WIFI_AUTH_WPA_PSK
             bool "WPA PSK"
-        config EXAMPLE_WIFI_AUTH_WPA2_PSK
+        config ESP_WIFI_AUTH_WPA2_PSK
             bool "WPA2 PSK"
-        config EXAMPLE_WIFI_AUTH_WPA_WPA2_PSK
-            bool "WPA WPA2 PSK"
-        config EXAMPLE_WIFI_AUTH_WPA2_ENTERPRISE
-            bool "WPA2 ENTERPRISE"
-        config EXAMPLE_WIFI_AUTH_WPA3_PSK
+        config ESP_WIFI_AUTH_WPA_WPA2_PSK
+            bool "WPA/WPA2 PSK"
+        config ESP_WIFI_AUTH_WPA3_PSK
             bool "WPA3 PSK"
-        config EXAMPLE_WIFI_AUTH_WPA2_WPA3_PSK
-            bool "WPA2 WPA3 PSK"
-        config EXAMPLE_WIFI_AUTH_WAPI_PSK
+        config ESP_WIFI_AUTH_WPA2_WPA3_PSK
+            bool "WPA2/WPA3 PSK"
+        config ESP_WIFI_AUTH_WAPI_PSK
             bool "WAPI PSK"
-    endchoice
-
-
-    choice EXAMPLE_WIFI_CONNECT_AP_SORT_METHOD
-        prompt "WiFi Connect AP Sort Method"
-        default EXAMPLE_WIFI_CONNECT_AP_BY_SIGNAL
-        help
-            WiFi connect AP sort method:
-
-            If "Signal" is selected, Sort matched APs in scan list by RSSI.
-
-            If "Security" is selected, Sort matched APs in scan list by security mode.
-
-        config EXAMPLE_WIFI_CONNECT_AP_BY_SIGNAL
-            bool "Signal"
-        config EXAMPLE_WIFI_CONNECT_AP_BY_SECURITY
-            bool "Security"
     endchoice
 
 endmenu
