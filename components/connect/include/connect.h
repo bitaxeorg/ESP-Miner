@@ -20,18 +20,8 @@ extern "C" {
 #include <lwip/netdb.h>
 #include <arpa/inet.h>
 
-#ifdef CONFIG_EXAMPLE_CONNECT_ETHERNET
-#define EXAMPLE_INTERFACE get_example_netif()
-#endif
 
-#ifdef CONFIG_EXAMPLE_CONNECT_WIFI
 #define EXAMPLE_INTERFACE get_example_netif()
-#endif
-
-#if !defined (CONFIG_EXAMPLE_CONNECT_ETHERNET) && !defined (CONFIG_EXAMPLE_CONNECT_WIFI)
-// This is useful for some tests which do not need a network connection
-#define EXAMPLE_INTERFACE NULL
-#endif
 
 /**
  * @brief Configure Wi-Fi or Ethernet, connect, wait for IP
@@ -48,7 +38,7 @@ extern "C" {
  *
  * @return ESP_OK on successful connection
  */
-esp_err_t example_connect(void);
+esp_err_t wifi_connect(void);
 
 /**
  * Counterpart to example_connect, de-initializes Wi-Fi or Ethernet
