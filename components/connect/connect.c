@@ -142,7 +142,7 @@ void wifi_init_sta(void)
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to SSID: %s", WIFI_SSD);
     } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "Failed to connect to SSID: %s, password:%s", WIFI_SSD);
+        ESP_LOGI(TAG, "Failed to connect to SSID: %s", WIFI_SSD);
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
