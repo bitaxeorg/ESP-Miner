@@ -5,6 +5,7 @@
 #include "bm1397.h"
 #include "system.h"
 #include "stratum_api.h"
+#include "asic_task.h"
 
 
 
@@ -17,6 +18,7 @@ typedef struct  {
 
     bm1397Module BM1397_MODULE;
     SystemModule SYSTEM_MODULE;
+    AsicTaskModule ASIC_TASK_MODULE;
 
 
     char * extranonce_str;

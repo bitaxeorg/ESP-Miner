@@ -13,6 +13,7 @@ SRCS
     "./tasks/stratum_task.c"
     "./tasks/create_jobs_task.c"
     "./tasks/asic_task.c"
+    "./tasks/asic_result_task.c"
 INCLUDE_DIRS 
     "."
     "tasks"

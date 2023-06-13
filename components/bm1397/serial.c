@@ -38,7 +38,7 @@ void SERIAL_init(void) {
     //Install UART driver (we don't need an event queue here)
     //tx buffer 0 so the tx time doesn't overlap with the job wait time
     // by returning before the job is written
-    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, BUF_SIZE * 2, 0, NULL, 0);
 }
 
 void SERIAL_set_baud(int baud){

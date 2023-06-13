@@ -11,6 +11,7 @@
 #include "create_jobs_task.h"
 #include "global_state.h"
 #include "serial.h"
+#include "asic_result_task.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL,
@@ -45,8 +46,9 @@ void app_main(void)
 
     BM1397_init();
 
-    xTaskCreate(stratum_task, "stratum admin", 8192, (void*)&GLOBAL_STATE, 15, NULL);
+    xTaskCreate(stratum_task, "stratum admin", 8192, (void*)&GLOBAL_STATE, 5, NULL);
     xTaskCreate(create_jobs_task, "stratum miner", 8192, (void*)&GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, (void*)&GLOBAL_STATE, 10, NULL);
+    xTaskCreate(ASIC_result_task, "asic result", 8192, (void*)&GLOBAL_STATE, 15, NULL);
 }
 
