@@ -14,6 +14,10 @@
 #define THROTTLE_TEMP 80.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
 
+#define VOLTAGE_START_THROTTLE 4900
+#define VOLTAGE_MIN_THROTTLE 3500
+#define VOLTAGE_RANGE (VOLTAGE_START_THROTTLE - VOLTAGE_MIN_THROTTLE)
+
 static const char * TAG = "power_management";
 
 static float _fbound(float value, float lower_bound, float upper_bound)
@@ -47,29 +51,34 @@ void POWER_MANAGEMENT_task(void * pvParameters){
         power_management->power = INA260_read_power() / 1000;
         power_management->current = INA260_read_current();
 
-        float old_multiplier = power_management->frequency_multiplier;
-        float old_frequency = power_management->frequency_value;
+
+        // Voltage
+        // We'll throttle between 4.9v and 3.5v
+        float voltage_multiplier =  _fbound((power_management->voltage - VOLTAGE_MIN_THROTTLE) * (1/(float)VOLTAGE_RANGE), 0, 1);
 
 
-        //float voltage_multiplier =  _fbound((power_management->voltage - 4.5) * 2, 0, 1);
-
-        // power_management->frequency_multiplier = voltage_multiplier;
-
-
-
+        // Temperature
         float temperature_multiplier = 1;
-            float over_temp = -(THROTTLE_TEMP - power_management->chip_temp);
+        float over_temp = -(THROTTLE_TEMP - power_management->chip_temp);
         if(over_temp > 0){
             temperature_multiplier = (THROTTLE_TEMP_RANGE - over_temp)/THROTTLE_TEMP_RANGE;
         }
 
-        power_management->frequency_multiplier = temperature_multiplier;
+        float lowest_multiplier = 1;
+        float multipliers[2] = {voltage_multiplier, temperature_multiplier};
 
+        for(int i = 0; i < 2; i++){
+            if(multipliers[i] < lowest_multiplier){
+                lowest_multiplier = multipliers[i];
+            }
+        }
+
+        power_management->frequency_multiplier = lowest_multiplier;
 
 
         float target_frequency = _fbound(power_management->frequency_multiplier * BM1397_FREQUENCY, 0, BM1397_FREQUENCY);
 
-        if(target_frequency < 13){
+        if(target_frequency < 50){
             // TODO: Turn the chip off
         }
 
@@ -84,7 +93,7 @@ void POWER_MANAGEMENT_task(void * pvParameters){
                 last_frequency_increase > 250 &&
                 power_management->frequency_value != BM1397_FREQUENCY
             ){
-                float add = power_management->frequency_value - (((power_management->frequency_value * 29.0) + target_frequency)/30.0);
+                float add = power_management->frequency_value - (((power_management->frequency_value * 9.0) + target_frequency)/10.0);
                 power_management->frequency_value += _fbound(add, 2 , 10);
                 BM1397_send_hash_frequency(power_management->frequency_value);
                 ESP_LOGI(TAG, "target %f, Freq %f, Temp %f, Power %f", target_frequency, power_management->frequency_value, power_management->chip_temp, power_management->power);
@@ -97,7 +106,7 @@ void POWER_MANAGEMENT_task(void * pvParameters){
 
 
 
-        //ESP_LOGI(TAG, "target %f, Freq %f, Temp %f, Power %f", target_frequency, power_management->frequency_value, power_management->chip_temp, power_management->power);
+        //ESP_LOGI(TAG, "target %f, Freq %f, Volt %f, Power %f", target_frequency, power_management->frequency_value, power_management->voltage, power_management->power);
         vTaskDelay(POLL_RATE / portTICK_RATE_MS);
     }
 }

@@ -120,8 +120,10 @@ void BM1397_send_hash_frequency(float frequency) {
 	int i;
 
     //bound the frequency setting
-    if (frequency < 13) {
-        f1 = 13;
+    // You can go as low as 13 but it doesn't really scale or
+    // produce any nonces
+    if (frequency < 50) {
+        f1 = 50;
     } else if (frequency > 500) {
         f1 = 500;
     } else {
