@@ -8,6 +8,7 @@
 #include "EMC2101.h"
 #include "INA260.h"
 #include "math.h"
+#include "serial.h"
 
 #define POLL_RATE 1000/60
 #define MAX_TEMP 90.0
@@ -84,10 +85,20 @@ void POWER_MANAGEMENT_task(void * pvParameters){
             // TODO: Turn the chip off
         }
 
-        // reinitialize after coming off some low voltage
-        if(power_management->frequency_value <=  50 && target_frequency > 50){
-            power_management->frequency_value = target_frequency;
+        // chip is coming back from a low/no voltage event
+        if(power_management->frequency_value <  50 && target_frequency > 50){
+            // The chip could have reset to the default baud OR not
+            // if chip is not default baud, set to default
+            int baud =  BM1397_set_default_baud();
+            // then set esp32 baud to default
+            SERIAL_set_baud(baud);
+            // init the chip
             BM1397_init(target_frequency);
+            // set asic and esp32 to max baud again
+            baud = BM1397_set_max_baud();
+            SERIAL_set_baud(baud);
+            power_management->frequency_value = target_frequency;
+
         }
 
 
@@ -101,7 +112,8 @@ void POWER_MANAGEMENT_task(void * pvParameters){
                 last_frequency_increase > 120 &&
                 power_management->frequency_value != BM1397_FREQUENCY
             ){
-                power_management->frequency_value += _fbound(target_frequency, 2 , 15);
+                float add = (target_frequency + power_management->frequency_value) / 2;
+                power_management->frequency_value += _fbound(add, 2 , 20);
                 BM1397_send_hash_frequency(power_management->frequency_value);
                 ESP_LOGI(TAG, "target %f, Freq %f, Temp %f, Power %f", target_frequency, power_management->frequency_value, power_management->chip_temp, power_management->power);
                 last_frequency_increase = 60;

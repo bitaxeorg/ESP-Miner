@@ -206,7 +206,7 @@ static void _send_init(u_int64_t frequency) {
     unsigned char init6[9] = {0x00, FAST_UART_CONFIGURATION, 0x06, 0x00, 0x00, 0x0F}; //init6 - fast_uart_configuration
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6, 6, false);
 
-    BM1397_set_default_baud();
+    //BM1397_set_default_baud();
 
     BM1397_send_hash_frequency(frequency);
 }
@@ -259,10 +259,11 @@ void BM1397_init(u_int64_t frequency) {
 
 // Baud formula = 25M/((denominator+1)*8)
 // The denominator is 5 bits found in the misc_control (bits 9-13)
-void BM1397_set_default_baud(void){
+int BM1397_set_default_baud(void){
     //default divider of 26 (11010) for 115,749
     unsigned char baudrate[9] = {0x00, MISC_CONTROL, 0x00, 0x00, 0b01111010, 0b00110001}; //baudrate - misc_control
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, false);
+    return 115749;
 }
 
 int BM1397_set_max_baud(void){
