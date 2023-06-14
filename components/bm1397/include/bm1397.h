@@ -65,7 +65,7 @@ struct __attribute__((__packed__)) nonce_response {
     uint8_t crc;
 };
 
-void BM1397_init(void);
+void BM1397_init(u_int64_t frequency);
 
 void BM1397_send_init(void);
 void BM1397_send_work(struct job_packet *job);

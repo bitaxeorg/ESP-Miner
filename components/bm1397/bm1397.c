@@ -178,7 +178,7 @@ void BM1397_send_hash_frequency(float frequency) {
 
 }
 
-static void _send_init(void) {
+static void _send_init(u_int64_t frequency) {
 
     //send serial data
     vTaskDelay(SLEEP_TIME / portTICK_RATE_MS);
@@ -208,7 +208,7 @@ static void _send_init(void) {
 
     BM1397_set_default_baud();
 
-    BM1397_send_hash_frequency(BM1397_FREQUENCY);
+    BM1397_send_hash_frequency(frequency);
 }
 
 
@@ -236,7 +236,7 @@ static void _send_read_address(void) {
 }
 
 
-void BM1397_init(void) {
+void BM1397_init(u_int64_t frequency) {
     ESP_LOGI(TAG, "Initializing BM1397");
 
     gpio_pad_select_gpio(BM1397_RST_PIN);
@@ -248,7 +248,7 @@ void BM1397_init(void) {
     //send the init command
     _send_read_address();
 
-    _send_init();
+    _send_init(frequency);
 
 
 }

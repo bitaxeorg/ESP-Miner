@@ -30,18 +30,18 @@ static float _fbound(float value, float lower_bound, float upper_bound)
 	return value;
 }
 
-void _power_init(PowerManagementModule * power_management){
-    power_management->frequency_multiplier = 1;
-    power_management->frequency_value = BM1397_FREQUENCY;
+// void _power_init(PowerManagementModule * power_management){
+//     power_management->frequency_multiplier = 1;
+//     power_management->frequency_value = BM1397_FREQUENCY;
 
-}
+// }
 
 void POWER_MANAGEMENT_task(void * pvParameters){
 
     GlobalState *GLOBAL_STATE = (GlobalState*)pvParameters;
     //bm1397Module * bm1397 = &GLOBAL_STATE->BM1397_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-    _power_init(power_management);
+   // _power_init(power_management);
 
     int last_frequency_increase = 0;
     while(1){
@@ -73,6 +73,8 @@ void POWER_MANAGEMENT_task(void * pvParameters){
             }
         }
 
+
+
         power_management->frequency_multiplier = lowest_multiplier;
 
 
@@ -80,6 +82,12 @@ void POWER_MANAGEMENT_task(void * pvParameters){
 
         if(target_frequency < 50){
             // TODO: Turn the chip off
+        }
+
+        // reinitialize after coming off some low voltage
+        if(power_management->frequency_value <=  50 && target_frequency > 50){
+            power_management->frequency_value = target_frequency;
+            BM1397_init(target_frequency);
         }
 
 
@@ -90,14 +98,13 @@ void POWER_MANAGEMENT_task(void * pvParameters){
             ESP_LOGI(TAG, "target %f, Freq %f, Temp %f, Power %f", target_frequency, power_management->frequency_value, power_management->chip_temp, power_management->power);
         }else{
             if(
-                last_frequency_increase > 250 &&
+                last_frequency_increase > 120 &&
                 power_management->frequency_value != BM1397_FREQUENCY
             ){
-                float add = power_management->frequency_value - (((power_management->frequency_value * 9.0) + target_frequency)/10.0);
-                power_management->frequency_value += _fbound(add, 2 , 10);
+                power_management->frequency_value += _fbound(target_frequency, 2 , 15);
                 BM1397_send_hash_frequency(power_management->frequency_value);
                 ESP_LOGI(TAG, "target %f, Freq %f, Temp %f, Power %f", target_frequency, power_management->frequency_value, power_management->chip_temp, power_management->power);
-                last_frequency_increase = 125;
+                last_frequency_increase = 60;
             }else{
                 last_frequency_increase++;
             }

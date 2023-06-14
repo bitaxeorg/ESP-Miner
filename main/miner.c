@@ -19,7 +19,11 @@ static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL,
     .extranonce_2_len = 0,
     .abandon_work = 0,
-    .version_mask = 0
+    .version_mask = 0,
+    .POWER_MANAGEMENT_MODULE = {
+        .frequency_multiplier = 1,
+        .frequency_value = BM1397_FREQUENCY/3
+    }
 };
 
 
@@ -28,6 +32,8 @@ static const char *TAG = "miner";
 void app_main(void)
 {
     ESP_LOGI(TAG, "Welcome to the bitaxe!");
+    //wait between 0 and 5 seconds for multiple units
+    vTaskDelay(rand() % 5001 / portTICK_RATE_MS);
     ESP_ERROR_CHECK(nvs_flash_init());
     //ESP_ERROR_CHECK(esp_netif_init());
     //ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -47,7 +53,7 @@ void app_main(void)
 
     SERIAL_init();
 
-    BM1397_init();
+    BM1397_init(GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
 
     xTaskCreate(stratum_task, "stratum admin", 8192, (void*)&GLOBAL_STATE, 5, NULL);
     xTaskCreate(create_jobs_task, "stratum miner", 8192, (void*)&GLOBAL_STATE, 10, NULL);
