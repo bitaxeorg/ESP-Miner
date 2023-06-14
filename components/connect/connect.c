@@ -13,8 +13,6 @@
 #include "lwip/sys.h"
 
 
-#define WIFI_SSD      CONFIG_ESP_WIFI_SSID
-#define WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
 #define MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
 
 #if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
@@ -84,7 +82,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-void wifi_init_sta(void)
+void wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
 {
     s_wifi_event_group = xEventGroupCreate();
 
@@ -111,8 +109,6 @@ void wifi_init_sta(void)
 
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = WIFI_SSD,
-            .password = WIFI_PASS,
             /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
              * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
              * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
@@ -123,9 +119,14 @@ void wifi_init_sta(void)
             // .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
         },
     };
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
-    ESP_ERROR_CHECK(esp_wifi_start() );
+    strncpy((char *) wifi_config.sta.ssid, wifi_ssid, 31);
+    wifi_config.sta.ssid[31] = '\0';
+    strncpy((char *) wifi_config.sta.password, wifi_pass, 63);
+    wifi_config.sta.password[63] = '\0';
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
@@ -140,9 +141,9 @@ void wifi_init_sta(void)
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
      * happened. */
     if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "Connected to SSID: %s", WIFI_SSD);
+        ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);
     } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "Failed to connect to SSID: %s", WIFI_SSD);
+        ESP_LOGI(TAG, "Failed to connect to SSID: %s", wifi_ssid);
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }

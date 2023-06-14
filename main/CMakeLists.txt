@@ -7,6 +7,7 @@ SRCS
     "INA260.c"
     "led_controller.c"
     "miner.c"
+    "nvs_config.c"
     "oled.c"
     "system.c"
     "work_queue.c"
@@ -15,7 +16,7 @@ SRCS
     "./tasks/asic_task.c"
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
-INCLUDE_DIRS 
+INCLUDE_DIRS
     "."
     "tasks"
 )

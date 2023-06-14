@@ -1,4 +1,3 @@
-
 #include "esp_log.h"
 //#include "addr_from_stdin.h"
 #include "connect.h"
@@ -7,6 +6,7 @@
 #include "bm1397.h"
 #include "global_state.h"
 #include "stratum_task.h"
+#include "nvs_config.h"
 #include <esp_sntp.h>
 #include <time.h>
 
@@ -32,10 +32,8 @@ void dns_found_cb(const char * name, const ip_addr_t * ipaddr, void * callback_a
     bDNSFound = true;
 }
 
-
 void stratum_task(void * pvParameters)
 {
-
     GlobalState *GLOBAL_STATE = (GlobalState*)pvParameters;
 
     STRATUM_V1_initialize_buffer();
@@ -43,14 +41,17 @@ void stratum_task(void * pvParameters)
     int addr_family = 0;
     int ip_protocol = 0;
 
+    char * stratum_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, STRATUM_URL);
+    uint16_t port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, PORT);
+
     //check to see if the STRATUM_URL is an ip address already
-    if (inet_pton(AF_INET, STRATUM_URL, &ip_Addr) == 1) {
+    if (inet_pton(AF_INET, stratum_url, &ip_Addr) == 1) {
         bDNSFound = true;
     } else {
         //it's a hostname. Lookup the ip address.
         IP_ADDR4(&ip_Addr, 0, 0, 0, 0);
-        ESP_LOGI(TAG, "Get IP for URL: %s\n", STRATUM_URL);
-        dns_gethostbyname(STRATUM_URL, &ip_Addr, dns_found_cb, NULL);
+        ESP_LOGI(TAG, "Get IP for URL: %s\n", stratum_url);
+        dns_gethostbyname(stratum_url, &ip_Addr, dns_found_cb, NULL);
         while (!bDNSFound);
     }
 
@@ -60,13 +61,14 @@ void stratum_task(void * pvParameters)
              ip4_addr2(&ip_Addr.u_addr.ip4),
              ip4_addr3(&ip_Addr.u_addr.ip4),
              ip4_addr4(&ip_Addr.u_addr.ip4));
-    ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)\n", STRATUM_URL, PORT, host_ip);
+    ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)\n", stratum_url, port, host_ip);
+    free(stratum_url);
 
     while (1) {
         struct sockaddr_in dest_addr;
         dest_addr.sin_addr.s_addr = inet_addr(host_ip);
         dest_addr.sin_family = AF_INET;
-        dest_addr.sin_port = htons(PORT);
+        dest_addr.sin_port = htons(port);
         addr_family = AF_INET;
         ip_protocol = IPPROTO_IP;
 
@@ -76,7 +78,7 @@ void stratum_task(void * pvParameters)
             ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
             break;
         }
-        ESP_LOGI(TAG, "Socket created, connecting to %s:%d", host_ip, PORT);
+        ESP_LOGI(TAG, "Socket created, connecting to %s:%d", host_ip, port);
 
         int err = connect(GLOBAL_STATE->sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
         if (err != 0)
@@ -89,7 +91,9 @@ void stratum_task(void * pvParameters)
 
         STRATUM_V1_configure_version_rolling(GLOBAL_STATE->sock);
 
-        STRATUM_V1_authenticate(GLOBAL_STATE->sock, STRATUM_USER);
+        char * username = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, STRATUM_USER);
+        STRATUM_V1_authenticate(GLOBAL_STATE->sock, username);
+        free(username);
 
         ESP_LOGI(TAG, "Extranonce: %s", GLOBAL_STATE->extranonce_str);
         ESP_LOGI(TAG, "Extranonce 2 length: %d", GLOBAL_STATE->extranonce_2_len);

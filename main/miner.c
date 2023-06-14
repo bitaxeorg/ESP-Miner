@@ -13,6 +13,7 @@
 #include "global_state.h"
 #include "serial.h"
 #include "asic_result_task.h"
+#include "nvs_config.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL,
@@ -24,7 +25,6 @@ static GlobalState GLOBAL_STATE = {
 
 static const char *TAG = "miner";
 
-
 void app_main(void)
 {
     ESP_LOGI(TAG, "Welcome to the bitaxe!");
@@ -35,7 +35,12 @@ void app_main(void)
     xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void*)&GLOBAL_STATE, 3, NULL);
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-    wifi_init_sta();
+
+    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, WIFI_SSID);
+    char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, WIFI_PASS);
+    wifi_init_sta(wifi_ssid, wifi_pass);
+    free(wifi_ssid);
+    free(wifi_pass);
 
     queue_init(&GLOBAL_STATE.stratum_queue);
     queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
