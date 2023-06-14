@@ -4,6 +4,7 @@
 #include "bm1397.h"
 #include <string.h>
 #include "esp_log.h"
+#include "nvs_config.h"
 
 const char * TAG = "asic_result";
 
@@ -16,6 +17,9 @@ void ASIC_result_task(void * pvParameters)
     memset(buf, 0, 1024);
     SERIAL_clear_buffer();
     uint32_t prev_nonce = 0;
+
+
+    char * user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, STRATUM_USER);
 
     while(1){
 
@@ -91,7 +95,7 @@ void ASIC_result_task(void * pvParameters)
 
             STRATUM_V1_submit_share(
                 GLOBAL_STATE->sock,
-                STRATUM_USER,
+                user,
                 GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->jobid,
                 GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->extranonce2,
                 GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->ntime,
