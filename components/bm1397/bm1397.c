@@ -206,7 +206,7 @@ static void _send_init(u_int64_t frequency) {
     unsigned char init6[9] = {0x00, FAST_UART_CONFIGURATION, 0x06, 0x00, 0x00, 0x0F}; //init6 - fast_uart_configuration
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6, 6, false);
 
-    //BM1397_set_default_baud();
+    BM1397_set_default_baud();
 
     BM1397_send_hash_frequency(frequency);
 }
