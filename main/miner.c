@@ -22,7 +22,7 @@ static GlobalState GLOBAL_STATE = {
     .version_mask = 0,
     .POWER_MANAGEMENT_MODULE = {
         .frequency_multiplier = 1,
-        .frequency_value = 50
+        .frequency_value = BM1397_FREQUENCY
     }
 };
 

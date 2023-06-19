@@ -87,18 +87,8 @@ void POWER_MANAGEMENT_task(void * pvParameters){
 
         // chip is coming back from a low/no voltage event
         if(power_management->frequency_value <  50 && target_frequency > 50){
-            // The chip could have reset to the default baud OR not
-            // if chip is not default baud, set to default
-            int baud =  BM1397_set_default_baud();
-            // then set esp32 baud to default
-            SERIAL_set_baud(baud);
-            // init the chip
-            BM1397_init(target_frequency);
-            // set asic and esp32 to max baud again
-            baud = BM1397_set_max_baud();
-            SERIAL_set_baud(baud);
-            power_management->frequency_value = target_frequency;
-
+            // TODO recover gracefully?
+            exit(1);
         }
 
 
