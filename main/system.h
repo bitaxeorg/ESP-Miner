@@ -3,6 +3,8 @@
 
 #define HISTORY_LENGTH 100
 #define HISTORY_WINDOW_SIZE 5
+
+#define DIFF_STRING_SIZE 10
 typedef struct {
     double duration_start;
     int historical_hashrate_rolling_index;
@@ -16,6 +18,7 @@ typedef struct {
     int screen_page;
     char oled_buf[20];
     uint32_t best_nonce_diff;
+    char best_diff_string[DIFF_STRING_SIZE];
     bool FOUND_BLOCK;
 
     uint32_t lastClockSync;

@@ -23,6 +23,8 @@ static const char *TAG = "SystemModule";
 
 #define BM1397_VOLTAGE CONFIG_BM1397_VOLTAGE
 
+static void _suffix_string(uint64_t, char *, size_t, int);
+
 
 static void _init_system(SystemModule* module) {
 
@@ -37,6 +39,8 @@ static void _init_system(SystemModule* module) {
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
     module->FOUND_BLOCK = false;
+
+    _suffix_string(0, module->best_diff_string, DIFF_STRING_SIZE, 0);
 
     //test the LEDs
     // ESP_LOGI(TAG, "Init LEDs!");
@@ -106,7 +110,7 @@ static void _update_best_diff(SystemModule* module){
     }
     OLED_clearLine(3);
     memset(module->oled_buf, 0, 20);
-    snprintf(module->oled_buf, 20, module->FOUND_BLOCK ? "!!! BLOCK FOUND !!!" : "BD: %u",  module->best_nonce_diff);
+    snprintf(module->oled_buf, 20, module->FOUND_BLOCK ? "!!! BLOCK FOUND !!!" : "BD: %s",  module->best_diff_string);
     OLED_writeString(0, 3, module->oled_buf);
 }
 
@@ -208,12 +212,70 @@ static void _check_for_best_diff(SystemModule * module, double diff, uint32_t nb
         return;
     }
     module->best_nonce_diff = diff;
+    //make the best_nonce_diff into a string
+    _suffix_string((uint64_t)diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     double network_diff = _calculate_network_difficulty(nbits);
     if(diff > network_diff){
         module->FOUND_BLOCK = true;
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
     }
     ESP_LOGI(TAG, "Network diff: %f", network_diff);
+}
+
+/* Convert a uint64_t value into a truncated string for displaying with its
+ * associated suitable for Mega, Giga etc. Buf array needs to be long enough */
+static void _suffix_string(uint64_t val, char *buf, size_t bufsiz, int sigdigits) {
+	const double  dkilo = 1000.0;
+	const uint64_t kilo = 1000ull;
+	const uint64_t mega = 1000000ull;
+	const uint64_t giga = 1000000000ull;
+	const uint64_t tera = 1000000000000ull;
+	const uint64_t peta = 1000000000000000ull;
+	const uint64_t exa  = 1000000000000000000ull;
+	char suffix[2] = "";
+	bool decimal = true;
+	double dval;
+
+	if (val >= exa) {
+		val /= peta;
+		dval = (double)val / dkilo;
+		strcpy(suffix, "E");
+	} else if (val >= peta) {
+		val /= tera;
+		dval = (double)val / dkilo;
+		strcpy(suffix, "P");
+	} else if (val >= tera) {
+		val /= giga;
+		dval = (double)val / dkilo;
+		strcpy(suffix, "T");
+	} else if (val >= giga) {
+		val /= mega;
+		dval = (double)val / dkilo;
+		strcpy(suffix, "G");
+	} else if (val >= mega) {
+		val /= kilo;
+		dval = (double)val / dkilo;
+		strcpy(suffix, "M");
+	} else if (val >= kilo) {
+		dval = (double)val / dkilo;
+		strcpy(suffix, "K");
+	} else {
+		dval = val;
+		decimal = false;
+	}
+
+	if (!sigdigits) {
+		if (decimal)
+			snprintf(buf, bufsiz, "%.3g%s", dval, suffix);
+		else
+			snprintf(buf, bufsiz, "%d%s", (unsigned int)dval, suffix);
+	} else {
+		/* Always show sigdigits + 1, padded on right with zeroes
+		 * followed by suffix */
+		int ndigits = sigdigits - 1 - (dval > 0.0 ? floor(log10(dval)) : 0);
+
+		snprintf(buf, bufsiz, "%*.*f%s", sigdigits + 1, ndigits, dval, suffix);
+	}
 }
 
 
