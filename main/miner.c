@@ -4,7 +4,7 @@
 #include "nvs_flash.h"
 
 //#include "protocol_examples_common.h"
-#include "connect.h"
+#include "miner.h"
 
 
 #include "stratum_task.h"
@@ -65,8 +65,6 @@ void app_main(void)
     free(wifi_ssid);
     free(wifi_pass);
 
-
-
     queue_init(&GLOBAL_STATE.stratum_queue);
     queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
 
@@ -83,5 +81,15 @@ void app_main(void)
     xTaskCreate(ASIC_task, "asic", 8192, (void*)&GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_result_task, "asic result", 8192, (void*)&GLOBAL_STATE, 15, NULL);
 
+}
+
+void MINER_set_wifi_status(wifi_status_t status, uint16_t retry_count) {
+    if (status == WIFI_RETRYING) {
+        snprintf(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, 20, "Retrying: %d/%d", retry_count, WIFI_MAXIMUM_RETRY);
+        return;
+    } else if (status == WIFI_CONNECT_FAILED) {
+        snprintf(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, 20, "Connect Failed!");
+        return;
+    }
 }
 

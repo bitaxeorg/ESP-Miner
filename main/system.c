@@ -184,8 +184,8 @@ static void _init_connection(SystemModule* module) {
 
     if (OLED_status()) {
         memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "Connecting to:");
-        OLED_writeString(0, 1, module->oled_buf);
+        snprintf(module->oled_buf, 20, "Connecting to ssid:");
+        OLED_writeString(0, 0, module->oled_buf);
     }
 
 }
@@ -196,7 +196,7 @@ static void _update_connection(SystemModule* module) {
         OLED_clearLine(2);
         memset(module->oled_buf, 0, 20);
         snprintf(module->oled_buf, 20, "%s", module->ssid);
-        OLED_writeString(0, 2, module->oled_buf);
+        OLED_writeString(0, 1, module->oled_buf);
 
         OLED_clearLine(3);
         memset(module->oled_buf, 0, 20);

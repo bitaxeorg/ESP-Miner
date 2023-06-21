@@ -3,5 +3,6 @@ SRCS
     "connect.c"
 INCLUDE_DIRS 
     "include"
+    "../../main"
 REQUIRES nvs_flash
 )

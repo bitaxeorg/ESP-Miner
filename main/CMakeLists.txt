@@ -19,4 +19,5 @@ SRCS
 INCLUDE_DIRS
     "."
     "tasks"
+    "../components/connect/include"
 )
