@@ -20,6 +20,9 @@ typedef struct {
     uint32_t best_nonce_diff;
     char best_diff_string[DIFF_STRING_SIZE];
     bool FOUND_BLOCK;
+    bool startup_done;
+    char ssid[20];
+    char wifi_status[20];
 
     uint32_t lastClockSync;
 } SystemModule;

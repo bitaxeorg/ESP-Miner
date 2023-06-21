@@ -10,7 +10,7 @@
 #include "math.h"
 #include "serial.h"
 
-#define POLL_RATE 1000/60
+#define POLL_RATE 5000
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 80.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)

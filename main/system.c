@@ -39,8 +39,16 @@ static void _init_system(SystemModule* module) {
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
     module->FOUND_BLOCK = false;
+    module->startup_done = false;
 
+    //set the best diff string to 0
     _suffix_string(0, module->best_diff_string, DIFF_STRING_SIZE, 0);
+
+    //set the ssid string to blank
+    memset(module->ssid, 0, 20);
+
+    //set the wifi_status to blank
+    memset(module->wifi_status, 0, 20);
 
     //test the LEDs
     // ESP_LOGI(TAG, "Init LEDs!");
@@ -172,6 +180,32 @@ static void _update_esp32_info(SystemModule* module) {
 
 }
 
+static void _init_connection(SystemModule* module) {
+
+    if (OLED_status()) {
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, "Connecting to:");
+        OLED_writeString(0, 1, module->oled_buf);
+    }
+
+}
+
+static void _update_connection(SystemModule* module) {
+
+    if (OLED_status()) {
+        OLED_clearLine(2);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, "%s", module->ssid);
+        OLED_writeString(0, 2, module->oled_buf);
+
+        OLED_clearLine(3);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, "%s", module->wifi_status);
+        OLED_writeString(0, 3, module->oled_buf);
+    }
+
+}
+
 static void _update_system_performance(SystemModule* module){
 
 
@@ -195,6 +229,8 @@ static void _update_system_performance(SystemModule* module){
         OLED_writeString(0, 2, module->oled_buf);
     }
 }
+
+
 
 static double _calculate_network_difficulty(uint32_t nBits) {
     uint32_t mantissa = nBits & 0x007fffff;       // Extract the mantissa from nBits
@@ -285,6 +321,16 @@ void SYSTEM_task(void *pvParameters) {
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     _init_system(module);
+
+    _clear_display();
+    _init_connection(module);
+
+    //show the connection screen
+    while (!module->startup_done) {
+        _update_connection(module);
+        vTaskDelay(100 / portTICK_RATE_MS);
+    }
+
 
     while(1){
         _clear_display();
@@ -379,7 +425,6 @@ void SYSTEM_notify_found_nonce(SystemModule* module, double pool_diff, double fo
     _check_for_best_diff(module, found_diff, nbits);
 
 }
-
 
 
 
