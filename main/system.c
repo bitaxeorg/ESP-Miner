@@ -294,7 +294,7 @@ static void _suffix_string(uint64_t val, char *buf, size_t bufsiz, int sigdigits
 		strcpy(suffix, "M");
 	} else if (val >= kilo) {
 		dval = (double)val / dkilo;
-		strcpy(suffix, "K");
+		strcpy(suffix, "k");
 	} else {
 		dval = val;
 		decimal = false;
