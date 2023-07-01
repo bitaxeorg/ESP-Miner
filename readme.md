@@ -1,5 +1,5 @@
-| Supported Targets | ESP32-S3 |
-| ----------------- | -------- |
+| Supported Targets | ESP32-S3 (BitAxe v2+) |
+| ----------------- | --------------------- |
 
 
 # ESP-Miner
