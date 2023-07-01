@@ -6,5 +6,3 @@ stratumurl,data,string,solo.ckpool.org
 stratumport,data,u16,3333
 stratumuser,data,string,1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.bitaxe
 stratumpass,data,string,x
-bm1397frequency,data,u16,425
-bm1397voltage,data,u16,1400
