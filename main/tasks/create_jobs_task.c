@@ -21,20 +21,8 @@ void create_jobs_task(void * pvParameters)
         ESP_LOGI(TAG, "New Work Dequeued %s", mining_notification->job_id);
 
         uint32_t extranonce_2 = 0;
-        while (extranonce_2 < UINT_MAX && GLOBAL_STATE->abandon_work == 0)
+        while (GLOBAL_STATE->stratum_queue.count < 1 && extranonce_2 < UINT_MAX && GLOBAL_STATE->abandon_work == 0)
         {
-            struct timeval tv;
-	        gettimeofday(&tv, NULL);
-            int job_time_sec = tv.tv_sec - mining_notification->ntime;
-
-            // Expire jobs after 5 minutes
-            // This seems to be an issue with some pools (ckpool)
-            // ESP_LOGI(TAG, "job_time_sec %d", job_time_sec);
-            if(job_time_sec > 60 * 5){
-                ESP_LOGI(TAG, "Job Expired");
-                break;
-            }
-
             char * extranonce_2_str = extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len);
 
             char *coinbase_tx = construct_coinbase_tx(mining_notification->coinbase_1, mining_notification->coinbase_2, GLOBAL_STATE->extranonce_str, extranonce_2_str);
