@@ -76,6 +76,7 @@ void stratum_task(void * pvParameters)
         if (GLOBAL_STATE->sock < 0)
         {
             ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+            esp_restart();
             break;
         }
         ESP_LOGI(TAG, "Socket created, connecting to %s:%d", host_ip, port);
@@ -84,6 +85,7 @@ void stratum_task(void * pvParameters)
         if (err != 0)
         {
             ESP_LOGE(TAG, "Socket unable to connect: errno %d", errno);
+            esp_restart();
             break;
         }
 
