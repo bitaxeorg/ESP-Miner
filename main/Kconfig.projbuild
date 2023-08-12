@@ -19,20 +19,20 @@ menu "Stratum Configuration"
 
     config STRATUM_URL
         string "Stratum Address"
-        default "solo.ckpool.org"
+        default "public-pool.io"
         help
             The example will connect to this Stratum pool address.
 
     config STRATUM_PORT
         int "Stratum Port"
         range 0 65535
-        default 3333
+        default 21496
         help
             The stratum server port to connect to.
 
     config STRATUM_USER
         string "Stratum username"
-        default ""
+        default "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.bitaxe"
         help
             Stratum user to use with pool
 
