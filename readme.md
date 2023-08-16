@@ -3,13 +3,13 @@
 
 # ESP-Miner
 
-## Requires ESP-IDF v4.4
+## Requires ESP-IDF v5.1
 
 You can chose between 2 methods of installations:
 
 ### Manual Installation
 
-Follow the official [instructions](https://docs.espressif.com/projects/esp-idf/en/v4.4.5/esp32s3/get-started/index.html#installation-step-by-step).
+Follow the official [instructions](https://docs.espressif.com/projects/esp-idf/en/release-v5.1/esp32s3/get-started/index.html#manual-installation).
 
 ### ESP-IDF Visual Studio Code Extension
 
