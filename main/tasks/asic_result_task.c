@@ -77,7 +77,7 @@ void ASIC_result_task(void * pvParameters)
             rx_midstate_index
         );
 
-        ESP_LOGI(TAG, "Nonce difficulty %.2f of %d.", nonce_diff, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->pool_diff);
+        ESP_LOGI(TAG, "Nonce difficulty %.2f of %ld.", nonce_diff, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->pool_diff);
 
         if (nonce_diff > GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->pool_diff)
         {

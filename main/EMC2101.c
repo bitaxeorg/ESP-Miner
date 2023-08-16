@@ -18,7 +18,7 @@
  * @brief Read a sequence of I2C bytes
  */
 static esp_err_t register_read(uint8_t reg_addr, uint8_t *data, size_t len) {
-    return i2c_master_write_read_device(I2C_MASTER_NUM, EMC2101_I2CADDR_DEFAULT, &reg_addr, 1, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_RATE_MS);
+  return i2c_master_write_read_device(I2C_MASTER_NUM, EMC2101_I2CADDR_DEFAULT, &reg_addr, 1, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 }
 
 /**
@@ -28,7 +28,7 @@ static esp_err_t register_write_byte(uint8_t reg_addr, uint8_t data) {
     int ret;
     uint8_t write_buf[2] = {reg_addr, data};
 
-    ret = i2c_master_write_to_device(I2C_MASTER_NUM, EMC2101_I2CADDR_DEFAULT, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_RATE_MS);
+    ret = i2c_master_write_to_device(I2C_MASTER_NUM, EMC2101_I2CADDR_DEFAULT, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 
     return ret;
 }

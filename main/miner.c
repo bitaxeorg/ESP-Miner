@@ -32,7 +32,7 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "Welcome to the bitaxe!");
     //wait between 0 and 5 seconds for multiple units
-    vTaskDelay(rand() % 5001 / portTICK_RATE_MS);
+    vTaskDelay(rand() % 5001 / portTICK_PERIOD_MS);
     ESP_ERROR_CHECK(nvs_flash_init());
 
     xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void*)&GLOBAL_STATE, 3, NULL);

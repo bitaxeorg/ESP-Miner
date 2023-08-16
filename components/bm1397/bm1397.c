@@ -164,24 +164,24 @@ void BM1397_send_hash_frequency(float frequency) {
 	}
 
 	for (i = 0; i < 2; i++) {
-        vTaskDelay(10 / portTICK_RATE_MS);
-        _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, false);
+          vTaskDelay(10 / portTICK_PERIOD_MS);
+          _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, false);
 	}
 	for (i = 0; i < 2; i++) {
-        vTaskDelay(10 / portTICK_RATE_MS);
-        _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
+          vTaskDelay(10 / portTICK_PERIOD_MS);
+          _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
 	}
 
-    vTaskDelay(10 / portTICK_RATE_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
 
-    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
+        ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
 
 }
 
 static void _send_init(u_int64_t frequency) {
 
     //send serial data
-    vTaskDelay(SLEEP_TIME / portTICK_RATE_MS);
+    vTaskDelay(SLEEP_TIME / portTICK_PERIOD_MS);
     _send_chain_inactive();
 
     _set_chip_address(0x00);
@@ -217,14 +217,13 @@ static void _reset(void) {
     gpio_set_level(BM1397_RST_PIN, 0);
 
     //delay for 100ms
-    vTaskDelay(100 / portTICK_RATE_MS);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
 
     //set the gpio pin high
     gpio_set_level(BM1397_RST_PIN, 1);
 
     //delay for 100ms
-    vTaskDelay(100 / portTICK_RATE_MS);
-
+    vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
 
@@ -239,7 +238,7 @@ static void _send_read_address(void) {
 void BM1397_init(u_int64_t frequency) {
     ESP_LOGI(TAG, "Initializing BM1397");
 
-    gpio_pad_select_gpio(BM1397_RST_PIN);
+    esp_rom_gpio_pad_select_gpio(BM1397_RST_PIN);
     gpio_set_direction(BM1397_RST_PIN, GPIO_MODE_OUTPUT);
 
     //reset the bm1397
