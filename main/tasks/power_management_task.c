@@ -116,6 +116,6 @@ void POWER_MANAGEMENT_task(void * pvParameters){
 
 
         //ESP_LOGI(TAG, "target %f, Freq %f, Volt %f, Power %f", target_frequency, power_management->frequency_value, power_management->voltage, power_management->power);
-        vTaskDelay(POLL_RATE / portTICK_RATE_MS);
+        vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
     }
 }

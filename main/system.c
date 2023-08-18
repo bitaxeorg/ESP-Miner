@@ -17,7 +17,7 @@
 #include <math.h>
 #include <inttypes.h>
 #include "global_state.h"
-
+#include "esp_timer.h"
 
 static const char *TAG = "SystemModule";
 
@@ -71,7 +71,7 @@ static void _init_system(SystemModule* module) {
     //Fan Tests
     EMC2101_init();
     EMC2101_set_fan_speed(0.75);
-    vTaskDelay(500 / portTICK_RATE_MS);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
 
     //oled
     if (!OLED_init()) {
@@ -166,7 +166,7 @@ static void _update_esp32_info(SystemModule* module) {
     if (OLED_status()) {
 
         memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "FH: %u bytes", free_heap_size);
+        snprintf(module->oled_buf, 20, "FH: %lu bytes", free_heap_size);
         OLED_writeString(0, 0, module->oled_buf);
 
         memset(module->oled_buf, 0, 20);
@@ -328,7 +328,7 @@ void SYSTEM_task(void *pvParameters) {
     //show the connection screen
     while (!module->startup_done) {
         _update_connection(module);
-        vTaskDelay(100 / portTICK_RATE_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
 
@@ -336,17 +336,17 @@ void SYSTEM_task(void *pvParameters) {
         _clear_display();
         module->screen_page = 0;
         _update_system_performance(module);
-        vTaskDelay(40000 / portTICK_RATE_MS);
+        vTaskDelay(40000 / portTICK_PERIOD_MS);
 
         _clear_display();
         module->screen_page = 1;
         _update_system_info(GLOBAL_STATE);
-        vTaskDelay(10000 / portTICK_RATE_MS);
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
 
         _clear_display();
         module->screen_page = 2;
         _update_esp32_info(module);
-        vTaskDelay(10000 / portTICK_RATE_MS);
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
 
     }
 }

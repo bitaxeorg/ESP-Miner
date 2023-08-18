@@ -285,7 +285,7 @@ bool OLED_status(void) {
 static esp_err_t write(uint8_t *data, uint8_t len) {
     int ret;
 
-    ret = i2c_master_write_to_device(I2C_MASTER_NUM, 0x3C, data, len, 1000 / portTICK_RATE_MS);
+    ret = i2c_master_write_to_device(I2C_MASTER_NUM, 0x3C, data, len, 1000 / portTICK_PERIOD_MS);
 
     return ret;
 }
