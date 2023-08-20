@@ -12,6 +12,28 @@
 #include "bm1397.h"
 #include "utils.h"
 #include "crc.h"
+#include "mining.h"
+#include "global_state.h"
+
+#define BM1397_RST_PIN  GPIO_NUM_1
+
+
+#define TYPE_JOB 0x20
+#define TYPE_CMD 0x40
+
+#define GROUP_SINGLE 0x00
+#define GROUP_ALL 0x10
+
+#define CMD_JOB 0x01
+
+#define CMD_SETADDRESS 0x00
+#define CMD_WRITE 0x01
+#define CMD_READ 0x02
+#define CMD_INACTIVE 0x03
+
+#define RESPONSE_CMD 0x00
+#define RESPONSE_JOB 0x80
+
 
 #define SLEEP_TIME 20
 #define FREQ_MULT 25.0
@@ -25,7 +47,19 @@
 #define TICKET_MASK 0x14
 #define MISC_CONTROL 0x18
 
+typedef struct __attribute__((__packed__)) {
+    uint8_t preamble[2];
+    uint32_t nonce;
+    uint8_t midstate_num;
+    uint8_t job_id;
+    uint8_t crc;
+} asic_result;
+
 static const char *TAG = "bm1397Module";
+
+static uint8_t asic_response_buffer[CHUNK_SIZE];
+static uint32_t prev_nonce = 0;
+static task_result result;
 
 /// @brief
 /// @param ftdi
@@ -81,29 +115,6 @@ static void _set_chip_address(uint8_t chipAddr) {
     _send_BM1397((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, false);
 }
 
-static unsigned char _reverse_bits(unsigned char num) {
-    unsigned char reversed = 0;
-    int i;
-
-    for (i = 0; i < 8; i++) {
-        reversed <<= 1;     // Left shift the reversed variable by 1
-        reversed |= num & 1; // Use bitwise OR to set the rightmost bit of reversed to the current bit of num
-        num >>= 1;          // Right shift num by 1 to get the next bit
-    }
-
-    return reversed;
-}
-
-static int _largest_power_of_two(int num) {
-    int power = 0;
-
-    while (num > 1) {
-        num = num >> 1;
-        power++;
-    }
-
-    return 1 << power;
-}
 
 // borrowed from cgminer driver-gekko.c calc_gsf_freq()
 void BM1397_send_hash_frequency(float frequency) {
@@ -238,6 +249,8 @@ static void _send_read_address(void) {
 void BM1397_init(u_int64_t frequency) {
     ESP_LOGI(TAG, "Initializing BM1397");
 
+    memset(asic_response_buffer, 0, sizeof(asic_response_buffer));
+
     esp_rom_gpio_pad_select_gpio(BM1397_RST_PIN);
     gpio_set_direction(BM1397_RST_PIN, GPIO_MODE_OUTPUT);
 
@@ -248,7 +261,6 @@ void BM1397_init(u_int64_t frequency) {
     _send_read_address();
 
     _send_init(frequency);
-
 
 }
 
@@ -301,10 +313,127 @@ void BM1397_set_job_difficulty_mask(int difficulty){
 }
 
 
+static uint8_t id = 0;
+
+void BM1397_send_work(void *pvParameters, bm_job *next_bm_job) {
+
+        GlobalState *GLOBAL_STATE = (GlobalState*) pvParameters;
+
+        job_packet job;
+        // max job number is 128
+        // there is still some really weird logic with the job id bits for the asic to sort out
+        // so we have it limited to 128 and it has to increment by 4
+        id = (id + 4) % 128;
+
+        job.job_id = id;
+        job.num_midstates = next_bm_job->num_midstates;
+        memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
+        memcpy(&job.nbits, &next_bm_job->target, 4);
+        memcpy(&job.ntime, &next_bm_job->ntime, 4);
+        memcpy(&job.merkle4, next_bm_job->merkle_root + 28, 4);
+        memcpy(job.midstate, next_bm_job->midstate, 32);
 
 
-void BM1397_send_work(struct job_packet *job) {
-    _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t*)job, sizeof(struct job_packet), false);
+        if (job.num_midstates == 4)
+        {
+            memcpy(job.midstate1, next_bm_job->midstate1, 32);
+            memcpy(job.midstate2, next_bm_job->midstate2, 32);
+            memcpy(job.midstate3, next_bm_job->midstate3, 32);
+        }
+
+        if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
+            free_bm_job(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id]);
+        }
+
+        GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
+
+        pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
+        GLOBAL_STATE-> valid_jobs[job.job_id] = 1;
+        //ESP_LOGI(TAG, "Added Job: %i", job.job_id);
+        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+
+        _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), &job, sizeof(job_packet), false);
 }
 
+
+
+
+asic_result * BM1397_receive_work(void){
+
+    //wait for a response, wait time is pretty arbitrary
+    int received = SERIAL_rx(asic_response_buffer, 9, 60000);
+
+    if (received < 0) {
+        ESP_LOGI(TAG, "Error in serial RX");
+        return NULL;
+    } else if(received == 0){
+        // Didn't find a solution, restart and try again
+        return NULL;
+    }
+
+    if(received != 9 || asic_response_buffer[0] != 0xAA || asic_response_buffer[1] != 0x55){
+        ESP_LOGI(TAG, "Serial RX invalid %i", received);
+        ESP_LOG_BUFFER_HEX(TAG, asic_response_buffer, received);
+        return NULL;
+    }
+
+
+
+    return  (asic_result*) asic_response_buffer;
+}
+
+
+task_result * BM1397_proccess_work(void *pvParameters){
+
+    asic_result *asic_result = BM1397_receive_work();
+
+    if(asic_result == NULL){
+        ESP_LOGI(TAG, "return null");
+        return NULL;
+    }
+    ESP_LOGI(TAG, "return not null");
+
+    uint8_t nonce_found = 0;
+    uint32_t first_nonce = 0;
+
+
+    uint8_t rx_job_id = asic_result->job_id & 0xfc;
+    uint8_t rx_midstate_index = asic_result->job_id & 0x03;
+
+
+    GlobalState *GLOBAL_STATE = (GlobalState*) pvParameters;
+    if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0) {
+        ESP_LOGI(TAG, "Invalid job nonce found, id=%d", rx_job_id);
+    }
+
+    uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->version;
+    for (int i = 0; i < rx_midstate_index; i++) {
+        rolled_version = increment_bitmask(rolled_version, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->version_mask);
+    }
+
+
+    // ASIC may return the same nonce multiple times
+    // or one that was already found
+    // most of the time it behavies however
+    if (nonce_found == 0) {
+        first_nonce = asic_result->nonce;
+        nonce_found = 1;
+    } else if (asic_result->nonce == first_nonce) {
+        // stop if we've already seen this nonce
+        return NULL;
+    }
+
+    if (asic_result->nonce == prev_nonce) {
+        return NULL;
+    } else {
+        prev_nonce = asic_result->nonce;
+    }
+
+
+    result.job_id = rx_job_id;
+    result.nonce =  asic_result->nonce;
+    result.rolled_version = rolled_version;
+
+    return &result;
+}
 

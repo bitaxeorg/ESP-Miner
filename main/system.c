@@ -21,7 +21,7 @@
 
 static const char *TAG = "SystemModule";
 
-#define BM1397_VOLTAGE CONFIG_BM1397_VOLTAGE
+#define ASIC_VOLTAGE CONFIG_ASIC_VOLTAGE
 
 static void _suffix_string(uint64_t, char *, size_t, int);
 
@@ -66,7 +66,7 @@ static void _init_system(SystemModule* module) {
     ADC_init();
 
     //DS4432U tests
-    DS4432U_set_vcore(BM1397_VOLTAGE / 1000.0);
+    DS4432U_set_vcore(ASIC_VOLTAGE / 1000.0);
 
     //Fan Tests
     EMC2101_init();

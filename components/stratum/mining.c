@@ -63,7 +63,15 @@ bm_job construct_bm_job(mining_notify * params, const char * merkle_root, const 
     new_job.pool_diff = params->difficulty;
 
     hex2bin(merkle_root, new_job.merkle_root, 32);
+
+    //hex2bin(merkle_root, new_job.merkle_root_be, 32);
+    swap_endian_words(merkle_root, new_job.merkle_root_be);
+    reverse_bytes(new_job.merkle_root_be, 32);
+
     swap_endian_words(params->prev_block_hash, new_job.prev_block_hash);
+
+    hex2bin(params->prev_block_hash, new_job.prev_block_hash_be, 32);
+    reverse_bytes(new_job.prev_block_hash_be, 32);
 
     ////make the midstate hash
     uint8_t midstate_data[64];
@@ -117,15 +125,15 @@ char * extranonce_2_generate(uint32_t extranonce_2, uint32_t length)
 static const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
 
 /* testing a nonce and return the diff - 0 means invalid */
-double test_nonce_value(const bm_job * job, const uint32_t nonce, const uint8_t midstate_index) {
+double test_nonce_value(const bm_job * job, const uint32_t nonce, const uint32_t rolled_version) {
 	double d64, s64, ds;
     unsigned char header[80];
 
-    // TODO: use the midstate hash instead of hashing the whole header
-    uint32_t rolled_version = job->version;
-    for (int i = 0; i < midstate_index; i++) {
-        rolled_version = increment_bitmask(rolled_version, job->version_mask);
-    }
+    // // TODO: use the midstate hash instead of hashing the whole header
+    // uint32_t rolled_version = job->version;
+    // for (int i = 0; i < midstate_index; i++) {
+    //     rolled_version = increment_bitmask(rolled_version, job->version_mask);
+    // }
 
     // copy data from job to header
     memcpy(header, &rolled_version, 4);

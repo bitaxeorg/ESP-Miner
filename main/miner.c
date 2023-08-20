@@ -15,6 +15,10 @@
 #include "asic_result_task.h"
 #include "nvs_config.h"
 
+#define ASIC_MODEL CONFIG_ASIC_MODEL
+
+
+
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL,
     .extranonce_2_len = 0,
@@ -22,7 +26,7 @@ static GlobalState GLOBAL_STATE = {
     .version_mask = 0,
     .POWER_MANAGEMENT_MODULE = {
         .frequency_multiplier = 1,
-        .frequency_value = BM1397_FREQUENCY
+        .frequency_value = ASIC_FREQUENCY
     }
 };
 
@@ -30,6 +34,39 @@ static const char *TAG = "miner";
 
 void app_main(void)
 {
+
+    if(strcmp(ASIC_MODEL, "BM1366") == 0){
+        ESP_LOGI(TAG, "ASIC: BM1366");
+        AsicFunctions ASIC_functions =  {
+            .init_fn = BM1366_init,
+            .receive_result_fn = BM1366_proccess_work,
+            .set_max_baud_fn = BM1366_set_max_baud,
+            .set_difficulty_mask_fn = BM1366_set_job_difficulty_mask,
+            .send_work_fn = BM1366_send_work
+        };
+        GLOBAL_STATE.asic_job_frequency_ms = BM1366_FULLSCAN_MS;
+
+        GLOBAL_STATE.ASIC_functions = ASIC_functions;
+    }else if(strcmp(ASIC_MODEL, "BM1397") == 0){
+        ESP_LOGI(TAG, "ASIC: BM1397");
+        AsicFunctions ASIC_functions =  {
+            .init_fn = BM1397_init,
+            .receive_result_fn = BM1397_proccess_work,
+            .set_max_baud_fn = BM1397_set_max_baud,
+            .set_difficulty_mask_fn = BM1397_set_job_difficulty_mask,
+            .send_work_fn = BM1397_send_work
+        };
+        GLOBAL_STATE.asic_job_frequency_ms = BM1397_FULLSCAN_MS;
+
+        GLOBAL_STATE.ASIC_functions = ASIC_functions;
+    }else{
+        ESP_LOGI(TAG, "Invalid ASIC model");
+        exit(EXIT_FAILURE);
+    }
+
+
+
+
     ESP_LOGI(TAG, "Welcome to the bitaxe!");
     //wait between 0 and 5 seconds for multiple units
     vTaskDelay(rand() % 5001 / portTICK_PERIOD_MS);
@@ -70,7 +107,7 @@ void app_main(void)
 
     SERIAL_init();
 
-    BM1397_init(GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
+    (*GLOBAL_STATE.ASIC_functions.init_fn)(GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
 
     //set the startup_done flag
     GLOBAL_STATE.SYSTEM_MODULE.startup_done = true;

@@ -1,13 +1,19 @@
 menu "Bitaxe Configuration"
 
-    config BM1397_VOLTAGE
+    config ASIC_MODEL
+        string "ASIC Model"
+        default "BM1397"
+        help
+            BM1397 or BM1366
+
+    config ASIC_VOLTAGE
         int "ASIC Core Voltage (mV)"
         range 1000 1800
         default 1400
         help
-            The core voltage to set the BM1397 ASIC to.
+            The core voltage to set the ASIC to. 1200 for BM1366 or 1400 for BM1397 is typical.
 
-    config BM1397_FREQUENCY
+    config ASIC_FREQUENCY
         int "ASIC Hash Frequency (MHz)"
         range 200 800
         default 250

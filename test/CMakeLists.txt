@@ -16,6 +16,6 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 set(IDF_TARGET "esp32s3")
 
-idf_build_set_property(COMPILE_DEFINITIONS "-DCONFIG_BM1397_FREQUENCY=100" APPEND)
+idf_build_set_property(COMPILE_DEFINITIONS "-DCONFIG_ASIC_FREQUENCY=100" APPEND)
 
 project(unit_test_stratum)
