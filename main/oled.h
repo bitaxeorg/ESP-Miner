@@ -8,7 +8,8 @@
 // Project started 1/15/2017
 //
 // OLED type for init function
-enum {
+enum
+{
   OLED_128x32 = 1,
   OLED_128x64,
   OLED_132x64,
@@ -17,9 +18,9 @@ enum {
 
 typedef enum
 {
-   FONT_NORMAL=0,   // 8x8
-   FONT_BIG,        // 16x24
-   FONT_SMALL       // 6x8
+  FONT_NORMAL = 0, // 8x8
+  FONT_BIG,        // 16x24
+  FONT_SMALL       // 6x8
 } FONTSIZE;
 
 // Initialize the OLED96 library for a specific I2C address

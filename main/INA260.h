@@ -3,9 +3,9 @@
 
 #define INA260_I2CADDR_DEFAULT 0x40 ///< INA260 default i2c address
 #define INA260_REG_CONFIG 0x00      ///< Configuration register
-#define INA260_REG_CURRENT 0x01 ///< Current measurement register (signed) in mA
-#define INA260_REG_BUSVOLTAGE 0x02 ///< Bus voltage measurement register in mV
-#define INA260_REG_POWER 0x03      ///< Power calculation register in mW
+#define INA260_REG_CURRENT 0x01     ///< Current measurement register (signed) in mA
+#define INA260_REG_BUSVOLTAGE 0x02  ///< Bus voltage measurement register in mV
+#define INA260_REG_POWER 0x03       ///< Power calculation register in mW
 #define INA260_REG_MASK_ENABLE 0x06 ///< Interrupt/Alert setting and checking register
 #define INA260_REG_ALERT_LIMIT 0x07 ///< Alert limit value register
 #define INA260_REG_MFG_UID 0xFE     ///< Manufacturer ID Register
@@ -16,7 +16,8 @@
  *
  * Allowed values for setMode.
  */
-typedef enum _mode {
+typedef enum _mode
+{
   INA260_MODE_SHUTDOWN = 0x00,   /**< SHUTDOWN: Minimize quiescient current and
                                   turn off current into the device inputs. Set
                                   another mode to exit shutown mode **/
@@ -33,7 +34,8 @@ typedef enum _mode {
  *
  * Allowed values for setCurrentConversionTime and setVoltageConversionTime.
  */
-typedef enum _conversion_time {
+typedef enum _conversion_time
+{
   INA260_TIME_140_us,   ///< Measurement time: 140us
   INA260_TIME_204_us,   ///< Measurement time: 204us
   INA260_TIME_332_us,   ///< Measurement time: 332us
@@ -49,7 +51,8 @@ typedef enum _conversion_time {
  *
  * Allowed values forsetAveragingCount.
  */
-typedef enum _count {
+typedef enum _count
+{
   INA260_COUNT_1,    ///< Window size: 1 sample (Default)
   INA260_COUNT_4,    ///< Window size: 4 samples
   INA260_COUNT_16,   ///< Window size: 16 samples
@@ -65,7 +68,8 @@ typedef enum _count {
  *
  * Allowed values for setAlertType.
  */
-typedef enum _alert_type {
+typedef enum _alert_type
+{
   INA260_ALERT_CONVERSION_READY = 0x1, ///< Trigger on conversion ready
   INA260_ALERT_OVERPOWER = 0x2,        ///< Trigger on power over limit
   INA260_ALERT_UNDERVOLTAGE = 0x4,     ///< Trigger on bus voltage under limit
@@ -80,8 +84,9 @@ typedef enum _alert_type {
  *
  * Allowed values for setAlertPolarity.
  */
-typedef enum _alert_polarity {
-  INA260_ALERT_POLARITY_NORMAL = 0x0, ///< Active high open-collector (Default)
+typedef enum _alert_polarity
+{
+  INA260_ALERT_POLARITY_NORMAL = 0x0,   ///< Active high open-collector (Default)
   INA260_ALERT_POLARITY_INVERTED = 0x1, ///< Active low open-collector
 } INA260_AlertPolarity;
 
@@ -90,13 +95,13 @@ typedef enum _alert_polarity {
  *
  * Allowed values for setAlertLatch.
  */
-typedef enum _alert_latch {
+typedef enum _alert_latch
+{
   INA260_ALERT_LATCH_ENABLED = 0x1,     /**< Alert will latch until Mask/Enable
                                            register is read **/
   INA260_ALERT_LATCH_TRANSPARENT = 0x0, /**< Alert will reset when fault is
                                            cleared **/
 } INA260_AlertLatch;
-
 
 float INA260_read_current(void);
 float INA260_read_voltage(void);

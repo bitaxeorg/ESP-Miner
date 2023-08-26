@@ -13,15 +13,17 @@
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 
-typedef struct {
+typedef struct
+{
     void (*init_fn)(u_int64_t);
-    task_result * (*receive_result_fn)(void *GLOBAL_STATE);
+    task_result *(*receive_result_fn)(void *GLOBAL_STATE);
     int (*set_max_baud_fn)(void);
     void (*set_difficulty_mask_fn)(int);
     void (*send_work_fn)(void *GLOBAL_STATE, bm_job *next_bm_job);
 } AsicFunctions;
 
-typedef struct  {
+typedef struct
+{
     AsicFunctions ASIC_functions;
     double asic_job_frequency_ms;
 
@@ -33,13 +35,11 @@ typedef struct  {
     AsicTaskModule ASIC_TASK_MODULE;
     PowerManagementModule POWER_MANAGEMENT_MODULE;
 
-
-
-    char * extranonce_str;
+    char *extranonce_str;
     int extranonce_2_len;
     int abandon_work;
 
-    uint8_t * valid_jobs;
+    uint8_t *valid_jobs;
     pthread_mutex_t valid_jobs_lock;
 
     uint32_t stratum_difficulty;
@@ -47,11 +47,6 @@ typedef struct  {
 
     int sock;
 
-
 } GlobalState;
-
-
-
-
 
 #endif /* GLOBAL_STATE_H_ */

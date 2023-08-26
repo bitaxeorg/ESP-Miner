@@ -10,8 +10,8 @@
 #define COINBASE_SIZE 100
 #define COINBASE2_SIZE 128
 
-
-typedef enum {
+typedef enum
+{
     STRATUM_UNKNOWN,
     MINING_NOTIFY,
     MINING_SET_DIFFICULTY,
@@ -20,12 +20,13 @@ typedef enum {
     STRATUM_RESULT_VERSION_MASK
 } stratum_method;
 
-typedef struct {
-    char * job_id;
-    char * prev_block_hash;
-    char * coinbase_1;
-    char * coinbase_2;
-    uint8_t * merkle_branches;
+typedef struct
+{
+    char *job_id;
+    char *prev_block_hash;
+    char *coinbase_1;
+    char *coinbase_2;
+    uint8_t *merkle_branches;
     size_t n_merkle_branches;
     uint32_t version;
     uint32_t version_mask;
@@ -34,45 +35,42 @@ typedef struct {
     uint32_t difficulty;
 } mining_notify;
 
-typedef struct {
+typedef struct
+{
 
     int16_t message_id;
-    //Indicates the type of request the message represents.
+    // Indicates the type of request the message represents.
     stratum_method method;
 
-    //mining.notify
+    // mining.notify
     int should_abandon_work;
-    mining_notify * mining_notification;
-    //mining.set_difficulty
+    mining_notify *mining_notification;
+    // mining.set_difficulty
     uint32_t new_difficulty;
-    //mining.set_version_mask
+    // mining.set_version_mask
     uint32_t version_mask;
-    //result
+    // result
     bool response_success;
 } StratumApiV1Message;
 
-
 void STRATUM_V1_initialize_buffer();
 
-char * STRATUM_V1_receive_jsonrpc_line(int sockfd);
+char *STRATUM_V1_receive_jsonrpc_line(int sockfd);
 
-int STRATUM_V1_subscribe(int socket, char ** extranonce, int * extranonce2_len);
+int STRATUM_V1_subscribe(int socket, char **extranonce, int *extranonce2_len);
 
-void STRATUM_V1_parse(StratumApiV1Message* message, const char * stratum_json);
+void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
 
+void STRATUM_V1_free_mining_notify(mining_notify *params);
 
-void STRATUM_V1_free_mining_notify(mining_notify * params);
-
-
-int STRATUM_V1_authenticate(int socket, const char * username);
+int STRATUM_V1_authenticate(int socket, const char *username);
 
 void STRATUM_V1_configure_version_rolling(int socket);
 
 int STRATUM_V1_suggest_difficulty(int socket, uint32_t difficulty);
 
-void STRATUM_V1_submit_share(int socket, const char * username, const char * jobid,
-                             const char * extranonce_2, const uint32_t ntime, const uint32_t nonce,
+void STRATUM_V1_submit_share(int socket, const char *username, const char *jobid,
+                             const char *extranonce_2, const uint32_t ntime, const uint32_t nonce,
                              const uint32_t version);
-
 
 #endif // STRATUM_API_H

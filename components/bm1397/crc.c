@@ -5,8 +5,9 @@
 #include "bm1397.h"
 
 /* compute crc5 over given number of bytes */
-//adapted from https://mightydevices.com/index.php/2018/02/reverse-engineering-antminer-s1/
-uint8_t crc5(uint8_t * data, uint8_t len) {
+// adapted from https://mightydevices.com/index.php/2018/02/reverse-engineering-antminer-s1/
+uint8_t crc5(uint8_t *data, uint8_t len)
+{
 	uint8_t i, j, k, index = 0;
 	uint8_t crc = CRC5_MASK;
 	/* registers */
@@ -14,10 +15,11 @@ uint8_t crc5(uint8_t * data, uint8_t len) {
 	uint8_t crcout[5] = {1, 1, 1, 1, 1};
 	uint8_t din = 0;
 
-    len *= 8;
+	len *= 8;
 
 	/* push data bits */
-	for (j = 0x80, k = 0, i = 0; i < len; i++) {
+	for (j = 0x80, k = 0, i = 0; i < len; i++)
+	{
 		/* input bit */
 		din = (data[index] & j) != 0;
 		/* shift register */
@@ -32,22 +34,27 @@ uint8_t crc5(uint8_t * data, uint8_t len) {
 		if (k == 8)
 			j = 0x80, k = 0, index++;
 		/* apply new shift register value */
-        memcpy(crcin, crcout, 5);
-		//crcin = crcout[0];
+		memcpy(crcin, crcout, 5);
+		// crcin = crcout[0];
 	}
 
 	crc = 0;
 	/* extract bitmask from register */
-	if (crcin[4]) crc |= 0x10;
-	if (crcin[3]) crc |= 0x08;
-	if (crcin[2]) crc |= 0x04;
-	if (crcin[1]) crc |= 0x02;
-	if (crcin[0]) crc |= 0x01;
+	if (crcin[4])
+		crc |= 0x10;
+	if (crcin[3])
+		crc |= 0x08;
+	if (crcin[2])
+		crc |= 0x04;
+	if (crcin[1])
+		crc |= 0x02;
+	if (crcin[0])
+		crc |= 0x01;
 
 	return crc;
 }
 
-//kindly provided by cgminer
+// kindly provided by cgminer
 unsigned int crc16_table[256] = {
 	0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
 	0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
@@ -80,27 +87,28 @@ unsigned int crc16_table[256] = {
 	0xFD2E, 0xED0F, 0xDD6C, 0xCD4D, 0xBDAA, 0xAD8B, 0x9DE8, 0x8DC9,
 	0x7C26, 0x6C07, 0x5C64, 0x4C45, 0x3CA2, 0x2C83, 0x1CE0, 0x0CC1,
 	0xEF1F, 0xFF3E, 0xCF5D, 0xDF7C, 0xAF9B, 0xBFBA, 0x8FD9, 0x9FF8,
-	0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0
-};
+	0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0};
 
 /* CRC-16/CCITT */
-uint16_t crc16(uint8_t *buffer, uint16_t len) {
+uint16_t crc16(uint8_t *buffer, uint16_t len)
+{
 	uint16_t crc;
 
 	crc = 0;
-	while(len-- > 0)
-	    crc = crc16_table[((crc >> 8) ^ (*buffer++)) & 0xFF] ^ (crc << 8);
+	while (len-- > 0)
+		crc = crc16_table[((crc >> 8) ^ (*buffer++)) & 0xFF] ^ (crc << 8);
 
 	return crc;
 }
 
 /* CRC-16/CCITT-FALSE */
-uint16_t crc16_false(uint8_t *buffer, uint16_t len) {
+uint16_t crc16_false(uint8_t *buffer, uint16_t len)
+{
 	uint16_t crc;
 
 	crc = 0xffff;
-	while(len-- > 0)
-	    crc = crc16_table[((crc >> 8) ^ (*buffer++)) & 0xFF] ^ (crc << 8);
+	while (len-- > 0)
+		crc = crc16_table[((crc >> 8) ^ (*buffer++)) & 0xFF] ^ (crc << 8);
 
 	return crc;
 }

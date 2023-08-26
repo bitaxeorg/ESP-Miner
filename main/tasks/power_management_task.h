@@ -1,7 +1,8 @@
 #ifndef POWER_MANAGEMENT_TASK_H_
 #define POWER_MANAGEMENT_TASK_H_
 
-typedef struct {
+typedef struct
+{
         uint16_t fan_speed;
         float chip_temp;
         float voltage;
@@ -11,6 +12,6 @@ typedef struct {
         float current;
 } PowerManagementModule;
 
-void POWER_MANAGEMENT_task(void * pvParameters);
+void POWER_MANAGEMENT_task(void *pvParameters);
 
 #endif
