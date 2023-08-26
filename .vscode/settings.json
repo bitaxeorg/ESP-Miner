@@ -1,0 +1,17 @@
+{
+    "idf.flashType": "UART",
+    "idf.portWin": "COM6",
+    "idf.adapterTargetName": "esp32s3",
+    "idf.openOcdConfigs": [
+        "interface/ftdi/esp32_devkitj_v1.cfg",
+        "target/esp32s3.cfg"
+    ],
+    "files.associations": {
+        "freertos.h": "c",
+        "esp_netif.h": "c",
+        "esp_http_server.h": "c",
+        "esp_chip_info.h": "c",
+        "xtensa_context.h": "c"
+    },
+    "editor.formatOnSave": true
+}

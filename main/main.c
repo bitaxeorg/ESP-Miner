@@ -4,7 +4,7 @@
 #include "nvs_flash.h"
 
 //#include "protocol_examples_common.h"
-#include "miner.h"
+#include "main.h"
 
 
 #include "stratum_task.h"
@@ -14,9 +14,13 @@
 #include "serial.h"
 #include "asic_result_task.h"
 #include "nvs_config.h"
+#include "http_server.h"
+#include "esp_netif.h"
+#include "user_input_task.h"
+
+
 
 #define ASIC_MODEL CONFIG_ASIC_MODEL
-
 
 
 static GlobalState GLOBAL_STATE = {
@@ -64,17 +68,12 @@ void app_main(void)
         exit(EXIT_FAILURE);
     }
 
-
-
-
     ESP_LOGI(TAG, "Welcome to the bitaxe!");
     //wait between 0 and 5 seconds for multiple units
     vTaskDelay(rand() % 5001 / portTICK_PERIOD_MS);
     ESP_ERROR_CHECK(nvs_flash_init());
 
     xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void*)&GLOBAL_STATE, 3, NULL);
-
-    ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
 
     //pull the wifi credentials out of NVS
     char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, WIFI_SSID);
@@ -84,7 +83,9 @@ void app_main(void)
     strncpy(GLOBAL_STATE.SYSTEM_MODULE.ssid, wifi_ssid, 20);
 
     //init and connect to wifi
-    EventBits_t result_bits = wifi_init_sta(wifi_ssid, wifi_pass);
+    wifi_init(wifi_ssid, wifi_pass);
+    start_rest_server((void*)&GLOBAL_STATE);
+    EventBits_t result_bits = wifi_connect();
 
     if (result_bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);
@@ -92,12 +93,22 @@ void app_main(void)
     } else if (result_bits & WIFI_FAIL_BIT) {
         ESP_LOGE(TAG, "Failed to connect to SSID: %s", wifi_ssid);
         strncpy(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, "Failed to connect", 20);
-        esp_restart(); //this is pretty much fatal, so just restart
+        // User might be trying to configure with AP, just chill here
+        ESP_LOGI(TAG,"Finished, waiting for user input.");
+        while(1){
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
         strncpy(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, "unexpected error", 20);
-        esp_restart(); //this is pretty much fatal, so just restart
+        // User might be trying to configure with AP, just chill here
+        ESP_LOGI(TAG,"Finished, waiting for user input.");
+        while(1){
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
     }
+
+    wifi_softap_off();
 
     free(wifi_ssid);
     free(wifi_pass);
@@ -118,6 +129,9 @@ void app_main(void)
     xTaskCreate(ASIC_task, "asic", 8192, (void*)&GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_result_task, "asic result", 8192, (void*)&GLOBAL_STATE, 15, NULL);
 
+    xTaskCreate(USER_INPUT_task, "user input", 8192, (void*)&GLOBAL_STATE, 5, NULL);
+
+
 }
 
 void MINER_set_wifi_status(wifi_status_t status, uint16_t retry_count) {
@@ -129,4 +143,3 @@ void MINER_set_wifi_status(wifi_status_t status, uint16_t retry_count) {
         return;
     }
 }
-

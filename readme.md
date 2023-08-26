@@ -51,6 +51,24 @@ Set following parameters under Example Connection Configuration Options:
 
 For more information about the example_connect() method used here, check out <https://github.com/espressif/esp-idf/blob/master/examples/protocols/README.md>.
 
+## Build website
+
+To build the website for viewing and OTA updates open the Angular project found in
+```
+ESP-Miner\main\http_server\axe-os
+```
+
+Then install dependencies and build.
+
+```
+npm i
+npm run build
+```
+
+
+ When the esp-idf project is built it will bundle the website in www.bin
+
+
 ## Build and Flash
 
 Build the project and flash it to the board, then run monitor tool to view serial output:

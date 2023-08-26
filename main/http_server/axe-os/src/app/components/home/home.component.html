@@ -1,0 +1,116 @@
+<ng-container *ngIf="info$ | async as info">
+    <div class="button-row">
+        <button [routerLink]="['edit']" class="btn btn-primary edit">Edit</button>
+        <button (click)="restart()" class="btn btn-danger restart">Restart</button>
+    </div>
+    <div class="card">
+        <h2>Pool Information</h2>
+        <table>
+            <tr>
+                <td>URL:</td>
+                <td>{{info.stratumURL}}</td>
+            </tr>
+            <tr>
+                <td>Port:</td>
+                <td>{{info.stratumPort}}</td>
+            </tr>
+            <tr>
+                <td>User:</td>
+                <td>{{info.stratumUser}}</td>
+            </tr>
+            <tr>
+                <td>Shares Accepted:</td>
+                <td>{{info.sharesAccepted}}</td>
+
+            </tr>
+            <tr>
+                <td>Shares Rejected:</td>
+                <td>{{info.sharesRejected}}</td>
+
+            </tr>
+        </table>
+    </div>
+    <div class="container">
+        <div>
+            <div class="card">
+                <h2>Overview</h2>
+                <table>
+                    <tr>
+                        <td>Model:</td>
+                        <td>{{info.ASICModel}}</td>
+                    </tr>
+                    <tr>
+                        <td>Uptime (seconds):</td>
+                        <td>{{info.uptimeSeconds}}</td>
+
+                    </tr>
+                    <tr>
+                        <td>WiFi Status:</td>
+                        <td>{{info.wifiStatus}}</td>
+
+                    </tr>
+                    <tr>
+                        <td>Free Heap Memory:</td>
+                        <td>{{info.freeHeap}}</td>
+
+                    </tr>
+                </table>
+            </div>
+
+        </div>
+
+        <div>
+            <div class="card">
+                <h2>Power</h2>
+
+                <table>
+                    <tr>
+                        <td>Power Consumption:</td>
+                        <td>{{info.power | number: '1.2-2'}} <small>W</small></td>
+
+                    </tr>
+                    <tr>
+                        <td>Input Voltage:</td>
+                        <td>{{info.voltage | number: '0.0-0'}} <small>mV</small></td>
+
+                    </tr>
+                    <tr>
+                        <td>Input Current:</td>
+                        <td>{{info.current | number: '0.0-0'}} <small>mA</small></td>
+
+                    </tr>
+                    <tr>
+                        <td>Core Voltage:</td>
+                        <td>{{info.coreVoltage}} <small>mV</small></td>
+
+                    </tr>
+                    <tr>
+                        <td>Fan Speed:</td>
+                        <td>{{info.fanSpeed}} <small>RPM</small></td>
+
+                    </tr>
+                </table>
+
+            </div>
+            <div class="card">
+                <h2>Results</h2>
+                <table>
+                    <tr>
+                        <td> Hash Rate:</td>
+                        <td>{{info.hashRate | number: '1.2-2'}}Gh/s</td>
+
+                    </tr>
+                    <tr>
+                        <td>Best Difficulty:</td>
+                        <td>{{info.bestDiff}}</td>
+
+                    </tr>
+
+                </table>
+            </div>
+        </div>
+
+
+
+    </div>
+</ng-container>

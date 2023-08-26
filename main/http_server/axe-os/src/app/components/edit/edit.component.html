@@ -1,0 +1,48 @@
+<div class="card">
+    <h2>Edit</h2>
+    <ng-container *ngIf="form != null">
+        <form [formGroup]="form">
+            <div class="form-group">
+                <label>WiFi SSID: </label>
+                <input formControlName="ssid" type="text">
+            </div>
+            <div class="form-group">
+                <label>WiFi Password: </label>
+                <input formControlName="wifiPass" type="password">
+            </div>
+            <div class="form-group">
+                <label>Stratum URL:</label>
+                <input formControlName="stratumURL" type="text">
+            </div>
+            <div class="form-group">
+                <label>Stratum Port:</label>
+                <input formControlName="stratumPort" type="number">
+            </div>
+            <div class="form-group">
+                <label>Stratum User: </label>
+                <input formControlName="stratumUser" type="text">
+            </div>
+
+        </form>
+    </ng-container>
+    <div class="mt-2">
+        <button (click)="updateSystem()" class="btn btn-primary mr-2">Save</button>
+        <button [routerLink]="['/']" class="btn btn-secondary">Cancel</button>
+    </div>
+
+
+</div>
+
+<div class="card">
+    <h2>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}}%</span></h2>
+    <input type="file" id="file" (change)="otaUpdate($event)" accept=".bin">
+    <br>
+    <small>(esp-miner.bin)</small>
+</div>
+
+<div class="card">
+    <h2>Update Website <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}}%</span></h2>
+    <input type="file" id="file" (change)="otaWWWUpdate($event)" accept=".bin">
+    <br>
+    <small>(www.bin)</small>
+</div>

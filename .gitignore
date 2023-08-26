@@ -3,8 +3,13 @@ sdkconfig
 sdkconfig.old
 dependencies.lock
 
-# User specific VSCode
-**/.vscode/*
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/*
 
 # Production folder
 build/

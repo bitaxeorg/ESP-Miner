@@ -1,0 +1,14 @@
+.content {
+    margin-top: 150px;
+
+    padding-left: 10vw;
+    padding-right: 10vw;
+
+}
+
+@media only screen and (max-width:900px) {
+    .content {
+        padding-left: 25px;
+        padding-right: 25px;
+    }
+}
