@@ -33,6 +33,7 @@ char *nvs_config_get_string(const char *key, const char *default_value)
     if (err != ESP_OK)
     {
         ESP_LOGW(TAG, "Key %s not found in nvs, using default value", key);
+        free(out);
         return strdup(default_value);
     }
 

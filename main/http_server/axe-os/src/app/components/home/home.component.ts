@@ -1,6 +1,6 @@
 import { AfterViewChecked, Component, ElementRef, ViewChild } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
-import { Observable } from 'rxjs';
+import { interval, Observable, switchMap } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { WebsocketService } from 'src/app/services/web-socket.service';
@@ -23,8 +23,11 @@ export class HomeComponent implements AfterViewChecked {
     private loadingService: LoadingService,
     private websocketService: WebsocketService
   ) {
-    this.info$ = this.systemService.getInfo().pipe(
-      this.loadingService.lockUIUntilComplete()
+
+    this.info$ = interval(3000).pipe(
+      switchMap(() => {
+        return this.systemService.getInfo()
+      })
     )
 
     this.websocketService.ws$.subscribe({

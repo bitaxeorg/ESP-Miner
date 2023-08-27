@@ -17,5 +17,8 @@
         "string": "c",
         "string_view": "c"
     },
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "cSpell.words": [
+        "ssid"
+    ]
 }
