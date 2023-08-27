@@ -151,6 +151,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
     }
     else
     {
+        httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
         strlcat(filepath, req->uri, filePathLength);
     }
     set_content_type_from_file(req, filepath);
