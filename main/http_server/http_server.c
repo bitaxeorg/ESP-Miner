@@ -141,17 +141,20 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepa
 static esp_err_t rest_common_get_handler(httpd_req_t *req)
 {
     char filepath[FILE_PATH_MAX];
+    uint8_t filePathLength = sizeof(filepath);
 
     rest_server_context_t *rest_context = (rest_server_context_t *)req->user_ctx;
-    strlcpy(filepath, rest_context->base_path, sizeof(filepath));
+    strlcpy(filepath, rest_context->base_path, filePathLength);
     if (req->uri[strlen(req->uri) - 1] == '/')
     {
-        strlcat(filepath, "/index.html", sizeof(filepath));
+        strlcat(filepath, "/index.html", filePathLength);
     }
     else
     {
-        strlcat(filepath, req->uri, sizeof(filepath));
+        strlcat(filepath, req->uri, filePathLength);
     }
+    set_content_type_from_file(req, filepath);
+    strcat(filepath, ".gz");
     int fd = open(filepath, O_RDONLY, 0);
     if (fd == -1)
     {
@@ -161,7 +164,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    set_content_type_from_file(req, filepath);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 
     char *chunk = rest_context->scratch;
     ssize_t read_bytes;
