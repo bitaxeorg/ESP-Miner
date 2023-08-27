@@ -1,11 +1,14 @@
-<ng-container *ngIf="info$ | async as info">
+<ng-template #loading>
+    <h4>Loading...</h4>
+</ng-template>
+<ng-container>
     <div class="button-row">
         <button [routerLink]="['edit']" class="btn btn-primary edit">Edit</button>
         <button (click)="restart()" class="btn btn-danger restart">Restart</button>
     </div>
     <div class="card">
         <h2>Pool Information</h2>
-        <table>
+        <table *ngIf="info$ | async as info; else loading">
             <tr>
                 <td>URL:</td>
                 <td>{{info.stratumURL}}</td>
@@ -34,7 +37,7 @@
         <div>
             <div class="card">
                 <h2>Overview</h2>
-                <table>
+                <table *ngIf="info$ | async as info; else loading">
                     <tr>
                         <td>Model:</td>
                         <td>{{info.ASICModel}}</td>
@@ -63,7 +66,7 @@
             <div class="card">
                 <h2>Power</h2>
 
-                <table>
+                <table *ngIf="info$ | async as info; else loading">
                     <tr>
                         <td>Power Consumption:</td>
                         <td>{{info.power | number: '1.2-2'}} <small>W</small></td>
@@ -94,7 +97,7 @@
             </div>
             <div class="card">
                 <h2>Results</h2>
-                <table>
+                <table *ngIf="info$ | async as info; else loading">
                     <tr>
                         <td> Hash Rate:</td>
                         <td>{{info.hashRate | number: '1.2-2'}}Gh/s</td>
