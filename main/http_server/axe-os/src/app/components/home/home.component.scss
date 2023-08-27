@@ -37,3 +37,17 @@ table>tr>td {
     display: flex;
     justify-content: space-between;
 }
+
+#logs {
+    height: 500px;
+    font-family: monospace;
+    border: 1px solid #304562;
+    overflow-y: scroll;
+    overflow-x: hidden;
+
+    >div {
+        max-width: 100%;
+        line-break: anywhere;
+
+    }
+}

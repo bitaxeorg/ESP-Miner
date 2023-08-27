@@ -11,7 +11,11 @@
         "esp_netif.h": "c",
         "esp_http_server.h": "c",
         "esp_chip_info.h": "c",
-        "xtensa_context.h": "c"
+        "xtensa_context.h": "c",
+        "sys.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c"
     },
     "editor.formatOnSave": true
 }

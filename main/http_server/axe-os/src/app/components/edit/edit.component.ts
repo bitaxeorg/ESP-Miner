@@ -89,15 +89,19 @@ export class EditComponent {
     }
 
     this.systemService.performWWWOTAUpdate(file)
-      .pipe(this.loadingService.lockUIUntilComplete())
-      .subscribe({
+      .pipe(
+        this.loadingService.lockUIUntilComplete(),
+      ).subscribe({
         next: (event) => {
           if (event.type === HttpEventType.UploadProgress) {
             this.websiteUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
           } else if (event.type === HttpEventType.Response) {
             if (event.ok) {
-              this.toastrService.success('Website updated', 'Success!');
-              window.location.reload();
+              setTimeout(() => {
+                this.toastrService.success('Website updated', 'Success!');
+                window.location.reload();
+              }, 1000);
+
             } else {
               this.toastrService.error(event.statusText, 'Error');
             }

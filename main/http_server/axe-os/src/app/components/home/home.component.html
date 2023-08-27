@@ -113,4 +113,11 @@
 
 
     </div>
+
+    <div class="card mt-2">
+        <h2>Realtime Logs</h2>
+        <div id="logs" #scrollContainer>
+            <div *ngFor="let log of logs">₿ {{log | ANSI}}</div>
+        </div>
+    </div>
 </ng-container>

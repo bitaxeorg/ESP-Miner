@@ -32,6 +32,9 @@
 static const char *TAG = "http_server";
 
 static GlobalState *GLOBAL_STATE;
+static httpd_handle_t server = NULL;
+
+static int fd = -1;
 
 #define REST_CHECK(a, str, goto_tag, ...)                                         \
     do                                                                            \
@@ -377,6 +380,40 @@ esp_err_t POST_OTA_update(httpd_req_t *req)
     return ESP_OK;
 }
 
+void log_to_websocket(const char *format, va_list args)
+{
+    char log_buffer[1000];
+    vsnprintf(log_buffer, sizeof(log_buffer), format, args);
+
+    httpd_ws_frame_t ws_pkt;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.payload = (uint8_t *)log_buffer;
+    ws_pkt.len = strlen(log_buffer);
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    vprintf(format, args);
+    if (httpd_ws_send_frame_async(server, fd, &ws_pkt) != ESP_OK)
+    {
+        esp_log_set_vprintf(vprintf);
+    }
+}
+
+/*
+ * This handler echos back the received ws data
+ * and triggers an async send if certain message received
+ */
+esp_err_t echo_handler(httpd_req_t *req)
+{
+
+    if (req->method == HTTP_GET)
+    {
+        ESP_LOGI(TAG, "Handshake done, the new connection was opened");
+        fd = httpd_req_to_sockfd(req);
+        esp_log_set_vprintf(log_to_websocket);
+        return ESP_OK;
+    }
+
+    return ESP_OK;
+}
 esp_err_t start_rest_server(void *pvParameters)
 {
     GLOBAL_STATE = (GlobalState *)pvParameters;
@@ -389,7 +426,6 @@ esp_err_t start_rest_server(void *pvParameters)
     REST_CHECK(rest_context, "No memory for rest context", err);
     strlcpy(rest_context->base_path, base_path, sizeof(rest_context->base_path));
 
-    httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
 
@@ -431,6 +467,14 @@ esp_err_t start_rest_server(void *pvParameters)
         .handler = POST_WWW_update,
         .user_ctx = NULL};
     httpd_register_uri_handler(server, &update_post_ota_www);
+
+    httpd_uri_t ws = {
+        .uri = "/api/ws",
+        .method = HTTP_GET,
+        .handler = echo_handler,
+        .user_ctx = NULL,
+        .is_websocket = true};
+    httpd_register_uri_handler(server, &ws);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

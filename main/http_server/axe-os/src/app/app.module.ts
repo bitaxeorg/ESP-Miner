@@ -12,6 +12,7 @@ import { EditComponent } from './components/edit/edit.component';
 import { HeaderComponent } from './components/header/header.component';
 import { HomeComponent } from './components/home/home.component';
 import { LoadingComponent } from './components/loading/loading.component';
+import { ANSIPipe } from './pipes/ansi.pipe';
 
 const components = [
   AppComponent,
@@ -23,7 +24,8 @@ const components = [
     ...components,
     EditComponent,
     HomeComponent,
-    LoadingComponent
+    LoadingComponent,
+    ANSIPipe
   ],
   imports: [
     BrowserModule,
