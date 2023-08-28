@@ -86,17 +86,16 @@ static void _init_system(SystemModule *module)
     }
 }
 
-static void _update_hashrate(SystemModule *module)
+static void _update_hashrate(GlobalState *GLOBAL_STATE)
 {
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     if (module->screen_page != 0)
     {
         return;
     }
 
-    float power = INA260_read_power() / 1000;
-
-    float efficiency = power / (module->current_hashrate / 1000.0);
+    float efficiency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power / (module->current_hashrate / 1000.0);
 
     OLED_clearLine(0);
     memset(module->oled_buf, 0, 20);
@@ -215,9 +214,10 @@ static void _update_connection(SystemModule *module)
     }
 }
 
-static void _update_system_performance(SystemModule *module)
+static void _update_system_performance(GlobalState *GLOBAL_STATE)
 {
 
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     // Calculate the uptime in seconds
     double uptime_in_seconds = (esp_timer_get_time() - module->start_time) / 1000000;
     int uptime_in_days = uptime_in_seconds / (3600 * 24);
@@ -229,7 +229,7 @@ static void _update_system_performance(SystemModule *module)
     if (OLED_status())
     {
 
-        _update_hashrate(module);
+        _update_hashrate(GLOBAL_STATE);
         _update_shares(module);
         _update_best_diff(module);
 
@@ -364,7 +364,7 @@ void SYSTEM_task(void *pvParameters)
     {
         _clear_display();
         module->screen_page = 0;
-        _update_system_performance(module);
+        _update_system_performance(GLOBAL_STATE);
         vTaskDelay(40000 / portTICK_PERIOD_MS);
 
         _clear_display();

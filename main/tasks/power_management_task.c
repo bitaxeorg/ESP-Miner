@@ -41,12 +41,17 @@ void POWER_MANAGEMENT_task(void *pvParameters)
     PowerManagementModule *power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
     int last_frequency_increase = 0;
+
+    bool read_power = INA260_installed();
     while (1)
     {
 
-        power_management->voltage = INA260_read_voltage();
-        power_management->power = INA260_read_power() / 1000;
-        power_management->current = INA260_read_current();
+        if (read_power)
+        {
+            power_management->voltage = INA260_read_voltage();
+            power_management->power = INA260_read_power() / 1000;
+            power_management->current = INA260_read_current();
+        }
         power_management->fan_speed = EMC2101_get_fan_speed();
 
         if (strcmp(ASIC_MODEL, "BM1397") == 0)
@@ -120,7 +125,7 @@ void POWER_MANAGEMENT_task(void *pvParameters)
         }
         else if (strcmp(ASIC_MODEL, "BM1366") == 0)
         {
-            if (power_management->fan_speed < 1000)
+            if (power_management->fan_speed < 10)
             {
                 ESP_LOGE(TAG, "Detected fan speed too slow, setting vCore to 0");
                 DS4432U_set_vcore(0);

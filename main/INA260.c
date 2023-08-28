@@ -33,6 +33,11 @@ static esp_err_t register_read(uint8_t reg_addr, uint8_t *data, size_t len)
 
 //     return ret;
 // }
+bool INA260_installed(void)
+{
+    uint8_t data[2];
+    return register_read(INA260_REG_BUSVOLTAGE, data, 2) == ESP_OK;
+}
 
 float INA260_read_current(void)
 {
