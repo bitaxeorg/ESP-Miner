@@ -6,33 +6,7 @@
         <button [routerLink]="['edit']" class="btn btn-primary edit">Edit</button>
         <button (click)="restart()" class="btn btn-danger restart">Restart</button>
     </div>
-    <div class="card">
-        <h2>Pool Information</h2>
-        <table *ngIf="info$ | async as info; else loading">
-            <tr>
-                <td>URL:</td>
-                <td>{{info.stratumURL}}</td>
-            </tr>
-            <tr>
-                <td>Port:</td>
-                <td>{{info.stratumPort}}</td>
-            </tr>
-            <tr>
-                <td>User:</td>
-                <td>{{info.stratumUser}}</td>
-            </tr>
-            <tr>
-                <td>Shares Accepted:</td>
-                <td>{{info.sharesAccepted}}</td>
 
-            </tr>
-            <tr>
-                <td>Shares Rejected:</td>
-                <td>{{info.sharesRejected}}</td>
-
-            </tr>
-        </table>
-    </div>
     <div class="container">
         <div>
             <div class="card">
@@ -59,7 +33,33 @@
                     </tr>
                 </table>
             </div>
+            <div class="card">
+                <h2>Pool Information</h2>
+                <table *ngIf="info$ | async as info; else loading">
+                    <tr>
+                        <td>URL:</td>
+                        <td>{{info.stratumURL}}</td>
+                    </tr>
+                    <tr>
+                        <td>Port:</td>
+                        <td>{{info.stratumPort}}</td>
+                    </tr>
+                    <tr>
+                        <td>User:</td>
+                        <td>{{info.stratumUser}}</td>
+                    </tr>
+                    <tr>
+                        <td>Shares Accepted:</td>
+                        <td>{{info.sharesAccepted}}</td>
 
+                    </tr>
+                    <tr>
+                        <td>Shares Rejected:</td>
+                        <td>{{info.sharesRejected}}</td>
+
+                    </tr>
+                </table>
+            </div>
         </div>
 
         <div>
