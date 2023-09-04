@@ -59,7 +59,7 @@ static void realloc_json_buffer(size_t len)
     if (new_sockbuf == NULL)
     {
         fprintf(stderr, "Error: realloc failed in recalloc_sock()\n");
-        exit(EXIT_FAILURE);
+        esp_restart();
     }
 
     json_rpc_buffer = new_sockbuf;
@@ -87,7 +87,7 @@ char *STRATUM_V1_receive_jsonrpc_line(int sockfd)
             if (nbytes == -1)
             {
                 perror("recv");
-                exit(EXIT_FAILURE);
+                esp_restart();
             }
 
             realloc_json_buffer(nbytes);
