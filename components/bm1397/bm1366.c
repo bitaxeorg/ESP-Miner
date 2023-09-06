@@ -1,18 +1,19 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <math.h>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
-
-#include "serial.h"
 #include "bm1366.h"
-#include "utils.h"
+
 #include "crc.h"
 #include "global_state.h"
+#include "serial.h"
+#include "utils.h"
+
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#include <math.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define BM1366_RST_PIN GPIO_NUM_1
 
@@ -54,7 +55,7 @@ typedef struct __attribute__((__packed__))
     uint8_t crc;
 } asic_result;
 
-static const char *TAG = "bm1366Module";
+static const char * TAG = "bm1366Module";
 
 static uint8_t asic_response_buffer[CHUNK_SIZE];
 static task_result result;
@@ -64,13 +65,13 @@ static task_result result;
 /// @param header
 /// @param data
 /// @param len
-static void _send_BM1366(uint8_t header, uint8_t *data, uint8_t data_len, bool debug)
+static void _send_BM1366(uint8_t header, uint8_t * data, uint8_t data_len, bool debug)
 {
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
     // allocate memory for buffer
-    unsigned char *buf = malloc(total_length);
+    unsigned char * buf = malloc(total_length);
 
     // add the preamble
     buf[0] = 0x55;
@@ -86,14 +87,11 @@ static void _send_BM1366(uint8_t header, uint8_t *data, uint8_t data_len, bool d
     memcpy(buf + 4, data, data_len);
 
     // add the correct crc type
-    if (packet_type == JOB_PACKET)
-    {
+    if (packet_type == JOB_PACKET) {
         uint16_t crc16_total = crc16_false(buf + 2, data_len + 2);
         buf[4 + data_len] = (crc16_total >> 8) & 0xFF;
         buf[5 + data_len] = crc16_total & 0xFF;
-    }
-    else
-    {
+    } else {
         buf[4 + data_len] = crc5(buf + 2, data_len + 2);
     }
 
@@ -103,9 +101,9 @@ static void _send_BM1366(uint8_t header, uint8_t *data, uint8_t data_len, bool d
     free(buf);
 }
 
-static void _send_simple(uint8_t *data, uint8_t total_length)
+static void _send_simple(uint8_t * data, uint8_t total_length)
 {
-    unsigned char *buf = malloc(total_length);
+    unsigned char * buf = malloc(total_length);
     memcpy(buf, data, total_length);
     SERIAL_send(buf, total_length, false);
 
@@ -128,191 +126,68 @@ static void _set_chip_address(uint8_t chipAddr)
     _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, false);
 }
 
-// borrowed from cgminer driver-gekko.c calc_gsf_freq()
-void BM1366_send_hash_frequency(float frequency)
+void BM1366_send_hash_frequency(float target_freq)
 {
-
-    unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; // prefreq - pll0_divider
-
     // default 200Mhz if it fails
-    unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x25}; // freqbuf - pll0_parameter
+    unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41}; // freqbuf - pll0_parameter
+    float newf = 200.0;
 
-    float deffreq = 200.0;
+    uint8_t fb_divider = 0;
+    uint8_t post_divider1 = 0, post_divider2 = 0;
+    uint8_t ref_divider = 0;
+    float min_difference = 10;
 
-    float fa, fb, fc1, fc2, newf;
-    float f1, basef, famax = 0xf0, famin = 0x10;
-    int i;
+    // refdiver is 2 or 1
+    // postdivider 2 is 1 to 7
+    // postdivider 1 is 1 to 7 and less than postdivider 2
+    // fbdiv is 144 to 235
+    for (uint8_t refdiv_loop = 2; refdiv_loop > 0 && fb_divider == 0; refdiv_loop--) {
+        for (uint8_t postdiv1_loop = 7; postdiv1_loop > 0 && fb_divider == 0; postdiv1_loop--) {
+            for (uint8_t postdiv2_loop = 1; postdiv2_loop < postdiv1_loop && fb_divider == 0; postdiv2_loop++) {
+                int temp_fb_divider = round(((float) (postdiv1_loop * postdiv2_loop * target_freq * refdiv_loop) / 25.0));
 
-    // bound the frequency setting
-    //  You can go as low as 13 but it doesn't really scale or
-    //  produce any nonces
-    if (frequency < 50)
-    {
-        f1 = 50;
-    }
-    else if (frequency > 500)
-    {
-        f1 = 500;
-    }
-    else
-    {
-        f1 = frequency;
-    }
+                if (temp_fb_divider >= 144 && temp_fb_divider <= 235) {
+                    float temp_freq = 25.0 * (float) temp_fb_divider / (float) (refdiv_loop * postdiv2_loop * postdiv1_loop);
+                    float freq_diff = fabs(target_freq - temp_freq);
 
-    fb = 2;
-    fc1 = 1;
-    fc2 = 5; // initial multiplier of 10
-    if (f1 >= 500)
-    {
-        // halve down to '250-400'
-        fb = 1;
-    }
-    else if (f1 <= 150)
-    {
-        // triple up to '300-450'
-        fc1 = 3;
-    }
-    else if (f1 <= 250)
-    {
-        // double up to '300-500'
-        fc1 = 2;
-    }
-    // else f1 is 250-500
-
-    // f1 * fb * fc1 * fc2 is between 2500 and 5000
-    // - so round up to the next 25 (freq_mult)
-    basef = FREQ_MULT * ceil(f1 * fb * fc1 * fc2 / FREQ_MULT);
-
-    // fa should be between 100 (0x64) and 200 (0xC8)
-    fa = basef / FREQ_MULT;
-
-    // code failure ... basef isn't 400 to 6000
-    if (fa < famin || fa > famax)
-    {
-        newf = deffreq;
-    }
-    else
-    {
-        freqbuf[3] = (int)fa;
-        freqbuf[4] = (int)fb;
-        // fc1, fc2 'should' already be 1..15
-        freqbuf[5] = (((int)fc1 & 0xf) << 4) + ((int)fc2 & 0xf);
-
-        newf = basef / ((float)fb * (float)fc1 * (float)fc2);
+                    if (freq_diff < min_difference) {
+                        fb_divider = temp_fb_divider;
+                        post_divider1 = postdiv1_loop;
+                        post_divider2 = postdiv2_loop;
+                        ref_divider = refdiv_loop;
+                        min_difference = freq_diff;
+                        break;
+                    }
+                }
+            }
+        }
     }
 
-    for (i = 0; i < 2; i++)
-    {
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-        _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, false);
-    }
-    for (i = 0; i < 2; i++)
-    {
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-        _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
+    if (fb_divider == 0) {
+        puts("Finding dividers failed, using default value (200Mhz)");
+    } else {
+        newf = 25.0 / (float) (ref_divider * fb_divider) / (float) (post_divider1 * post_divider2);
+        printf("final refdiv: %d, fbdiv: %d, postdiv1: %d, postdiv2: %d, min diff value: %f\n", ref_divider, fb_divider,
+               post_divider1, post_divider2, min_difference);
+
+        freqbuf[3] = fb_divider;
+        freqbuf[4] = ref_divider;
+        freqbuf[5] = (((post_divider1 - 1) & 0xf) << 4) + ((post_divider2 - 1) & 0xf);
+
+        if (fb_divider * 25 / (float) ref_divider >= 2400) {
+            freqbuf[2] = 0x50;
+        }
     }
 
-    vTaskDelay(10 / portTICK_PERIOD_MS);
+    _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, true);
 
-    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
+    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", target_freq, newf);
 }
 
-static void _send_init(u_int64_t frequency)
+static void do_frequency_ramp_up()
 {
-
-    //     //send serial data
-    //     vTaskDelay(SLEEP_TIME / portTICK_PERIOD_MS);
-
-    //     unsigned char init[6] =  {  0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF};
-
-    //      _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init,  6, true);
-
-    //      unsigned char init18[7] =  { 0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A };
-    //      _send_simple(init18, 7);
-
-    //      unsigned char init2[6] =  { 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00};
-    //      _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init2,  6, true);
-
-    //      unsigned char init3[6] =  { 0x00, 0x18, 0xFF, 0x0F, 0xC1, 0x00 };
-    //       _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init3,  6, true);
-
-    //      unsigned char init4[7] =  { 0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03 };
-    //      _send_simple(init4, 7);
-
-    //      unsigned char init5[7] =  { 0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C };
-    //      _send_simple(init5, 7);
-
-    //       unsigned char init6[6] =  { 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40 };
-    //      _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6,  6, true);
-
-    //      unsigned char init7[6] =  { 0x00, 0x3C, 0x80, 0x00, 0x80, 0x20};
-    //       _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init7,  6, true);
-
-    //     unsigned char init17[11] =  {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    //    _send_simple(init17, 11);
-
-    unsigned char init0[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    _send_simple(init0, 11);
-
-    unsigned char init1[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    _send_simple(init1, 11);
-
-    unsigned char init2[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    _send_simple(init2, 11);
-
-    unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};
-    _send_simple(init3, 7);
-
-    unsigned char init4[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00, 0x03};
-    _send_simple(init4, 11);
-
-    unsigned char init5[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x18, 0xFF, 0x0F, 0xC1, 0x00, 0x00};
-    _send_simple(init5, 11);
-
-    unsigned char init6[7] = {0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03};
-    _send_simple(init6, 7);
-
-    unsigned char init7[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
-    _send_simple(init7, 7);
-
-    unsigned char init135[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40, 0x0C};
-    _send_simple(init135, 11);
-
-    unsigned char init136[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x80, 0x20, 0x19};
-    _send_simple(init136, 11);
-
-    unsigned char init137[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x14, 0x00, 0x00, 0x00, 0xFF, 0x08};
-    _send_simple(init137, 11);
-
-    unsigned char init138[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x54, 0x00, 0x00, 0x00, 0x03, 0x1D};
-    _send_simple(init138, 11);
-
-    unsigned char init139[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x58, 0x02, 0x11, 0x11, 0x11, 0x06};
-    _send_simple(init139, 11);
-
-    unsigned char init171[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x2C, 0x00, 0x7C, 0x00, 0x03, 0x03};
-    _send_simple(init171, 11);
-
-    unsigned char init173[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x28, 0x11, 0x30, 0x02, 0x00, 0x03};
-    _send_simple(init173, 11);
-
-    unsigned char init174[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x01, 0xF0, 0x15};
-    _send_simple(init174, 11);
-
-    unsigned char init175[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x18, 0xF0, 0x00, 0xC1, 0x00, 0x0C};
-    _send_simple(init175, 11);
-
-    unsigned char init176[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40, 0x04};
-    _send_simple(init176, 11);
-
-    unsigned char init177[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x80, 0x20, 0x11};
-    _send_simple(init177, 11);
-
-    unsigned char init178[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x82, 0xAA, 0x05};
-    _send_simple(init178, 11);
-
-    /////////////////////////////////////////////////////////////////////////////
-
+    // TODO: figure out how to replicate this ramp up.
+    //       bm1366 doesn't get going until after this sequence
     unsigned char init724[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x08, 0x40, 0xA2, 0x02, 0x55, 0x0F};
     _send_simple(init724, 11);
 
@@ -522,6 +397,105 @@ static void _send_init(u_int64_t frequency)
 
     unsigned char init793[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x08, 0x50, 0xC2, 0x02, 0x40, 0x1C};
     _send_simple(init793, 11);
+}
+
+static void _send_init(uint64_t frequency)
+{
+
+    //     //send serial data
+    //     vTaskDelay(SLEEP_TIME / portTICK_PERIOD_MS);
+
+    //     unsigned char init[6] =  {  0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF};
+
+    //      _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init,  6, true);
+
+    //      unsigned char init18[7] =  { 0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A };
+    //      _send_simple(init18, 7);
+
+    //      unsigned char init2[6] =  { 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00};
+    //      _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init2,  6, true);
+
+    //      unsigned char init3[6] =  { 0x00, 0x18, 0xFF, 0x0F, 0xC1, 0x00 };
+    //       _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init3,  6, true);
+
+    //      unsigned char init4[7] =  { 0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03 };
+    //      _send_simple(init4, 7);
+
+    //      unsigned char init5[7] =  { 0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C };
+    //      _send_simple(init5, 7);
+
+    //       unsigned char init6[6] =  { 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40 };
+    //      _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6,  6, true);
+
+    //      unsigned char init7[6] =  { 0x00, 0x3C, 0x80, 0x00, 0x80, 0x20};
+    //       _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init7,  6, true);
+
+    //     unsigned char init17[11] =  {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
+    //    _send_simple(init17, 11);
+
+    unsigned char init0[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
+    _send_simple(init0, 11);
+
+    unsigned char init1[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
+    _send_simple(init1, 11);
+
+    unsigned char init2[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
+    _send_simple(init2, 11);
+
+    unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};
+    _send_simple(init3, 7);
+
+    unsigned char init4[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00, 0x03};
+    _send_simple(init4, 11);
+
+    unsigned char init5[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x18, 0xFF, 0x0F, 0xC1, 0x00, 0x00};
+    _send_simple(init5, 11);
+
+    unsigned char init6[7] = {0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03};
+    _send_simple(init6, 7);
+
+    unsigned char init7[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
+    _send_simple(init7, 7);
+
+    unsigned char init135[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40, 0x0C};
+    _send_simple(init135, 11);
+
+    unsigned char init136[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x80, 0x20, 0x19};
+    _send_simple(init136, 11);
+
+    unsigned char init137[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x14, 0x00, 0x00, 0x00, 0xFF, 0x08};
+    _send_simple(init137, 11);
+
+    unsigned char init138[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x54, 0x00, 0x00, 0x00, 0x03, 0x1D};
+    _send_simple(init138, 11);
+
+    unsigned char init139[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x58, 0x02, 0x11, 0x11, 0x11, 0x06};
+    _send_simple(init139, 11);
+
+    unsigned char init171[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x2C, 0x00, 0x7C, 0x00, 0x03, 0x03};
+    _send_simple(init171, 11);
+
+    unsigned char init173[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x28, 0x11, 0x30, 0x02, 0x00, 0x03};
+    _send_simple(init173, 11);
+
+    unsigned char init174[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x01, 0xF0, 0x15};
+    _send_simple(init174, 11);
+
+    unsigned char init175[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x18, 0xF0, 0x00, 0xC1, 0x00, 0x0C};
+    _send_simple(init175, 11);
+
+    unsigned char init176[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40, 0x04};
+    _send_simple(init176, 11);
+
+    unsigned char init177[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x80, 0x20, 0x11};
+    _send_simple(init177, 11);
+
+    unsigned char init178[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x82, 0xAA, 0x05};
+    _send_simple(init178, 11);
+
+    do_frequency_ramp_up();
+
+    BM1366_send_hash_frequency(frequency);
 
     unsigned char init794[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x10, 0x00, 0x00, 0x15, 0x1C, 0x02};
     _send_simple(init794, 11);
@@ -553,7 +527,7 @@ static void _send_read_address(void)
     _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, false);
 }
 
-void BM1366_init(u_int64_t frequency)
+void BM1366_init(uint64_t frequency)
 {
     ESP_LOGI(TAG, "Initializing BM1366");
 
@@ -605,13 +579,13 @@ void BM1366_set_job_difficulty_mask(int difficulty)
     // The mask must be a power of 2 so there are no holes
     // Correct:  {0b00000000, 0b00000000, 0b11111111, 0b11111111}
     // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
-    difficulty = _largest_power_of_two(difficulty) - 1; // (difficulty - 1) if it is a pow 2 then step down to second largest for more hashrate sampling
+    // (difficulty - 1) if it is a pow 2 then step down to second largest for more hashrate sampling
+    difficulty = _largest_power_of_two(difficulty) - 1;
 
     // convert difficulty into char array
     // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
     // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
-    for (int i = 0; i < 4; i++)
-    {
+    for (int i = 0; i < 4; i++) {
         char value = (difficulty >> (8 * i)) & 0xFF;
         // The char is read in backwards to the register so we need to reverse them
         // So a mask of 512 looks like 0b00000000 00000000 00000001 1111111
@@ -627,10 +601,10 @@ void BM1366_set_job_difficulty_mask(int difficulty)
 
 static uint8_t id = 0;
 
-void BM1366_send_work(void *pvParameters, bm_job *next_bm_job)
+void BM1366_send_work(void * pvParameters, bm_job * next_bm_job)
 {
 
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     BM1366_job job;
     id = (id + 8) % 128;
@@ -643,8 +617,7 @@ void BM1366_send_work(void *pvParameters, bm_job *next_bm_job)
     memcpy(job.prev_block_hash, next_bm_job->prev_block_hash_be, 32);
     memcpy(&job.version, &next_bm_job->version, 4);
 
-    if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL)
-    {
+    if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
         free_bm_job(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id]);
     }
 
@@ -658,30 +631,26 @@ void BM1366_send_work(void *pvParameters, bm_job *next_bm_job)
     _send_BM1366((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), &job, sizeof(BM1366_job), false);
 }
 
-asic_result *BM1366_receive_work(void)
+asic_result * BM1366_receive_work(void)
 {
     // wait for a response, wait time is pretty arbitrary
     int received = SERIAL_rx(asic_response_buffer, 11, 60000);
 
-    if (received < 0)
-    {
+    if (received < 0) {
         ESP_LOGI(TAG, "Error in serial RX");
         return NULL;
-    }
-    else if (received == 0)
-    {
+    } else if (received == 0) {
         // Didn't find a solution, restart and try again
         return NULL;
     }
 
-    if (received != 11 || asic_response_buffer[0] != 0xAA || asic_response_buffer[1] != 0x55)
-    {
+    if (received != 11 || asic_response_buffer[0] != 0xAA || asic_response_buffer[1] != 0x55) {
         ESP_LOGI(TAG, "Serial RX invalid %i", received);
         ESP_LOG_BUFFER_HEX(TAG, asic_response_buffer, received);
         return NULL;
     }
 
-    return (asic_result *)asic_response_buffer;
+    return (asic_result *) asic_response_buffer;
 }
 
 uint16_t reverse_uint16(uint16_t num)
@@ -689,20 +658,19 @@ uint16_t reverse_uint16(uint16_t num)
     return (num >> 8) | (num << 8);
 }
 
-task_result *BM1366_proccess_work(void *pvParameters)
+task_result * BM1366_proccess_work(void * pvParameters)
 {
 
-    asic_result *asic_result = BM1366_receive_work();
+    asic_result * asic_result = BM1366_receive_work();
 
-    if (asic_result == NULL)
-    {
+    if (asic_result == NULL) {
         return NULL;
     }
 
     uint8_t job_id = asic_result->job_id;
     uint8_t rx_job_id = job_id & 0xf8;
 
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->version;
 
