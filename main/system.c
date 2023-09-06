@@ -22,6 +22,7 @@
 static const char *TAG = "SystemModule";
 
 #define ASIC_VOLTAGE CONFIG_ASIC_VOLTAGE
+#define ASIC_MODEL CONFIG_ASIC_MODEL
 
 static void _suffix_string(uint64_t, char *, size_t, int);
 
@@ -70,7 +71,14 @@ static void _init_system(SystemModule *module)
 
     // Fan Tests
     EMC2101_init();
-    EMC2101_set_fan_speed(0.75);
+    if (strcmp(ASIC_MODEL, "BM1366") == 0)
+    {
+        EMC2101_set_fan_speed(0);
+    }
+    else
+    {
+        EMC2101_set_fan_speed(1);
+    }
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
     // oled
