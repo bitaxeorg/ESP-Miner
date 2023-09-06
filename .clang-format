@@ -1,0 +1,19 @@
+BasedOnStyle: LLVM
+UseTab: false
+IndentWidth: 4
+AllowShortIfStatementsOnASingleLine: false
+IndentCaseLabels: false
+ColumnLimit: 132
+DerivePointerAlignment: false
+PointerAlignment: Middle
+AllowShortFunctionsOnASingleLine: None
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterEnum: true
+  AfterStruct: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterUnion: true
+  AfterExternBlock: true
+  SplitEmptyFunction: false
+SpaceAfterCStyleCast: true
