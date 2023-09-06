@@ -46,7 +46,7 @@ void POWER_MANAGEMENT_task(void *pvParameters)
     while (1)
     {
 
-        if (read_power)
+        if (read_power == true)
         {
             power_management->voltage = INA260_read_voltage();
             power_management->power = INA260_read_power() / 1000;
@@ -57,7 +57,7 @@ void POWER_MANAGEMENT_task(void *pvParameters)
         if (strcmp(ASIC_MODEL, "BM1397") == 0)
         {
 
-            power_management->chip_temp = EMC2101_get_chip_temp();
+            power_management->chip_temp = EMC2101_get_external_temp();
 
             // Voltage
             // We'll throttle between 4.9v and 3.5v
@@ -125,6 +125,8 @@ void POWER_MANAGEMENT_task(void *pvParameters)
         }
         else if (strcmp(ASIC_MODEL, "BM1366") == 0)
         {
+            power_management->chip_temp = EMC2101_get_internal_temp() + 5;
+
             if (power_management->fan_speed < 10)
             {
                 ESP_LOGE(TAG, "Detected fan speed too slow, setting vCore to 0");

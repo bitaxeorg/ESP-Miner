@@ -1,6 +1,6 @@
 import { AfterViewChecked, Component, ElementRef, ViewChild } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
-import { interval, Observable, shareReplay, switchMap } from 'rxjs';
+import { interval, Observable, shareReplay, startWith, switchMap } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { WebsocketService } from 'src/app/services/web-socket.service';
@@ -25,6 +25,7 @@ export class HomeComponent implements AfterViewChecked {
   ) {
 
     this.info$ = interval(3000).pipe(
+      startWith(() => this.systemService.getInfo()),
       switchMap(() => {
         return this.systemService.getInfo()
       }),

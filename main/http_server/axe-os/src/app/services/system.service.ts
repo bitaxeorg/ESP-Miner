@@ -24,6 +24,7 @@ export class SystemService {
           "voltage": 5208.75,
           "current": 2237.5,
           "fanSpeed": 82,
+          "temp": 60,
           "hashRate": 0,
           "bestDiff": "0",
           "freeHeap": 200504,

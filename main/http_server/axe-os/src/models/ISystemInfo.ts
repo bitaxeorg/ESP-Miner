@@ -4,6 +4,7 @@ export interface ISystemInfo {
     voltage: number,
     current: number,
     fanSpeed: number,
+    temp: number,
     hashRate: number,
     bestDiff: string,
     freeHeap: number,

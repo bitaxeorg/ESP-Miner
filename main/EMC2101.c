@@ -71,7 +71,7 @@ uint16_t EMC2101_get_fan_speed(void)
     return RPM;
 }
 
-float EMC2101_get_chip_temp(void)
+float EMC2101_get_external_temp(void)
 {
     uint8_t temp_msb, temp_lsb;
     uint16_t reading;
@@ -83,4 +83,11 @@ float EMC2101_get_chip_temp(void)
     reading >>= 5;
 
     return (float)reading / 8.0;
+}
+
+uint8_t EMC2101_get_internal_temp(void)
+{
+    uint8_t temp;
+    ESP_ERROR_CHECK(register_read(EMC2101_INTERNAL_TEMP, &temp, 1));
+    return temp;
 }
