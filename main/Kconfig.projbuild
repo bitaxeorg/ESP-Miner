@@ -15,7 +15,7 @@ menu "Bitaxe Configuration"
 
     config ASIC_FREQUENCY
         int "ASIC Hash Frequency (MHz)"
-        range 200 800
+        range 50 800
         default 250
         help
             The BM1397 hash frequency
