@@ -425,6 +425,7 @@ task_result *BM1397_proccess_work(void *pvParameters)
     if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0)
     {
         ESP_LOGI(TAG, "Invalid job nonce found, id=%d", rx_job_id);
+        return NULL;
     }
 
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->version;

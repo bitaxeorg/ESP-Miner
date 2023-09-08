@@ -672,6 +672,11 @@ task_result * BM1366_proccess_work(void * pvParameters)
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
+    if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0) {
+        ESP_LOGE(TAG, "Invalid job nonce found, id=%d", rx_job_id);
+        return NULL;
+    }
+
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->version;
 
     // // // shift the 16 bit value left 13
