@@ -28,7 +28,7 @@ for file in "${required_files[@]}"; do
 done
 
 # Call esptool.py with the specified arguments
-esptool.py --chip esp32s3 merge_bin --flash_mode dio --flash_size 8MB --flash_freq 80m 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/esp-miner.bin 0x110000 build/www.bin 0x510000 build/ota_data_initial.bin -o "$output_file"
+esptool.py --chip esp32s3 merge_bin --flash_mode dio --flash_size 8MB --flash_freq 80m 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/esp-miner.bin 0x410000 build/www.bin 0xf10000 build/ota_data_initial.bin -o "$output_file"
 
 # Check if esptool.py command was successful
 if [ $? -eq 0 ]; then
