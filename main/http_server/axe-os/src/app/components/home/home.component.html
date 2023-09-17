@@ -3,7 +3,7 @@
 </ng-template>
 <ng-container>
     <div class="button-row">
-        <button [routerLink]="['edit']" class="btn btn-primary edit">Edit</button>
+        <button [routerLink]="['edit']" class="btn btn-primary edit">Settings</button>
         <button (click)="restart()" class="btn btn-danger restart">Restart</button>
     </div>
 
@@ -83,9 +83,16 @@
 
                     </tr>
                     <tr>
+                        <td>Frequency:</td>
+                        <td>{{info.frequency}} <small>Mhz</small></td>
+                    </tr>
+                    <tr>
                         <td>Core Voltage:</td>
                         <td>{{info.coreVoltage}} <small>mV</small></td>
-
+                    </tr>
+                    <tr>
+                        <td>Measured Core Voltage:</td>
+                        <td>{{info.coreVoltageActual}} <small>mV</small></td>
                     </tr>
                     <tr>
                         <td>Fan Speed:</td>
@@ -105,8 +112,12 @@
                 <table *ngIf="info$ | async as info; else loading">
                     <tr>
                         <td> Hash Rate:</td>
-                        <td>{{info.hashRate | number: '1.2-2'}}Gh/s</td>
+                        <td>{{info.hashRate | number: '1.2-2'}} <small>Gh/s</small></td>
 
+                    </tr>
+                    <tr>
+                        <td>Efficiency:</td>
+                        <td>{{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>W/Th</small></td>
                     </tr>
                     <tr>
                         <td>Best Difficulty:</td>

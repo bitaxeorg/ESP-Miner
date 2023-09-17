@@ -18,5 +18,6 @@ export interface ISystemInfo {
     ASICModel: string,
     stratumURL: string,
     stratumPort: number,
-    stratumUser: string
+    stratumUser: string,
+    frequency: number
 }

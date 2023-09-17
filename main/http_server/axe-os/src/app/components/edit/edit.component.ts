@@ -33,6 +33,8 @@ export class EditComponent {
           stratumUser: [info.stratumUser, [Validators.required]],
           ssid: [info.ssid, [Validators.required]],
           wifiPass: [info.wifiPass, [Validators.required]],
+          coreVoltage: [info.coreVoltage, [Validators.required]],
+          frequency: [info.frequency, [Validators.required]],
         });
       });
   }
@@ -114,5 +116,12 @@ export class EditComponent {
           this.websiteUpdateProgress = null;
         }
       });
+  }
+
+  public restart() {
+    this.systemService.restart().subscribe(res => {
+
+    });
+    this.toastr.success('Success!', 'Bitaxe restarted');
   }
 }

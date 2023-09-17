@@ -38,7 +38,8 @@ export class SystemService {
           "ASICModel": "BM1366",
           "stratumURL": "192.168.1.242",
           "stratumPort": 3333,
-          "stratumUser": "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1"
+          "stratumUser": "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
+          "frequency": 485
         }
       ).pipe(delay(1000));
     }
