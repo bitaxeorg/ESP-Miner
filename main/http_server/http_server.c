@@ -354,8 +354,8 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
 void log_to_websocket(const char * format, va_list args)
 {
-    char log_buffer[2048];
-    vsnprintf(log_buffer, sizeof(log_buffer), format, args);
+    char * log_buffer = (char *) malloc(2048);
+    vsnprintf(log_buffer, 2048, format, args);
 
     httpd_ws_frame_t ws_pkt;
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
@@ -366,6 +366,8 @@ void log_to_websocket(const char * format, va_list args)
     if (httpd_ws_send_frame_async(server, fd, &ws_pkt) != ESP_OK) {
         esp_log_set_vprintf(vprintf);
     }
+
+    free(log_buffer);
 }
 
 /*
