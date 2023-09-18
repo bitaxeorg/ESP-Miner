@@ -17,6 +17,7 @@
 #include <string.h>
 #include <sys/param.h>
 
+#include "dns_server.h"
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_ota_ops.h"
@@ -120,17 +121,25 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
     if (req->uri[strlen(req->uri) - 1] == '/') {
         strlcat(filepath, "/index.html", filePathLength);
     } else {
-        httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
         strlcat(filepath, req->uri, filePathLength);
     }
     set_content_type_from_file(req, filepath);
     strcat(filepath, ".gz");
     int fd = open(filepath, O_RDONLY, 0);
     if (fd == -1) {
-        ESP_LOGE(TAG, "Failed to open file : %s", filepath);
-        /* Respond with 500 Internal Server Error */
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read existing file");
-        return ESP_FAIL;
+        // Set status
+        httpd_resp_set_status(req, "302 Temporary Redirect");
+        // Redirect to the "/" root directory
+        httpd_resp_set_hdr(req, "Location", "/");
+        // iOS requires content in the response to detect a captive portal, simply redirecting is not sufficient.
+        httpd_resp_send(req, "Redirect to the captive portal", HTTPD_RESP_USE_STRLEN);
+
+        ESP_LOGI(TAG, "Redirecting to root");
+        return ESP_OK;
+    }
+
+    if (req->uri[strlen(req->uri) - 1] != '/') {
+        httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
     }
 
     httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
@@ -386,6 +395,21 @@ esp_err_t echo_handler(httpd_req_t * req)
 
     return ESP_OK;
 }
+
+// HTTP Error (404) Handler - Redirects all requests to the root page
+esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
+{
+    // Set status
+    httpd_resp_set_status(req, "302 Temporary Redirect");
+    // Redirect to the "/" root directory
+    httpd_resp_set_hdr(req, "Location", "/");
+    // iOS requires content in the response to detect a captive portal, simply redirecting is not sufficient.
+    httpd_resp_send(req, "Redirect to the captive portal", HTTPD_RESP_USE_STRLEN);
+
+    ESP_LOGI(TAG, "Redirecting to root");
+    return ESP_OK;
+}
+
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -431,6 +455,13 @@ esp_err_t start_rest_server(void * pvParameters)
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {.uri = "/*", .method = HTTP_GET, .handler = rest_common_get_handler, .user_ctx = rest_context};
     httpd_register_uri_handler(server, &common_get_uri);
+
+    httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
+
+    // Start the DNS server that will redirect all queries to the softAP IP
+
+    dns_server_config_t dns_config = DNS_SERVER_CONFIG_SINGLE("*" /* all A queries */, "WIFI_AP_DEF" /* softAP netif ID */);
+    start_dns_server(&dns_config);
 
     return ESP_OK;
 err_start:

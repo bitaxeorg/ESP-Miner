@@ -1,6 +1,6 @@
-import { AfterViewChecked, Component, ElementRef, ViewChild } from '@angular/core';
+import { AfterViewChecked, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
-import { interval, Observable, shareReplay, startWith, switchMap } from 'rxjs';
+import { interval, Observable, shareReplay, startWith, Subscription, switchMap } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { WebsocketService } from 'src/app/services/web-socket.service';
@@ -10,12 +10,15 @@ import { WebsocketService } from 'src/app/services/web-socket.service';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent implements AfterViewChecked {
+export class HomeComponent implements AfterViewChecked, OnDestroy {
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
   public info$: Observable<any>;
 
   public logs: string[] = [];
+
+  private websocketSubscription: Subscription;
+
 
   constructor(
     private systemService: SystemService,
@@ -24,7 +27,7 @@ export class HomeComponent implements AfterViewChecked {
     private websocketService: WebsocketService
   ) {
 
-    this.info$ = interval(3000).pipe(
+    this.info$ = interval(5000).pipe(
       startWith(() => this.systemService.getInfo()),
       switchMap(() => {
         return this.systemService.getInfo()
@@ -32,7 +35,7 @@ export class HomeComponent implements AfterViewChecked {
       shareReplay({ refCount: true, bufferSize: 1 })
     )
 
-    this.websocketService.ws$.subscribe({
+    this.websocketSubscription = this.websocketService.ws$.subscribe({
       next: (val) => {
         this.logs.push(val);
         if (this.logs.length > 100) {
@@ -42,6 +45,9 @@ export class HomeComponent implements AfterViewChecked {
       }
     })
 
+  }
+  ngOnDestroy(): void {
+    this.websocketSubscription.unsubscribe();
   }
   ngAfterViewChecked(): void {
     if (this.scrollContainer?.nativeElement != null) {
