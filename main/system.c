@@ -14,6 +14,7 @@
 
 #include "driver/gpio.h"
 #include "driver/i2c.h"
+#include "esp_app_desc.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
@@ -28,7 +29,6 @@
 
 static const char * TAG = "SystemModule";
 
-// #define ASIC_VOLTAGE CONFIG_ASIC_VOLTAGE
 #define ASIC_MODEL CONFIG_ASIC_MODEL
 
 static void _suffix_string(uint64_t, char *, size_t, int);
@@ -38,7 +38,6 @@ static esp_netif_ip_info_t ip_info;
 
 static void _init_system(SystemModule * module)
 {
-
     module->duration_start = 0;
     module->historical_hashrate_rolling_index = 0;
     module->historical_hashrate_init = 0;
@@ -149,7 +148,6 @@ static void _clear_display(void)
 
 static void _update_system_info(GlobalState * GLOBAL_STATE)
 {
-
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
@@ -175,7 +173,6 @@ static void _update_system_info(GlobalState * GLOBAL_STATE)
 
 static void _update_esp32_info(SystemModule * module)
 {
-
     uint32_t free_heap_size = esp_get_free_heap_size();
 
     uint16_t vcore = ADC_get_vcore();
@@ -197,12 +194,13 @@ static void _update_esp32_info(SystemModule * module)
         memset(module->oled_buf, 0, 20);
         snprintf(module->oled_buf, 20, "IP: %s", ip_address_str);
         OLED_writeString(0, 2, module->oled_buf);
+
+        OLED_writeString(0, 3, esp_app_get_description()->version);
     }
 }
 
 static void _init_connection(SystemModule * module)
 {
-
     if (OLED_status()) {
         memset(module->oled_buf, 0, 20);
         snprintf(module->oled_buf, 20, "Connecting to ssid:");
@@ -212,7 +210,6 @@ static void _init_connection(SystemModule * module)
 
 static void _update_connection(SystemModule * module)
 {
-
     if (OLED_status()) {
         OLED_clearLine(2);
         memset(module->oled_buf, 0, 20);
@@ -228,7 +225,6 @@ static void _update_connection(SystemModule * module)
 
 static void _update_system_performance(GlobalState * GLOBAL_STATE)
 {
-
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
     // Calculate the uptime in seconds
     double uptime_in_seconds = (esp_timer_get_time() - module->start_time) / 1000000;
@@ -337,7 +333,6 @@ static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigit
 
 void SYSTEM_task(void * pvParameters)
 {
-
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
@@ -402,7 +397,6 @@ void SYSTEM_notify_new_ntime(SystemModule * module, uint32_t ntime)
 
 void SYSTEM_notify_found_nonce(SystemModule * module, double pool_diff, double found_diff, uint32_t nbits)
 {
-
     // Calculate the time difference in seconds with sub-second precision
 
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
