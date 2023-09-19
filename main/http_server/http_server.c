@@ -264,6 +264,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
+    cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
     free(ssid);
     free(wifiPass);
