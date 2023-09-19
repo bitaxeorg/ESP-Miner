@@ -19,17 +19,18 @@
                     <tr>
                         <td>Uptime:</td>
                         <td>{{info.uptimeSeconds | dateAgo}}</td>
-
                     </tr>
                     <tr>
                         <td>WiFi Status:</td>
                         <td>{{info.wifiStatus}}</td>
-
                     </tr>
                     <tr>
                         <td>Free Heap Memory:</td>
                         <td>{{info.freeHeap}}</td>
-
+                    </tr>
+                    <tr>
+                        <td>Version:</td>
+                        <td>{{info.version}}</td>
                     </tr>
                 </table>
             </div>
@@ -51,12 +52,10 @@
                     <tr>
                         <td>Shares Accepted:</td>
                         <td>{{info.sharesAccepted}}</td>
-
                     </tr>
                     <tr>
                         <td>Shares Rejected:</td>
                         <td>{{info.sharesRejected}}</td>
-
                     </tr>
                 </table>
             </div>
@@ -70,17 +69,14 @@
                     <tr>
                         <td>Power Consumption:</td>
                         <td>{{info.power | number: '1.2-2'}} <small>W</small></td>
-
                     </tr>
                     <tr>
                         <td>Input Voltage:</td>
                         <td>{{info.voltage | number: '0.0-0'}} <small>mV</small></td>
-
                     </tr>
                     <tr>
                         <td>Input Current:</td>
                         <td>{{info.current | number: '0.0-0'}} <small>mA</small></td>
-
                     </tr>
                     <tr>
                         <td>Frequency:</td>
@@ -97,12 +93,10 @@
                     <tr>
                         <td>Fan Speed:</td>
                         <td>{{info.fanSpeed}} <small>RPM</small></td>
-
                     </tr>
                     <tr>
                         <td>Chip Temperature:</td>
                         <td>{{info.temp}} <small>C</small></td>
-
                     </tr>
                 </table>
 
@@ -113,7 +107,6 @@
                     <tr>
                         <td> Hash Rate:</td>
                         <td>{{info.hashRate | number: '1.2-2'}} <small>Gh/s</small></td>
-
                     </tr>
                     <tr>
                         <td>Efficiency:</td>
@@ -122,15 +115,10 @@
                     <tr>
                         <td>Best Difficulty:</td>
                         <td>{{info.bestDiff}}</td>
-
                     </tr>
-
                 </table>
             </div>
         </div>
-
-
-
     </div>
 
     <div class="card mt-2">
