@@ -1,29 +1,31 @@
-#include "esp_log.h"
-#include <stdio.h>
-#include <string.h>
+#include "system.h"
 
-#include "driver/gpio.h"
-#include "driver/i2c.h"
+#include "esp_log.h"
 
 #include "DS4432U.h"
 #include "EMC2101.h"
 #include "INA260.h"
 #include "adc.h"
-#include "esp_timer.h"
-
 #include "connect.h"
-#include "esp_netif.h"
-#include "esp_wifi.h"
 #include "global_state.h"
 #include "led_controller.h"
-#include "lwip/inet.h"
 #include "nvs_config.h"
 #include "oled.h"
-#include "system.h"
+
+#include "driver/gpio.h"
+#include "driver/i2c.h"
+#include "esp_netif.h"
+#include "esp_timer.h"
+#include "esp_wifi.h"
+#include "lwip/inet.h"
+
 #include <inttypes.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/time.h>
+
 static const char * TAG = "SystemModule";
 
 // #define ASIC_VOLTAGE CONFIG_ASIC_VOLTAGE
