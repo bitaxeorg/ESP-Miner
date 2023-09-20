@@ -80,24 +80,33 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
     }
 }
 
+void generate_ssid(char * ssid)
+{
+    uint8_t mac[6];
+    esp_wifi_get_mac(ESP_IF_WIFI_AP, mac);
+
+    // Format the last 4 bytes of the MAC address as a hexadecimal string
+    snprintf(ssid, 32, "Bitaxe_%02X%02X", mac[4], mac[5]);
+}
+
 esp_netif_t * wifi_init_softap(void)
 {
     esp_netif_t * esp_netif_ap = esp_netif_create_default_wifi_ap();
 
-    wifi_config_t wifi_ap_config = {
-        .ap =
-            {
-                .ssid = "Bitaxe",
-                .ssid_len = strlen("Bitaxe"),
-                .channel = 1,
-                .max_connection = 30,
-                .authmode = WIFI_AUTH_OPEN,
-                .pmf_cfg =
-                    {
-                        .required = false,
-                    },
-            },
-    };
+    // Define a buffer for the SSID
+    char ssid_with_mac[13]; // "Bitaxe" + 4 bytes from MAC address
+
+    // Generate the SSID
+    generate_ssid(ssid_with_mac);
+
+    wifi_config_t wifi_ap_config;
+    memset(&wifi_ap_config, 0, sizeof(wifi_ap_config)); // Clear the structure
+    strncpy((char *) wifi_ap_config.ap.ssid, ssid_with_mac, sizeof(wifi_ap_config.ap.ssid));
+    wifi_ap_config.ap.ssid_len = strlen(ssid_with_mac);
+    wifi_ap_config.ap.channel = 1;
+    wifi_ap_config.ap.max_connection = 30;
+    wifi_ap_config.ap.authmode = WIFI_AUTH_OPEN;
+    wifi_ap_config.ap.pmf_cfg.required = false;
 
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_ap_config));
 
