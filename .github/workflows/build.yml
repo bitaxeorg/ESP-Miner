@@ -23,3 +23,13 @@ jobs:
         esp_idf_version: v5.1
         target: esp32s2
         path: '.'
+    - name: upload esp-miner.bin
+      uses: actions/upload-artifact@v3
+      with:
+        name: esp-miner.bin
+        path: ./build/esp-miner.bin
+    - name: upload www.bin
+      uses: actions/upload-artifact@v3
+      with:
+        name: www.bin
+        path: ./build/www.bin
