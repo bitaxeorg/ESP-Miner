@@ -52,7 +52,8 @@ void app_main(void)
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
     } else {
-        ESP_LOGE(TAG, "Unable to determine ASIC model. Please make sure the model has been written into NVS.");
+        ESP_LOGE(TAG, "Unable to determine ASIC model. Please make sure the model has been written into NVS at main/asicmodel.");
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
         exit(EXIT_FAILURE);
     }
 
