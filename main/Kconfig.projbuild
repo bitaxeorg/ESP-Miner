@@ -1,11 +1,4 @@
 menu "Bitaxe Configuration"
-
-    config ASIC_MODEL
-        string "ASIC Model"
-        default "BM1397"
-        help
-            BM1397 or BM1366
-
     config ASIC_VOLTAGE
         int "ASIC Core Voltage (mV)"
         range 1000 1800
