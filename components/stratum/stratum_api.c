@@ -266,14 +266,14 @@ int _parse_stratum_subscribe_result_message(const char *result_json_str,
     return 0;
 }
 
-int STRATUM_V1_subscribe(int socket, char **extranonce, int *extranonce2_len)
+int STRATUM_V1_subscribe(int socket, char ** extranonce, int * extranonce2_len, char * model)
 {
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];
-    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe %s\"]}\n", send_uid++, CONFIG_ASIC_MODEL);
+    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe %s\"]}\n", send_uid++, model);
     debug_stratum_tx(subscribe_msg);
     write(socket, subscribe_msg, strlen(subscribe_msg));
-    char *line;
+    char * line;
     line = STRATUM_V1_receive_jsonrpc_line(socket);
 
     ESP_LOGI(TAG, "Received result %s", line);

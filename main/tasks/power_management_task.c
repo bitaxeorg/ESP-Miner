@@ -20,7 +20,6 @@
 #define VOLTAGE_START_THROTTLE 4900
 #define VOLTAGE_MIN_THROTTLE 3500
 #define VOLTAGE_RANGE (VOLTAGE_START_THROTTLE - VOLTAGE_MIN_THROTTLE)
-#define ASIC_MODEL CONFIG_ASIC_MODEL
 
 static const char * TAG = "power_management";
 
@@ -58,7 +57,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
         power_management->fan_speed = EMC2101_get_fan_speed();
 
-        if (strcmp(ASIC_MODEL, "BM1397") == 0) {
+        if (strcmp(GLOBAL_STATE->asic_model, "BM1397") == 0) {
 
             power_management->chip_temp = EMC2101_get_external_temp();
 
@@ -115,7 +114,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     last_frequency_increase++;
                 }
             }
-        } else if (strcmp(ASIC_MODEL, "BM1366") == 0) {
+        } else if (strcmp(GLOBAL_STATE->asic_model, "BM1366") == 0) {
             power_management->chip_temp = EMC2101_get_internal_temp() + 5;
 
             if (power_management->fan_speed < 10) {

@@ -29,14 +29,12 @@
 
 static const char * TAG = "SystemModule";
 
-#define ASIC_MODEL CONFIG_ASIC_MODEL
-
 static void _suffix_string(uint64_t, char *, size_t, int);
 
 static esp_netif_t * netif;
 static esp_netif_ip_info_t ip_info;
 
-static void _init_system(SystemModule * module)
+static void _init_system(GlobalState * global_state, SystemModule * module)
 {
     module->duration_start = 0;
     module->historical_hashrate_rolling_index = 0;
@@ -80,7 +78,7 @@ static void _init_system(SystemModule * module)
 
     // Fan Tests
     EMC2101_init();
-    if (strcmp(ASIC_MODEL, "BM1366") == 0) {
+    if (strcmp(global_state->asic_model, "BM1366") == 0) {
         EMC2101_set_fan_speed(0);
     } else {
         EMC2101_set_fan_speed(1);
@@ -336,7 +334,7 @@ void SYSTEM_task(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
-    _init_system(module);
+    _init_system(GLOBAL_STATE, module);
 
     _clear_display();
     _init_connection(module);

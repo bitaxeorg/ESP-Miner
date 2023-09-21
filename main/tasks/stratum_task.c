@@ -93,7 +93,8 @@ void stratum_task(void *pvParameters)
             break;
         }
 
-        STRATUM_V1_subscribe(GLOBAL_STATE->sock, &GLOBAL_STATE->extranonce_str, &GLOBAL_STATE->extranonce_2_len);
+        STRATUM_V1_subscribe(GLOBAL_STATE->sock, &GLOBAL_STATE->extranonce_str, &GLOBAL_STATE->extranonce_2_len,
+                             GLOBAL_STATE->asic_model);
 
         STRATUM_V1_configure_version_rolling(GLOBAL_STATE->sock);
 

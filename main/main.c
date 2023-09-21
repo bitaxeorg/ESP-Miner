@@ -17,8 +17,6 @@
 #include "stratum_task.h"
 #include "user_input_task.h"
 
-#define ASIC_MODEL CONFIG_ASIC_MODEL
-
 static GlobalState GLOBAL_STATE = {.extranonce_str = NULL, .extranonce_2_len = 0, .abandon_work = 0, .version_mask = 0};
 
 static const char * TAG = "miner";
@@ -30,7 +28,8 @@ void app_main(void)
     ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float) nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY));
     GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
-    if (strcmp(ASIC_MODEL, "BM1366") == 0) {
+    GLOBAL_STATE.asic_model = nvs_config_get_string(NVS_CONFIG_ASIC_MODEL, "");
+    if (strcmp(GLOBAL_STATE.asic_model, "BM1366") == 0) {
         ESP_LOGI(TAG, "ASIC: BM1366");
         AsicFunctions ASIC_functions = {.init_fn = BM1366_init,
                                         .receive_result_fn = BM1366_proccess_work,
@@ -40,7 +39,7 @@ void app_main(void)
         GLOBAL_STATE.asic_job_frequency_ms = BM1366_FULLSCAN_MS;
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
-    } else if (strcmp(ASIC_MODEL, "BM1397") == 0) {
+    } else if (strcmp(GLOBAL_STATE.asic_model, "BM1397") == 0) {
         ESP_LOGI(TAG, "ASIC: BM1397");
         AsicFunctions ASIC_functions = {.init_fn = BM1397_init,
                                         .receive_result_fn = BM1397_proccess_work,
@@ -53,7 +52,7 @@ void app_main(void)
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
     } else {
-        ESP_LOGI(TAG, "Invalid ASIC model");
+        ESP_LOGE(TAG, "Unable to determine ASIC model. Please make sure the model has been written into NVS.");
         exit(EXIT_FAILURE);
     }
 
