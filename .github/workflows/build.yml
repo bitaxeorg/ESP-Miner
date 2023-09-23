@@ -5,13 +5,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         submodules: 'recursive'
     - name: Setup Node.js
-      uses: actions/setup-node@v2
+      uses: actions/setup-node@v3
       with:
-        node-version: '16'
+        node-version: '20'
     - name: Build web dist
       working-directory: ./main/http_server/axe-os
       run: |
@@ -22,6 +22,7 @@ jobs:
       with:
         esp_idf_version: v5.1
         target: esp32s2
+        command: GITHUB_ACTIONS="true" idf.py build
         path: '.'
     - name: upload esp-miner.bin
       uses: actions/upload-artifact@v3
