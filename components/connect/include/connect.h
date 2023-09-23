@@ -32,3 +32,4 @@ void toggle_wifi_softap(void);
 void wifi_softap_off(void);
 void wifi_init(const char * wifi_ssid, const char * wifi_pass);
 EventBits_t wifi_connect(void);
+void generate_ssid(char * ssid);

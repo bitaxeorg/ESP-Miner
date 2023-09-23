@@ -244,6 +244,17 @@ static void _update_system_performance(GlobalState * GLOBAL_STATE)
     }
 }
 
+static void show_ap_information()
+{
+    if (OLED_status()) {
+        _clear_display();
+        OLED_writeString(0, 0, "connect to ssid:");
+        char ap_ssid[13];
+        generate_ssid(ap_ssid);
+        OLED_writeString(0, 2, ap_ssid);
+    }
+}
+
 static double _calculate_network_difficulty(uint32_t nBits)
 {
     uint32_t mantissa = nBits & 0x007fffff;  // Extract the mantissa from nBits
@@ -339,9 +350,19 @@ void SYSTEM_task(void * pvParameters)
     _clear_display();
     _init_connection(module);
 
+    wifi_mode_t wifi_mode;
+    esp_err_t result;
+
     // show the connection screen
     while (!module->startup_done) {
-        _update_connection(module);
+        result = esp_wifi_get_mode(&wifi_mode);
+        if (result == ESP_OK && (wifi_mode == WIFI_MODE_APSTA || wifi_mode == WIFI_MODE_AP) &&
+            strcmp(module->wifi_status, "Failed to connect") == 0) {
+            show_ap_information(module);
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+        } else {
+            _update_connection(module);
+        }
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
