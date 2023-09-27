@@ -52,9 +52,13 @@ void app_main(void)
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
     } else {
-        ESP_LOGE(TAG, "Unable to determine ASIC model. Please make sure the model has been written into NVS at main/asicmodel.");
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
-        exit(EXIT_FAILURE);
+        ESP_LOGI(TAG, "Invalid ASIC model");
+        AsicFunctions ASIC_functions = {.init_fn = NULL,
+                                        .receive_result_fn = NULL,
+                                        .set_max_baud_fn = NULL,
+                                        .set_difficulty_mask_fn = NULL,
+                                        .send_work_fn = NULL};
+        GLOBAL_STATE.ASIC_functions = ASIC_functions;
     }
 
     ESP_LOGI(TAG, "Welcome to the bitaxe!");
@@ -95,28 +99,29 @@ void app_main(void)
         }
     }
 
-    wifi_softap_off();
-
     free(wifi_ssid);
     free(wifi_pass);
-
-    queue_init(&GLOBAL_STATE.stratum_queue);
-    queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
-
-    SERIAL_init();
-
-    (*GLOBAL_STATE.ASIC_functions.init_fn)(GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
 
     // set the startup_done flag
     GLOBAL_STATE.SYSTEM_MODULE.startup_done = true;
 
-    xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
-    xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(POWER_MANAGEMENT_task, "power mangement", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
-
     xTaskCreate(USER_INPUT_task, "user input", 8192, (void *) &GLOBAL_STATE, 5, NULL);
+    xTaskCreate(POWER_MANAGEMENT_task, "power mangement", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+
+    if (GLOBAL_STATE.ASIC_functions.init_fn != NULL) {
+        wifi_softap_off();
+
+        queue_init(&GLOBAL_STATE.stratum_queue);
+        queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
+
+        SERIAL_init();
+        (*GLOBAL_STATE.ASIC_functions.init_fn)(GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
+
+        xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
+        xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+        xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+        xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
+    }
 }
 
 void MINER_set_wifi_status(wifi_status_t status, uint16_t retry_count)

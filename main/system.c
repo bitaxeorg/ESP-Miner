@@ -244,11 +244,14 @@ static void _update_system_performance(GlobalState * GLOBAL_STATE)
     }
 }
 
-static void show_ap_information()
+static void show_ap_information(const char * error)
 {
     if (OLED_status()) {
         _clear_display();
-        OLED_writeString(0, 0, "connect to ssid:");
+        if (error != NULL) {
+            OLED_writeString(0, 0, error);
+        }
+        OLED_writeString(0, 1, "connect to ssid:");
         char ap_ssid[13];
         generate_ssid(ap_ssid);
         OLED_writeString(0, 2, ap_ssid);
@@ -353,12 +356,17 @@ void SYSTEM_task(void * pvParameters)
     wifi_mode_t wifi_mode;
     esp_err_t result;
 
+    while (GLOBAL_STATE->ASIC_functions.init_fn == NULL) {
+        show_ap_information("ASIC MODEL INVALID");
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
+
     // show the connection screen
     while (!module->startup_done) {
         result = esp_wifi_get_mode(&wifi_mode);
         if (result == ESP_OK && (wifi_mode == WIFI_MODE_APSTA || wifi_mode == WIFI_MODE_AP) &&
             strcmp(module->wifi_status, "Failed to connect") == 0) {
-            show_ap_information(module);
+            show_ap_information(NULL);
             vTaskDelay(5000 / portTICK_PERIOD_MS);
         } else {
             _update_connection(module);
