@@ -43,12 +43,10 @@ else()
         PREFIX ${CMAKE_BINARY_DIR}/web_ui_dist
         SOURCE_DIR ${WEB_SRC_DIR}
         DOWNLOAD_COMMAND ""
-        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
-            PATH=$ENV{PATH}
+        CONFIGURE_COMMAND
             ${NPM_EXECUTABLE}  i
         USES_TERMINAL_BUILD true
-        BUILD_COMMAND ${CMAKE_COMMAND} -E env
-            PATH=$ENV{PATH}
+        BUILD_COMMAND
             ${NPM_EXECUTABLE} run build
         INSTALL_COMMAND ""
         BUILD_ALWAYS OFF
