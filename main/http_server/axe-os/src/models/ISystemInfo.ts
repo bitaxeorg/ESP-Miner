@@ -1,3 +1,5 @@
+import { eASICModel } from './enum/eASICModel';
+
 export interface ISystemInfo {
 
     power: number,
@@ -15,7 +17,7 @@ export interface ISystemInfo {
     sharesAccepted: number,
     sharesRejected: number,
     uptimeSeconds: number,
-    ASICModel: string,
+    ASICModel: eASICModel,
     stratumURL: string,
     stratumPort: number,
     stratumUser: string,

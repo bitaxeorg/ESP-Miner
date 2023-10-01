@@ -25,14 +25,76 @@
                 <label>Stratum User: </label>
                 <input formControlName="stratumUser" type="text">
             </div>
-            <div class="form-group">
-                <label>Frequency </label>
-                <input formControlName="frequency" type="number">
-            </div>
-            <div class="form-group">
-                <label>Core Voltage</label>
-                <input formControlName="coreVoltage" type="number">
-            </div>
+
+            <ng-container *ngIf="!devToolsOpen && ASICModel == eASICModel.BM1366">
+
+                <div class="form-group">
+                    <label>Frequency </label>
+                    <select formControlName="frequency">
+                        <option value="400">400</option>
+                        <option value="425">425</option>
+                        <option value="450">450</option>
+                        <option value="475">475</option>
+                        <option value="485">485 (default)</option>
+                        <option value="500">500</option>
+                        <option value="525">525</option>
+                        <option value="550">550</option>
+                        <option value="575">575</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Core Voltage </label>
+                    <select formControlName="coreVoltage">
+                        <option value="1100">1100</option>
+                        <option value="1150">1150</option>
+                        <option value="1200">1200 (default)</option>
+                        <option value="1250">1250</option>
+                        <option value="1300">1300</option>
+                    </select>
+                </div>
+            </ng-container>
+
+            <ng-container *ngIf="!devToolsOpen && ASICModel == eASICModel.BM1397">
+
+                <div class="form-group">
+                    <label>Frequency </label>
+                    <select formControlName="frequency">
+                        <option value="400">400</option>
+                        <option value="425">425 (default)</option>
+                        <option value="450">450</option>
+                        <option value="475">475</option>
+                        <option value="485">485</option>
+                        <option value="500">500</option>
+                        <option value="525">525</option>
+                        <option value="550">550</option>
+                        <option value="575">575</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Core Voltage </label>
+                    <select formControlName="coreVoltage">
+                        <option value="1300">1300</option>
+                        <option value="1350">1350</option>
+                        <option value="1400">1400 (default)</option>
+                        <option value="1450">1450</option>
+                        <option value="1500">1500</option>
+                    </select>
+                </div>
+            </ng-container>
+
+            <ng-container *ngIf="devToolsOpen === true">
+                <div class="form-group">
+                    <label>Frequency </label>
+                    <input formControlName="frequency" type="number">
+                </div>
+
+                <div class="form-group">
+                    <label>Core Voltage</label>
+                    <input formControlName="coreVoltage" type="number">
+                </div>
+            </ng-container>
 
 
         </form>

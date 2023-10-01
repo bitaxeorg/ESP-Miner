@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
+import { eASICModel } from 'src/models/enum/eASICModel';
 
 @Component({
   selector: 'app-edit',
@@ -17,6 +18,11 @@ export class EditComponent {
   public firmwareUpdateProgress: number | null = null;
   public websiteUpdateProgress: number | null = null;
 
+
+  public devToolsOpen: boolean = false;
+  public eASICModel = eASICModel;
+  public ASICModel!: eASICModel;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -24,9 +30,14 @@ export class EditComponent {
     private toastrService: ToastrService,
     private loadingService: LoadingService
   ) {
+
+    window.addEventListener('resize', this.checkDevTools);
+    this.checkDevTools();
+
     this.systemService.getInfo()
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
+        this.ASICModel = info.ASICModel;
         this.form = this.fb.group({
           stratumURL: [info.stratumURL, [Validators.required]],
           stratumPort: [info.stratumPort, [Validators.required]],
@@ -38,9 +49,26 @@ export class EditComponent {
         });
       });
   }
+  private checkDevTools = () => {
+    if (
+      window.outerWidth - window.innerWidth > 160 ||
+      window.outerHeight - window.innerHeight > 160
+    ) {
+      this.devToolsOpen = true;
+    } else {
+      this.devToolsOpen = false;
+    }
+  };
 
   public updateSystem() {
-    this.systemService.updateSystem(this.form.value)
+
+    const form = this.form.value;
+
+    form.frequency = parseInt(form.frequency);
+    form.coreVoltage = parseInt(form.coreVoltage);
+
+
+    this.systemService.updateSystem(form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
@@ -124,4 +152,9 @@ export class EditComponent {
     });
     this.toastr.success('Success!', 'Bitaxe restarted');
   }
+
+
+
+
+
 }
