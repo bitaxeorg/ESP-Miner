@@ -94,7 +94,7 @@ button {
 
 }
 
-input[type="text"],
+input:not([type="checkbox"]),
 select {
 
     font-size: 1rem;
