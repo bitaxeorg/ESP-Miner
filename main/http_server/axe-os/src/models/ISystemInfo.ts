@@ -2,6 +2,8 @@ import { eASICModel } from './enum/eASICModel';
 
 export interface ISystemInfo {
 
+    flipscreen: number;
+    invertscreen: number;
     power: number,
     voltage: number,
     current: number,

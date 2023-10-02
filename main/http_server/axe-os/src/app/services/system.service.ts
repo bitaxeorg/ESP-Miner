@@ -42,6 +42,8 @@ export class SystemService {
           stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
           frequency: 485,
           version: "2.0",
+          flipscreen: 1,
+          invertscreen: 0
         }
       ).pipe(delay(1000));
     }

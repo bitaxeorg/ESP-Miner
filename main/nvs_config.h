@@ -14,6 +14,8 @@
 #define NVS_CONFIG_ASIC_MODEL "asicmodel"
 #define NVS_CONFIG_DEVICE_MODEL "devicemodel"
 #define NVS_CONFIG_BOARD_VERSION "boardversion"
+#define NVS_CONFIG_FLIP_SCREEN "flipscreen"
+#define NVS_CONFIG_INVERT_SCREEN "invertscreen"
 
 char * nvs_config_get_string(const char * key, const char * default_value);
 void nvs_config_set_string(const char * key, const char * default_value);

@@ -15,20 +15,20 @@
 // A copy of the display memory is maintained by this code so that single pixel
 // writes can occur without having to read from the display controller.
 
-#include <string.h>
+#include "driver/i2c.h"
+#include "esp_err.h"
+#include "esp_log.h"
+#include "nvs_config.h"
 #include <stdbool.h>
 #include <stdint.h>
-
-#include "driver/i2c.h"
-#include "esp_log.h"
-#include "esp_err.h"
+#include <string.h>
 
 #include "oled.h"
 
 #define I2C_TIMEOUT 1000
-#define OLED_FLIP 1
-#define OLED_INVERT 0
-#define I2C_MASTER_NUM 0 /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
+
+/*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
+#define I2C_MASTER_NUM 0
 
 extern unsigned char ucSmallFont[];
 static int iScreenOffset;            // current write offset of screen data
@@ -43,35 +43,34 @@ static bool oled_active;
 // Initialialize the OLED Screen
 bool OLED_init(void)
 {
-    uint8_t oled32_initbuf[] = {
-        0x00,
-        0xae, // cmd: display off
-        0xd5, // cmd: set display clock
-        0x80,
-        0xa8, // cmd: set multiplex ratio
-        0x1f, // HEIGHT - 1 -> 31
-        0xd3, // cmd: set display offset
-        0x00,
-        0x40, // cmd: Set Display Start Line
-        0x8d,
-        0x14, // cmd: Set Higher Column Start Address for Page Addressing Mode
-        0xa1,
-        0xc8, // cmd: Set COM Output Scan Direction C0/C8
-        0xda, // cmd: Set COM Pins Hardware Configuration
-        0x02, //
-        0x81, // cmd: Set Contrast control
-        0x7f,
-        0xd9, // cmd: Set Pre-Charge Period
-        0xf1,
-        0xdb, // comd: Vcom regulator output
-        0x40,
-        0xa4,  // cmd: display on ram contents
-        0xa6,  // cmd: set normal
-        0xaf}; // cmd: display on
+    uint8_t oled32_initbuf[] = {0x00,
+                                0xae, // cmd: display off
+                                0xd5, // cmd: set display clock
+                                0x80,
+                                0xa8, // cmd: set multiplex ratio
+                                0x1f, // HEIGHT - 1 -> 31
+                                0xd3, // cmd: set display offset
+                                0x00,
+                                0x40, // cmd: Set Display Start Line
+                                0x8d,
+                                0x14, // cmd: Set Higher Column Start Address for Page Addressing Mode
+                                0xa1,
+                                0xc8, // cmd: Set COM Output Scan Direction C0/C8
+                                0xda, // cmd: Set COM Pins Hardware Configuration
+                                0x02, //
+                                0x81, // cmd: Set Contrast control
+                                0x7f,
+                                0xd9, // cmd: Set Pre-Charge Period
+                                0xf1,
+                                0xdb, // comd: Vcom regulator output
+                                0x40,
+                                0xa4,  // cmd: display on ram contents
+                                0xa6,  // cmd: set normal
+                                0xaf}; // cmd: display on
     uint8_t uc[4];
 
-    uint8_t bFlip = OLED_FLIP;
-    uint8_t bInvert = OLED_INVERT;
+    uint8_t bFlip = nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1);
+    uint8_t bInvert = nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0);
     oled_active = false;
 
     // //enable the module
@@ -98,15 +97,13 @@ bool OLED_init(void)
 
     write(oled32_initbuf, sizeof(oled32_initbuf));
 
-    if (bInvert)
-    {
+    if (bInvert) {
         uc[0] = 0;    // command
         uc[1] = 0xa7; // invert command
         write(uc, 2);
     }
 
-    if (bFlip)
-    {              // rotate display 180
+    if (bFlip) {   // rotate display 180
         uc[0] = 0; // command
         uc[1] = 0xa0;
         write(uc, 2);
@@ -164,8 +161,7 @@ static void oledSetPosition(int x, int y)
         x += 32;            // display is centered in VRAM, so this is always true
         if (oled_flip == 0) // non-flipped display starts from line 4
             y += 4;
-    }
-    else if (oled_type == OLED_132x64) // SH1106 has 128 pixels centered in 132
+    } else if (oled_type == OLED_132x64) // SH1106 has 128 pixels centered in 132
     {
         x += 2;
     }
@@ -177,7 +173,7 @@ static void oledSetPosition(int x, int y)
 
 // Write a block of pixel data to the OLED
 // Length can be anything from 1 to 1024 (whole display)
-static void oledWriteDataBlock(uint8_t *ucBuf, int iLen)
+static void oledWriteDataBlock(uint8_t * ucBuf, int iLen)
 {
     uint8_t ucTemp[129];
 
@@ -205,8 +201,7 @@ int OLED_setPixel(int x, int y, uint8_t ucColor)
         return -1;
     uc = ucOld = ucScreen[i];
     uc &= ~(0x1 << (y & 7));
-    if (ucColor)
-    {
+    if (ucColor) {
         uc |= (0x1 << (y & 7));
     }
     if (uc != ucOld) // pixel changed
@@ -223,10 +218,10 @@ int OLED_setPixel(int x, int y, uint8_t ucColor)
 // The X position is in character widths (8 or 16)
 // The Y position is in memory pages (8 lines each)
 //
-int OLED_writeString(int x, int y, char *szMsg)
+int OLED_writeString(int x, int y, char * szMsg)
 {
     int i, iLen;
-    uint8_t *s;
+    uint8_t * s;
 
     // if (oled_i2c == NULL) return -1; // not initialized
 
@@ -237,9 +232,8 @@ int OLED_writeString(int x, int y, char *szMsg)
         iLen = 21 - x;
     if (iLen < 0)
         return -1;
-    for (i = 0; i < iLen; i++)
-    {
-        s = &ucSmallFont[(unsigned char)szMsg[i] * 6];
+    for (i = 0; i < iLen; i++) {
+        s = &ucSmallFont[(unsigned char) szMsg[i] * 6];
         oledWriteDataBlock(s, 6);
     }
 
@@ -260,8 +254,7 @@ int OLED_fill(uint8_t ucData)
     iCols = (oled_type == OLED_64x32) ? 4 : 8;
 
     memset(temp, ucData, 128);
-    for (y = 0; y < iLines; y++)
-    {
+    for (y = 0; y < iLines; y++) {
         oledSetPosition(0, y);                // set to (0,Y)
         oledWriteDataBlock(temp, iCols * 16); // fill with data byte
     }                                         // for y
@@ -291,7 +284,7 @@ bool OLED_status(void)
 /**
  * @brief Write a byte to a I2C register
  */
-static esp_err_t write(uint8_t *data, uint8_t len)
+static esp_err_t write(uint8_t * data, uint8_t len)
 {
     int ret;
 

@@ -39,6 +39,8 @@ export class EditComponent {
       .subscribe(info => {
         this.ASICModel = info.ASICModel;
         this.form = this.fb.group({
+          flipscreen: [info.flipscreen == 1],
+          invertscreen: [info.invertscreen == 1],
           stratumURL: [info.stratumURL, [Validators.required]],
           stratumPort: [info.stratumPort, [Validators.required]],
           stratumUser: [info.stratumUser, [Validators.required]],
@@ -67,6 +69,8 @@ export class EditComponent {
     form.frequency = parseInt(form.frequency);
     form.coreVoltage = parseInt(form.coreVoltage);
 
+    form.flipscreen = form.flipscreen == true ? 1 : 0;
+    form.invertscreen = form.invertscreen == true ? 1 : 0;
 
     this.systemService.updateSystem(form)
       .pipe(this.loadingService.lockUIUntilComplete())

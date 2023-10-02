@@ -204,6 +204,9 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     uint16_t coreVoltage = cJSON_GetObjectItem(root, "coreVoltage")->valueint;
     uint16_t frequency = cJSON_GetObjectItem(root, "frequency")->valueint;
 
+    uint16_t flip_screen = cJSON_GetObjectItem(root, "flipscreen")->valueint;
+    uint16_t invert_screen = cJSON_GetObjectItem(root, "invertscreen")->valueint;
+
     nvs_config_set_string(NVS_CONFIG_STRATUM_URL, stratumURL);
     nvs_config_set_string(NVS_CONFIG_STRATUM_USER, stratumUser);
     nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, stratumPort);
@@ -211,6 +214,8 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     nvs_config_set_string(NVS_CONFIG_WIFI_PASS, wifiPass);
     nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, coreVoltage);
     nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, frequency);
+    nvs_config_set_u16(NVS_CONFIG_FLIP_SCREEN, flip_screen);
+    nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, invert_screen);
 
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
@@ -265,6 +270,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
+
+    cJSON_AddNumberToObject(root, "flipscreen", nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1));
+    cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
 
     free(ssid);
     free(wifiPass);

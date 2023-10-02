@@ -1,4 +1,4 @@
-input {
+input[type="text"] {
     min-width: 250px;
     max-width: 90%;
 }
@@ -15,7 +15,7 @@ select {
 
 @media only screen and (min-width:900px) {
 
-    input {
+    input[type="text"] {
         min-width: 500px
     }
 

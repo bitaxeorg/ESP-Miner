@@ -6,6 +6,14 @@
     <ng-container *ngIf="form != null">
         <form [formGroup]="form">
             <div class="form-group">
+                <label>Flip Screen</label>
+                <input formControlName="flipscreen" type="checkbox">
+            </div>
+            <!-- <div class="form-group">
+                <label>Invert Screen</label>
+                <input formControlName="invertscreen" type="checkbox">
+            </div> -->
+            <div class="form-group">
                 <label>WiFi SSID: </label>
                 <input formControlName="ssid" type="text">
             </div>
