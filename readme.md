@@ -1,7 +1,12 @@
+[![](https://dcbadge.vercel.app/api/server/3E8ca2dkcC)](https://discord.gg/3E8ca2dkcC)
+
+
+
+# ESP-Miner
+
 | Supported Targets | ESP32-S3 (BitAxe v2+) |
 | ----------------- | --------------------- |
 
-# ESP-Miner
 
 ## Requires ESP-IDF v5.1
 
