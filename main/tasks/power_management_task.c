@@ -14,7 +14,7 @@
 
 #define POLL_RATE 5000
 #define MAX_TEMP 90.0
-#define THROTTLE_TEMP 80.0
+#define THROTTLE_TEMP 75.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
 
 #define VOLTAGE_START_THROTTLE 4900
@@ -119,7 +119,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         } else if (strcmp(GLOBAL_STATE->asic_model, "BM1366") == 0) {
             power_management->chip_temp = EMC2101_get_internal_temp() + 5;
 
-            if (power_management->chip_temp > 75 && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+            if (power_management->chip_temp > THROTTLE_TEMP &&
+                (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
                 ESP_LOGE(TAG, "OVERHEAT");
                 nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 990);
                 nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
