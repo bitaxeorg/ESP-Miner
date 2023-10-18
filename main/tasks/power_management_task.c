@@ -48,6 +48,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
+    vTaskDelay(2000);
+
     while (1) {
 
         if (read_power == true) {
@@ -117,9 +119,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         } else if (strcmp(GLOBAL_STATE->asic_model, "BM1366") == 0) {
             power_management->chip_temp = EMC2101_get_internal_temp() + 5;
 
-            if (power_management->fan_speed < 10) {
-                ESP_LOGE(TAG, "Detected fan speed too slow, setting vCore to 0");
-                DS4432U_set_vcore(0);
+            if (power_management->chip_temp > 75 && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+                ESP_LOGE(TAG, "OVERHEAT");
+                nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 990);
+                nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
+                exit(EXIT_FAILURE);
             }
         }
 
