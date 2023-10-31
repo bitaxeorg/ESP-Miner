@@ -18,10 +18,13 @@
 #define NVS_CONFIG_INVERT_SCREEN "invertscreen"
 #define NVS_CONFIG_INVERT_FAN_POLARITY "invertfanpolarity"
 #define NVS_CONFIG_FAN_SPEED "fanspeed"
+#define NVS_CONFIG_BEST_DIFF "bestdiff"
 
 char * nvs_config_get_string(const char * key, const char * default_value);
 void nvs_config_set_string(const char * key, const char * default_value);
 uint16_t nvs_config_get_u16(const char * key, const uint16_t default_value);
 void nvs_config_set_u16(const char * key, const uint16_t value);
+uint64_t nvs_config_get_u64(const char * key, const uint64_t default_value);
+void nvs_config_set_u64(const char * key, const uint64_t value);
 
 #endif // MAIN_NVS_CONFIG_H
