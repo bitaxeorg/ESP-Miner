@@ -45,22 +45,22 @@
  */
 typedef enum
 {
-  EMC2101_RATE_1_16_HZ, ///< 1_16_HZ
-  EMC2101_RATE_1_8_HZ,  ///< 1_8_HZ
-  EMC2101_RATE_1_4_HZ,  ///< 1_4_HZ
-  EMC2101_RATE_1_2_HZ,  ///< 1_2_HZ
-  EMC2101_RATE_1_HZ,    ///< 1_HZ
-  EMC2101_RATE_2_HZ,    ///< 2_HZ
-  EMC2101_RATE_4_HZ,    ///< 4_HZ
-  EMC2101_RATE_8_HZ,    ///< 8_HZ
-  EMC2101_RATE_16_HZ,   ///< 16_HZ
-  EMC2101_RATE_32_HZ,   ///< 32_HZ
+    EMC2101_RATE_1_16_HZ, ///< 1_16_HZ
+    EMC2101_RATE_1_8_HZ,  ///< 1_8_HZ
+    EMC2101_RATE_1_4_HZ,  ///< 1_4_HZ
+    EMC2101_RATE_1_2_HZ,  ///< 1_2_HZ
+    EMC2101_RATE_1_HZ,    ///< 1_HZ
+    EMC2101_RATE_2_HZ,    ///< 2_HZ
+    EMC2101_RATE_4_HZ,    ///< 4_HZ
+    EMC2101_RATE_8_HZ,    ///< 8_HZ
+    EMC2101_RATE_16_HZ,   ///< 16_HZ
+    EMC2101_RATE_32_HZ,   ///< 32_HZ
 } emc2101_rate_t;
 
 void EMC2101_set_fan_speed(float);
 // void EMC2101_read(void);
 uint16_t EMC2101_get_fan_speed(void);
-void EMC2101_init(void);
+void EMC2101_init(bool);
 float EMC2101_get_external_temp(void);
 uint8_t EMC2101_get_internal_temp(void);
 #endif /* EMC2101_H_ */

@@ -77,12 +77,10 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
     DS4432U_set_vcore(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0);
 
     // Fan Tests
-    EMC2101_init();
-    if (strcmp(global_state->asic_model, "BM1366") == 0) {
-        EMC2101_set_fan_speed(0);
-    } else {
-        EMC2101_set_fan_speed(1);
-    }
+    EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
+
+    EMC2101_set_fan_speed((float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100) / 100);
+
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
     // oled

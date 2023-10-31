@@ -48,6 +48,8 @@ export class EditComponent {
           wifiPass: [info.wifiPass, [Validators.required]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
+          invertfanpolarity: [info.invertfanpolarity, [Validators.required]],
+          fanspeed: [info.fanspeed, [Validators.required]],
         });
       });
   }

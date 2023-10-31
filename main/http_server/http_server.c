@@ -207,6 +207,9 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     uint16_t flip_screen = cJSON_GetObjectItem(root, "flipscreen")->valueint;
     uint16_t invert_screen = cJSON_GetObjectItem(root, "invertscreen")->valueint;
 
+    uint16_t invert_fan_polarity = cJSON_GetObjectItem(root, "invertfanpolarity")->valueint;
+    uint16_t fan_speed = cJSON_GetObjectItem(root, "fanspeed")->valueint;
+
     nvs_config_set_string(NVS_CONFIG_STRATUM_URL, stratumURL);
     nvs_config_set_string(NVS_CONFIG_STRATUM_USER, stratumUser);
     nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, stratumPort);
@@ -216,6 +219,9 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, frequency);
     nvs_config_set_u16(NVS_CONFIG_FLIP_SCREEN, flip_screen);
     nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, invert_screen);
+    nvs_config_set_u16(NVS_CONFIG_INVERT_FAN_POLARITY, invert_screen);
+    nvs_config_set_u16(NVS_CONFIG_INVERT_FAN_POLARITY, invert_fan_polarity);
+    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, fan_speed);
 
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
@@ -273,6 +279,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "flipscreen", nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1));
     cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
+
+    cJSON_AddNumberToObject(root, "invertfanpolarity", nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
+    cJSON_AddNumberToObject(root, "fanspeed", nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100));
 
     free(ssid);
     free(wifiPass);

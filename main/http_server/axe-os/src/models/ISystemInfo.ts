@@ -24,5 +24,7 @@ export interface ISystemInfo {
     stratumPort: number,
     stratumUser: string,
     frequency: number,
-    version: string
+    version: string,
+    invertfanpolarity: number,
+    fanspeed: number,
 }

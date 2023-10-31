@@ -43,7 +43,9 @@ export class SystemService {
           frequency: 485,
           version: "2.0",
           flipscreen: 1,
-          invertscreen: 0
+          invertscreen: 0,
+          invertfanpolarity: 1,
+          fanspeed: 100
         }
       ).pipe(delay(1000));
     }

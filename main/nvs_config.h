@@ -16,6 +16,8 @@
 #define NVS_CONFIG_BOARD_VERSION "boardversion"
 #define NVS_CONFIG_FLIP_SCREEN "flipscreen"
 #define NVS_CONFIG_INVERT_SCREEN "invertscreen"
+#define NVS_CONFIG_INVERT_FAN_POLARITY "invertfanpolarity"
+#define NVS_CONFIG_FAN_SPEED "fanspeed"
 
 char * nvs_config_get_string(const char * key, const char * default_value);
 void nvs_config_set_string(const char * key, const char * default_value);
