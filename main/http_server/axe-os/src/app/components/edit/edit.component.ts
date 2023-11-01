@@ -71,8 +71,10 @@ export class EditComponent {
     form.frequency = parseInt(form.frequency);
     form.coreVoltage = parseInt(form.coreVoltage);
 
+    // bools to ints
     form.flipscreen = form.flipscreen == true ? 1 : 0;
     form.invertscreen = form.invertscreen == true ? 1 : 0;
+    form.invertfanpolarity = form.invertfanpolarity == true ? 1 : 0;
 
     this.systemService.updateSystem(form)
       .pipe(this.loadingService.lockUIUntilComplete())

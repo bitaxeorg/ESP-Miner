@@ -110,7 +110,9 @@
             </div>
 
             <div class="form-group">
-                <label>Fan Speed {{form.controls['fanspeed'].value}}%</label>
+                <label>Fan Speed {{form.controls['fanspeed'].value}}% <b *ngIf="form.controls['fanspeed'].value < 33"
+                        style="color:red">Danger: Could Cause Overheating</b> <b
+                        *ngIf="form.controls['fanspeed'].value == 100" style="color:red">S19 Simulator</b></label>
                 <input formControlName="fanspeed" type="range" [min]="0" [max]="100">
             </div>
 
