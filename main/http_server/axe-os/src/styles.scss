@@ -94,6 +94,18 @@ button {
 
 }
 
+button:disabled,
+button[disabled] {
+    background: #45657f;
+    border: 1px solid #1c4567;
+    cursor: not-allowed;
+
+    &:hover {
+        background: #45657f;
+        border: 1px solid #1c4567;
+    }
+}
+
 input[type="text"],
 input[type="password"],
 input[type="number"],

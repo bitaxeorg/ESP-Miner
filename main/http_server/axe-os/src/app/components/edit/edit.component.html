@@ -22,7 +22,7 @@
                 <input formControlName="wifiPass" type="password">
             </div>
             <div class="form-group">
-                <label>Stratum URL:</label>
+                <label>Stratum URL: (Do not include 'stratum+tcp://' or port</label>
                 <input formControlName="stratumURL" type="text">
             </div>
             <div class="form-group">
@@ -116,22 +116,22 @@
             </div>
 
 
-            <div class="form-group">
-                <label>Fan Speed {{form.controls['fanspeed'].value}}% <span
-                        *ngIf="form.controls['autofanspeed'].value == true">(disabled, automatic) </span> <b
-                        *ngIf="form.controls['fanspeed'].value < 33" style="color:red">Danger: Could Cause
+            <div class="form-group" *ngIf="form.controls['autofanspeed'].value != true">
+                <label>Fan Speed {{form.controls['fanspeed'].value}}%
+                    <b *ngIf="form.controls['fanspeed'].value < 33" style="color:red">Danger: Could Cause
                         Overheating</b> <b *ngIf="form.controls['fanspeed'].value == 100" style="color:	#F2A900">S19
                         Simulator</b></label>
                 <input formControlName="fanspeed" type="range" [min]="0" [max]="100">
             </div>
+            <div class="mt-2">
+                <button [disabled]="form.invalid" (click)="updateSystem()" class="btn btn-primary mr-2">Save</button>
+                <b style="line-height: 34px;">You must restart this device after saving for changes to take effect.</b>
+            </div>
+
 
         </form>
     </ng-container>
 
-    <div class="mt-2">
-        <button (click)="updateSystem()" class="btn btn-primary mr-2">Save</button>
-        <b style="line-height: 34px;">You must restart this device after saving for changes to take effect.</b>
-    </div>
 
 
 </div>

@@ -42,8 +42,17 @@ export class EditComponent {
         this.form = this.fb.group({
           flipscreen: [info.flipscreen == 1],
           invertscreen: [info.invertscreen == 1],
-          stratumURL: [info.stratumURL, [Validators.required]],
-          stratumPort: [info.stratumPort, [Validators.required]],
+          stratumURL: [info.stratumURL, [
+            Validators.required,
+            Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
+            Validators.pattern(/^[^:]*$/),
+          ]],
+          stratumPort: [info.stratumPort, [
+            Validators.required,
+            Validators.pattern(/^[^:]*$/),
+            Validators.min(0),
+            Validators.max(65353)
+          ]],
           stratumUser: [info.stratumUser, [Validators.required]],
           ssid: [info.ssid, [Validators.required]],
           wifiPass: [info.wifiPass, [Validators.required]],
