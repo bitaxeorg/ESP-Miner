@@ -1,9 +1,10 @@
 import { AfterViewChecked, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
-import { interval, Observable, shareReplay, startWith, Subscription, switchMap } from 'rxjs';
+import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { WebsocketService } from 'src/app/services/web-socket.service';
+import { ISystemInfo } from 'src/models/ISystemInfo';
 
 @Component({
   selector: 'app-home',
@@ -13,7 +14,9 @@ import { WebsocketService } from 'src/app/services/web-socket.service';
 export class HomeComponent implements AfterViewChecked, OnDestroy {
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
-  public info$: Observable<any>;
+  public info$: Observable<ISystemInfo>;
+
+  public quickLink$: Observable<string | undefined>;
 
   public logs: string[] = [];
 
@@ -33,6 +36,17 @@ export class HomeComponent implements AfterViewChecked, OnDestroy {
         return this.systemService.getInfo()
       }),
       shareReplay({ refCount: true, bufferSize: 1 })
+    );
+
+    this.quickLink$ = this.info$.pipe(
+      map(info => {
+        if (info.stratumURL.includes('public-pool.io')) {
+          const address = info.stratumUser.split('.')[0]
+          return `https://web.public-pool.io/#/app/${address}`;
+        } else {
+          return undefined;
+        }
+      })
     )
 
     this.websocketSubscription = this.websocketService.ws$.subscribe({

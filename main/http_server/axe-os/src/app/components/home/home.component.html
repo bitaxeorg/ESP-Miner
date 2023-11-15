@@ -37,6 +37,10 @@
             <div class="card">
                 <h2>Pool Information</h2>
                 <table *ngIf="info$ | async as info; else loading">
+                    <tr *ngIf="quickLink$ | async as quickLink">
+                        <td>Quick Link:</td>
+                        <td><a style="color: white;" [href]="quickLink" target="_blank">{{quickLink}}</a></td>
+                    </tr>
                     <tr>
                         <td>URL:</td>
                         <td>{{info.stratumURL}}</td>
