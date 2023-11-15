@@ -75,6 +75,9 @@ uint16_t EMC2101_get_fan_speed(void)
     RPM = 5400000 / reading;
 
     // ESP_LOGI(TAG, "Fan Speed = %d RPM", RPM);
+    if (RPM == 82) {
+        return 0;
+    }
     return RPM;
 }
 
