@@ -38,6 +38,30 @@
 #define EMC2101_FAN_RPM_NUMERATOR 5400000 ///< Conversion unit to convert LSBs to fan RPM
 #define _TEMP_LSB 0.125                   ///< single bit value for internal temperature readings
 
+#define FAN_LOOKUP_TABLE_T1 0x50
+#define FAN_LOOKUP_TABLE_S1 0x51
+
+#define FAN_LOOKUP_TABLE_T2 0x52
+#define FAN_LOOKUP_TABLE_S2 0x53
+
+#define FAN_LOOKUP_TABLE_T3 0x54
+#define FAN_LOOKUP_TABLE_S3 0x55
+
+#define FAN_LOOKUP_TABLE_T4 0x56
+#define FAN_LOOKUP_TABLE_S4 0x57
+
+#define FAN_LOOKUP_TABLE_T5 0x58
+#define FAN_LOOKUP_TABLE_S5 0x59
+
+#define FAN_LOOKUP_TABLE_T6 0x5A
+#define FAN_LOOKUP_TABLE_S6 0x5B
+
+#define FAN_LOOKUP_TABLE_T7 0x5C
+#define FAN_LOOKUP_TABLE_S7 0x5D
+
+#define FAN_LOOKUP_TABLE_T8 0x5E
+#define FAN_LOOKUP_TABLE_S8 0x5F
+
 /**
  * @brief
  *

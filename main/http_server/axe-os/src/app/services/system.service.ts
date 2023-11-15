@@ -45,6 +45,7 @@ export class SystemService {
           flipscreen: 1,
           invertscreen: 0,
           invertfanpolarity: 1,
+          autofanspeed: 1,
           fanspeed: 100
         }
       ).pipe(delay(1000));

@@ -104,15 +104,24 @@
                 </div>
             </ng-container>
 
+
             <div class="form-group">
                 <label>Invert Fan Polarity</label>
                 <input formControlName="invertfanpolarity" type="checkbox">
             </div>
 
             <div class="form-group">
-                <label>Fan Speed {{form.controls['fanspeed'].value}}% <b *ngIf="form.controls['fanspeed'].value < 33"
-                        style="color:red">Danger: Could Cause Overheating</b> <b
-                        *ngIf="form.controls['fanspeed'].value == 100" style="color:	#F2A900">S19 Simulator</b></label>
+                <label>Automatic Fan Control</label>
+                <input formControlName="autofanspeed" type="checkbox">
+            </div>
+
+
+            <div class="form-group">
+                <label>Fan Speed {{form.controls['fanspeed'].value}}% <span
+                        *ngIf="form.controls['autofanspeed'].value == true">(disabled, automatic) </span> <b
+                        *ngIf="form.controls['fanspeed'].value < 33" style="color:red">Danger: Could Cause
+                        Overheating</b> <b *ngIf="form.controls['fanspeed'].value == 100" style="color:	#F2A900">S19
+                        Simulator</b></label>
                 <input formControlName="fanspeed" type="range" [min]="0" [max]="100">
             </div>
 

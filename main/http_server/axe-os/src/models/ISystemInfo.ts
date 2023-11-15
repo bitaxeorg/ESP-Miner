@@ -26,5 +26,6 @@ export interface ISystemInfo {
     frequency: number,
     version: string,
     invertfanpolarity: number,
+    autofanspeed: number,
     fanspeed: number,
 }

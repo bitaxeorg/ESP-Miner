@@ -2,6 +2,7 @@ import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
+import { startWith } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
@@ -48,10 +49,22 @@ export class EditComponent {
           wifiPass: [info.wifiPass, [Validators.required]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
-          invertfanpolarity: [info.invertfanpolarity, [Validators.required]],
+          autofanspeed: [info.autofanspeed == 1, [Validators.required]],
+          invertfanpolarity: [info.invertfanpolarity == 1, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
         });
+
+        this.form.controls['autofanspeed'].valueChanges.pipe(
+          startWith(this.form.controls['autofanspeed'].value)
+        ).subscribe(autofanspeed => {
+          if (autofanspeed) {
+            this.form.controls['fanspeed'].disable();
+          } else {
+            this.form.controls['fanspeed'].enable();
+          }
+        });
       });
+
   }
   private checkDevTools = () => {
     if (
@@ -66,7 +79,7 @@ export class EditComponent {
 
   public updateSystem() {
 
-    const form = this.form.value;
+    const form = this.form.getRawValue();
 
     form.frequency = parseInt(form.frequency);
     form.coreVoltage = parseInt(form.coreVoltage);
@@ -75,6 +88,7 @@ export class EditComponent {
     form.flipscreen = form.flipscreen == true ? 1 : 0;
     form.invertscreen = form.invertscreen == true ? 1 : 0;
     form.invertfanpolarity = form.invertfanpolarity == true ? 1 : 0;
+    form.autofanspeed = form.autofanspeed == true ? 1 : 0;
 
     this.systemService.updateSystem(form)
       .pipe(this.loadingService.lockUIUntilComplete())

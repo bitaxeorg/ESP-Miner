@@ -48,7 +48,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
-    vTaskDelay(2000);
+    uint16_t auto_fan_speed = nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1);
+
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
 
     while (1) {
 
@@ -124,12 +126,38 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 ESP_LOGE(TAG, "OVERHEAT");
                 nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 990);
                 nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
+                nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
+                nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
                 exit(EXIT_FAILURE);
             }
         }
 
+        if (auto_fan_speed == 1) {
+            automatic_fan_speed(power_management->chip_temp);
+        } else {
+            EMC2101_set_fan_speed((float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100) / 100);
+        }
         // ESP_LOGI(TAG, "target %f, Freq %f, Volt %f, Power %f", target_frequency, power_management->frequency_value,
         // power_management->voltage, power_management->power);
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
     }
+}
+
+// all values input below 60 result in 38 but increases exponentially such that an input of 70 results in 100
+static void automatic_fan_speed(float chip_temp)
+{
+    double result = 0.0;
+    double min_temp = 50.0;
+
+    if (chip_temp < min_temp) {
+        result = 25;
+    } else if (chip_temp >= THROTTLE_TEMP) {
+        result = 100;
+    } else {
+        double range = THROTTLE_TEMP - min_temp;
+        result = ((chip_temp - min_temp) / range) * 100;
+    }
+
+    ESP_LOGE(TAG, "Result %f", result);
+    EMC2101_set_fan_speed((float) result / 100);
 }

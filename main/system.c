@@ -76,10 +76,8 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
     // DS4432U tests
     DS4432U_set_vcore(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0);
 
-    // Fan Tests
     EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
-
-    EMC2101_set_fan_speed((float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100) / 100);
+    EMC2101_set_fan_speed(1);
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
@@ -277,7 +275,7 @@ static void _check_for_best_diff(SystemModule * module, double diff, uint32_t nb
     uint64_t old = module->best_nonce_diff;
     module->best_nonce_diff = diff;
     // only write to flash if new > old
-    if(module->best_nonce_diff > old) {
+    if (module->best_nonce_diff > old) {
         nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, module->best_nonce_diff);
     }
     // make the best_nonce_diff into a string
