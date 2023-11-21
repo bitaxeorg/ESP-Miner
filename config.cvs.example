@@ -12,6 +12,6 @@ asicmodel,data,string,BM1366
 devicemodel,data,string,ultra
 boardversion,data,string,0.11
 flipscreen,data,u16,1
-invertfanpolarity,data,u16,1
+invertfanpol,data,u16,1
 autofanspeed,data,u16,1
 fanspeed,data,u16,100
