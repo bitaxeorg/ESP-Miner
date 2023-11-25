@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { catchError, map, Observable, of, startWith, switchMap } from 'rxjs';
+import { BehaviorSubject, catchError, map, Observable, of, startWith, switchMap } from 'rxjs';
 import { SystemService } from 'src/app/services/system.service';
 
 @Component({
@@ -14,6 +14,8 @@ export class SwarmComponent {
   public form: FormGroup;
 
   public swarm$: Observable<Observable<any>[]>;
+
+  public refresh$: BehaviorSubject<null> = new BehaviorSubject(null);
 
   constructor(
     private fb: FormBuilder,
@@ -28,7 +30,11 @@ export class SwarmComponent {
       map(swarmInfo => {
         return swarmInfo.map(({ ip }) => {
           // Make individual API calls for each IP
-          return this.systemService.getInfo(`http://${ip}`).pipe(
+          return this.refresh$.pipe(
+            switchMap(() => {
+              return this.systemService.getInfo(`http://${ip}`);
+            })
+          ).pipe(
             startWith({ ip }),
             map(info => {
               return {
@@ -68,6 +74,20 @@ export class SwarmComponent {
       }
     });
 
+  }
+
+  public refresh() {
+    this.refresh$.next(null);
+  }
+
+  public edit(axe: any) {
+
+  }
+  public restart(axe: any) {
+    this.systemService.restart(`http://${axe.ip}`).subscribe(res => {
+
+    });
+    this.toastr.success('Success!', 'Bitaxe restarted');
   }
 
   public remove(axe: any) {

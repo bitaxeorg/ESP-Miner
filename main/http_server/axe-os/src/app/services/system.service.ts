@@ -15,9 +15,9 @@ export class SystemService {
     private httpClient: HttpClient
   ) { }
 
-  public getInfo(ip: string = ''): Observable<ISystemInfo> {
+  public getInfo(uri: string = ''): Observable<ISystemInfo> {
     if (environment.production) {
-      return this.httpClient.get(`${ip}/api/system/info`) as Observable<ISystemInfo>;
+      return this.httpClient.get(`${uri}/api/system/info`) as Observable<ISystemInfo>;
     } else {
       return of(
         {
@@ -53,8 +53,8 @@ export class SystemService {
     }
   }
 
-  public restart() {
-    return this.httpClient.post(`/api/system/restart`, {});
+  public restart(uri: string = '') {
+    return this.httpClient.post(`${uri}/api/system/restart`, {});
   }
 
   public updateSystem(update: any) {

@@ -1,0 +1,21 @@
+<div class="card">
+    <h2>Settings</h2>
+
+    <app-edit></app-edit>
+
+
+</div>
+
+<div class="card">
+    <h2>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}}%</span></h2>
+    <input type="file" id="file" (change)="otaUpdate($event)" accept=".bin">
+    <br>
+    <small>(esp-miner.bin)</small>
+</div>
+
+<div class="card">
+    <h2>Update Website <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}}%</span></h2>
+    <input type="file" id="file" (change)="otaWWWUpdate($event)" accept=".bin">
+    <br>
+    <small>(www.bin)</small>
+</div>

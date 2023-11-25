@@ -1,8 +1,8 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
-import { EditComponent } from './components/edit/edit.component';
 import { HomeComponent } from './components/home/home.component';
+import { SettingsComponent } from './components/settings/settings.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
 
 const routes: Routes = [
@@ -11,8 +11,8 @@ const routes: Routes = [
     component: HomeComponent
   },
   {
-    path: 'edit',
-    component: EditComponent
+    path: 'settings',
+    component: SettingsComponent
   },
   {
     path: 'swarm',

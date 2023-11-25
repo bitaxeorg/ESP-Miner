@@ -1,4 +1,4 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
@@ -8,11 +8,11 @@ import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
 
 @Component({
-  selector: 'app-edit',
-  templateUrl: './edit.component.html',
-  styleUrls: ['./edit.component.scss']
+  selector: 'app-settings',
+  templateUrl: './settings.component.html',
+  styleUrls: ['./settings.component.scss']
 })
-export class EditComponent {
+export class SettingsComponent {
 
   public form!: FormGroup;
 
@@ -110,5 +110,82 @@ export class EditComponent {
         }
       });
   }
+
+  otaUpdate(event: any) {
+    const file = event.target?.files.item(0) as File;
+
+    if (file.name != 'esp-miner.bin') {
+      this.toastrService.error('Incorrect file, looking for esp-miner.bin.', 'Error');
+      return;
+    }
+
+    this.systemService.performOTAUpdate(file)
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: (event) => {
+          if (event.type === HttpEventType.UploadProgress) {
+            this.firmwareUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
+          } else if (event.type === HttpEventType.Response) {
+            if (event.ok) {
+              this.toastrService.success('Firmware updated', 'Success!');
+
+            } else {
+              this.toastrService.error(event.statusText, 'Error');
+            }
+          }
+        },
+        error: (err) => {
+          this.toastrService.error(event.statusText, 'Error');
+        },
+        complete: () => {
+          this.firmwareUpdateProgress = null;
+        }
+      });
+  }
+  otaWWWUpdate(event: any) {
+    const file = event.target?.files.item(0) as File;
+    if (file.name != 'www.bin') {
+      this.toastrService.error('Incorrect file, looking for www.bin.', 'Error');
+      return;
+    }
+
+    this.systemService.performWWWOTAUpdate(file)
+      .pipe(
+        this.loadingService.lockUIUntilComplete(),
+      ).subscribe({
+        next: (event) => {
+          if (event.type === HttpEventType.UploadProgress) {
+            this.websiteUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
+          } else if (event.type === HttpEventType.Response) {
+            if (event.ok) {
+              setTimeout(() => {
+                this.toastrService.success('Website updated', 'Success!');
+                window.location.reload();
+              }, 1000);
+
+            } else {
+              this.toastrService.error(event.statusText, 'Error');
+            }
+          }
+        },
+        error: (err) => {
+          this.toastrService.error(event.statusText, 'Error');
+        },
+        complete: () => {
+          this.websiteUpdateProgress = null;
+        }
+      });
+  }
+
+  public restart() {
+    this.systemService.restart().subscribe(res => {
+
+    });
+    this.toastr.success('Success!', 'Bitaxe restarted');
+  }
+
+
+
+
 
 }
