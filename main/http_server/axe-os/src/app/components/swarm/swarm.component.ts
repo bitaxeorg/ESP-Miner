@@ -37,7 +37,7 @@ export class SwarmComponent {
               };
             }),
             catchError(error => {
-              return of(null);
+              return of({ ip, error: true });
             })
           );
         });
@@ -58,6 +58,7 @@ export class SwarmComponent {
     ).subscribe({
       next: () => {
         this.toastr.success('Success!', 'Saved.');
+        window.location.reload();
       },
       error: (err) => {
         this.toastr.error('Error.', `Could not save. ${err.message}`);
@@ -67,6 +68,25 @@ export class SwarmComponent {
       }
     });
 
+  }
+
+  public remove(axe: any) {
+    this.systemService.getSwarmInfo().pipe(
+      switchMap((swarm: any) => {
+        return this.systemService.updateSwarm(swarm.filter((s: any) => s.ip != axe.ip))
+      })
+    ).subscribe({
+      next: () => {
+        this.toastr.success('Success!', 'Saved.');
+        window.location.reload();
+      },
+      error: (err) => {
+        this.toastr.error('Error.', `Could not save. ${err.message}`);
+      },
+      complete: () => {
+        this.form.reset();
+      }
+    });
   }
 
 }

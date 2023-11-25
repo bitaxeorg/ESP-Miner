@@ -3,12 +3,29 @@
     <input formControlName="ip" type="text">
     <button style="margin-left: 15px;" class="btn btn-primary" (click)="add()">Add</button>
 </form>
-<div class="card">
-    <ng-container *ngIf="swarm$ | async as swarm">
-        <div *ngFor="let axeOs$ of swarm">
-            <div class="row" *ngIf="axeOs$ | async as axe">
-                {{axe.ip}}: {{axe.hashRate | number: '1.2-2'}}
-            </div>
-        </div>
-    </ng-container>
+<div>
+    <table cellspacing="0" cellpadding="0" *ngIf="swarm$ | async as swarm">
+        <tr>
+            <th>IP</th>
+            <th>Hash Rate</th>
+            <th>Uptime</th>
+            <th>Accepted</th>
+            <th>Power</th>
+            <th>Temp</th>
+            <th>Best Difficulty</th>
+            <th>Remove</th>
+        </tr>
+        <ng-container *ngFor="let axeOs$ of swarm">
+            <tr *ngIf="axeOs$ | async as axe">
+                <td>{{axe.ip}}</td>
+                <td>{{axe.hashRate | number: '1.2-2'}} <small>Gh/s</small></td>
+                <td>{{axe.uptimeSeconds | dateAgo}}</td>
+                <td>{{axe.sharesAccepted}}</td>
+                <td>{{axe.power | number: '1.2-2'}} <small>W</small> </td>
+                <td>{{axe.temp}} <small>C</small></td>
+                <td>{{axe.bestDiff}}</td>
+                <td><button class="btn btn-secondary" (click)="remove(axe)">X</button></td>
+            </tr>
+        </ng-container>
+    </table>
 </div>
