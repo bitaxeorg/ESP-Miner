@@ -199,8 +199,37 @@ static esp_err_t PATCH_update_swarm(httpd_req_t * req)
     return ESP_OK;
 }
 
+static esp_err_t set_cors_headers(httpd_req_t * req)
+{
+    return httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*") == ESP_OK &&
+                   httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS") == ESP_OK &&
+                   httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type") == ESP_OK
+               ? ESP_OK
+               : ESP_FAIL;
+}
+
+static esp_err_t handle_options_request(httpd_req_t * req)
+{
+    // Set CORS headers for OPTIONS request
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    // Send a blank response for OPTIONS request
+    httpd_resp_send(req, NULL, 0);
+
+    return ESP_OK;
+}
+
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
     int total_len = req->content_len;
     int cur_len = 0;
     char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
@@ -266,11 +295,11 @@ static esp_err_t GET_swarm(httpd_req_t * req)
 {
     httpd_resp_set_type(req, "application/json");
 
-    // Add CORS headers
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Credentials", "true");
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
 
     char * swarm_config = nvs_config_get_string(NVS_CONFIG_SWARM, "[]");
     httpd_resp_sendstr(req, swarm_config);
@@ -282,11 +311,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 {
     httpd_resp_set_type(req, "application/json");
 
-    // Add CORS headers
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Credentials", "true");
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
 
     char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
     char * wifiPass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, CONFIG_ESP_WIFI_PASSWORD);
@@ -512,6 +541,14 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_uri_t update_system_settings_uri = {
         .uri = "/api/system", .method = HTTP_PATCH, .handler = PATCH_update_settings, .user_ctx = rest_context};
     httpd_register_uri_handler(server, &update_system_settings_uri);
+
+    httpd_uri_t options_uri = {
+        .uri = "/api/system",
+        .method = HTTP_OPTIONS,
+        .handler = handle_options_request,
+        .user_ctx = NULL,
+    };
+    httpd_register_uri_handler(server, &options_uri);
 
     httpd_uri_t update_post_ota_firmware = {
         .uri = "/api/system/OTA", .method = HTTP_POST, .handler = POST_OTA_update, .user_ctx = NULL};

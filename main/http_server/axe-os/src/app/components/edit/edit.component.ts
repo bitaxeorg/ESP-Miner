@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { startWith } from 'rxjs';
@@ -12,7 +12,7 @@ import { eASICModel } from 'src/models/enum/eASICModel';
   templateUrl: './edit.component.html',
   styleUrls: ['./edit.component.scss']
 })
-export class EditComponent {
+export class EditComponent implements OnInit {
 
   public form!: FormGroup;
 
@@ -23,6 +23,8 @@ export class EditComponent {
   public devToolsOpen: boolean = false;
   public eASICModel = eASICModel;
   public ASICModel!: eASICModel;
+
+  @Input() uri = '';
 
   constructor(
     private fb: FormBuilder,
@@ -35,7 +37,11 @@ export class EditComponent {
     window.addEventListener('resize', this.checkDevTools);
     this.checkDevTools();
 
-    this.systemService.getInfo()
+
+
+  }
+  ngOnInit(): void {
+    this.systemService.getInfo(this.uri)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
         this.ASICModel = info.ASICModel;
@@ -73,8 +79,9 @@ export class EditComponent {
           }
         });
       });
-
   }
+
+
   private checkDevTools = () => {
     if (
       window.outerWidth - window.innerWidth > 160 ||
@@ -99,7 +106,7 @@ export class EditComponent {
     form.invertfanpolarity = form.invertfanpolarity == true ? 1 : 0;
     form.autofanspeed = form.autofanspeed == true ? 1 : 0;
 
-    this.systemService.updateSystem(form)
+    this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {

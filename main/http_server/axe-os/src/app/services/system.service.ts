@@ -57,8 +57,8 @@ export class SystemService {
     return this.httpClient.post(`${uri}/api/system/restart`, {});
   }
 
-  public updateSystem(update: any) {
-    return this.httpClient.patch(`/api/system`, update);
+  public updateSystem(uri: string = '', update: any) {
+    return this.httpClient.patch(`${uri}/api/system`, update);
   }
 
 

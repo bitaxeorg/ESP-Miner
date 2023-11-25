@@ -24,3 +24,32 @@ td {
 a {
     color: white;
 }
+
+.modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    position: fixed;
+    z-index: 9;
+}
+
+.modal {
+    position: fixed;
+    max-height: 70vh;
+    width: 50vw;
+    z-index: 999;
+    top: 0;
+    left: 0;
+    margin: 12vh 25vw;
+    padding: 50px;
+    overflow-y: auto;
+}
+
+.close {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    cursor: pointer;
+}

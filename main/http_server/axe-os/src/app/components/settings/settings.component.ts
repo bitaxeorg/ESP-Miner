@@ -99,7 +99,7 @@ export class SettingsComponent {
     form.invertfanpolarity = form.invertfanpolarity == true ? 1 : 0;
     form.autofanspeed = form.autofanspeed == true ? 1 : 0;
 
-    this.systemService.updateSystem(form)
+    this.systemService.updateSystem(undefined, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {

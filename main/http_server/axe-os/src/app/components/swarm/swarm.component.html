@@ -16,6 +16,7 @@
             <th>Power</th>
             <th>Temp</th>
             <th>Best Difficulty</th>
+            <th>Version</th>
             <th>Edit</th>
             <th>Restart</th>
             <th>Remove</th>
@@ -29,10 +30,18 @@
                 <td>{{axe.power | number: '1.2-2'}} <small>W</small> </td>
                 <td>{{axe.temp}} <small>C</small></td>
                 <td>{{axe.bestDiff}}</td>
+                <td>{{axe.version}}</td>
                 <td><button class="btn btn-primary" (click)="edit(axe)">&#9998;</button></td>
                 <td><button class="btn btn-danger" (click)="restart(axe)">&#9850;</button></td>
                 <td><button class="btn btn-secondary" (click)="remove(axe)">&#10006;</button></td>
             </tr>
         </ng-container>
     </table>
+</div>
+
+<div class="modal-backdrop" *ngIf="showEdit" (click)="showEdit = false"></div>
+<div class="modal card" *ngIf="showEdit">
+    <div class="close" (click)="showEdit = false">&#10006;</div>
+    <h1>{{selectedAxeOs.ip}}</h1>
+    <app-edit [uri]="'http://' + selectedAxeOs.ip"></app-edit>
 </div>

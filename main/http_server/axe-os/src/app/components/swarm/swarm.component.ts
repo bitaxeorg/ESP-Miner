@@ -17,6 +17,9 @@ export class SwarmComponent {
 
   public refresh$: BehaviorSubject<null> = new BehaviorSubject(null);
 
+  public selectedAxeOs: any = null;
+  public showEdit = false;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -81,8 +84,10 @@ export class SwarmComponent {
   }
 
   public edit(axe: any) {
-
+    this.selectedAxeOs = axe;
+    this.showEdit = true;
   }
+
   public restart(axe: any) {
     this.systemService.restart(`http://${axe.ip}`).subscribe(res => {
 
