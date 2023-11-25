@@ -3,6 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 
 import { EditComponent } from './components/edit/edit.component';
 import { HomeComponent } from './components/home/home.component';
+import { SwarmComponent } from './components/swarm/swarm.component';
 
 const routes: Routes = [
   {
@@ -12,6 +13,10 @@ const routes: Routes = [
   {
     path: 'edit',
     component: EditComponent
+  },
+  {
+    path: 'swarm',
+    component: SwarmComponent
   }
 ];
 

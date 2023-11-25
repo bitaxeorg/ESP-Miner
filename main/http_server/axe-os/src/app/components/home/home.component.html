@@ -2,10 +2,7 @@
     <h4>Loading...</h4>
 </ng-template>
 <ng-container>
-    <div class="button-row">
-        <button [routerLink]="['edit']" class="btn btn-primary edit">Settings</button>
-        <button (click)="restart()" class="btn btn-danger restart">Restart</button>
-    </div>
+
 
     <div class="container">
         <div>
@@ -128,8 +125,11 @@
     </div>
 
     <div class="card mt-2">
-        <h2>Realtime Logs</h2>
-        <div id="logs" #scrollContainer>
+        <h2>Realtime Logs <button (click)="showLogs = !showLogs" style="margin-left: 15px;"
+                class="btn btn-secondary">{{showLogs ? 'Hide': 'Show'}}
+                Logs</button></h2>
+
+        <div *ngIf="showLogs" id="logs" #scrollContainer>
             <div *ngFor="let log of logs">₿ {{log | ANSI}}</div>
         </div>
     </div>

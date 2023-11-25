@@ -14,6 +14,7 @@ import { HomeComponent } from './components/home/home.component';
 import { LoadingComponent } from './components/loading/loading.component';
 import { ANSIPipe } from './pipes/ansi.pipe';
 import { DateAgoPipe } from './pipes/date-ago.pipe';
+import { SwarmComponent } from './components/swarm/swarm.component';
 
 const components = [
   AppComponent,
@@ -27,7 +28,8 @@ const components = [
     HomeComponent,
     LoadingComponent,
     ANSIPipe,
-    DateAgoPipe
+    DateAgoPipe,
+    SwarmComponent
   ],
   imports: [
     BrowserModule,

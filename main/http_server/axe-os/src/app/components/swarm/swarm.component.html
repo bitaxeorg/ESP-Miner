@@ -1,0 +1,14 @@
+<form [formGroup]="form">
+    <label>AxeOS Device IP: </label>
+    <input formControlName="ip" type="text">
+    <button style="margin-left: 15px;" class="btn btn-primary" (click)="add()">Add</button>
+</form>
+<div class="card">
+    <ng-container *ngIf="swarm$ | async as swarm">
+        <div *ngFor="let axeOs$ of swarm">
+            <div class="row" *ngIf="axeOs$ | async as axe">
+                {{axe.ip}}: {{axe.hashRate | number: '1.2-2'}}
+            </div>
+        </div>
+    </ng-container>
+</div>

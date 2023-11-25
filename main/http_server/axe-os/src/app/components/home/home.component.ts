@@ -1,7 +1,5 @@
 import { AfterViewChecked, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
-import { ToastrService } from 'ngx-toastr';
 import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap } from 'rxjs';
-import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { WebsocketService } from 'src/app/services/web-socket.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
@@ -22,11 +20,11 @@ export class HomeComponent implements AfterViewChecked, OnDestroy {
 
   private websocketSubscription: Subscription;
 
+  public showLogs = false;
+
 
   constructor(
     private systemService: SystemService,
-    private toastr: ToastrService,
-    private loadingService: LoadingService,
     private websocketService: WebsocketService
   ) {
 
@@ -69,11 +67,6 @@ export class HomeComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
-  public restart() {
-    this.systemService.restart().subscribe(res => {
 
-    });
-    this.toastr.success('Success!', 'Bitaxe restarted');
-  }
 }
 

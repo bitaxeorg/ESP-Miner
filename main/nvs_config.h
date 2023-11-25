@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+// Max length 15
+
 #define NVS_CONFIG_WIFI_SSID "wifissid"
 #define NVS_CONFIG_WIFI_PASS "wifipass"
 #define NVS_CONFIG_STRATUM_URL "stratumurl"
@@ -20,6 +22,8 @@
 #define NVS_CONFIG_AUTO_FAN_SPEED "autofanspeed"
 #define NVS_CONFIG_FAN_SPEED "fanspeed"
 #define NVS_CONFIG_BEST_DIFF "bestdiff"
+
+#define NVS_CONFIG_SWARM "swarmconfig"
 
 char * nvs_config_get_string(const char * key, const char * default_value);
 void nvs_config_set_string(const char * key, const char * default_value);

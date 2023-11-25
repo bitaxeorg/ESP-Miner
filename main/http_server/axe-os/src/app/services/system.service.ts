@@ -15,9 +15,9 @@ export class SystemService {
     private httpClient: HttpClient
   ) { }
 
-  public getInfo(): Observable<ISystemInfo> {
+  public getInfo(ip: string = ''): Observable<ISystemInfo> {
     if (environment.production) {
-      return this.httpClient.get(`/api/system/info`) as Observable<ISystemInfo>;
+      return this.httpClient.get(`${ip}/api/system/info`) as Observable<ISystemInfo>;
     } else {
       return of(
         {
@@ -100,4 +100,11 @@ export class SystemService {
   }
 
 
+  public getSwarmInfo(): Observable<{ ip: string }[]> {
+    return this.httpClient.get(`/api/swarm/info`) as Observable<{ ip: string }[]>;
+  }
+
+  public updateSwarm(swarmConfig: any) {
+    return this.httpClient.patch(`/api/swarm`, swarmConfig);
+  }
 }
