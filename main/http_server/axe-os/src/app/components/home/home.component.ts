@@ -18,7 +18,7 @@ export class HomeComponent implements AfterViewChecked, OnDestroy {
 
   public logs: string[] = [];
 
-  private websocketSubscription: Subscription;
+  private websocketSubscription?: Subscription;
 
   public showLogs = false;
 
@@ -47,23 +47,32 @@ export class HomeComponent implements AfterViewChecked, OnDestroy {
       })
     )
 
-    this.websocketSubscription = this.websocketService.ws$.subscribe({
-      next: (val) => {
-        this.logs.push(val);
-        if (this.logs.length > 100) {
-          this.logs.shift();
-        }
 
-      }
-    })
 
   }
   ngOnDestroy(): void {
-    this.websocketSubscription.unsubscribe();
+    this.websocketSubscription?.unsubscribe();
   }
   ngAfterViewChecked(): void {
     if (this.scrollContainer?.nativeElement != null) {
       this.scrollContainer.nativeElement.scrollTo({ left: 0, top: this.scrollContainer.nativeElement.scrollHeight, behavior: 'smooth' });
+    }
+  }
+
+  public toggleLogs() {
+    this.showLogs = !this.showLogs;
+
+    if (this.showLogs) {
+      this.websocketSubscription = this.websocketService.ws$.subscribe({
+        next: (val) => {
+          this.logs.push(val);
+          if (this.logs.length > 100) {
+            this.logs.shift();
+          }
+        }
+      })
+    } else {
+      this.websocketSubscription?.unsubscribe();
     }
   }
 

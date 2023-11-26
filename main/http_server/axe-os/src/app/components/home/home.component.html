@@ -125,8 +125,8 @@
     </div>
 
     <div class="card mt-2">
-        <h2>Realtime Logs <button (click)="showLogs = !showLogs" style="margin-left: 15px;"
-                class="btn btn-secondary">{{showLogs ? 'Hide': 'Show'}}
+        <h2>Realtime Logs <button (click)="toggleLogs()" style="margin-left: 15px;" class="btn btn-secondary">{{showLogs
+                ? 'Hide': 'Show'}}
                 Logs</button></h2>
 
         <div *ngIf="showLogs" id="logs" #scrollContainer>
