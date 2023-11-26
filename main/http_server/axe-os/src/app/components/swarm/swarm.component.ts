@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { BehaviorSubject, catchError, combineLatest, forkJoin, map, Observable, of, startWith, switchMap } from 'rxjs';
 import { SystemService } from 'src/app/services/system.service';
@@ -26,7 +26,7 @@ export class SwarmComponent {
     private toastr: ToastrService
   ) {
     this.form = this.fb.group({
-      ip: []
+      ip: [null, [Validators.required, Validators.pattern('(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')]]
     });
 
     this.swarm$ = this.systemService.getSwarmInfo().pipe(

@@ -1,7 +1,7 @@
 <form [formGroup]="form">
     <label>AxeOS Device IP: </label>
     <input formControlName="ip" type="text">
-    <button style="margin-left: 15px;" class="btn btn-primary" (click)="add()">Add</button>
+    <button style="margin-left: 15px;" class="btn btn-primary" (click)="add()" [disabled]="form.invalid">Add</button>
     <!-- <input type="checkbox" formControlName="sync"> Sync All -->
 </form>
 <div>
