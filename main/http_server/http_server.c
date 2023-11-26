@@ -109,6 +109,15 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
     }
     return httpd_resp_set_type(req, type);
 }
+static esp_err_t set_cors_headers(httpd_req_t * req)
+{
+
+    return httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*") == ESP_OK &&
+                   httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS") == ESP_OK &&
+                   httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type") == ESP_OK
+               ? ESP_OK
+               : ESP_FAIL;
+}
 
 /* Send HTTP response with the contents of the requested file */
 static esp_err_t rest_common_get_handler(httpd_req_t * req)
@@ -174,6 +183,12 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
 
 static esp_err_t PATCH_update_swarm(httpd_req_t * req)
 {
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
     int total_len = req->content_len;
     int cur_len = 0;
     char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
@@ -197,15 +212,6 @@ static esp_err_t PATCH_update_swarm(httpd_req_t * req)
     nvs_config_set_string(NVS_CONFIG_SWARM, buf);
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
-}
-
-static esp_err_t set_cors_headers(httpd_req_t * req)
-{
-    return httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*") == ESP_OK &&
-                   httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS") == ESP_OK &&
-                   httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type") == ESP_OK
-               ? ESP_OK
-               : ESP_FAIL;
 }
 
 static esp_err_t handle_options_request(httpd_req_t * req)
@@ -534,6 +540,14 @@ esp_err_t start_rest_server(void * pvParameters)
         .uri = "/api/swarm", .method = HTTP_PATCH, .handler = PATCH_update_swarm, .user_ctx = rest_context};
     httpd_register_uri_handler(server, &update_swarm_uri);
 
+    httpd_uri_t swarm_options_uri = {
+        .uri = "/api/swarm",
+        .method = HTTP_OPTIONS,
+        .handler = handle_options_request,
+        .user_ctx = NULL,
+    };
+    httpd_register_uri_handler(server, &swarm_options_uri);
+
     httpd_uri_t system_restart_uri = {
         .uri = "/api/system/restart", .method = HTTP_POST, .handler = POST_restart, .user_ctx = rest_context};
     httpd_register_uri_handler(server, &system_restart_uri);
@@ -542,13 +556,13 @@ esp_err_t start_rest_server(void * pvParameters)
         .uri = "/api/system", .method = HTTP_PATCH, .handler = PATCH_update_settings, .user_ctx = rest_context};
     httpd_register_uri_handler(server, &update_system_settings_uri);
 
-    httpd_uri_t options_uri = {
+    httpd_uri_t system_options_uri = {
         .uri = "/api/system",
         .method = HTTP_OPTIONS,
         .handler = handle_options_request,
         .user_ctx = NULL,
     };
-    httpd_register_uri_handler(server, &options_uri);
+    httpd_register_uri_handler(server, &system_options_uri);
 
     httpd_uri_t update_post_ota_firmware = {
         .uri = "/api/system/OTA", .method = HTTP_POST, .handler = POST_OTA_update, .user_ctx = NULL};

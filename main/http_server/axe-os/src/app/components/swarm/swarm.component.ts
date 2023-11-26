@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { BehaviorSubject, catchError, map, Observable, of, startWith, switchMap } from 'rxjs';
+import { BehaviorSubject, catchError, forkJoin, map, Observable, of, startWith, switchMap } from 'rxjs';
 import { SystemService } from 'src/app/services/system.service';
 
 @Component({
@@ -58,11 +58,19 @@ export class SwarmComponent {
 
 
   public add() {
-    const ip = this.form.value.ip;
+    const newIp = this.form.value.ip;
 
     this.systemService.getSwarmInfo().pipe(
-      switchMap((swarm: any) => {
-        return this.systemService.updateSwarm([{ ip }, ...swarm])
+      switchMap((swarmInfo) => {
+
+        const swarmUpdate = swarmInfo.map(({ ip }) => {
+          return this.systemService.updateSwarm('http://' + ip, [{ ip: newIp }, ...swarmInfo])
+        });
+
+        const newAxeOs = this.systemService.updateSwarm('http://' + newIp, [{ ip: newIp }, ...swarmInfo])
+
+        return forkJoin([newAxeOs, ...swarmUpdate]);
+
       })
     ).subscribe({
       next: () => {
@@ -95,10 +103,19 @@ export class SwarmComponent {
     this.toastr.success('Success!', 'Bitaxe restarted');
   }
 
-  public remove(axe: any) {
+  public remove(axeOs: any) {
     this.systemService.getSwarmInfo().pipe(
-      switchMap((swarm: any) => {
-        return this.systemService.updateSwarm(swarm.filter((s: any) => s.ip != axe.ip))
+      switchMap((swarmInfo) => {
+
+        const newSwarm = swarmInfo.filter((s: any) => s.ip != axeOs.ip);
+
+        const swarmUpdate = newSwarm.map(({ ip }) => {
+          return this.systemService.updateSwarm('http://' + ip, newSwarm)
+        });
+
+        const removedAxeOs = this.systemService.updateSwarm('http://' + axeOs.ip, []);
+
+        return forkJoin([removedAxeOs, ...swarmUpdate]);
       })
     ).subscribe({
       next: () => {

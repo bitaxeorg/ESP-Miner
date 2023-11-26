@@ -37,8 +37,6 @@ export class EditComponent implements OnInit {
     window.addEventListener('resize', this.checkDevTools);
     this.checkDevTools();
 
-
-
   }
   ngOnInit(): void {
     this.systemService.getInfo(this.uri)
