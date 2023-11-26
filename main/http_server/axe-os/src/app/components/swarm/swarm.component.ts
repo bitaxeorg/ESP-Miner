@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { BehaviorSubject, catchError, forkJoin, map, Observable, of, startWith, switchMap } from 'rxjs';
+import { BehaviorSubject, catchError, combineLatest, forkJoin, map, Observable, of, startWith, switchMap } from 'rxjs';
 import { SystemService } from 'src/app/services/system.service';
 
 @Component({
@@ -60,11 +60,11 @@ export class SwarmComponent {
   public add() {
     const newIp = this.form.value.ip;
 
-    this.systemService.getSwarmInfo().pipe(
-      switchMap((swarmInfo) => {
+    combineLatest([this.systemService.getSwarmInfo('http://' + newIp), this.systemService.getSwarmInfo()]).pipe(
+      switchMap(([newSwarmInfo, swarmInfo]) => {
 
         const swarmUpdate = swarmInfo.map(({ ip }) => {
-          return this.systemService.updateSwarm('http://' + ip, [{ ip: newIp }, ...swarmInfo])
+          return this.systemService.updateSwarm('http://' + ip, [{ ip: newIp }, ...newSwarmInfo, ...swarmInfo])
         });
 
         const newAxeOs = this.systemService.updateSwarm('http://' + newIp, [{ ip: newIp }, ...swarmInfo])

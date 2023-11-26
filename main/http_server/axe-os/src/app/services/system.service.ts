@@ -100,8 +100,8 @@ export class SystemService {
   }
 
 
-  public getSwarmInfo(): Observable<{ ip: string }[]> {
-    return this.httpClient.get(`/api/swarm/info`) as Observable<{ ip: string }[]>;
+  public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
+    return this.httpClient.get(`${uri}/api/swarm/info`) as Observable<{ ip: string }[]>;
   }
 
   public updateSwarm(uri: string = '', swarmConfig: any) {
