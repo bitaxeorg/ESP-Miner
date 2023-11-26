@@ -257,34 +257,43 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     buf[total_len] = '\0';
 
     cJSON * root = cJSON_Parse(buf);
-    char * stratumURL = cJSON_GetObjectItem(root, "stratumURL")->valuestring;
-    char * stratumUser = cJSON_GetObjectItem(root, "stratumUser")->valuestring;
-    uint16_t stratumPort = cJSON_GetObjectItem(root, "stratumPort")->valueint;
-    char * ssid = cJSON_GetObjectItem(root, "ssid")->valuestring;
-    char * wifiPass = cJSON_GetObjectItem(root, "wifiPass")->valuestring;
-
-    uint16_t coreVoltage = cJSON_GetObjectItem(root, "coreVoltage")->valueint;
-    uint16_t frequency = cJSON_GetObjectItem(root, "frequency")->valueint;
-
-    uint16_t flip_screen = cJSON_GetObjectItem(root, "flipscreen")->valueint;
-    uint16_t invert_screen = cJSON_GetObjectItem(root, "invertscreen")->valueint;
-
-    uint16_t invert_fan_polarity = cJSON_GetObjectItem(root, "invertfanpolarity")->valueint;
-    uint16_t auto_fan_speed = cJSON_GetObjectItem(root, "autofanspeed")->valueint;
-    uint16_t fan_speed = cJSON_GetObjectItem(root, "fanspeed")->valueint;
-
-    nvs_config_set_string(NVS_CONFIG_STRATUM_URL, stratumURL);
-    nvs_config_set_string(NVS_CONFIG_STRATUM_USER, stratumUser);
-    nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, stratumPort);
-    nvs_config_set_string(NVS_CONFIG_WIFI_SSID, ssid);
-    nvs_config_set_string(NVS_CONFIG_WIFI_PASS, wifiPass);
-    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, coreVoltage);
-    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, frequency);
-    nvs_config_set_u16(NVS_CONFIG_FLIP_SCREEN, flip_screen);
-    nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, invert_screen);
-    nvs_config_set_u16(NVS_CONFIG_INVERT_FAN_POLARITY, invert_fan_polarity);
-    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, auto_fan_speed);
-    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, fan_speed);
+    cJSON * item;
+    if ((item = cJSON_GetObjectItem(root, "stratumURL")) != NULL) {
+        nvs_config_set_string(NVS_CONFIG_STRATUM_URL, item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "stratumUser")) != NULL) {
+        nvs_config_set_string(NVS_CONFIG_STRATUM_USER, item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "stratumPort")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "ssid")) != NULL) {
+        nvs_config_set_string(NVS_CONFIG_WIFI_SSID, item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "wifiPass")) != NULL) {
+        nvs_config_set_string(NVS_CONFIG_WIFI_PASS, item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "flipscreen")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_FLIP_SCREEN, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "invertfanpolarity")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_INVERT_FAN_POLARITY, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "autofanspeed")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
+    }
 
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
