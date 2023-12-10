@@ -333,13 +333,25 @@ void STRATUM_V1_submit_share(int socket, const char *username, const char *jobid
     write(socket, submit_msg, strlen(submit_msg));
 }
 
-void STRATUM_V1_configure_version_rolling(int socket)
+void STRATUM_V1_configure_version_rolling(int socket, uint32_t * version_mask)
 {
-    // Configure
     char configure_msg[BUFFER_SIZE * 2];
     sprintf(configure_msg, "{\"id\": %d, \"method\": \"mining.configure\", \"params\": [[\"version-rolling\"], {\"version-rolling.mask\": \"ffffffff\"}]}\n", send_uid++);
     ESP_LOGI(TAG, "tx: %s", configure_msg);
     write(socket, configure_msg, strlen(configure_msg));
+
+    char * line;
+    line = STRATUM_V1_receive_jsonrpc_line(socket);
+
+    ESP_LOGI(TAG, "Received result %s", line);
+    StratumApiV1Message stratum_api_v1_message;
+    STRATUM_V1_parse(&stratum_api_v1_message, line);
+    if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK || stratum_api_v1_message.method == STRATUM_RESULT_VERSION_MASK) {
+        *version_mask = stratum_api_v1_message.version_mask;
+        ESP_LOGI(TAG, "Set version mask: %08lx", *version_mask);
+    }
+
+    free(line);
 
     return;
 }
