@@ -14,7 +14,6 @@ export interface ISystemInfo {
     freeHeap: number,
     coreVoltage: number,
     ssid: string,
-    wifiPass: string,
     wifiStatus: string,
     sharesAccepted: number,
     sharesRejected: number,

@@ -55,7 +55,7 @@ export class SettingsComponent {
           ]],
           stratumUser: [info.stratumUser, [Validators.required]],
           ssid: [info.ssid, [Validators.required]],
-          wifiPass: [info.wifiPass],
+          wifiPass: ['password'],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
