@@ -31,12 +31,12 @@ typedef struct
     uint32_t lastClockSync;
 } SystemModule;
 
-void SYSTEM_task(void *parameters);
+void SYSTEM_task(void * parameters);
 
-void SYSTEM_notify_accepted_share(SystemModule *module);
-void SYSTEM_notify_rejected_share(SystemModule *module);
-void SYSTEM_notify_found_nonce(SystemModule *module, double pool_diff, double found_diff, uint32_t nbits);
-void SYSTEM_notify_mining_started(SystemModule *module);
-void SYSTEM_notify_new_ntime(SystemModule *module, uint32_t ntime);
+void SYSTEM_notify_accepted_share(SystemModule * module);
+void SYSTEM_notify_rejected_share(SystemModule * module);
+void SYSTEM_notify_found_nonce(SystemModule * module, double pool_diff, double found_diff, uint32_t nbits, float power);
+void SYSTEM_notify_mining_started(SystemModule * module);
+void SYSTEM_notify_new_ntime(SystemModule * module, uint32_t ntime);
 
 #endif /* SYSTEM_H_ */

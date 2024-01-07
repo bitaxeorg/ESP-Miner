@@ -93,15 +93,14 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
     netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
 }
 
-static void _update_hashrate(GlobalState * GLOBAL_STATE)
+static void _update_hashrate(SystemModule * module, float power)
 {
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     if (module->screen_page != 0) {
         return;
     }
 
-    float efficiency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power / (module->current_hashrate / 1000.0);
+    float efficiency = power / (module->current_hashrate / 1000.0);
 
     OLED_clearLine(0);
     memset(module->oled_buf, 0, 20);
@@ -230,7 +229,7 @@ static void _update_system_performance(GlobalState * GLOBAL_STATE)
 
     if (OLED_status()) {
 
-        _update_hashrate(GLOBAL_STATE);
+        _update_hashrate(module, GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
         _update_shares(module);
         _update_best_diff(module);
 
@@ -424,7 +423,7 @@ void SYSTEM_notify_new_ntime(SystemModule * module, uint32_t ntime)
     settimeofday(&tv, NULL);
 }
 
-void SYSTEM_notify_found_nonce(SystemModule * module, double pool_diff, double found_diff, uint32_t nbits)
+void SYSTEM_notify_found_nonce(SystemModule * module, double pool_diff, double found_diff, uint32_t nbits, float power)
 {
     // Calculate the time difference in seconds with sub-second precision
 
@@ -459,7 +458,7 @@ void SYSTEM_notify_found_nonce(SystemModule * module, double pool_diff, double f
         module->current_hashrate = ((module->current_hashrate * 9) + rolling_rate) / 10;
     }
 
-    _update_hashrate(module);
+    _update_hashrate(module, power);
 
     // logArrayContents(historical_hashrate, HISTORY_LENGTH);
     // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
