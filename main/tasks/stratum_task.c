@@ -19,6 +19,7 @@
 static const char * TAG = "stratum_task";
 static ip_addr_t ip_Addr;
 static bool bDNSFound = false;
+static bool bDNSInvalid = false;
 
 static StratumApiV1Message stratum_api_v1_message = {};
 
@@ -26,9 +27,13 @@ static SystemTaskModule SYSTEM_TASK_MODULE = {.stratum_difficulty = 8192};
 
 void dns_found_cb(const char * name, const ip_addr_t * ipaddr, void * callback_arg)
 {
-    ip_Addr = *ipaddr;
     bDNSFound = true;
-}
+    if (ipaddr != NULL) {
+        ip_Addr = *ipaddr;
+    } else {
+        bDNSInvalid = true;
+    }
+ }
 
 void stratum_task(void * pvParameters)
 {
@@ -39,26 +44,32 @@ void stratum_task(void * pvParameters)
     int addr_family = 0;
     int ip_protocol = 0;
 
-    char * stratum_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, STRATUM_URL);
-    uint16_t port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, PORT);
+
+    char *stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pool_url;
+    uint16_t port = GLOBAL_STATE->SYSTEM_MODULE.pool_port;
 
     // check to see if the STRATUM_URL is an ip address already
     if (inet_pton(AF_INET, stratum_url, &ip_Addr) == 1) {
         bDNSFound = true;
-    } else {
-        // it's a hostname. Lookup the ip address.
-        IP_ADDR4(&ip_Addr, 0, 0, 0, 0);
+    }
+    else
+    {
         ESP_LOGI(TAG, "Get IP for URL: %s\n", stratum_url);
         dns_gethostbyname(stratum_url, &ip_Addr, dns_found_cb, NULL);
-        while (!bDNSFound)
-            ;
+        while (!bDNSFound);
+
+        if (bDNSInvalid) {
+            ESP_LOGE(TAG, "DNS lookup failed for URL: %s\n", stratum_url);
+            //set ip_Addr to 0.0.0.0 so that connect() will fail
+            IP_ADDR4(&ip_Addr, 0, 0, 0, 0);
+        }
+
     }
 
     // make IP address string from ip_Addr
     snprintf(host_ip, sizeof(host_ip), "%d.%d.%d.%d", ip4_addr1(&ip_Addr.u_addr.ip4), ip4_addr2(&ip_Addr.u_addr.ip4),
              ip4_addr3(&ip_Addr.u_addr.ip4), ip4_addr4(&ip_Addr.u_addr.ip4));
     ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)\n", stratum_url, port, host_ip);
-    free(stratum_url);
 
     while (1) {
         struct sockaddr_in dest_addr;
@@ -76,11 +87,16 @@ void stratum_task(void * pvParameters)
         }
         ESP_LOGI(TAG, "Socket created, connecting to %s:%d", host_ip, port);
 
-        int err = connect(GLOBAL_STATE->sock, (struct sockaddr *) &dest_addr, sizeof(struct sockaddr_in6));
-        if (err != 0) {
-            ESP_LOGE(TAG, "Socket unable to connect: errno %d", errno);
-            esp_restart();
-            break;
+        int err = connect(GLOBAL_STATE->sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        if (err != 0)
+        {
+            ESP_LOGE(TAG, "Socket unable to connect to %s:%d (errno %d)", stratum_url, port, errno);
+            // close the socket
+            shutdown(GLOBAL_STATE->sock, SHUT_RDWR);
+            close(GLOBAL_STATE->sock);
+            // instead of restarting, retry this every 5 seconds
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            continue;
         }
 
         STRATUM_V1_configure_version_rolling(GLOBAL_STATE->sock, &GLOBAL_STATE->version_mask);

@@ -48,6 +48,12 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
     module->lastClockSync = 0;
     module->FOUND_BLOCK = false;
     module->startup_done = false;
+    
+    // set the pool url
+    module->pool_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
+
+    //set the pool port
+    module->pool_port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT);
 
     // set the best diff string
     _suffix_string(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
