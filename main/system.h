@@ -27,6 +27,8 @@ typedef struct
     bool startup_done;
     char ssid[20];
     char wifi_status[20];
+    char * pool_url;
+    uint16_t pool_port;
 
     uint32_t lastClockSync;
 } SystemModule;
