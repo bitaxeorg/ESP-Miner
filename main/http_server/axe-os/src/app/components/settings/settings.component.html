@@ -6,6 +6,23 @@
 
 </div>
 
+<div class="card" *ngIf="latestRelease$ | async as latestRelease">
+    <h2>Latest Release: {{latestRelease.name}}</h2>
+
+
+
+    <div *ngFor="let asset of latestRelease.assets">
+        <div *ngIf="asset.name == 'esp-miner.bin'">
+            <a target="_blank" [href]="asset.browser_download_url">esp-miner.bin</a>
+        </div>
+        <div *ngIf="asset.name == 'www.bin'">
+            <a target="_blank" [href]="asset.browser_download_url">www.bin</a>
+        </div>
+    </div>
+
+
+</div>
+
 <div class="card">
     <h2>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}}%</span></h2>
     <input type="file" id="file" (change)="otaUpdate($event)" accept=".bin">

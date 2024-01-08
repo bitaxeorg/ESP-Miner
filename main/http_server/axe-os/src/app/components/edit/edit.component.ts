@@ -104,6 +104,10 @@ export class EditComponent implements OnInit {
     form.invertfanpolarity = form.invertfanpolarity == true ? 1 : 0;
     form.autofanspeed = form.autofanspeed == true ? 1 : 0;
 
+    if (form.wifiPass === 'password') {
+      delete form.wifiPass;
+    }
+
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({

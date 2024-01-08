@@ -2,7 +2,8 @@ import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { startWith } from 'rxjs';
+import { map, Observable, startWith } from 'rxjs';
+import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
@@ -24,16 +25,25 @@ export class SettingsComponent {
   public eASICModel = eASICModel;
   public ASICModel!: eASICModel;
 
+  public latestRelease$: Observable<any>;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
     private toastr: ToastrService,
     private toastrService: ToastrService,
-    private loadingService: LoadingService
+    private loadingService: LoadingService,
+    private githubUpdateService: GithubUpdateService
   ) {
+
+
 
     window.addEventListener('resize', this.checkDevTools);
     this.checkDevTools();
+
+    this.latestRelease$ = this.githubUpdateService.getReleases().pipe(map(releases => {
+      return releases[0];
+    }))
 
     this.systemService.getInfo()
       .pipe(this.loadingService.lockUIUntilComplete())
@@ -98,6 +108,10 @@ export class SettingsComponent {
     form.invertscreen = form.invertscreen == true ? 1 : 0;
     form.invertfanpolarity = form.invertfanpolarity == true ? 1 : 0;
     form.autofanspeed = form.autofanspeed == true ? 1 : 0;
+
+    if (form.wifiPass === 'password') {
+      delete form.wifiPass;
+    }
 
     this.systemService.updateSystem(undefined, form)
       .pipe(this.loadingService.lockUIUntilComplete())

@@ -62,7 +62,7 @@ export class SystemService {
   }
 
 
-  private otaUpdate(file: File, url: string) {
+  private otaUpdate(file: File | Blob, url: string) {
     return new Observable<HttpEvent<string>>((subscriber) => {
       const reader = new FileReader();
 
@@ -78,12 +78,13 @@ export class SystemService {
           },
         }).subscribe({
           next: (e) => {
-            subscriber.next(e)
+
           },
           error: (err) => {
             subscriber.error(err)
           },
           complete: () => {
+            subscriber.next()
             subscriber.complete();
           }
         });
@@ -92,10 +93,10 @@ export class SystemService {
     });
   }
 
-  public performOTAUpdate(file: File) {
+  public performOTAUpdate(file: File | Blob) {
     return this.otaUpdate(file, `/api/system/OTA`);
   }
-  public performWWWOTAUpdate(file: File) {
+  public performWWWOTAUpdate(file: File | Blob) {
     return this.otaUpdate(file, `/api/system/OTAWWW`);
   }
 
