@@ -18,8 +18,10 @@
         "string_view": "c",
         "*.tcc": "c"
     },
-    "editor.formatOnSave": true,
+    "editor.formatOnSave": false,
     "cSpell.words": [
         "ssid"
-    ]
+    ],
+    "idf.port": "/dev/cu.usbmodem1434301",
+    "C_Cpp.intelliSenseEngine": "Tag Parser"
 }
