@@ -304,11 +304,11 @@ int STRATUM_V1_suggest_difficulty(int socket, uint32_t difficulty)
     return 1;
 }
 
-int STRATUM_V1_authenticate(int socket, const char *username)
+int STRATUM_V1_authenticate(int socket, const char *username, const char *pass)
 {
     char authorize_msg[BUFFER_SIZE];
-    sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"x\"]}\n",
-            send_uid++, username);
+    sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"%s\"]}\n",
+            send_uid++, username, pass);
     debug_stratum_tx(authorize_msg);
 
     write(socket, authorize_msg, strlen(authorize_msg));
@@ -344,11 +344,17 @@ void STRATUM_V1_configure_version_rolling(int socket, uint32_t * version_mask)
     line = STRATUM_V1_receive_jsonrpc_line(socket);
 
     ESP_LOGI(TAG, "Received result %s", line);
-    StratumApiV1Message stratum_api_v1_message;
-    STRATUM_V1_parse(&stratum_api_v1_message, line);
-    if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK || stratum_api_v1_message.method == STRATUM_RESULT_VERSION_MASK) {
-        *version_mask = stratum_api_v1_message.version_mask;
-        ESP_LOGI(TAG, "Set version mask: %08lx", *version_mask);
+
+    cJSON * result = cJSON_GetObjectItem(line, "result");
+    if (result != NULL)
+    {
+            cJSON * version_rolling_enabled = cJSON_GetObjectItem(result, "version-rolling");
+            if (cJSON_IsBool(version_rolling_enabled) && cJSON_IsTrue(version_rolling_enabled)){
+                cJSON * mask = cJSON_GetObjectItem(result, "version-rolling.mask");
+                uint32_t version_mask = strtoul(mask->valuestring, NULL, 16);
+                ESP_LOGI(TAG, "Set version mask: %08lx", version_mask);
+            }
+
     }
 
     free(line);

@@ -110,7 +110,9 @@ void stratum_task(void * pvParameters)
         STRATUM_V1_suggest_difficulty(GLOBAL_STATE->sock, STRATUM_DIFFICULTY);
 
         char * username = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, STRATUM_USER);
-        STRATUM_V1_authenticate(GLOBAL_STATE->sock, username);
+        char * password = nvs_config_get_string(NVS_CONFIG_STRATUM_PASS, STRATUM_PW);
+        STRATUM_V1_authenticate(GLOBAL_STATE->sock, username, password);
+        free(password);
         free(username);
 
         ESP_LOGI(TAG, "Extranonce: %s", GLOBAL_STATE->extranonce_str);

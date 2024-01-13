@@ -64,6 +64,7 @@ export class SettingsComponent {
             Validators.max(65353)
           ]],
           stratumUser: [info.stratumUser, [Validators.required]],
+          stratumPassword: ['password', [Validators.required]],
           ssid: [info.ssid, [Validators.required]],
           wifiPass: ['password'],
           coreVoltage: [info.coreVoltage, [Validators.required]],
@@ -111,6 +112,9 @@ export class SettingsComponent {
 
     if (form.wifiPass === 'password') {
       delete form.wifiPass;
+    }
+    if (form.stratumPassword === 'password') {
+      delete form.stratumPassword;
     }
 
     this.systemService.updateSystem(undefined, form)

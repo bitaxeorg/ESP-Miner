@@ -58,6 +58,7 @@ export class EditComponent implements OnInit {
             Validators.max(65353)
           ]],
           stratumUser: [info.stratumUser, [Validators.required]],
+          stratumPassword: ['password', [Validators.required]],
           ssid: [info.ssid, [Validators.required]],
           wifiPass: ['password'],
           coreVoltage: [info.coreVoltage, [Validators.required]],
@@ -106,6 +107,9 @@ export class EditComponent implements OnInit {
 
     if (form.wifiPass === 'password') {
       delete form.wifiPass;
+    }
+    if (form.stratumPassword === 'password') {
+      delete form.stratumPassword;
     }
 
     this.systemService.updateSystem(this.uri, form)
