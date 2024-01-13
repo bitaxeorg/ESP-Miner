@@ -120,11 +120,10 @@ void stratum_task(void * pvParameters)
 
 
 
-        // ESP_LOGI(TAG, "Extranonce: %s", GLOBAL_STATE->extranonce_str);
-        // ESP_LOGI(TAG, "Extranonce 2 length: %d", GLOBAL_STATE->extranonce_2_len);
+        //ESP_LOGI(TAG, "Extranonce: %s", GLOBAL_STATE->extranonce_str);
+        //ESP_LOGI(TAG, "Extranonce 2 length: %d", GLOBAL_STATE->extranonce_2_len);
 
         while (1) {
-            ESP_LOGI(TAG, "rx: waiting");
             char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->sock);
             ESP_LOGI(TAG, "rx: %s", line); // debug incoming stratum messages
             STRATUM_V1_parse(&stratum_api_v1_message, line);
