@@ -10,6 +10,8 @@ typedef struct
     float frequency_value;
     float power;
     float current;
+    bool HAS_POWER_EN;
+    bool HAS_PLUG_SENSE;
 } PowerManagementModule;
 
 static void automatic_fan_speed(float chip_temp);

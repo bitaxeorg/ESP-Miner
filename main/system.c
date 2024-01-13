@@ -69,10 +69,6 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
     //  ledc_init();
     //  led_set();
 
-    // Playing with BI level
-    gpio_set_direction(GPIO_NUM_10, GPIO_MODE_OUTPUT);
-    gpio_set_level(GPIO_NUM_10, 0);
-
     // Init I2C
     ESP_ERROR_CHECK(i2c_master_init());
     ESP_LOGI(TAG, "I2C initialized successfully");

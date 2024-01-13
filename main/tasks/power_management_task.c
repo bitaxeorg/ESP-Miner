@@ -12,7 +12,7 @@
 #include "serial.h"
 #include <string.h>
 
-#define POLL_RATE 5000
+#define POLL_RATE 2000
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
@@ -42,6 +42,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     power_management->frequency_multiplier = 1;
 
+    char * board_version = nvs_config_get_string(NVS_CONFIG_BOARD_VERSION, "unknown");
+    power_management->HAS_POWER_EN =
+        (strcmp(board_version, "202") == 1 || strcmp(board_version, "203") == 1 || strcmp(board_version, "204") == 1);
+    power_management->HAS_PLUG_SENSE = strcmp(board_version, "204") == 1;
+    free(board_version);
+
     int last_frequency_increase = 0;
 
     bool read_power = INA260_installed();
@@ -49,6 +55,23 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
     uint16_t auto_fan_speed = nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1);
+
+    // Configure GPIO12 as input(barrel jack) 1 is plugged in
+    gpio_config_t barrel_jack_conf = {
+        .pin_bit_mask = (1ULL << GPIO_NUM_12),
+        .mode = GPIO_MODE_INPUT,
+    };
+    gpio_config(&barrel_jack_conf);
+    int barrel_jack_plugged_in = gpio_get_level(GPIO_NUM_12);
+
+    gpio_set_direction(GPIO_NUM_10, GPIO_MODE_OUTPUT);
+    if (barrel_jack_plugged_in == 1 || !power_management->HAS_PLUG_SENSE) {
+        // turn ASIC on
+        gpio_set_level(GPIO_NUM_10, 0);
+    } else {
+        // turn ASIC off
+        gpio_set_level(GPIO_NUM_10, 1);
+    }
 
     vTaskDelay(3000 / portTICK_PERIOD_MS);
 
@@ -124,11 +147,18 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             if (power_management->chip_temp > THROTTLE_TEMP &&
                 (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
                 ESP_LOGE(TAG, "OVERHEAT");
-                nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 990);
-                nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-                nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-                nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                exit(EXIT_FAILURE);
+
+
+                if (power_management->HAS_POWER_EN) {
+                    gpio_set_level(GPIO_NUM_10, 1);
+                } else {
+                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 990);
+                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
+                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
+                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+                    exit(EXIT_FAILURE);
+                }
+
             }
         }
 
@@ -139,6 +169,16 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
         // ESP_LOGI(TAG, "target %f, Freq %f, Volt %f, Power %f", target_frequency, power_management->frequency_value,
         // power_management->voltage, power_management->power);
+
+        // Read the state of GPIO12
+        if (power_management->HAS_PLUG_SENSE) {
+            int gpio12_state = gpio_get_level(GPIO_NUM_12);
+            if (gpio12_state == 0) {
+                // turn ASIC off
+                gpio_set_level(GPIO_NUM_10, 1);
+            }
+        }
+
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
     }
 }
