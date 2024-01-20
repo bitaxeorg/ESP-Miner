@@ -7,7 +7,7 @@ stratumport,data,u16,21496
 stratumuser,data,string,1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.bitaxe
 stratumpass,data,string,x
 asicfrequency,data,u16,485
-asicvoltage,data,u16,1320
+asicvoltage,data,u16,1200
 asicmodel,data,string,BM1366
 devicemodel,data,string,ultra
 boardversion,data,string,204
