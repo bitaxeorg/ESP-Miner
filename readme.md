@@ -30,13 +30,25 @@ Starting with v2.0.0, the ESP-Miner firmware requires some basic manufacturing d
 
 The following are recommendations but it is necessary that you do have all values in your `config.cvs`file to flash properly.
 
+- recommended values for the Bitaxe 1368 (supra)
+
+  ```
+  key,type,encoding,value
+  main,namespace,,
+  asicfrequency,data,u16,490
+  asicvoltage,data,u16,1200
+  asicmodel,data,string,BM1368
+  devicemodel,data,string,supra
+  boardversion,data,string,400
+  ```
+
 - recommended values for the Bitaxe 1366 (ultra)
 
   ```
   key,type,encoding,value
   main,namespace,,
   asicfrequency,data,u16,485
-  asicvoltage,data,u16,1320
+  asicvoltage,data,u16,1200
   asicmodel,data,string,BM1366
   devicemodel,data,string,ultra
   boardversion,data,string,0.11

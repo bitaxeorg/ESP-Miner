@@ -2,6 +2,7 @@
 #define GLOBAL_STATE_H_
 
 #include "asic_task.h"
+#include "bm1368.h"
 #include "bm1366.h"
 #include "bm1397.h"
 #include "common.h"

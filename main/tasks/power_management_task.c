@@ -141,7 +141,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     last_frequency_increase++;
                 }
             }
-        } else if (strcmp(GLOBAL_STATE->asic_model, "BM1366") == 0) {
+        } else if (strcmp(GLOBAL_STATE->asic_model, "BM1366") == 0 || strcmp(GLOBAL_STATE->asic_model, "BM1368") == 0) {
             power_management->chip_temp = EMC2101_get_internal_temp() + 5;
 
             if (power_management->chip_temp > THROTTLE_TEMP &&

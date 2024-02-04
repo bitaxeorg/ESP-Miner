@@ -39,6 +39,18 @@ void app_main(void)
         GLOBAL_STATE.asic_job_frequency_ms = BM1366_FULLSCAN_MS;
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
+    } else if (strcmp(GLOBAL_STATE.asic_model, "BM1368") == 0) {
+        ESP_LOGI(TAG, "ASIC: BM1368");
+        AsicFunctions ASIC_functions = {.init_fn = BM1368_init,
+                                        .receive_result_fn = BM1368_proccess_work,
+                                        .set_max_baud_fn = BM1368_set_max_baud,
+                                        .set_difficulty_mask_fn = BM1368_set_job_difficulty_mask,
+                                        .send_work_fn = BM1368_send_work};
+
+        uint64_t bm1368_hashrate = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value * BM1368_CORE_COUNT * 1000000;
+        GLOBAL_STATE.asic_job_frequency_ms = ((double) NONCE_SPACE / (double) bm1368_hashrate) * 1000;
+
+        GLOBAL_STATE.ASIC_functions = ASIC_functions;
     } else if (strcmp(GLOBAL_STATE.asic_model, "BM1397") == 0) {
         ESP_LOGI(TAG, "ASIC: BM1397");
         AsicFunctions ASIC_functions = {.init_fn = BM1397_init,
