@@ -122,16 +122,16 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
     } else {
         // parse results
         cJSON * result_json = cJSON_GetObjectItem(json, "result");
-        if (result_json != NULL && cJSON_IsBool(result_json)) {
-
+        if (result_json == NULL){
+            message->response_success = false;
+        }
+        else if (cJSON_IsBool(result_json)) {
             result = STRATUM_RESULT;
-
-            bool response_success = false;
-            if (result_json != NULL && cJSON_IsTrue(result_json)) {
-                response_success = true;
+            if (cJSON_IsTrue(result_json)) {
+                message->response_success = true;
+            }else{
+                message->response_success = false;
             }
-
-            message->response_success = response_success;
         } else {
             cJSON * mask = cJSON_GetObjectItem(result_json, "version-rolling.mask");
             if (mask != NULL) {
