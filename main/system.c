@@ -269,18 +269,16 @@ static double _calculate_network_difficulty(uint32_t nBits)
 
 static void _check_for_best_diff(SystemModule * module, double diff, uint32_t nbits)
 {
-    if (diff < module->best_nonce_diff) {
+    if (diff <= module->best_nonce_diff) {
         return;
     }
-
-    uint64_t old = module->best_nonce_diff;
     module->best_nonce_diff = diff;
-    // only write to flash if new > old
-    if (module->best_nonce_diff > old) {
-        nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, module->best_nonce_diff);
-    }
+
+    nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, module->best_nonce_diff);
+
     // make the best_nonce_diff into a string
     _suffix_string((uint64_t) diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
+
     double network_diff = _calculate_network_difficulty(nbits);
     if (diff > network_diff) {
         module->FOUND_BLOCK = true;

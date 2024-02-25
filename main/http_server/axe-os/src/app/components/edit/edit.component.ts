@@ -26,6 +26,64 @@ export class EditComponent implements OnInit {
 
   @Input() uri = '';
 
+  public BM1397DropdownFrequency = [
+    { name: '400', value: 400 },
+    { name: '425 (default)', value: 425 },
+    { name: '450', value: 450 },
+    { name: '475', value: 475 },
+    { name: '485', value: 485 },
+    { name: '500', value: 500 },
+    { name: '525', value: 525 },
+    { name: '550', value: 550 },
+    { name: '575', value: 575 },
+  ];
+
+  public BM1366DropdownFrequency = [
+    { name: '400', value: 400 },
+    { name: '425', value: 425 },
+    { name: '450', value: 450 },
+    { name: '475', value: 475 },
+    { name: '485 (default)', value: 485 },
+    { name: '500', value: 500 },
+    { name: '525', value: 525 },
+    { name: '550', value: 550 },
+    { name: '575', value: 575 },
+  ];
+
+  public BM1368DropdownFrequency = [
+    { name: '400', value: 400 },
+    { name: '425', value: 425 },
+    { name: '450', value: 450 },
+    { name: '475', value: 475 },
+    { name: '490 (default)', value: 490 },
+    { name: '500', value: 500 },
+    { name: '525', value: 525 },
+    { name: '550', value: 550 },
+    { name: '575', value: 575 },
+  ];
+
+  public BM1397CoreVoltage = [
+    { name: '1100', value: 1100 },
+    { name: '1150', value: 1150 },
+    { name: '1200', value: 1200 },
+    { name: '1250', value: 1250 },
+    { name: '1300', value: 1300 },
+  ];
+  public BM1366CoreVoltage = [
+    { name: '1100', value: 1100 },
+    { name: '1150', value: 1150 },
+    { name: '1200 (default)', value: 1200 },
+    { name: '1250', value: 1250 },
+    { name: '1300', value: 1300 },
+  ];
+  public BM1368CoreVoltage = [
+    { name: '1100', value: 1100 },
+    { name: '1150', value: 1150 },
+    { name: '1200', value: 1200 },
+    { name: '1250', value: 1250 },
+    { name: '1300', value: 1300 },
+  ];
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -95,15 +153,6 @@ export class EditComponent implements OnInit {
   public updateSystem() {
 
     const form = this.form.getRawValue();
-
-    form.frequency = parseInt(form.frequency);
-    form.coreVoltage = parseInt(form.coreVoltage);
-
-    // bools to ints
-    form.flipscreen = form.flipscreen == true ? 1 : 0;
-    form.invertscreen = form.invertscreen == true ? 1 : 0;
-    form.invertfanpolarity = form.invertfanpolarity == true ? 1 : 0;
-    form.autofanspeed = form.autofanspeed == true ? 1 : 0;
 
     if (form.wifiPass === 'password') {
       delete form.wifiPass;

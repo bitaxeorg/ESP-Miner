@@ -1,56 +1,8 @@
-.container {
-    display: grid;
-    grid-template-columns: 2fr 2fr;
-    grid-gap: 1.5rem;
-}
-
-table>tr>td {
-
-    &:first-child {
-        text-align: right;
-        font-weight: bold;
-    }
-
-    &:nth-child(2) {
-        padding-left: 10px;
-    }
-
-}
-
-@media only screen and (max-width:900px) {
-    .container {
-        grid-template-columns: 1fr;
-    }
-}
-
-.edit {
-    margin-bottom: 1.5rem;
-    margin-right: 1.5rem;
-
-}
-
-.restart {
-    margin-bottom: 1.5rem;
-
-}
-
-
-
-#logs {
-    height: 500px;
-    font-family: monospace;
-    border: 1px solid #304562;
-    overflow-y: scroll;
-    overflow-x: hidden;
-
-    >div {
-        max-width: 100%;
-        line-break: anywhere;
-
-    }
-}
-
 .danger {
     color: red;
     font-weight: bold;
+}
+
+.card {
+    min-height: 100%;
 }

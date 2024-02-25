@@ -6,33 +6,42 @@
 
 </div>
 
-<div class="card" *ngIf="latestRelease$ | async as latestRelease">
-    <h2>Latest Release: {{latestRelease.name}}</h2>
+<div class="grid">
+    <div class="col-12 lg:col-6 xl:col-4">
+        <div class="card" *ngIf="latestRelease$ | async as latestRelease">
+            <h2>Latest Release: {{latestRelease.name}}</h2>
 
-
-
-    <div *ngFor="let asset of latestRelease.assets">
-        <div *ngIf="asset.name == 'esp-miner.bin'">
-            <a target="_blank" [href]="asset.browser_download_url">esp-miner.bin</a>
-        </div>
-        <div *ngIf="asset.name == 'www.bin'">
-            <a target="_blank" [href]="asset.browser_download_url">www.bin</a>
+            <div *ngFor="let asset of latestRelease.assets">
+                <div *ngIf="asset.name == 'esp-miner.bin'">
+                    <a style="text-decoration: underline;" target="_blank"
+                        [href]="asset.browser_download_url">esp-miner.bin</a>
+                </div>
+                <div *ngIf="asset.name == 'www.bin'">
+                    <a style="text-decoration: underline;" target="_blank"
+                        [href]="asset.browser_download_url">www.bin</a>
+                </div>
+            </div>
         </div>
     </div>
+    <div class="col-12 lg:col-6 xl:col-4">
+        <div class="card">
+            <h2>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}}%</span></h2>
+            <!-- <input type="file" id="file" (change)="otaUpdate($event)" accept=".bin"> -->
+            <p-fileUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaUpdate($event)"
+                [auto]="true" chooseLabel="Browse"></p-fileUpload>
 
+            <small>(esp-miner.bin)</small>
+        </div>
 
-</div>
+    </div>
+    <div class="col-12 lg:col-12 xl:col-4">
+        <div class="card">
+            <h2>Update Website <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}}%</span></h2>
 
-<div class="card">
-    <h2>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}}%</span></h2>
-    <input type="file" id="file" (change)="otaUpdate($event)" accept=".bin">
-    <br>
-    <small>(esp-miner.bin)</small>
-</div>
+            <p-fileUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
+                [auto]="true" chooseLabel="Browse"></p-fileUpload>
 
-<div class="card">
-    <h2>Update Website <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}}%</span></h2>
-    <input type="file" id="file" (change)="otaWWWUpdate($event)" accept=".bin">
-    <br>
-    <small>(www.bin)</small>
+            <small>(www.bin)</small>
+        </div>
+    </div>
 </div>

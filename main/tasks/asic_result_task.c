@@ -43,13 +43,6 @@ void ASIC_result_task(void *pvParameters)
 
         if (nonce_diff > GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->pool_diff)
         {
-            SYSTEM_notify_found_nonce(
-                &GLOBAL_STATE->SYSTEM_MODULE,
-                GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->pool_diff,
-                nonce_diff,
-                GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target,
-                GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power
-                );
 
             STRATUM_V1_submit_share(
                 GLOBAL_STATE->sock,
@@ -59,6 +52,10 @@ void ASIC_result_task(void *pvParameters)
                 GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->ntime,
                 asic_result->nonce,
                 asic_result->rolled_version ^ GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version);
+
+            SYSTEM_notify_found_nonce(&GLOBAL_STATE->SYSTEM_MODULE, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->pool_diff,
+                                      nonce_diff, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target,
+                                      GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
         }
     }
 }

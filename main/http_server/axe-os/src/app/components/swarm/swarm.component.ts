@@ -61,13 +61,18 @@ export class SwarmComponent {
     const newIp = this.form.value.ip;
 
     combineLatest([this.systemService.getSwarmInfo('http://' + newIp), this.systemService.getSwarmInfo()]).pipe(
-      switchMap(([newSwarmInfo, swarmInfo]) => {
+      switchMap(([newSwarmInfo, existingSwarmInfo]) => {
 
-        const swarmUpdate = swarmInfo.map(({ ip }) => {
-          return this.systemService.updateSwarm('http://' + ip, [{ ip: newIp }, ...newSwarmInfo, ...swarmInfo])
+        if (existingSwarmInfo.length < 1) {
+          existingSwarmInfo.push({ ip: window.location.host });
+        }
+
+
+        const swarmUpdate = existingSwarmInfo.map(({ ip }) => {
+          return this.systemService.updateSwarm('http://' + ip, [{ ip: newIp }, ...newSwarmInfo, ...existingSwarmInfo])
         });
 
-        const newAxeOs = this.systemService.updateSwarm('http://' + newIp, [{ ip: newIp }, ...swarmInfo])
+        const newAxeOs = this.systemService.updateSwarm('http://' + newIp, [{ ip: newIp }, ...existingSwarmInfo])
 
         return forkJoin([newAxeOs, ...swarmUpdate]);
 

@@ -1,11 +1,20 @@
-<form [formGroup]="form">
-    <label>AxeOS Device IP: </label>
-    <input formControlName="ip" type="text">
-    <button style="margin-left: 15px;" class="btn btn-primary" (click)="add()" [disabled]="form.invalid">Add</button>
-    <!-- <input type="checkbox" formControlName="sync"> Sync All -->
-</form>
+<div class="card">
+    <form [formGroup]="form">
+        <div class="field grid p-fluid">
+            <label htmlFor="ip" class="col-12 mb-2 md:col-2 md:mb-0">AxeOS Device IP</label>
+            <div class="col-12 md:col-10">
+                <p-inputGroup>
+                    <input pInputText id="ip" formControlName="ip" type="text" />
+                    <button pButton (click)="add()" [disabled]="form.invalid">Add</button>
+                </p-inputGroup>
+
+            </div>
+        </div>
+
+    </form>
+</div>
 <div>
-    <button class="btn btn-primary" (click)="refresh()">Refresh</button>
+    <button pButton (click)="refresh()">Refresh</button>
 </div>
 <div>
     <table cellspacing="0" cellpadding="0" *ngIf="swarm$ | async as swarm">
@@ -32,9 +41,9 @@
                 <td>{{axe.temp}} <small>C</small></td>
                 <td>{{axe.bestDiff}}</td>
                 <td>{{axe.version}}</td>
-                <td><button class="btn btn-primary" (click)="edit(axe)">&#9998;</button></td>
-                <td><button class="btn btn-danger" (click)="restart(axe)">&#9850;</button></td>
-                <td><button class="btn btn-secondary" (click)="remove(axe)">&#10006;</button></td>
+                <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
+                <td><p-button icon="pi pi-sync" pp-button severity="danger" (click)="restart(axe)"></p-button></td>
+                <td><p-button icon="pi pi-trash" pp-button severity="secondary" (click)="remove(axe)"></p-button></td>
             </tr>
         </ng-container>
     </table>

@@ -26,7 +26,7 @@ export class SystemService {
           current: 2237.5,
           fanSpeed: 82,
           temp: 60,
-          hashRate: 0,
+          hashRate: 475,
           bestDiff: "0",
           freeHeap: 200504,
           coreVoltage: 1200,
@@ -48,7 +48,10 @@ export class SystemService {
           invertscreen: 0,
           invertfanpolarity: 1,
           autofanspeed: 1,
-          fanspeed: 100
+          fanspeed: 100,
+
+          boardtemp1: 30,
+          boardtemp2: 40
         }
       ).pipe(delay(1000));
     }

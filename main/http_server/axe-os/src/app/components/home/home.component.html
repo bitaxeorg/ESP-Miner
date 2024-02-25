@@ -3,44 +3,182 @@
 </ng-template>
 <ng-container>
 
+    <div class="grid" *ngIf="info$ | async as info; else loading">
+        <div class="col-12">
+            <div class="card">
+                <div class="grid mb-4">
+                    <div class="col-12 lg:col-6 xl:col-3">
+                        <div class="card mb-0">
+                            <div class="flex justify-content-between mb-3">
+                                <div>
+                                    <span class="block text-500 font-medium mb-3">Hash Rate</span>
+                                    <div class="text-900 font-medium text-xl">{{info.hashRate | number: '1.2-2'}}
+                                        <small>Gh/s</small>
+                                    </div>
+                                </div>
+                                <div class="flex align-items-center justify-content-center bg-orange-100 border-round"
+                                    [ngStyle]="{width: '2.5rem', height: '2.5rem'}">
+                                    <i class="pi pi-bolt text-orange-500 text-xl"></i>
+                                </div>
+                            </div>
+                            <ng-container *ngIf="expectedHashRate$ | async as expectedHashRate">
+                                <span class="text-green-500 font-medium">{{expectedHashRate}}
+                                    <small>Gh/s </small></span>
+                                <span class="text-500">expected</span>
+                            </ng-container>
+                        </div>
+                    </div>
+                    <div class="col-12 lg:col-6 xl:col-3">
+                        <div class="card mb-0">
+                            <div class="flex justify-content-between mb-3">
+                                <div>
+                                    <span class="block text-500 font-medium mb-3">Shares</span>
+                                    <div class="text-900 font-medium text-xl">{{info.sharesAccepted}}</div>
+                                </div>
+                                <div class="flex align-items-center justify-content-center bg-blue-100 border-round"
+                                    [ngStyle]="{width: '2.5rem', height: '2.5rem'}">
+                                    <i class="pi pi-send text-blue-500 text-xl"></i>
+                                </div>
+                            </div>
+                            <span class="text-red-500 font-medium">{{info.sharesRejected}} </span>
+                            <span class="text-500">rejected</span>
+                        </div>
+                    </div>
+                    <div class="col-12 lg:col-6 xl:col-3">
+                        <div class="card mb-0">
+                            <div class="flex justify-content-between mb-3">
+                                <div>
+                                    <span class="block text-500 font-medium mb-3">Efficiency</span>
+                                    <div class="text-900 font-medium text-xl">
+                                        <td>{{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>W/Th</small>
+                                        </td>
+                                    </div>
+                                </div>
+                                <div class="flex align-items-center justify-content-center bg-orange-100 border-round"
+                                    [ngStyle]="{width: '2.5rem', height: '2.5rem'}">
+                                    <i class="pi pi-thumbs-up text-orange-500 text-xl"></i>
+                                </div>
+                            </div>
+                            <!-- <span class="text-green-500 font-medium">%52+ </span>
+                            <span class="text-500">since last week</span> -->
+                        </div>
+                    </div>
+                    <div class="col-12 lg:col-6 xl:col-3">
+                        <div class="card mb-0">
+                            <div class="flex justify-content-between mb-3">
+                                <div>
+                                    <span class="block text-500 font-medium mb-3">Best Difficulty</span>
+                                    <div class="text-900 font-medium text-xl">{{info.bestDiff}}</div>
+                                </div>
+                                <div class="flex align-items-center justify-content-center bg-yellow-100 border-round"
+                                    [ngStyle]="{width: '2.5rem', height: '2.5rem'}">
+                                    <i class="pi pi-star-fill text-yellow-500 text-xl"></i>
+                                </div>
+                            </div>
+                            <!-- <span class="text-green-500 font-medium">520 </span>
+                            <span class="text-500">newly registered</span> -->
+                        </div>
+                    </div>
 
-    <div class="container">
-        <div>
-            <div class="card">
-                <h2>Overview</h2>
-                <table *ngIf="info$ | async as info; else loading">
-                    <tr>
-                        <td>Model:</td>
-                        <td>{{info.ASICModel}}</td>
-                    </tr>
-                    <tr>
-                        <td>Uptime:</td>
-                        <td>{{info.uptimeSeconds | dateAgo}}</td>
-                    </tr>
-                    <tr>
-                        <td>WiFi Status:</td>
-                        <td>{{info.wifiStatus}}</td>
-                    </tr>
-                    <tr>
-                        <td>Free Heap Memory:</td>
-                        <td>{{info.freeHeap}}</td>
-                    </tr>
-                    <tr>
-                        <td>Version:</td>
-                        <td>{{info.version}}</td>
-                    </tr>
-                    <tr>
-                        <td>Board Version:</td>
-                        <td>{{info.boardVersion}}</td>
-                    </tr>
-                </table>
+                </div>
+
+
+                <p-chart [data]="chartData" [options]="chartOptions"></p-chart>
             </div>
+        </div>
+        <div class="col-12 lg:col-12 xl:col-6">
             <div class="card">
-                <h2>Pool Information</h2>
+                <h5>Power</h5>
+                <div class="grid text-center">
+                    <div class="col-4">
+                        <p-knob [min]="3" [max]="20" [readonly]="true" [(ngModel)]="info.power"
+                            valueTemplate="{value}W"></p-knob>
+                        Power
+                    </div>
+
+                    <div class="col-4">
+                        <p-knob [min]="4.5" [max]="5.5" [readonly]="true" [(ngModel)]="info.voltage"
+                            valueTemplate="{value}V"></p-knob>
+                        Input Voltage
+                        <span class="danger" *ngIf="info.voltage < 4.8">&nbsp; Danger: Low voltage</span>
+                    </div>
+
+                    <div class="col-4">
+                        <p-knob [min]="0.9" [max]="1.8" [readonly]="true" [(ngModel)]="info.coreVoltage"
+                            valueTemplate="{value}A"></p-knob>
+                        ASIC Voltage Requested
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="col-12 lg:col-6 xl:col-3">
+            <div class="card">
+                <h5>Heat</h5>
+                <div class="grid text-center">
+                    <div class="col-6">
+                        <p-knob [min]="20" [max]="75" [readonly]="true" [(ngModel)]="info.temp"
+                            valueTemplate="{value}C"></p-knob>
+                        ASIC Temperature
+
+                        <span class="danger" *ngIf="info.temp >= 70">&nbsp;
+                            Danger:
+                            High Temperature</span>
+                    </div>
+                    <div class="col-6">
+                        <p-knob [min]="0" [max]="100" [readonly]="true" [(ngModel)]="info.fanspeed"
+                            valueTemplate="{value}%"></p-knob>
+                        Fan
+                    </div>
+                    <div class="col-6" *ngIf="info.boardtemp1">
+                        <p-knob [min]="20" [max]="75" [readonly]="true" [(ngModel)]="info.boardtemp1"
+                            valueTemplate="{value}C"></p-knob>
+                        Board Temp 1
+                    </div>
+                    <div class="col-6" *ngIf="info.boardtemp2">
+                        <p-knob [min]="20" [max]="75" [readonly]="true" [(ngModel)]="info.boardtemp2"
+                            valueTemplate="{value}C"></p-knob>
+                        Board Temp 2
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <div class="col-12 lg:col-6 xl:col-3">
+            <div class="card">
+                <h5>Performance</h5>
+                <div class="grid text-center">
+                    <div class="col-6">
+                        <p-knob [min]="100" [max]="800" [readonly]="true" [(ngModel)]="info.frequency"
+                            valueTemplate="{value}Mhz"></p-knob>
+                        ASIC Frequency
+                    </div>
+                    <div class="col-6">
+                        <p-knob [min]="0.9" [max]="1.8" [readonly]="true" [(ngModel)]="info.coreVoltageActual"
+                            valueTemplate="{value}V"></p-knob>
+                        ASIC Voltage Measured
+                    </div>
+
+
+                </div>
+
+            </div>
+        </div>
+
+
+
+
+        <div class=" col-12 lg:col-6">
+            <div class="card">
+                <h5>Pool Information</h5>
                 <table *ngIf="info$ | async as info; else loading">
                     <tr *ngIf="quickLink$ | async as quickLink">
                         <td>Quick Link:</td>
-                        <td><a style="color: white;" [href]="quickLink" target="_blank">{{quickLink}}</a></td>
+                        <td><a style="color: white; text-decoration: underline;" [href]="quickLink"
+                                target="_blank">{{quickLink}}</a></td>
                     </tr>
                     <tr>
                         <td>URL:</td>
@@ -54,87 +192,13 @@
                         <td>User:</td>
                         <td>{{info.stratumUser}}</td>
                     </tr>
-                    <tr>
-                        <td>Shares Accepted:</td>
-                        <td>{{info.sharesAccepted}}</td>
-                    </tr>
-                    <tr>
-                        <td>Shares Rejected:</td>
-                        <td>{{info.sharesRejected}}</td>
-                    </tr>
+
                 </table>
             </div>
         </div>
 
-        <div>
-            <div class="card">
-                <h2>Power</h2>
 
-                <table *ngIf="info$ | async as info; else loading">
-                    <tr>
-                        <td>Power Consumption:</td>
-                        <td>{{info.power | number: '1.2-2'}} <small>W</small> </td>
-                    </tr>
-                    <tr>
-                        <td>Input Voltage:</td>
-                        <td>{{info.voltage | number: '0.0-0'}} <small>mV</small> <span class="danger"
-                                *ngIf="info.voltage < 4800">&nbsp; Danger: Low voltage</span></td>
-                    </tr>
-                    <tr>
-                        <td>Input Current:</td>
-                        <td>{{info.current | number: '0.0-0'}} <small>mA</small></td>
-                    </tr>
-                    <tr>
-                        <td>Frequency:</td>
-                        <td>{{info.frequency}} <small>Mhz</small></td>
-                    </tr>
-                    <tr>
-                        <td>Core Voltage:</td>
-                        <td>{{info.coreVoltage}} <small>mV</small></td>
-                    </tr>
-                    <tr>
-                        <td>Measured Core Voltage:</td>
-                        <td>{{info.coreVoltageActual}} <small>mV</small></td>
-                    </tr>
-                    <tr>
-                        <td>Fan Speed:</td>
-                        <td>{{info.fanSpeed}} <small>RPM</small></td>
-                    </tr>
-                    <tr>
-                        <td>Chip Temperature:</td>
-                        <td>{{info.temp}} <small>C</small> <span class="danger" *ngIf="info.temp >= 70">&nbsp; Danger:
-                                High Temperature</span></td>
-                    </tr>
-                </table>
-
-            </div>
-            <div class="card">
-                <h2>Results</h2>
-                <table *ngIf="info$ | async as info; else loading">
-                    <tr>
-                        <td> Hash Rate:</td>
-                        <td>{{info.hashRate | number: '1.2-2'}} <small>Gh/s</small></td>
-                    </tr>
-                    <tr>
-                        <td>Efficiency:</td>
-                        <td>{{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>W/Th</small></td>
-                    </tr>
-                    <tr>
-                        <td>Best Difficulty:</td>
-                        <td>{{info.bestDiff}}</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
     </div>
 
-    <div class="card mt-2">
-        <h2>Realtime Logs <button (click)="toggleLogs()" style="margin-left: 15px;" class="btn btn-secondary">{{showLogs
-                ? 'Hide': 'Show'}}
-                Logs</button></h2>
 
-        <div *ngIf="showLogs" id="logs" #scrollContainer>
-            <div *ngFor="let log of logs">₿ {{log | ANSI}}</div>
-        </div>
-    </div>
 </ng-container>

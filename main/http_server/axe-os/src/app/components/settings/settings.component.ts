@@ -2,6 +2,7 @@ import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
+import { FileUploadHandlerEvent } from 'primeng/fileupload';
 import { map, Observable, startWith } from 'rxjs';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
@@ -129,8 +130,8 @@ export class SettingsComponent {
       });
   }
 
-  otaUpdate(event: any) {
-    const file = event.target?.files.item(0) as File;
+  otaUpdate(event: FileUploadHandlerEvent) {
+    const file = event.files[0];
 
     if (file.name != 'esp-miner.bin') {
       this.toastrService.error('Incorrect file, looking for esp-miner.bin.', 'Error');
@@ -153,15 +154,16 @@ export class SettingsComponent {
           }
         },
         error: (err) => {
-          this.toastrService.error(event.statusText, 'Error');
+          this.toastrService.error('Uploaded Error', 'Error');
         },
         complete: () => {
           this.firmwareUpdateProgress = null;
         }
       });
   }
-  otaWWWUpdate(event: any) {
-    const file = event.target?.files.item(0) as File;
+
+  otaWWWUpdate(event: FileUploadHandlerEvent) {
+    const file = event.files[0];
     if (file.name != 'www.bin') {
       this.toastrService.error('Incorrect file, looking for www.bin.', 'Error');
       return;
@@ -187,7 +189,7 @@ export class SettingsComponent {
           }
         },
         error: (err) => {
-          this.toastrService.error(event.statusText, 'Error');
+          this.toastrService.error('Upload Error', 'Error');
         },
         complete: () => {
           this.websiteUpdateProgress = null;

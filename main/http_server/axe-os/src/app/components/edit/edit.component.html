@@ -1,158 +1,160 @@
 <ng-container *ngIf="form != null">
     <form [formGroup]="form">
-        <div class="form-group">
-            <label>Flip Screen</label>
-            <input formControlName="flipscreen" type="checkbox">
+
+        <div class="field grid p-fluid">
+            <label htmlFor="ssid" class="col-12 mb-2 md:col-2 md:mb-0">WiFi SSID:</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="ssid" type="text" formControlName="ssid" />
+            </div>
         </div>
-        <!-- <div class="form-group">
-            <label>Invert Screen</label>
-            <input formControlName="invertscreen" type="checkbox">
-        </div> -->
-        <div class="form-group">
-            <label>WiFi SSID: </label>
-            <input formControlName="ssid" type="text">
+        <div class="field grid p-fluid">
+            <label htmlFor="wifiPass" class="col-12 mb-2 md:col-2 md:mb-0">WiFi Password:</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="wifiPass" formControlName="wifiPass" type="password" />
+            </div>
         </div>
-        <div class="form-group">
-            <label>WiFi Password: </label>
-            <input formControlName="wifiPass" type="password">
+        <div class="field grid p-fluid">
+            <label htmlFor="stratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Stratum URL:</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="stratumURL" type="text" formControlName="stratumURL"
+                    formControlName="stratumURL" />
+                <div>
+                    <small>Do not include 'stratum+tcp://' or port.</small>
+                </div>
+            </div>
         </div>
-        <div class="form-group">
-            <label>Stratum URL: (Do not include 'stratum+tcp://' or port</label>
-            <input formControlName="stratumURL" type="text">
+
+
+        <div class="field grid p-fluid">
+            <label htmlFor="stratumPort" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Port:</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="stratumPort" formControlName="stratumPort" type="number" />
+            </div>
         </div>
-        <div class="form-group">
-            <label>Stratum Port:</label>
-            <input formControlName="stratumPort" type="number">
+        <div class="field grid p-fluid">
+            <label htmlFor="stratumUser" class="col-12 mb-2 md:col-2 md:mb-0">Stratum User:</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="stratumUser" formControlName="stratumUser" type="text" />
+            </div>
         </div>
-        <div class="form-group">
-            <label>Stratum User: </label>
-            <input formControlName="stratumUser" type="text">
+        <div class="field grid p-fluid">
+            <label htmlFor="stratumPassword" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Password:</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="stratumPassword" formControlName="stratumPassword" type="password" />
+            </div>
         </div>
-        <div class="form-group">
-            <label>Stratum Password: </label>
-            <input formControlName="stratumPassword" type="password">
-        </div>
+
+
 
         <ng-container *ngIf="!devToolsOpen && ASICModel == eASICModel.BM1366">
 
-            <div class="form-group">
-                <label>Frequency </label>
-                <select formControlName="frequency">
-                    <option value="400">400</option>
-                    <option value="425">425</option>
-                    <option value="450">450</option>
-                    <option value="475">475</option>
-                    <option value="485">485 (default)</option>
-                    <option value="500">500</option>
-                    <option value="525">525</option>
-                    <option value="550">550</option>
-                    <option value="575">575</option>
-                </select>
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
+                <div class="col-12 md:col-10">
+                    <p-dropdown [options]="BM1366DropdownFrequency" optionLabel="name" optionValue="value"
+                        formControlName="frequency"></p-dropdown>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label>Core Voltage </label>
-                <select formControlName="coreVoltage">
-                    <option value="1100">1100</option>
-                    <option value="1150">1150</option>
-                    <option value="1200">1200 (default)</option>
-                    <option value="1250">1250</option>
-                    <option value="1300">1300</option>
-                </select>
+
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="coreVoltage">Core Voltage</label>
+                <p-dropdown class="col-12 md:col-10" [options]="BM1366CoreVoltage" optionLabel="name"
+                    optionValue="value" formControlName="coreVoltage"></p-dropdown>
             </div>
+
         </ng-container>
 
         <ng-container *ngIf="!devToolsOpen && ASICModel == eASICModel.BM1368">
 
-            <div class="form-group">
-                <label>Frequency </label>
-                <select formControlName="frequency">
-                    <option value="400">400</option>
-                    <option value="425">425</option>
-                    <option value="450">450</option>
-                    <option value="475">475</option>
-                    <option value="490">490 (default)</option>
-                    <option value="500">500</option>
-                    <option value="525">525</option>
-                    <option value="550">550</option>
-                    <option value="575">575</option>
-                </select>
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
+                <div class="col-12 md:col-10">
+                    <p-dropdown [options]="BM1368DropdownFrequency" optionLabel="name" optionValue="value"
+                        formControlName="frequency"></p-dropdown>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label>Core Voltage </label>
-                <select formControlName="coreVoltage">
-                    <option value="1100">1100</option>
-                    <option value="1150">1150</option>
-                    <option value="1200">1200 (default)</option>
-                    <option value="1250">1250</option>
-                    <option value="1300">1300</option>
-                </select>
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="coreVoltage">Core Voltage</label>
+                <p-dropdown class="col-12 md:col-10" [options]="BM1368CoreVoltage" optionLabel="name"
+                    optionValue="value" formControlName="coreVoltage"></p-dropdown>
             </div>
         </ng-container>
 
         <ng-container *ngIf="!devToolsOpen && ASICModel == eASICModel.BM1397">
 
-            <div class="form-group">
-                <label>Frequency </label>
-                <select formControlName="frequency">
-                    <option value="400">400</option>
-                    <option value="425">425 (default)</option>
-                    <option value="450">450</option>
-                    <option value="475">475</option>
-                    <option value="485">485</option>
-                    <option value="500">500</option>
-                    <option value="525">525</option>
-                    <option value="550">550</option>
-                    <option value="575">575</option>
-                </select>
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
+
+                <p-dropdown class="col-12 md:col-10" [options]="BM1397DropdownFrequency" optionLabel="name"
+                    optionValue="value" formControlName="frequency"></p-dropdown>
+
             </div>
 
-            <div class="form-group">
-                <label>Core Voltage </label>
-                <select formControlName="coreVoltage">
-                    <option value="1300">1300</option>
-                    <option value="1350">1350</option>
-                    <option value="1400">1400 (default)</option>
-                    <option value="1450">1450</option>
-                    <option value="1500">1500</option>
-                </select>
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="coreVoltage">Core Voltage</label>
+                <p-dropdown class="col-12 md:col-10" [options]="BM1397CoreVoltage" optionLabel="name"
+                    optionValue="value" formControlName="coreVoltage"></p-dropdown>
             </div>
         </ng-container>
 
         <ng-container *ngIf="devToolsOpen === true">
-            <div class="form-group">
-                <label>Frequency </label>
-                <input formControlName="frequency" type="number">
+
+            <div class="field grid p-fluid">
+                <label htmlFor="frequency" class="col-12 mb-2 md:col-2 md:mb-0">Frequency</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="frequency" formControlName="frequency" type="number" />
+                </div>
             </div>
 
-            <div class="form-group">
-                <label>Core Voltage</label>
-                <input formControlName="coreVoltage" type="number">
+            <div class="field grid p-fluid">
+                <label htmlFor="coreVoltage" class="col-12 mb-2 md:col-2 md:mb-0">Core Voltage</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="coreVoltage" formControlName="coreVoltage" type="number" />
+                </div>
             </div>
+
         </ng-container>
 
 
-        <div class="form-group">
-            <label>Invert Fan Polarity</label>
-            <input formControlName="invertfanpolarity" type="checkbox">
+        <div class="col-12 md:col-4">
+            <div class="field-checkbox">
+                <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
+                    [binary]="true"></p-checkbox>
+                <label for="flipscreen">Flip Screen</label>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label>Automatic Fan Control</label>
-            <input formControlName="autofanspeed" type="checkbox">
+        <div class="col-12 md:col-4">
+            <div class="field-checkbox">
+                <p-checkbox name="invertfanpolarity" formControlName="invertfanpolarity" inputId="invertfanpolarity"
+                    [binary]="true"></p-checkbox>
+                <label for="invertfanpolarity">Invert Fan Polarity</label>
+            </div>
+        </div>
+        <div class="col-12 md:col-4">
+            <div class="field-checkbox">
+                <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed"
+                    [binary]="true"></p-checkbox>
+                <label for="autofanspeed">Automatic Fan Control</label>
+            </div>
         </div>
 
 
-        <div class="form-group" *ngIf="form.controls['autofanspeed'].value != true">
-            <label>Fan Speed {{form.controls['fanspeed'].value}}%
-                <b *ngIf="form.controls['fanspeed'].value < 33" style="color:red">Danger: Could Cause
-                    Overheating</b> <b *ngIf="form.controls['fanspeed'].value == 100" style="color:	#F2A900">S19
-                    Simulator</b></label>
-            <input formControlName="fanspeed" type="range" [min]="0" [max]="100">
+        <div *ngIf="form.controls['autofanspeed'].value != true">
+            <div class="col-12" *ngIf="form.controls['autofanspeed'].value != true">
+                <label>Fan Speed {{form.controls['fanspeed'].value}}%
+                    <b *ngIf="form.controls['fanspeed'].value < 33" style="color:red">Danger: Could Cause
+                        Overheating</b> <b *ngIf="form.controls['fanspeed'].value == 100" style="color:	#F2A900">S19
+                        Simulator</b></label>
+
+                <p-slider formControlName="fanspeed"></p-slider>
+            </div>
         </div>
         <div class="mt-2">
-            <button [disabled]="form.invalid" (click)="updateSystem()" class="btn btn-primary mr-2">Save</button>
+            <button pButton [disabled]="form.invalid" (click)="updateSystem()"
+                class="btn btn-primary mr-2">Save</button>
             <b style="line-height: 34px;">You must restart this device after saving for changes to take effect.</b>
         </div>
 

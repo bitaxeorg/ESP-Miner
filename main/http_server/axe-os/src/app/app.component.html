@@ -1,21 +1,8 @@
 <app-loading></app-loading>
-<app-header></app-header>
 <div class="body">
     <!-- <button [routerLink]="['edit']" class="btn btn-primary edit">Settings</button> -->
 
-    <button (click)="restart()" class="btn btn-danger restart">Restart</button>
 
-
-    <div class="tab-container">
-        <div class="tab" [routerLink]="['/']" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">Home
-        </div>
-        <div class="tab" [routerLink]="['settings']" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">
-            Settings
-        </div>
-        <div class="tab" [routerLink]="['swarm']" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">
-            Swarm
-        </div>
-    </div>
 
     <div class="content">
         <router-outlet></router-outlet>

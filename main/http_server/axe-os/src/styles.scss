@@ -1,176 +1,20 @@
+@import "app/layout/styles/layout/layout.scss";
+@import "app/layout/styles/theme/vela-blue/theme.css";
+
+@import "../node_modules/primeicons/primeicons.css";
+@import "../node_modules/primeng/resources/primeng.min.css";
+
+@import "../node_modules/primeflex/primeflex.min.css";
+
+
 /* You can add global styles to this file, and also import other style files */
-body {
-    background-color: #17212f;
-    margin: 0;
-    color: white;
-    font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol;
+p-chart>div {
+    position: relative;
+    min-height: 40vh;
 }
 
 .card {
-    background-color: #1f2d40;
-    border: 1px solid #304562;
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-
-    h1,
-    h2,
-    h3,
-    h4 {
-        margin-top: 0;
+    &.chart {
+        padding: 10px;
     }
-
-    line-break: anywhere;
-
-}
-
-button {
-    margin: 0;
-    display: inline-flex;
-    cursor: pointer;
-    -webkit-user-select: none;
-    user-select: none;
-    align-items: center;
-    vertical-align: bottom;
-    text-align: center;
-    overflow: hidden;
-    position: relative;
-
-
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-    transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
-    border-radius: 3px;
-
-    &.btn-primary {
-        color: #212529;
-        background: #64B5F6;
-        border: 1px solid #64B5F6;
-
-        &:hover {
-            background: #43a5f4;
-            color: #212529;
-            border-color: #43a5f4;
-        }
-    }
-
-    &.btn-danger {
-        color: #121212;
-        background: #F48FB1;
-        border: 1px solid #F48FB1;
-
-        &:hover {
-            background: #f16c98;
-            color: #121212;
-            border-color: #f16c98;
-        }
-    }
-
-    &.btn-secondary {
-        color: #ffffff;
-        background: #78909C;
-        border: 1px solid #78909C;
-
-        &:hover {
-            background: #69838f;
-            color: #ffffff;
-            border-color: #69838f;
-        }
-    }
-
-    &.btn-warning {
-        color: #121212;
-        background: #FFE082;
-        border: 1px solid #FFE082;
-
-        &:hover {
-            background: #ffd65c;
-            color: #121212;
-            border-color: #ffd65c;
-        }
-    }
-
-
-
-}
-
-button:disabled,
-button[disabled] {
-    background: #45657f;
-    border: 1px solid #1c4567;
-    cursor: not-allowed;
-
-    &:hover {
-        background: #45657f;
-        border: 1px solid #1c4567;
-    }
-}
-
-input[type="text"],
-input[type="password"],
-input[type="number"],
-select {
-
-    font-size: 1rem;
-    color: rgba(255, 255, 255, 0.87);
-    background: #17212f;
-    padding: 0.5rem 0.5rem;
-    border: 1px solid #304562;
-    transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
-    appearance: none;
-    border-radius: 3px;
-
-}
-
-label {
-    margin-right: 0.5rem;
-}
-
-.form-group {
-    margin-bottom: 0.5rem;
-
-    label {
-        margin-bottom: 0.25rem;
-    }
-
-    label,
-    input {
-        display: block;
-    }
-}
-
-.mr-2 {
-    margin-right: 2rem;
-}
-
-.ml-2 {
-    margin-left: 2rem;
-}
-
-.mt-2 {
-    margin-top: 2rem;
-}
-
-.mb-2 {
-    margin-bottom: 2rem;
-}
-
-.p-fileupload-choose {
-    margin: 0;
-    display: inline-flex;
-    cursor: pointer;
-    -webkit-user-select: none;
-    user-select: none;
-    align-items: center;
-    vertical-align: bottom;
-    text-align: center;
-    overflow: hidden;
-    position: relative;
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-    transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
-    border-radius: 3px;
-    color: #212529;
-    background: #64B5F6;
-    border: 1px solid #64B5F6;
 }

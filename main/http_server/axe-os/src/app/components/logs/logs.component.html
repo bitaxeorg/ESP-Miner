@@ -1,0 +1,47 @@
+<div class="grid">
+    <div class="col-12 lg:col-6">
+        <div class="card">
+            <h5>Overview</h5>
+            <table *ngIf="info$ | async as info">
+                <tr>
+                    <td>Model:</td>
+                    <td>{{info.ASICModel}}</td>
+                </tr>
+                <tr>
+                    <td>Uptime:</td>
+                    <td>{{info.uptimeSeconds | dateAgo}}</td>
+                </tr>
+                <tr>
+                    <td>WiFi Status:</td>
+                    <td>{{info.wifiStatus}}</td>
+                </tr>
+                <tr>
+                    <td>Free Heap Memory:</td>
+                    <td>{{info.freeHeap}}</td>
+                </tr>
+                <tr>
+                    <td>Version:</td>
+                    <td>{{info.version}}</td>
+                </tr>
+                <tr>
+                    <td>Board Version:</td>
+                    <td>{{info.boardVersion}}</td>
+                </tr>
+            </table>
+        </div>
+
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <h2>Realtime Logs <button pButton (click)="toggleLogs()" style="margin-left: 15px;"
+                    class="btn btn-secondary">{{showLogs
+                    ? 'Hide': 'Show'}}
+                    Logs</button></h2>
+
+            <div *ngIf="showLogs" id="logs" #scrollContainer>
+                <div *ngFor="let log of logs">₿ {{log | ANSI}}</div>
+            </div>
+        </div>
+    </div>
+</div>

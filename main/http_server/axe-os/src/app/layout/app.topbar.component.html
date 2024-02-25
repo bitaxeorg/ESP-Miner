@@ -1,0 +1,15 @@
+<div class="layout-topbar">
+    <a class="layout-topbar-logo" routerLink="">
+        <div [routerLink]="['/']" class="header-text">Axe<span class="os">OS</span></div>
+    </a>
+
+    <button #menubutton class="p-link layout-menu-button layout-topbar-button" (click)="layoutService.onMenuToggle()">
+        <i class="pi pi-bars"></i>
+    </button>
+
+
+    <div class="layout-topbar-menu">
+        <p-button (click)="restart()" label="Restart" severity="danger"></p-button>
+    </div>
+
+</div>
