@@ -141,6 +141,8 @@ export class HomeComponent {
         }
       } else if (info.ASICModel === eASICModel.BM1397) {
         return (info.frequency * (672 / 1000))
+      } else if (info.ASICModel === eASICModel.BM1368) {
+        return (info.frequency * (1276 / 1000))
       }
 
       return undefined;
