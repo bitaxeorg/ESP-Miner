@@ -20,6 +20,8 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
 
   public showLogs = false;
 
+  public stopScroll: boolean = false;
+
   constructor(
     private websocketService: WebsocketService,
     private systemService: SystemService
@@ -65,6 +67,9 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
   }
 
   ngAfterViewChecked(): void {
+    if(this.stopScroll == true){
+      return;
+    }
     if (this.scrollContainer?.nativeElement != null) {
       this.scrollContainer.nativeElement.scrollTo({ left: 0, top: this.scrollContainer.nativeElement.scrollHeight, behavior: 'smooth' });
     }

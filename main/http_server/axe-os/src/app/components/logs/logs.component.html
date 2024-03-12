@@ -37,7 +37,11 @@
             <h2>Realtime Logs <button pButton (click)="toggleLogs()" style="margin-left: 15px;"
                     class="btn btn-secondary">{{showLogs
                     ? 'Hide': 'Show'}}
-                    Logs</button></h2>
+                    Logs</button>
+
+                <button pButton style="margin-left: 15px;" class="btn btn-secondary" (click)="stopScroll = !stopScroll"
+                    *ngIf="showLogs">{{stopScroll ? 'Start' : 'Stop'}} Scrolling</button>
+            </h2>
 
             <div *ngIf="showLogs" id="logs" #scrollContainer>
                 <div *ngFor="let log of logs">₿ {{log | ANSI}}</div>

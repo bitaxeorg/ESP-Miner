@@ -40,7 +40,7 @@ export class HomeComponent {
       datasets: [
         {
           type: 'line',
-          label: '10 Minute',
+          label: 'Hashrate',
           data: [],
           fill: false,
           backgroundColor: primaryColor,
@@ -135,14 +135,14 @@ export class HomeComponent {
       if (info.ASICModel === eASICModel.BM1366) {
         const version = parseInt(info.boardVersion);
         if (version >= 400 && version < 500) {
-          return (info.frequency * ((894 * 6) / 1000))
+          return Math.floor(info.frequency * ((894 * 6) / 1000))
         } else {
-          return (info.frequency * (894 / 1000))
+          return Math.floor(info.frequency * (894 / 1000))
         }
       } else if (info.ASICModel === eASICModel.BM1397) {
-        return (info.frequency * (672 / 1000))
+        return Math.floor(info.frequency * (672 / 1000))
       } else if (info.ASICModel === eASICModel.BM1368) {
-        return (info.frequency * (1276 / 1000))
+        return Math.floor(info.frequency * (1276 / 1000))
       }
 
       return undefined;
