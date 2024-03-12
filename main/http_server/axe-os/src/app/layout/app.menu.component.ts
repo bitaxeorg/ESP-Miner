@@ -1,5 +1,7 @@
 import { Component, OnInit } from '@angular/core';
+import { ToastrService } from 'ngx-toastr';
 
+import { SystemService } from '../services/system.service';
 import { LayoutService } from './service/app.layout.service';
 
 @Component({
@@ -10,7 +12,10 @@ export class AppMenuComponent implements OnInit {
 
     model: any[] = [];
 
-    constructor(public layoutService: LayoutService) { }
+    constructor(public layoutService: LayoutService,
+        private systemService: SystemService,
+        private toastr: ToastrService
+    ) { }
 
     ngOnInit() {
         this.model = [
@@ -27,4 +32,14 @@ export class AppMenuComponent implements OnInit {
 
         ];
     }
+
+
+
+    public restart() {
+        this.systemService.restart().subscribe(res => {
+
+        });
+        this.toastr.success('Success!', 'Bitaxe restarted');
+    }
+
 }

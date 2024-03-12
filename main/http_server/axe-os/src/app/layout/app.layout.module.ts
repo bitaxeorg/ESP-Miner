@@ -40,7 +40,8 @@ import { AppTopBarComponent } from './app.topbar.component';
         InputSwitchModule,
         RippleModule,
         RouterModule,
-        PrimeNGModule
+        PrimeNGModule,
+
     ],
     exports: [AppLayoutComponent]
 })

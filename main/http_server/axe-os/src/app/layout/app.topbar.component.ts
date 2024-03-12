@@ -1,8 +1,6 @@
 import { Component, ElementRef, ViewChild } from '@angular/core';
-import { ToastrService } from 'ngx-toastr';
 import { MenuItem } from 'primeng/api';
 
-import { SystemService } from '../services/system.service';
 import { LayoutService } from './service/app.layout.service';
 
 @Component({
@@ -20,17 +18,7 @@ export class AppTopBarComponent {
     @ViewChild('topbarmenu') menu!: ElementRef;
 
     constructor(public layoutService: LayoutService,
-        private systemService: SystemService,
-        private toastr: ToastrService
     ) { }
 
-
-
-    public restart() {
-        this.systemService.restart().subscribe(res => {
-
-        });
-        this.toastr.success('Success!', 'Bitaxe restarted');
-    }
 
 }
