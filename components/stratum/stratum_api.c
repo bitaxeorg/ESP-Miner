@@ -318,8 +318,8 @@ void STRATUM_V1_configure_version_rolling(int socket, uint32_t * version_mask)
         cJSON * version_rolling_enabled = cJSON_GetObjectItem(result, "version-rolling");
         if (cJSON_IsBool(version_rolling_enabled) && cJSON_IsTrue(version_rolling_enabled)) {
             cJSON * mask = cJSON_GetObjectItem(result, "version-rolling.mask");
-            uint32_t version_mask = strtoul(mask->valuestring, NULL, 16);
-            ESP_LOGI(TAG, "Set version mask: %08lx", version_mask);
+            *version_mask = strtoul(mask->valuestring, NULL, 16);
+            ESP_LOGI(TAG, "Set version mask: %08lx", *version_mask);
         }
     }else{
         printf("configure_version result null\n");
