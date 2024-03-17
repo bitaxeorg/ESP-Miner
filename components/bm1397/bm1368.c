@@ -266,7 +266,8 @@ static void do_frequency_ramp_up() {
     }
 }
 
-static void _send_init(uint64_t frequency) {
+static uint8_t _send_init(uint64_t frequency)
+{
 
     //enable and set version rolling mask to 0xFFFF
     unsigned char init0[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
@@ -283,6 +284,16 @@ static void _send_init(uint64_t frequency) {
     //read register 00 on all chips (should respond AA 55 13 68 00 00 00 00 00 00 0F)
     unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};
     _send_simple(init3, 7);
+
+    int chip_counter = 0;
+    while (true) {
+        if (SERIAL_rx(asic_response_buffer, 11, 1000) > 0) {
+            chip_counter++;
+        } else {
+            break;
+        }
+    }
+    ESP_LOGI(TAG, "%i chip(s) detected on the chain", chip_counter);
 
     //enable and set version rolling mask to 0xFFFF (again)
     unsigned char init4[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
@@ -348,6 +359,7 @@ static void _send_init(uint64_t frequency) {
 
     BM1368_send_hash_frequency(frequency);
 
+    return chip_counter;
 }
 
 // reset the BM1368 via the RTS line
@@ -373,7 +385,7 @@ static void _send_read_address(void)
     _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, false);
 }
 
-void BM1368_init(uint64_t frequency)
+uint8_t BM1368_init(uint64_t frequency)
 {
     ESP_LOGI(TAG, "Initializing BM1368");
 
@@ -388,7 +400,7 @@ void BM1368_init(uint64_t frequency)
     // send the init command
     //_send_read_address();
 
-    _send_init(frequency);
+    return _send_init(frequency);
 }
 
 // Baud formula = 25M/((denominator+1)*8)
@@ -514,6 +526,7 @@ task_result * BM1368_proccess_work(void * pvParameters)
     }
 
     uint8_t job_id = asic_result->job_id;
+    ESP_LOGI(TAG, "Job ID: %02X", job_id);
     uint8_t rx_job_id = ((int8_t)job_id & 0xf0) >> 1;
     ESP_LOGI(TAG, "RX Job ID: %02X", rx_job_id);
 

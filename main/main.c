@@ -73,9 +73,14 @@ void app_main(void)
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
     }
 
-    ESP_LOGI(TAG, "Welcome to the bitaxe!");
+    uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 1);
+    if (should_self_test == 1) {
+        self_test((void *) &GLOBAL_STATE);
+    }
 
     xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void *) &GLOBAL_STATE, 3, NULL);
+
+    ESP_LOGI(TAG, "Welcome to the bitaxe!");
 
     // pull the wifi credentials out of NVS
     char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, WIFI_SSID);
@@ -146,3 +151,4 @@ void MINER_set_wifi_status(wifi_status_t status, uint16_t retry_count)
         return;
     }
 }
+

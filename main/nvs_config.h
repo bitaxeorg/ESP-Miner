@@ -22,6 +22,7 @@
 #define NVS_CONFIG_AUTO_FAN_SPEED "autofanspeed"
 #define NVS_CONFIG_FAN_SPEED "fanspeed"
 #define NVS_CONFIG_BEST_DIFF "bestdiff"
+#define NVS_CONFIG_SELF_TEST "selftest"
 
 #define NVS_CONFIG_SWARM "swarmconfig"
 

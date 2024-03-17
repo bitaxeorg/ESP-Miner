@@ -16,7 +16,7 @@
 
 typedef struct
 {
-    void (*init_fn)(u_int64_t);
+    uint8_t (*init_fn)(u_int64_t);
     task_result * (*receive_result_fn)(void * GLOBAL_STATE);
     int (*set_max_baud_fn)(void);
     void (*set_difficulty_mask_fn)(int);

@@ -399,7 +399,7 @@ static void do_frequency_ramp_up()
     _send_simple(init793, 11);
 }
 
-static void _send_init(uint64_t frequency)
+static uint8_t _send_init(uint64_t frequency)
 {
 
     //     //send serial data
@@ -442,6 +442,7 @@ static void _send_init(uint64_t frequency)
     unsigned char init2[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
     _send_simple(init2, 11);
 
+    // read register 00 on all chips
     unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};
     _send_simple(init3, 7);
 
@@ -512,6 +513,8 @@ static void _send_init(uint64_t frequency)
 
     unsigned char init795[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
     _send_simple(init795, 11);
+
+    return chip_counter;
 }
 
 // reset the BM1366 via the RTS line
@@ -537,7 +540,7 @@ static void _send_read_address(void)
     _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, false);
 }
 
-void BM1366_init(uint64_t frequency)
+uint8_t BM1366_init(uint64_t frequency)
 {
     ESP_LOGI(TAG, "Initializing BM1366");
 
@@ -552,7 +555,7 @@ void BM1366_init(uint64_t frequency)
     // send the init command
     //_send_read_address();
 
-    _send_init(frequency);
+    return _send_init(frequency);
 }
 
 // Baud formula = 25M/((denominator+1)*8)
@@ -679,6 +682,7 @@ task_result * BM1366_proccess_work(void * pvParameters)
 
     uint8_t job_id = asic_result->job_id;
     uint8_t rx_job_id = job_id & 0xf8;
+    ESP_LOGI(TAG, "RX Job ID: %02X", rx_job_id);
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 

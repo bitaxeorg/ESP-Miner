@@ -31,7 +31,7 @@ typedef struct __attribute__((__packed__))
     uint8_t version[4];
 } BM1366_job;
 
-void BM1366_init(u_int64_t frequency);
+uint8_t BM1366_init(u_int64_t frequency);
 
 void BM1366_send_init(void);
 void BM1366_send_work(void * GLOBAL_STATE, bm_job * next_bm_job);

@@ -127,7 +127,7 @@ bool DS4432U_set_vcore(float core_voltage)
 
     reg_setting = voltage_to_reg(core_voltage);
 
-    ESP_LOGI(TAG, "Set BM1397 voltage = %.3fV [0x%02X]", core_voltage, reg_setting);
+    ESP_LOGI(TAG, "Set ASIC voltage = %.3fV [0x%02X]", core_voltage, reg_setting);
 
     DS4432U_set(reg_setting); /// eek!
 
