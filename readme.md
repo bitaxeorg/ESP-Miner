@@ -77,3 +77,35 @@ The bitaxetool requires a config.cvs preloaded file and the appropiate firmware.
 ```
 bitaxetool --config ./config.cvs --firmware ./esp-miner-factory-v2.0.3.bin
 ```
+
+## API
+Bitaxe provides an API to expose actions and information.
+
+For more details take a look at `main/http_server/http_server.c`.
+
+Things that can be done are:
+  
+  - Get System Info
+  - Get Swarm Info
+  - Update Swarm
+  - Swarm Options
+  - System Restart Action
+  - Update System Settings Action
+  - System Options
+  - Update OTA Firmware
+  - Update OTA WWW
+  - WebSocket
+
+Some API examples in curl:
+  ```bash
+  # Get system information
+  curl http://YOUR-BITAXE-IP/api/system/info
+  ```
+  ```bash
+  # Get swarm information
+  curl http://YOUR-BITAXE-IP/api/swarm/info
+  ```
+  ```bash
+  # System restart action
+  curl -X POST http://YOUR-BITAXE-IP/api/system/restart
+  ```
