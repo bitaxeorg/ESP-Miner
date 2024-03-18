@@ -45,8 +45,7 @@ static bool core_voltage_pass()
 
 void self_test(void * pvParameters)
 {
-    bool ASIC_PASS = false;
-    bool POWER_PASS = false;
+
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
@@ -86,19 +85,16 @@ void self_test(void * pvParameters)
         memset(module->oled_buf, 0, 20);
         snprintf(module->oled_buf, 20, "SELF TEST...");
         OLED_writeString(0, 0, module->oled_buf);
-
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "ASIC:");
-        OLED_writeString(0, 1, module->oled_buf);
-
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "POWER:");
-        OLED_writeString(0, 2, module->oled_buf);
-
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "FAN:");
-        OLED_writeString(0, 3, module->oled_buf);
     }
+
+    if(!DS4432U_test()){
+        if (OLED_status()) {
+            memset(module->oled_buf, 0, 20);
+            snprintf(module->oled_buf, 20, "DS4432U:FAIL");
+            OLED_writeString(0, 2, module->oled_buf);
+        }
+    }
+
 
     SERIAL_init();
     uint8_t chips_detected = (GLOBAL_STATE->ASIC_functions.init_fn)(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
@@ -168,79 +164,48 @@ void self_test(void * pvParameters)
     //     ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
 
     // if (asic_result->nonce == 4054974794) {
-    if (chips_detected > 0) {
-        ESP_LOGI(TAG, "SELF TEST PASS");
-        ASIC_PASS = true;
+    if (chips_detected < 1) {
+        ESP_LOGE(TAG, "SELF TEST FAIL, NO CHIPS DETECTED");
+        // ESP_LOGE(TAG, "SELF TEST FAIL, INCORRECT NONCE DIFF");
         if (OLED_status()) {
             memset(module->oled_buf, 0, 20);
-            snprintf(module->oled_buf, 20, "ASIC:      PASS");
-            OLED_writeString(0, 1, module->oled_buf);
+            snprintf(module->oled_buf, 20, "ASIC:FAIL NO CHIPS");
+            OLED_writeString(0, 2, module->oled_buf);
         }
-    } else {
-        ESP_LOGE(TAG, "SELF TEST FAIL, INCORRECT NONCE DIFF");
-        if (OLED_status()) {
-            memset(module->oled_buf, 0, 20);
-            snprintf(module->oled_buf, 20, "ASIC:     FAIL");
-            OLED_writeString(0, 1, module->oled_buf);
-        }
+        return;
     }
-    // } else {
-    //     ESP_LOGE(TAG, "SELF TEST FAIL, NO NONCE DIFF");
-    //     if (OLED_status()) {
-    //         memset(module->oled_buf, 0, 20);
-    //         snprintf(module->oled_buf, 20, "ASIC:     FAIL");
-    //         OLED_writeString(0, 1, module->oled_buf);
-    //     }
-    // }
 
     free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
     free(GLOBAL_STATE->valid_jobs);
 
-
-    if (INA260_installed()) {
-        if (power_consumption_pass() && core_voltage_pass()) {
-            POWER_PASS = true;
-            if (OLED_status()) {
-                memset(module->oled_buf, 0, 20);
-                snprintf(module->oled_buf, 20, "POWER:     PASS");
-                OLED_writeString(0, 2, module->oled_buf);
-            }
-        } else {
-            if (OLED_status()) {
-                memset(module->oled_buf, 0, 20);
-                snprintf(module->oled_buf, 20, "POWER:     FAIL");
-                OLED_writeString(0, 2, module->oled_buf);
-            }
+    if (!core_voltage_pass()) {
+        if (OLED_status()) {
+            memset(module->oled_buf, 0, 20);
+            snprintf(module->oled_buf, 20, "POWER:     FAIL");
+            OLED_writeString(0, 2, module->oled_buf);
         }
-    } else {
-        if (core_voltage_pass()) {
-            POWER_PASS = true;
-            if (OLED_status()) {
-                memset(module->oled_buf, 0, 20);
-                snprintf(module->oled_buf, 20, "POWER:     PASS");
-                OLED_writeString(0, 2, module->oled_buf);
-            }
-        } else {
-            if (OLED_status()) {
-                memset(module->oled_buf, 0, 20);
-                snprintf(module->oled_buf, 20, "POWER:     FAIL");
-                OLED_writeString(0, 2, module->oled_buf);
-            }
-        }
+        return;
     }
 
-    if (fan_sense_pass()) {
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "FAN:       PASS");
-        OLED_writeString(0, 3, module->oled_buf);
-    } else {
+    if (INA260_installed() && !power_consumption_pass()) {
+        if (OLED_status()) {
+            memset(module->oled_buf, 0, 20);
+            snprintf(module->oled_buf, 20, "POWER:     FAIL");
+            OLED_writeString(0, 2, module->oled_buf);
+        }
+        return;
+    }
+
+    if (!fan_sense_pass()) {
         memset(module->oled_buf, 0, 20);
         snprintf(module->oled_buf, 20, "FAN:       WARN");
-        OLED_writeString(0, 3, module->oled_buf);
+        OLED_writeString(0, 1, module->oled_buf);
     }
 
-    if (POWER_PASS && ASIC_PASS) {
-        nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
-    }
-    vTaskDelay(60 * 60 * 1000 / portTICK_PERIOD_MS);
+
+    memset(module->oled_buf, 0, 20);
+    snprintf(module->oled_buf, 20, "           PASS");
+    OLED_writeString(0, 2, module->oled_buf);
+    nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
+
 }

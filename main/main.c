@@ -73,9 +73,12 @@ void app_main(void)
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
     }
 
+    bool is_max = strcmp(GLOBAL_STATE.asic_model, "BM1397") == 0;
+    uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 1);
-    if (should_self_test == 1) {
+    if (should_self_test == 1 && !is_max && best_diff < 1) {
         self_test((void *) &GLOBAL_STATE);
+        vTaskDelay(60 * 60 * 1000 / portTICK_PERIOD_MS);
     }
 
     xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void *) &GLOBAL_STATE, 3, NULL);
@@ -151,4 +154,3 @@ void MINER_set_wifi_status(wifi_status_t status, uint16_t retry_count)
         return;
     }
 }
-

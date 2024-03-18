@@ -106,6 +106,16 @@ static esp_err_t register_write_byte(uint8_t reg_addr, uint8_t data)
     return ret;
 }
 
+bool DS4432U_test(void)
+{
+    uint8_t data[3];
+
+    /* Read the DS4432U+ WHO_AM_I register, on power up the register should have the value 0x00 */
+    esp_err_t register_result = register_read(DS4432U_OUT0_REG, data, 1);
+    ESP_LOGI(TAG, "DS4432U+ OUT1 = 0x%02X", data[0]);
+    return register_result == ESP_OK;
+}
+
 void DS4432U_read(void)
 {
     uint8_t data[3];
