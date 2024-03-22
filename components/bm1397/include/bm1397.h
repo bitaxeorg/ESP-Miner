@@ -7,11 +7,11 @@
 
 #define CRC5_MASK 0x1F
 
-// static const u_int64_t ASIC_FREQUENCY = CONFIG_ASIC_FREQUENCY;
-static const u_int64_t BM1397_CORE_COUNT = 672;
-// static const u_int64_t BM1397_HASHRATE_S = ASIC_FREQUENCY * BM1397_CORE_COUNT * 1000000;
+// static const uint64_t ASIC_FREQUENCY = CONFIG_ASIC_FREQUENCY;
+static const uint64_t BM1397_CORE_COUNT = 672;
+// static const uint64_t BM1397_HASHRATE_S = ASIC_FREQUENCY * BM1397_CORE_COUNT * 1000000;
 //  2^32
-static const u_int64_t NONCE_SPACE = 4294967296;
+static const uint64_t NONCE_SPACE = 4294967296;
 // static const double BM1397_FULLSCAN_MS = ((double) NONCE_SPACE / (double) BM1397_HASHRATE_S) * 1000;
 
 typedef struct
@@ -45,7 +45,7 @@ typedef struct __attribute__((__packed__))
     uint8_t midstate3[32];
 } job_packet;
 
-void BM1397_init(u_int64_t frequency);
+void BM1397_init(uint64_t frequency);
 
 void BM1397_send_work(void * GLOBAL_STATE, bm_job * next_bm_job);
 void BM1397_set_job_difficulty_mask(int);

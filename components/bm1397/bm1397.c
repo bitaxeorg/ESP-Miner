@@ -209,7 +209,7 @@ void BM1397_send_hash_frequency(float frequency)
     ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
 }
 
-static void _send_init(u_int64_t frequency)
+static void _send_init(uint64_t frequency)
 {
 
     // send serial data
@@ -266,7 +266,7 @@ static void _send_read_address(void)
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, false);
 }
 
-void BM1397_init(u_int64_t frequency)
+void BM1397_init(uint64_t frequency)
 {
     ESP_LOGI(TAG, "Initializing BM1397");
 
