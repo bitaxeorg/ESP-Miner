@@ -269,10 +269,10 @@ static double _calculate_network_difficulty(uint32_t nBits)
 
 static void _check_for_best_diff(SystemModule * module, double diff, uint32_t nbits)
 {
-    if (diff <= module->best_nonce_diff) {
+    if ((uint64_t) diff <= module->best_nonce_diff) {
         return;
     }
-    module->best_nonce_diff = diff;
+    module->best_nonce_diff = (uint64_t) diff;
 
     nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, module->best_nonce_diff);
 
