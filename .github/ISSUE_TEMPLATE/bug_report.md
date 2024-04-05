@@ -1,6 +1,7 @@
 ---
 name: Bug report
-about: Create a bug report to track and resolve issues
+about: Create a bug report to track and resolve issues -- support requests will be
+  deleted
 title: ''
 labels: ''
 assignees: ''
