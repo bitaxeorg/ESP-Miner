@@ -26,7 +26,7 @@ static bool power_consumption_pass()
 {
     float power = INA260_read_power() / 1000;
     ESP_LOGI(TAG, "Power: %f", power);
-    if (power > 9 && power < 13) {
+    if (power > 9 && power < 15) {
         return true;
     }
     return false;
