@@ -75,7 +75,7 @@ void app_main(void)
 
     bool is_max = strcmp(GLOBAL_STATE.asic_model, "BM1397") == 0;
     uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
-    uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 1);
+    uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
     if (should_self_test == 1 && !is_max && best_diff < 1) {
         self_test((void *) &GLOBAL_STATE);
         vTaskDelay(60 * 60 * 1000 / portTICK_PERIOD_MS);
