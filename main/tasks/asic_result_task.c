@@ -12,7 +12,6 @@ const char *TAG = "asic_result";
 void ASIC_result_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
-    SERIAL_clear_buffer();
 
     char *user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, STRATUM_USER);
 

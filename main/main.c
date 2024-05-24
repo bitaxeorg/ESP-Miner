@@ -138,6 +138,8 @@ void app_main(void)
 
         SERIAL_init();
         (*GLOBAL_STATE.ASIC_functions.init_fn)(GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
+        SERIAL_set_baud((*GLOBAL_STATE.ASIC_functions.set_max_baud_fn)());
+        SERIAL_clear_buffer();
 
         xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
         xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);

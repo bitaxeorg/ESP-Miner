@@ -25,10 +25,6 @@ void ASIC_task(void *pvParameters)
         GLOBAL_STATE->valid_jobs[i] = 0;
     }
 
-    int baud = (*GLOBAL_STATE->ASIC_functions.set_max_baud_fn)();
-    vTaskDelay(10 / portTICK_PERIOD_MS);
-    SERIAL_set_baud(baud);
-
     SYSTEM_notify_mining_started(&GLOBAL_STATE->SYSTEM_MODULE);
     ESP_LOGI(TAG, "ASIC Ready!");
     while (1)
