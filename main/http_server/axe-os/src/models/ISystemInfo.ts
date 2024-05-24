@@ -11,6 +11,7 @@ export interface ISystemInfo {
     temp: number,
     hashRate: number,
     bestDiff: string,
+    bestSessionDiff: string,
     freeHeap: number,
     coreVoltage: number,
     hostname: string,

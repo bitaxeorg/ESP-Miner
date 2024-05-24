@@ -23,6 +23,8 @@ typedef struct
     char oled_buf[20];
     uint64_t best_nonce_diff;
     char best_diff_string[DIFF_STRING_SIZE];
+    uint64_t best_session_nonce_diff;
+    char best_session_diff_string[DIFF_STRING_SIZE];
     bool FOUND_BLOCK;
     bool startup_done;
     char ssid[20];

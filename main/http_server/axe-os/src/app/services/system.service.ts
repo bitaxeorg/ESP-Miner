@@ -28,6 +28,7 @@ export class SystemService {
           temp: 60,
           hashRate: 475,
           bestDiff: "0",
+          bestSessionDiff: "0",
           freeHeap: 200504,
           coreVoltage: 1200,
           coreVoltageActual: 1200,

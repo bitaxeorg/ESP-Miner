@@ -44,6 +44,7 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
     module->shares_accepted = 0;
     module->shares_rejected = 0;
     module->best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
+    module->best_session_nonce_diff = 0;
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
     module->FOUND_BLOCK = false;
@@ -57,6 +58,7 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
 
     // set the best diff string
     _suffix_string(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
+    _suffix_string(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 
     // set the ssid string to blank
     memset(module->ssid, 0, 20);
@@ -269,6 +271,11 @@ static double _calculate_network_difficulty(uint32_t nBits)
 
 static void _check_for_best_diff(SystemModule * module, double diff, uint32_t nbits)
 {
+    if ((uint64_t) diff > module->best_session_nonce_diff) {
+        module->best_session_nonce_diff = (uint64_t) diff;
+        _suffix_string((uint64_t) diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
+    }
+
     if ((uint64_t) diff <= module->best_nonce_diff) {
         return;
     }
