@@ -31,6 +31,7 @@ void ASIC_result_task(void *pvParameters)
         if (GLOBAL_STATE->valid_jobs[job_id] == 0)
         {
             ESP_LOGI(TAG, "Invalid job nonce found, id=%d", job_id);
+            continue;
         }
 
         // check the nonce difficulty

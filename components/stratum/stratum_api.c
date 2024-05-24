@@ -118,25 +118,32 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             result = MINING_SET_DIFFICULTY;
         } else if (strcmp("mining.set_version_mask", method_json->valuestring) == 0) {
             result = MINING_SET_VERSION_MASK;
+        } else {
+            ESP_LOGI(TAG, "unhandled method in stratum message: %s", stratum_json);
         }
     } else {
         // parse results
         cJSON * result_json = cJSON_GetObjectItem(json, "result");
-        if (result_json == NULL){
+        cJSON * error_json = cJSON_GetObjectItem(json, "error");
+        if (result_json == NULL) {
             message->response_success = false;
-        }
-        else if (cJSON_IsBool(result_json)) {
-            result = STRATUM_RESULT;
-            if (cJSON_IsTrue(result_json)) {
-                message->response_success = true;
-            }else{
-                message->response_success = false;
-            }
         } else {
             cJSON * mask = cJSON_GetObjectItem(result_json, "version-rolling.mask");
             if (mask != NULL) {
                 result = STRATUM_RESULT_VERSION_MASK;
                 message->version_mask = strtoul(mask->valuestring, NULL, 16);
+            } else if (cJSON_IsBool(result_json)) {
+                result = STRATUM_RESULT;
+                if (cJSON_IsTrue(result_json)) {
+                    message->response_success = true;
+                } else {
+                    message->response_success = false;
+                }
+            } else if (!cJSON_IsNull(error_json)) {
+                result = STRATUM_RESULT;
+                message->response_success = false;
+            } else {
+                ESP_LOGI(TAG, "unhandled result in stratum message: %s", stratum_json);
             }
         }
     }
