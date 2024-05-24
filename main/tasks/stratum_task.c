@@ -82,6 +82,8 @@ void stratum_task(void * pvParameters)
         GLOBAL_STATE->sock = socket(addr_family, SOCK_STREAM, ip_protocol);
         if (GLOBAL_STATE->sock < 0) {
             ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+            ESP_LOGI(TAG, "Restarting System because of ERROR: Unable to create socket");
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
             esp_restart();
             break;
         }

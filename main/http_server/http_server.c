@@ -308,6 +308,8 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
 static esp_err_t POST_restart(httpd_req_t * req)
 {
+    ESP_LOGI(TAG, "Restarting System because of API Request");
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
     esp_restart();
     return ESP_OK;
 }
@@ -471,8 +473,8 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     }
 
     httpd_resp_sendstr(req, "Firmware update complete, rebooting now!\n");
-
-    vTaskDelay(500 / portTICK_PERIOD_MS);
+    ESP_LOGI(TAG, "Restarting System because of Firmware update complete");
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
     esp_restart();
 
     return ESP_OK;

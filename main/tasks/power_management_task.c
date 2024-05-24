@@ -120,6 +120,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             // chip is coming back from a low/no voltage event
             if (power_management->frequency_value < 50 && target_frequency > 50) {
                 // TODO recover gracefully?
+                ESP_LOGE(TAG, "Freq %f", power_management->frequency_value);
+                ESP_LOGI(TAG, "Restarting System because of ERROR: low/no voltage event");
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
                 esp_restart();
             }
 

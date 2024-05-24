@@ -56,6 +56,8 @@ static void realloc_json_buffer(size_t len)
 
     if (new_sockbuf == NULL) {
         fprintf(stderr, "Error: realloc failed in recalloc_sock()\n");
+        ESP_LOGI(TAG, "Restarting System because of ERROR: realloc failed in recalloc_sock");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
         esp_restart();
     }
 
@@ -79,7 +81,10 @@ char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
             memset(recv_buffer, 0, BUFFER_SIZE);
             nbytes = recv(sockfd, recv_buffer, BUFFER_SIZE - 1, 0);
             if (nbytes == -1) {
-                perror("recv");
+                //perror("recv");
+                ESP_LOGE(TAG, "recv");
+                ESP_LOGI(TAG, "Restarting System because of Error: recv");
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
                 esp_restart();
             }
 
