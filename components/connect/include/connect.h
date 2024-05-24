@@ -9,7 +9,7 @@
 #define WIFI_SSID CONFIG_ESP_WIFI_SSID
 #define WIFI_PASS CONFIG_ESP_WIFI_PASSWORD
 
-#define WIFI_MAXIMUM_RETRY CONFIG_ESP_MAXIMUM_RETRY
+
 
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
@@ -29,6 +29,7 @@ typedef enum
 } wifi_status_t;
 
 void toggle_wifi_softap(void);
+void wifi_softap_on(void);
 void wifi_softap_off(void);
 void wifi_init(const char * wifi_ssid, const char * wifi_pass);
 EventBits_t wifi_connect(void);
