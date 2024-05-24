@@ -31,6 +31,7 @@ export class SystemService {
           freeHeap: 200504,
           coreVoltage: 1200,
           coreVoltageActual: 1200,
+          hostname: "Bitaxe",
           ssid: "default",
           wifiPass: "password",
           wifiStatus: "Connected!",

@@ -13,6 +13,7 @@ export interface ISystemInfo {
     bestDiff: string,
     freeHeap: number,
     coreVoltage: number,
+    hostname: string,
     ssid: string,
     wifiStatus: string,
     sharesAccepted: number,

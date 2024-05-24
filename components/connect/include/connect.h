@@ -8,6 +8,7 @@
 
 #define WIFI_SSID CONFIG_ESP_WIFI_SSID
 #define WIFI_PASS CONFIG_ESP_WIFI_PASSWORD
+#define HOSTNAME CONFIG_LWIP_LOCAL_HOSTNAME
 
 
 
@@ -31,6 +32,6 @@ typedef enum
 void toggle_wifi_softap(void);
 void wifi_softap_on(void);
 void wifi_softap_off(void);
-void wifi_init(const char * wifi_ssid, const char * wifi_pass);
+void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * hostname);
 EventBits_t wifi_connect(void);
 void generate_ssid(char * ssid);
