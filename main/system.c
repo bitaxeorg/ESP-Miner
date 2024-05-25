@@ -200,7 +200,7 @@ static void _init_connection(SystemModule * module)
 {
     if (OLED_status()) {
         memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "Connecting to ssid:");
+        snprintf(module->oled_buf, 20, "Connecting to SSID:");
         OLED_writeString(0, 0, module->oled_buf);
     }
 }
@@ -212,10 +212,16 @@ static void _update_connection(SystemModule * module)
         memset(module->oled_buf, 0, 20);
         snprintf(module->oled_buf, 20, "%s", module->ssid);
         OLED_writeString(0, 1, module->oled_buf);
-
-        OLED_clearLine(3);
+        
         memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "%s", module->wifi_status);
+        snprintf(module->oled_buf, 20, "Configuration SSID:");
+        OLED_writeString(0, 2, module->oled_buf);
+
+
+        char ap_ssid[13];
+        generate_ssid(ap_ssid);
+        memset(module->oled_buf, 0, 20);
+        snprintf(module->oled_buf, 20, ap_ssid);
         OLED_writeString(0, 3, module->oled_buf);
     }
 }
@@ -250,7 +256,7 @@ static void show_ap_information(const char * error)
         if (error != NULL) {
             OLED_writeString(0, 0, error);
         }
-        OLED_writeString(0, 1, "connect to ssid:");
+        OLED_writeString(0, 1, "Configuration SSID:");
         char ap_ssid[13];
         generate_ssid(ap_ssid);
         OLED_writeString(0, 2, ap_ssid);
@@ -371,15 +377,8 @@ void SYSTEM_task(void * pvParameters)
 
     // show the connection screen
     while (!module->startup_done) {
-        result = esp_wifi_get_mode(&wifi_mode);
-        if (result == ESP_OK && (wifi_mode == WIFI_MODE_APSTA || wifi_mode == WIFI_MODE_AP) &&
-            strcmp(module->wifi_status, "Failed to connect") == 0) {
-            show_ap_information(NULL);
-            vTaskDelay(5000 / portTICK_PERIOD_MS);
-        } else {
-            _update_connection(module);
-        }
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        _update_connection(module);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 
     while (1) {

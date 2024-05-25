@@ -78,7 +78,6 @@ void generate_ssid(char * ssid)
 {
     uint8_t mac[6];
     esp_wifi_get_mac(ESP_IF_WIFI_AP, mac);
-
     // Format the last 4 bytes of the MAC address as a hexadecimal string
     snprintf(ssid, 32, "Bitaxe_%02X%02X", mac[4], mac[5]);
 }
