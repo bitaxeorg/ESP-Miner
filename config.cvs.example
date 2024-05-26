@@ -5,7 +5,7 @@ wifissid,data,string,myssid
 wifipass,data,string,mypass
 stratumurl,data,string,public-pool.io
 stratumport,data,u16,21496
-stratumuser,data,string,1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.bitaxe
+stratumuser,data,string,bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq.bitaxe
 stratumpass,data,string,x
 asicfrequency,data,u16,485
 asicvoltage,data,u16,1200
@@ -16,3 +16,4 @@ flipscreen,data,u16,1
 invertfanpol,data,u16,1
 autofanspeed,data,u16,1
 fanspeed,data,u16,100
+selftest,data,u16,1

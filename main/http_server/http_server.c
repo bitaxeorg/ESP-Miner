@@ -309,8 +309,18 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 static esp_err_t POST_restart(httpd_req_t * req)
 {
     ESP_LOGI(TAG, "Restarting System because of API Request");
+
+    // Send HTTP response before restarting
+    const char* resp_str = "System will restart shortly.";
+    httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
+
+    // Delay to ensure the response is sent
     vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // Restart the system
     esp_restart();
+
+    // This return statement will never be reached, but it's good practice to include it
     return ESP_OK;
 }
 
@@ -483,19 +493,50 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
 void log_to_websocket(const char * format, va_list args)
 {
-    char * log_buffer = (char *) malloc(2048);
-    vsnprintf(log_buffer, 2048, format, args);
+    va_list args_copy;
+    va_copy(args_copy, args);
 
+    // Calculate the required buffer size
+    int needed_size = vsnprintf(NULL, 0, format, args_copy) + 1;
+    va_end(args_copy);
+
+    // Allocate the buffer dynamically
+    char * log_buffer = (char *) malloc(needed_size);
+    if (log_buffer == NULL) {
+        // Handle allocation failure
+        return;
+    }
+
+    // Format the string into the allocated buffer
+    va_copy(args_copy, args);
+    vsnprintf(log_buffer, needed_size, format, args_copy);
+    va_end(args_copy);
+
+    // Prepare the WebSocket frame
     httpd_ws_frame_t ws_pkt;
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
     ws_pkt.payload = (uint8_t *) log_buffer;
     ws_pkt.len = strlen(log_buffer);
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-    vprintf(format, args);
+
+    // Print to standard output
+    va_copy(args_copy, args);
+    vprintf(format, args_copy);
+    va_end(args_copy);
+
+    // Ensure server and fd are valid
+    if (server == NULL || fd < 0) {
+        // Handle invalid server or socket descriptor
+        free(log_buffer);
+        return;
+    }
+
+    // Send the WebSocket frame asynchronously
     if (httpd_ws_send_frame_async(server, fd, &ws_pkt) != ESP_OK) {
         esp_log_set_vprintf(vprintf);
     }
 
+    // Free the allocated buffer
     free(log_buffer);
 }
 
