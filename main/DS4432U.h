@@ -3,6 +3,8 @@
 
 #include "driver/i2c.h"
 
+#include "i2c_params.h"
+
 esp_err_t i2c_master_init(void);
 esp_err_t i2c_master_delete(void);
 void DS4432U_read(void);

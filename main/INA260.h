@@ -1,6 +1,8 @@
 #ifndef INA260_H_
 #define INA260_H_
 
+#include "i2c_params.h"
+
 #define INA260_I2CADDR_DEFAULT 0x40 ///< INA260 default i2c address
 #define INA260_REG_CONFIG 0x00      ///< Configuration register
 #define INA260_REG_CURRENT 0x01     ///< Current measurement register (signed) in mA
