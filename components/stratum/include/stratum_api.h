@@ -17,8 +17,13 @@ typedef enum
     MINING_SET_DIFFICULTY,
     MINING_SET_VERSION_MASK,
     STRATUM_RESULT,
-    STRATUM_RESULT_VERSION_MASK
+    STRATUM_RESULT_SETUP,
+    STRATUM_RESULT_VERSION_MASK,
+    STRATUM_RESULT_SUBSCRIBE
 } stratum_method;
+
+static const int  STRATUM_ID_SUBSCRIBE    = 1;
+static const int  STRATUM_ID_CONFIGURE    = 2;
 
 typedef struct
 {
@@ -37,6 +42,8 @@ typedef struct
 
 typedef struct
 {
+    char * extranonce_str;
+    int extranonce_2_len;
 
     int16_t message_id;
     // Indicates the type of request the message represents.
@@ -57,7 +64,7 @@ void STRATUM_V1_initialize_buffer();
 
 char *STRATUM_V1_receive_jsonrpc_line(int sockfd);
 
-int STRATUM_V1_subscribe(int socket, char ** extranonce, int * extranonce2_len, char * model);
+int STRATUM_V1_subscribe(int socket, char * model);
 
 void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
 
