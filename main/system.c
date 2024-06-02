@@ -432,7 +432,6 @@ void SYSTEM_notify_new_ntime(SystemModule * module, uint32_t ntime)
 void SYSTEM_notify_found_nonce(SystemModule * module, double pool_diff, double found_diff, uint32_t nbits, float power)
 {
     // Calculate the time difference in seconds with sub-second precision
-
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
 
     module->historical_hashrate[module->historical_hashrate_rolling_index] = pool_diff;

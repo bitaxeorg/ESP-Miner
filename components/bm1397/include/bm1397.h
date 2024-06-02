@@ -6,6 +6,7 @@
 #include "mining.h"
 
 #define CRC5_MASK 0x1F
+#define BM1397_INITIAL_DIFFICULTY 256
 
 // static const uint64_t ASIC_FREQUENCY = CONFIG_ASIC_FREQUENCY;
 static const uint64_t BM1397_CORE_COUNT = 672;

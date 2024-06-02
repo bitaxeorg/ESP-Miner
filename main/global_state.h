@@ -28,6 +28,7 @@ typedef struct
     char * asic_model;
     AsicFunctions ASIC_functions;
     double asic_job_frequency_ms;
+    uint32_t initial_ASIC_difficulty;
 
     work_queue stratum_queue;
     work_queue ASIC_jobs_queue;

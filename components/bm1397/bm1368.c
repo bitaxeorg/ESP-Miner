@@ -324,8 +324,9 @@ static uint8_t _send_init(uint64_t frequency)
     _send_simple(init10, 11);
 
     //set ticket mask
-    unsigned char init11[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x14, 0x00, 0x00, 0x00, 0xFF, 0x08};
-    _send_simple(init11, 11);
+    // unsigned char init11[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x14, 0x00, 0x00, 0x00, 0xFF, 0x08};
+    // _send_simple(init11, 11);
+    BM1368_set_job_difficulty_mask(BM1368_INITIAL_DIFFICULTY);
 
     //Analog Mux Control
     unsigned char init12[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x54, 0x00, 0x00, 0x00, 0x03, 0x1D};
@@ -426,11 +427,9 @@ int BM1368_set_max_baud(void)
     return 1000000;
 }
 
+
 void BM1368_set_job_difficulty_mask(int difficulty)
 {
-
-    return;
-
     // Default mask of 256 diff
     unsigned char job_difficulty_mask[9] = {0x00, TICKET_MASK, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
 
@@ -452,7 +451,7 @@ void BM1368_set_job_difficulty_mask(int difficulty)
         job_difficulty_mask[5 - i] = _reverse_bits(value);
     }
 
-    ESP_LOGI(TAG, "Setting job ASIC mask to %d", difficulty);
+    ESP_LOGI(TAG, "Setting ASIC difficulty mask to %d", difficulty);
 
     _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, false);
 }

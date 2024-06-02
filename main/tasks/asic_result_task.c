@@ -53,9 +53,10 @@ void ASIC_result_task(void *pvParameters)
                 asic_result->nonce,
                 asic_result->rolled_version ^ GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version);
 
-            SYSTEM_notify_found_nonce(&GLOBAL_STATE->SYSTEM_MODULE, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->pool_diff,
-                                      nonce_diff, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target,
-                                      GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
         }
+
+        SYSTEM_notify_found_nonce(&GLOBAL_STATE->SYSTEM_MODULE, GLOBAL_STATE->initial_ASIC_difficulty,
+                    nonce_diff, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target,
+                    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
     }
 }
