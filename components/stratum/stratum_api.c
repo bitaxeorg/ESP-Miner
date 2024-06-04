@@ -7,6 +7,7 @@
 #include "stratum_api.h"
 #include "cJSON.h"
 #include "esp_log.h"
+#include "esp_ota_ops.h"
 #include "lwip/sockets.h"
 #include "utils.h"
 #include <stdio.h>
@@ -299,7 +300,9 @@ int STRATUM_V1_subscribe(int socket, char * model)
 {
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];
-    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe/%s\"]}\n", send_uid++, model);
+    const esp_app_desc_t *app_desc = esp_ota_get_app_description();
+    const char *version = app_desc->version;	
+    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe/%s (%s)\"]}\n", send_uid++, model, version);
     debug_stratum_tx(subscribe_msg);
     write(socket, subscribe_msg, strlen(subscribe_msg));
 
