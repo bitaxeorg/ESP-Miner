@@ -28,9 +28,25 @@ void app_main(void)
     ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float) nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY));
     GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
-    GLOBAL_STATE.asic_model = nvs_config_get_string(NVS_CONFIG_ASIC_MODEL, "");
-    if (strcmp(GLOBAL_STATE.asic_model, "BM1366") == 0) {
+    GLOBAL_STATE.device_model_str = nvs_config_get_string(NVS_CONFIG_DEVICE_MODEL, "");
+    if (strcmp(GLOBAL_STATE.device_model_str, "max") == 0) {
+        ESP_LOGI(TAG, "DEVICE: Max");
+        GLOBAL_STATE.device_model = DEVICE_MAX;
+    } else if (strcmp(GLOBAL_STATE.device_model_str, "ultra") == 0) {
+        ESP_LOGI(TAG, "DEVICE: Ultra");
+        GLOBAL_STATE.device_model = DEVICE_ULTRA;
+    } else if (strcmp(GLOBAL_STATE.device_model_str, "supra") == 0) {
+        ESP_LOGI(TAG, "DEVICE: Supra");
+        GLOBAL_STATE.device_model = DEVICE_SUPRA;
+    } else {
+        ESP_LOGE(TAG, "Invalid DEVICE model");
+        // maybe should return here to now execute anything with a faulty device parameter !
+    }
+
+    GLOBAL_STATE.asic_model_str = nvs_config_get_string(NVS_CONFIG_ASIC_MODEL, "");
+    if (strcmp(GLOBAL_STATE.asic_model_str, "BM1366") == 0) {
         ESP_LOGI(TAG, "ASIC: BM1366");
+        GLOBAL_STATE.asic_model = ASIC_BM1366;
         AsicFunctions ASIC_functions = {.init_fn = BM1366_init,
                                         .receive_result_fn = BM1366_proccess_work,
                                         .set_max_baud_fn = BM1366_set_max_baud,
@@ -40,8 +56,9 @@ void app_main(void)
         GLOBAL_STATE.initial_ASIC_difficulty = BM1366_INITIAL_DIFFICULTY;
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
-    } else if (strcmp(GLOBAL_STATE.asic_model, "BM1368") == 0) {
+    } else if (strcmp(GLOBAL_STATE.asic_model_str, "BM1368") == 0) {
         ESP_LOGI(TAG, "ASIC: BM1368");
+        GLOBAL_STATE.asic_model = ASIC_BM1368;
         AsicFunctions ASIC_functions = {.init_fn = BM1368_init,
                                         .receive_result_fn = BM1368_proccess_work,
                                         .set_max_baud_fn = BM1368_set_max_baud,
@@ -53,8 +70,9 @@ void app_main(void)
         GLOBAL_STATE.initial_ASIC_difficulty = BM1368_INITIAL_DIFFICULTY;
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
-    } else if (strcmp(GLOBAL_STATE.asic_model, "BM1397") == 0) {
+    } else if (strcmp(GLOBAL_STATE.asic_model_str, "BM1397") == 0) {
         ESP_LOGI(TAG, "ASIC: BM1397");
+        GLOBAL_STATE.asic_model = ASIC_BM1397;
         AsicFunctions ASIC_functions = {.init_fn = BM1397_init,
                                         .receive_result_fn = BM1397_proccess_work,
                                         .set_max_baud_fn = BM1397_set_max_baud,
@@ -67,16 +85,17 @@ void app_main(void)
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
     } else {
-        ESP_LOGI(TAG, "Invalid ASIC model");
+        ESP_LOGE(TAG, "Invalid ASIC model");
         AsicFunctions ASIC_functions = {.init_fn = NULL,
                                         .receive_result_fn = NULL,
                                         .set_max_baud_fn = NULL,
                                         .set_difficulty_mask_fn = NULL,
                                         .send_work_fn = NULL};
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
+        // maybe should return here to now execute anything with a faulty device parameter !
     }
 
-    bool is_max = strcmp(GLOBAL_STATE.asic_model, "BM1397") == 0;
+    bool is_max = GLOBAL_STATE.asic_model == ASIC_BM1397;
     uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
     if (should_self_test == 1 && !is_max && best_diff < 1) {
