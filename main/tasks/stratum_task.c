@@ -48,30 +48,35 @@ void stratum_task(void * pvParameters)
     char *stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pool_url;
     uint16_t port = GLOBAL_STATE->SYSTEM_MODULE.pool_port;
 
-    // check to see if the STRATUM_URL is an ip address already
-    if (inet_pton(AF_INET, stratum_url, &ip_Addr) == 1) {
-        bDNSFound = true;
-    }
-    else
-    {
-        ESP_LOGI(TAG, "Get IP for URL: %s\n", stratum_url);
-        dns_gethostbyname(stratum_url, &ip_Addr, dns_found_cb, NULL);
-        while (!bDNSFound);
+    while (1) {
+        //clear flags used by the dns callback, dns_found_cb()
+        bDNSFound = false;
+        bDNSInvalid = false;
 
-        if (bDNSInvalid) {
-            ESP_LOGE(TAG, "DNS lookup failed for URL: %s\n", stratum_url);
-            //set ip_Addr to 0.0.0.0 so that connect() will fail
-            IP_ADDR4(&ip_Addr, 0, 0, 0, 0);
+        // check to see if the STRATUM_URL is an ip address already
+        if (inet_pton(AF_INET, stratum_url, &ip_Addr) == 1) {
+            bDNSFound = true;
+        }
+        else
+        {
+            ESP_LOGI(TAG, "Get IP for URL: %s", stratum_url);
+            dns_gethostbyname(stratum_url, &ip_Addr, dns_found_cb, NULL);
+            while (!bDNSFound);
+
+            if (bDNSInvalid) {
+                ESP_LOGE(TAG, "DNS lookup failed for URL: %s", stratum_url);
+                //set ip_Addr to 0.0.0.0 so that connect() will fail
+                IP_ADDR4(&ip_Addr, 0, 0, 0, 0);
+            }
+
         }
 
-    }
+        // make IP address string from ip_Addr
+        snprintf(host_ip, sizeof(host_ip), "%d.%d.%d.%d", ip4_addr1(&ip_Addr.u_addr.ip4), ip4_addr2(&ip_Addr.u_addr.ip4),
+                    ip4_addr3(&ip_Addr.u_addr.ip4), ip4_addr4(&ip_Addr.u_addr.ip4));
+        ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)", stratum_url, port, host_ip);
 
-    // make IP address string from ip_Addr
-    snprintf(host_ip, sizeof(host_ip), "%d.%d.%d.%d", ip4_addr1(&ip_Addr.u_addr.ip4), ip4_addr2(&ip_Addr.u_addr.ip4),
-             ip4_addr3(&ip_Addr.u_addr.ip4), ip4_addr4(&ip_Addr.u_addr.ip4));
-    ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)\n", stratum_url, port, host_ip);
-
-    while (1) {
+    
         struct sockaddr_in dest_addr;
         dest_addr.sin_addr.s_addr = inet_addr(host_ip);
         dest_addr.sin_family = AF_INET;
