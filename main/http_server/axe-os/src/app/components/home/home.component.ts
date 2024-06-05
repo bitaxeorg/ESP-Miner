@@ -154,6 +154,9 @@ export class HomeComponent {
         if (info.stratumURL.includes('public-pool.io')) {
           const address = info.stratumUser.split('.')[0]
           return `https://web.public-pool.io/#/app/${address}`;
+        } else if (info.stratumURL.includes('ocean.xyz')) {
+          const address = info.stratumUser.split('.')[0]
+          return `https://ocean.xyz/stats/${address}`;
         } else {
           return undefined;
         }
