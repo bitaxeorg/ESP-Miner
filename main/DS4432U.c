@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <math.h>
 #include "esp_log.h"
-#include "driver/i2c.h"
 
 #include "DS4432U.h"
 
@@ -50,62 +49,12 @@ static uint8_t voltage_to_reg(float vout)
     return reg;
 }
 
-/**
- * @brief i2c master initialization
- */
-esp_err_t i2c_master_init(void)
-{
-    int i2c_master_port = I2C_MASTER_NUM;
-
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_MASTER_SDA_IO,
-        .scl_io_num = I2C_MASTER_SCL_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
-    };
-
-    i2c_param_config(i2c_master_port, &conf);
-
-    return i2c_driver_install(i2c_master_port, conf.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
-}
-
-/**
- * @brief i2c master delete
- */
-esp_err_t i2c_master_delete(void)
-{
-    return i2c_driver_delete(I2C_MASTER_NUM);
-}
-
-/**
- * @brief Read a sequence of I2C bytes
- */
-static esp_err_t register_read(uint8_t reg_addr, uint8_t *data, size_t len)
-{
-    return i2c_master_write_read_device(I2C_MASTER_NUM, DS4432U_SENSOR_ADDR, &reg_addr, 1, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
-}
-
-/**
- * @brief Write a byte to a I2C register
- */
-static esp_err_t register_write_byte(uint8_t reg_addr, uint8_t data)
-{
-    int ret;
-    uint8_t write_buf[2] = {reg_addr, data};
-
-    ret = i2c_master_write_to_device(I2C_MASTER_NUM, DS4432U_SENSOR_ADDR, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
-
-    return ret;
-}
-
 bool DS4432U_test(void)
 {
     uint8_t data[3];
 
     /* Read the DS4432U+ WHO_AM_I register, on power up the register should have the value 0x00 */
-    esp_err_t register_result = register_read(DS4432U_OUT0_REG, data, 1);
+    esp_err_t register_result = register_read(DS4432U_SENSOR_ADDR, DS4432U_OUT0_REG, data, 1);
     ESP_LOGI(TAG, "DS4432U+ OUT1 = 0x%02X", data[0]);
     return register_result == ESP_OK;
 }
@@ -115,14 +64,14 @@ void DS4432U_read(void)
     uint8_t data[3];
 
     /* Read the DS4432U+ WHO_AM_I register, on power up the register should have the value 0x00 */
-    ESP_ERROR_CHECK(register_read(DS4432U_OUT0_REG, data, 1));
+    ESP_ERROR_CHECK(register_read(DS4432U_SENSOR_ADDR, DS4432U_OUT0_REG, data, 1));
     ESP_LOGI(TAG, "DS4432U+ OUT1 = 0x%02X", data[0]);
 }
 
 static void DS4432U_set(uint8_t val)
 {
     ESP_LOGI(TAG, "Writing 0x%02X", val);
-    ESP_ERROR_CHECK(register_write_byte(DS4432U_OUT0_REG, val));
+    ESP_ERROR_CHECK(register_write_byte(DS4432U_SENSOR_ADDR, DS4432U_OUT0_REG, val));
 }
 
 bool DS4432U_set_vcore(float core_voltage)

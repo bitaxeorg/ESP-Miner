@@ -1,6 +1,7 @@
 idf_component_register(
 SRCS
     "adc.c"
+    "i2c_master.c"
     "DS4432U.c"
     "EMC2101.c"
     "fonts.c"

@@ -2,6 +2,7 @@
 
 #include "esp_log.h"
 
+#include "i2c_master.h"
 #include "DS4432U.h"
 #include "EMC2101.h"
 #include "INA260.h"
@@ -13,7 +14,6 @@
 #include "oled.h"
 
 #include "driver/gpio.h"
-#include "driver/i2c.h"
 #include "esp_app_desc.h"
 #include "esp_netif.h"
 #include "esp_timer.h"

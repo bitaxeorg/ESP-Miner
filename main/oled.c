@@ -15,7 +15,7 @@
 // A copy of the display memory is maintained by this code so that single pixel
 // writes can occur without having to read from the display controller.
 
-#include "driver/i2c.h"
+#include "i2c_master.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "nvs_config.h"
@@ -24,11 +24,6 @@
 #include <string.h>
 
 #include "oled.h"
-
-#define I2C_TIMEOUT 1000
-
-/*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
-#define I2C_MASTER_NUM 0
 
 extern unsigned char ucSmallFont[];
 static int iScreenOffset;            // current write offset of screen data
@@ -288,7 +283,7 @@ static esp_err_t write(uint8_t * data, uint8_t len)
 {
     int ret;
 
-    ret = i2c_master_write_to_device(I2C_MASTER_NUM, 0x3C, data, len, 1000 / portTICK_PERIOD_MS);
+    ret = i2c_master_write_to_device(I2C_MASTER_NUM, 0x3C, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 
     return ret;
 }

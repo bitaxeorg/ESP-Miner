@@ -1,7 +1,7 @@
 #ifndef EMC2101_H_
 #define EMC2101_H_
 
-#include "i2c_params.h"
+#include "i2c_master.h"
 
 #define EMC2101_I2CADDR_DEFAULT 0x4C ///< EMC2101 default i2c address
 #define EMC2101_CHIP_ID 0x16         ///< EMC2101 default device id from part id
