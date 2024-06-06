@@ -39,6 +39,8 @@ export class SystemService {
           sharesAccepted: 1,
           sharesRejected: 0,
           uptimeSeconds: 38,
+          asicCount: 1,
+          coreCount: 672,
           ASICModel: eASICModel.BM1366,
           stratumURL: "public-pool.io",
           stratumPort: 21496,
