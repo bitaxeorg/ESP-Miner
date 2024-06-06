@@ -8,6 +8,7 @@
 #include "nvs_config.h"
 #include "nvs_flash.h"
 #include "oled.h"
+#include "vcore.h"
 #include "utils.h"
 
 static const char * TAG = "self_test";
@@ -67,7 +68,7 @@ void self_test(void * pvParameters)
     ESP_LOGI(TAG, "I2C initialized successfully");
 
     ADC_init();
-    DS4432U_set_vcore(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0);
+    VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, *GLOBAL_STATE);
 
     EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
     EMC2101_set_fan_speed(1);

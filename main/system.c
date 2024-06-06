@@ -3,7 +3,6 @@
 #include "esp_log.h"
 
 #include "i2c_master.h"
-#include "DS4432U.h"
 #include "EMC2101.h"
 #include "INA260.h"
 #include "adc.h"
@@ -12,6 +11,7 @@
 #include "led_controller.h"
 #include "nvs_config.h"
 #include "oled.h"
+#include "vcore.h"
 
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
@@ -84,8 +84,7 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
 
     ADC_init();
 
-    // DS4432U tests
-    DS4432U_set_vcore(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0);
+    VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, *global_state);
 
     EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
 

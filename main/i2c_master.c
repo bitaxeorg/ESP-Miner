@@ -38,7 +38,7 @@ esp_err_t i2c_master_delete(void)
 /**
  * @brief Read a sequence of I2C bytes
  */
-esp_err_t register_read(uint8_t device_address, uint8_t reg_addr, uint8_t * data, size_t len)
+esp_err_t i2c_master_register_read(uint8_t device_address, uint8_t reg_addr, uint8_t * data, size_t len)
 {
     return i2c_master_write_read_device(I2C_MASTER_NUM, device_address, &reg_addr, 1, data, len,
                                         I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
@@ -47,7 +47,7 @@ esp_err_t register_read(uint8_t device_address, uint8_t reg_addr, uint8_t * data
 /**
  * @brief Write a byte to a I2C register
  */
-esp_err_t register_write_byte(uint8_t device_address, uint8_t reg_addr, uint8_t data)
+esp_err_t i2c_master_register_write_byte(uint8_t device_address, uint8_t reg_addr, uint8_t data)
 {
     int ret;
     uint8_t write_buf[2] = {reg_addr, data};

@@ -1,10 +1,11 @@
 #ifndef DS4432U_H_
 #define DS4432U_H_
 
-#include "i2c_master.h"
+#include <stdbool.h>
+#include "esp_check.h"
 
-void DS4432U_read(void);
 bool DS4432U_test(void);
-bool DS4432U_set_vcore(float);
+esp_err_t DS4432U_set_current_code(uint8_t output, uint8_t code);
+esp_err_t DS4432U_get_current_code(uint8_t output, uint8_t *code);
 
 #endif /* DS4432U_H_ */

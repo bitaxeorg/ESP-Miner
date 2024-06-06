@@ -11,6 +11,7 @@ SRCS
     "nvs_config.c"
     "oled.c"
     "system.c"
+    "vcore.c"
     "work_queue.c"
     "./tasks/stratum_task.c"
     "./tasks/create_jobs_task.c"
