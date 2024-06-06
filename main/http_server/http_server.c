@@ -1,5 +1,4 @@
 #include "http_server.h"
-#include "adc.h"
 #include "cJSON.h"
 #include "esp_chip_info.h"
 #include "esp_http_server.h"

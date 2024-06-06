@@ -25,8 +25,14 @@ void app_main(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
 
-    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float) nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY));
     GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
+
+    GLOBAL_STATE.asic_count = nvs_config_get_u16(NVS_CONFIG_ASIC_COUNT, 1);
+    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_COUNT %f", (float)GLOBAL_STATE.asic_count);
+
+    GLOBAL_STATE.voltage_domain = nvs_config_get_u16(NVS_CONFIG_VOLTAGE_DOMAIN, 1);
+    ESP_LOGI(TAG, "NVS_CONFIG_VOLTAGE_DOMAIN %f", (float)GLOBAL_STATE.voltage_domain);
 
     GLOBAL_STATE.device_model_str = nvs_config_get_string(NVS_CONFIG_DEVICE_MODEL, "");
     if (strcmp(GLOBAL_STATE.device_model_str, "max") == 0) {

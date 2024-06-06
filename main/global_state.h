@@ -43,6 +43,8 @@ typedef struct
     char * device_model_str;
     AsicModel asic_model;
     char * asic_model_str;
+    uint16_t asic_count;
+    uint16_t voltage_domain;
     AsicFunctions ASIC_functions;
     double asic_job_frequency_ms;
     uint32_t initial_ASIC_difficulty;
