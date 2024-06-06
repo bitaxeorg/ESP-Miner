@@ -58,7 +58,7 @@ void app_main(void)
                                         .set_max_baud_fn = BM1366_set_max_baud,
                                         .set_difficulty_mask_fn = BM1366_set_job_difficulty_mask,
                                         .send_work_fn = BM1366_send_work};
-        GLOBAL_STATE.asic_job_frequency_ms = BM1366_FULLSCAN_MS;
+        GLOBAL_STATE.asic_job_frequency_ms = BM1366_FULLSCAN_MS / (double) GLOBAL_STATE.asic_count;
         GLOBAL_STATE.initial_ASIC_difficulty = BM1366_INITIAL_DIFFICULTY;
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
@@ -72,7 +72,7 @@ void app_main(void)
                                         .send_work_fn = BM1368_send_work};
 
         uint64_t bm1368_hashrate = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value * BM1368_CORE_COUNT * 1000000;
-        GLOBAL_STATE.asic_job_frequency_ms = ((double) NONCE_SPACE / (double) bm1368_hashrate) * 1000;
+        GLOBAL_STATE.asic_job_frequency_ms = (((double) NONCE_SPACE / (double) bm1368_hashrate) * 1000) / (double) GLOBAL_STATE.asic_count;
         GLOBAL_STATE.initial_ASIC_difficulty = BM1368_INITIAL_DIFFICULTY;
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
@@ -86,7 +86,7 @@ void app_main(void)
                                         .send_work_fn = BM1397_send_work};
 
         uint64_t bm1397_hashrate = GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value * BM1397_CORE_COUNT * 1000000;
-        GLOBAL_STATE.asic_job_frequency_ms = ((double) NONCE_SPACE / (double) bm1397_hashrate) * 1000;
+        GLOBAL_STATE.asic_job_frequency_ms = (((double) NONCE_SPACE / (double) bm1397_hashrate) * 1000) / (double) GLOBAL_STATE.asic_count;
         GLOBAL_STATE.initial_ASIC_difficulty = BM1397_INITIAL_DIFFICULTY;
 
         GLOBAL_STATE.ASIC_functions = ASIC_functions;
