@@ -399,7 +399,7 @@ static void do_frequency_ramp_up()
     _send_simple(init793, 11);
 }
 
-static uint8_t _send_init(uint64_t frequency)
+static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 {
 
     //     //send serial data
@@ -418,8 +418,9 @@ static uint8_t _send_init(uint64_t frequency)
     //      unsigned char init3[6] =  { 0x00, 0x18, 0xFF, 0x0F, 0xC1, 0x00 };
     //       _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init3,  6, true);
 
-    //      unsigned char init4[7] =  { 0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03 };
-    //      _send_simple(init4, 7);
+    //      _send_chain_inactive();
+    //      // unsigned char init4[7] =  { 0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03 };
+    //      // _send_simple(init4, 7);
 
     //      unsigned char init5[7] =  { 0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C };
     //      _send_simple(init5, 7);
@@ -454,7 +455,7 @@ static uint8_t _send_init(uint64_t frequency)
             break;
         }
     }
-    ESP_LOGI(TAG, "%i chip(s) detected on the chain", chip_counter);
+    ESP_LOGI(TAG, "%i chip(s) detected on the chain, expected %i", chip_counter, asic_count);
 
     unsigned char init4[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00, 0x03};
     _send_simple(init4, 11);
@@ -462,11 +463,16 @@ static uint8_t _send_init(uint64_t frequency)
     unsigned char init5[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x18, 0xFF, 0x0F, 0xC1, 0x00, 0x00};
     _send_simple(init5, 11);
 
-    unsigned char init6[7] = {0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03};
-    _send_simple(init6, 7);
+    _send_chain_inactive();
+    // unsigned char init6[7] = {0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03};
+    // _send_simple(init6, 7);
 
-    unsigned char init7[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
-    _send_simple(init7, 7);
+    // split the chip address space evenly
+    for (uint8_t i = 0; i < chip_counter; i++) {
+        _set_chip_address(i * (256 / chip_counter));
+        // unsigned char init7[7] = { 0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C };
+        // _send_simple(init7, 7);
+    }
 
     unsigned char init135[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40, 0x0C};
     _send_simple(init135, 11);
@@ -540,7 +546,7 @@ static void _send_read_address(void)
     _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, false);
 }
 
-uint8_t BM1366_init(uint64_t frequency)
+uint8_t BM1366_init(uint64_t frequency, uint16_t asic_count)
 {
     ESP_LOGI(TAG, "Initializing BM1366");
 
@@ -552,10 +558,7 @@ uint8_t BM1366_init(uint64_t frequency)
     // reset the bm1366
     _reset();
 
-    // send the init command
-    //_send_read_address();
-
-    return _send_init(frequency);
+    return _send_init(frequency, asic_count);
 }
 
 // Baud formula = 25M/((denominator+1)*8)

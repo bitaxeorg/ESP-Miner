@@ -30,7 +30,7 @@ typedef enum
 
 typedef struct
 {
-    uint8_t (*init_fn)(uint64_t);
+    uint8_t (*init_fn)(uint64_t, uint16_t);
     task_result * (*receive_result_fn)(void * GLOBAL_STATE);
     int (*set_max_baud_fn)(void);
     void (*set_difficulty_mask_fn)(int);

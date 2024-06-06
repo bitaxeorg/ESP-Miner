@@ -266,7 +266,7 @@ static void do_frequency_ramp_up() {
     }
 }
 
-static uint8_t _send_init(uint64_t frequency)
+static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 {
 
     //enable and set version rolling mask to 0xFFFF
@@ -293,7 +293,7 @@ static uint8_t _send_init(uint64_t frequency)
             break;
         }
     }
-    ESP_LOGI(TAG, "%i chip(s) detected on the chain", chip_counter);
+    ESP_LOGI(TAG, "%i chip(s) detected on the chain, expected %i", chip_counter, asic_count);
 
     //enable and set version rolling mask to 0xFFFF (again)
     unsigned char init4[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
@@ -308,12 +308,16 @@ static uint8_t _send_init(uint64_t frequency)
     _send_simple(init6, 11);
 
     //chain inactive
-    unsigned char init7[7] = {0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03};
-    _send_simple(init7, 7);
+    _send_chain_inactive();
+    // unsigned char init7[7] = {0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03};
+    // _send_simple(init7, 7);
 
-    //assign address 0x00 to the first chip
-    unsigned char init8[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
-    _send_simple(init8, 7);
+    // split the chip address space evenly
+    for (uint8_t i = 0; i < chip_counter; i++) {
+        _set_chip_address(i * (256 / chip_counter));
+        // unsigned char init8[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
+        // _send_simple(init8, 7);
+    }
 
     //Core Register Control
     unsigned char init9[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x8B, 0x00, 0x12};
@@ -386,7 +390,7 @@ static void _send_read_address(void)
     _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, false);
 }
 
-uint8_t BM1368_init(uint64_t frequency)
+uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
 {
     ESP_LOGI(TAG, "Initializing BM1368");
 
@@ -398,10 +402,7 @@ uint8_t BM1368_init(uint64_t frequency)
     // reset the bm1368
     _reset();
 
-    // send the init command
-    //_send_read_address();
-
-    return _send_init(frequency);
+    return _send_init(frequency, asic_count);
 }
 
 // Baud formula = 25M/((denominator+1)*8)
