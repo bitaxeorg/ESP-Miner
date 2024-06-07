@@ -313,8 +313,9 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     // _send_simple(init7, 7);
 
     // split the chip address space evenly
+    uint8_t address_interval = (uint8_t) (256 / chip_counter);
     for (uint8_t i = 0; i < chip_counter; i++) {
-        _set_chip_address(i * (256 / chip_counter));
+        _set_chip_address(i * address_interval);
         // unsigned char init8[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
         // _send_simple(init8, 7);
     }
@@ -340,25 +341,23 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     unsigned char init13[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x58, 0x02, 0x11, 0x11, 0x11, 0x06};
     _send_simple(init13, 11);
 
-    //Reg_A8
-    unsigned char init14[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x01, 0xF0, 0x15};
-    _send_simple(init14, 11);
-
-    //Misc Control
-    unsigned char init15[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x18, 0xF0, 0x00, 0xC1, 0x00, 0x0C};
-    _send_simple(init15, 11);
-
-    //Core Register Control
-    unsigned char init16[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x8B, 0x00, 0x1A};
-    _send_simple(init16, 11);
-
-    //Core Register Control
-    unsigned char init17[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x80, 0x18, 0x17};
-    _send_simple(init17, 11);
-
-    //Core Register Control
-    unsigned char init18[11] = {0x55, 0xAA, 0x41, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x82, 0xAA, 0x05};
-    _send_simple(init18, 11);
+    for (uint8_t i = 0; i < chip_counter; i++) {
+        //Reg_A8
+        unsigned char set_a8_register[6] = {i * address_interval, 0xA8, 0x00, 0x07, 0x01, 0xF0};
+        _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_a8_register, 6, true);
+        //Misc Control
+        unsigned char set_18_register[6] = {i * address_interval, 0x18, 0xF0, 0x00, 0xC1, 0x00};
+        _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_18_register, 6, true);
+        //Core Register Control
+        unsigned char set_3c_register_first[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x8B, 0x00};
+        _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_first, 6, true);
+        //Core Register Control
+        unsigned char set_3c_register_second[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x80, 0x18};
+        _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_second, 6, true);
+        //Core Register Control
+        unsigned char set_3c_register_third[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x82, 0xAA};
+        _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_third, 6, true);
+    }
 
     do_frequency_ramp_up();
 
