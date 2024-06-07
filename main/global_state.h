@@ -17,15 +17,15 @@
 typedef enum
 {
     DEVICE_MAX = 0,
-    DEVICE_ULTRA = 1,
-    DEVICE_SUPRA = 2,
+    DEVICE_ULTRA,
+    DEVICE_SUPRA,
 } DeviceModel;
 
 typedef enum
 {
     ASIC_BM1397 = 0,
-    ASIC_BM1366 = 1,
-    ASIC_BM1368 = 2,
+    ASIC_BM1366,
+    ASIC_BM1368,
 } AsicModel;
 
 typedef struct
