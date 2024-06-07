@@ -33,9 +33,9 @@ static bool power_consumption_pass()
     return false;
 }
 
-static bool core_voltage_pass()
+static bool core_voltage_pass(GlobalState * global_state)
 {
-    uint16_t core_voltage = ADC_get_vcore();
+    uint16_t core_voltage = VCORE_get_voltage_mv(global_state);
     ESP_LOGI(TAG, "Voltage: %u", core_voltage);
 
     if (core_voltage > 1100 && core_voltage < 1300) {
@@ -67,8 +67,8 @@ void self_test(void * pvParameters)
     ESP_ERROR_CHECK(i2c_master_init());
     ESP_LOGI(TAG, "I2C initialized successfully");
 
-    ADC_init();
-    VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, *GLOBAL_STATE);
+    VCORE_init(GLOBAL_STATE);
+    VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE);
 
     EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
     EMC2101_set_fan_speed(1);
@@ -179,7 +179,7 @@ void self_test(void * pvParameters)
     free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
     free(GLOBAL_STATE->valid_jobs);
 
-    if (!core_voltage_pass()) {
+    if (!core_voltage_pass(GLOBAL_STATE)) {
         if (OLED_status()) {
             memset(module->oled_buf, 0, 20);
             snprintf(module->oled_buf, 20, "POWER:     FAIL");

@@ -3,6 +3,8 @@
 
 #include "global_state.h"
 
-bool VCORE_set_voltage(float core_voltage, GlobalState global_state);
+void VCORE_init(GlobalState * global_state);
+bool VCORE_set_voltage(float core_voltage, GlobalState * global_state);
+uint16_t VCORE_get_voltage_mv(GlobalState * global_state);
 
 #endif /* VCORE_H_ */

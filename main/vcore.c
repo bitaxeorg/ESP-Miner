@@ -3,6 +3,7 @@
 #include "esp_log.h"
 
 #include "vcore.h"
+#include "adc.h"
 #include "DS4432U.h"
 
 // DS4432U Transfer function constants for Bitaxe board
@@ -15,6 +16,10 @@
 #define BITAXE_VMIN 0.046
 
 static const char *TAG = "vcore.c";
+
+void VCORE_init(GlobalState * global_state) {
+    ADC_init();
+}
 
 /**
  * @brief ds4432_tps40305_bitaxe_voltage_to_reg takes a voltage and returns a register setting for the DS4432U to get that voltage on the TPS40305
@@ -44,19 +49,25 @@ static uint8_t ds4432_tps40305_bitaxe_voltage_to_reg(float vout)
     return reg;
 }
 
-bool VCORE_set_voltage(float core_voltage, GlobalState global_state)
+bool VCORE_set_voltage(float core_voltage, GlobalState * global_state)
 {
     uint8_t reg_setting;
 
-    if ((global_state.device_model == DEVICE_MAX) ||
-        (global_state.device_model == DEVICE_ULTRA) ||
-        (global_state.device_model == DEVICE_SUPRA)) {
-        reg_setting = ds4432_tps40305_bitaxe_voltage_to_reg(core_voltage);
-        ESP_LOGI(TAG, "Set ASIC voltage = %.3fV [0x%02X]", core_voltage, reg_setting);
-        DS4432U_set_current_code(0, reg_setting); /// eek!
+    switch (global_state->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            reg_setting = ds4432_tps40305_bitaxe_voltage_to_reg(core_voltage);
+            ESP_LOGI(TAG, "Set ASIC voltage = %.3fV [0x%02X]", core_voltage, reg_setting);
+            DS4432U_set_current_code(0, reg_setting); /// eek!
+            break;
+        // case DEVICE_HEX:
+        default:
     }
-    // can make other fancy 'else if' based on other device_model or specific version that have different HW to set VCore value
-    // for example DEVICE_HEX will have a different way to set VCore using TPS546...
 
     return true;
+}
+
+uint16_t VCORE_get_voltage_mv(GlobalState * global_state) {
+    return ADC_get_vcore();
 }

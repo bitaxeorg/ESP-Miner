@@ -82,12 +82,17 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
     ESP_ERROR_CHECK(i2c_master_init());
     ESP_LOGI(TAG, "I2C initialized successfully");
 
-    ADC_init();
+    VCORE_init(global_state);
+    VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, global_state);
 
-    VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, *global_state);
-
-    EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
-
+    switch (global_state->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
+            break;
+        default:
+    }
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
@@ -174,11 +179,12 @@ static void _update_system_info(GlobalState * GLOBAL_STATE)
     }
 }
 
-static void _update_esp32_info(SystemModule * module)
+static void _update_esp32_info(GlobalState * GLOBAL_STATE)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
     uint32_t free_heap_size = esp_get_free_heap_size();
 
-    uint16_t vcore = ADC_get_vcore();
+    uint16_t vcore = VCORE_get_voltage_mv(GLOBAL_STATE);
 
     if (OLED_status()) {
 
@@ -405,7 +411,7 @@ void SYSTEM_task(void * pvParameters)
                     _update_system_info(GLOBAL_STATE);
                     break;
                 case 2:
-                    _update_esp32_info(module);
+                    _update_esp32_info(GLOBAL_STATE);
                     break;
             }
 
