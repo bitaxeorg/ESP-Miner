@@ -57,7 +57,7 @@ bool VCORE_set_voltage(float core_voltage, GlobalState * global_state)
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            reg_setting = ds4432_tps40305_bitaxe_voltage_to_reg(core_voltage);
+            reg_setting = ds4432_tps40305_bitaxe_voltage_to_reg(core_voltage * global_state->voltage_domain);
             ESP_LOGI(TAG, "Set ASIC voltage = %.3fV [0x%02X]", core_voltage, reg_setting);
             DS4432U_set_current_code(0, reg_setting); /// eek!
             break;
@@ -69,5 +69,5 @@ bool VCORE_set_voltage(float core_voltage, GlobalState * global_state)
 }
 
 uint16_t VCORE_get_voltage_mv(GlobalState * global_state) {
-    return ADC_get_vcore();
+    return ADC_get_vcore() / global_state->voltage_domain;
 }

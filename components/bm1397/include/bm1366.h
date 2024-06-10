@@ -32,7 +32,7 @@ typedef struct __attribute__((__packed__))
     uint8_t version[4];
 } BM1366_job;
 
-uint8_t BM1366_init(uint64_t frequency);
+uint8_t BM1366_init(uint64_t frequency, uint16_t asic_count);
 
 void BM1366_send_init(void);
 void BM1366_send_work(void * GLOBAL_STATE, bm_job * next_bm_job);

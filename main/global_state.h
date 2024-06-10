@@ -30,7 +30,7 @@ typedef enum
 
 typedef struct
 {
-    uint8_t (*init_fn)(uint64_t);
+    uint8_t (*init_fn)(uint64_t, uint16_t);
     task_result * (*receive_result_fn)(void * GLOBAL_STATE);
     int (*set_max_baud_fn)(void);
     void (*set_difficulty_mask_fn)(int);
@@ -43,6 +43,8 @@ typedef struct
     char * device_model_str;
     AsicModel asic_model;
     char * asic_model_str;
+    uint16_t asic_count;
+    uint16_t voltage_domain;
     AsicFunctions ASIC_functions;
     double asic_job_frequency_ms;
     uint32_t initial_ASIC_difficulty;

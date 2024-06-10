@@ -104,6 +104,13 @@ static void _send_BM1397(uint8_t header, uint8_t *data, uint8_t data_len, bool d
     free(buf);
 }
 
+static void _send_read_address(void)
+{
+    unsigned char read_address[2] = {0x00, 0x00};
+    // send serial data
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, false);
+}
+
 static void _send_chain_inactive(void)
 {
 
@@ -209,14 +216,29 @@ void BM1397_send_hash_frequency(float frequency)
     ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
 }
 
-static void _send_init(uint64_t frequency)
+static void _send_init(uint64_t frequency, uint16_t asic_count)
 {
+    // send the init command
+    _send_read_address();
+
+    int chip_counter = 0;
+    while (true) {
+        if (SERIAL_rx(asic_response_buffer, 11, 1000) > 0) {
+            chip_counter++;
+        } else {
+            break;
+        }
+    }
+    ESP_LOGI(TAG, "%i chip(s) detected on the chain, expected %i", chip_counter, asic_count);
 
     // send serial data
     vTaskDelay(SLEEP_TIME / portTICK_PERIOD_MS);
     _send_chain_inactive();
 
-    _set_chip_address(0x00);
+    // split the chip address space evenly
+    for (uint8_t i = 0; i < asic_count; i++) {
+        _set_chip_address(i * (256 / asic_count));
+    }
 
     unsigned char init[6] = {0x00, CLOCK_ORDER_CONTROL_0, 0x00, 0x00, 0x00, 0x00}; // init1 - clock_order_control0
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init, 6, false);
@@ -258,15 +280,7 @@ static void _reset(void)
     vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
-static void _send_read_address(void)
-{
-
-    unsigned char read_address[2] = {0x00, 0x00};
-    // send serial data
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, false);
-}
-
-void BM1397_init(uint64_t frequency)
+void BM1397_init(uint64_t frequency, uint16_t asic_count)
 {
     ESP_LOGI(TAG, "Initializing BM1397");
 
@@ -278,10 +292,7 @@ void BM1397_init(uint64_t frequency)
     // reset the bm1397
     _reset();
 
-    // send the init command
-    _send_read_address();
-
-    _send_init(frequency);
+    _send_init(frequency, asic_count);
 }
 
 // Baud formula = 25M/((denominator+1)*8)

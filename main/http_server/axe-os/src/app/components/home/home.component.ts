@@ -132,21 +132,7 @@ export class HomeComponent {
     );
 
     this.expectedHashRate$ = this.info$.pipe(map(info => {
-      if (info.ASICModel === eASICModel.BM1366) {
-        const version = parseInt(info.boardVersion);
-        if (version >= 400 && version < 500) {
-          return Math.floor(info.frequency * ((894 * 6) / 1000))
-        } else {
-          return Math.floor(info.frequency * (894 / 1000))
-        }
-      } else if (info.ASICModel === eASICModel.BM1397) {
-        return Math.floor(info.frequency * (672 / 1000))
-      } else if (info.ASICModel === eASICModel.BM1368) {
-        return Math.floor(info.frequency * (1276 / 1000))
-      }
-
-      return undefined;
-
+      return Math.floor(info.frequency * ((info.coreCount * info.asicCount) / 1000))
     }))
 
     this.quickLink$ = this.info$.pipe(
