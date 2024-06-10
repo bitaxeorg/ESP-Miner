@@ -28,22 +28,22 @@ void app_main(void)
     GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
 
-    GLOBAL_STATE.asic_count = nvs_config_get_u16(NVS_CONFIG_ASIC_COUNT, 1);
-    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_COUNT %f", (float)GLOBAL_STATE.asic_count);
-
-    GLOBAL_STATE.voltage_domain = nvs_config_get_u16(NVS_CONFIG_VOLTAGE_DOMAIN, 1);
-    ESP_LOGI(TAG, "NVS_CONFIG_VOLTAGE_DOMAIN %f", (float)GLOBAL_STATE.voltage_domain);
-
     GLOBAL_STATE.device_model_str = nvs_config_get_string(NVS_CONFIG_DEVICE_MODEL, "");
     if (strcmp(GLOBAL_STATE.device_model_str, "max") == 0) {
         ESP_LOGI(TAG, "DEVICE: Max");
         GLOBAL_STATE.device_model = DEVICE_MAX;
+        GLOBAL_STATE.asic_count = 1;
+        GLOBAL_STATE.voltage_domain = 1;
     } else if (strcmp(GLOBAL_STATE.device_model_str, "ultra") == 0) {
         ESP_LOGI(TAG, "DEVICE: Ultra");
         GLOBAL_STATE.device_model = DEVICE_ULTRA;
+        GLOBAL_STATE.asic_count = 1;
+        GLOBAL_STATE.voltage_domain = 1;
     } else if (strcmp(GLOBAL_STATE.device_model_str, "supra") == 0) {
         ESP_LOGI(TAG, "DEVICE: Supra");
         GLOBAL_STATE.device_model = DEVICE_SUPRA;
+        GLOBAL_STATE.asic_count = 1;
+        GLOBAL_STATE.voltage_domain = 1;
     } else {
         ESP_LOGE(TAG, "Invalid DEVICE model");
         // maybe should return here to now execute anything with a faulty device parameter !

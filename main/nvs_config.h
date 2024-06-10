@@ -15,8 +15,6 @@
 #define NVS_CONFIG_ASIC_FREQ "asicfrequency"
 #define NVS_CONFIG_ASIC_VOLTAGE "asicvoltage"
 #define NVS_CONFIG_ASIC_MODEL "asicmodel"
-#define NVS_CONFIG_ASIC_COUNT "asiccount"
-#define NVS_CONFIG_VOLTAGE_DOMAIN "voltagedomain"
 #define NVS_CONFIG_DEVICE_MODEL "devicemodel"
 #define NVS_CONFIG_BOARD_VERSION "boardversion"
 #define NVS_CONFIG_FLIP_SCREEN "flipscreen"

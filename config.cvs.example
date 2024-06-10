@@ -10,8 +10,6 @@ stratumpass,data,string,x
 asicfrequency,data,u16,485
 asicvoltage,data,u16,1200
 asicmodel,data,string,BM1366
-asiccount,data,u16,1
-voltagedomain,data,u16,1
 devicemodel,data,string,ultra
 boardversion,data,string,204
 flipscreen,data,u16,1

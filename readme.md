@@ -26,7 +26,7 @@ Starting with v2.0.0, the ESP-Miner firmware requires some basic manufacturing d
 1. Download the esp-miner-factory-v2.0.3.bin file from the release tab.
    Click [here](https://github.com/skot/ESP-Miner/releases) for the release tab
 
-2. Copy `config.cvs.example` to `config.cvs` and modify `asicfrequency`, `asicvoltage`, `asicmodel`, `asiccount`, `voltagedomain`, `devicemodel`, and `boardversion`
+2. Copy `config.cvs.example` to `config.cvs` and modify `asicfrequency`, `asicvoltage`, `asicmodel`, `devicemodel`, and `boardversion`
 
 The following are recommendations but it is necessary that you do have all values in your `config.cvs`file to flash properly.
 
@@ -38,8 +38,6 @@ The following are recommendations but it is necessary that you do have all value
   asicfrequency,data,u16,490
   asicvoltage,data,u16,1200
   asicmodel,data,string,BM1368
-  asiccount,data,u16,1
-  voltagedomain,data,u16,1
   devicemodel,data,string,supra
   boardversion,data,string,400
   ```
@@ -53,8 +51,6 @@ The following are recommendations but it is necessary that you do have all value
   asicvoltage,data,u16,1200
   asicmodel,data,string,BM1366
   asiccount,data,u16,1
-  voltagedomain,data,u16,1
-  devicemodel,data,string,ultra
   boardversion,data,string,0.11
   ```
 
@@ -66,8 +62,6 @@ The following are recommendations but it is necessary that you do have all value
   asicfrequency,data,u16,475
   asicvoltage,data,u16,1400
   asicmodel,data,string,BM1397
-  asiccount,data,u16,1
-  voltagedomain,data,u16,1
   devicemodel,data,string,max
   boardversion,data,string,2.2
   ```

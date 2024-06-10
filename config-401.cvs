@@ -10,8 +10,6 @@ stratumpass,data,string,x
 asicfrequency,data,u16,490
 asicvoltage,data,u16,1166
 asicmodel,data,string,BM1368
-asiccount,data,u16,1
-voltagedomain,data,u16,1
 devicemodel,data,string,supra
 boardversion,data,string,401
 flipscreen,data,u16,1
