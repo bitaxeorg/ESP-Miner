@@ -10,6 +10,7 @@
 #include "oled.h"
 #include "vcore.h"
 #include "utils.h"
+#include "string.h"
 
 static const char * TAG = "self_test";
 

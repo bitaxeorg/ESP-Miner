@@ -28,3 +28,4 @@ html_doc/
 components/components/*
 config.bin
 config.cvs
+managed_components/*

@@ -7,7 +7,7 @@
 #include "nvs_config.h"
 #include "utils.h"
 
-const char *TAG = "asic_result";
+static const char *TAG = "asic_result";
 
 void ASIC_result_task(void *pvParameters)
 {
