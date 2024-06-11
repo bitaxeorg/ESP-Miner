@@ -6,8 +6,11 @@
 #include "adc.h"
 #include "DS4432U.h"
 
+#define TPS40305_VFB 0.6
+
 // DS4432U Transfer function constants for Bitaxe board
-#define BITAXE_VFB 0.6
+// #define BITAXE_RFS 80000.0     // R16
+// #define BITAXE_IFS ((DS4432_VRFS * 127.0) / (BITAXE_RFS * 16))
 #define BITAXE_IFS 0.000098921 // (Vrfs / Rfs) x (127/16)  -> Vrfs = 0.997, Rfs = 80000
 #define BITAXE_RA 4750.0       // R14
 #define BITAXE_RB 3320.0       // R15
@@ -37,7 +40,7 @@ static uint8_t ds4432_tps40305_bitaxe_voltage_to_reg(float vout)
     }
 
     // this is the transfer function. comes from the DS4432U+ datasheet
-    change = fabs((((BITAXE_VFB / BITAXE_RB) - ((vout - BITAXE_VFB) / BITAXE_RA)) / BITAXE_IFS) * 127);
+    change = fabs((((TPS40305_VFB / BITAXE_RB) - ((vout - TPS40305_VFB) / BITAXE_RA)) / BITAXE_IFS) * 127);
     reg = (uint8_t)ceil(change);
 
     // Set the MSB high if the requested voltage is BELOW nominal
