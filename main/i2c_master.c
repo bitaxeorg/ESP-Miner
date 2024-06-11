@@ -57,3 +57,17 @@ esp_err_t i2c_master_register_write_byte(uint8_t device_address, uint8_t reg_add
 
     return ret;
 }
+
+/**
+ * @brief Write a word to a I2C register
+ */
+esp_err_t i2c_master_register_write_word(uint8_t device_address, uint8_t reg_addr, uint16_t data)
+{
+    int ret;
+    uint8_t write_buf[3] = {reg_addr, (data >> 8) & 0xFF, data & 0xFF};
+
+    ret = i2c_master_write_to_device(I2C_MASTER_NUM, device_address, write_buf, sizeof(write_buf),
+                                     I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
+
+    return ret;
+}
