@@ -48,6 +48,9 @@ void app_main(void)
         ESP_LOGE(TAG, "Invalid DEVICE model");
         // maybe should return here to now execute anything with a faulty device parameter !
     }
+    GLOBAL_STATE.board_version = atoi(nvs_config_get_string(NVS_CONFIG_BOARD_VERSION, "000"));
+    ESP_LOGI(TAG, "Found Device Model: %s", GLOBAL_STATE.device_model_str);
+    ESP_LOGI(TAG, "Found Board Version: %d", GLOBAL_STATE.board_version);
 
     GLOBAL_STATE.asic_model_str = nvs_config_get_string(NVS_CONFIG_ASIC_MODEL, "");
     if (strcmp(GLOBAL_STATE.asic_model_str, "BM1366") == 0) {
