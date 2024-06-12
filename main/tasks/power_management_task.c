@@ -32,6 +32,34 @@ static float _fbound(float value, float lower_bound, float upper_bound)
     return value;
 }
 
+// Set the fan speed between 20% min and 100% max based on chip temperature as input.
+// The fan speed increases from 20% to 100% proportionally to the temperature increase from 50 and THROTTLE_TEMP
+static void automatic_fan_speed(float chip_temp, GlobalState * GLOBAL_STATE)
+{
+    double result = 0.0;
+    double min_temp = 50.0;
+    double min_fan_speed = 20.0;
+
+    if (chip_temp < min_temp) {
+        result = min_fan_speed;
+    } else if (chip_temp >= THROTTLE_TEMP) {
+        result = 100;
+    } else {
+        double temp_range = THROTTLE_TEMP - min_temp;
+        double fan_range = 100 - min_fan_speed;
+        result = ((chip_temp - min_temp) / temp_range) * fan_range + min_fan_speed;
+    }
+
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            EMC2101_set_fan_speed((float) result / 100);
+            break;
+        default:
+    }
+}
+
 void POWER_MANAGEMENT_task(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -75,16 +103,30 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     while (1) {
 
-        if (read_power == true) {
-            power_management->voltage = INA260_read_voltage();
-            power_management->power = INA260_read_power() / 1000;
-            power_management->current = INA260_read_current();
+        switch (GLOBAL_STATE->device_model) {
+            case DEVICE_MAX:
+            case DEVICE_ULTRA:
+            case DEVICE_SUPRA:
+                if (read_power == true) {
+                    power_management->voltage = INA260_read_voltage();
+                    power_management->power = INA260_read_power() / 1000;
+                    power_management->current = INA260_read_current();
+                }
+                power_management->fan_speed = EMC2101_get_fan_speed();
+                break;
+            default:
         }
-        power_management->fan_speed = EMC2101_get_fan_speed();
 
         if (GLOBAL_STATE->asic_model == ASIC_BM1397) {
 
-            power_management->chip_temp = EMC2101_get_external_temp();
+            switch (GLOBAL_STATE->device_model) {
+                case DEVICE_MAX:
+                case DEVICE_ULTRA:
+                case DEVICE_SUPRA:
+                    power_management->chip_temp_avg = EMC2101_get_external_temp();
+                    break;
+                default:
+            }
 
             // Voltage
             // We'll throttle between 4.9v and 3.5v
@@ -93,7 +135,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
             // Temperature
             float temperature_multiplier = 1;
-            float over_temp = -(THROTTLE_TEMP - power_management->chip_temp);
+            float over_temp = -(THROTTLE_TEMP - power_management->chip_temp_avg);
             if (over_temp > 0) {
                 temperature_multiplier = (THROTTLE_TEMP_RANGE - over_temp) / THROTTLE_TEMP_RANGE;
             }
@@ -129,23 +171,23 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 last_frequency_increase = 0;
                 BM1397_send_hash_frequency(power_management->frequency_value);
                 ESP_LOGI(TAG, "target %f, Freq %f, Temp %f, Power %f", target_frequency, power_management->frequency_value,
-                         power_management->chip_temp, power_management->power);
+                         power_management->chip_temp_avg, power_management->power);
             } else {
                 if (last_frequency_increase > 120 && power_management->frequency_value != frequency_target) {
                     float add = (target_frequency + power_management->frequency_value) / 2;
                     power_management->frequency_value += _fbound(add, 2, 20);
                     BM1397_send_hash_frequency(power_management->frequency_value);
                     ESP_LOGI(TAG, "target %f, Freq %f, Temp %f, Power %f", target_frequency, power_management->frequency_value,
-                             power_management->chip_temp, power_management->power);
+                             power_management->chip_temp_avg, power_management->power);
                     last_frequency_increase = 60;
                 } else {
                     last_frequency_increase++;
                 }
             }
         } else if (GLOBAL_STATE->asic_model == ASIC_BM1366 || GLOBAL_STATE->asic_model == ASIC_BM1368) {
-            power_management->chip_temp = EMC2101_get_internal_temp() + 5;
+            power_management->chip_temp_avg = EMC2101_get_internal_temp() + 5;
 
-            if (power_management->chip_temp > THROTTLE_TEMP &&
+            if (power_management->chip_temp_avg > THROTTLE_TEMP &&
                 (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
                 ESP_LOGE(TAG, "OVERHEAT");
 
@@ -164,9 +206,16 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         if (auto_fan_speed == 1) {
-            automatic_fan_speed(power_management->chip_temp);
+            automatic_fan_speed(power_management->chip_temp_avg, GLOBAL_STATE);
         } else {
-            EMC2101_set_fan_speed((float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100) / 100);
+            switch (GLOBAL_STATE->device_model) {
+                case DEVICE_MAX:
+                case DEVICE_ULTRA:
+                case DEVICE_SUPRA:
+                    EMC2101_set_fan_speed((float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100) / 100);
+                    break;
+                default:
+            }
         }
         // ESP_LOGI(TAG, "target %f, Freq %f, Volt %f, Power %f", target_frequency, power_management->frequency_value,
         // power_management->voltage, power_management->power);
@@ -184,23 +233,3 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     }
 }
 
-// Set the fan speed between 20% min and 100% max based on chip temperature as input.
-// The fan speed increases from 20% to 100% proportionally to the temperature increase from 50 and THROTTLE_TEMP
-static void automatic_fan_speed(float chip_temp)
-{
-    double result = 0.0;
-    double min_temp = 50.0;
-    double min_fan_speed = 20.0;
-
-    if (chip_temp < min_temp) {
-        result = min_fan_speed;
-    } else if (chip_temp >= THROTTLE_TEMP) {
-        result = 100;
-    } else {
-        double temp_range = THROTTLE_TEMP - min_temp;
-        double fan_range = 100 - min_fan_speed;
-        result = ((chip_temp - min_temp) / temp_range) * fan_range + min_fan_speed;
-    }
-
-    EMC2101_set_fan_speed((float) result / 100);
-}

@@ -1,4 +1,4 @@
-#include "global_state.h"
+#include "system.h"
 #include "work_queue.h"
 #include "serial.h"
 #include "bm1397.h"
@@ -55,8 +55,6 @@ void ASIC_result_task(void *pvParameters)
 
         }
 
-        SYSTEM_notify_found_nonce(&GLOBAL_STATE->SYSTEM_MODULE, GLOBAL_STATE->initial_ASIC_difficulty,
-                    nonce_diff, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target,
-                    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
+        SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, job_id);
     }
 }

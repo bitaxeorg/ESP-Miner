@@ -7,7 +7,6 @@
 #include "INA260.h"
 #include "adc.h"
 #include "connect.h"
-#include "global_state.h"
 #include "led_controller.h"
 #include "nvs_config.h"
 #include "oled.h"
@@ -41,8 +40,10 @@ static esp_netif_ip_info_t ip_info;
 
 QueueHandle_t user_input_queue;
 
-static void _init_system(GlobalState * global_state, SystemModule * module)
+static void _init_system(GlobalState * GLOBAL_STATE)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     module->duration_start = 0;
     module->historical_hashrate_rolling_index = 0;
     module->historical_hashrate_init = 0;
@@ -83,10 +84,10 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
     ESP_LOGI(TAG, "I2C initialized successfully");
 
     // Initialize the core voltage regulator
-    VCORE_init(global_state);
-    VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, global_state);
+    VCORE_init(GLOBAL_STATE);
+    VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE);
 
-    switch (global_state->device_model) {
+    switch (GLOBAL_STATE->device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
@@ -97,62 +98,102 @@ static void _init_system(GlobalState * global_state, SystemModule * module)
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
-    // oled
-    if (!OLED_init()) {
-        ESP_LOGI(TAG, "OLED init failed!");
-    } else {
-        ESP_LOGI(TAG, "OLED init success!");
-        // clear the oled screen
-        OLED_fill(0);
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            // oled
+            if (!OLED_init()) {
+                ESP_LOGI(TAG, "OLED init failed!");
+            } else {
+                ESP_LOGI(TAG, "OLED init success!");
+                // clear the oled screen
+                OLED_fill(0);
+            }
+            break;
+        default:
     }
 
     netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
 }
 
-static void _update_hashrate(SystemModule * module, float power)
+static void _update_hashrate(GlobalState * GLOBAL_STATE)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     if (module->screen_page != 0) {
         return;
     }
 
-    float efficiency = power / (module->current_hashrate / 1000.0);
-
-    OLED_clearLine(0);
-    memset(module->oled_buf, 0, 20);
-    snprintf(module->oled_buf, 20, "Gh%s: %.1f W/Th: %.1f", module->historical_hashrate_init < HISTORY_LENGTH ? "*" : "",
-             module->current_hashrate, efficiency);
-    OLED_writeString(0, 0, module->oled_buf);
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            float efficiency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power / (module->current_hashrate / 1000.0);
+            OLED_clearLine(0);
+            memset(module->oled_buf, 0, 20);
+            snprintf(module->oled_buf, 20, "Gh%s: %.1f W/Th: %.1f", module->historical_hashrate_init < HISTORY_LENGTH ? "*" : "",
+                    module->current_hashrate, efficiency);
+            OLED_writeString(0, 0, module->oled_buf);
+            break;
+        default:
+    }
 }
 
-static void _update_shares(SystemModule * module)
+static void _update_shares(GlobalState * GLOBAL_STATE)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     if (module->screen_page != 0) {
         return;
     }
-    OLED_clearLine(1);
-    memset(module->oled_buf, 0, 20);
-    snprintf(module->oled_buf, 20, "A/R: %u/%u", module->shares_accepted, module->shares_rejected);
-    OLED_writeString(0, 1, module->oled_buf);
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            OLED_clearLine(1);
+            memset(module->oled_buf, 0, 20);
+            snprintf(module->oled_buf, 20, "A/R: %u/%u", module->shares_accepted, module->shares_rejected);
+            OLED_writeString(0, 1, module->oled_buf);
+            break;
+        default:
+    }
 }
 
-static void _update_best_diff(SystemModule * module)
+static void _update_best_diff(GlobalState * GLOBAL_STATE)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     if (module->screen_page != 0) {
         return;
     }
-    OLED_clearLine(3);
-    memset(module->oled_buf, 0, 20);
-    snprintf(module->oled_buf, 20, module->FOUND_BLOCK ? "!!! BLOCK FOUND !!!" : "BD: %s", module->best_diff_string);
-    OLED_writeString(0, 3, module->oled_buf);
+
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            OLED_clearLine(3);
+            memset(module->oled_buf, 0, 20);
+            snprintf(module->oled_buf, 20, module->FOUND_BLOCK ? "!!! BLOCK FOUND !!!" : "BD: %s", module->best_diff_string);
+            OLED_writeString(0, 3, module->oled_buf);
+            break;
+        default:
+    }
 }
 
-static void _clear_display(void)
+static void _clear_display(GlobalState * GLOBAL_STATE)
 {
-    OLED_clearLine(0);
-    OLED_clearLine(1);
-    OLED_clearLine(2);
-    OLED_clearLine(3);
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            OLED_clearLine(0);
+            OLED_clearLine(1);
+            OLED_clearLine(2);
+            OLED_clearLine(3);
+            break;
+        default:
+    }
 }
 
 static void _update_system_info(GlobalState * GLOBAL_STATE)
@@ -160,23 +201,30 @@ static void _update_system_info(GlobalState * GLOBAL_STATE)
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
-    if (OLED_status()) {
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (OLED_status()) {
 
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, " Fan: %d RPM", power_management->fan_speed);
-        OLED_writeString(0, 0, module->oled_buf);
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, " Fan: %d RPM", power_management->fan_speed);
+                OLED_writeString(0, 0, module->oled_buf);
 
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "Temp: %.1f C", power_management->chip_temp);
-        OLED_writeString(0, 1, module->oled_buf);
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, "Temp: %.1f C", power_management->chip_temp_avg);
+                OLED_writeString(0, 1, module->oled_buf);
 
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, " Pwr: %.3f W", power_management->power);
-        OLED_writeString(0, 2, module->oled_buf);
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, " Pwr: %.3f W", power_management->power);
+                OLED_writeString(0, 2, module->oled_buf);
 
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, " %i mV: %i mA", (int) power_management->voltage, (int) power_management->current);
-        OLED_writeString(0, 3, module->oled_buf);
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, " %i mV: %i mA", (int) power_management->voltage, (int) power_management->current);
+                OLED_writeString(0, 3, module->oled_buf);
+            }
+            break;
+        default:
     }
 }
 
@@ -187,55 +235,79 @@ static void _update_esp32_info(GlobalState * GLOBAL_STATE)
 
     uint16_t vcore = VCORE_get_voltage_mv(GLOBAL_STATE);
 
-    if (OLED_status()) {
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (OLED_status()) {
 
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "FH: %lu bytes", free_heap_size);
-        OLED_writeString(0, 0, module->oled_buf);
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, "FH: %lu bytes", free_heap_size);
+                OLED_writeString(0, 0, module->oled_buf);
 
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "vCore: %u mV", vcore);
-        OLED_writeString(0, 1, module->oled_buf);
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, "vCore: %u mV", vcore);
+                OLED_writeString(0, 1, module->oled_buf);
 
-        esp_netif_get_ip_info(netif, &ip_info);
-        char ip_address_str[IP4ADDR_STRLEN_MAX];
-        esp_ip4addr_ntoa(&ip_info.ip, ip_address_str, IP4ADDR_STRLEN_MAX);
+                esp_netif_get_ip_info(netif, &ip_info);
+                char ip_address_str[IP4ADDR_STRLEN_MAX];
+                esp_ip4addr_ntoa(&ip_info.ip, ip_address_str, IP4ADDR_STRLEN_MAX);
 
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "IP: %s", ip_address_str);
-        OLED_writeString(0, 2, module->oled_buf);
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, "IP: %s", ip_address_str);
+                OLED_writeString(0, 2, module->oled_buf);
 
-        OLED_writeString(0, 3, esp_app_get_description()->version);
+                OLED_writeString(0, 3, esp_app_get_description()->version);
+            }
+            break;
+        default:
     }
 }
 
-static void _init_connection(SystemModule * module)
+static void _init_connection(GlobalState * GLOBAL_STATE)
 {
-    if (OLED_status()) {
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "Connecting to SSID:");
-        OLED_writeString(0, 0, module->oled_buf);
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (OLED_status()) {
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, "Connecting to SSID:");
+                OLED_writeString(0, 0, module->oled_buf);
+            }
+            break;
+        default:
     }
 }
 
-static void _update_connection(SystemModule * module)
+static void _update_connection(GlobalState * GLOBAL_STATE)
 {
-    if (OLED_status()) {
-        OLED_clearLine(2);
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "%s", module->ssid);
-        OLED_writeString(0, 1, module->oled_buf);
-        
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "Configuration SSID:");
-        OLED_writeString(0, 2, module->oled_buf);
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (OLED_status()) {
+                OLED_clearLine(2);
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, "%s", module->ssid);
+                OLED_writeString(0, 1, module->oled_buf);
+                
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, "Configuration SSID:");
+                OLED_writeString(0, 2, module->oled_buf);
 
-        char ap_ssid[13];
-        generate_ssid(ap_ssid);
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, ap_ssid);
-        OLED_writeString(0, 3, module->oled_buf);
+                char ap_ssid[13];
+                generate_ssid(ap_ssid);
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, ap_ssid);
+                OLED_writeString(0, 3, module->oled_buf);
+            }
+            break;
+        default:
     }
 }
 
@@ -250,29 +322,43 @@ static void _update_system_performance(GlobalState * GLOBAL_STATE)
     remaining_seconds %= 3600;
     int uptime_in_minutes = remaining_seconds / 60;
 
-    if (OLED_status()) {
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (OLED_status()) {
 
-        _update_hashrate(module, GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
-        _update_shares(module);
-        _update_best_diff(module);
+                _update_hashrate(GLOBAL_STATE);
+                _update_shares(GLOBAL_STATE);
+                _update_best_diff(GLOBAL_STATE);
 
-        memset(module->oled_buf, 0, 20);
-        snprintf(module->oled_buf, 20, "UT: %dd %ih %im", uptime_in_days, uptime_in_hours, uptime_in_minutes);
-        OLED_writeString(0, 2, module->oled_buf);
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, "UT: %dd %ih %im", uptime_in_days, uptime_in_hours, uptime_in_minutes);
+                OLED_writeString(0, 2, module->oled_buf);
+            }
+            break;
+        default:
     }
 }
 
-static void show_ap_information(const char * error)
+static void show_ap_information(const char * error, GlobalState * GLOBAL_STATE)
 {
-    if (OLED_status()) {
-        _clear_display();
-        if (error != NULL) {
-            OLED_writeString(0, 0, error);
-        }
-        OLED_writeString(0, 1, "Configuration SSID:");
-        char ap_ssid[13];
-        generate_ssid(ap_ssid);
-        OLED_writeString(0, 2, ap_ssid);
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (OLED_status()) {
+                _clear_display(GLOBAL_STATE);
+                if (error != NULL) {
+                    OLED_writeString(0, 0, error);
+                }
+                OLED_writeString(0, 1, "Configuration SSID:");
+                char ap_ssid[13];
+                generate_ssid(ap_ssid);
+                OLED_writeString(0, 2, ap_ssid);
+            }
+            break;
+        default:
     }
 }
 
@@ -288,8 +374,10 @@ static double _calculate_network_difficulty(uint32_t nBits)
     return difficulty;
 }
 
-static void _check_for_best_diff(SystemModule * module, double diff, uint32_t nbits)
+static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     if ((uint64_t) diff > module->best_session_nonce_diff) {
         module->best_session_nonce_diff = (uint64_t) diff;
         _suffix_string((uint64_t) diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
@@ -305,7 +393,7 @@ static void _check_for_best_diff(SystemModule * module, double diff, uint32_t nb
     // make the best_nonce_diff into a string
     _suffix_string((uint64_t) diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
 
-    double network_diff = _calculate_network_difficulty(nbits);
+    double network_diff = _calculate_network_difficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
     if (diff > network_diff) {
         module->FOUND_BLOCK = true;
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
@@ -375,11 +463,11 @@ void SYSTEM_task(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
-    _init_system(GLOBAL_STATE, module);
+    _init_system(GLOBAL_STATE);
     user_input_queue = xQueueCreate(10, sizeof(char[10])); // Create a queue to handle user input events
 
-    _clear_display();
-    _init_connection(module);
+    _clear_display(GLOBAL_STATE);
+    _init_connection(GLOBAL_STATE);
 
     wifi_mode_t wifi_mode;
     esp_err_t result;
@@ -388,20 +476,20 @@ void SYSTEM_task(void * pvParameters)
     ESP_LOGI(TAG, "SYSTEM_task started");
 
     while (GLOBAL_STATE->ASIC_functions.init_fn == NULL) {
-        show_ap_information("ASIC MODEL INVALID");
+        show_ap_information("ASIC MODEL INVALID", GLOBAL_STATE);
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 
     // show the connection screen
     while (!module->startup_done) {
-        _update_connection(module);
+        _update_connection(GLOBAL_STATE);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 
     while (1) {
         // Automatically cycle through screens
         for (int screen = 0; screen < 3; screen++) {
-            _clear_display();
+            _clear_display(GLOBAL_STATE);
             module->screen_page = screen;
 
             switch (module->screen_page) {
@@ -433,24 +521,32 @@ void SYSTEM_task(void * pvParameters)
     }
 }
 
-void SYSTEM_notify_accepted_share(SystemModule * module)
+void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     module->shares_accepted++;
-    _update_shares(module);
+    _update_shares(GLOBAL_STATE);
 }
-void SYSTEM_notify_rejected_share(SystemModule * module)
+void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     module->shares_rejected++;
-    _update_shares(module);
+    _update_shares(GLOBAL_STATE);
 }
 
-void SYSTEM_notify_mining_started(SystemModule * module)
+void SYSTEM_notify_mining_started(GlobalState * GLOBAL_STATE)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     module->duration_start = esp_timer_get_time();
 }
 
-void SYSTEM_notify_new_ntime(SystemModule * module, uint32_t ntime)
+void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     // Hourly clock sync
     if (module->lastClockSync + (60 * 60) > ntime) {
         return;
@@ -463,12 +559,14 @@ void SYSTEM_notify_new_ntime(SystemModule * module, uint32_t ntime)
     settimeofday(&tv, NULL);
 }
 
-void SYSTEM_notify_found_nonce(SystemModule * module, double pool_diff, double found_diff, uint32_t nbits, float power)
+void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double found_diff, uint8_t job_id)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     // Calculate the time difference in seconds with sub-second precision
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
 
-    module->historical_hashrate[module->historical_hashrate_rolling_index] = pool_diff;
+    module->historical_hashrate[module->historical_hashrate_rolling_index] = GLOBAL_STATE->initial_ASIC_difficulty;
     module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time();
 
     module->historical_hashrate_rolling_index = (module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
@@ -497,10 +595,10 @@ void SYSTEM_notify_found_nonce(SystemModule * module, double pool_diff, double f
         module->current_hashrate = ((module->current_hashrate * 9) + rolling_rate) / 10;
     }
 
-    _update_hashrate(module, power);
+    _update_hashrate(GLOBAL_STATE);
 
     // logArrayContents(historical_hashrate, HISTORY_LENGTH);
     // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
 
-    _check_for_best_diff(module, found_diff, nbits);
+    _check_for_best_diff(GLOBAL_STATE, found_diff, job_id);
 }

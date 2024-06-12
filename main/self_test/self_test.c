@@ -14,9 +14,17 @@
 
 static const char * TAG = "self_test";
 
-static bool fan_sense_pass()
+static bool fan_sense_pass(GlobalState * global_state)
 {
-    uint16_t fan_speed = EMC2101_get_fan_speed();
+    uint16_t fan_speed = 0;
+    switch (global_state->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            fan_speed = EMC2101_get_fan_speed();
+            break;
+        default:
+    }
     ESP_LOGI(TAG, "fanSpeed: %d", fan_speed);
     if (fan_speed > 1000) {
         return true;
@@ -198,7 +206,7 @@ void self_test(void * pvParameters)
         return;
     }
 
-    if (!fan_sense_pass()) {
+    if (!fan_sense_pass(GLOBAL_STATE)) {
         memset(module->oled_buf, 0, 20);
         snprintf(module->oled_buf, 20, "FAN:       WARN");
         OLED_writeString(0, 1, module->oled_buf);

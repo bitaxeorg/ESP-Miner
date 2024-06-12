@@ -1,4 +1,4 @@
-#include "global_state.h"
+#include "system.h"
 #include "work_queue.h"
 #include "serial.h"
 #include "bm1397.h"
@@ -26,7 +26,7 @@ void ASIC_task(void *pvParameters)
         GLOBAL_STATE->valid_jobs[i] = 0;
     }
 
-    SYSTEM_notify_mining_started(&GLOBAL_STATE->SYSTEM_MODULE);
+    SYSTEM_notify_mining_started(GLOBAL_STATE);
     ESP_LOGI(TAG, "ASIC Ready!");
     while (1)
     {

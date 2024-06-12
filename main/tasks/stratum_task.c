@@ -2,7 +2,7 @@
 // #include "addr_from_stdin.h"
 #include "bm1397.h"
 #include "connect.h"
-#include "global_state.h"
+#include "system.h"
 #include "lwip/dns.h"
 #include "nvs_config.h"
 #include "stratum_task.h"
@@ -131,7 +131,7 @@ void stratum_task(void * pvParameters)
             free(line);
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
-                SYSTEM_notify_new_ntime(&GLOBAL_STATE->SYSTEM_MODULE, stratum_api_v1_message.mining_notification->ntime);
+                SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
                 if (stratum_api_v1_message.should_abandon_work &&
                     (GLOBAL_STATE->stratum_queue.count > 0 || GLOBAL_STATE->ASIC_jobs_queue.count > 0)) {
                     ESP_LOGI(TAG, "abandoning work");
@@ -169,10 +169,10 @@ void stratum_task(void * pvParameters)
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "message result accepted");
-                    SYSTEM_notify_accepted_share(&GLOBAL_STATE->SYSTEM_MODULE);
+                    SYSTEM_notify_accepted_share(GLOBAL_STATE);
                 } else {
                     ESP_LOGE(TAG, "message result rejected");
-                    SYSTEM_notify_rejected_share(&GLOBAL_STATE->SYSTEM_MODULE);
+                    SYSTEM_notify_rejected_share(GLOBAL_STATE);
                 }
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {
                 if (stratum_api_v1_message.response_success) {

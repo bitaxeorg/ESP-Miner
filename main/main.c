@@ -10,7 +10,7 @@
 #include "asic_task.h"
 #include "create_jobs_task.h"
 #include "esp_netif.h"
-#include "global_state.h"
+#include "system.h"
 #include "http_server.h"
 #include "nvs_config.h"
 #include "serial.h"

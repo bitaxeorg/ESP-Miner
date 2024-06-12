@@ -1,6 +1,8 @@
 #ifndef GLOBAL_STATE_H_
 #define GLOBAL_STATE_H_
 
+#include <stdbool.h>
+#include <stdint.h>
 #include "asic_task.h"
 #include "bm1368.h"
 #include "bm1366.h"
@@ -9,10 +11,12 @@
 #include "power_management_task.h"
 #include "serial.h"
 #include "stratum_api.h"
-#include "system.h"
 #include "work_queue.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
+
+#define HISTORY_LENGTH 100
+#define DIFF_STRING_SIZE 10
 
 typedef enum
 {
@@ -36,6 +40,33 @@ typedef struct
     void (*set_difficulty_mask_fn)(int);
     void (*send_work_fn)(void * GLOBAL_STATE, bm_job * next_bm_job);
 } AsicFunctions;
+
+typedef struct
+{
+    double duration_start;
+    int historical_hashrate_rolling_index;
+    double historical_hashrate_time_stamps[HISTORY_LENGTH];
+    double historical_hashrate[HISTORY_LENGTH];
+    int historical_hashrate_init;
+    double current_hashrate;
+    int64_t start_time;
+    uint16_t shares_accepted;
+    uint16_t shares_rejected;
+    int screen_page;
+    char oled_buf[20];
+    uint64_t best_nonce_diff;
+    char best_diff_string[DIFF_STRING_SIZE];
+    uint64_t best_session_nonce_diff;
+    char best_session_diff_string[DIFF_STRING_SIZE];
+    bool FOUND_BLOCK;
+    bool startup_done;
+    char ssid[20];
+    char wifi_status[20];
+    char * pool_url;
+    uint16_t pool_port;
+
+    uint32_t lastClockSync;
+} SystemModule;
 
 typedef struct
 {
