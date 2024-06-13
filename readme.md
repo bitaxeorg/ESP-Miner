@@ -50,7 +50,7 @@ The following are recommendations but it is necessary that you do have all value
   asicfrequency,data,u16,485
   asicvoltage,data,u16,1200
   asicmodel,data,string,BM1366
-  asiccount,data,u16,1
+  devicemodel,data,string,ultra
   boardversion,data,string,0.11
   ```
 
