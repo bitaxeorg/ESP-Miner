@@ -5,6 +5,7 @@
 #include "i2c_master.h"
 #include "EMC2101.h"
 #include "INA260.h"
+#include "TMP1075.h"
 #include "adc.h"
 #include "connect.h"
 #include "led_controller.h"

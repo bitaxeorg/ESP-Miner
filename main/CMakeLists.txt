@@ -11,6 +11,8 @@ SRCS
     "nvs_config.c"
     "oled.c"
     "system.c"
+    "TMP1075.c"
+    "TPS546.c"
     "vcore.c"
     "work_queue.c"
     "./http_server/http_server.c"

@@ -131,6 +131,15 @@
                             High Temperature</span>
                     </div>
                     <div class="col-6">
+                        <p-knob [min]="20" [max]="145" [readonly]="true" [(ngModel)]="info.vrTemp"
+                            valueTemplate="{value}C"></p-knob>
+                        Voltage Regulator Temperature
+
+                        <span class="danger" *ngIf="info.vrTemp >= 105">&nbsp;
+                            Danger:
+                            High Temperature</span>
+                    </div>
+                    <div class="col-4">
                         <p-knob [min]="0" [max]="100" [readonly]="true" [(ngModel)]="info.fanspeed"
                             valueTemplate="{value}%"></p-knob>
                         Fan

@@ -9,6 +9,7 @@ export interface ISystemInfo {
     current: number,
     fanSpeed: number,
     temp: number,
+    vrTemp: number,
     hashRate: number,
     bestDiff: string,
     bestSessionDiff: string,

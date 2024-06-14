@@ -5,6 +5,7 @@
 #include "vcore.h"
 #include "adc.h"
 #include "DS4432U.h"
+#include "TPS546.h"
 
 #define TPS40305_VFB 0.6
 
@@ -21,6 +22,9 @@
 static const char *TAG = "vcore.c";
 
 void VCORE_init(GlobalState * global_state) {
+    if (global_state->board_version == 402) {
+        TPS546_init();
+    }
     ADC_init();
 }
 
@@ -54,15 +58,18 @@ static uint8_t ds4432_tps40305_bitaxe_voltage_to_reg(float vout)
 
 bool VCORE_set_voltage(float core_voltage, GlobalState * global_state)
 {
-    uint8_t reg_setting;
-
     switch (global_state->device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            reg_setting = ds4432_tps40305_bitaxe_voltage_to_reg(core_voltage * global_state->voltage_domain);
-            ESP_LOGI(TAG, "Set ASIC voltage = %.3fV [0x%02X]", core_voltage, reg_setting);
-            DS4432U_set_current_code(0, reg_setting); /// eek!
+            if (global_state->board_version == 402) {
+                ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
+                TPS546_set_vout(core_voltage * (float)global_state->voltage_domain);
+            } else {
+                uint8_t reg_setting = ds4432_tps40305_bitaxe_voltage_to_reg(core_voltage * (float)global_state->voltage_domain);
+                ESP_LOGI(TAG, "Set ASIC voltage = %.3fV [0x%02X]", core_voltage, reg_setting);
+                DS4432U_set_current_code(0, reg_setting); /// eek!
+            }
             break;
         // case DEVICE_HEX:
         default:
