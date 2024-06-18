@@ -70,7 +70,7 @@ static void _init_system(GlobalState * GLOBAL_STATE)
     _suffix_string(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 
     // set the ssid string to blank
-    memset(module->ssid, 0, 20);
+    memset(module->ssid, 0, sizeof(module->ssid));
 
     // set the wifi_status to blank
     memset(module->wifi_status, 0, 20);
@@ -293,8 +293,8 @@ static void _update_connection(GlobalState * GLOBAL_STATE)
         case DEVICE_SUPRA:
             if (OLED_status()) {
                 OLED_clearLine(2);
-                memset(module->oled_buf, 0, 20);
-                snprintf(module->oled_buf, 20, "%s", module->ssid);
+                strncpy(module->oled_buf, module->ssid, sizeof(module->oled_buf));
+                module->oled_buf[sizeof(module->oled_buf) - 1] = 0;
                 OLED_writeString(0, 1, module->oled_buf);
                 
                 memset(module->oled_buf, 0, 20);
@@ -469,9 +469,6 @@ void SYSTEM_task(void * pvParameters)
 
     _clear_display(GLOBAL_STATE);
     _init_connection(GLOBAL_STATE);
-
-    wifi_mode_t wifi_mode;
-    esp_err_t result;
 
     char input_event[10];
     ESP_LOGI(TAG, "SYSTEM_task started");

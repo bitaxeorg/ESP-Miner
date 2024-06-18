@@ -213,7 +213,7 @@ int OLED_setPixel(int x, int y, uint8_t ucColor)
 // The X position is in character widths (8 or 16)
 // The Y position is in memory pages (8 lines each)
 //
-int OLED_writeString(int x, int y, char * szMsg)
+int OLED_writeString(int x, int y, const char * szMsg)
 {
     int i, iLen;
     uint8_t * s;

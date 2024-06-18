@@ -150,8 +150,10 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
                 // .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
             },
     };
-    strncpy((char *) wifi_sta_config.sta.ssid, wifi_ssid, 31);
-    wifi_sta_config.sta.ssid[31] = '\0';
+    strncpy((char *) wifi_sta_config.sta.ssid,
+            wifi_ssid,
+            sizeof(wifi_sta_config.sta.ssid));
+    wifi_sta_config.sta.ssid[sizeof(wifi_sta_config.sta.ssid) - 1] = '\0';
     strncpy((char *) wifi_sta_config.sta.password, wifi_pass, 63);
     wifi_sta_config.sta.password[63] = '\0';
 

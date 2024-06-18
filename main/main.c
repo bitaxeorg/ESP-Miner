@@ -47,6 +47,10 @@ void app_main(void)
     } else {
         ESP_LOGE(TAG, "Invalid DEVICE model");
         // maybe should return here to now execute anything with a faulty device parameter !
+        // this stops crashes/reboots and allows dev testing without an asic
+        GLOBAL_STATE.device_model = DEVICE_UNKNOWN;
+        GLOBAL_STATE.asic_count = -1;
+        GLOBAL_STATE.voltage_domain = 1;
     }
     GLOBAL_STATE.board_version = atoi(nvs_config_get_string(NVS_CONFIG_BOARD_VERSION, "000"));
     ESP_LOGI(TAG, "Found Device Model: %s", GLOBAL_STATE.device_model_str);
@@ -122,7 +126,10 @@ void app_main(void)
     char * hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME, HOSTNAME);
 
     // copy the wifi ssid to the global state
-    strncpy(GLOBAL_STATE.SYSTEM_MODULE.ssid, wifi_ssid, 20);
+    strncpy(GLOBAL_STATE.SYSTEM_MODULE.ssid,
+            wifi_ssid,
+            sizeof(GLOBAL_STATE.SYSTEM_MODULE.ssid));
+    GLOBAL_STATE.SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE.SYSTEM_MODULE.ssid)-1] = 0;
 
     // init and connect to wifi
     wifi_init(wifi_ssid, wifi_pass, hostname);

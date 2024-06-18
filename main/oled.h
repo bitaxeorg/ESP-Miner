@@ -37,7 +37,7 @@ int OLED_fill(uint8_t ucPattern);
 
 // Write a text string to the display at x (column 0-127) and y (row 0-7)
 // bLarge = 0 - 8x8 font, bLarge = 1 - 16x24 font
-int OLED_writeString(int x, int y, char *szText);
+int OLED_writeString(int x, int y, const char *szText);
 
 // Sets a pixel to On (1) or Off (0)
 // Coordinate system is pixels, not text rows (0-127, 0-63)

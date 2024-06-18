@@ -20,14 +20,16 @@
 
 typedef enum
 {
-    DEVICE_MAX = 0,
+    DEVICE_UNKNOWN = -1,
+    DEVICE_MAX,
     DEVICE_ULTRA,
     DEVICE_SUPRA,
 } DeviceModel;
 
 typedef enum
 {
-    ASIC_BM1397 = 0,
+    ASIC_UNKNOWN = -1,
+    ASIC_BM1397,
     ASIC_BM1366,
     ASIC_BM1368,
 } AsicModel;
@@ -60,7 +62,7 @@ typedef struct
     char best_session_diff_string[DIFF_STRING_SIZE];
     bool FOUND_BLOCK;
     bool startup_done;
-    char ssid[20];
+    char ssid[32];
     char wifi_status[20];
     char * pool_url;
     uint16_t pool_port;
