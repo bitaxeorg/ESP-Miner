@@ -43,7 +43,6 @@ void ASIC_task(void *pvParameters)
         (*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, next_bm_job); // send the job to the ASIC
 
         // Time to execute the above code is ~0.3ms
-        // vTaskDelay((BM1397_FULLSCAN_MS - 0.3 ) / portTICK_PERIOD_MS);
         vTaskDelay((GLOBAL_STATE->asic_job_frequency_ms - 0.3) / portTICK_PERIOD_MS);
     }
 }

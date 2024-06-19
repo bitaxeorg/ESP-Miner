@@ -132,7 +132,7 @@ export class HomeComponent {
     );
 
     this.expectedHashRate$ = this.info$.pipe(map(info => {
-      return Math.floor(info.frequency * ((info.coreCount * info.asicCount) / 1000))
+      return Math.floor(info.frequency * ((info.smallCoreCount * info.asicCount) / 1000))
     }))
 
     this.quickLink$ = this.info$.pipe(

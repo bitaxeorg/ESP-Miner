@@ -9,12 +9,8 @@
 
 #define BM1368_INITIAL_DIFFICULTY 256
 
-// static const uint64_t BM1368_FREQUENCY = CONFIG_ASIC_FREQUENCY;
-static const uint64_t BM1368_CORE_COUNT = 672;
-// static const uint64_t BM1368_HASHRATE_S = BM1368_FREQUENCY * BM1368_CORE_COUNT * 1000000;
-//  2^32
-//  static const uint64_t NONCE_SPACE = 4294967296;
-static const double BM1368_FULLSCAN_MS = 2140;
+static const uint64_t BM1368_CORE_COUNT = 80;
+static const uint64_t BM1368_SMALL_CORE_COUNT = 1276;
 
 typedef struct
 {

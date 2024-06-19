@@ -8,12 +8,8 @@
 #define CRC5_MASK 0x1F
 #define BM1366_INITIAL_DIFFICULTY 256
 
-// static const uint64_t BM1366_FREQUENCY = CONFIG_ASIC_FREQUENCY;
-static const uint64_t BM1366_CORE_COUNT = 672;
-// static const uint64_t BM1366_HASHRATE_S = BM1366_FREQUENCY * BM1366_CORE_COUNT * 1000000;
-//  2^32
-//  static const uint64_t NONCE_SPACE = 4294967296;
-static const double BM1366_FULLSCAN_MS = 2140;
+static const uint64_t BM1366_CORE_COUNT = 112;
+static const uint64_t BM1366_SMALL_CORE_COUNT = 894;
 
 typedef struct
 {

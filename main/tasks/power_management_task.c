@@ -145,75 +145,36 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 case DEVICE_ULTRA:
                 case DEVICE_SUPRA:
                     power_management->chip_temp_avg = EMC2101_get_external_temp();
+
+                    if ((power_management->chip_temp_avg > THROTTLE_TEMP) &&
+                        (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+                        ESP_LOGE(TAG, "OVERHEAT");
+
+                        EMC2101_set_fan_speed(1);
+                        if (power_management->HAS_POWER_EN) {
+                            gpio_set_level(GPIO_NUM_10, 1);
+                        }
+                        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 990);
+                        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
+                        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
+                        nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+                        exit(EXIT_FAILURE);
+					}
                     break;
+
                 default:
-            }
-
-            // Voltage
-            // We'll throttle between 4.9v and 3.5v
-            float voltage_multiplier =
-                _fbound((power_management->voltage - VOLTAGE_MIN_THROTTLE) * (1 / (float) VOLTAGE_RANGE), 0, 1);
-
-            // Temperature
-            float temperature_multiplier = 1;
-            float over_temp = -(THROTTLE_TEMP - power_management->chip_temp_avg);
-            if (over_temp > 0) {
-                temperature_multiplier = (THROTTLE_TEMP_RANGE - over_temp) / THROTTLE_TEMP_RANGE;
-            }
-
-            float lowest_multiplier = 1;
-            float multipliers[2] = {voltage_multiplier, temperature_multiplier};
-
-            for (int i = 0; i < 2; i++) {
-                if (multipliers[i] < lowest_multiplier) {
-                    lowest_multiplier = multipliers[i];
-                }
-            }
-
-            power_management->frequency_multiplier = lowest_multiplier;
-
-            float target_frequency = _fbound(power_management->frequency_multiplier * frequency_target, 0, frequency_target);
-
-            if (target_frequency < 50) {
-                // TODO: Turn the chip off
-            }
-
-            // chip is coming back from a low/no voltage event
-            if (power_management->frequency_value < 50 && target_frequency > 50) {
-                // TODO recover gracefully?
-                ESP_LOGE(TAG, "Freq %f", power_management->frequency_value);
-                ESP_LOGI(TAG, "Restarting System because of ERROR: low/no voltage event");
-                vTaskDelay(1000 / portTICK_PERIOD_MS);
-                esp_restart();
-            }
-
-            if (power_management->frequency_value > target_frequency) {
-                power_management->frequency_value = target_frequency;
-                last_frequency_increase = 0;
-                BM1397_send_hash_frequency(power_management->frequency_value);
-                ESP_LOGI(TAG, "target %f, Freq %f, Temp %f, Power %f", target_frequency, power_management->frequency_value,
-                         power_management->chip_temp_avg, power_management->power);
-            } else {
-                if (last_frequency_increase > 120 && power_management->frequency_value != frequency_target) {
-                    float add = (target_frequency + power_management->frequency_value) / 2;
-                    power_management->frequency_value += _fbound(add, 2, 20);
-                    BM1397_send_hash_frequency(power_management->frequency_value);
-                    ESP_LOGI(TAG, "target %f, Freq %f, Temp %f, Power %f", target_frequency, power_management->frequency_value,
-                             power_management->chip_temp_avg, power_management->power);
-                    last_frequency_increase = 60;
-                } else {
-                    last_frequency_increase++;
-                }
             }
         } else if (GLOBAL_STATE->asic_model == ASIC_BM1366 || GLOBAL_STATE->asic_model == ASIC_BM1368) {
             switch (GLOBAL_STATE->device_model) {
                 case DEVICE_MAX:
                 case DEVICE_ULTRA:
                 case DEVICE_SUPRA:
-                    power_management->chip_temp_avg = EMC2101_get_internal_temp() + 5;
+                    
 					if (GLOBAL_STATE->board_version == 402) {
+                        power_management->chip_temp_avg = EMC2101_get_external_temp();
 						power_management->vr_temp = (float)TPS546_get_temperature();
 					} else {
+                        power_management->chip_temp_avg = EMC2101_get_internal_temp() + 5;
     					power_management->vr_temp = 0.0;
 					}
 

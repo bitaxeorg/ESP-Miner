@@ -52,7 +52,7 @@ int SERIAL_send(uint8_t *data, int len, bool debug)
 {
     if (debug)
     {
-        printf("->");
+        printf("tx: ");
         prettyHex((unsigned char *)data, len);
         printf("\n");
     }
@@ -67,11 +67,15 @@ int SERIAL_send(uint8_t *data, int len, bool debug)
 int16_t SERIAL_rx(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
 {
     int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, size, timeout_ms / portTICK_PERIOD_MS);
-    // if (bytes_read > 0) {
-    //     printf("rx: ");
-    //     prettyHex((unsigned char*) buf, bytes_read);
-    //     printf("\n");
-    // }
+
+    #if BM1937_SERIALRX_DEBUG
+    if (bytes_read > 0) {
+        printf("rx: ");
+        prettyHex((unsigned char*) buf, bytes_read);
+        printf("\n");
+    }
+    #endif
+
     return bytes_read;
 }
 
