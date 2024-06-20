@@ -1,4 +1,5 @@
 #include "http_server.h"
+#include "recovery_page.h"
 #include "cJSON.h"
 #include "esp_chip_info.h"
 #include "esp_http_server.h"
@@ -117,6 +118,13 @@ static esp_err_t set_cors_headers(httpd_req_t * req)
                    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type") == ESP_OK
                ? ESP_OK
                : ESP_FAIL;
+}
+
+/* Recovery handler */
+static esp_err_t rest_recovery_handler(httpd_req_t * req)
+{
+    httpd_resp_send(req, recovery_page, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
 }
 
 /* Send HTTP response with the contents of the requested file */
@@ -595,7 +603,12 @@ esp_err_t start_rest_server(void * pvParameters)
     GLOBAL_STATE = (GlobalState *) pvParameters;
     const char * base_path = "";
 
-    ESP_ERROR_CHECK(init_fs());
+    bool enter_recovery = false;
+    if (init_fs() != ESP_OK) {
+        // Unable to initialize the web app filesystem.
+        // Enter recovery mode
+        enter_recovery = true;
+    }
 
     REST_CHECK(base_path, "wrong base path", err);
     rest_server_context_t * rest_context = calloc(1, sizeof(rest_server_context_t));
@@ -608,6 +621,10 @@ esp_err_t start_rest_server(void * pvParameters)
 
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
+
+    httpd_uri_t recovery_explicit_get_uri = {
+        .uri = "/recovery", .method = HTTP_GET, .handler = rest_recovery_handler, .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &recovery_explicit_get_uri);
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
@@ -656,9 +673,17 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_uri_t ws = {.uri = "/api/ws", .method = HTTP_GET, .handler = echo_handler, .user_ctx = NULL, .is_websocket = true};
     httpd_register_uri_handler(server, &ws);
 
-    /* URI handler for getting web server files */
-    httpd_uri_t common_get_uri = {.uri = "/*", .method = HTTP_GET, .handler = rest_common_get_handler, .user_ctx = rest_context};
-    httpd_register_uri_handler(server, &common_get_uri);
+    if (enter_recovery) {
+        /* Make default route serve Recovery */
+        httpd_uri_t recovery_implicit_get_uri = {
+            .uri = "/*", .method = HTTP_GET, .handler = rest_recovery_handler, .user_ctx = rest_context};
+        httpd_register_uri_handler(server, &recovery_implicit_get_uri);
+
+    } else {
+        /* URI handler for getting web server files */
+        httpd_uri_t common_get_uri = {.uri = "/*", .method = HTTP_GET, .handler = rest_common_get_handler, .user_ctx = rest_context};
+        httpd_register_uri_handler(server, &common_get_uri);
+    }
 
     httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
 
