@@ -130,8 +130,8 @@
                             Danger:
                             High Temperature</span>
                     </div>
-                    <div class="col-6">
-                        <p-knob [min]="20" [max]="145" [readonly]="true" [(ngModel)]="info.vrTemp"
+                    <div class="col-6" *ngIf="info.vrTemp > 0">
+                        <p-knob  [min]="20" [max]="145" [readonly]="true" [(ngModel)]="info.vrTemp"
                             valueTemplate="{value}C"></p-knob>
                         Voltage Regulator Temperature
 
