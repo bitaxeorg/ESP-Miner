@@ -121,7 +121,7 @@
             <div class="card">
                 <h5>Heat</h5>
                 <div class="grid text-center">
-                    <div class="col-6">
+                    <div class="col-4">
                         <p-knob [min]="20" [max]="75" [readonly]="true" [(ngModel)]="info.temp"
                             valueTemplate="{value}C"></p-knob>
                         ASIC Temperature
@@ -142,8 +142,14 @@
                     <div class="col-4">
                         <p-knob [min]="0" [max]="100" [readonly]="true" [(ngModel)]="info.fanspeed"
                             valueTemplate="{value}%"></p-knob>
-                        Fan
+                        Fan %
                     </div>
+                    <div class="col-4">
+                        <p-knob [min]="0" [max]="20000" [readonly]="true" [(ngModel)]="info.fanrpm"
+                            valueTemplate="{value}"></p-knob>
+                        Fan RPM
+                    </div>
+                    <!--
                     <div class="col-6" *ngIf="info.boardtemp1">
                         <p-knob [min]="20" [max]="75" [readonly]="true" [(ngModel)]="info.boardtemp1"
                             valueTemplate="{value}C"></p-knob>
@@ -154,6 +160,7 @@
                             valueTemplate="{value}C"></p-knob>
                         Board Temp 2
                     </div>
+                    -->
                 </div>
             </div>
         </div>

@@ -209,7 +209,7 @@ static void _update_system_info(GlobalState * GLOBAL_STATE)
             if (OLED_status()) {
 
                 memset(module->oled_buf, 0, 20);
-                snprintf(module->oled_buf, 20, " Fan: %d RPM", power_management->fan_speed);
+                snprintf(module->oled_buf, 20, " Fan: %d RPM", power_management->fan_rpm);
                 OLED_writeString(0, 0, module->oled_buf);
 
                 memset(module->oled_buf, 0, 20);

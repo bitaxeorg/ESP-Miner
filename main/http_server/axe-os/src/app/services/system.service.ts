@@ -24,7 +24,6 @@ export class SystemService {
           power: 11.670000076293945,
           voltage: 5208.75,
           current: 2237.5,
-          fanSpeed: 82,
           temp: 60,
           vrTemp: 45,
           hashRate: 475,
@@ -54,6 +53,7 @@ export class SystemService {
           invertfanpolarity: 1,
           autofanspeed: 1,
           fanspeed: 100,
+          fanrpm: 0,
 
           boardtemp1: 30,
           boardtemp2: 40

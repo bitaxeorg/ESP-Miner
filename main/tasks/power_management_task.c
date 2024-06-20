@@ -60,7 +60,9 @@ static double automatic_fan_speed(float chip_temp, GlobalState * GLOBAL_STATE)
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            EMC2101_set_fan_speed((float) result / 100);
+            float perc = (float) result / 100;
+            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc = perc;
+            EMC2101_set_fan_speed( perc );
             break;
         default:
     }
@@ -133,7 +135,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     power_management->current = INA260_read_current();
                     power_management->power = INA260_read_power() / 1000;
 				}
-                power_management->fan_speed = EMC2101_get_fan_speed();
+            
+                power_management->fan_rpm = EMC2101_get_fan_speed();
+            
                 break;
             default:
         }
@@ -204,14 +208,19 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         if (auto_fan_speed == 1) {
-            power_management->fan_percentage = (float)automatic_fan_speed(power_management->chip_temp_avg, GLOBAL_STATE);
+
+            power_management->fan_perc = (float)automatic_fan_speed(power_management->chip_temp_avg, GLOBAL_STATE);
+
         } else {
             switch (GLOBAL_STATE->device_model) {
                 case DEVICE_MAX:
                 case DEVICE_ULTRA:
                 case DEVICE_SUPRA:
-                    EMC2101_set_fan_speed((float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100) / 100);
-                    power_management->fan_percentage = (float)nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
+
+                    float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
+                    power_management->fan_perc = fs;
+                    EMC2101_set_fan_speed((float) fs / 100);
+
                     break;
                 default:
             }
