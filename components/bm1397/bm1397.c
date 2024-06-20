@@ -139,7 +139,7 @@ void BM1397_send_hash_frequency(float frequency)
     float deffreq = 200.0;
 
     float fa, fb, fc1, fc2, newf;
-    float f1, basef, famax = 0xf0, famin = 0x10;
+    float f1, basef, famax = 0x104, famin = 0x10;
     int i;
 
     // bound the frequency setting
@@ -149,9 +149,9 @@ void BM1397_send_hash_frequency(float frequency)
     {
         f1 = 50;
     }
-    else if (frequency > 500)
+    else if (frequency > 650)
     {
-        f1 = 500;
+        f1 = 650;
     }
     else
     {
@@ -178,7 +178,7 @@ void BM1397_send_hash_frequency(float frequency)
     }
     // else f1 is 250-500
 
-    // f1 * fb * fc1 * fc2 is between 2500 and 5000
+    // f1 * fb * fc1 * fc2 is between 2500 and 6500
     // - so round up to the next 25 (freq_mult)
     basef = FREQ_MULT * ceil(f1 * fb * fc1 * fc2 / FREQ_MULT);
 
@@ -192,11 +192,12 @@ void BM1397_send_hash_frequency(float frequency)
     }
     else
     {
-        freqbuf[3] = (int)fa;
-        freqbuf[4] = (int)fb;
+        freqbuf[2] = 0x40 + (unsigned char)((int)fa >> 8);
+        freqbuf[3] = (unsigned char)((int)fa & 0xff);
+        freqbuf[4] = (unsigned char)fb;
         // fc1, fc2 'should' already be 1..15
-        freqbuf[5] = (((int)fc1 & 0xf) << 4) + ((int)fc2 & 0xf);
-
+        freqbuf[5] = (((unsigned char)fc1 & 0x7) << 4) + ((unsigned char)fc2 & 0x7);
+        
         newf = basef / ((float)fb * (float)fc1 * (float)fc2);
     }
 
