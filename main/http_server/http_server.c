@@ -444,6 +444,12 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         return ESP_FAIL;
     }
 
+    // Don't attempt to write more than what can be stored in the partition
+    if (remaining > www_partition->size) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "File provided is too large for device");
+        return ESP_FAIL;
+    }
+
     // Erase the entire www partition before writing
     ESP_ERROR_CHECK(esp_partition_erase_range(www_partition, 0, www_partition->size));
 
