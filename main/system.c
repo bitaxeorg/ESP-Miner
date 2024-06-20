@@ -133,7 +133,7 @@ static void _update_hashrate(GlobalState * GLOBAL_STATE)
             float efficiency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power / (module->current_hashrate / 1000.0);
             OLED_clearLine(0);
             memset(module->oled_buf, 0, 20);
-            snprintf(module->oled_buf, 20, "Gh%s: %.1f W/Th: %.1f", module->historical_hashrate_init < HISTORY_LENGTH ? "*" : "",
+            snprintf(module->oled_buf, 20, "Gh%s: %.1f J/Th: %.1f", module->historical_hashrate_init < HISTORY_LENGTH ? "*" : "",
                     module->current_hashrate, efficiency);
             OLED_writeString(0, 0, module->oled_buf);
             break;
