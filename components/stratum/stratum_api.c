@@ -83,11 +83,11 @@ char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
             memset(recv_buffer, 0, BUFFER_SIZE);
             nbytes = recv(sockfd, recv_buffer, BUFFER_SIZE - 1, 0);
             if (nbytes == -1) {
-                //perror("recv");
-                ESP_LOGE(TAG, "recv");
-                ESP_LOGI(TAG, "Restarting System because of Error: recv");
-                vTaskDelay(1000 / portTICK_PERIOD_MS);
-                esp_restart();
+                ESP_LOGI(TAG, "Error: recv");
+                if (json_rpc_buffer) {
+                    free(json_rpc_buffer);
+                }
+                return 0;
             }
 
             realloc_json_buffer(nbytes);
