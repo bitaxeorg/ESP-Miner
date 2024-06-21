@@ -8,7 +8,11 @@
 
 <div class="grid">
     <div class="col-12 lg:col-6 xl:col-4">
-        <div class="card" *ngIf="latestRelease$ | async as latestRelease">
+        <div class="card" *ngIf="checkLatestRelease == false">
+            <h2>Latest Release: <p-button (onClick)="checkLatestRelease = true">Check</p-button></h2>
+        </div>
+        <div class="card" *ngIf="checkLatestRelease == true">
+            <ng-container *ngIf="latestRelease$ | async as latestRelease">
             <h2>Latest Release: {{latestRelease.name}}</h2>
 
             <div *ngFor="let asset of latestRelease.assets">
@@ -21,6 +25,7 @@
                         [href]="asset.browser_download_url">www.bin</a>
                 </div>
             </div>
+        </ng-container>
         </div>
     </div>
     <div class="col-12 lg:col-6 xl:col-4">

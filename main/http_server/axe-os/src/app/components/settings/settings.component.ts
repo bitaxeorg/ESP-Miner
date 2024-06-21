@@ -26,6 +26,7 @@ export class SettingsComponent {
   public eASICModel = eASICModel;
   public ASICModel!: eASICModel;
 
+  public checkLatestRelease: boolean = false;
   public latestRelease$: Observable<any>;
 
   constructor(
