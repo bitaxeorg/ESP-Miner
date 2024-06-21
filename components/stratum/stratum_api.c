@@ -86,6 +86,7 @@ char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
                 ESP_LOGI(TAG, "Error: recv");
                 if (json_rpc_buffer) {
                     free(json_rpc_buffer);
+                    json_rpc_buffer=0;
                 }
                 return 0;
             }
