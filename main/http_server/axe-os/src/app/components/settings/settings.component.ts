@@ -3,7 +3,7 @@ import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { FileUploadHandlerEvent } from 'primeng/fileupload';
-import { map, Observable, startWith } from 'rxjs';
+import { map, Observable, shareReplay, startWith } from 'rxjs';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
@@ -29,6 +29,8 @@ export class SettingsComponent {
   public checkLatestRelease: boolean = false;
   public latestRelease$: Observable<any>;
 
+  public info$: Observable<any>;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -45,10 +47,12 @@ export class SettingsComponent {
 
     this.latestRelease$ = this.githubUpdateService.getReleases().pipe(map(releases => {
       return releases[0];
-    }))
+    }));
 
-    this.systemService.getInfo()
-      .pipe(this.loadingService.lockUIUntilComplete())
+    this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}))
+
+
+      this.info$.pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
         this.ASICModel = info.ASICModel;
         this.form = this.fb.group({
