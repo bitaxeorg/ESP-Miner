@@ -3,6 +3,8 @@
 
 #include "EMC2101.h"
 
+static const char * TAG = "EMC2101";
+
 // static const char *TAG = "EMC2101.c";
 
 // run this first. sets up the config register
@@ -55,11 +57,19 @@ float EMC2101_get_external_temp(void)
 
     ESP_ERROR_CHECK(i2c_master_register_read(EMC2101_I2CADDR_DEFAULT, EMC2101_EXTERNAL_TEMP_MSB, &temp_msb, 1));
     ESP_ERROR_CHECK(i2c_master_register_read(EMC2101_I2CADDR_DEFAULT, EMC2101_EXTERNAL_TEMP_LSB, &temp_lsb, 1));
-
+    
     reading = temp_lsb | (temp_msb << 8);
     reading >>= 5;
 
-    return (float) reading / 8.0;
+    if (reading == EMC2101_TEMP_FAULT_OPEN_CIRCUIT) {
+        ESP_LOGE(TAG, "EMC2101 TEMP_FAULT_OPEN_CIRCUIT");
+    }
+    if (reading == EMC2101_TEMP_FAULT_SHORT) {
+        ESP_LOGE(TAG, "EMC2101 TEMP_FAULT_SHORT");
+    }
+
+    float result = (float) reading / 8.0;
+    return result;
 }
 
 uint8_t EMC2101_get_internal_temp(void)

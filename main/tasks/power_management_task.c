@@ -112,11 +112,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         default:
     }
 
-	if (GLOBAL_STATE->board_version == 402) {
-        // has already been done in system.c, why do it again here ?
-        VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE);
-	}
-
     vTaskDelay(3000 / portTICK_PERIOD_MS);
 
     while (1) {
@@ -152,13 +147,13 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
                     if ((power_management->chip_temp_avg > THROTTLE_TEMP) &&
                         (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                        ESP_LOGE(TAG, "OVERHEAT");
+                        ESP_LOGE(TAG, "OVERHEAT ASIC %fC", power_management->chip_temp_avg );
 
                         EMC2101_set_fan_speed(1);
                         if (power_management->HAS_POWER_EN) {
                             gpio_set_level(GPIO_NUM_10, 1);
                         }
-                        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 990);
+                        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
                         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
                         nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
                         nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
@@ -182,9 +177,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     					power_management->vr_temp = 0.0;
 					}
 
+                    // EMC2101 will give bad readings if the ASIC is turned off
+                    if(power_management->voltage < TPS546_INIT_VOUT_MIN){
+                        break;
+                    }
+
                     if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) &&
                         (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                        ESP_LOGE(TAG, "OVERHEAT");
+                        ESP_LOGE(TAG, "OVERHEAT  VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg );
 
                         EMC2101_set_fan_speed(1);
                         if (GLOBAL_STATE->board_version == 402) {
@@ -193,14 +193,13 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                         } else if (power_management->HAS_POWER_EN) {
                             gpio_set_level(GPIO_NUM_10, 1);
                         }
-                        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 990);
+                        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
                         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
                         nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
                         nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
                         exit(EXIT_FAILURE);
 					}
-                    // ESP_LOGI(TAG, "target %f, Freq %f, Volt %f, Power %f", target_frequency, power_management->frequency_value,
-                    // power_management->voltage, power_management->power);
+
                     break;
 
                 default:

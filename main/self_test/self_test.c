@@ -134,9 +134,11 @@ void self_test(void * pvParameters)
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            if(!DS4432U_test()){
-                ESP_LOGE(TAG, "DS4432 test failed!");
-                display_msg("DS4432U:FAIL", GLOBAL_STATE);
+            if(GLOBAL_STATE->board_version != 402){
+                if(!DS4432U_test()){
+                    ESP_LOGE(TAG, "DS4432 test failed!");
+                    display_msg("DS4432U:FAIL", GLOBAL_STATE);
+                }
             }
             break;
         default:
