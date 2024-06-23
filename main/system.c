@@ -154,7 +154,7 @@ static void _update_shares(GlobalState * GLOBAL_STATE)
         case DEVICE_SUPRA:
             OLED_clearLine(1);
             memset(module->oled_buf, 0, 20);
-            snprintf(module->oled_buf, 20, "A/R: %u/%u", module->shares_accepted, module->shares_rejected);
+            snprintf(module->oled_buf, 20, "A/R: %llu/%llu", module->shares_accepted, module->shares_rejected);
             OLED_writeString(0, 1, module->oled_buf);
             break;
         default:

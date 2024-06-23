@@ -52,8 +52,8 @@ typedef struct
     int historical_hashrate_init;
     double current_hashrate;
     int64_t start_time;
-    uint16_t shares_accepted;
-    uint16_t shares_rejected;
+    uint64_t shares_accepted;
+    uint64_t shares_rejected;
     int screen_page;
     char oled_buf[20];
     uint64_t best_nonce_diff;
