@@ -45,7 +45,7 @@ typedef struct
     char * extranonce_str;
     int extranonce_2_len;
 
-    int16_t message_id;
+    int64_t message_id;
     // Indicates the type of request the message represents.
     stratum_method method;
 
