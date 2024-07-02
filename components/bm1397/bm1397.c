@@ -217,7 +217,7 @@ void BM1397_send_hash_frequency(float frequency)
     ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
 }
 
-static void _send_init(uint64_t frequency, uint16_t asic_count)
+static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 {
     // send the init command
     _send_read_address();
@@ -264,6 +264,8 @@ static void _send_init(uint64_t frequency, uint16_t asic_count)
     BM1397_set_default_baud();
 
     BM1397_send_hash_frequency(frequency);
+
+    return chip_counter;
 }
 
 // reset the BM1397 via the RTS line
@@ -281,7 +283,7 @@ static void _reset(void)
     vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
-void BM1397_init(uint64_t frequency, uint16_t asic_count)
+uint8_t BM1397_init(uint64_t frequency, uint16_t asic_count)
 {
     ESP_LOGI(TAG, "Initializing BM1397");
 
@@ -293,7 +295,7 @@ void BM1397_init(uint64_t frequency, uint16_t asic_count)
     // reset the bm1397
     _reset();
 
-    _send_init(frequency, asic_count);
+    return _send_init(frequency, asic_count);
 }
 
 // Baud formula = 25M/((denominator+1)*8)
