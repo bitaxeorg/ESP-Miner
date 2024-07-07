@@ -356,7 +356,7 @@ void STRATUM_V1_configure_version_rolling(int socket, uint32_t * version_mask)
             "{\"id\": %d, \"method\": \"mining.configure\", \"params\": [[\"version-rolling\"], {\"version-rolling.mask\": "
             "\"ffffffff\"}]}\n",
             send_uid++);
-    ESP_LOGI(TAG, "tx: %s", configure_msg);
+    debug_stratum_tx(configure_msg);
     write(socket, configure_msg, strlen(configure_msg));
 
     return;
@@ -364,5 +364,15 @@ void STRATUM_V1_configure_version_rolling(int socket, uint32_t * version_mask)
 
 static void debug_stratum_tx(const char * msg)
 {
+    //remove the trailing newline
+    char * newline = strchr(msg, '\n');
+    if (newline != NULL) {
+        *newline = '\0';
+    }
     ESP_LOGI(TAG, "tx: %s", msg);
+
+    //put it back!
+    if (newline != NULL) {
+        *newline = '\n';
+    }
 }

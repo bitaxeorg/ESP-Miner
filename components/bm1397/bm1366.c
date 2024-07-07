@@ -96,7 +96,7 @@ static void _send_BM1366(uint8_t header, uint8_t * data, uint8_t data_len, bool 
     }
 
     // send serial data
-    SERIAL_send(buf, total_length, debug);
+    SERIAL_send(buf, total_length, BM1366_DEBUG_CHIP_SERIAL);
 
     free(buf);
 }
@@ -105,7 +105,7 @@ static void _send_simple(uint8_t * data, uint8_t total_length)
 {
     unsigned char * buf = malloc(total_length);
     memcpy(buf, data, total_length);
-    SERIAL_send(buf, total_length, false);
+    SERIAL_send(buf, total_length, BM1366_DEBUG_CHIP_SERIAL);
 
     free(buf);
 }
@@ -402,38 +402,6 @@ static void do_frequency_ramp_up()
 static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 {
 
-    //     //send serial data
-    //     vTaskDelay(SLEEP_TIME / portTICK_PERIOD_MS);
-
-    //     unsigned char init[6] =  {  0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF};
-
-    //      _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init,  6, true);
-
-    //      unsigned char init18[7] =  { 0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A };
-    //      _send_simple(init18, 7);
-
-    //      unsigned char init2[6] =  { 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00};
-    //      _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init2,  6, true);
-
-    //      unsigned char init3[6] =  { 0x00, 0x18, 0xFF, 0x0F, 0xC1, 0x00 };
-    //       _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init3,  6, true);
-
-    //      _send_chain_inactive();
-    //      // unsigned char init4[7] =  { 0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03 };
-    //      // _send_simple(init4, 7);
-
-    //      unsigned char init5[7] =  { 0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C };
-    //      _send_simple(init5, 7);
-
-    //       unsigned char init6[6] =  { 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40 };
-    //      _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6,  6, true);
-
-    //      unsigned char init7[6] =  { 0x00, 0x3C, 0x80, 0x00, 0x80, 0x20};
-    //       _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), init7,  6, true);
-
-    //     unsigned char init17[11] =  {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    //    _send_simple(init17, 11);
-
     unsigned char init0[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
     _send_simple(init0, 11);
 
@@ -481,8 +449,9 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     unsigned char init136[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x80, 0x20, 0x19};
     _send_simple(init136, 11);
 
-    unsigned char init137[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x14, 0x00, 0x00, 0x00, 0xFF, 0x08};
-    _send_simple(init137, 11);
+    // unsigned char init137[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x14, 0x00, 0x00, 0x00, 0xFF, 0x08};
+    // _send_simple(init137, 11);
+    BM1366_set_job_difficulty_mask(BM1366_INITIAL_DIFFICULTY);
 
     unsigned char init138[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x54, 0x00, 0x00, 0x00, 0x03, 0x1D};
     _send_simple(init138, 11);
@@ -513,8 +482,13 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 
     BM1366_send_hash_frequency(frequency);
 
-    unsigned char init794[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x10, 0x00, 0x00, 0x15, 0x1C, 0x02};
-    _send_simple(init794, 11);
+    //register 10 is still a bit of a mystery. discussion: https://github.com/skot/ESP-Miner/pull/167
+
+    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x11, 0x5A}; //S19k Pro Default
+    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x14, 0x46}; //S19XP-Luxos Default
+    unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x15, 0x1C}; //S19XP-Stock Default
+    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x0F, 0x00, 0x00}; //supposedly the "full" 32bit nonce range
+    _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, false);
 
     unsigned char init795[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
     _send_simple(init795, 11);
@@ -573,20 +547,19 @@ int BM1366_set_default_baud(void)
 int BM1366_set_max_baud(void)
 {
 
-    /// return 115749;
 
-    // divider of 0 for 3,125,000
-    ESP_LOGI(TAG, "Setting max baud of 1000000 ");
-
-    unsigned char init8[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x28, 0x11, 0x30, 0x02, 0x00, 0x03};
-    _send_simple(init8, 11);
     return 1000000;
+
+    // // divider of 0 for 3,125,000
+    // ESP_LOGI(TAG, "Setting max baud of 1000000 ");
+
+    // unsigned char init8[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x28, 0x11, 0x30, 0x02, 0x00, 0x03};
+    // _send_simple(init8, 11);
+    // return 1000000;
 }
 
 void BM1366_set_job_difficulty_mask(int difficulty)
 {
-
-    return;
 
     // Default mask of 256 diff
     unsigned char job_difficulty_mask[9] = {0x00, TICKET_MASK, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
@@ -640,7 +613,9 @@ void BM1366_send_work(void * pvParameters, bm_job * next_bm_job)
 
     pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
     GLOBAL_STATE->valid_jobs[job.job_id] = 1;
-    // ESP_LOGI(TAG, "Added Job: %i", job.job_id);
+    
+    //debug sent jobs - this can get crazy if the interval is short
+    //ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
     pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
 
     _send_BM1366((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), &job, sizeof(BM1366_job), false);
@@ -673,6 +648,14 @@ static uint16_t reverse_uint16(uint16_t num)
     return (num >> 8) | (num << 8);
 }
 
+static uint32_t reverse_uint32(uint32_t val)
+{
+    return ((val >> 24) & 0xff) |      // Move byte 3 to byte 0
+           ((val << 8) & 0xff0000) |   // Move byte 1 to byte 2
+           ((val >> 8) & 0xff00) |     // Move byte 2 to byte 1
+           ((val << 24) & 0xff000000); // Move byte 0 to byte 3
+}
+
 task_result * BM1366_proccess_work(void * pvParameters)
 {
 
@@ -682,23 +665,22 @@ task_result * BM1366_proccess_work(void * pvParameters)
         return NULL;
     }
 
-    uint8_t job_id = asic_result->job_id;
-    uint8_t rx_job_id = job_id & 0xf8;
-    ESP_LOGI(TAG, "Job ID: %02X, RX: %02X", job_id, rx_job_id);
+    uint8_t job_id = asic_result->job_id & 0xf8;
+    uint8_t core_id = (uint8_t)((reverse_uint32(asic_result->nonce) >> 25) & 0x7f); // BM1366 has 112 cores, so it should be coded on 7 bits
+    uint8_t small_core_id = asic_result->job_id & 0x07; // BM1366 has 8 small cores, so it should be coded on 3 bits
+    uint32_t version_bits = (reverse_uint16(asic_result->version) << 13); // shift the 16 bit value left 13
+    ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
-    if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0) {
-        ESP_LOGE(TAG, "Invalid job nonce found, id=%d", rx_job_id);
+    if (GLOBAL_STATE->valid_jobs[job_id] == 0) {
+        ESP_LOGE(TAG, "Invalid job found, 0x%02X", job_id);
         return NULL;
     }
 
-    uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->version;
+    uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
 
-    // // // shift the 16 bit value left 13
-    rolled_version = (reverse_uint16(asic_result->version) << 13) | rolled_version;
-
-    result.job_id = rx_job_id;
+    result.job_id = job_id;
     result.nonce = asic_result->nonce;
     result.rolled_version = rolled_version;
 

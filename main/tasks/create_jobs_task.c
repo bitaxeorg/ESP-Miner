@@ -48,6 +48,7 @@ void create_jobs_task(void *pvParameters)
         {
             GLOBAL_STATE->abandon_work = 0;
             ASIC_jobs_queue_clear(&GLOBAL_STATE->ASIC_jobs_queue);
+            xSemaphoreGive(GLOBAL_STATE->ASIC_TASK_MODULE.semaphore);
         }
 
         STRATUM_V1_free_mining_notify(mining_notification);

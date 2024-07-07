@@ -14,20 +14,23 @@ static const char *TAG = "ASIC_task";
 
 void ASIC_task(void *pvParameters)
 {
-
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+
+    //initialize the semaphore
+    GLOBAL_STATE->ASIC_TASK_MODULE.semaphore = xSemaphoreCreateBinary();
 
     GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
     GLOBAL_STATE->valid_jobs = malloc(sizeof(uint8_t) * 128);
     for (int i = 0; i < 128; i++)
     {
-
         GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[i] = NULL;
         GLOBAL_STATE->valid_jobs[i] = 0;
     }
 
+    ESP_LOGI(TAG, "ASIC Job Interval: %.2f ms", GLOBAL_STATE->asic_job_frequency_ms);
     SYSTEM_notify_mining_started(GLOBAL_STATE);
     ESP_LOGI(TAG, "ASIC Ready!");
+
     while (1)
     {
 
@@ -36,13 +39,14 @@ void ASIC_task(void *pvParameters)
         if (next_bm_job->pool_diff != GLOBAL_STATE->stratum_difficulty)
         {
             ESP_LOGI(TAG, "New pool difficulty %lu", next_bm_job->pool_diff);
-            //(*GLOBAL_STATE->ASIC_functions.set_difficulty_mask_fn)(next_bm_job->pool_diff);
             GLOBAL_STATE->stratum_difficulty = next_bm_job->pool_diff;
         }
 
         (*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, next_bm_job); // send the job to the ASIC
 
         // Time to execute the above code is ~0.3ms
-        vTaskDelay((GLOBAL_STATE->asic_job_frequency_ms - 0.3) / portTICK_PERIOD_MS);
+        // Delay for ASIC(s) to finish the job
+        //vTaskDelay((GLOBAL_STATE->asic_job_frequency_ms - 0.3) / portTICK_PERIOD_MS);
+        xSemaphoreTake(GLOBAL_STATE->ASIC_TASK_MODULE.semaphore, (GLOBAL_STATE->asic_job_frequency_ms / portTICK_PERIOD_MS));
     }
 }
