@@ -26,6 +26,13 @@ static int send_uid = 1;
 static void debug_stratum_tx(const char *);
 int _parse_stratum_subscribe_result_message(const char * result_json_str, char ** extranonce, int * extranonce2_len);
 
+void STRATUM_V1_reset_uid()
+{
+    ESP_LOGI(TAG, "Resetting stratum uid");
+
+    send_uid = 1;
+}
+
 void STRATUM_V1_initialize_buffer()
 {
     json_rpc_buffer = malloc(BUFFER_SIZE);
@@ -128,6 +135,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             result = MINING_SET_DIFFICULTY;
         } else if (strcmp("mining.set_version_mask", method_json->valuestring) == 0) {
             result = MINING_SET_VERSION_MASK;
+        } else if (strcmp("client.reconnect", method_json->valuestring) == 0) {
+            result = CLIENT_RECONNECT;
         } else {
             ESP_LOGI(TAG, "unhandled method in stratum message: %s", stratum_json);
         }
