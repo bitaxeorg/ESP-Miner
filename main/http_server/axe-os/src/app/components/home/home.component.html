@@ -121,7 +121,7 @@
             <div class="card">
                 <h5>Heat</h5>
                 <div class="grid text-center">
-                    <div class="col-4">
+                    <div class="col-6">
                         <p-knob [min]="20" [max]="75" [readonly]="true" [(ngModel)]="info.temp"
                             valueTemplate="{value}C"></p-knob>
                         ASIC Temperature
@@ -139,12 +139,12 @@
                             Danger:
                             High Temperature</span>
                     </div>
-                    <div class="col-4">
+                    <div class="col-6">
                         <p-knob [min]="0" [max]="100" [readonly]="true" [(ngModel)]="info.fanspeed"
                             valueTemplate="{value}%"></p-knob>
                         Fan %
                     </div>
-                    <div class="col-4">
+                    <div class="col-6">
                         <p-knob [min]="0" [max]="20000" [readonly]="true" [(ngModel)]="info.fanrpm"
                             valueTemplate="{value}"></p-knob>
                         Fan RPM
@@ -191,26 +191,27 @@
 
 
 
-        <div class=" col-12 lg:col-6">
+        <div class="col-12 lg:col-6">
             <div class="card">
                 <h5>Pool Information</h5>
                 <table *ngIf="info$ | async as info; else loading">
                     <tr *ngIf="quickLink$ | async as quickLink">
                         <td>Quick Link:</td>
-                        <td><a style="color: white; text-decoration: underline;" [href]="quickLink"
-                                target="_blank">{{quickLink}}</a></td>
+                        <td style="word-break: break-all;">
+                            <a style="color: white; text-decoration: underline;" [href]="quickLink" target="_blank">{{quickLink}}</a>
+                        </td>
                     </tr>
                     <tr>
                         <td>URL:</td>
-                        <td>{{info.stratumURL}}</td>
+                        <td style="word-break: break-all;">{{info.stratumURL}}</td>
                     </tr>
                     <tr>
                         <td>Port:</td>
-                        <td>{{info.stratumPort}}</td>
+                        <td style="word-break: break-all;">{{info.stratumPort}}</td>
                     </tr>
                     <tr>
                         <td>User:</td>
-                        <td>{{info.stratumUser}}</td>
+                        <td style="word-break: break-all;">{{info.stratumUser}}</td>
                     </tr>
 
                 </table>
