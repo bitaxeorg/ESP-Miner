@@ -144,6 +144,9 @@ export class HomeComponent {
         } else if (info.stratumURL.includes('ocean.xyz')) {
           const address = info.stratumUser.split('.')[0]
           return `https://ocean.xyz/stats/${address}`;
+        } else if (info.stratumURL.includes('solo.d-central.tech')) {
+          const address = info.stratumUser.split('.')[0]
+          return `https://solo.d-central.tech/#/app/${address}`;
         } else {
           return undefined;
         }
