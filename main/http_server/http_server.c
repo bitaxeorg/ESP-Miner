@@ -296,8 +296,8 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "flipscreen")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_FLIP_SCREEN, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "overheat")) == 1) {
-        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, item->0);
+    if ((item = cJSON_GetObjectItem(root, "overheat")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
     }
     if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
