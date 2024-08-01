@@ -2,6 +2,7 @@
 #define ASIC_TASK_H_
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "mining.h"
 typedef struct
 {

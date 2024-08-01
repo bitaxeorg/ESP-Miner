@@ -19,7 +19,8 @@ typedef enum
     STRATUM_RESULT,
     STRATUM_RESULT_SETUP,
     STRATUM_RESULT_VERSION_MASK,
-    STRATUM_RESULT_SUBSCRIBE
+    STRATUM_RESULT_SUBSCRIBE,
+    CLIENT_RECONNECT
 } stratum_method;
 
 static const int  STRATUM_ID_SUBSCRIBE    = 1;
@@ -59,6 +60,8 @@ typedef struct
     // result
     bool response_success;
 } StratumApiV1Message;
+
+void STRATUM_V1_reset_uid();
 
 void STRATUM_V1_initialize_buffer();
 

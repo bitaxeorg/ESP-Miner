@@ -53,6 +53,19 @@ bool is_wifi_connected() {
     }
 }
 
+void cleanQueue(GlobalState * GLOBAL_STATE) {
+    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
+    GLOBAL_STATE->abandon_work = 1;
+    queue_clear(&GLOBAL_STATE->stratum_queue);
+
+    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
+    ASIC_jobs_queue_clear(&GLOBAL_STATE->ASIC_jobs_queue);
+    for (int i = 0; i < 128; i = i + 4) {
+        GLOBAL_STATE->valid_jobs[i] = 0;
+    }
+    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+}
+
 void stratum_task(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -136,6 +149,9 @@ void stratum_task(void * pvParameters)
                 continue;
             }
 
+            STRATUM_V1_reset_uid();
+            cleanQueue(GLOBAL_STATE);
+
             ///// Start Stratum Action
             // mining.subscribe - ID: 1
             STRATUM_V1_subscribe(GLOBAL_STATE->sock, GLOBAL_STATE->asic_model_str);
@@ -171,16 +187,7 @@ void stratum_task(void * pvParameters)
                     SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
                     if (stratum_api_v1_message.should_abandon_work &&
                         (GLOBAL_STATE->stratum_queue.count > 0 || GLOBAL_STATE->ASIC_jobs_queue.count > 0)) {
-                        ESP_LOGI(TAG, "Clean Jobs: clearing queue");
-                        GLOBAL_STATE->abandon_work = 1;
-                        queue_clear(&GLOBAL_STATE->stratum_queue);
-
-                        pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
-                        ASIC_jobs_queue_clear(&GLOBAL_STATE->ASIC_jobs_queue);
-                        for (int i = 0; i < 128; i = i + 4) {
-                            GLOBAL_STATE->valid_jobs[i] = 0;
-                        }
-                        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+                        cleanQueue(GLOBAL_STATE);
                     }
                     if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
                         mining_notify * next_notify_json_str = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
@@ -202,12 +209,18 @@ void stratum_task(void * pvParameters)
                 } else if (stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
                     GLOBAL_STATE->extranonce_str = stratum_api_v1_message.extranonce_str;
                     GLOBAL_STATE->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
+                } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
+                    ESP_LOGE(TAG, "Pool requested client reconnect...");
+                    shutdown(GLOBAL_STATE->sock, SHUT_RDWR);
+                    close(GLOBAL_STATE->sock);
+                    vTaskDelay(1000 / portTICK_PERIOD_MS); // Delay before attempting to reconnect
+                    break;
                 } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
                     if (stratum_api_v1_message.response_success) {
                         ESP_LOGI(TAG, "message result accepted");
                         SYSTEM_notify_accepted_share(GLOBAL_STATE);
                     } else {
-                        ESP_LOGE(TAG, "message result rejected");
+                        ESP_LOGW(TAG, "message result rejected");
                         SYSTEM_notify_rejected_share(GLOBAL_STATE);
                     }
                 } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {

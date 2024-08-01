@@ -166,7 +166,7 @@ void BM1366_send_hash_frequency(float target_freq)
     if (fb_divider == 0) {
         puts("Finding dividers failed, using default value (200Mhz)");
     } else {
-        newf = 25.0 / (float) (ref_divider * fb_divider) / (float) (post_divider1 * post_divider2);
+        newf = 25.0 * (float) (fb_divider) / (float) (ref_divider * post_divider1 * post_divider2);
         printf("final refdiv: %d, fbdiv: %d, postdiv1: %d, postdiv2: %d, min diff value: %f\n", ref_divider, fb_divider,
                post_divider1, post_divider2, min_difference);
 
