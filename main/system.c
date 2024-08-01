@@ -118,6 +118,28 @@ static void _init_system(GlobalState * GLOBAL_STATE)
     netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
 }
 
+static void _show_overheat_screen(GlobalState * GLOBAL_STATE)
+{
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (OLED_status()) {
+                OLED_clearLine(0);
+                OLED_clearLine(1);
+                OLED_clearLine(2);
+                OLED_clearLine(3);
+                OLED_writeString(0, 0, "DEVICE OVERHEATED");
+                OLED_writeString(0, 1, "Please check");
+                OLED_writeString(0, 2, "webUI for more");
+                OLED_writeString(0, 3, "information");
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 static void _update_hashrate(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -485,6 +507,15 @@ void SYSTEM_task(void * pvParameters)
     }
 
     while (1) {
+        // Check for overheat mode
+        uint16_t overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+        
+        if (overheat_mode == 1) {
+            _show_overheat_screen(GLOBAL_STATE);
+            vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
+            continue;  // Skip the normal screen cycle
+        }
+
         // Automatically cycle through screens
         for (int screen = 0; screen < 3; screen++) {
             _clear_display(GLOBAL_STATE);

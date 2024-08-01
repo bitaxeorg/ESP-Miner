@@ -24,6 +24,7 @@
 #define NVS_CONFIG_FAN_SPEED "fanspeed"
 #define NVS_CONFIG_BEST_DIFF "bestdiff"
 #define NVS_CONFIG_SELF_TEST "selftest"
+#define NVS_CONFIG_OVERHEAT_MODE "overheat_mode"
 
 #define NVS_CONFIG_SWARM "swarmconfig"
 

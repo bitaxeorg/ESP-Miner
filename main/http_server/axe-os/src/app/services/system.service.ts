@@ -56,7 +56,8 @@ export class SystemService {
           fanrpm: 0,
 
           boardtemp1: 30,
-          boardtemp2: 40
+          boardtemp2: 40,
+          overheat: 0
         }
       ).pipe(delay(1000));
     }
