@@ -147,7 +147,7 @@
             </div>
         </div>
 
-        <div class="col-12 md:col-4">
+        <div class="col-12 md:col-4" *ngIf="form.get('overheat')?.value === 1">
             <div class="field-checkbox">
                 <p-checkbox name="overheat" formControlName="overheat" inputId="overheat"
                     [binary]="true"></p-checkbox>
