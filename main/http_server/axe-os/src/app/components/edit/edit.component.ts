@@ -137,6 +137,7 @@ export class EditComponent implements OnInit {
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
           invertfanpolarity: [info.invertfanpolarity == 1, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
+          overheat: [info.overheat, [Validators.required]]
         });
 
         this.form.controls['autofanspeed'].valueChanges.pipe(
@@ -173,6 +174,8 @@ export class EditComponent implements OnInit {
     if (form.stratumPassword === 'password') {
       delete form.stratumPassword;
     }
+
+    form.overheat = form.overheat ? 1 : 0;
 
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
