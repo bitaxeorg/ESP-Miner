@@ -67,12 +67,11 @@ uint16_t nvs_config_get_u16(const char * key, const uint16_t default_value)
 
     uint16_t out;
     err = nvs_get_u16(handle, key, &out);
-
+    nvs_close(handle);
+    
     if (err != ESP_OK) {
         return default_value;
     }
-
-    nvs_close(handle);
     return out;
 }
 
