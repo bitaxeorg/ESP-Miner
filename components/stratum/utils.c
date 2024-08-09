@@ -291,7 +291,7 @@ void prettyHex(unsigned char *buf, int len)
     {
         printf("%02X ", buf[i]);
     }
-    printf("%02X]\n", buf[len - 1]);
+    printf("%02X]", buf[len - 1]);
 }
 
 uint32_t flip32(uint32_t val)

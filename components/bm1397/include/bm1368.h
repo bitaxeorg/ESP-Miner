@@ -6,8 +6,12 @@
 #include "mining.h"
 
 #define CRC5_MASK 0x1F
-
 #define BM1368_INITIAL_DIFFICULTY 256
+
+#define BM1368_SERIALTX_DEBUG false
+#define BM1368_SERIALRX_DEBUG false
+#define BM1368_DEBUG_WORK false //causes insane amount of debug output
+#define BM1368_DEBUG_JOBS false //causes insane amount of debug output
 
 static const uint64_t BM1368_CORE_COUNT = 80;
 static const uint64_t BM1368_SMALL_CORE_COUNT = 1276;
