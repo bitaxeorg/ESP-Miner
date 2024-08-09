@@ -347,6 +347,7 @@ static esp_err_t GET_swarm(httpd_req_t * req)
 
     char * swarm_config = nvs_config_get_string(NVS_CONFIG_SWARM, "[]");
     httpd_resp_sendstr(req, swarm_config);
+    free(swarm_config);
     return ESP_OK;
 }
 

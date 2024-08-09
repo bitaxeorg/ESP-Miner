@@ -1,7 +1,7 @@
 #ifndef SERIAL_H_
 #define SERIAL_H_
 
-#define CHUNK_SIZE 1024
+#define SERIAL_BUF_SIZE 16
 
 int SERIAL_send(uint8_t *, int, bool);
 void SERIAL_init(void);
