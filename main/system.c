@@ -41,6 +41,21 @@ static esp_netif_ip_info_t ip_info;
 
 QueueHandle_t user_input_queue;
 
+static esp_err_t ensure_overheat_mode_config() {
+    uint16_t overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, UINT16_MAX);
+
+    if (overheat_mode == UINT16_MAX) {
+        // Key doesn't exist or couldn't be read, set the default value
+        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+        ESP_LOGI(TAG, "Default value for overheat_mode set to 0");
+    } else {
+        // Key exists, log the current value
+        ESP_LOGI(TAG, "Existing overheat_mode value: %d", overheat_mode);
+    }
+
+    return ESP_OK;
+}
+
 static void _init_system(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -64,6 +79,10 @@ static void _init_system(GlobalState * GLOBAL_STATE)
 
     //set the pool port
     module->pool_port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT);
+
+    // Initialize overheat_mode
+    module->overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+    ESP_LOGI(TAG, "Initial overheat_mode value: %d", module->overheat_mode);
 
     // set the best diff string
     _suffix_string(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
@@ -99,6 +118,12 @@ static void _init_system(GlobalState * GLOBAL_STATE)
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
+    // Ensure overheat_mode config exists
+    esp_err_t ret = ensure_overheat_mode_config();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to ensure overheat_mode config");
+    }
+
     switch (GLOBAL_STATE->device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
@@ -116,6 +141,17 @@ static void _init_system(GlobalState * GLOBAL_STATE)
     }
 
     netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+}
+
+void SYSTEM_update_overheat_mode(GlobalState * GLOBAL_STATE)
+{
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    uint16_t new_overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+    
+    if (new_overheat_mode != module->overheat_mode) {
+        module->overheat_mode = new_overheat_mode;
+        ESP_LOGI(TAG, "Overheat mode updated to: %d", module->overheat_mode);
+    }
 }
 
 static void _show_overheat_screen(GlobalState * GLOBAL_STATE)
@@ -508,11 +544,10 @@ void SYSTEM_task(void * pvParameters)
 
     while (1) {
         // Check for overheat mode
-        uint16_t overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-        
-        if (overheat_mode == 1) {
+        if (module->overheat_mode == 1) {
             _show_overheat_screen(GLOBAL_STATE);
             vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
+            SYSTEM_update_overheat_mode(GLOBAL_STATE);  // Check for changes
             continue;  // Skip the normal screen cycle
         }
 
