@@ -170,6 +170,6 @@ static void generate_additional_work(GlobalState *GLOBAL_STATE, mining_notify *n
     if (extranonce_2 >= MAX_EXTRANONCE_2) {
         extranonce_2 = 1; // Reset to 1 if we've reached the maximum
     }
-
-    ESP_LOGI(TAG, "Additional job generated and queued: %s (Extranonce2: %lu)", notification->job_id, (unsigned long)(extranonce_2 - 1));
+    // Logging could cause websocket to crash use with caution
+    //ESP_LOGI(TAG, "Additional job generated and queued: %s (Extranonce2: %lu)", notification->job_id, (extranonce_2 - 1));
 }
