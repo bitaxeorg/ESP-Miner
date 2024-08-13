@@ -56,7 +56,7 @@ typedef struct __attribute__((__packed__))
 
 static const char *TAG = "bm1397Module";
 
-static uint8_t asic_response_buffer[CHUNK_SIZE];
+static uint8_t asic_response_buffer[SERIAL_BUF_SIZE];
 static uint32_t prev_nonce = 0;
 static task_result result;
 
@@ -287,7 +287,7 @@ uint8_t BM1397_init(uint64_t frequency, uint16_t asic_count)
 {
     ESP_LOGI(TAG, "Initializing BM1397");
 
-    memset(asic_response_buffer, 0, sizeof(asic_response_buffer));
+    memset(asic_response_buffer, 0, SERIAL_BUF_SIZE);
 
     esp_rom_gpio_pad_select_gpio(BM1397_RST_PIN);
     gpio_set_direction(BM1397_RST_PIN, GPIO_MODE_OUTPUT);

@@ -1,6 +1,15 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+
+
+interface GithubRelease {
+  id: number;
+  tag_name: string;
+  name: string;
+  prerelease: boolean;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -12,8 +21,12 @@ export class GithubUpdateService {
   ) { }
 
 
-  public getReleases() {
-    return this.httpClient.get(`https://api.github.com/repos/skot/esp-miner/releases`) as Observable<any[]>;
+  public getReleases(): Observable<GithubRelease[]> {
+    return this.httpClient.get<GithubRelease[]>(
+      'https://api.github.com/repos/skot/esp-miner/releases'
+    ).pipe(
+      map((releases: GithubRelease[]) => releases.filter((release: GithubRelease) => !release.prerelease))
+    );
   }
 
 }

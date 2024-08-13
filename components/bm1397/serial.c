@@ -85,7 +85,7 @@ int16_t SERIAL_rx(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
 void SERIAL_debug_rx(void)
 {
     int ret;
-    uint8_t buf[CHUNK_SIZE];
+    uint8_t buf[100];
 
     ret = SERIAL_rx(buf, 100, 20);
     if (ret < 0)
