@@ -69,6 +69,27 @@ export class EditComponent implements OnInit {
     { name: '575', value: 575 },
   ];
 
+  public BM1370DropdownFrequency = [
+    { name: '400', value: 400 },
+    { name: '490', value: 490 },
+    { name: '525', value: 525 },
+    { name: '575', value: 575 },
+    { name: '596 (default)', value: 596 },
+    { name: '610', value: 610 },
+    { name: '625', value: 625 },
+  ];
+
+  public BM1370CoreVoltage = [
+    { name: '900', value: 900 },
+    { name: '950', value: 950 },
+    { name: '1000', value: 1000 },
+    { name: '1060 (default)', value: 1060 },
+    { name: '1100', value: 1100 },
+    { name: '1150', value: 1150 },
+    { name: '1200', value: 1200 },
+    { name: '1250', value: 1250 },
+  ];
+
   public BM1397CoreVoltage = [
     { name: '1100', value: 1100 },
     { name: '1150', value: 1150 },
@@ -137,7 +158,6 @@ export class EditComponent implements OnInit {
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
           invertfanpolarity: [info.invertfanpolarity == 1, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
-          overheat_mode: [info.overheat_mode, [Validators.required]]
         });
 
         this.form.controls['autofanspeed'].valueChanges.pipe(
@@ -174,8 +194,6 @@ export class EditComponent implements OnInit {
     if (form.stratumPassword === 'password') {
       delete form.stratumPassword;
     }
-
-    form.overheat_mode = form.overheat_mode ? 1 : 0;
 
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())

@@ -28,7 +28,7 @@ INCLUDE_DIRS
     "."
     "tasks"
     "http_server"
-    "../components/bm1397/include"
+    "../components/asic/include"
     "../components/connect/include"
     "../components/dns_server/include"
     "../components/stratum/include"
