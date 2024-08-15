@@ -57,7 +57,7 @@ typedef struct __attribute__((__packed__))
 
 static const char * TAG = "bm1370Module";
 
-static uint8_t asic_response_buffer[CHUNK_SIZE];
+static uint8_t asic_response_buffer[SERIAL_BUF_SIZE];
 static task_result result;
 
 /// @brief
