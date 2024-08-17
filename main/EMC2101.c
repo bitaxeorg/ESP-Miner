@@ -62,10 +62,10 @@ float EMC2101_get_external_temp(void)
     reading >>= 5;
 
     if (reading == EMC2101_TEMP_FAULT_OPEN_CIRCUIT) {
-        ESP_LOGE(TAG, "EMC2101 TEMP_FAULT_OPEN_CIRCUIT");
+        ESP_LOGE(TAG, "EMC2101 TEMP_FAULT_OPEN_CIRCUIT: %04X", reading);
     }
     if (reading == EMC2101_TEMP_FAULT_SHORT) {
-        ESP_LOGE(TAG, "EMC2101 TEMP_FAULT_SHORT");
+        ESP_LOGE(TAG, "EMC2101 TEMP_FAULT_SHORT: %04X", reading);
     }
 
     float result = (float) reading / 8.0;
