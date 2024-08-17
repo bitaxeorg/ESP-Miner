@@ -9,7 +9,7 @@
 
 #define BM1370_INITIAL_DIFFICULTY 256
 
-#define BM1370_SERIALTX_DEBUG false
+#define BM1370_SERIALTX_DEBUG true
 #define BM1370_SERIALRX_DEBUG false
 #define BM1370_DEBUG_WORK false //causes insane amount of debug output
 
