@@ -1,5 +1,10 @@
 [![](https://dcbadge.vercel.app/api/server/3E8ca2dkcC)](https://discord.gg/3E8ca2dkcC)
 
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/skot/esp-miner/total)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/t/skot/esp-miner)
+![GitHub contributors](https://img.shields.io/github/contributors/skot/esp-miner)
+
+
 # ESP-Miner
 
 | Supported Targets | ESP32-S3 (BitAxe v2+) |
