@@ -401,6 +401,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         case ASIC_BM1368:
             small_core_count = BM1368_SMALL_CORE_COUNT;
             break;
+        case ASIC_BM1370:
+            small_core_count = BM1370_SMALL_CORE_COUNT;
+            break;
         case ASIC_UNKNOWN:
         default:
             small_core_count = -1;
