@@ -126,168 +126,70 @@ static void _set_chip_address(uint8_t chipAddr)
     _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, false);
 }
 
-void BM1370_send_hash_frequency(float target_freq)
-{
-    // default 200Mhz if it fails
-    unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41}; // freqbuf - pll0_parameter
-    float newf = 200.0;
+void BM1370_send_hash_frequency(int id, float target_freq, float max_diff) {
+    uint8_t freqbuf[6] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41};
+    uint8_t postdiv_min = 255;
+    uint8_t postdiv2_min = 255;
+    float best_freq = 0;
+    uint8_t best_refdiv = 0, best_fbdiv = 0, best_postdiv1 = 0, best_postdiv2 = 0;
 
-    uint8_t fb_divider = 0;
-    uint8_t post_divider1 = 0, post_divider2 = 0;
-    uint8_t ref_divider = 0;
-    float min_difference = 10;
-
-    // refdiver is 2 or 1
-    // postdivider 2 is 1 to 7
-    // postdivider 1 is 1 to 7 and less than postdivider 2
-    // fbdiv is 144 to 235
-    for (uint8_t refdiv_loop = 2; refdiv_loop > 0 && fb_divider == 0; refdiv_loop--) {
-        for (uint8_t postdiv1_loop = 7; postdiv1_loop > 0 && fb_divider == 0; postdiv1_loop--) {
-            for (uint8_t postdiv2_loop = 1; postdiv2_loop < postdiv1_loop && fb_divider == 0; postdiv2_loop++) {
-                int temp_fb_divider = round(((float) (postdiv1_loop * postdiv2_loop * target_freq * refdiv_loop) / 25.0));
-
-                if (temp_fb_divider >= 144 && temp_fb_divider <= 235) {
-                    float temp_freq = 25.0 * (float) temp_fb_divider / (float) (refdiv_loop * postdiv2_loop * postdiv1_loop);
-                    float freq_diff = fabs(target_freq - temp_freq);
-
-                    if (freq_diff < min_difference) {
-                        fb_divider = temp_fb_divider;
-                        post_divider1 = postdiv1_loop;
-                        post_divider2 = postdiv2_loop;
-                        ref_divider = refdiv_loop;
-                        min_difference = freq_diff;
-                        break;
-                    }
+    for (uint8_t refdiv = 2; refdiv > 0; refdiv--) {
+        for (uint8_t postdiv1 = 7; postdiv1 > 0; postdiv1--) {
+            for (uint8_t postdiv2 = 7; postdiv2 > 0; postdiv2--) {
+                uint16_t fb_divider = round(target_freq / 25.0 * (refdiv * postdiv2 * postdiv1));
+                float newf = 25.0 * fb_divider / (refdiv * postdiv2 * postdiv1);
+                
+                if (fb_divider >= 0xa0 && fb_divider <= 0xef &&
+                    fabs(target_freq - newf) < max_diff &&
+                    postdiv1 >= postdiv2 &&
+                    postdiv1 * postdiv2 < postdiv_min &&
+                    postdiv2 <= postdiv2_min) {
+                    
+                    postdiv2_min = postdiv2;
+                    postdiv_min = postdiv1 * postdiv2;
+                    best_freq = newf;
+                    best_refdiv = refdiv;
+                    best_fbdiv = fb_divider;
+                    best_postdiv1 = postdiv1;
+                    best_postdiv2 = postdiv2;
                 }
             }
         }
     }
 
-    if (fb_divider == 0) {
-        ESP_LOGE(TAG, "Finding dividers failed, using default value (200Mhz)");
-    } else {
-        newf = 25.0 * (float) (fb_divider) / (float) (ref_divider * post_divider1 * post_divider2);
-        ESP_LOGI(TAG, "final refdiv: %d, fbdiv: %d, postdiv1: %d, postdiv2: %d, min diff value: %f\n", ref_divider, fb_divider,
-               post_divider1, post_divider2, min_difference);
-
-        freqbuf[3] = fb_divider;
-        freqbuf[4] = ref_divider;
-        freqbuf[5] = (((post_divider1 - 1) & 0xf) << 4) + ((post_divider2 - 1) & 0xf);
-
-        if (fb_divider * 25 / (float) ref_divider >= 2400) {
-            freqbuf[2] = 0x50;
-        }
+    if (best_fbdiv == 0) {
+        ESP_LOGE(TAG, "Failed to find PLL settings for target frequency %.2f", target_freq);
+        return;
     }
 
-    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, false);
+    freqbuf[2] = (best_fbdiv * 25 / best_refdiv >= 2400) ? 0x50 : 0x40;
+    freqbuf[3] = best_fbdiv;
+    freqbuf[4] = best_refdiv;
+    freqbuf[5] = (((best_postdiv1 - 1) & 0xf) << 4) | ((best_postdiv2 - 1) & 0xf);
 
-    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", target_freq, newf);
+    if (id != -1) {
+        freqbuf[0] = id * 2;
+        _send_BM1370(TYPE_CMD | GROUP_SINGLE | CMD_WRITE, freqbuf, 6, BM1370_SERIALTX_DEBUG);
+    } else {
+        _send_BM1370(TYPE_CMD | GROUP_ALL | CMD_WRITE, freqbuf, 6, BM1370_SERIALTX_DEBUG);
+    }
+
+    //ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", target_freq, best_freq);
 }
 
-static void do_frequency_ramp_up() {
+static void do_frequency_ramp_up(float target_frequency) {
+    float current = 56.25;
+    float step = 6.25;
 
-    //PLLO settings taken from a S21 Pro dump.
-    //todo: do this right.
-    uint8_t freq_list[89][4] = {
-        {0x40, 0xA2, 0x02, 0x55},
-        {0x40, 0xAF, 0x02, 0x64},
-        {0x40, 0xA5, 0x02, 0x54},
-        {0x40, 0xA8, 0x02, 0x63},
-        {0x40, 0xB6, 0x02, 0x63},
-        {0x40, 0xA8, 0x02, 0x53},
-        {0x40, 0xB4, 0x02, 0x53},
-        {0x40, 0xA8, 0x02, 0x62},
-        {0x40, 0xAA, 0x02, 0x43},
-        {0x40, 0xA2, 0x02, 0x52},
-        {0x40, 0xAB, 0x02, 0x52},
-        {0x40, 0xB4, 0x02, 0x52},
-        {0x40, 0xBD, 0x02, 0x52},
-        {0x40, 0xA5, 0x02, 0x42},
-        {0x40, 0xA1, 0x02, 0x61},
-        {0x40, 0xA8, 0x02, 0x61},
-        {0x40, 0xAF, 0x02, 0x61},
-        {0x40, 0xB6, 0x02, 0x61},
-        {0x40, 0xA2, 0x02, 0x51},
-        {0x40, 0xA8, 0x02, 0x51},
-        {0x40, 0xAE, 0x02, 0x51},
-        {0x40, 0xB4, 0x02, 0x51},
-        {0x40, 0xBA, 0x02, 0x51},
-        {0x40, 0xA0, 0x02, 0x41},
-        {0x40, 0xA5, 0x02, 0x41},
-        {0x40, 0xAA, 0x02, 0x41},
-        {0x40, 0xAF, 0x02, 0x41},
-        {0x40, 0xB4, 0x02, 0x41},
-        {0x40, 0xB9, 0x02, 0x41},
-        {0x40, 0xBE, 0x02, 0x41},
-        {0x50, 0xC3, 0x02, 0x41},
-        {0x40, 0xA0, 0x02, 0x31},
-        {0x40, 0xA4, 0x02, 0x31},
-        {0x40, 0xA8, 0x02, 0x31},
-        {0x40, 0xAC, 0x02, 0x31},
-        {0x40, 0xB0, 0x02, 0x31},
-        {0x40, 0xB4, 0x02, 0x31},
-        {0x40, 0xA1, 0x02, 0x60},
-        {0x40, 0xBC, 0x02, 0x31},
-        {0x40, 0xA8, 0x02, 0x60},
-        {0x50, 0xC4, 0x02, 0x31},
-        {0x40, 0xAF, 0x02, 0x60},
-        {0x50, 0xCC, 0x02, 0x31},
-        {0x40, 0xB6, 0x02, 0x60},
-        {0x50, 0xD4, 0x02, 0x31},
-        {0x40, 0xA2, 0x02, 0x50},
-        {0x40, 0xA5, 0x02, 0x50},
-        {0x40, 0xA8, 0x02, 0x50},
-        {0x40, 0xAB, 0x02, 0x50},
-        {0x40, 0xAE, 0x02, 0x50},
-        {0x40, 0xB1, 0x02, 0x50},
-        {0x40, 0xB4, 0x02, 0x50},
-        {0x40, 0xB7, 0x02, 0x50},
-        {0x40, 0xBA, 0x02, 0x50},
-        {0x40, 0xBD, 0x02, 0x50},
-        {0x40, 0xA0, 0x02, 0x40},
-        {0x50, 0xC3, 0x02, 0x50},
-        {0x40, 0xA5, 0x02, 0x40},
-        {0x50, 0xC9, 0x02, 0x50},
-        {0x40, 0xAA, 0x02, 0x40},
-        {0x50, 0xCF, 0x02, 0x50},
-        {0x40, 0xAF, 0x02, 0x40},
-        {0x50, 0xD5, 0x02, 0x50},
-        {0x40, 0xB4, 0x02, 0x40},
-        {0x50, 0xDB, 0x02, 0x50},
-        {0x40, 0xB9, 0x02, 0x40},
-        {0x50, 0xE1, 0x02, 0x50},
-        {0x40, 0xBE, 0x02, 0x40},
-        {0x50, 0xE7, 0x02, 0x50},
-        {0x50, 0xC3, 0x02, 0x40},
-        {0x50, 0xED, 0x02, 0x50},
-        {0x40, 0xA0, 0x02, 0x30},
-        {0x40, 0xA2, 0x02, 0x30},
-        {0x40, 0xA4, 0x02, 0x30},
-        {0x40, 0xA6, 0x02, 0x30},
-        {0x40, 0xA8, 0x02, 0x30},
-        {0x40, 0xAA, 0x02, 0x30},
-        {0x40, 0xAC, 0x02, 0x30},
-        {0x40, 0xAE, 0x02, 0x30},
-        {0x40, 0xB0, 0x02, 0x30},
-        {0x40, 0xB2, 0x02, 0x30},
-        {0x40, 0xB4, 0x02, 0x30},
-        {0x40, 0xB6, 0x02, 0x30},
-        {0x40, 0xB8, 0x02, 0x30},
-        {0x40, 0xBA, 0x02, 0x30},
-        {0x40, 0xBC, 0x02, 0x30},
-        {0x40, 0xBE, 0x02, 0x30},
-        {0x50, 0xC0, 0x02, 0x30},
-        {0x50, 0xC0, 0x02, 0x30}};
+    ESP_LOGI(TAG, "Ramping up frequency from %.2f MHz to %.2f MHz with step %.2f MHz", current, target_frequency, step);
 
-    uint8_t freq_cmd[6] = {0x00, 0x08, 0x40, 0xB4, 0x02, 0x40};
-
-    for (int i = 0; i < 89; i++) {
-        freq_cmd[2] = freq_list[i][0];
-        freq_cmd[3] = freq_list[i][1];
-        freq_cmd[4] = freq_list[i][2];
-        freq_cmd[5] = freq_list[i][3];
-        _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), freq_cmd, 6, false);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+    BM1370_send_hash_frequency(-1, current, 0.001);
+    
+    while (current < target_frequency) {
+        float next_step = fminf(step, target_frequency - current);
+        current += next_step;
+        BM1370_send_hash_frequency(-1, current, 0.001);
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -391,9 +293,9 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
         _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_third, 6, false);
     }
 
-    do_frequency_ramp_up();
+    do_frequency_ramp_up(frequency);
 
-    BM1370_send_hash_frequency(frequency);
+    //BM1370_send_hash_frequency(frequency);
 
     //register 10 is still a bit of a mystery. discussion: https://github.com/skot/ESP-Miner/pull/167
 
