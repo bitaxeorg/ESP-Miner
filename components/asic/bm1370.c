@@ -445,6 +445,7 @@ asic_result * BM1370_receive_work(void)
     if (received != 11 || asic_response_buffer[0] != 0xAA || asic_response_buffer[1] != 0x55) {
         ESP_LOGI(TAG, "Serial RX invalid %i", received);
         ESP_LOG_BUFFER_HEX(TAG, asic_response_buffer, received);
+        SERIAL_clear_buffer();
         return NULL;
     }
 
