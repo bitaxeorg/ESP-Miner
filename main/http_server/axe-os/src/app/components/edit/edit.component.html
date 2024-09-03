@@ -87,6 +87,38 @@
                     optionValue="value" formControlName="coreVoltage"></p-dropdown>
             </div>
         </ng-container>
+        <ng-container *ngIf="!devToolsOpen && ASICModel == eASICModel.BM1370">
+
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
+                <div class="col-12 md:col-10">
+                    <p-dropdown [options]="BM1370DropdownFrequency" optionLabel="name" optionValue="value"
+                        formControlName="frequency"></p-dropdown>
+                </div>
+            </div>
+
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="coreVoltage">Core Voltage</label>
+                <p-dropdown class="col-12 md:col-10" [options]="BM1370CoreVoltage" optionLabel="name"
+                    optionValue="value" formControlName="coreVoltage"></p-dropdown>
+            </div>
+        </ng-container>
+        <ng-container *ngIf="!devToolsOpen && ASICModel == eASICModel.BM1368">
+
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
+                <div class="col-12 md:col-10">
+                    <p-dropdown [options]="BM1368DropdownFrequency" optionLabel="name" optionValue="value"
+                        formControlName="frequency"></p-dropdown>
+                </div>
+            </div>
+
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="coreVoltage">Core Voltage</label>
+                <p-dropdown class="col-12 md:col-10" [options]="BM1368CoreVoltage" optionLabel="name"
+                    optionValue="value" formControlName="coreVoltage"></p-dropdown>
+            </div>
+        </ng-container>
 
         <ng-container *ngIf="!devToolsOpen && ASICModel == eASICModel.BM1397">
 
@@ -146,7 +178,7 @@
                 <label for="autofanspeed">Automatic Fan Control</label>
             </div>
         </div>
-
+        
         <div class="col-12 md:col-4" *ngIf="form.get('overheat_mode')?.value === 1">
             <div class="field-checkbox">
                 <p-checkbox name="overheat_mode" formControlName="overheat_mode" inputId="overheat_mode"
