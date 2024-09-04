@@ -567,11 +567,11 @@ void log_to_queue(const char * format, va_list args)
     // Print to standard output
     printf("%s", log_buffer);
 
-	if (xQueueSendToBack(log_queue, (void*)&log_buffer, (TickType_t) 0) != pdPASS) {
-		if (log_buffer != NULL) {
-			free((void*)log_buffer);
-		}
-	}
+    if (xQueueSendToBack(log_queue, (void*)&log_buffer, (TickType_t) 0) != pdPASS) {
+        if (log_buffer != NULL) {
+            free((void*)log_buffer);
+        }
+    }
 }
 
 void send_log_to_websocket(char *message)
@@ -626,25 +626,25 @@ esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
 
 void websocket_log_handler()
 {
-	while (true)
-	{
-		char *message;
-		if (xQueueReceive(log_queue, &message, (TickType_t) portMAX_DELAY) != pdPASS) {
-			if (message != NULL) {
-				free((void*)message);
-			}
-			vTaskDelay(10 / portTICK_PERIOD_MS);
-			continue;
-		}
+    while (true)
+    {
+        char *message;
+        if (xQueueReceive(log_queue, &message, (TickType_t) portMAX_DELAY) != pdPASS) {
+            if (message != NULL) {
+                free((void*)message);
+            }
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            continue;
+        }
 
-		if (fd == -1) {
-			free((void*)message);
-			vTaskDelay(100 / portTICK_PERIOD_MS);
-			continue;
-		}
+        if (fd == -1) {
+            free((void*)message);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        }
 
-		send_log_to_websocket(message);
-	}
+        send_log_to_websocket(message);
+    }
 }
 
 esp_err_t start_rest_server(void * pvParameters)
