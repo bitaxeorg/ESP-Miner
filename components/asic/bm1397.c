@@ -411,6 +411,7 @@ asic_result *BM1397_receive_work(void)
     {
         ESP_LOGI(TAG, "Serial RX invalid %i", received);
         ESP_LOG_BUFFER_HEX(TAG, asic_response_buffer, received);
+        SERIAL_clear_buffer();
         return NULL;
     }
 
