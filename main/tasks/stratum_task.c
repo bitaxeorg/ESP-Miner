@@ -31,18 +31,15 @@ static SystemTaskModule SYSTEM_TASK_MODULE = {.stratum_difficulty = 8192};
 
 void dns_found_cb(const char * name, const ip_addr_t * ipaddr, void * callback_arg)
 {
-    if ((ipaddr != NULL)){
+    if (ipaddr != NULL){
         ip4_addr_t ip4addr = ipaddr->u_addr.ip4;  // Obtener la estructura ip4_addr_t
-        if (ip4_addr1(&ip4addr) != 0 && ip4_addr2(&ip4addr) != 0 && 
-            ip4_addr3(&ip4addr) != 0 && ip4_addr4(&ip4addr) != 0) {
-            ESP_LOGI(TAG, "IP found : %d.%d.%d.%d",ip4_addr1(&ip4addr),ip4_addr2(&ip4addr),ip4_addr3(&ip4addr),ip4_addr4(&ip4addr));
-            ip_Addr = *ipaddr;
-         }
+        ESP_LOGI(TAG, "IP found : %d.%d.%d.%d", ip4_addr1(&ip4addr), ip4_addr2(&ip4addr), ip4_addr3(&ip4addr), ip4_addr4(&ip4addr));
+        ip_Addr = *ipaddr;
     } else {
         bDNSInvalid = true;
     }
     bDNSFound = true;
- }
+}
 
 bool is_wifi_connected() {
     wifi_ap_record_t ap_info;
