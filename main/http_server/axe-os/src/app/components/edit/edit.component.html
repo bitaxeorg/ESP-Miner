@@ -16,10 +16,10 @@
         <div class="field grid p-fluid">
             <label htmlFor="wifiPass" class="col-12 mb-2 md:col-2 md:mb-0">WiFi Password:</label>
             <div class="col-12 md:col-10 p-input-icon-right">
-                <i *ngIf="form.get('wifiPass')?.dirty" class="pi" 
-                   [ngClass]="{'pi-eye': !showWifiPassword, 'pi-eye-slash': showWifiPassword}" 
+                <i *ngIf="form.get('wifiPass')?.dirty" class="pi"
+                   [ngClass]="{'pi-eye': !showWifiPassword, 'pi-eye-slash': showWifiPassword}"
                    (click)="toggleWifiPasswordVisibility()" style="cursor: pointer;"></i>
-                <input pInputText id="wifiPass" formControlName="wifiPass" 
+                <input pInputText id="wifiPass" formControlName="wifiPass"
                        [type]="showWifiPassword ? 'text' : 'password'"
                        placeholder="Enter WiFi password" />
             </div>
@@ -34,8 +34,6 @@
                 </div>
             </div>
         </div>
-
-
         <div class="field grid p-fluid">
             <label htmlFor="stratumPort" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Port:</label>
             <div class="col-12 md:col-10">
@@ -51,16 +49,42 @@
         <div class="field grid p-fluid">
             <label htmlFor="stratumPassword" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Password:</label>
             <div class="col-12 md:col-10 p-input-icon-right">
-                <i *ngIf="form.get('stratumPassword')?.dirty" class="pi" 
-                   [ngClass]="{'pi-eye': !showStratumPassword, 'pi-eye-slash': showStratumPassword}" 
+                <i *ngIf="form.get('stratumPassword')?.dirty" class="pi"
+                   [ngClass]="{'pi-eye': !showStratumPassword, 'pi-eye-slash': showStratumPassword}"
                    (click)="toggleStratumPasswordVisibility()" style="cursor: pointer;"></i>
-                <input pInputText id="stratumPassword" formControlName="stratumPassword" 
+                <input pInputText id="stratumPassword" formControlName="stratumPassword"
                        [type]="showStratumPassword ? 'text' : 'password'"
                        placeholder="Enter stratum password" />
             </div>
         </div>
-
-
+        <div class="field grid p-fluid">
+            <label htmlFor="stratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum URL:</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="fallbackStratumURL" type="text" formControlName="fallbackStratumURL"
+                    formControlName="fallbackStratumURL" />
+                <div>
+                    <small>Do not include 'stratum+tcp://' or port.</small>
+                </div>
+            </div>
+        </div>
+        <div class="field grid p-fluid">
+            <label htmlFor="fallbackStratumPort" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum Port:</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="fallbackStratumPort" formControlName="fallbackStratumPort" type="number" />
+            </div>
+        </div>
+        <div class="field grid p-fluid">
+            <label htmlFor="fallbackStratumUser" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum User:</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="fallbackStratumUser" formControlName="fallbackStratumUser" type="text" />
+            </div>
+        </div>
+        <div class="field grid p-fluid">
+            <label htmlFor="fallbackStratumPassword" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum Password:</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="fallbackStratumPassword" formControlName="fallbackStratumPassword" type="password" />
+            </div>
+        </div>
 
         <ng-container *ngIf="!devToolsOpen && ASICModel == eASICModel.BM1366">
 

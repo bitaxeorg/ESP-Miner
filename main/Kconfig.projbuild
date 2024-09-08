@@ -29,6 +29,19 @@ menu "Stratum Configuration"
         help
             The stratum server port to connect to.
 
+    config FALLBACK_STRATUM_URL
+        string "Fallback Stratum Address"
+        default "solo.ckpool.org"
+        help
+            The example will connect to this Stratum pool address if the primary fails.
+
+    config FALLBACK_STRATUM_PORT
+        int "Fallback Stratum Port"
+        range 0 65535
+        default 3333
+        help
+            The stratum server port to connect to if the primary fails.
+
     config STRATUM_USER
         string "Stratum username"
         default "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.bitaxe"
@@ -40,6 +53,18 @@ menu "Stratum Configuration"
         default "x"
         help
             Stratum password to use with pool
+
+    config FALLBACK_STRATUM_USER
+        string "Fallback Stratum username"
+        default "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.bitaxe"
+        help
+            Fallback Stratum user to use with pool
+
+    config FALLBACK_STRATUM_PW
+        string "Fallback Stratum password"
+        default "x"
+        help
+            Fallback Stratum password to use with pool
 
     config STRATUM_DIFFICULTY
         int "Stratum default difficulty"
