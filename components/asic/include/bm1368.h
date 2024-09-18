@@ -5,6 +5,8 @@
 #include "driver/gpio.h"
 #include "mining.h"
 
+#define ASIC_BM1368_JOB_FREQUENCY_MS 500
+
 #define CRC5_MASK 0x1F
 #define BM1368_INITIAL_DIFFICULTY 256
 
