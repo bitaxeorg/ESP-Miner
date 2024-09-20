@@ -11,6 +11,7 @@
 #include "vcore.h"
 #include "utils.h"
 #include "string.h"
+#include "TPS546.h"
 
 static const char * TAG = "self_test";
 
@@ -51,11 +52,23 @@ static bool fan_sense_pass(GlobalState * GLOBAL_STATE)
     return false;
 }
 
-static bool power_consumption_pass()
+static bool INA260_power_consumption_pass(int target_power, int margin)
 {
     float power = INA260_read_power() / 1000;
     ESP_LOGI(TAG, "Power: %f", power);
-    if (power > 9 && power < 15) {
+    if (power > target_power -margin && power < target_power +margin) {
+        return true;
+    }
+    return false;
+}
+
+static bool TPS546_power_consumption_pass(int target_power, int margin)
+{
+    float voltage = TPS546_get_vout();
+    float current = TPS546_get_iout();
+    float power = voltage * current;
+    ESP_LOGI(TAG, "Power: %f, Voltage: %f, Current %f", power, voltage, current);
+    if (power > target_power -margin && power < target_power +margin) {
         return true;
     }
     return false;
@@ -143,10 +156,24 @@ void self_test(void * pvParameters)
                 if(!DS4432U_test()){
                     ESP_LOGE(TAG, "DS4432 test failed!");
                     display_msg("DS4432U:FAIL", GLOBAL_STATE);
+                    return;
+                }
+            }else{
+                int result = TPS546_init();
+                if(result != 0){
+                    ESP_LOGE(TAG, "TPS546 test failed!");
+                    display_msg("TPS546:FAIL", GLOBAL_STATE);
+                    return;
                 }
             }
             break;
         case DEVICE_GAMMA:
+                int result = TPS546_init();
+                if(result != 0){
+                    ESP_LOGE(TAG, "TPS546 test failed!");
+                    display_msg("TPS546:FAIL", GLOBAL_STATE);
+                    return;
+                }
             break;
         default:
     }
@@ -240,11 +267,26 @@ void self_test(void * pvParameters)
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            if (INA260_installed() && !power_consumption_pass()) {
-                ESP_LOGE(TAG, "INA260 test failed!");
-                display_msg("MONITOR:   FAIL", GLOBAL_STATE);
-                return;
+            if(GLOBAL_STATE->board_version != 402){
+                if (!INA260_power_consumption_pass(12, 3)) {
+                    ESP_LOGE(TAG, "INA260 Power Draw Failed");
+                    display_msg("POWER:   FAIL", GLOBAL_STATE);
+                    return;
+                }
+            } else {
+                if (!TPS546_power_consumption_pass(8, 2)) {
+                    ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %f", 8.0);
+                    display_msg("POWER:   FAIL", GLOBAL_STATE);
+                    return;
+                }
             }
+            break;
+        case DEVICE_GAMMA:
+                if (!TPS546_power_consumption_pass(15, 2)) {
+                    ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %f", 15.0);
+                    display_msg("POWER:   FAIL", GLOBAL_STATE);
+                    return;
+                }
             break;
         default:
     }

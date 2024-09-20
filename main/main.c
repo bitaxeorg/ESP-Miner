@@ -17,7 +17,13 @@
 #include "stratum_task.h"
 #include "user_input_task.h"
 
-static GlobalState GLOBAL_STATE = {.extranonce_str = NULL, .extranonce_2_len = 0, .abandon_work = 0, .version_mask = 0};
+static GlobalState GLOBAL_STATE = {
+    .extranonce_str = NULL, 
+    .extranonce_2_len = 0, 
+    .abandon_work = 0, 
+    .version_mask = 0,
+    .ASIC_initalized = false
+};
 
 static const char * TAG = "bitaxe";
 static const double NONCE_SPACE = 4294967296.0; //  2^32
@@ -194,6 +200,8 @@ void app_main(void)
         (*GLOBAL_STATE.ASIC_functions.init_fn)(GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE.asic_count);
         SERIAL_set_baud((*GLOBAL_STATE.ASIC_functions.set_max_baud_fn)());
         SERIAL_clear_buffer();
+
+        GLOBAL_STATE.ASIC_initalized = true;
 
         xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
         xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);

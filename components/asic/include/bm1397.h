@@ -13,6 +13,7 @@
 #define BM1937_SERIALTX_DEBUG false
 #define BM1937_SERIALRX_DEBUG false
 #define BM1397_DEBUG_WORK false //causes insane amount of debug output
+#define BM1397_DEBUG_JOBS false //causes insane amount of debug output
 
 static const uint64_t BM1397_CORE_COUNT = 168;
 static const uint64_t BM1397_SMALL_CORE_COUNT = 672;

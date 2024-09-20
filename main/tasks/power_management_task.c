@@ -157,7 +157,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         switch (GLOBAL_STATE->device_model) {
             case DEVICE_MAX:
-                power_management->chip_temp_avg = EMC2101_get_external_temp();
+                power_management->chip_temp_avg = GLOBAL_STATE->ASIC_initalized ? EMC2101_get_external_temp() : -1;
 
                 if ((power_management->chip_temp_avg > THROTTLE_TEMP) &&
                     (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
@@ -178,7 +178,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             case DEVICE_SUPRA:
                 
                 if (GLOBAL_STATE->board_version == 402) {
-                    power_management->chip_temp_avg = EMC2101_get_external_temp();
+                    power_management->chip_temp_avg = GLOBAL_STATE->ASIC_initalized ? EMC2101_get_external_temp() : -1;
                     power_management->vr_temp = (float)TPS546_get_temperature();
                 } else {
                     power_management->chip_temp_avg = EMC2101_get_internal_temp() + 5;
@@ -212,7 +212,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
                 break;
             case DEVICE_GAMMA:
-                power_management->chip_temp_avg = EMC2101_get_external_temp();
+                power_management->chip_temp_avg = GLOBAL_STATE->ASIC_initalized ? EMC2101_get_external_temp() : -1;
                 power_management->vr_temp = (float)TPS546_get_temperature();
 
                 // EMC2101 will give bad readings if the ASIC is turned off

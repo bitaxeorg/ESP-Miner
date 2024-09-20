@@ -348,11 +348,11 @@ void BM1368_send_work(void * pvParameters, bm_job * next_bm_job)
 
     pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
     GLOBAL_STATE->valid_jobs[job.job_id] = 1;
+    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
 
     #if BM1368_DEBUG_JOBS
     ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
     #endif
-    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
 
     _send_BM1368((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), &job, sizeof(BM1368_job), BM1368_DEBUG_WORK);
 }
