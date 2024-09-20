@@ -69,6 +69,11 @@ float EMC2101_get_external_temp(void)
     }
 
     float result = (float) reading / 8.0;
+
+    // Greater than 200C is probably an erroneous reading...
+    if (result > 200){
+        return EMC2101_get_internal_temp();
+    }
     return result;
 }
 

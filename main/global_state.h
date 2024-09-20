@@ -106,7 +106,7 @@ typedef struct
     uint32_t version_mask;
 
     int sock;
-
+    bool ASIC_initalized;
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */
