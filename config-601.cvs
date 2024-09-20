@@ -7,7 +7,7 @@ stratumurl,data,string,public-pool.io
 stratumport,data,u16,21496
 stratumuser,data,string,bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq.bitaxe
 stratumpass,data,string,x
-asicfrequency,data,u16,490
+asicfrequency,data,u16,525
 asicvoltage,data,u16,1100
 asicmodel,data,string,BM1370
 devicemodel,data,string,gamma
@@ -16,4 +16,4 @@ flipscreen,data,u16,1
 invertfanpol,data,u16,1
 autofanspeed,data,u16,0
 fanspeed,data,u16,100
-selftest,data,u16,0
+selftest,data,u16,1
