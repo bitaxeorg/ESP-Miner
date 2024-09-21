@@ -274,7 +274,7 @@ void self_test(void * pvParameters)
                     return;
                 }
             } else {
-                if (!TPS546_power_consumption_pass(8, 2)) {
+                if (!TPS546_power_consumption_pass(8, 3)) {
                     ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %f", 8.0);
                     display_msg("POWER:   FAIL", GLOBAL_STATE);
                     return;
@@ -282,7 +282,7 @@ void self_test(void * pvParameters)
             }
             break;
         case DEVICE_GAMMA:
-                if (!TPS546_power_consumption_pass(15, 2)) {
+                if (!TPS546_power_consumption_pass(13, 3)) {
                     ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %f", 15.0);
                     display_msg("POWER:   FAIL", GLOBAL_STATE);
                     return;

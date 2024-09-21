@@ -96,7 +96,7 @@ fi
 
 selected_bins=()
 selected_bins_and_addrs=()
-esptool_leading_args="--chip esp32s3 merge_bin --flash_mode dio --flash_size 8MB --flash_freq 80m"
+esptool_leading_args="--chip esp32s3 merge_bin --flash_mode dio --flash_size 16MB --flash_freq 80m"
 
 if [ "$update_only" -eq 1 ]; then
     selected_bins+=(${BINS_UPDATE[@]})
