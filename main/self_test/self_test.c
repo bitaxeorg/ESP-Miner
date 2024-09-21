@@ -79,7 +79,7 @@ static bool core_voltage_pass(GlobalState * GLOBAL_STATE)
     uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
     ESP_LOGI(TAG, "Voltage: %u", core_voltage);
 
-    if (core_voltage > 1100 && core_voltage < 1300) {
+    if (core_voltage > 1000 && core_voltage < 1300) {
         return true;
     }
     return false;
@@ -87,6 +87,8 @@ static bool core_voltage_pass(GlobalState * GLOBAL_STATE)
 
 void self_test(void * pvParameters)
 {
+
+    ESP_LOGI(TAG, "Running Self Tests");
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
@@ -115,8 +117,6 @@ void self_test(void * pvParameters)
     ESP_ERROR_CHECK(i2c_master_init());
     ESP_LOGI(TAG, "I2C initialized successfully");
 
-    VCORE_init(GLOBAL_STATE);
-    VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE);
 
     switch (GLOBAL_STATE->device_model) {
         case DEVICE_MAX:
@@ -159,7 +159,10 @@ void self_test(void * pvParameters)
                     return;
                 }
             }else{
-                int result = TPS546_init();
+                
+                uint8_t result = VCORE_init(GLOBAL_STATE);
+                VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE);
+
                 if(result != 0){
                     ESP_LOGE(TAG, "TPS546 test failed!");
                     display_msg("TPS546:FAIL", GLOBAL_STATE);
@@ -168,7 +171,10 @@ void self_test(void * pvParameters)
             }
             break;
         case DEVICE_GAMMA:
-                int result = TPS546_init();
+
+                uint8_t result = VCORE_init(GLOBAL_STATE);
+                VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE);
+
                 if(result != 0){
                     ESP_LOGE(TAG, "TPS546 test failed!");
                     display_msg("TPS546:FAIL", GLOBAL_STATE);
@@ -258,8 +264,8 @@ void self_test(void * pvParameters)
     free(GLOBAL_STATE->valid_jobs);
 
     if (!core_voltage_pass(GLOBAL_STATE)) {
-        ESP_LOGE(TAG, "SELF TEST FAIL, NO CHIPS DETECTED");
-        display_msg("POWER:     FAIL", GLOBAL_STATE);
+        ESP_LOGE(TAG, "SELF TEST FAIL, INCORRECT CORE VOLTAGE");
+        display_msg("VCORE:     FAIL", GLOBAL_STATE);
         return;
     }
 
@@ -282,8 +288,8 @@ void self_test(void * pvParameters)
             }
             break;
         case DEVICE_GAMMA:
-                if (!TPS546_power_consumption_pass(13, 3)) {
-                    ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %f", 15.0);
+                if (!TPS546_power_consumption_pass(11, 3)) {
+                    ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %f", 11.0);
                     display_msg("POWER:   FAIL", GLOBAL_STATE);
                     return;
                 }

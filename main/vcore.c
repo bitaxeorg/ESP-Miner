@@ -21,22 +21,24 @@
 
 static const char *TAG = "vcore.c";
 
-void VCORE_init(GlobalState * global_state) {
+uint8_t VCORE_init(GlobalState * global_state) {
+    uint8_t result = 0;
     switch (global_state->device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
             if (global_state->board_version == 402) {
-                TPS546_init();
+                result = TPS546_init();
             }
             break;
         case DEVICE_GAMMA:
-            TPS546_init();
+            result = TPS546_init();
             break;
         // case DEVICE_HEX:
         default:
     }
     ADC_init();
+    return result;
 }
 
 /**
