@@ -27,7 +27,7 @@ uint8_t VCORE_init(GlobalState * global_state) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            if (global_state->board_version == 402) {
+            if (global_state->board_version >= 402 && global_state->board_version <= 499) {
                 result = TPS546_init();
             }
             break;
@@ -75,7 +75,7 @@ bool VCORE_set_voltage(float core_voltage, GlobalState * global_state)
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            if (global_state->board_version == 402) {
+            if (global_state->board_version >= 402 && global_state->board_version <= 499) {
                 ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
                 TPS546_set_vout(core_voltage * (float)global_state->voltage_domain);
             } else {
