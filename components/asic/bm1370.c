@@ -191,7 +191,7 @@ static void do_frequency_ramp_up(float target_frequency) {
         float next_step = fminf(step, target_frequency - current);
         current += next_step;
         BM1370_send_hash_frequency(-1, current, 0.001);
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
