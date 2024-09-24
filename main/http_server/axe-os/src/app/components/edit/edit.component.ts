@@ -187,6 +187,9 @@ export class EditComponent implements OnInit {
 
     const form = this.form.getRawValue();
 
+    // Allow an empty wifi password
+    form.wifiPass = form.wifiPass == null ? '' : form.wifiPass;
+
     if (form.wifiPass === '*****') {
       delete form.wifiPass;
     }
