@@ -59,6 +59,10 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
 
+        //lookup the exact reason code
+        wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
+        ESP_LOGI(TAG, "Could not connect to '%s' [rssi %d]: reason %d", event->ssid, event->rssi, event->reason);
+
         // Wait a little
         vTaskDelay(2500 / portTICK_PERIOD_MS);
         esp_wifi_connect();
@@ -137,25 +141,37 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
 {
     esp_netif_t * esp_netif_sta = esp_netif_create_default_wifi_sta();
 
+    /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
+    * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
+    * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
+    * WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK standards.
+    */
+    wifi_auth_mode_t authmode;
+
+    if (strlen(wifi_pass) == 0) {
+        ESP_LOGI(TAG, "No WiFi password provided, using open network");
+        authmode = WIFI_AUTH_OPEN;
+    } else {
+        ESP_LOGI(TAG, "WiFi Password provided, using WPA2");
+        authmode = WIFI_AUTH_WPA2_PSK;
+    }
+
     wifi_config_t wifi_sta_config = {
         .sta =
             {
-                /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
-                 * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
-                 * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
-                 * WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK standards.
-                 */
-                .threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,
-                // .sae_pwe_h2e = ESP_WIFI_SAE_MODE,
-                // .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
+                .threshold.authmode = authmode,
             },
     };
-    strncpy((char *) wifi_sta_config.sta.ssid,
-            wifi_ssid,
-            sizeof(wifi_sta_config.sta.ssid));
+
+    strncpy((char *) wifi_sta_config.sta.ssid, wifi_ssid, sizeof(wifi_sta_config.sta.ssid));
     wifi_sta_config.sta.ssid[sizeof(wifi_sta_config.sta.ssid) - 1] = '\0';
-    strncpy((char *) wifi_sta_config.sta.password, wifi_pass, 63);
-    wifi_sta_config.sta.password[63] = '\0';
+
+    if (authmode != WIFI_AUTH_OPEN) {
+        strncpy((char *) wifi_sta_config.sta.password, wifi_pass, sizeof(wifi_sta_config.sta.password));
+        wifi_sta_config.sta.password[sizeof(wifi_sta_config.sta.password) - 1] = '\0';
+    }
+    // strncpy((char *) wifi_sta_config.sta.password, wifi_pass, 63);
+    // wifi_sta_config.sta.password[63] = '\0';
 
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_sta_config));
 
