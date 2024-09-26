@@ -126,6 +126,15 @@ static void _set_chip_address(uint8_t chipAddr)
     _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, BM1366_SERIALTX_DEBUG);
 }
 
+void BM1366_set_version_mask(uint32_t version_mask) 
+{
+    int versions_to_roll = version_mask >> 13;
+    uint8_t version_byte0 = (versions_to_roll >> 8);
+    uint8_t version_byte1 = (versions_to_roll & 0xFF); 
+    uint8_t version_cmd[] = {0x00, 0xA4, 0x90, 0x00, version_byte0, version_byte1};
+    _send_BM1366(TYPE_CMD | GROUP_ALL | CMD_WRITE, version_cmd, 6, BM1366_SERIALTX_DEBUG);
+}
+
 void BM1366_send_hash_frequency(float target_freq)
 {
     // default 200Mhz if it fails
@@ -402,14 +411,10 @@ static void do_frequency_ramp_up()
 static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 {
 
-    unsigned char init0[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    _send_simple(init0, 11);
-
-    unsigned char init1[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    _send_simple(init1, 11);
-
-    unsigned char init2[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    _send_simple(init2, 11);
+    // set version mask
+    for (int i = 0; i < 3; i++) {
+        BM1366_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
+    }
 
     // read register 00 on all chips
     unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};

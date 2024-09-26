@@ -128,6 +128,15 @@ static void _set_chip_address(uint8_t chipAddr)
     _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, BM1370_SERIALTX_DEBUG);
 }
 
+void BM1370_set_version_mask(uint32_t version_mask) 
+{
+    int versions_to_roll = version_mask >> 13;
+    uint8_t version_byte0 = (versions_to_roll >> 8);
+    uint8_t version_byte1 = (versions_to_roll & 0xFF); 
+    uint8_t version_cmd[] = {0x00, 0xA4, 0x90, 0x00, version_byte0, version_byte1};
+    _send_BM1370(TYPE_CMD | GROUP_ALL | CMD_WRITE, version_cmd, 6, BM1370_SERIALTX_DEBUG);
+}
+
 void BM1370_send_hash_frequency(int id, float target_freq, float max_diff) {
     uint8_t freqbuf[6] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41};
     uint8_t postdiv_min = 255;
@@ -197,18 +206,10 @@ static void do_frequency_ramp_up(float target_frequency) {
 
 static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 {
-
-    //enable and set version rolling mask to 0xFFFF
-    unsigned char init0[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    _send_simple(init0, 11);
-
-    //enable and set version rolling mask to 0xFFFF (again)
-    unsigned char init1[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    _send_simple(init1, 11);
-
-    //enable and set version rolling mask to 0xFFFF (again)
-    unsigned char init2[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    _send_simple(init2, 11);
+    // set version mask
+    for (int i = 0; i < 3; i++) {
+        BM1370_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
+    }
 
     //read register 00 on all chips (should respond AA 55 13 68 00 00 00 00 00 00 0F)
     unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};
@@ -224,9 +225,8 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     }
     ESP_LOGI(TAG, "%i chip(s) detected on the chain, expected %i", chip_counter, asic_count);
 
-    //enable and set version rolling mask to 0xFFFF (again)
-    unsigned char init4[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA4, 0x90, 0x00, 0xFF, 0xFF, 0x1C};
-    _send_simple(init4, 11);
+    // set version mask
+    BM1370_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
     //Reg_A8
     unsigned char init5[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00, 0x03};
