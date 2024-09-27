@@ -12,7 +12,6 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 })
 export class HomeComponent {
 
-
   public info$: Observable<ISystemInfo>;
 
   public quickLink$: Observable<string | undefined>;
@@ -46,7 +45,8 @@ export class HomeComponent {
           backgroundColor: primaryColor,
           borderColor: primaryColor,
           tension: .4,
-          pointRadius: 1,
+          pointRadius: 2,
+          pointHoverRadius: 5,
           borderWidth: 1
         },
 
@@ -61,7 +61,19 @@ export class HomeComponent {
           labels: {
             color: textColor
           }
-        }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(tooltipItem: any) {
+              let label = tooltipItem.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              label += HashSuffixPipe.transform(tooltipItem.raw);
+              return label;
+            }
+          }
+        },
       },
       scales: {
         x: {
@@ -160,7 +172,9 @@ export class HomeComponent {
 
   }
 
-
+  max(a: number, b: number): number {
+    return Math.max(a, b);
+  }
 
 
 }
