@@ -49,7 +49,8 @@
                 <i class="pi" [ngClass]="{'pi-eye': !showStratumPassword, 'pi-eye-slash': showStratumPassword}" 
                    (click)="toggleStratumPasswordVisibility()" style="cursor: pointer;"></i>
                 <input pInputText id="stratumPassword" formControlName="stratumPassword" 
-                       [type]="showStratumPassword ? 'text' : 'password'" />
+                       [type]="showStratumPassword ? 'text' : 'password'"
+                       placeholder="Saved stratum password hidden" />
             </div>
         </div>
 

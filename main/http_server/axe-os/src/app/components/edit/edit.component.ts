@@ -147,7 +147,7 @@ export class EditComponent implements OnInit {
             Validators.max(65353)
           ]],
           stratumUser: [info.stratumUser, [Validators.required]],
-          stratumPassword: ['*****', [Validators.required]],
+          stratumPassword: [''],
           hostname: [info.hostname, [Validators.required]],
           ssid: [info.ssid, [Validators.required]],
           wifiPass: ['*****'],
@@ -193,7 +193,7 @@ export class EditComponent implements OnInit {
     if (form.wifiPass === '*****') {
       delete form.wifiPass;
     }
-    if (form.stratumPassword === '*****') {
+    if (form.stratumPassword.length === 0) {
       delete form.stratumPassword;
     }
 
