@@ -45,8 +45,11 @@
         </div>
         <div class="field grid p-fluid">
             <label htmlFor="stratumPassword" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Password:</label>
-            <div class="col-12 md:col-10">
-                <input pInputText id="stratumPassword" formControlName="stratumPassword" type="password" />
+            <div class="col-12 md:col-10 p-input-icon-right">
+                <i class="pi" [ngClass]="{'pi-eye': !showStratumPassword, 'pi-eye-slash': showStratumPassword}" 
+                   (click)="toggleStratumPasswordVisibility()" style="cursor: pointer;"></i>
+                <input pInputText id="stratumPassword" formControlName="stratumPassword" 
+                       [type]="showStratumPassword ? 'text' : 'password'" />
             </div>
         </div>
 
