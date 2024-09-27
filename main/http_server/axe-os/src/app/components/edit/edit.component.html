@@ -20,7 +20,8 @@
                    [ngClass]="{'pi-eye': !showWifiPassword, 'pi-eye-slash': showWifiPassword}" 
                    (click)="toggleWifiPasswordVisibility()" style="cursor: pointer;"></i>
                 <input pInputText id="wifiPass" formControlName="wifiPass" 
-                       [type]="showWifiPassword ? 'text' : 'password'" />
+                       [type]="showWifiPassword ? 'text' : 'password'"
+                       placeholder="Enter WiFi password" />
             </div>
         </div>
         <div class="field grid p-fluid">
@@ -55,7 +56,7 @@
                    (click)="toggleStratumPasswordVisibility()" style="cursor: pointer;"></i>
                 <input pInputText id="stratumPassword" formControlName="stratumPassword" 
                        [type]="showStratumPassword ? 'text' : 'password'"
-                       placeholder="Saved stratum password hidden" />
+                       placeholder="Enter stratum password" />
             </div>
         </div>
 
