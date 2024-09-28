@@ -158,6 +158,8 @@ void SYSTEM_update_overheat_mode(GlobalState * GLOBAL_STATE)
 
 static void _show_overheat_screen(GlobalState * GLOBAL_STATE)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     switch (GLOBAL_STATE->device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
@@ -165,13 +167,18 @@ static void _show_overheat_screen(GlobalState * GLOBAL_STATE)
         case DEVICE_GAMMA:
             if (OLED_status()) {
                 OLED_clearLine(0);
+                OLED_writeString(0, 0, "DEVICE OVERHEAT!");
                 OLED_clearLine(1);
+                OLED_writeString(0, 1, "See AxeOS settings");
                 OLED_clearLine(2);
                 OLED_clearLine(3);
-                OLED_writeString(0, 0, "DEVICE OVERHEATED");
-                OLED_writeString(0, 1, "Please check");
-                OLED_writeString(0, 2, "webUI for more");
-                OLED_writeString(0, 3, "information");
+                esp_netif_get_ip_info(netif, &ip_info);
+                char ip_address_str[IP4ADDR_STRLEN_MAX];
+                esp_ip4addr_ntoa(&ip_info.ip, ip_address_str, IP4ADDR_STRLEN_MAX);
+
+                memset(module->oled_buf, 0, 20);
+                snprintf(module->oled_buf, 20, "IP: %s", ip_address_str);
+                OLED_writeString(0, 3, module->oled_buf);
             }
             break;
         default:
