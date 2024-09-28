@@ -1,13 +1,19 @@
 <ng-template #loading>
     <h4>Loading...</h4>
 </ng-template>
-<ng-container>
+<ng-container *ngIf="info$ | async as info; else loading">
+    <!-- Temp warning alert -->
+    <p-message *ngIf="info.overheat_mode" 
+        severity="error" 
+        styleClass="w-full mb-4 py-4 border-round-xl"
+        text="Bitaxe has overheated - See settings">
+    </p-message>
 
     <div class="grid" *ngIf="info$ | async as info; else loading">
         <div class="col-12">
             <div class="card">
                 <div class="grid mb-4">
-                    <div class="col-12 lg:col-6 xl:col-3">
+                    <div class="col-12 md:col-6 xl:col-3">
                         <div class="card mb-0">
                             <div class="flex justify-content-between mb-3">
                                 <div>
@@ -28,7 +34,7 @@
                             </ng-container>
                         </div>
                     </div>
-                    <div class="col-12 lg:col-6 xl:col-3">
+                    <div class="col-12 md:col-6 xl:col-3">
                         <div class="card mb-0">
                             <div class="flex justify-content-between mb-3">
                                 <div>
@@ -44,7 +50,7 @@
                             <span class="text-500">rejected</span>
                         </div>
                     </div>
-                    <div class="col-12 lg:col-6 xl:col-3">
+                    <div class="col-12 md:col-6 xl:col-3">
                         <div class="card mb-0">
                             <div class="flex justify-content-between mb-3">
                                 <div>
@@ -63,7 +69,7 @@
                             <span class="text-500">since last week</span> -->
                         </div>
                     </div>
-                    <div class="col-12 lg:col-6 xl:col-3">
+                    <div class="col-12 md:col-6 xl:col-3">
                         <div class="card mb-0">
                             <div class="flex justify-content-between mb-3">
                                 <div>
@@ -95,14 +101,15 @@
                 <h5>Power</h5>
                 <div class="grid text-center">
                     <div class="col-4">
-                        <p-knob [min]="3" [max]="50" [readonly]="true" [(ngModel)]="info.power"
+                        <p-knob [min]="3" [max]="maxPower" [readonly]="true" [(ngModel)]="info.power"
                             valueTemplate="{value}W"></p-knob>
                         Power
                     </div>
 
                     <div class="col-4">
                         <p-knob [min]="4.5" [max]="5.5" [readonly]="true" [(ngModel)]="info.voltage"
-                            valueTemplate="{value}V"></p-knob>
+                            valueTemplate="{value}V"
+                            [valueColor]="info.voltage < 4.8 ? '#ff0000' : 'var(--primary-color, Black)'"></p-knob>
                         Input Voltage
                         <span class="danger" *ngIf="info.voltage < 4.8">&nbsp; Danger: Low voltage</span>
                     </div>
@@ -122,8 +129,10 @@
                 <h5>Heat</h5>
                 <div class="grid text-center">
                     <div class="col-6">
-                        <p-knob [min]="20" [max]="75" [readonly]="true" [(ngModel)]="info.temp"
-                            valueTemplate="{value}C"></p-knob>
+                        <p-knob [min]="20" [max]="maxTemp" [readonly]="true" [(ngModel)]="info.temp"
+                            valueTemplate="{value}C"
+                            [valueColor]="info.temp >= 70 ? '#ff0000' : 'var(--primary-color, Black)'">
+                        </p-knob>
                         ASIC Temperature
 
                         <span class="danger" *ngIf="info.temp >= 70">&nbsp;
@@ -132,7 +141,8 @@
                     </div>
                     <div class="col-6" *ngIf="info.vrTemp > 0">
                         <p-knob  [min]="20" [max]="145" [readonly]="true" [(ngModel)]="info.vrTemp"
-                            valueTemplate="{value}C"></p-knob>
+                            valueTemplate="{value}C"
+                            [valueColor]="info.vrTemp >= 105 ? '#ff0000' : 'var(--primary-color, Black)'"></p-knob>
                         Voltage Regulator Temperature
 
                         <span class="danger" *ngIf="info.vrTemp >= 105">&nbsp;
@@ -172,7 +182,7 @@
                 <h5>Performance</h5>
                 <div class="grid text-center">
                     <div class="col-6">
-                        <p-knob [min]="100" [max]="800" [readonly]="true" [(ngModel)]="info.frequency"
+                        <p-knob [min]="100" [max]="maxFrequency" [readonly]="true" [(ngModel)]="info.frequency"
                             valueTemplate="{value}Mhz"></p-knob>
                         ASIC Frequency
                     </div>

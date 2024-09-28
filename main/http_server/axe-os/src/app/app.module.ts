@@ -21,8 +21,7 @@ import { ANSIPipe } from './pipes/ansi.pipe';
 import { DateAgoPipe } from './pipes/date-ago.pipe';
 import { HashSuffixPipe } from './pipes/hash-suffix.pipe';
 import { PrimeNGModule } from './prime-ng.module';
-
-
+import { MessageModule } from 'primeng/message';
 
 const components = [
   AppComponent,
@@ -55,7 +54,8 @@ const components = [
     BrowserAnimationsModule,
     CommonModule,
     PrimeNGModule,
-    AppLayoutModule
+    AppLayoutModule,
+    MessageModule
   ],
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },

@@ -12,7 +12,6 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 })
 export class HomeComponent {
 
-
   public info$: Observable<ISystemInfo>;
 
   public quickLink$: Observable<string | undefined>;
@@ -24,10 +23,13 @@ export class HomeComponent {
   public dataData: number[] = [];
   public chartData?: any;
 
+  public maxPower: number = 50;
+  public maxTemp: number = 75;
+  public maxFrequency: number = 800;
+
   constructor(
     private systemService: SystemService
   ) {
-
 
     const documentStyle = getComputedStyle(document.documentElement);
     const textColor = documentStyle.getPropertyValue('--text-color');
@@ -45,8 +47,9 @@ export class HomeComponent {
           fill: false,
           backgroundColor: primaryColor,
           borderColor: primaryColor,
-          tension: .4,
-          pointRadius: 1,
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 5,
           borderWidth: 1
         },
 
@@ -61,7 +64,19 @@ export class HomeComponent {
           labels: {
             color: textColor
           }
-        }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(tooltipItem: any) {
+              let label = tooltipItem.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              label += HashSuffixPipe.transform(tooltipItem.raw);
+              return label;
+            }
+          }
+        },
       },
       scales: {
         x: {
@@ -110,11 +125,13 @@ export class HomeComponent {
         this.chartData.labels = this.dataLabel;
         this.chartData.datasets[0].data = this.dataData;
 
-
-
         this.chartData = {
           ...this.chartData
         };
+
+        this.maxPower = Math.max(50, info.power);
+        this.maxTemp = Math.max(75, info.temp);
+        this.maxFrequency = Math.max(800, info.frequency);
 
       }),
       map(info => {
@@ -156,12 +173,7 @@ export class HomeComponent {
       })
     )
 
-
-
   }
-
-
-
 
 }
 
