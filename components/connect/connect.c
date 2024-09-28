@@ -75,6 +75,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         ESP_LOGI(TAG, "Bitaxe ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        MINER_set_wifi_status(WIFI_CONNECTED, 0);
     }
 }
 
