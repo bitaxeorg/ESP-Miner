@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { interval, map, Observable, shareReplay, startWith, switchMap, tap, Subscription } from 'rxjs';
+import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
@@ -10,7 +10,7 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent implements OnInit, OnDestroy {
+export class HomeComponent {
 
   public info$: Observable<ISystemInfo>;
 
@@ -22,6 +22,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   public dataLabel: number[] = [];
   public dataData: number[] = [];
   public chartData?: any;
+
+  public maxPower: number = 50;
+  public maxTemp: number = 75;
+  public maxFrequency: number = 800;
 
   constructor(
     private systemService: SystemService
@@ -121,11 +125,13 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.chartData.labels = this.dataLabel;
         this.chartData.datasets[0].data = this.dataData;
 
-
-
         this.chartData = {
           ...this.chartData
         };
+
+        this.maxPower = Math.max(50, info.power);
+        this.maxTemp = Math.max(75, info.temp);
+        this.maxFrequency = Math.max(800, info.frequency);
 
       }),
       map(info => {
@@ -167,26 +173,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       })
     )
 
-  }
-
-  maxPower: number = 50;
-  maxTemp: number = 75;
-  maxFrequency: number = 800;
-
-  private infoSubscription: Subscription = new Subscription();
-
-  ngOnInit() {
-    this.infoSubscription = this.info$.subscribe(info => {
-      this.maxPower = Math.max(50, info.power);
-      this.maxTemp = Math.max(75, info.temp);
-      this.maxFrequency = Math.max(800, info.frequency);
-    });
-  }
-
-  ngOnDestroy() {
-    if (this.infoSubscription) {
-      this.infoSubscription.unsubscribe();
-    }
   }
 
 }
