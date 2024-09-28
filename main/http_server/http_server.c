@@ -290,10 +290,10 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "hostname")) != NULL) {
         nvs_config_set_string(NVS_CONFIG_HOSTNAME, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL) {
+    if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL) {
+    if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL && item->valueint > 0) {
         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "flipscreen")) != NULL) {
