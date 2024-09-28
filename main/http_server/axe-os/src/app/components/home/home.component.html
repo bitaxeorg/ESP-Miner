@@ -101,7 +101,7 @@
                 <h5>Power</h5>
                 <div class="grid text-center">
                     <div class="col-4">
-                        <p-knob [min]="3" [max]="max(50, info.power)" [readonly]="true" [(ngModel)]="info.power"
+                        <p-knob [min]="3" [max]="maxPower" [readonly]="true" [(ngModel)]="info.power"
                             valueTemplate="{value}W"></p-knob>
                         Power
                     </div>
@@ -129,7 +129,7 @@
                 <h5>Heat</h5>
                 <div class="grid text-center">
                     <div class="col-6">
-                        <p-knob [min]="20" [max]="max(75, info.temp)" [readonly]="true" [(ngModel)]="info.temp"
+                        <p-knob [min]="20" [max]="maxTemp" [readonly]="true" [(ngModel)]="info.temp"
                             valueTemplate="{value}C"
                             [valueColor]="info.temp >= 70 ? '#ff0000' : 'var(--primary-color, Black)'">
                         </p-knob>
@@ -182,7 +182,7 @@
                 <h5>Performance</h5>
                 <div class="grid text-center">
                     <div class="col-6">
-                        <p-knob [min]="100" [max]="max(800, info.frequency)" [readonly]="true" [(ngModel)]="info.frequency"
+                        <p-knob [min]="100" [max]="maxFrequency" [readonly]="true" [(ngModel)]="info.frequency"
                             valueTemplate="{value}Mhz"></p-knob>
                         ASIC Frequency
                     </div>

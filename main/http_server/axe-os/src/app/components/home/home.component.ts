@@ -1,5 +1,5 @@
-import { Component } from '@angular/core';
-import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { interval, map, Observable, shareReplay, startWith, switchMap, tap, Subscription } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
@@ -10,7 +10,7 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit, OnDestroy {
 
   public info$: Observable<ISystemInfo>;
 
@@ -26,7 +26,6 @@ export class HomeComponent {
   constructor(
     private systemService: SystemService
   ) {
-
 
     const documentStyle = getComputedStyle(document.documentElement);
     const textColor = documentStyle.getPropertyValue('--text-color');
@@ -168,14 +167,27 @@ export class HomeComponent {
       })
     )
 
-
-
   }
 
-  max(a: number, b: number): number {
-    return Math.max(a, b);
+  maxPower: number = 50;
+  maxTemp: number = 75;
+  maxFrequency: number = 800;
+
+  private infoSubscription: Subscription = new Subscription();
+
+  ngOnInit() {
+    this.infoSubscription = this.info$.subscribe(info => {
+      this.maxPower = Math.max(50, info.power);
+      this.maxTemp = Math.max(75, info.temp);
+      this.maxFrequency = Math.max(800, info.frequency);
+    });
   }
 
+  ngOnDestroy() {
+    if (this.infoSubscription) {
+      this.infoSubscription.unsubscribe();
+    }
+  }
 
 }
 
