@@ -63,6 +63,11 @@
                                     <i class="pi pi-thumbs-up text-orange-500 text-xl"></i>
                                 </div>
                             </div>
+                            <ng-container *ngIf="expectedHashRate$ | async as expectedHashRate">
+                                <span class="text-green-500 font-medium">{{info.power / (expectedHashRate/1000) | number: '1.2-2'}} <small>J/TH</small>
+                                </span>
+                                <span class="text-500"> expected</span>
+                            </ng-container>
                             <!-- <span class="text-green-500 font-medium">%52+ </span>
                             <span class="text-500">since last week</span> -->
                         </div>
