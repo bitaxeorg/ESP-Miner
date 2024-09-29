@@ -62,9 +62,10 @@ export class HomeComponent {
           backgroundColor: textColorSecondary,
           borderColor: textColorSecondary,
           tension: 0.2,
-          pointRadius: 2,
+          pointRadius: 0,
           pointHoverRadius: 5,
           borderWidth: 2,
+          borderDash: [5, 5]
         }
       ]
     };
