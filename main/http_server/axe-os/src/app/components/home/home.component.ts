@@ -28,6 +28,8 @@ export class HomeComponent {
   public maxTemp: number = 75;
   public maxFrequency: number = 800;
 
+  private dataCounter: number = 0;
+
   constructor(
     private systemService: SystemService
   ) {
@@ -62,10 +64,9 @@ export class HomeComponent {
           backgroundColor: textColorSecondary,
           borderColor: textColorSecondary,
           tension: 0.2,
-          pointRadius: 0,
+          pointRadius: 1,
           pointHoverRadius: 5,
           borderWidth: 2,
-          borderDash: [5, 5]
         }
       ]
     };
@@ -121,31 +122,34 @@ export class HomeComponent {
     };
 
 
-    this.info$ = interval(5000).pipe(
+    this.info$ = interval(2000).pipe(
       startWith(() => this.systemService.getInfo()),
       switchMap(() => {
         return this.systemService.getInfo()
       }),
       tap(info => {
+        if (this.dataCounter % 5 === 0) {
+          this.dataData.push(info.hashRate * 1000000000);
+          this.dataLabel.push(new Date().getTime());
 
-        this.dataData.push(info.hashRate * 1000000000);
-        this.dataLabel.push(new Date().getTime());
+          if (this.dataData.length >= 500) {
+            this.dataData.shift();
+            this.dataLabel.shift();
+          }
 
-        if (this.dataData.length >= 1000) {
-          this.dataData.shift();
-          this.dataLabel.shift();
+          this.chartData.labels = this.dataLabel;
+          this.chartData.datasets[0].data = this.dataData;
+
+          // Calculate average hashrate and push to chart data
+          this.dataDataAverage.push(this.calculateAverage(this.dataData));
+          this.chartData.datasets[1].data = this.dataDataAverage;
+
+          this.chartData = {
+            ...this.chartData
+          };
         }
 
-        this.chartData.labels = this.dataLabel;
-        this.chartData.datasets[0].data = this.dataData;
-
-        // Calculate average hashrate and push to chart data
-        this.dataDataAverage.push(this.calculateAverage(this.dataData));
-        this.chartData.datasets[1].data = this.dataDataAverage;
-
-        this.chartData = {
-          ...this.chartData
-        };
+        this.dataCounter++;
 
         this.maxPower = Math.max(50, info.power);
         this.maxTemp = Math.max(75, info.temp);
