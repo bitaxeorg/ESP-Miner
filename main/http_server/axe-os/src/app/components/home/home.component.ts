@@ -21,6 +21,7 @@ export class HomeComponent {
   public chartOptions: any;
   public dataLabel: number[] = [];
   public dataData: number[] = [];
+  public dataDataAverage: number[] = [];
   public chartData?: any;
 
   public maxPower: number = 50;
@@ -36,6 +37,7 @@ export class HomeComponent {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
+    const secondaryColor = documentStyle.getPropertyValue('--secondary-color');
 
     this.chartData = {
       labels: [],
@@ -52,7 +54,19 @@ export class HomeComponent {
           pointHoverRadius: 5,
           borderWidth: 1
         },
-
+        {
+          type: 'line',
+          label: 'Average Hashrate',
+          data: [],
+          fill: false,
+          backgroundColor: textColorSecondary,
+          borderColor: textColorSecondary,
+          tension: 0.2,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          borderWidth: 2,
+          borderDash: [5, 5]
+        }
       ]
     };
 
@@ -125,6 +139,10 @@ export class HomeComponent {
         this.chartData.labels = this.dataLabel;
         this.chartData.datasets[0].data = this.dataData;
 
+        // Calculate average hashrate and push to chart data
+        this.dataDataAverage.push(this.calculateAverage(this.dataData));
+        this.chartData.datasets[1].data = this.dataDataAverage;
+
         this.chartData = {
           ...this.chartData
         };
@@ -141,8 +159,6 @@ export class HomeComponent {
         info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
         info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
-
-
 
         return info;
       }),
@@ -175,5 +191,10 @@ export class HomeComponent {
 
   }
 
+  private calculateAverage(data: number[]): number {
+    if (data.length === 0) return 0;
+    const sum = data.reduce((sum, value) => sum + value, 0);
+    return sum / data.length;
+  }
 }
 
