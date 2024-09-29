@@ -65,7 +65,6 @@ export class HomeComponent {
           pointRadius: 2,
           pointHoverRadius: 5,
           borderWidth: 2,
-          borderDash: [5, 5]
         }
       ]
     };
