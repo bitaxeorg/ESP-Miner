@@ -28,8 +28,6 @@ export class HomeComponent {
   public maxTemp: number = 75;
   public maxFrequency: number = 800;
 
-  private dataCounter: number = 0;
-
   constructor(
     private systemService: SystemService
   ) {
@@ -121,34 +119,30 @@ export class HomeComponent {
     };
 
 
-    this.info$ = interval(2000).pipe(
+    this.info$ = interval(5000).pipe(
       startWith(() => this.systemService.getInfo()),
       switchMap(() => {
         return this.systemService.getInfo()
       }),
       tap(info => {
-        if (this.dataCounter % 5 === 0) {
-          this.dataData.push(info.hashRate * 1000000000);
-          this.dataLabel.push(new Date().getTime());
+        this.dataData.push(info.hashRate * 1000000000);
+        this.dataLabel.push(new Date().getTime());
 
-          if (this.dataData.length >= 500) {
-            this.dataData.shift();
-            this.dataLabel.shift();
-          }
-
-          this.chartData.labels = this.dataLabel;
-          this.chartData.datasets[0].data = this.dataData;
-
-          // Calculate average hashrate and fill the array with the same value for the average line
-          const averageHashrate = this.calculateAverage(this.dataData);
-          this.chartData.datasets[1].data = Array(this.dataData.length).fill(averageHashrate);
-
-          this.chartData = {
-            ...this.chartData
-          };
+        if (this.dataData.length >= 720) {
+          this.dataData.shift();
+          this.dataLabel.shift();
         }
 
-        this.dataCounter++;
+        this.chartData.labels = this.dataLabel;
+        this.chartData.datasets[0].data = this.dataData;
+
+        // Calculate average hashrate and fill the array with the same value for the average line
+        const averageHashrate = this.calculateAverage(this.dataData);
+        this.chartData.datasets[1].data = Array(this.dataData.length).fill(averageHashrate);
+
+        this.chartData = {
+          ...this.chartData
+        };
 
         this.maxPower = Math.max(50, info.power);
         this.maxTemp = Math.max(75, info.temp);
