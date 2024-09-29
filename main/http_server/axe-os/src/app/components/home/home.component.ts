@@ -63,10 +63,10 @@ export class HomeComponent {
           fill: false,
           backgroundColor: textColorSecondary,
           borderColor: textColorSecondary,
-          tension: 0.2,
-          pointRadius: 1,
-          pointHoverRadius: 5,
+          tension: 0,
+          pointRadius: 0,
           borderWidth: 2,
+          borderDash: [5, 5]
         }
       ]
     };
@@ -140,9 +140,9 @@ export class HomeComponent {
           this.chartData.labels = this.dataLabel;
           this.chartData.datasets[0].data = this.dataData;
 
-          // Calculate average hashrate and push to chart data
-          this.dataDataAverage.push(this.calculateAverage(this.dataData));
-          this.chartData.datasets[1].data = this.dataDataAverage;
+          // Calculate average hashrate and fill the array with the same value for the average line
+          const averageHashrate = this.calculateAverage(this.dataData);
+          this.chartData.datasets[1].data = Array(this.dataData.length).fill(averageHashrate);
 
           this.chartData = {
             ...this.chartData
