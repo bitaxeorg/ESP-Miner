@@ -39,7 +39,6 @@ export class HomeComponent {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
-    const secondaryColor = documentStyle.getPropertyValue('--secondary-color');
 
     this.chartData = {
       labels: [],
