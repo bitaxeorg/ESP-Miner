@@ -33,6 +33,7 @@ export class SystemService {
           coreVoltage: 1200,
           coreVoltageActual: 1200,
           hostname: "Bitaxe",
+          macAddr: "2C:54:91:88:C9:E3",
           ssid: "default",
           wifiPass: "password",
           wifiStatus: "Connected!",
