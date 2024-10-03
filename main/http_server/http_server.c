@@ -461,6 +461,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(stratumURL);
     free(fallbackStratumURL);
     free(stratumUser);
+    free(fallbackStratumUser);
     free(board_version);
 
         const char * sys_info = cJSON_Print(root);
