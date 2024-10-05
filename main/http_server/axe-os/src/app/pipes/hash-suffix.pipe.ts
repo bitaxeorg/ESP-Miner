@@ -28,9 +28,11 @@ export class HashSuffixPipe implements PipeTransform {
 
     if (scaledValue < 10) {
       return scaledValue.toFixed(2) + suffix;
+    } else if (scaledValue < 100) {
+      return scaledValue.toFixed(1) + suffix;
     }
 
-    return scaledValue.toFixed(1) + suffix;
+    return scaledValue.toFixed(0) + suffix;
   }
 
 

@@ -21,6 +21,7 @@ export class HomeComponent {
   public chartOptions: any;
   public dataLabel: number[] = [];
   public dataData: number[] = [];
+  public dataDataAverage: number[] = [];
   public chartData?: any;
 
   public maxPower: number = 50;
@@ -52,7 +53,18 @@ export class HomeComponent {
           pointHoverRadius: 5,
           borderWidth: 1
         },
-
+        {
+          type: 'line',
+          label: 'Average Hashrate',
+          data: [],
+          fill: false,
+          backgroundColor: textColorSecondary,
+          borderColor: textColorSecondary,
+          tension: 0,
+          pointRadius: 0,
+          borderWidth: 2,
+          borderDash: [5, 5]
+        }
       ]
     };
 
@@ -113,17 +125,20 @@ export class HomeComponent {
         return this.systemService.getInfo()
       }),
       tap(info => {
-
         this.dataData.push(info.hashRate * 1000000000);
         this.dataLabel.push(new Date().getTime());
 
-        if (this.dataData.length >= 1000) {
+        if (this.dataData.length >= 720) {
           this.dataData.shift();
           this.dataLabel.shift();
         }
 
         this.chartData.labels = this.dataLabel;
         this.chartData.datasets[0].data = this.dataData;
+
+        // Calculate average hashrate and fill the array with the same value for the average line
+        const averageHashrate = this.calculateAverage(this.dataData);
+        this.chartData.datasets[1].data = Array(this.dataData.length).fill(averageHashrate);
 
         this.chartData = {
           ...this.chartData
@@ -141,8 +156,6 @@ export class HomeComponent {
         info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
         info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
-
-
 
         return info;
       }),
@@ -175,5 +188,10 @@ export class HomeComponent {
 
   }
 
+  private calculateAverage(data: number[]): number {
+    if (data.length === 0) return 0;
+    const sum = data.reduce((sum, value) => sum + value, 0);
+    return sum / data.length;
+  }
 }
 

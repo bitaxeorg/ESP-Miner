@@ -34,11 +34,11 @@
         <ng-container *ngFor="let axeOs$ of swarm">
             <tr *ngIf="axeOs$ | async as axe">
                 <td><a [href]="'http://'+axe.ip" target="_blank">{{axe.ip}}</a></td>
-                <td>{{axe.hashRate | number: '1.2-2'}} <small>Gh/s</small></td>
+                <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
                 <td>{{axe.uptimeSeconds | dateAgo}}</td>
-                <td>{{axe.sharesAccepted}}</td>
+                <td>{{axe.sharesAccepted | number: '1.0-0'}}</td>
                 <td>{{axe.power | number: '1.2-2'}} <small>W</small> </td>
-                <td>{{axe.temp}} <small>C</small></td>
+                <td>{{axe.temp}}°<small>C</small></td>
                 <td>{{axe.bestDiff}}</td>
                 <td>{{axe.version}}</td>
                 <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
