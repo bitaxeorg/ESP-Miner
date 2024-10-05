@@ -56,7 +56,7 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
       this.websocketSubscription = this.websocketService.ws$.subscribe({
         next: (val) => {
           this.logs.push(val);
-          if (this.logs.length > 100) {
+          if (this.logs.length > 256) {
             this.logs.shift();
           }
         }
