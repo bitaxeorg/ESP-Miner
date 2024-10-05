@@ -273,14 +273,26 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "stratumURL")) != NULL) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_URL, item->valuestring);
     }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumURL")) != NULL) {
+        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, item->valuestring);
+    }
     if ((item = cJSON_GetObjectItem(root, "stratumUser")) != NULL) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_USER, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "stratumPassword")) != NULL) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, item->valuestring);
     }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumUser")) != NULL) {
+        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPassword")) != NULL) {
+        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, item->valuestring);
+    }
     if ((item = cJSON_GetObjectItem(root, "stratumPort")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPort")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "ssid")) != NULL) {
         nvs_config_set_string(NVS_CONFIG_WIFI_SSID, item->valuestring);
@@ -372,7 +384,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     uint8_t mac[6];
     char formattedMac[18];
     char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
+    char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
+    char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
     char * board_version = nvs_config_get_string(NVS_CONFIG_BOARD_VERSION, "unknown");
 
     esp_wifi_get_mac(WIFI_IF_STA, mac);
@@ -422,8 +436,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "smallCoreCount", small_core_count);
     cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->asic_model_str);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
+    cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT));
+    cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT));
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
+    cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
     cJSON_AddStringToObject(root, "boardVersion", board_version);
@@ -442,7 +459,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(ssid);
     free(hostname);
     free(stratumURL);
+    free(fallbackStratumURL);
     free(stratumUser);
+    free(fallbackStratumUser);
     free(board_version);
 
         const char * sys_info = cJSON_Print(root);

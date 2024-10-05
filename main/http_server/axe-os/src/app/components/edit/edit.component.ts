@@ -146,8 +146,19 @@ export class EditComponent implements OnInit {
             Validators.min(0),
             Validators.max(65353)
           ]],
+          fallbackStratumURL: [info.fallbackStratumURL, [
+            Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
+          ]],
+          fallbackStratumPort: [info.fallbackStratumPort, [
+            Validators.required,
+            Validators.pattern(/^[^:]*$/),
+            Validators.min(0),
+            Validators.max(65353)
+          ]],
           stratumUser: [info.stratumUser, [Validators.required]],
           stratumPassword: ['*****', [Validators.required]],
+          fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
+          fallbackStratumPassword: ['password', [Validators.required]],
           hostname: [info.hostname, [Validators.required]],
           ssid: [info.ssid, [Validators.required]],
           wifiPass: ['*****'],
