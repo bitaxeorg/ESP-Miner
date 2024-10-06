@@ -15,8 +15,6 @@ void ASIC_result_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
-    char *user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, STRATUM_USER);
-
     while (1)
     {
         task_result *asic_result = (*GLOBAL_STATE->ASIC_functions.receive_result_fn)(GLOBAL_STATE);
@@ -45,6 +43,7 @@ void ASIC_result_task(void *pvParameters)
 
         if (nonce_diff > GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->pool_diff)
         {
+            char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, FALLBACK_STRATUM_USER) : nvs_config_get_string(NVS_CONFIG_STRATUM_USER, STRATUM_USER);
             int ret = STRATUM_V1_submit_share(
                 GLOBAL_STATE->sock,
                 user,
@@ -53,6 +52,7 @@ void ASIC_result_task(void *pvParameters)
                 GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->ntime,
                 asic_result->nonce,
                 asic_result->rolled_version ^ GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version);
+            free(user);
 
             if (ret < 0) {
                 ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
