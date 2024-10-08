@@ -159,9 +159,6 @@ export class EditComponent implements OnInit {
           stratumPassword: ['*****', [Validators.required]],
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
           fallbackStratumPassword: ['password', [Validators.required]],
-          hostname: [info.hostname, [Validators.required]],
-          ssid: [info.ssid, [Validators.required]],
-          wifiPass: ['*****'],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
@@ -198,12 +195,6 @@ export class EditComponent implements OnInit {
 
     const form = this.form.getRawValue();
 
-    // Allow an empty wifi password
-    form.wifiPass = form.wifiPass == null ? '' : form.wifiPass;
-
-    if (form.wifiPass === '*****') {
-      delete form.wifiPass;
-    }
     if (form.stratumPassword === '*****') {
       delete form.stratumPassword;
     }
@@ -225,11 +216,6 @@ export class EditComponent implements OnInit {
   showStratumPassword: boolean = false;
   toggleStratumPasswordVisibility() {
     this.showStratumPassword = !this.showStratumPassword;
-  }
-
-  showWifiPassword: boolean = false;
-  toggleWifiPasswordVisibility() {
-    this.showWifiPassword = !this.showWifiPassword;
   }
 
 }

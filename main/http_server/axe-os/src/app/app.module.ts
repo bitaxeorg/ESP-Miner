@@ -11,9 +11,11 @@ import { ToastrModule } from 'ngx-toastr';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { EditComponent } from './components/edit/edit.component';
+import { NetworkEditComponent } from './components/network-edit/network.edit.component';
 import { HomeComponent } from './components/home/home.component';
 import { LoadingComponent } from './components/loading/loading.component';
 import { LogsComponent } from './components/logs/logs.component';
+import { NetworkComponent } from './components/network/network.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
 import { AppLayoutModule } from './layout/app.layout.module';
@@ -26,8 +28,10 @@ import { MessageModule } from 'primeng/message';
 const components = [
   AppComponent,
   EditComponent,
+  NetworkEditComponent,
   HomeComponent,
   LoadingComponent,
+  NetworkComponent,
   SettingsComponent,
   LogsComponent
 ];
