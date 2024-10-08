@@ -15,15 +15,17 @@
 // A copy of the display memory is maintained by this code so that single pixel
 // writes can occur without having to read from the display controller.
 
-#include "i2c_master.h"
-#include "esp_err.h"
-#include "esp_log.h"
-#include "nvs_config.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include "esp_err.h"
+#include "esp_log.h"
 
+#include "nvs_config.h"
+#include "i2c_bitaxe.h"
 #include "oled.h"
+
+#define OLED_I2C_ADDR 0x3C
 
 extern unsigned char ucSmallFont[];
 static int iScreenOffset;            // current write offset of screen data
@@ -35,9 +37,17 @@ static esp_err_t write(uint8_t *, uint8_t);
 
 static bool oled_active;
 
+static i2c_master_dev_handle_t ssd1306_dev_handle;
+
 // Initialialize the OLED Screen
-bool OLED_init(void)
+esp_err_t OLED_init(void)
 {
+
+    //init the I2C device
+    if (i2c_bitaxe_add_device(OLED_I2C_ADDR, &ssd1306_dev_handle) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
     uint8_t oled32_initbuf[] = {0x00,
                                 0xae, // cmd: display off
                                 0xd5, // cmd: set display clock
@@ -281,9 +291,7 @@ bool OLED_status(void)
  */
 static esp_err_t write(uint8_t * data, uint8_t len)
 {
-    int ret;
+    //return i2c_master_write_to_device(I2C_MASTER_NUM, 0x3C, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 
-    ret = i2c_master_write_to_device(I2C_MASTER_NUM, 0x3C, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
-
-    return ret;
+    return i2c_bitaxe_register_write_bytes(ssd1306_dev_handle, data, len);
 }

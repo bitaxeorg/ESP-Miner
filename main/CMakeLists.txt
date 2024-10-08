@@ -4,14 +4,13 @@ SRCS
     "DS4432U.c"
     "EMC2101.c"
     "fonts.c"
-    "i2c_master.c"
+    "i2c_bitaxe.c"
     "INA260.c"
     "led_controller.c"
     "main.c"
     "nvs_config.c"
     "oled.c"
     "system.c"
-    "TMP1075.c"
     "TPS546.c"
     "vcore.c"
     "work_queue.c"
@@ -47,6 +46,7 @@ PRIV_REQUIRES
     "nvs_flash"
     "spiffs"
     "vfs"
+    "esp_driver_i2c"
 )
 
 set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/axe-os")

@@ -27,7 +27,7 @@ typedef enum
 // Optionally enable inverted or flipped mode
 // returns 0 for success, 1 for failure
 //
-bool OLED_init(void);
+esp_err_t OLED_init(void);
 
 // Turns off the display and closes the I2C handle
 void OLED_shutdown(void);

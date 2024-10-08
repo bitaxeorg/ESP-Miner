@@ -10,5 +10,6 @@
 
 bool TMP1075_installed(int);
 uint8_t TMP1075_read_temperature(int);
+esp_err_t TMP1075_init(void);
 
 #endif /* TMP1075_H_ */

@@ -6,6 +6,7 @@ SRCS
     "bm1397.c"
     "serial.c"
     "crc.c"
+    "common.c"
 
 INCLUDE_DIRS 
     "include"

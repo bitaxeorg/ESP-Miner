@@ -2,8 +2,7 @@
 #include <math.h>
 #include "esp_log.h"
 
-#include "i2c_master.h"
-
+#include "i2c_bitaxe.h"
 #include "DS4432U.h"
 
 // DS4432U+ -- Adjustable current DAC
@@ -12,6 +11,17 @@
 #define DS4432U_OUT1_REG 0xF9    // register for current output 1
 
 static const char *TAG = "DS4432U";
+
+static i2c_master_dev_handle_t ds4432u_dev_handle;
+
+/**
+ * @brief Initialize the DS4432U+ sensor.
+ *
+ * @return esp_err_t ESP_OK on success, or an error code on failure.
+ */
+esp_err_t DS4432U_init(void) {
+    return i2c_bitaxe_add_device(DS4432U_SENSOR_ADDR, &ds4432u_dev_handle);
+}
 
 /**
  * @brief Set the current DAC code for a specific DS4432U output.
@@ -22,7 +32,7 @@ static const char *TAG = "DS4432U";
  */
 esp_err_t DS4432U_set_current_code(uint8_t output, uint8_t code) {
     uint8_t reg = (output == 0) ? DS4432U_OUT0_REG : DS4432U_OUT1_REG;
-    return i2c_master_register_write_byte(DS4432U_SENSOR_ADDR, reg, code);
+    return i2c_bitaxe_register_write_byte(ds4432u_dev_handle, reg, code);
 }
 
 /**
@@ -34,7 +44,7 @@ esp_err_t DS4432U_set_current_code(uint8_t output, uint8_t code) {
  */
 esp_err_t DS4432U_get_current_code(uint8_t output, uint8_t *code) {
     uint8_t reg = (output == 0) ? DS4432U_OUT0_REG : DS4432U_OUT1_REG;
-    return i2c_master_register_read(DS4432U_SENSOR_ADDR, reg, code, 1);
+    return i2c_bitaxe_register_read(ds4432u_dev_handle, reg, code, 1);
 }
 
 bool DS4432U_test(void)
@@ -42,7 +52,7 @@ bool DS4432U_test(void)
     uint8_t data;
 
     /* Read the DS4432U+ WHO_AM_I register, on power up the register should have the value 0x00 */
-    esp_err_t register_result = i2c_master_register_read(DS4432U_SENSOR_ADDR, DS4432U_OUT0_REG, &data, 1);
+    esp_err_t register_result = i2c_bitaxe_register_read(ds4432u_dev_handle, DS4432U_OUT0_REG, &data, 1);
     ESP_LOGI(TAG, "DS4432U+ OUT0 = 0x%02X", data);
     return register_result == ESP_OK;
 }

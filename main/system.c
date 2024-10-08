@@ -2,10 +2,9 @@
 
 #include "esp_log.h"
 
-#include "i2c_master.h"
+#include "i2c_bitaxe.h"
 #include "EMC2101.h"
-#include "INA260.h"
-#include "TMP1075.h"
+//#include "INA260.h"
 #include "adc.h"
 #include "connect.h"
 #include "led_controller.h"
@@ -41,22 +40,23 @@ static esp_netif_ip_info_t ip_info;
 
 QueueHandle_t user_input_queue;
 
-static esp_err_t ensure_overheat_mode_config() {
-    uint16_t overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, UINT16_MAX);
+//local function prototypes
+static esp_err_t ensure_overheat_mode_config();
+static void _show_overheat_screen(GlobalState * GLOBAL_STATE);
+static void _update_hashrate(GlobalState * GLOBAL_STATE);
+static void _update_shares(GlobalState * GLOBAL_STATE);
+static void _clear_display(GlobalState * GLOBAL_STATE);
+static void _init_connection(GlobalState * GLOBAL_STATE);
+static void _update_connection(GlobalState * GLOBAL_STATE);
+static void _update_system_performance(GlobalState * GLOBAL_STATE);
+static void _update_system_info(GlobalState * GLOBAL_STATE);
+static void _update_esp32_info(GlobalState * GLOBAL_STATE);
+static void show_ap_information(const char * error, GlobalState * GLOBAL_STATE);
 
-    if (overheat_mode == UINT16_MAX) {
-        // Key doesn't exist or couldn't be read, set the default value
-        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-        ESP_LOGI(TAG, "Default value for overheat_mode set to 0");
-    } else {
-        // Key exists, log the current value
-        ESP_LOGI(TAG, "Existing overheat_mode value: %d", overheat_mode);
-    }
+static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id);
+static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 
-    return ESP_OK;
-}
-
-static void _init_system(GlobalState * GLOBAL_STATE)
+void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
@@ -99,15 +99,6 @@ static void _init_system(GlobalState * GLOBAL_STATE)
     // set the wifi_status to blank
     memset(module->wifi_status, 0, 20);
 
-    // test the LEDs
-    //  ESP_LOGI(TAG, "Init LEDs!");
-    //  ledc_init();
-    //  led_set();
-
-    // Init I2C
-    ESP_ERROR_CHECK(i2c_master_init());
-    ESP_LOGI(TAG, "I2C initialized successfully");
-
     // Initialize the core voltage regulator
     VCORE_init(GLOBAL_STATE);
     VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE);
@@ -148,7 +139,80 @@ static void _init_system(GlobalState * GLOBAL_STATE)
     }
 
     netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+
+    user_input_queue = xQueueCreate(10, sizeof(char[10])); // Create a queue to handle user input events
+
+    _clear_display(GLOBAL_STATE);
+    _init_connection(GLOBAL_STATE);
 }
+
+
+
+void SYSTEM_task(void * pvParameters)
+{
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    //_init_system(GLOBAL_STATE);
+
+    char input_event[10];
+    ESP_LOGI(TAG, "SYSTEM_task started");
+
+    while (GLOBAL_STATE->ASIC_functions.init_fn == NULL) {
+        show_ap_information("ASIC MODEL INVALID", GLOBAL_STATE);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
+
+    // show the connection screen
+    while (!module->startup_done) {
+        _update_connection(GLOBAL_STATE);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+
+    while (1) {
+        // Check for overheat mode
+        if (module->overheat_mode == 1) {
+            _show_overheat_screen(GLOBAL_STATE);
+            vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
+            SYSTEM_update_overheat_mode(GLOBAL_STATE);  // Check for changes
+            continue;  // Skip the normal screen cycle
+        }
+
+        // Automatically cycle through screens
+        for (int screen = 0; screen < 3; screen++) {
+            _clear_display(GLOBAL_STATE);
+            module->screen_page = screen;
+
+            switch (module->screen_page) {
+                case 0:
+                    _update_system_performance(GLOBAL_STATE);
+                    break;
+                case 1:
+                    _update_system_info(GLOBAL_STATE);
+                    break;
+                case 2:
+                    _update_esp32_info(GLOBAL_STATE);
+                    break;
+            }
+
+            // Wait for 10 seconds or until a button press
+            for (int i = 0; i < 10; i++) {
+                if (xQueueReceive(user_input_queue, &input_event, pdMS_TO_TICKS(1000))) {
+                    if (strcmp(input_event, "SHORT") == 0) {
+                        ESP_LOGI(TAG, "Short button press detected, switching to next screen");
+                        screen = (screen + 1) % 3; // Move to next screen
+                        break;
+                    } else if (strcmp(input_event, "LONG") == 0) {
+                        ESP_LOGI(TAG, "Long button press detected, toggling WiFi SoftAP");
+                        toggle_wifi_softap(); // Toggle AP 
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 
 void SYSTEM_update_overheat_mode(GlobalState * GLOBAL_STATE)
 {
@@ -161,6 +225,92 @@ void SYSTEM_update_overheat_mode(GlobalState * GLOBAL_STATE)
     }
 }
 
+void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
+{
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    module->shares_accepted++;
+    _update_shares(GLOBAL_STATE);
+}
+void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE)
+{
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    module->shares_rejected++;
+    _update_shares(GLOBAL_STATE);
+}
+
+void SYSTEM_notify_mining_started(GlobalState * GLOBAL_STATE)
+{
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    module->duration_start = esp_timer_get_time();
+}
+
+void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
+{
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    // Hourly clock sync
+    if (module->lastClockSync + (60 * 60) > ntime) {
+        return;
+    }
+    ESP_LOGI(TAG, "Syncing clock");
+    module->lastClockSync = ntime;
+    struct timeval tv;
+    tv.tv_sec = ntime;
+    tv.tv_usec = 0;
+    settimeofday(&tv, NULL);
+}
+
+void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double found_diff, uint8_t job_id)
+{
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    // Calculate the time difference in seconds with sub-second precision
+    // hashrate = (nonce_difficulty * 2^32) / time_to_find
+
+    module->historical_hashrate[module->historical_hashrate_rolling_index] = GLOBAL_STATE->initial_ASIC_difficulty;
+    module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time();
+
+    module->historical_hashrate_rolling_index = (module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
+
+    // ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration,
+    // historical_hashrate[historical_hashrate_rolling_index]);
+
+    if (module->historical_hashrate_init < HISTORY_LENGTH) {
+        module->historical_hashrate_init++;
+    } else {
+        module->duration_start =
+            module->historical_hashrate_time_stamps[(module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
+    }
+    double sum = 0;
+    for (int i = 0; i < module->historical_hashrate_init; i++) {
+        sum += module->historical_hashrate[i];
+    }
+
+    double duration = (double) (esp_timer_get_time() - module->duration_start) / 1000000;
+
+    double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
+    if (module->historical_hashrate_init < HISTORY_LENGTH) {
+        module->current_hashrate = rolling_rate;
+    } else {
+        // More smoothing
+        module->current_hashrate = ((module->current_hashrate * 9) + rolling_rate) / 10;
+    }
+
+    _update_hashrate(GLOBAL_STATE);
+
+    // logArrayContents(historical_hashrate, HISTORY_LENGTH);
+    // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
+
+    _check_for_best_diff(GLOBAL_STATE, found_diff, job_id);
+}
+
+
+/// 
+/// LOCAL FUNCTIONS
+/// 
 static void _show_overheat_screen(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -542,152 +692,17 @@ static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigit
     }
 }
 
-void SYSTEM_task(void * pvParameters)
-{
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+static esp_err_t ensure_overheat_mode_config() {
+    uint16_t overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, UINT16_MAX);
 
-    _init_system(GLOBAL_STATE);
-    user_input_queue = xQueueCreate(10, sizeof(char[10])); // Create a queue to handle user input events
-
-    _clear_display(GLOBAL_STATE);
-    _init_connection(GLOBAL_STATE);
-
-    char input_event[10];
-    ESP_LOGI(TAG, "SYSTEM_task started");
-
-    while (GLOBAL_STATE->ASIC_functions.init_fn == NULL) {
-        show_ap_information("ASIC MODEL INVALID", GLOBAL_STATE);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-    }
-
-    // show the connection screen
-    while (!module->startup_done) {
-        _update_connection(GLOBAL_STATE);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-
-    while (1) {
-        // Check for overheat mode
-        if (module->overheat_mode == 1) {
-            _show_overheat_screen(GLOBAL_STATE);
-            vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
-            SYSTEM_update_overheat_mode(GLOBAL_STATE);  // Check for changes
-            continue;  // Skip the normal screen cycle
-        }
-
-        // Automatically cycle through screens
-        for (int screen = 0; screen < 3; screen++) {
-            _clear_display(GLOBAL_STATE);
-            module->screen_page = screen;
-
-            switch (module->screen_page) {
-                case 0:
-                    _update_system_performance(GLOBAL_STATE);
-                    break;
-                case 1:
-                    _update_system_info(GLOBAL_STATE);
-                    break;
-                case 2:
-                    _update_esp32_info(GLOBAL_STATE);
-                    break;
-            }
-
-            // Wait for 10 seconds or until a button press
-            for (int i = 0; i < 10; i++) {
-                if (xQueueReceive(user_input_queue, &input_event, pdMS_TO_TICKS(1000))) {
-                    if (strcmp(input_event, "SHORT") == 0) {
-                        ESP_LOGI(TAG, "Short button press detected, switching to next screen");
-                        screen = (screen + 1) % 3; // Move to next screen
-                        break;
-                    } else if (strcmp(input_event, "LONG") == 0) {
-                        ESP_LOGI(TAG, "Long button press detected, toggling WiFi SoftAP");
-                        toggle_wifi_softap(); // Toggle AP 
-                    }
-                }
-            }
-        }
-    }
-}
-
-void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
-{
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    module->shares_accepted++;
-    _update_shares(GLOBAL_STATE);
-}
-void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE)
-{
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    module->shares_rejected++;
-    _update_shares(GLOBAL_STATE);
-}
-
-void SYSTEM_notify_mining_started(GlobalState * GLOBAL_STATE)
-{
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    module->duration_start = esp_timer_get_time();
-}
-
-void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
-{
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    // Hourly clock sync
-    if (module->lastClockSync + (60 * 60) > ntime) {
-        return;
-    }
-    ESP_LOGI(TAG, "Syncing clock");
-    module->lastClockSync = ntime;
-    struct timeval tv;
-    tv.tv_sec = ntime;
-    tv.tv_usec = 0;
-    settimeofday(&tv, NULL);
-}
-
-void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double found_diff, uint8_t job_id)
-{
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    // Calculate the time difference in seconds with sub-second precision
-    // hashrate = (nonce_difficulty * 2^32) / time_to_find
-
-    module->historical_hashrate[module->historical_hashrate_rolling_index] = GLOBAL_STATE->initial_ASIC_difficulty;
-    module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time();
-
-    module->historical_hashrate_rolling_index = (module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
-
-    // ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration,
-    // historical_hashrate[historical_hashrate_rolling_index]);
-
-    if (module->historical_hashrate_init < HISTORY_LENGTH) {
-        module->historical_hashrate_init++;
+    if (overheat_mode == UINT16_MAX) {
+        // Key doesn't exist or couldn't be read, set the default value
+        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+        ESP_LOGI(TAG, "Default value for overheat_mode set to 0");
     } else {
-        module->duration_start =
-            module->historical_hashrate_time_stamps[(module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
-    }
-    double sum = 0;
-    for (int i = 0; i < module->historical_hashrate_init; i++) {
-        sum += module->historical_hashrate[i];
+        // Key exists, log the current value
+        ESP_LOGI(TAG, "Existing overheat_mode value: %d", overheat_mode);
     }
 
-    double duration = (double) (esp_timer_get_time() - module->duration_start) / 1000000;
-
-    double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
-    if (module->historical_hashrate_init < HISTORY_LENGTH) {
-        module->current_hashrate = rolling_rate;
-    } else {
-        // More smoothing
-        module->current_hashrate = ((module->current_hashrate * 9) + rolling_rate) / 10;
-    }
-
-    _update_hashrate(GLOBAL_STATE);
-
-    // logArrayContents(historical_hashrate, HISTORY_LENGTH);
-    // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
-
-    _check_for_best_diff(GLOBAL_STATE, found_diff, job_id);
+    return ESP_OK;
 }

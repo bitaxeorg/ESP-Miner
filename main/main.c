@@ -16,6 +16,7 @@
 #include "serial.h"
 #include "stratum_task.h"
 #include "user_input_task.h"
+#include "i2c_bitaxe.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -31,6 +32,14 @@ static const double NONCE_SPACE = 4294967296.0; //  2^32
 void app_main(void)
 {
     ESP_LOGI(TAG, "Welcome to the bitaxe - hack the planet!");
+
+    // Init I2C
+    ESP_ERROR_CHECK(i2c_bitaxe_init());
+    ESP_LOGI(TAG, "I2C initialized successfully");
+
+    //wait for I2C to init
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
     ESP_ERROR_CHECK(nvs_flash_init());
 
     GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
@@ -144,9 +153,6 @@ void app_main(void)
         vTaskDelay(60 * 60 * 1000 / portTICK_PERIOD_MS);
     }
 
-    xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void *) &GLOBAL_STATE, 3, NULL);
-    xTaskCreate(POWER_MANAGEMENT_task, "power mangement", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-
     // pull the wifi credentials and hostname out of NVS
     char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, WIFI_SSID);
     char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, WIFI_PASS);
@@ -188,6 +194,11 @@ void app_main(void)
     free(wifi_ssid);
     free(wifi_pass);
     free(hostname);
+
+    SYSTEM_init_system(&GLOBAL_STATE);
+
+    xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void *) &GLOBAL_STATE, 3, NULL);
+    xTaskCreate(POWER_MANAGEMENT_task, "power mangement", 8192, (void *) &GLOBAL_STATE, 10, NULL);
 
     // set the startup_done flag
     GLOBAL_STATE.SYSTEM_MODULE.startup_done = true;

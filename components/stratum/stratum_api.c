@@ -310,7 +310,7 @@ int STRATUM_V1_subscribe(int socket, char * model)
 {
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];
-    const esp_app_desc_t *app_desc = esp_ota_get_app_description();
+    const esp_app_desc_t *app_desc = esp_app_get_description();
     const char *version = app_desc->version;	
     sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe/%s/%s\"]}\n", send_uid++, model, version);
     debug_stratum_tx(subscribe_msg);

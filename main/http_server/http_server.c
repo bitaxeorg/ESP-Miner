@@ -464,9 +464,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(fallbackStratumUser);
     free(board_version);
 
-        const char * sys_info = cJSON_Print(root);
+    const char * sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free(sys_info);
+    free((char *)sys_info);
     cJSON_Delete(root);
     return ESP_OK;
 }
@@ -563,7 +563,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     return ESP_OK;
 }
 
-void log_to_queue(const char * format, va_list args)
+int log_to_queue(const char * format, va_list args)
 {
     va_list args_copy;
     va_copy(args_copy, args);
@@ -575,7 +575,7 @@ void log_to_queue(const char * format, va_list args)
     // Allocate the buffer dynamically
     char * log_buffer = (char *) calloc(needed_size + 2, sizeof(char));  // +2 for potential \n and \0
     if (log_buffer == NULL) {
-        return;
+        return 0;
     }
 
     // Format the string into the allocated buffer
@@ -599,6 +599,8 @@ void log_to_queue(const char * format, va_list args)
             free((void*)log_buffer);
         }
     }
+
+    return 0;
 }
 
 void send_log_to_websocket(char *message)

@@ -201,7 +201,7 @@ void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * host
 
     /* Initialize AP */
     ESP_LOGI(TAG, "ESP_WIFI Access Point On");
-    esp_netif_t * esp_netif_ap = wifi_init_softap();
+    wifi_init_softap();
 
     /* Initialize STA */
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");

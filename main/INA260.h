@@ -1,7 +1,7 @@
 #ifndef INA260_H_
 #define INA260_H_
 
-#include "i2c_master.h"
+#include "i2c_bitaxe.h"
 
 #define INA260_I2CADDR_DEFAULT 0x40 ///< INA260 default i2c address
 #define INA260_REG_CONFIG 0x00      ///< Configuration register
@@ -104,6 +104,8 @@ typedef enum _alert_latch
   INA260_ALERT_LATCH_TRANSPARENT = 0x0, /**< Alert will reset when fault is
                                            cleared **/
 } INA260_AlertLatch;
+
+esp_err_t INA260_init(void);
 bool INA260_installed(void);
 float INA260_read_current(void);
 float INA260_read_voltage(void);

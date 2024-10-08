@@ -9,7 +9,6 @@
 #include "mining.h"
 #include "nvs_config.h"
 #include "serial.h"
-#include "TMP1075.h"
 #include "TPS546.h"
 #include "vcore.h"
 #include <string.h>
@@ -31,15 +30,15 @@
 
 static const char * TAG = "power_management";
 
-static float _fbound(float value, float lower_bound, float upper_bound)
-{
-    if (value < lower_bound)
-        return lower_bound;
-    if (value > upper_bound)
-        return upper_bound;
+// static float _fbound(float value, float lower_bound, float upper_bound)
+// {
+//     if (value < lower_bound)
+//         return lower_bound;
+//     if (value > upper_bound)
+//         return upper_bound;
 
-    return value;
-}
+//     return value;
+// }
 
 // Set the fan speed between 20% min and 100% max based on chip temperature as input.
 // The fan speed increases from 20% to 100% proportionally to the temperature increase from 50 and THROTTLE_TEMP
@@ -84,9 +83,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     power_management->HAS_POWER_EN = GLOBAL_STATE->board_version == 202 || GLOBAL_STATE->board_version == 203 || GLOBAL_STATE->board_version == 204;
     power_management->HAS_PLUG_SENSE = GLOBAL_STATE->board_version == 204;
 
-    int last_frequency_increase = 0;
-
-    uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    //int last_frequency_increase = 0;
+    //uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
     uint16_t auto_fan_speed = nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1);
 
@@ -118,7 +116,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         default:
     }
 
-    vTaskDelay(4000 / portTICK_PERIOD_MS);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
     uint16_t last_asic_frequency = power_management->frequency_value;
     
@@ -135,10 +133,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     power_management->power = (TPS546_get_vout() * power_management->current) / 1000;
                     // The power reading from the TPS546 is only it's output power. So the rest of the Bitaxe power is not accounted for.
                     power_management->power += SUPRA_POWER_OFFSET; // Add offset for the rest of the Bitaxe power. TODO: this better.
-				} else if (INA260_installed() == true) {
-                    power_management->voltage = INA260_read_voltage();
-                    power_management->current = INA260_read_current();
-                    power_management->power = INA260_read_power() / 1000;
+				} else {
+                    INA260_init();
+
+                    if (INA260_installed() == true) {
+                        power_management->voltage = INA260_read_voltage();
+                        power_management->current = INA260_read_current();
+                        power_management->power = INA260_read_power() / 1000;
+                    }
 				}
             
                 break;

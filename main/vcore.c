@@ -79,6 +79,8 @@ bool VCORE_set_voltage(float core_voltage, GlobalState * global_state)
                 ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
                 TPS546_set_vout(core_voltage * (float)global_state->voltage_domain);
             } else {
+                DS4432U_init();
+                
                 uint8_t reg_setting = ds4432_tps40305_bitaxe_voltage_to_reg(core_voltage * (float)global_state->voltage_domain);
                 ESP_LOGI(TAG, "Set ASIC voltage = %.3fV [0x%02X]", core_voltage, reg_setting);
                 DS4432U_set_current_code(0, reg_setting); /// eek!

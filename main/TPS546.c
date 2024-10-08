@@ -1,12 +1,14 @@
-#include "driver/i2c.h"
-#include "esp_log.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
 #include <string.h>
-
+#include "esp_log.h"
 #include "pmbus_commands.h"
+
+#include "i2c_bitaxe.h"
 #include "TPS546.h"
+
+//#define _DEBUG_LOG_ 1
 
 #define I2C_MASTER_NUM 0 /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
 
@@ -29,153 +31,105 @@ static uint8_t MFR_ID[] = {'B', 'A', 'X'};
 static uint8_t MFR_MODEL[] = {'H', 'E', 'X'};
 static uint8_t MFR_REVISION[] = {0x00, 0x00, 0x01};
 
-static uint8_t COMPENSATION_CONFIG[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+//static uint8_t COMPENSATION_CONFIG[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+static i2c_master_dev_handle_t tps546_dev_handle;
 
 /**
  * @brief SMBus read byte
+ * @param command The command to read
+ * @param data Pointer to store the read data
  */
 static esp_err_t smb_read_byte(uint8_t command, uint8_t *data)
 {
-    esp_err_t err = ESP_FAIL;
-
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, TPS546_I2CADDR << 1 | WRITE_BIT, ACK_CHECK);
-    i2c_master_write_byte(cmd, command, ACK_CHECK);
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, TPS546_I2CADDR << 1 | READ_BIT, ACK_CHECK);
-    i2c_master_read_byte(cmd, data, NACK_VALUE);
-    i2c_master_stop(cmd);
-    i2c_set_timeout(I2C_MASTER_NUM, 20);
-    ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, SMBUS_DEFAULT_TIMEOUT));
-    i2c_cmd_link_delete(cmd);
-
-    // return get an actual error status
-    return err;
+    return i2c_bitaxe_register_read(tps546_dev_handle, command, data, 1);
 }
 
 /**
  * @brief SMBus write byte
+ * @param command The command to write
+ * @param data The data to write
  */
 static esp_err_t smb_write_byte(uint8_t command, uint8_t data)
 {
-    esp_err_t err = ESP_FAIL;
-
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, TPS546_I2CADDR << 1 | WRITE_BIT, ACK_CHECK);
-    i2c_master_write_byte(cmd, command, ACK_CHECK);
-    i2c_master_write_byte(cmd, data, ACK_CHECK);
-    i2c_master_stop(cmd);
-    ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, SMBUS_DEFAULT_TIMEOUT));
-    i2c_cmd_link_delete(cmd);
-
-    // TODO return an actual error status
-    return err;
+    return i2c_bitaxe_register_write_byte(tps546_dev_handle, command, data);
 }
 
 /**
  * @brief SMBus read word
+ * @param command The command to read
+ * @param result Pointer to store the read data
  */
 static esp_err_t smb_read_word(uint8_t command, uint16_t *result)
 {
     uint8_t data[2];
-    esp_err_t err = ESP_FAIL;
-
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, TPS546_I2CADDR << 1 | WRITE_BIT, ACK_CHECK);
-    i2c_master_write_byte(cmd, command, ACK_CHECK);
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, TPS546_I2CADDR << 1 | READ_BIT, ACK_CHECK);
-    i2c_master_read(cmd, &data[0], 1, ACK_VALUE);
-    i2c_master_read_byte(cmd, &data[1], NACK_VALUE);
-    i2c_master_stop(cmd);
-    i2c_set_timeout(I2C_MASTER_NUM, 20);
-    ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, SMBUS_DEFAULT_TIMEOUT));
-    i2c_cmd_link_delete(cmd);
-
-    *result = (data[1] << 8) + data[0];
-    // TODO return an actual error status
-    return err;
+    if (i2c_bitaxe_register_read(tps546_dev_handle, command, data, 2) != ESP_OK) {
+        return ESP_FAIL;
+    } else {
+        *result = (data[1] << 8) + data[0];
+        return ESP_OK;
+    }
 }
 
 /**
  * @brief SMBus write word
+ * @param command The command to write
+ * @param data The data to write
  */
 static esp_err_t smb_write_word(uint8_t command, uint16_t data)
 {
-    esp_err_t err = ESP_FAIL;
-
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, TPS546_I2CADDR << 1 | WRITE_BIT, ACK_CHECK);
-    i2c_master_write_byte(cmd, command, ACK_CHECK);
-    i2c_master_write_byte(cmd, (uint8_t)(data & 0x00FF), ACK_CHECK);
-    i2c_master_write_byte(cmd, (uint8_t)((data & 0xFF00) >> 8), NACK_VALUE);
-    i2c_master_stop(cmd);
-    ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, SMBUS_DEFAULT_TIMEOUT));
-    i2c_cmd_link_delete(cmd);
-
-    // TODO return an actual error status
-    return err;
+    return i2c_bitaxe_register_write_word(tps546_dev_handle, command, data);
 }
 
 /**
- * @brief SMBus read block
+ * @brief SMBus read block -- SMBus is funny in that the first byte returned is the length of data??
+ * @param command The command to read
+ * @param data Pointer to store the read data
+ * @param len The number of bytes to read
  */
 static esp_err_t smb_read_block(uint8_t command, uint8_t *data, uint8_t len)
 {
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, TPS546_I2CADDR << 1 | WRITE_BIT, ACK_CHECK);
-    i2c_master_write_byte(cmd, command, ACK_CHECK);
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, TPS546_I2CADDR << 1 | READ_BIT, ACK_CHECK);
-    uint8_t slave_len = 0;
-    i2c_master_read_byte(cmd, &slave_len, ACK_VALUE);
-    ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, SMBUS_DEFAULT_TIMEOUT));
-    i2c_cmd_link_delete(cmd);
-
-    cmd = i2c_cmd_link_create();
-    for (size_t i = 0; i < slave_len - 1; ++i)
-    {
-        i2c_master_read_byte(cmd, &data[i], ACK_VALUE);
+    //malloc a buffer len+1 to store the length byte
+    uint8_t *buf = (uint8_t *)malloc(len+1);
+    if (i2c_bitaxe_register_read(tps546_dev_handle, command, buf, len+1) != ESP_OK) {
+        free(buf);
+        return ESP_FAIL;
     }
-    i2c_master_read_byte(cmd, &data[slave_len - 1], NACK_VALUE);
-    i2c_master_stop(cmd);
-    ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, SMBUS_DEFAULT_TIMEOUT));
-    i2c_cmd_link_delete(cmd);
+    //copy the data into the buffer
+    memcpy(data, buf+1, len);
+    free(buf);
 
-    // TODO return an actual error status
-    return 0;
+    return ESP_OK;
 }
 
 /**
- * @brief SMBus write block
+ * @brief SMBus write block - don;t forget the length byte first :P
+ * @param command The command to write
+ * @param data The data to write
+ * @param len The number of bytes to write
  */
 static esp_err_t smb_write_block(uint8_t command, uint8_t *data, uint8_t len)
 {
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, TPS546_I2CADDR << 1 | WRITE_BIT, ACK_CHECK);
-    i2c_master_write_byte(cmd, command, ACK_CHECK);
-    i2c_master_write_byte(cmd, len, ACK_CHECK);
-    for (size_t i = 0; i < len; ++i)
-    {
-        i2c_master_write_byte(cmd, data[i], ACK_CHECK);
-    }
-    i2c_master_stop(cmd);
-    i2c_set_timeout(I2C_MASTER_NUM, 20);
-    ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, SMBUS_DEFAULT_TIMEOUT));
-    i2c_cmd_link_delete(cmd);
+    //malloc a buffer len+2 to store the command byte and then the length byte
+    uint8_t *buf = (uint8_t *)malloc(len+2);
+    buf[0] = command;
+    buf[1] = len;
+    //copy the data into the buffer
+    memcpy(buf+2, data, len);
 
-    // TODO return an actual error status
-    return 0;
+    //write it all
+    if (i2c_bitaxe_register_write_bytes(tps546_dev_handle, buf, len+2) != ESP_OK) {
+        free(buf);
+        return ESP_FAIL;
+    } else {
+        free(buf);
+        return ESP_OK;
+    }
 }
 
 /**
  * @brief Convert an SLINEAR11 value into an int
+ * @param value The SLINEAR11 value to convert
  */
 static int slinear11_2_int(uint16_t value)
 {
@@ -206,6 +160,7 @@ static int slinear11_2_int(uint16_t value)
 
 /**
  * @brief Convert an SLINEAR11 value into an int
+ * @param value The SLINEAR11 value to convert
  */
 static float slinear11_2_float(uint16_t value)
 {
@@ -236,6 +191,7 @@ static float slinear11_2_float(uint16_t value)
 
 /**
  * @brief Convert an int value into an SLINEAR11
+ * @param value The int value to convert
  */
 static uint16_t int_2_slinear11(int value)
 {
@@ -271,6 +227,7 @@ static uint16_t int_2_slinear11(int value)
 
 /**
  * @brief Convert a float value into an SLINEAR11
+ * @param value The float value to convert
  */
 static uint16_t float_2_slinear11(float value)
 {
@@ -310,6 +267,7 @@ static uint16_t float_2_slinear11(float value)
  * the exponent comes from the VOUT_MODE bits[4..0]
  * stored in twos-complement
  * The mantissa occupies the full 16-bits of the value
+ * @param value The ULINEAR16 value to convert
  */
 static float ulinear16_2_float(uint16_t value)
 {
@@ -334,7 +292,8 @@ static float ulinear16_2_float(uint16_t value)
  * the exponent comes from the VOUT_MODE bits[4..0]
  * stored in twos-complement
  * The mantissa occupies the full 16-bits of the result
-**/
+ * @param value The float value to convert
+*/
 static uint16_t float_2_ulinear16(float value)
 {
     uint8_t voutmode;
@@ -356,29 +315,33 @@ static uint16_t float_2_ulinear16(float value)
 
 /*--- Public TPS546 functions ---*/
 
-// Set up the TPS546 regulator and turn it on
+/**
+ * @brief Set up the TPS546 regulator and turn it on
+*/
 int TPS546_init(void)
 {
-	uint8_t data[6];
+	uint8_t data[7];
     uint8_t u8_value;
     uint16_t u16_value;
-    float vin;
-    float iout;
-    float vout;
     uint8_t read_mfr_revision[4];
     int temp;
     uint8_t comp_config[5];
+    uint8_t voutmode;
 
     ESP_LOGI(TAG, "Initializing the core voltage regulator");
 
+    if (i2c_bitaxe_add_device(TPS546_I2CADDR, &tps546_dev_handle) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add I2C device");
+        return -1;
+    }
+
     /* Establish communication with regulator */
-    smb_read_block(PMBUS_IC_DEVICE_ID, data, 6);
-    ESP_LOGI(TAG, "Device ID: %02x %02x %02x %02x %02x %02x", data[0], data[1],
-                 data[2], data[3], data[4], data[5]);
+    smb_read_block(PMBUS_IC_DEVICE_ID, data, 6); //the DEVICE_ID block first byte is the length.
+    ESP_LOGI(TAG, "Device ID: %02x %02x %02x %02x %02x %02x", data[0], data[1], data[2], data[3], data[4], data[5]);
     /* There's 3 different known device IDs observed so far */
     if ( (memcmp(data, DEVICE_ID1, 6) != 0) && (memcmp(data, DEVICE_ID2, 6) != 0) && (memcmp(data, DEVICE_ID3, 6) != 0))
     {
-        ESP_LOGI(TAG, "ERROR- cannot find TPS546 regulator");
+        ESP_LOGE(TAG, "Cannot find TPS546 regulator - Device ID mismatch");
         return -1;
     }
 
@@ -391,7 +354,7 @@ int TPS546_init(void)
     /* Read version number and see if it matches */
     TPS546_read_mfr_info(read_mfr_revision);
     // if (memcmp(read_mfr_revision, MFR_REVISION, 3) != 0) {
-    uint8_t voutmode;
+    
     // If it doesn't match, then write all the registers and set new version number
     // ESP_LOGI(TAG, "--------------------------------");
     // ESP_LOGI(TAG, "Config version mismatch, writing new config values");
@@ -401,24 +364,26 @@ int TPS546_init(void)
     TPS546_write_entire_config();
     //}
 
-    /* Show temperature */
-    ESP_LOGI(TAG, "--------------------------------");
-    ESP_LOGI(TAG, "Temp: %d", TPS546_get_temperature());
+    // /* Show temperature */
+    // ESP_LOGI(TAG, "--------------------------------");
+    // ESP_LOGI(TAG, "Temp: %d", TPS546_get_temperature());
 
-    /* Show switching frequency */
-    TPS546_get_frequency();
-    TPS546_set_frequency(650);
+    // /* Show switching frequency */
+    // TPS546_get_frequency();
+    // TPS546_set_frequency(650);
 
     /* Show voltage settings */
     TPS546_show_voltage_settings();
 
-    ESP_LOGI(TAG, "-----------VOLTAGE/CURRENT---------------------");
-    /* Get voltage input (SLINEAR11) */
-    TPS546_get_vin();
-    /* Get output current (SLINEAR11) */
-    TPS546_get_iout();
-    /* Get voltage output (ULINEAR16) */
-    TPS546_get_vout();
+    //TPS546_print_status();
+
+    // ESP_LOGI(TAG, "-----------VOLTAGE/CURRENT---------------------");
+    // /* Get voltage input (SLINEAR11) */
+    // ESP_LOGI(TAG, "READ_VIN: %.2fV", TPS546_get_vin());
+    // /* Get output current (SLINEAR11) */
+    // ESP_LOGI(TAG, "READ_IOUT: %.2fA", TPS546_get_iout());
+    // /* Get voltage output (ULINEAR16) */
+    // ESP_LOGI(TAG, "READ_VOUT: %.2fV", TPS546_get_vout());
 
     ESP_LOGI(TAG, "-----------TIMING---------------------");
     smb_read_word(PMBUS_TON_DELAY, &u16_value);
@@ -441,7 +406,10 @@ int TPS546_init(void)
     ESP_LOGI(TAG, "--------------------------------------");
 
     // Read the compensation config registers
-    smb_read_block(PMBUS_COMPENSATION_CONFIG, comp_config, 5);
+    if (smb_read_block(PMBUS_COMPENSATION_CONFIG, comp_config, 5) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read COMPENSATION CONFIG");
+        return -1;
+    }
     ESP_LOGI(TAG, "COMPENSATION CONFIG");
     ESP_LOGI(TAG, "%02x %02x %02x %02x %02x", comp_config[0], comp_config[1],
         comp_config[2], comp_config[3], comp_config[4]);
@@ -449,18 +417,30 @@ int TPS546_init(void)
     return 0;
 }
 
-/* Read the manufacturer model and revision */
+/**
+ * @brief Read the manufacturer model and revision 
+ * @param read_mfr_revision Pointer to store the read revision
+*/
 void TPS546_read_mfr_info(uint8_t *read_mfr_revision)
 {
     uint8_t read_mfr_id[4];
     uint8_t read_mfr_model[4];
 
     ESP_LOGI(TAG, "Reading MFR info");
-    smb_read_block(PMBUS_MFR_ID, read_mfr_id, 3);
+    if (smb_read_block(PMBUS_MFR_ID, read_mfr_id, 3) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read MFR ID");
+        return;
+    }
     read_mfr_id[3] = 0x00;
-    smb_read_block(PMBUS_MFR_MODEL, read_mfr_model, 3);
+    if (smb_read_block(PMBUS_MFR_MODEL, read_mfr_model, 3) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read MFR MODEL");
+        return;
+    }
     read_mfr_model[3] = 0x00;
-    smb_read_block(PMBUS_MFR_REVISION, read_mfr_revision, 3);
+    if (smb_read_block(PMBUS_MFR_REVISION, read_mfr_revision, 3) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read MFR REVISION");
+        return;
+    }
 
     ESP_LOGI(TAG, "MFR_ID: %s", read_mfr_id);
     ESP_LOGI(TAG, "MFR_MODEL: %s", read_mfr_model);
@@ -468,7 +448,9 @@ void TPS546_read_mfr_info(uint8_t *read_mfr_revision)
         read_mfr_revision[1], read_mfr_revision[2]);
 }
 
-/* Write the manufacturer ID and revision to NVM */
+/**
+ * @brief Write the manufacturer ID and revision to NVM 
+*/
 void TPS546_set_mfr_info(void)
 {
     ESP_LOGI(TAG, "Setting MFR info");
@@ -477,46 +459,55 @@ void TPS546_set_mfr_info(void)
 	smb_write_block(PMBUS_MFR_REVISION, MFR_REVISION, 3);
 }
 
-/* Set all the relevant config registers for normal operation */
+/**
+ * @brief Set all the relevant config registers for normal operation 
+*/
 void TPS546_write_entire_config(void)
 {
     ESP_LOGI(TAG, "---Writing new config values to TPS546---");
     /* set up the ON_OFF_CONFIG */
     ESP_LOGI(TAG, "Setting ON_OFF_CONFIG");
-    smb_write_byte(PMBUS_ON_OFF_CONFIG, TPS546_INIT_ON_OFF_CONFIG);
+    if (smb_write_byte(PMBUS_ON_OFF_CONFIG, TPS546_INIT_ON_OFF_CONFIG) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write ON_OFF_CONFIG");
+        return;
+    }
 
     /* Switch frequency */
     ESP_LOGI(TAG, "Setting FREQUENCY");
     smb_write_word(PMBUS_FREQUENCY_SWITCH, int_2_slinear11(TPS546_INIT_FREQUENCY));
 
     /* vin voltage */
-    ESP_LOGI(TAG, "Setting VIN");
+    ESP_LOGI(TAG, "Setting VIN_ON: %.2f", TPS546_INIT_VIN_ON);
     smb_write_word(PMBUS_VIN_ON, float_2_slinear11(TPS546_INIT_VIN_ON));
+    ESP_LOGI(TAG, "Setting VIN_OFF: %.2f", TPS546_INIT_VIN_OFF);
     smb_write_word(PMBUS_VIN_OFF, float_2_slinear11(TPS546_INIT_VIN_OFF));
+    ESP_LOGI(TAG, "Setting VIN_UV_WARN_LIMIT: %.2f", TPS546_INIT_VIN_UV_WARN_LIMIT);
     smb_write_word(PMBUS_VIN_UV_WARN_LIMIT, float_2_slinear11(TPS546_INIT_VIN_UV_WARN_LIMIT));
+    ESP_LOGI(TAG, "Setting VIN_OV_FAULT_LIMIT: %.2f", TPS546_INIT_VIN_OV_FAULT_LIMIT);
     smb_write_word(PMBUS_VIN_OV_FAULT_LIMIT, float_2_slinear11(TPS546_INIT_VIN_OV_FAULT_LIMIT));
+    ESP_LOGI(TAG, "Setting VIN_OV_FAULT_RESPONSE: %02X", TPS546_INIT_VIN_OV_FAULT_RESPONSE);
     smb_write_byte(PMBUS_VIN_OV_FAULT_RESPONSE, TPS546_INIT_VIN_OV_FAULT_RESPONSE);
 
     /* vout voltage */
-    ESP_LOGI(TAG, "Setting VOUT SCALE");
+    ESP_LOGI(TAG, "Setting VOUT SCALE: %.2f", TPS546_INIT_SCALE_LOOP);
     smb_write_word(PMBUS_VOUT_SCALE_LOOP, float_2_slinear11(TPS546_INIT_SCALE_LOOP));
-    ESP_LOGI(TAG, "VOUT_COMMAND");
+    ESP_LOGI(TAG, "VOUT_COMMAND: %.2f", TPS546_INIT_VOUT_COMMAND);
     smb_write_word(PMBUS_VOUT_COMMAND, float_2_ulinear16(TPS546_INIT_VOUT_COMMAND));
-    ESP_LOGI(TAG, "VOUT_MAX");
+    ESP_LOGI(TAG, "VOUT_MAX: %d", TPS546_INIT_VOUT_MAX);
     smb_write_word(PMBUS_VOUT_MAX, float_2_ulinear16(TPS546_INIT_VOUT_MAX));
-    ESP_LOGI(TAG, "VOUT_OV_FAULT_LIMIT");
+    ESP_LOGI(TAG, "VOUT_OV_FAULT_LIMIT: %.2f", TPS546_INIT_VOUT_OV_FAULT_LIMIT);
     smb_write_word(PMBUS_VOUT_OV_FAULT_LIMIT, float_2_ulinear16(TPS546_INIT_VOUT_OV_FAULT_LIMIT));
-    ESP_LOGI(TAG, "VOUT_OV_WARN_LIMIT");
+    ESP_LOGI(TAG, "VOUT_OV_WARN_LIMIT: %.2f", TPS546_INIT_VOUT_OV_WARN_LIMIT);
     smb_write_word(PMBUS_VOUT_OV_WARN_LIMIT, float_2_ulinear16(TPS546_INIT_VOUT_OV_WARN_LIMIT));
-    ESP_LOGI(TAG, "VOUT_MARGIN_HIGH");
+    ESP_LOGI(TAG, "VOUT_MARGIN_HIGH: %.2f", TPS546_INIT_VOUT_MARGIN_HIGH);
     smb_write_word(PMBUS_VOUT_MARGIN_HIGH, float_2_ulinear16(TPS546_INIT_VOUT_MARGIN_HIGH));
-    ESP_LOGI(TAG, "VOUT_MARGIN_LOW");
+    ESP_LOGI(TAG, "VOUT_MARGIN_LOW: %.2f", TPS546_INIT_VOUT_MARGIN_LOW);
     smb_write_word(PMBUS_VOUT_MARGIN_LOW, float_2_ulinear16(TPS546_INIT_VOUT_MARGIN_LOW));
-    ESP_LOGI(TAG, "VOUT_UV_WARN_LIMIT");
+    ESP_LOGI(TAG, "VOUT_UV_WARN_LIMIT: %.2f", TPS546_INIT_VOUT_UV_WARN_LIMIT);
     smb_write_word(PMBUS_VOUT_UV_WARN_LIMIT, float_2_ulinear16(TPS546_INIT_VOUT_UV_WARN_LIMIT));
-    ESP_LOGI(TAG, "VOUT_UV_FAULT_LIMIT");
+    ESP_LOGI(TAG, "VOUT_UV_FAULT_LIMIT: %.2f", TPS546_INIT_VOUT_UV_FAULT_LIMIT);
     smb_write_word(PMBUS_VOUT_UV_FAULT_LIMIT, float_2_ulinear16(TPS546_INIT_VOUT_UV_FAULT_LIMIT));
-    ESP_LOGI(TAG, "VOUT_MIN");
+    ESP_LOGI(TAG, "VOUT_MIN: %d", TPS546_INIT_VOUT_MIN);
     smb_write_word(PMBUS_VOUT_MIN, float_2_ulinear16(TPS546_INIT_VOUT_MIN));
 
     /* iout current */
@@ -527,23 +518,26 @@ void TPS546_write_entire_config(void)
 
     /* temperature */
     ESP_LOGI(TAG, "Setting TEMPERATURE");
-    ESP_LOGI(TAG, "OT_WARN_LIMIT");
+    ESP_LOGI(TAG, "OT_WARN_LIMIT: %d", TPS546_INIT_OT_WARN_LIMIT);
     smb_write_word(PMBUS_OT_WARN_LIMIT, int_2_slinear11(TPS546_INIT_OT_WARN_LIMIT));
-    ESP_LOGI(TAG, "OT_FAULT_LIMIT");
+    ESP_LOGI(TAG, "OT_FAULT_LIMIT: %d", TPS546_INIT_OT_FAULT_LIMIT);
     smb_write_word(PMBUS_OT_FAULT_LIMIT, int_2_slinear11(TPS546_INIT_OT_FAULT_LIMIT));
-    ESP_LOGI(TAG, "OT_FAULT_RESPONSE");
+    ESP_LOGI(TAG, "OT_FAULT_RESPONSE: %02x", TPS546_INIT_OT_FAULT_RESPONSE);
     smb_write_byte(PMBUS_OT_FAULT_RESPONSE, TPS546_INIT_OT_FAULT_RESPONSE);
 
     /* timing */
     ESP_LOGI(TAG, "Setting TIMING");
-    ESP_LOGI(TAG, "TON_DELAY");
+    ESP_LOGI(TAG, "TON_DELAY: %d", TPS546_INIT_TON_DELAY);
     smb_write_word(PMBUS_TON_DELAY, int_2_slinear11(TPS546_INIT_TON_DELAY));
-    ESP_LOGI(TAG, "TON_RISE");
+    ESP_LOGI(TAG, "TON_RISE: %d", TPS546_INIT_TON_RISE);
     smb_write_word(PMBUS_TON_RISE, int_2_slinear11(TPS546_INIT_TON_RISE));
-    ESP_LOGI(TAG, "TON_MAX_FAULT_LIMIT");
+    ESP_LOGI(TAG, "TON_MAX_FAULT_LIMIT: %d", TPS546_INIT_TON_MAX_FAULT_LIMIT);
     smb_write_word(PMBUS_TON_MAX_FAULT_LIMIT, int_2_slinear11(TPS546_INIT_TON_MAX_FAULT_LIMIT));
+    ESP_LOGI(TAG, "TON_MAX_FAULT_RESPONSE: %02x", TPS546_INIT_TON_MAX_FAULT_RESPONSE);
     smb_write_byte(PMBUS_TON_MAX_FAULT_RESPONSE, TPS546_INIT_TON_MAX_FAULT_RESPONSE);
+    ESP_LOGI(TAG, "TOFF_DELAY: %d", TPS546_INIT_TOFF_DELAY);
     smb_write_word(PMBUS_TOFF_DELAY, int_2_slinear11(TPS546_INIT_TOFF_DELAY));
+    ESP_LOGI(TAG, "TOFF_FALL: %d", TPS546_INIT_TOFF_FALL);
     smb_write_word(PMBUS_TOFF_FALL, int_2_slinear11(TPS546_INIT_TOFF_FALL));
 
     /* Compensation config */
@@ -587,7 +581,7 @@ int TPS546_get_frequency(void)
 void TPS546_set_frequency(int newfreq)
 {
     uint16_t value;
-    int freq;
+    //int freq;
 
     ESP_LOGI(TAG, "Writing new frequency: %d", newfreq);
     value = int_2_slinear11(newfreq);
@@ -615,12 +609,16 @@ float TPS546_get_vin(void)
     float vin;
 
     /* Get voltage input (ULINEAR16) */
-    smb_read_word(PMBUS_READ_VIN, &u16_value);
-    vin = slinear11_2_float(u16_value);
-#ifdef _DEBUG_LOG_
-    ESP_LOGI(TAG, "Got Vin: %2.3f V", vin);
-#endif
-    return vin;
+    if (smb_read_word(PMBUS_READ_VIN, &u16_value) != ESP_OK) {
+        ESP_LOGE(TAG, "Could not read VIN");
+        return 0;
+    } else {
+        vin = slinear11_2_float(u16_value);
+        #ifdef _DEBUG_LOG_
+        ESP_LOGI(TAG, "Got Vin: %2.3f V", vin);
+        #endif
+        return vin;
+    }    
 }
 
 float TPS546_get_iout(void)
@@ -629,14 +627,18 @@ float TPS546_get_iout(void)
     float iout;
 
     /* Get current output (SLINEAR11) */
-    smb_read_word(PMBUS_READ_IOUT, &u16_value);
-    iout = slinear11_2_float(u16_value);
+    if (smb_read_word(PMBUS_READ_IOUT, &u16_value) != ESP_OK) {
+        ESP_LOGE(TAG, "Could not read Iout");
+        return 0;
+    } else {
+        iout = slinear11_2_float(u16_value);
 
-#ifdef _DEBUG_LOG_
-    ESP_LOGI(TAG, "Got Iout: %2.3f A", iout);
-#endif
+    #ifdef _DEBUG_LOG_
+        ESP_LOGI(TAG, "Got Iout: %2.3f A", iout);
+    #endif
 
-    return iout;
+        return iout;
+}
 }
 
 float TPS546_get_vout(void)
@@ -645,12 +647,39 @@ float TPS546_get_vout(void)
     float vout;
 
     /* Get voltage output (ULINEAR16) */
-    smb_read_word(PMBUS_READ_VOUT, &u16_value);
-    vout = ulinear16_2_float(u16_value);
-#ifdef _DEBUG_LOG_
-    ESP_LOGI(TAG, "Got Vout: %2.3f V", vout);
-#endif
-    return vout;
+    if (smb_read_word(PMBUS_READ_VOUT, &u16_value) != ESP_OK) {
+        ESP_LOGE(TAG, "Could not read Vout");
+        return 0;
+    } else {
+        vout = ulinear16_2_float(u16_value);
+    #ifdef _DEBUG_LOG_
+        ESP_LOGI(TAG, "Got Vout: %2.3f V", vout);
+    #endif
+        return vout;
+    }
+}
+
+void TPS546_print_status(void) {
+    uint16_t u16_value;
+    uint8_t u8_value;
+
+    if (smb_read_word(PMBUS_STATUS_WORD, &u16_value) != ESP_OK) {
+        ESP_LOGE(TAG, "Could not read STATUS_WORD");
+    } else {
+        ESP_LOGI(TAG, "TPS546 Status: %04X", u16_value);
+    }
+
+    if (smb_read_byte(PMBUS_STATUS_VOUT, &u8_value) != ESP_OK) {
+        ESP_LOGE(TAG, "Could not read STATUS_VOUT");
+    } else {
+        ESP_LOGI(TAG, "TPS546 VOUT Status: %02X", u8_value);
+    }
+
+    if (smb_read_byte(PMBUS_STATUS_INPUT, &u8_value) != ESP_OK) {
+        ESP_LOGE(TAG, "Could not read STATUS_INPUT");
+    } else {
+        ESP_LOGI(TAG, "TPS546 INPUT Status: %02X", u8_value);
+    }
 }
 
 /**
@@ -659,6 +688,7 @@ float TPS546_get_vout(void)
  * send it the desired output in millivolts
  * A value between TPS546_INIT_VOUT_MIN and TPS546_INIT_VOUT_MAX
  * send a 0 to turn off the output
+ * @param volts The desired output voltage
 **/
 void TPS546_set_vout(float volts)
 {
@@ -666,19 +696,26 @@ void TPS546_set_vout(float volts)
 
     if (volts == 0) {
         /* turn off output */
-        smb_write_byte(PMBUS_OPERATION, OPERATION_OFF);
+        if (smb_write_byte(PMBUS_OPERATION, OPERATION_OFF) != ESP_OK) {
+            ESP_LOGE(TAG, "Could not turn off Vout");
+        }
     } else {
         /* make sure we're in range */
         if ((volts < TPS546_INIT_VOUT_MIN) || (volts > TPS546_INIT_VOUT_MAX)) {
-            ESP_LOGI(TAG, "ERR- Voltage requested (%f V) is out of range", volts);
+            ESP_LOGE(TAG, "Voltage requested (%f V) is out of range", volts);
         } else {
             /* set the output voltage */
             value = float_2_ulinear16(volts);
-            smb_write_word(PMBUS_VOUT_COMMAND, value);
+            if (smb_write_word(PMBUS_VOUT_COMMAND, value) != ESP_OK) {
+                ESP_LOGE(TAG, "Could not set Vout to %1.2f V", volts);
+            }
+
             ESP_LOGI(TAG, "Vout changed to %1.2f V", volts);
 
             /* turn on output */
-           smb_write_byte(PMBUS_OPERATION, OPERATION_ON);
+           if (smb_write_byte(PMBUS_OPERATION, OPERATION_ON) != ESP_OK) {
+                ESP_LOGE(TAG, "Could not turn on Vout");
+            }
         }
     }
 }
@@ -692,56 +729,56 @@ void TPS546_show_voltage_settings(void)
     /* VIN_ON SLINEAR11 */
     smb_read_word(PMBUS_VIN_ON, &u16_value);
     f_value = slinear11_2_float(u16_value);
-    ESP_LOGI(TAG, "VIN ON set to: %f", f_value);
+    ESP_LOGI(TAG, "VIN ON set to: %.2f", f_value);
 
     /* VIN_OFF SLINEAR11 */
     smb_read_word(PMBUS_VIN_OFF, &u16_value);
     f_value = slinear11_2_float(u16_value);
-    ESP_LOGI(TAG, "VIN OFF set to: %f", f_value);
+    ESP_LOGI(TAG, "VIN OFF set to: %.2f", f_value);
 
     /* VOUT_MAX */
     smb_read_word(PMBUS_VOUT_MAX, &u16_value);
     f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "Vout Max set to: %f V", f_value);
+    ESP_LOGI(TAG, "Vout Max set to: %.2f V", f_value);
 
     /* VOUT_OV_FAULT_LIMIT */
     smb_read_word(PMBUS_VOUT_OV_FAULT_LIMIT, &u16_value);
     f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "Vout OV Fault Limit: %f V", f_value);
+    ESP_LOGI(TAG, "Vout OV Fault Limit: %.2f V", f_value);
 
     /* VOUT_OV_WARN_LIMIT */
     smb_read_word(PMBUS_VOUT_OV_WARN_LIMIT, &u16_value);
     f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "Vout OV Warn Limit: %f V", f_value);
+    ESP_LOGI(TAG, "Vout OV Warn Limit: %.2f V", f_value);
 
     /* VOUT_MARGIN_HIGH */
     smb_read_word(PMBUS_VOUT_MARGIN_HIGH, &u16_value);
     f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "Vout Margin HIGH: %f V", f_value);
+    ESP_LOGI(TAG, "Vout Margin HIGH: %.2f V", f_value);
 
     /* --- VOUT_COMMAND --- */
     smb_read_word(PMBUS_VOUT_COMMAND, &u16_value);
     f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "Vout set to: %f V", f_value);
+    ESP_LOGI(TAG, "Vout set to: %.2f V", f_value);
 
     /* VOUT_MARGIN_LOW */
     smb_read_word(PMBUS_VOUT_MARGIN_LOW, &u16_value);
     f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "Vout Margin LOW: %f V", f_value);
+    ESP_LOGI(TAG, "Vout Margin LOW: %.2f V", f_value);
 
     /* VOUT_UV_WARN_LIMIT */
     smb_read_word(PMBUS_VOUT_UV_WARN_LIMIT, &u16_value);
     f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "Vout UV Warn Limit: %f V", f_value);
+    ESP_LOGI(TAG, "Vout UV Warn Limit: %.2f V", f_value);
 
     /* VOUT_UV_FAULT_LIMIT */
     smb_read_word(PMBUS_VOUT_UV_FAULT_LIMIT, &u16_value);
     f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "Vout UV Fault Limit: %f V", f_value);
+    ESP_LOGI(TAG, "Vout UV Fault Limit: %.2f V", f_value);
 
     /* VOUT_MIN */
     smb_read_word(PMBUS_VOUT_MIN, &u16_value);
     f_value = ulinear16_2_float(u16_value);
-    ESP_LOGI(TAG, "Vout Min set to: %f V", f_value);
+    ESP_LOGI(TAG, "Vout Min set to: %.2f V", f_value);
 }
 
