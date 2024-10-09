@@ -291,7 +291,7 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 
-    BM1368_set_job_difficulty_mask(BM1368_INITIAL_DIFFICULTY);
+    BM1368_set_job_difficulty_mask(BM1368_ASIC_DIFFICULTY);
 
     do_frequency_ramp_up((float)frequency);
 

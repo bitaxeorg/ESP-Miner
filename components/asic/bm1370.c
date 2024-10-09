@@ -264,7 +264,7 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     //set ticket mask
     // unsigned char init11[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x14, 0x00, 0x00, 0x00, 0xFF, 0x08};
     // _send_simple(init11, 11);
-    BM1370_set_job_difficulty_mask(BM1370_INITIAL_DIFFICULTY);
+    BM1370_set_job_difficulty_mask(BM1370_ASIC_DIFFICULTY);
 
     //Analog Mux Control
     unsigned char init12[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x54, 0x00, 0x00, 0x00, 0x03, 0x1D};

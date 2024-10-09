@@ -37,7 +37,6 @@ uint8_t VCORE_init(GlobalState * global_state) {
         // case DEVICE_HEX:
         default:
     }
-    ADC_init();
     return result;
 }
 

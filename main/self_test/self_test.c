@@ -20,6 +20,16 @@
 
 static const char * TAG = "self_test";
 
+bool should_test(GlobalState * GLOBAL_STATE) {
+    bool is_max = GLOBAL_STATE->asic_model == ASIC_BM1397;
+    uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
+    uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
+    if (should_self_test == 1 && !is_max && best_diff < 1) {
+        return true;
+    }
+    return false;
+}
+
 static void display_msg(char * msg, GlobalState * GLOBAL_STATE) {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 

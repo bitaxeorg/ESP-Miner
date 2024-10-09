@@ -103,13 +103,13 @@
             <div class="card">
                 <h5>Power</h5>
                 <div class="grid text-center">
-                    <div class="col-4">
+                    <div class="col-6 sm:col-4">
                         <p-knob [min]="3" [max]="maxPower" [readonly]="true" [(ngModel)]="info.power"
                             valueTemplate="{value}W"></p-knob>
                         Power
                     </div>
 
-                    <div class="col-4">
+                    <div class="col-6 sm:col-4">
                         <p-knob [min]="4.5" [max]="5.5" [readonly]="true" [(ngModel)]="info.voltage"
                             valueTemplate="{value}V"
                             [valueColor]="info.voltage < 4.8 ? '#ff0000' : 'var(--primary-color, Black)'"></p-knob>
@@ -117,7 +117,7 @@
                         <span class="danger" *ngIf="info.voltage < 4.8">&nbsp; Danger: Low voltage</span>
                     </div>
 
-                    <div class="col-4">
+                    <div class="col-6 sm:col-4">
                         <p-knob [min]="0.9" [max]="1.8" [readonly]="true" [(ngModel)]="info.coreVoltage"
                             valueTemplate="{value}V"></p-knob>
                         ASIC Voltage Requested

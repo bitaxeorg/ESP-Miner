@@ -134,8 +134,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     // The power reading from the TPS546 is only it's output power. So the rest of the Bitaxe power is not accounted for.
                     power_management->power += SUPRA_POWER_OFFSET; // Add offset for the rest of the Bitaxe power. TODO: this better.
 				} else {
-                    INA260_init();
-
                     if (INA260_installed() == true) {
                         power_management->voltage = INA260_read_voltage();
                         power_management->current = INA260_read_current();
