@@ -152,6 +152,10 @@ export class SettingsComponent {
               this.toastrService.error(event.statusText, 'Error');
             }
           }
+          else if (event instanceof HttpErrorResponse)
+          {
+            this.toastrService.error(event.error, 'Error');
+          }
         },
         error: (err) => {
           this.toastrService.error('Uploaded Error', 'Error');
@@ -186,6 +190,10 @@ export class SettingsComponent {
             } else {
               this.toastrService.error(event.statusText, 'Error');
             }
+          }
+          else if (event instanceof HttpErrorResponse)
+          {
+            this.toastrService.error(event.error, 'Error');
           }
         },
         error: (err) => {
