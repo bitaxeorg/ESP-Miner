@@ -135,6 +135,10 @@
 }
 
 #restart {
-    padding: 2rem 1rem;
-    display: block;
+    display: inline-block;
+}
+
+#restart-container {
+    margin: 2rem 1rem;
+    display: flex;
 }
