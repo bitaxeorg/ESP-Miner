@@ -89,7 +89,7 @@ typedef struct
     uint16_t voltage_domain;
     AsicFunctions ASIC_functions;
     double asic_job_frequency_ms;
-    uint32_t initial_ASIC_difficulty;
+    uint32_t ASIC_difficulty;
 
     work_queue stratum_queue;
     work_queue ASIC_jobs_queue;

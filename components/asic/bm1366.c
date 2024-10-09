@@ -456,7 +456,7 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 
     // unsigned char init137[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x14, 0x00, 0x00, 0x00, 0xFF, 0x08};
     // _send_simple(init137, 11);
-    BM1366_set_job_difficulty_mask(BM1366_INITIAL_DIFFICULTY);
+    BM1366_set_job_difficulty_mask(BM1366_ASIC_DIFFICULTY);
 
     unsigned char init138[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x54, 0x00, 0x00, 0x00, 0x03, 0x1D};
     _send_simple(init138, 11);
