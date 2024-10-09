@@ -161,7 +161,16 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
         .sta =
             {
                 .threshold.authmode = authmode,
-            },
+                .btm_enabled = 1,
+                .rm_enabled = 1,
+                .scan_method = WIFI_ALL_CHANNEL_SCAN,
+                .sort_method = WIFI_CONNECT_AP_BY_SIGNAL,
+                .pmf_cfg =
+                    {
+                        .capable = true,
+                        .required = false
+                    },
+        },
     };
 
     strncpy((char *) wifi_sta_config.sta.ssid, wifi_ssid, sizeof(wifi_sta_config.sta.ssid));
