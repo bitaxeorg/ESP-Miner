@@ -28,6 +28,7 @@ export interface ISystemInfo {
     stratumPort: number,
     fallbackStratumURL: string,
     fallbackStratumPort: number,
+    isUsingFallbackStratum: boolean,
     stratumUser: string,
     fallbackStratumUser: string,
     frequency: number,

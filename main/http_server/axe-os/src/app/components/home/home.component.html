@@ -205,39 +205,41 @@
 
 
         <div class="col-12 lg:col-6">
-            <div class="card">
-                <h5>Pool Information</h5>
-                <table *ngIf="info$ | async as info; else loading">
-                    <tr *ngIf="quickLink$ | async as quickLink">
-                        <td>Quick Link:</td>
-                        <td style="word-break: break-all;">
-                            <a style="color: white; text-decoration: underline;" [href]="quickLink" target="_blank">{{quickLink}}</a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>URL:</td>
-                        <td style="word-break: break-all;">{{info.stratumURL}}</td>
-                    </tr>
-                    <tr>
-                        <td>Port:</td>
-                        <td style="word-break: break-all;">{{info.stratumPort}}</td>
-                    </tr>
-                    <tr>
-                        <td>User:</td>
-                        <td style="word-break: break-all;">{{info.stratumUser}}</td>
-                    </tr>
-                    <tr>
-                        <td>Fallback URL:</td>
-                        <td style="word-break: break-all;">{{info.fallbackStratumURL}}</td>
-                    </tr>
-                    <tr>
-                        <td>Fallback Port:</td>
-                        <td style="word-break: break-all;">{{info.fallbackStratumPort}}</td>
-                    </tr>
-                    <tr>
-                        <td>Fallback User:</td>
-                        <td style="word-break: break-all;">{{info.fallbackStratumUser}}</td>
-                    </tr>
+            <div class="card" *ngIf="info$ | async as info; else loading">
+                <h5>Pool Information ({{info.isUsingFallbackStratum ? 'Fallback' : 'Primary' }})</h5>
+                <table>
+                    <ng-container *ngIf="!info.isUsingFallbackStratum">
+                        <tr>
+                            <td>URL:</td>
+                            <td style="word-break: break-all;">
+                                <a style="text-decoration: underline;" [href]="(quickLink$ | async) || info.stratumURL" target="_blank">{{info.stratumURL}}</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Port:</td>
+                            <td style="word-break: break-all;">{{info.stratumPort}}</td>
+                        </tr>
+                        <tr>
+                            <td>User:</td>
+                            <td style="word-break: break-all;">{{info.stratumUser}}</td>
+                        </tr>
+                    </ng-container>
+                    <ng-container *ngIf="info.isUsingFallbackStratum">
+                        <tr>
+                            <td>URL:</td>
+                            <td style="word-break: break-all;">
+                                <a style="text-decoration: underline;" [href]="(fallbackQuickLink$ | async) || info.fallbackStratumURL" target="_blank">{{info.fallbackStratumURL}}</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Port:</td>
+                            <td style="word-break: break-all;">{{info.fallbackStratumPort}}</td>
+                        </tr>
+                        <tr>
+                            <td>User:</td>
+                            <td style="word-break: break-all;">{{info.fallbackStratumUser}}</td>
+                        </tr>
+                    </ng-container>
                 </table>
             </div>
         </div>

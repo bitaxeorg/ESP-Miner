@@ -15,6 +15,7 @@ export class HomeComponent {
   public info$: Observable<ISystemInfo>;
 
   public quickLink$: Observable<string | undefined>;
+  public fallbackQuickLink$: Observable<string | undefined>;
   public expectedHashRate$: Observable<number | undefined>;
 
 
@@ -179,6 +180,26 @@ export class HomeComponent {
           return `https://solo.d-central.tech/#/app/${address}`;
         } else if (/solo[46]?.ckpool.org/.test(info.stratumURL)) {
           const address = info.stratumUser.split('.')[0]
+          return `https://solo.ckpool.org/users/${address}`;
+        } else {
+          return undefined;
+        }
+      })
+    )
+
+    this.fallbackQuickLink$ = this.info$.pipe(
+      map(info => {
+        if (info.fallbackStratumURL.includes('public-pool.io')) {
+          const address = info.fallbackStratumUser.split('.')[0]
+          return `https://web.public-pool.io/#/app/${address}`;
+        } else if (info.fallbackStratumURL.includes('ocean.xyz')) {
+          const address = info.fallbackStratumUser.split('.')[0]
+          return `https://ocean.xyz/stats/${address}`;
+        } else if (info.fallbackStratumURL.includes('solo.d-central.tech')) {
+          const address = info.fallbackStratumUser.split('.')[0]
+          return `https://solo.d-central.tech/#/app/${address}`;
+        } else if (/solo[46]?.ckpool.org/.test(info.fallbackStratumURL)) {
+          const address = info.fallbackStratumUser.split('.')[0]
           return `https://solo.ckpool.org/users/${address}`;
         } else {
           return undefined;
