@@ -30,7 +30,6 @@
 #include "vcore.h"
 
 
-
 static const char * TAG = "SystemModule";
 
 static void _suffix_string(uint64_t, char *, size_t, int);
@@ -400,7 +399,7 @@ static void _update_screen_one(GlobalState * GLOBAL_STATE)
 static void _update_screen_two(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
+    esp_netif_ip_info_t ip_info;
 
     switch (GLOBAL_STATE->device_model) {
         case DEVICE_MAX:
@@ -413,14 +412,6 @@ static void _update_screen_two(GlobalState * GLOBAL_STATE)
                 snprintf(module->oled_buf, 20, "Pool: %.13s", module->pool_url);
                 OLED_writeString(0, 0, module->oled_buf);
 
-                // Version (truncated to fit)
-                memset(module->oled_buf, 0, 20);
-                const char* version = esp_app_get_description()->version;
-                snprintf(module->oled_buf, 20, "Ver: %.14s", version);
-                if (strlen(version) > 14) {
-                    strncpy(module->oled_buf + 18, "..", 2);
-                }
-                OLED_writeString(0, 1, module->oled_buf);
 
                 // IP Address
                 esp_netif_get_ip_info(netif, &ip_info);
