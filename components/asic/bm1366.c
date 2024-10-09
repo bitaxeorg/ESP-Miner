@@ -45,6 +45,8 @@
 #define TICKET_MASK 0x14
 #define MISC_CONTROL 0x18
 
+#define BM1366_TIMEOUT_MS 10000
+#define BM1366_TIMEOUT_THRESHOLD 2
 typedef struct __attribute__((__packed__))
 {
     uint8_t preamble[2];
@@ -630,14 +632,23 @@ void BM1366_send_work(void * pvParameters, bm_job * next_bm_job)
 
 asic_result * BM1366_receive_work(void)
 {
-    // wait for a response, wait time is pretty arbitrary
-    int received = SERIAL_rx(asic_response_buffer, 11, 60000);
+    // wait for a response
+    int received = SERIAL_rx(asic_response_buffer, 11, BM1366_TIMEOUT_MS);
 
-    if (received < 0) {
-        ESP_LOGI(TAG, "Error in serial RX");
+    bool uart_err = received < 0;
+    bool uart_timeout = received == 0;
+    uint8_t asic_timeout_counter = 0;
+
+    // handle response
+    if (uart_err) {
+        ESP_LOGI(TAG, "UART Error in serial RX");
         return NULL;
-    } else if (received == 0) {
-        // Didn't find a solution, restart and try again
+    } else if (uart_timeout) {
+        if (asic_timeout_counter >= BM1366_TIMEOUT_THRESHOLD) {
+            ESP_LOGE(TAG, "ASIC not sending data");
+            asic_timeout_counter = 0;
+        }
+        asic_timeout_counter++;
         return NULL;
     }
 

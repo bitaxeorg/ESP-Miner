@@ -4,7 +4,6 @@
 #define SERIAL_BUF_SIZE 16
 #define CHUNK_SIZE 1024
 
-
 int SERIAL_send(uint8_t *, int, bool);
 void SERIAL_init(void);
 void SERIAL_debug_rx(void);
