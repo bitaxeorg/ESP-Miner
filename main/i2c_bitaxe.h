@@ -4,9 +4,6 @@
 #include "driver/i2c_master.h"
 //#include "driver/i2c.h"
 
-#define I2C_MASTER_NUM 0            /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
-#define I2C_MASTER_TIMEOUT_MS 1000
-
 esp_err_t i2c_bitaxe_init(void);
 esp_err_t i2c_bitaxe_add_device(uint8_t device_address, i2c_master_dev_handle_t * dev_handle);
 
