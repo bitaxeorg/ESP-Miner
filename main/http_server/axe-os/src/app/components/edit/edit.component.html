@@ -153,6 +153,16 @@
 
         </ng-container>
 
+        <div class="col-12" *ngIf="form.get('overheat_mode')?.value === 1">
+            <button pButton type="button" label="Disable Overheat Mode" 
+                    class="p-button-danger w-full py-3" 
+                    (click)="disableOverheatMode()">
+            </button>
+            <small class="block mt-1 text-center" style="color: #ff0000;">
+                Make sure to reset Frequency and Voltage before clicking this button.
+            </small>
+        </div>
+
         <div class="col-12 md:col-4">
             <div class="field-checkbox">
                 <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
@@ -184,14 +194,6 @@
                         Simulator</b></label>
 
                 <p-slider formControlName="fanspeed"></p-slider>
-            </div>
-        </div>
-
-        <div class="col-12" *ngIf="form.get('overheat_mode')?.value === 1">
-            <div class="field-checkbox">
-                <p-checkbox name="overheat_mode" formControlName="overheat_mode" inputId="overheat_mode"
-                    [binary]="true"></p-checkbox>
-                <label for="overheat_mode" style="color: #ff0000;">Disable Overheat Mode. Make sure to reset Frequency and Voltage</label>
             </div>
         </div>
 
