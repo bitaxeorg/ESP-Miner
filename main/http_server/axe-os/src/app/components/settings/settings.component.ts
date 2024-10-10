@@ -158,7 +158,7 @@ export class SettingsComponent {
           }
         },
         error: (err) => {
-          this.toastrService.error('Uploaded Error', 'Error');
+          this.toastrService.error(err.error, 'Error');
         },
         complete: () => {
           this.firmwareUpdateProgress = null;
@@ -197,7 +197,7 @@ export class SettingsComponent {
           }
         },
         error: (err) => {
-          this.toastrService.error('Upload Error', 'Error');
+          this.toastrService.error(err.error, 'Error');
         },
         complete: () => {
           this.websiteUpdateProgress = null;
