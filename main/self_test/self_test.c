@@ -206,6 +206,20 @@ void self_test(void * pvParameters)
         default:
     }
 
+    //initialize the INA260, if we have one.
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (GLOBAL_STATE->board_version < 402) {
+                // Initialize the LED controller
+                INA260_init();
+            }
+            break;
+        case DEVICE_GAMMA:
+        default:
+    }
+
 
     SERIAL_init();
     uint8_t chips_detected = (GLOBAL_STATE->ASIC_functions.init_fn)(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->asic_count);
