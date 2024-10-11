@@ -1,5 +1,8 @@
-name: Build Firmware
-on: [push, pull_request]
+name: Build & Release Firmware
+on:
+  push:
+    tags:
+      - '*'
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -39,10 +42,20 @@ jobs:
     - name: upload esp-miner.bin
       uses: actions/upload-artifact@v3
       with:
-        name: esp-miner-ota.bin
+        name: esp-miner.bin
         path: ./build/esp-miner.bin
     - name: upload www.bin
       uses: actions/upload-artifact@v3
       with:
         name: www.bin
         path: ./build/www.bin
+    - name: Release www.bin
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: ./build/www.bin
+    - name: Release esp-miner.bin
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: ./build/esp-miner.bin
