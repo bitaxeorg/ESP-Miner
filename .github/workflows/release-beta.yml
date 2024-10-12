@@ -2,7 +2,7 @@ name: Build & Release Firmware [Pre-Release]
 
 on:
   release:
-    types: [released]
+    types: [prereleased]
 
 jobs:
   build:

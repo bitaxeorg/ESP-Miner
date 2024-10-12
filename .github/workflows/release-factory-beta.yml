@@ -2,7 +2,7 @@ name: Build & Release Factory Images [Pre-Release]
 
 on:
   release:
-    types: [released]
+    types: [prereleased]
 
 jobs:
   build:
