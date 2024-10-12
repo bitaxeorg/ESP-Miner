@@ -1,8 +1,9 @@
-name: Build & Release Firmware
+name: Build & Release Firmware [Release]
+
 on:
-  push:
-    tags:
-      - '*'
+  release:
+    types: [released]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -53,11 +54,9 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        prerelease: true
         files: ./build/www.bin
     - name: Release esp-miner.bin
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        prerelease: true
         files: ./build/esp-miner.bin
