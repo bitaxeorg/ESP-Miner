@@ -1,0 +1,56 @@
+name: Build & Release Recovery Images [Release]
+
+on:
+  release:
+    types: [released]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: "Recovery ${{ matrix.build_type }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: ["102", "202", "204", "401", "402", "403", "601"]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build web dist
+        working-directory: ./main/http_server/axe-os
+        run: |
+          npm ci
+          npm run build
+      - name: esp-idf build
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.3.1
+          target: esp32s3
+          command: GITHUB_ACTIONS="true" idf.py build
+          path: '.'
+      - name: Disable self test on recovery images.
+        run: "sed -i 's/selftest,data,u16,1/selftest,data,u16,0/g' config-${{ matrix.build_type }}.cvs"
+      - name: "esp-idf build recovery config for ${{ matrix.build_type }}"
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.3.1
+          target: esp32s3
+          command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate config-${{ matrix.build_type }}.cvs config.bin 0x6000
+          path: '.'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      - run: pip install esptool
+      - name: "Create recovery image for ${{ matrix.build_type }}-${{ github.ref_name }}"
+        run: "./merge_bin.sh -c esp-miner-recovery-${{ matrix.build_type }}-${{ github.ref_name }}.bin"
+      - name: Release esp-miner.bin
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: "esp-miner-recovery-${{ matrix.build_type }}-${{ github.ref_name }}.bin"
