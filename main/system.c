@@ -383,7 +383,7 @@ static void _update_screen_one(GlobalState * GLOBAL_STATE)
                 OLED_writeString(0, 1, module->oled_buf);
 
                 memset(module->oled_buf, 0, 20);
-                snprintf(module->oled_buf, 20, module->FOUND_BLOCK ? "!!! BLOCK FOUND !!!" : "BD: %s", module->best_diff_string);
+                snprintf(module->oled_buf, 20, module->FOUND_BLOCK ? "!!! BLOCK FOUND !!!" : "Best: %s", module->best_diff_string);
                 OLED_writeString(0, 2, module->oled_buf);
 
                 memset(module->oled_buf, 0, 20);
@@ -408,30 +408,32 @@ static void _update_screen_two(GlobalState * GLOBAL_STATE)
         case DEVICE_GAMMA:
             if (OLED_status()) {
                 // Pool URL
+                OLED_writeString(0, 0, "Mining URL:");
                 memset(module->oled_buf, 0, 20);
                 if (module->is_using_fallback) {
-                snprintf(module->oled_buf, 20, "Pool: %.13s", module->fallback_pool_url);
+                snprintf(module->oled_buf, 20, "%.19s", module->fallback_pool_url);
                 } else {
-                    snprintf(module->oled_buf, 20, "Pool: %.13s", module->pool_url);
-                }
-                OLED_writeString(0, 0, module->oled_buf);
-                // Second line of pool URL
-                memset(module->oled_buf, 0, 20);
-                if (module->is_using_fallback) {
-                snprintf(module->oled_buf, 20, "%.19s", module->fallback_pool_url + 13);
-                } else {
-                    snprintf(module->oled_buf, 20, "%.19s", module->pool_url + 13);
+                    snprintf(module->oled_buf, 20, "%.19s", module->pool_url);
                 }
                 OLED_writeString(0, 1, module->oled_buf);
+                // // Second line of pool URL
+                // memset(module->oled_buf, 0, 20);
+                // if (module->is_using_fallback) {
+                // snprintf(module->oled_buf, 20, "%.19s", module->fallback_pool_url + 13);
+                // } else {
+                //     snprintf(module->oled_buf, 20, "%.19s", module->pool_url + 13);
+                // }
+                // OLED_writeString(0, 1, module->oled_buf);
 
                 // IP Address
+                OLED_writeString(0, 2, "Bitaxe IP:");
                 esp_netif_get_ip_info(netif, &ip_info);
                 char ip_address_str[IP4ADDR_STRLEN_MAX];
                 esp_ip4addr_ntoa(&ip_info.ip, ip_address_str, IP4ADDR_STRLEN_MAX);
 
                 memset(module->oled_buf, 0, 20);
-                snprintf(module->oled_buf, 20, "IP: %s", ip_address_str);
-                OLED_writeString(0, 2, module->oled_buf);
+                snprintf(module->oled_buf, 20, "%s", ip_address_str);
+                OLED_writeString(0, 3, module->oled_buf);
             }
             break;
         default:
