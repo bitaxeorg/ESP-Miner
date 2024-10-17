@@ -172,13 +172,13 @@ static void oledSetPosition(int x, int y)
     }
 
     write_command(0xb0 | y);                // go to page Y
-    write_command(0x00 | (x & 0xf));        // // lower col addr
-    write_command(0x10 | ((x >> 4) & 0xf)); // upper col addr
+    write_command(0x00 | (x & 0x0f));       // lower col addr
+    write_command(0x10 | ((x >> 4) & 0x0f));// upper col addr
 }
 
 // Write a block of pixel data to the OLED
 // Length can be anything from 1 to 1024 (whole display)
-static void oledWriteDataBlock(uint8_t * ucBuf, int iLen)
+static void oledWriteDataBlock(const uint8_t * ucBuf, int iLen)
 {
     uint8_t ucTemp[129];
 
@@ -214,6 +214,22 @@ int OLED_setPixel(int x, int y, uint8_t ucColor)
         oledSetPosition(x, y >> 3);
         oledWriteDataBlock(&uc, 1);
     }
+    return 0;
+}
+
+// Write a bitmap to the screen
+// The X position is in character widths (8 or 16)
+// The Y position is in memory pages (8 lines each)
+// Bitmap should be aligned vertical, 1 bit per pixel
+// Width and Height must be per 8 pixels
+// Conversion tool: https://javl.github.io/image2cpp/
+int OLED_showBitmap(int x, int y, const uint8_t *bitmap, int width, int height)
+{
+    for (int row = 0; row < (height >> 3); row++) {
+        oledSetPosition(x, y + row);
+        oledWriteDataBlock(&bitmap[row * width], width);
+    }
+
     return 0;
 }
 

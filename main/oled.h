@@ -42,6 +42,7 @@ int OLED_writeString(int x, int y, const char *szText);
 // Sets a pixel to On (1) or Off (0)
 // Coordinate system is pixels, not text rows (0-127, 0-63)
 int OLED_setPixel(int x, int y, uint8_t ucPixel);
+int OLED_showBitmap(int x, int y, const uint8_t *bitmap, int width, int height);
 
 // Sets the contrast (brightness) level of the display
 // Valid values are 0-255 where 0=off and 255=max brightness
