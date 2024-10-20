@@ -255,6 +255,7 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
 
     do_frequency_ramp_up((float)frequency);
 
+    //convert BM1368_HCN into bytes here
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, (uint8_t[]){0x00, 0x10, 0x00, 0x00, 0x15, 0xa4}, 6, false);
     BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 

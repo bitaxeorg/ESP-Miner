@@ -16,6 +16,9 @@
 
 static const uint64_t BM1397_CORE_COUNT = 168;
 static const uint64_t BM1397_SMALL_CORE_COUNT = 672;
+static const float BM1397_NONCE_PERCENT = 168.0/256.0; //maximum nonce space with 1 chip
+static const float BM1397_MIDSTATE_ENGINES = 4.0;
+const float BM1397_FULLSCAN_PERCENT = 0.5;             //normalised value 1 means do the maximum space, 0 dont wait before sending work
 
 typedef struct
 {
