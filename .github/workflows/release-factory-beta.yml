@@ -1,8 +1,8 @@
-name: Build & Release Factory Images [Release]
+name: Build & Release Factory Images [Pre-Release]
 
 on:
   release:
-    types: [released]
+    types: [prereleased]
 
 jobs:
   build:
@@ -51,4 +51,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          prerelease: true
           files: "esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin"
