@@ -114,14 +114,27 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
     }
     return httpd_resp_set_type(req, type);
 }
+
 static esp_err_t set_cors_headers(httpd_req_t * req)
 {
+    esp_err_t err;
 
-    return httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*") == ESP_OK &&
-                   httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS") == ESP_OK &&
-                   httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type") == ESP_OK
-               ? ESP_OK
-               : ESP_FAIL;
+    err = httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    if (err != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    err = httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    if (err != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    err = httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    if (err != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
 }
 
 /* Recovery handler */
@@ -237,6 +250,11 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
     cJSON * root = cJSON_Parse(buf);
     cJSON * item;
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
     if ((item = cJSON_GetObjectItem(root, "stratumURL")) != NULL) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_URL, item->valuestring);
     }
