@@ -255,8 +255,12 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
 
     do_frequency_ramp_up((float)frequency);
 
-    //convert BM1368_HCN into bytes here
-    _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, (uint8_t[]){0x00, 0x10, 0x00, 0x00, 0x15, 0xa4}, 6, false);
+    uint8_t set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x00, 0x00};
+    set_10_hash_counting[2] = (BM1368_HCN >> 24) & 0xFF;
+    set_10_hash_counting[3] = (BM1368_HCN >> 16) & 0xFF;
+    set_10_hash_counting[4] = (BM1368_HCN >> 8) & 0xFF;
+    set_10_hash_counting[5] = BM1368_HCN & 0xFF;
+    _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, set_10_hash_counting, 6, false);
     BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
     return chip_counter;
