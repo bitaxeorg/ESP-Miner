@@ -16,7 +16,7 @@
 
 static const uint64_t BM1366_CORE_COUNT = 112;
 static const uint64_t BM1366_SMALL_CORE_COUNT = 894;
-static const float BM1366_NONCE_PERCENT = 111.0/256.0;        //maximum nonce space with 1 chip
+static const float BM1366_NONCE_PERCENT = (float)BM1366_CORE_COUNT/256.0;        //maximum nonce space with 1 chip
 static const float BM1366_MIDSTATE_ENGINES = 8;
 static const int BM1366_HCN = 5450;
 static const float BM1366_HCN_MAX = 430000.0;
