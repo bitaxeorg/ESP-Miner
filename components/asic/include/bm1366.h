@@ -18,9 +18,9 @@ static const uint64_t BM1366_CORE_COUNT = 112;
 static const uint64_t BM1366_SMALL_CORE_COUNT = 894;
 static const float BM1366_NONCE_PERCENT = 111.0/256.0;        //maximum nonce space with 1 chip
 static const float BM1366_MIDSTATE_ENGINES = 8;
-static const float BM1366_HCN = 5450.0;
+static const int BM1366_HCN = 5450;
 static const float BM1366_HCN_MAX = 430000.0;
-static const float BM1366_HCN_PERCENT = BM1366_HCN/BM1366_HCN_MAX;  //hcn limit effect
+static const float BM1366_HCN_PERCENT = (float)BM1366_HCN/BM1366_HCN_MAX;  //hcn limit effect
 static const float BM1366_VERSION_PERCENT = 1.0;              //version scan percent
 static const float BM1366_FULLSCAN_PERCENT = 0.5;             //normalised value 1 means do the maximum space, 0 dont wait before sending work
 
