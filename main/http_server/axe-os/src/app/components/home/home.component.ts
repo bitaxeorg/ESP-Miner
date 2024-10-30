@@ -21,7 +21,8 @@ export class HomeComponent {
 
   public chartOptions: any;
   public dataLabel: number[] = [];
-  public dataData: number[] = [];
+  public hashrateData: number[] = [];
+  public temperatureData: number[] = [];
   public dataDataAverage: number[] = [];
   public chartData?: any;
 
@@ -39,6 +40,8 @@ export class HomeComponent {
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
 
+    console.log(primaryColor)
+
     this.chartData = {
       labels: [],
       datasets: [
@@ -46,25 +49,40 @@ export class HomeComponent {
           type: 'line',
           label: 'Hashrate',
           data: [],
-          fill: false,
-          backgroundColor: primaryColor,
+          backgroundColor: primaryColor + '30',
           borderColor: primaryColor,
           tension: 0,
           pointRadius: 2,
           pointHoverRadius: 5,
-          borderWidth: 1
+          borderWidth: 1,
+          yAxisID: 'y',
+          fill: true,
         },
         {
           type: 'line',
           label: 'Average Hashrate',
           data: [],
           fill: false,
-          backgroundColor: textColorSecondary,
-          borderColor: textColorSecondary,
+          backgroundColor: primaryColor +  '30',
+          borderColor: primaryColor + '30',
           tension: 0,
           pointRadius: 0,
           borderWidth: 2,
-          borderDash: [5, 5]
+          borderDash: [5, 5],
+          yAxisID: 'y',
+        },
+        {
+          type: 'line',
+          label: 'ASIC Temp',
+          data: [],
+          fill: false,
+          backgroundColor: textColorSecondary,
+          borderColor: textColorSecondary,
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          borderWidth: 1,
+          yAxisID: 'y2',
         }
       ]
     };
@@ -80,7 +98,7 @@ export class HomeComponent {
         },
         tooltip: {
           callbacks: {
-            label: function(tooltipItem: any) {
+            label: function (tooltipItem: any) {
               let label = tooltipItem.dataset.label || '';
               if (label) {
                 label += ': ';
@@ -115,6 +133,19 @@ export class HomeComponent {
             color: surfaceBorder,
             drawBorder: false
           }
+        },
+        y2: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          ticks: {
+            color: textColorSecondary
+          },
+          grid: {
+            drawOnChartArea: false,
+            color: surfaceBorder
+          },
+          suggestedMax: 80
         }
       }
     };
@@ -126,20 +157,23 @@ export class HomeComponent {
         return this.systemService.getInfo()
       }),
       tap(info => {
-        this.dataData.push(info.hashRate * 1000000000);
+        this.hashrateData.push(info.hashRate * 1000000000);
+        this.temperatureData.push(info.temp);
+
         this.dataLabel.push(new Date().getTime());
 
-        if (this.dataData.length >= 720) {
-          this.dataData.shift();
+        if (this.hashrateData.length >= 720) {
+          this.hashrateData.shift();
           this.dataLabel.shift();
         }
 
         this.chartData.labels = this.dataLabel;
-        this.chartData.datasets[0].data = this.dataData;
+        this.chartData.datasets[0].data = this.hashrateData;
+        this.chartData.datasets[2].data = this.temperatureData;
 
         // Calculate average hashrate and fill the array with the same value for the average line
-        const averageHashrate = this.calculateAverage(this.dataData);
-        this.chartData.datasets[1].data = Array(this.dataData.length).fill(averageHashrate);
+        const averageHashrate = this.calculateAverage(this.hashrateData);
+        this.chartData.datasets[1].data = Array(this.hashrateData.length).fill(averageHashrate);
 
         this.chartData = {
           ...this.chartData
