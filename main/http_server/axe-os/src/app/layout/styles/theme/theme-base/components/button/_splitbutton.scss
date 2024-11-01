@@ -1,0 +1,15 @@
+.p-splitbutton {
+    border-radius: $borderRadius;
+
+    &.p-button-rounded {
+        border-radius: $roundedButtonBorderRadius;
+
+        > .p-button {
+            border-radius: $roundedButtonBorderRadius;
+        }
+    }
+
+    &.p-button-raised {
+        box-shadow: $raisedButtonShadow;
+    }
+}

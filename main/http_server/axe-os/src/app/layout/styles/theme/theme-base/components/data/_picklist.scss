@@ -1,0 +1,125 @@
+.p-picklist {
+	.p-picklist-buttons {
+		padding: $panelContentPadding;
+
+		.p-button {
+			margin-bottom: $inlineSpacing;
+		}
+	}
+
+	.p-picklist-list-wrapper {
+        background: $panelContentBg;
+        border: $panelContentBorder;
+        border-radius: $borderRadius;
+        transition: $formElementTransition;
+        outline-color: transparent;
+
+        &.p-focus {
+            @include focused-input();
+        }
+    }
+
+	.p-picklist-header {
+	  color: $panelHeaderTextColor;
+        padding: $panelHeaderPadding;
+        font-weight: $panelHeaderFontWeight;
+
+		.p-picklist-title {
+			font-weight: $panelHeaderFontWeight;
+		}
+	}
+
+	.p-picklist-filter-container {
+		padding: $panelHeaderPadding;
+		background: $panelContentBg;
+		border: $panelHeaderBorder;
+		border-bottom: 0 none;
+
+		.p-picklist-filter-input {
+			padding-right: nth($inputPadding, 2) + $primeIconFontSize;
+		}
+
+		.p-picklist-filter-icon {
+			right: nth($inputPadding, 2);
+			color: $inputIconColor;
+		}
+	}
+
+	.p-picklist-list {
+		color: $panelContentTextColor;
+        padding: $inputListPadding;
+        outline: 0 none;
+
+		&:not(:first-child) {
+            border-top: $panelContentBorder;
+        }
+		.p-picklist-item {
+			padding: $inputListItemPadding;
+			margin: $inputListItemMargin;
+			border: $inputListItemBorder;
+			color: $inputListItemTextColor;
+			background: $inputListItemBg;
+			transition: $listItemTransition;
+
+            &:first-child {
+                margin-top: 0;
+            }
+
+			&:not(.p-highlight):hover {
+				background: $inputListItemHoverBg;
+				color: $inputListItemTextHoverColor;
+			}
+
+			&.p-focus {
+				color: $inputListItemTextFocusColor;
+				background: $inputListItemFocusBg;
+			}
+
+			&.p-highlight {
+				color: $highlightTextColor;
+				background: $highlightBg;
+
+				&.p-focus {
+					background: $highlightFocusBg;
+				}
+			}
+		}
+
+		.p-picklist-empty-message {
+			padding: $inputListItemPadding;
+			color: $inputListItemTextColor;
+		}
+
+		&:not(.cdk-drop-list-dragging) {
+			.p-picklist-item {
+				&:not(.p-highlight):hover {
+					background: $inputListItemHoverBg;
+					color: $inputListItemTextHoverColor;
+				}
+			}
+		}
+	}
+
+	&.p-picklist-striped {
+		.p-picklist-list {
+			.p-picklist-item:nth-child(even) {
+				background: $panelContentEvenRowBg;
+
+				&:hover {
+					background: $inputListItemHoverBg;
+				}
+			}
+		}
+	}
+}
+
+.p-picklist-item {
+	&.cdk-drag-preview {
+		padding: $inputListItemPadding;
+		box-shadow: $inputOverlayShadow;
+		border: $inputListItemBorder;
+		color: $inputListItemTextColor;
+		background: $panelContentBg;
+		margin: 0;
+	}
+}

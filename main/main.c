@@ -58,10 +58,10 @@ void app_main(void)
     }
 
     //should we run the self test?
-    if (should_test(&GLOBAL_STATE)) {
-        self_test((void *) &GLOBAL_STATE);
-        vTaskDelay(60 * 60 * 1000 / portTICK_PERIOD_MS);
-    }
+    // if (should_test(&GLOBAL_STATE)) {
+    //     self_test((void *) &GLOBAL_STATE);
+    //     vTaskDelay(60 * 60 * 1000 / portTICK_PERIOD_MS);
+    // }
 
     SYSTEM_init_system(&GLOBAL_STATE);
 

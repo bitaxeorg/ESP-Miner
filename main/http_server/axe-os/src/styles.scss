@@ -1,5 +1,24 @@
+@font-face {
+    font-family: 'Angel Wish';
+    src: url(./assets/fonts/AngelWish.ttf) format('truetype');
+}
+
+@font-face {
+    font-family: 'Nippo-Regular';
+    src: url(./assets/fonts/Nippo-Regular.woff2) format('woff2'),
+         url(./assets/fonts/Nippo-Regular.woff) format('woff'),
+         url(./assets/fonts/Nippo-Regular.ttf) format('truetype');
+    font-weight: 400;
+    font-display: swap;
+    font-style: normal;
+  }
+
+* {
+    font-family: 'Nippo-Regular';
+}
+
 @import "app/layout/styles/layout/layout.scss";
-@import "app/layout/styles/theme/vela-blue/theme.css";
+@import "app/layout/styles/theme/themes/vela/bitaxe/theme.scss";
 
 @import "../node_modules/primeicons/primeicons.css";
 @import "../node_modules/primeng/resources/primeng.min.css";

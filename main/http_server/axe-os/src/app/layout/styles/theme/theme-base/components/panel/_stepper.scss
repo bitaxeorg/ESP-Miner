@@ -1,0 +1,201 @@
+@use "sass:math";
+
+//core
+.p-stepper .p-stepper-nav {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+    overflow-x: auto;
+}
+
+.p-stepper-vertical .p-stepper-nav {
+    flex-direction: column;
+}
+
+.p-stepper-header {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+
+    &:last-of-type {
+        flex: initial;
+    }
+}
+
+.p-stepper-header .p-stepper-action {
+    border: 0 none;
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:focus-visible {
+        @include focused();
+    }
+}
+
+.p-stepper.p-stepper-readonly .p-stepper-header {
+    cursor: auto;
+}
+
+.p-stepper-header.p-highlight .p-stepper-action {
+    cursor: default;
+}
+
+.p-stepper-title {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.p-stepper-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.p-stepper-separator {
+    flex: 1 1 0;
+}
+
+//theme
+.p-stepper {
+    .p-stepper-nav {
+        display: flex;
+        justify-content: space-between;
+        margin: 0;
+        padding: 0;
+        list-style-type: none;
+    }
+
+    .p-stepper-header {
+        padding: $inlineSpacing;
+
+        .p-stepper-action {
+            transition: $listItemTransition;
+            border-radius: $borderRadius;
+            background: $stepsItemBg;
+            outline-color: transparent;
+
+            .p-stepper-number {
+                color: $stepsItemNumberColor;
+                border: $stepsItemBorder;
+                border-width: 2px;
+                background: $stepsItemBg;
+                min-width: $stepsItemNumberWidth;
+                height: $stepsItemNumberHeight;
+                line-height: $stepsItemNumberHeight;
+                font-size: $stepsItemNumberFontSize;
+                border-radius: $stepsItemNumberBorderRadius;
+                transition: $actionIconTransition;
+            }
+
+            .p-stepper-title {
+                margin-left: $inlineSpacing;
+                color: $stepsItemTextColor;
+                font-weight: $stepsItemActiveFontWeight;
+                transition: $actionIconTransition;
+            }
+
+            &:not(.p-disabled):focus-visible {
+                @include focused();
+            }
+        }
+
+        &.p-highlight {
+            .p-stepper-number {
+                background: $highlightBg;
+                color: $highlightTextColor;
+            }
+
+            .p-stepper-title {
+                color: $textColor;
+            }
+        }
+
+        &:not(.p-disabled):focus-visible {
+            @include focused();
+        }
+
+        &:has(~ .p-highlight) {
+            @if variable-exists(primaryColor) {
+                .p-stepper-separator {
+                    background-color: $primaryColor;
+                }
+            }
+        }
+    }
+
+    .p-stepper-panels {
+        background: $tabviewContentBg;
+        padding: $tabviewContentPadding;
+        color: $tabviewContentTextColor;
+    }
+
+    .p-stepper-separator {
+        background-color: $timelineEventColor;
+        width: 100%;
+        height: 2px;
+        margin-inline-start: calc($inlineSpacing * 2);
+        transition: $listItemTransition;
+    }
+
+    &.p-stepper-vertical {
+        display: flex;
+        flex-direction: column;
+
+        .p-stepper-toggleable-content {
+            display: flex;
+            flex: 1 1 auto;
+            background: $tabviewContentBg;
+            color: $tabviewContentTextColor;
+        }
+
+        .p-stepper-panel {
+            display: flex;
+            flex-direction: column;
+            flex: initial;
+
+            &.p-stepper-panel-active {
+                flex: 1 1 auto;
+            }
+
+            .p-stepper-header {
+                flex: initial;
+            }
+
+            .p-stepper-content {
+                width: 100%;
+                padding-left: calc($inlineSpacing * 2);
+            }
+
+            .p-stepper-separator {
+                flex: 0 0 auto;
+                width: 2px;
+                height: auto;
+                margin-inline-start: calc($inlineSpacing * 7 / 2 + 2px);
+            }
+
+            &:has(~ .p-stepper-panel-active) {
+                @if variable-exists(primaryColor) {
+                    .p-stepper-separator {
+                        background-color: $primaryColor;
+                    }
+                }
+            }
+
+            &:last-of-type {
+                .p-stepper-content {
+                    padding-left: calc($inlineSpacing * 6);
+                }
+            }
+        }
+    }
+}
