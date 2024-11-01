@@ -44,7 +44,7 @@ menu "Stratum Configuration"
 
     config STRATUM_USER
         string "Stratum username"
-        default "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.bitaxe"
+        default "replace-this-with-your-btc-address.bitaxe"
         help
             Stratum user to use with pool
 
@@ -56,7 +56,7 @@ menu "Stratum Configuration"
 
     config FALLBACK_STRATUM_USER
         string "Fallback Stratum username"
-        default "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.bitaxe"
+        default "replace-this-with-your-btc-address.bitaxe"
         help
             Fallback Stratum user to use with pool
 
