@@ -1,11 +1,12 @@
 <div class="card">
+
     <form [formGroup]="form">
         <div class="field grid p-fluid">
-            <label htmlFor="ip" class="col-12 mb-2 md:col-2 md:mb-0">AxeOS Device IP</label>
-            <div class="col-12 md:col-10">
+            <label htmlFor="ip" class="col-12 mb-2 md:col-4 md:mb-0">Manual Addition</label>
+            <div class="col-12 md:col-8">
                 <p-inputGroup>
-                    <input pInputText id="ip" formControlName="ip" type="text" />
-                    <button pButton (click)="add()" [disabled]="form.invalid">Add</button>
+                    <input pInputText id="manualAddIp" formControlName="manualAddIp" type="text" />
+                    <button pButton  [disabled]="form.invalid" (click)="add()">Add</button>
                 </p-inputGroup>
 
             </div>
@@ -13,11 +14,10 @@
 
     </form>
 </div>
+<button style="margin-right: 1rem;" pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
+<button pButton  severity="secondary" (click)="refreshList()" [disabled]="scanning">Refresh List ({{refreshIntervalTime}})</button>
 <div>
-    <button pButton (click)="refresh()">Refresh</button>
-</div>
-<div>
-    <table cellspacing="0" cellpadding="0" *ngIf="swarm$ | async as swarm">
+    <table cellspacing="0" cellpadding="0" >
         <tr>
             <th>IP</th>
             <th>Hash Rate</th>
@@ -31,9 +31,9 @@
             <th>Restart</th>
             <th>Remove</th>
         </tr>
-        <ng-container *ngFor="let axeOs$ of swarm">
-            <tr *ngIf="axeOs$ | async as axe">
-                <td><a [href]="'http://'+axe.ip" target="_blank">{{axe.ip}}</a></td>
+        <ng-container *ngFor="let axe of swarm">
+            <tr>
+                <td><a [href]="'http://'+axe.IP" target="_blank">{{axe.IP}}</a></td>
                 <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
                 <td>{{axe.uptimeSeconds | dateAgo}}</td>
                 <td>{{axe.sharesAccepted | number: '1.0-0'}}</td>
@@ -41,7 +41,7 @@
                 <td>{{axe.temp}}°<small>C</small></td>
                 <td>{{axe.bestDiff}}</td>
                 <td>{{axe.version}}</td>
-                <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
+             <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
                 <td><p-button icon="pi pi-sync" pp-button severity="danger" (click)="restart(axe)"></p-button></td>
                 <td><p-button icon="pi pi-trash" pp-button severity="secondary" (click)="remove(axe)"></p-button></td>
             </tr>
@@ -52,6 +52,6 @@
 <div class="modal-backdrop" *ngIf="showEdit" (click)="showEdit = false"></div>
 <div class="modal card" *ngIf="showEdit">
     <div class="close" (click)="showEdit = false">&#10006;</div>
-    <h1>{{selectedAxeOs.ip}}</h1>
-    <app-edit [uri]="'http://' + selectedAxeOs.ip"></app-edit>
+    <h1>{{selectedAxeOs.IP}}</h1>
+    <app-edit [uri]="'http://' + selectedAxeOs.IP"></app-edit>
 </div>

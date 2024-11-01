@@ -1,99 +1,129 @@
-import { Component } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { BehaviorSubject, catchError, combineLatest, forkJoin, map, Observable, of, startWith, switchMap } from 'rxjs';
+import { BehaviorSubject, catchError, combineLatest, debounce, debounceTime, forkJoin, from, interval, map, mergeAll, mergeMap, Observable, of, startWith, switchMap, take, timeout, toArray } from 'rxjs';
+import { LocalStorageService } from 'src/app/local-storage.service';
 import { SystemService } from 'src/app/services/system.service';
-
+const REFRESH_TIME_SECONDS = 30;
+const SWARM_DATA = 'SWARM_DATA'
 @Component({
   selector: 'app-swarm',
   templateUrl: './swarm.component.html',
   styleUrls: ['./swarm.component.scss']
 })
-export class SwarmComponent {
+export class SwarmComponent implements OnInit, OnDestroy {
 
-  public form: FormGroup;
-
-  public swarm$: Observable<Observable<any>[]>;
-
-  public refresh$: BehaviorSubject<null> = new BehaviorSubject(null);
+  public swarm: any[] = [];
 
   public selectedAxeOs: any = null;
   public showEdit = false;
 
+  public form: FormGroup;
+
+  public scanning = false;
+
+  public refreshIntervalRef!: number;
+  public refreshIntervalTime = REFRESH_TIME_SECONDS;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
-    private toastr: ToastrService
+    private toastr: ToastrService,
+    private localStorageService: LocalStorageService,
+    private httpClient: HttpClient
   ) {
+
     this.form = this.fb.group({
-      ip: [null, [Validators.required, Validators.pattern('(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')]]
-    });
-
-    this.swarm$ = this.systemService.getSwarmInfo().pipe(
-      map(swarmInfo => {
-        return swarmInfo.map(({ ip }) => {
-          // Make individual API calls for each IP
-          return this.refresh$.pipe(
-            switchMap(() => {
-              return this.systemService.getInfo(`http://${ip}`);
-            })
-          ).pipe(
-            startWith({ ip }),
-            map(info => {
-              return {
-                ip,
-                ...info
-              };
-            }),
-            catchError(error => {
-              return of({ ip, error: true });
-            })
-          );
-        });
-      })
-    );
-
+      manualAddIp: [null, [Validators.required, Validators.pattern('(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')]]
+    })
 
   }
 
+  ngOnInit(): void {
+    const swarmData = this.localStorageService.getObject(SWARM_DATA);
+    console.log(swarmData);
+    if (swarmData == null) {
+      this.scanNetwork();
+      //this.swarm$ = this.scanNetwork('192.168.1.23', '255.255.255.0').pipe(take(1));
+    } else {
+      this.swarm = swarmData;
+    }
 
-  public add() {
-    const newIp = this.form.value.ip;
+    this.refreshIntervalRef = window.setInterval(() => {
+      this.refreshIntervalTime --;
+      if(this.refreshIntervalTime <= 0){
+        this.refreshIntervalTime = REFRESH_TIME_SECONDS;
+        this.refreshList();
+      }
+    }, 1000);
+  }
 
-    combineLatest([this.systemService.getSwarmInfo('http://' + newIp), this.systemService.getSwarmInfo()]).pipe(
-      switchMap(([newSwarmInfo, existingSwarmInfo]) => {
-
-        if (existingSwarmInfo.length < 1) {
-          existingSwarmInfo.push({ ip: window.location.host });
-        }
+  ngOnDestroy(): void {
+    window.clearInterval(this.refreshIntervalRef);
+  }
 
 
-        const swarmUpdate = existingSwarmInfo.map(({ ip }) => {
-          return this.systemService.updateSwarm('http://' + ip, [{ ip: newIp }, ...newSwarmInfo, ...existingSwarmInfo])
-        });
 
-        const newAxeOs = this.systemService.updateSwarm('http://' + newIp, [{ ip: newIp }, ...existingSwarmInfo])
+  private ipToInt(ip: string): number {
+    return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+  }
 
-        return forkJoin([newAxeOs, ...swarmUpdate]);
+  private intToIp(int: number): string {
+    return `${(int >>> 24) & 255}.${(int >>> 16) & 255}.${(int >>> 8) & 255}.${int & 255}`;
+  }
 
-      })
-    ).subscribe({
-      next: () => {
-        this.toastr.success('Success!', 'Saved.');
-        window.location.reload();
-      },
-      error: (err) => {
-        this.toastr.error('Error.', `Could not save. ${err.message}`);
+  private calculateIpRange(ip: string, netmask: string): { start: number, end: number } {
+    const ipInt = this.ipToInt(ip);
+    const netmaskInt = this.ipToInt(netmask);
+    const network = ipInt & netmaskInt;
+    const broadcast = network | ~netmaskInt;
+    return { start: network + 1, end: broadcast - 1 };
+  }
+
+  scanNetwork() {
+    this.scanning = true;
+
+    const { start, end } = this.calculateIpRange(window.location.hostname, '255.255.255.0');
+    const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
+    from(ips).pipe(
+      mergeMap(ipAddr =>
+        this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
+          map(result => {
+            return {
+              IP: ipAddr,
+              ...result
+            }
+          }),
+          timeout(5000), // Set the timeout to 1 second
+          catchError(error => {
+            //console.error(`Request to ${ipAddr}/api/system/info failed or timed out`, error);
+            return []; // Return an empty result or handle as desired
+          })
+        ),
+        256 // Limit concurrency to avoid overload
+      ),
+      toArray() // Collect all results into a single array
+    ).pipe(take(1)).subscribe({
+      next: (result) => {
+        this.swarm = result;
+        this.localStorageService.setObject(SWARM_DATA, this.swarm);
       },
       complete: () => {
-        this.form.reset();
+        this.scanning = false;
       }
     });
-
   }
 
-  public refresh() {
-    this.refresh$.next(null);
+  public add() {
+    const newIp = this.form.value.manualAddIp;
+
+    this.systemService.getInfo(`http://${newIp}`).subscribe((res) => {
+      if (res.ASICModel) {
+        this.swarm.push({ IP: newIp, ...res });
+        this.localStorageService.setObject(SWARM_DATA, this.swarm);
+      }
+    });
   }
 
   public edit(axe: any) {
@@ -102,38 +132,46 @@ export class SwarmComponent {
   }
 
   public restart(axe: any) {
-    this.systemService.restart(`http://${axe.ip}`).subscribe(res => {
+    this.systemService.restart(`http://${axe.IP}`).subscribe(res => {
 
     });
     this.toastr.success('Success!', 'Bitaxe restarted');
   }
 
   public remove(axeOs: any) {
-    this.systemService.getSwarmInfo().pipe(
-      switchMap((swarmInfo) => {
+    this.swarm = this.swarm.filter(axe => axe.IP != axeOs.IP);
+    this.localStorageService.setObject(SWARM_DATA, this.swarm);
+  }
 
-        const newSwarm = swarmInfo.filter((s: any) => s.ip != axeOs.ip);
+  public refreshList() {
+    const ips = this.swarm.map(axeOs => axeOs.IP);
 
-        const swarmUpdate = newSwarm.map(({ ip }) => {
-          return this.systemService.updateSwarm('http://' + ip, newSwarm)
-        });
-
-        const removedAxeOs = this.systemService.updateSwarm('http://' + axeOs.ip, []);
-
-        return forkJoin([removedAxeOs, ...swarmUpdate]);
-      })
-    ).subscribe({
-      next: () => {
-        this.toastr.success('Success!', 'Saved.');
-        window.location.reload();
-      },
-      error: (err) => {
-        this.toastr.error('Error.', `Could not save. ${err.message}`);
+    from(ips).pipe(
+      mergeMap(ipAddr =>
+        this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
+          map(result => {
+            return {
+              IP: ipAddr,
+              ...result
+            }
+          }),
+          timeout(5000),
+          catchError(error => {
+            return of(this.swarm.find(axeOs => axeOs.IP == ipAddr));
+          })
+        ),
+        256 // Limit concurrency to avoid overload
+      ),
+      toArray() // Collect all results into a single array
+    ).pipe(take(1)).subscribe({
+      next: (result) => {
+        this.swarm = result;
+        this.localStorageService.setObject(SWARM_DATA, this.swarm);
       },
       complete: () => {
-        this.form.reset();
       }
     });
+
   }
 
 }

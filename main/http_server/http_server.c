@@ -193,38 +193,6 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
     return ESP_OK;
 }
 
-static esp_err_t PATCH_update_swarm(httpd_req_t * req)
-{
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
-        return ESP_FAIL;
-    }
-
-    int total_len = req->content_len;
-    int cur_len = 0;
-    char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
-    int received = 0;
-    if (total_len >= SCRATCH_BUFSIZE) {
-        /* Respond with 500 Internal Server Error */
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
-        return ESP_FAIL;
-    }
-    while (cur_len < total_len) {
-        received = httpd_req_recv(req, buf + cur_len, total_len);
-        if (received <= 0) {
-            /* Respond with 500 Internal Server Error */
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
-            return ESP_FAIL;
-        }
-        cur_len += received;
-    }
-    buf[total_len] = '\0';
-
-    nvs_config_set_string(NVS_CONFIG_SWARM, buf);
-    httpd_resp_send_chunk(req, NULL, 0);
-    return ESP_OK;
-}
 
 static esp_err_t handle_options_request(httpd_req_t * req)
 {
@@ -351,21 +319,6 @@ static esp_err_t POST_restart(httpd_req_t * req)
     return ESP_OK;
 }
 
-static esp_err_t GET_swarm(httpd_req_t * req)
-{
-    httpd_resp_set_type(req, "application/json");
-
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
-        return ESP_FAIL;
-    }
-
-    char * swarm_config = nvs_config_get_string(NVS_CONFIG_SWARM, "[]");
-    httpd_resp_sendstr(req, swarm_config);
-    free(swarm_config);
-    return ESP_OK;
-}
 
 /* Simple handler for getting system handler */
 static esp_err_t GET_system_info(httpd_req_t * req)
@@ -728,13 +681,6 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_uri_t system_info_get_uri = {
         .uri = "/api/system/info", .method = HTTP_GET, .handler = GET_system_info, .user_ctx = rest_context};
     httpd_register_uri_handler(server, &system_info_get_uri);
-
-    httpd_uri_t swarm_get_uri = {.uri = "/api/swarm/info", .method = HTTP_GET, .handler = GET_swarm, .user_ctx = rest_context};
-    httpd_register_uri_handler(server, &swarm_get_uri);
-
-    httpd_uri_t update_swarm_uri = {
-        .uri = "/api/swarm", .method = HTTP_PATCH, .handler = PATCH_update_swarm, .user_ctx = rest_context};
-    httpd_register_uri_handler(server, &update_swarm_uri);
 
     httpd_uri_t swarm_options_uri = {
         .uri = "/api/swarm",
