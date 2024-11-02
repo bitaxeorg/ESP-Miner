@@ -11,6 +11,7 @@
         <div class="card" *ngIf="checkLatestRelease == false">
             <h5>Current Version: {{(info$ | async)?.version}}</h5> 
             <h2>Latest Release: <p-button (onClick)="checkLatestRelease = true">Check</p-button></h2>
+            <small>Clicking this button will connect to GitHub to check for recent updates</small>
         </div>
         <div class="card" *ngIf="checkLatestRelease == true">
             <ng-container *ngIf="latestRelease$ | async as latestRelease">
