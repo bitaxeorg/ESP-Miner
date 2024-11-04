@@ -14,7 +14,7 @@ fs.readdir(directory, (err, files) => {
 
             if (stats.isDirectory()) {
                 // If it's a directory, call rmdir after deleting its contents
-                fs.rmdir(filePath, { recursive: true }, (err) => {
+                fs.rm(filePath, { recursive: true }, (err) => {
                     if (err) throw err;
                     console.log(`Removed directory: ${filePath}`);
                 });
