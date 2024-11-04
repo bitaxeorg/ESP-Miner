@@ -49,7 +49,7 @@
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
 
-static const char * TAG = "wifi station";
+static const char * TAG = "wifi_station";
 
 static int s_retry_num = 0;
 
@@ -102,7 +102,7 @@ esp_netif_t * wifi_init_softap(void)
     strncpy((char *) wifi_ap_config.ap.ssid, ssid_with_mac, sizeof(wifi_ap_config.ap.ssid));
     wifi_ap_config.ap.ssid_len = strlen(ssid_with_mac);
     wifi_ap_config.ap.channel = 1;
-    wifi_ap_config.ap.max_connection = 30;
+    wifi_ap_config.ap.max_connection = 10;
     wifi_ap_config.ap.authmode = WIFI_AUTH_OPEN;
     wifi_ap_config.ap.pmf_cfg.required = false;
 
