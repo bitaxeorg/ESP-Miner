@@ -99,10 +99,15 @@
                     <div class="col-12">
 
                         <h6>Input Voltage <span style="float: right;">{{info.voltage}} V</span></h6>
-                        <p-progressBar [value]="(info.voltage / 5.5) * 100" [style]="{ height: '6px' }" >
-                            <ng-template pTemplate="content" let-value>
-                            </ng-template>
-                        </p-progressBar>
+                        <div class="relative">
+                            <p-progressBar [value]="(info.voltage / 5.5) * 100" [style]="{ height: '6px' }">
+                                <ng-template pTemplate="content" let-value></ng-template>
+                            </p-progressBar>
+                            <!-- Add marker at 5.0V (90.91% of 5.5V) -->
+                            <div class="absolute bg-white" style="left: 90.5%; top: 0; width: 3px; height: 6px;">
+                                <small class="absolute text-white" style="top: -1.25rem; transform: translateX(-50%)">5.0</small>
+                            </div>
+                        </div>
                         <span class="danger" *ngIf="info.voltage < 4.8">&nbsp; Danger: Low voltage</span>
                     </div>
 

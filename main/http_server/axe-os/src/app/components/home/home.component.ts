@@ -64,7 +64,7 @@ export class HomeComponent {
           data: [],
           fill: false,
           backgroundColor: primaryColor +  '30',
-          borderColor: primaryColor + '30',
+          borderColor: primaryColor + '60',
           tension: 0,
           pointRadius: 0,
           borderWidth: 2,
@@ -103,7 +103,11 @@ export class HomeComponent {
               if (label) {
                 label += ': ';
               }
-              label += HashSuffixPipe.transform(tooltipItem.raw);
+              if (tooltipItem.dataset.label === 'ASIC Temp') {
+                label += tooltipItem.raw + '°C';
+              } else {
+                label += HashSuffixPipe.transform(tooltipItem.raw);
+              }
               return label;
             }
           }
@@ -139,7 +143,8 @@ export class HomeComponent {
           display: true,
           position: 'right',
           ticks: {
-            color: textColorSecondary
+            color: textColorSecondary,
+            callback: (value: number) => value + '°C'
           },
           grid: {
             drawOnChartArea: false,
