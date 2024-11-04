@@ -239,7 +239,7 @@ export class HomeComponent {
           return `https://solo.d-central.tech/#/app/${address}`;
         } else if (/solo[46]?.ckpool.org/.test(info.fallbackStratumURL)) {
           const address = info.fallbackStratumUser.split('.')[0]
-          return `https://solo.ckpool.org/users/${address}`;
+          return `https://solostats.ckpool.org/users/${address}`;
         } else {
           return undefined;
         }
