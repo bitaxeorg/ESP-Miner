@@ -42,7 +42,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const swarmData = this.localStorageService.getObject(SWARM_DATA);
-    console.log(swarmData);
+
     if (swarmData == null) {
       this.scanNetwork();
       //this.swarm$ = this.scanNetwork('192.168.1.23', '255.255.255.0').pipe(take(1));
