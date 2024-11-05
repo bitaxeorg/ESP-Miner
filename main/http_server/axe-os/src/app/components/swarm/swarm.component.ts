@@ -61,6 +61,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     window.clearInterval(this.refreshIntervalRef);
+    this.form.reset();
   }
 
 
