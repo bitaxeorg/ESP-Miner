@@ -53,7 +53,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.refreshIntervalRef = window.setInterval(() => {
       this.refreshIntervalTime --;
       if(this.refreshIntervalTime <= 0){
-        this.refreshIntervalTime = REFRESH_TIME_SECONDS;
         this.refreshList();
       }
     }, 1000);
@@ -161,6 +160,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public refreshList() {
+    this.refreshIntervalTime = REFRESH_TIME_SECONDS;
     const ips = this.swarm.map(axeOs => axeOs.IP);
 
     from(ips).pipe(
@@ -174,10 +174,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
           }),
           timeout(5000),
           catchError(error => {
+            this.toastr.error('Error', 'Failed to get info from ' + ipAddr + ' - ' + error);
             return of(this.swarm.find(axeOs => axeOs.IP == ipAddr));
           })
         ),
-        256 // Limit concurrency to avoid overload
+        128 // Limit concurrency to avoid overload
       ),
       toArray() // Collect all results into a single array
     ).pipe(take(1)).subscribe({
