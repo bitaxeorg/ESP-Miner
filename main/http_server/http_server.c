@@ -320,6 +320,12 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
 static esp_err_t POST_restart(httpd_req_t * req)
 {
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
     ESP_LOGI(TAG, "Restarting System because of API Request");
 
     // Send HTTP response before restarting
@@ -709,6 +715,10 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_uri_t system_restart_uri = {
         .uri = "/api/system/restart", .method = HTTP_POST, .handler = POST_restart, .user_ctx = rest_context};
     httpd_register_uri_handler(server, &system_restart_uri);
+
+    httpd_uri_t system_restart_options_uri = {
+        .uri = "/api/system/restart", .method = HTTP_OPTIONS, .handler = handle_options_request, .user_ctx = NULL};
+    httpd_register_uri_handler(server, &system_restart_options_uri);
 
     httpd_uri_t update_system_settings_uri = {
         .uri = "/api/system", .method = HTTP_PATCH, .handler = PATCH_update_settings, .user_ctx = rest_context};

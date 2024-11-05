@@ -132,10 +132,16 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public restart(axe: any) {
-    this.systemService.restart(`http://${axe.IP}`).subscribe(res => {
-
+    this.systemService.restart(`http://${axe.IP}`).pipe(
+      catchError(error => {
+        this.toastr.error('Failed to restart device', 'Error');
+        return of(null);
+      })
+    ).subscribe(res => {
+      if (res !== null) {
+        this.toastr.success('Bitaxe restarted', 'Success');
+      }
     });
-    this.toastr.success('Success!', 'Bitaxe restarted');
   }
 
   public remove(axeOs: any) {
