@@ -323,7 +323,7 @@ static esp_err_t POST_restart(httpd_req_t * req)
     // Set CORS headers
     if (set_cors_headers(req) != ESP_OK) {
         httpd_resp_send_500(req);
-        return ESP_FAIL;
+        return ESP_OK;
     }
 
     ESP_LOGI(TAG, "Restarting System because of API Request");
