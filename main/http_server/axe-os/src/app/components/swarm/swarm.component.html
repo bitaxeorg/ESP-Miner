@@ -19,6 +19,9 @@
         <button pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
         <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning">Refresh List ({{refreshIntervalTime}})</button>
     </div>
+    <div class="text-sm md:text-base">
+        Total Hash Rate: <span class="text-primary">{{totalHashRate * 1000000000 | hashSuffix}}</span>
+    </div>
 </div>
 
 <div class="table-container">
@@ -46,7 +49,7 @@
                 <td>{{axe.uptimeSeconds | dateAgo}}</td>
                 <td>{{axe.sharesAccepted | number: '1.0-0'}}</td>
                 <td>{{axe.power | number: '1.1-1'}} <small>W</small> </td>
-                <td>{{axe.temp | number: '1.0-1'}}°<small>C</small></td>
+                <td [ngClass]="{'text-orange-500': axe.temp > 65}">{{axe.temp | number: '1.0-1'}}°<small>C</small></td>
                 <td>{{axe.bestDiff}}</td>
                 <td>{{axe.version}}</td>
              <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>

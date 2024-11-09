@@ -26,6 +26,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalRef!: number;
   public refreshIntervalTime = REFRESH_TIME_SECONDS;
 
+  public totalHashRate: number = 0;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -48,6 +50,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       //this.swarm$ = this.scanNetwork('192.168.1.23', '255.255.255.0').pipe(take(1));
     } else {
       this.swarm = swarmData;
+      this.calculateTotalHashRate();
     }
 
     this.refreshIntervalRef = window.setInterval(() => {
@@ -111,6 +114,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
         const newItems = result.filter(item => !existingIps.has(item.IP));
         this.swarm = [...this.swarm, ...newItems].sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotalHashRate();
       },
       complete: () => {
         this.scanning = false;
@@ -132,6 +136,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
         this.swarm.push({ IP: newIp, ...res });
         this.swarm = this.swarm.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotalHashRate();
       }
     });
   }
@@ -157,6 +162,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public remove(axeOs: any) {
     this.swarm = this.swarm.filter(axe => axe.IP != axeOs.IP);
     this.localStorageService.setObject(SWARM_DATA, this.swarm);
+    this.calculateTotalHashRate();
   }
 
   public refreshList() {
@@ -185,6 +191,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       next: (result) => {
         this.swarm = result.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotalHashRate();
       },
       complete: () => {
       }
@@ -194,6 +201,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   private sortByIp(a: any, b: any): number {
     return this.ipToInt(a.IP) - this.ipToInt(b.IP);
+  }
+
+  private calculateTotalHashRate() {
+    this.totalHashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
   }
 
 }
