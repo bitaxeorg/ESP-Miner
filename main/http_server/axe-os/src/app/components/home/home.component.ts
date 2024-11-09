@@ -40,8 +40,6 @@ export class HomeComponent {
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
 
-    console.log(primaryColor)
-
     this.chartData = {
       labels: [],
       datasets: [
