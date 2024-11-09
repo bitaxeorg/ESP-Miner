@@ -39,7 +39,7 @@ jobs:
     - name: upload esp-miner.bin
       uses: actions/upload-artifact@v4
       with:
-        name: esp-miner-ota.bin
+        name: esp-miner.bin
         path: ./build/esp-miner.bin
     - name: upload www.bin
       uses: actions/upload-artifact@v4
