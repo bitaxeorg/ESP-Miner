@@ -58,9 +58,13 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-
         //lookup the exact reason code
         wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
+        if (event->reason == WIFI_REASON_ROAMING) {
+            ESP_LOGI(TAG, "We are roaming, nothing to do");
+            return;
+        }
+
         ESP_LOGI(TAG, "Could not connect to '%s' [rssi %d]: reason %d", event->ssid, event->rssi, event->reason);
 
         // Wait a little
