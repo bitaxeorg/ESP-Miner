@@ -207,44 +207,12 @@ export class HomeComponent {
     }))
 
     this.quickLink$ = this.info$.pipe(
-      map(info => {
-        if (info.stratumURL.includes('public-pool.io')) {
-          const address = info.stratumUser.split('.')[0]
-          return `https://web.public-pool.io/#/app/${address}`;
-        } else if (info.stratumURL.includes('ocean.xyz')) {
-          const address = info.stratumUser.split('.')[0]
-          return `https://ocean.xyz/stats/${address}`;
-        } else if (info.stratumURL.includes('solo.d-central.tech')) {
-          const address = info.stratumUser.split('.')[0]
-          return `https://solo.d-central.tech/#/app/${address}`;
-        } else if (/solo[46]?.ckpool.org/.test(info.stratumURL)) {
-          const address = info.stratumUser.split('.')[0]
-          return `https://solo.ckpool.org/users/${address}`;
-        } else {
-          return undefined;
-        }
-      })
-    )
+      map(info => this.getQuickLink(info.stratumURL, info.stratumUser))
+    );
 
     this.fallbackQuickLink$ = this.info$.pipe(
-      map(info => {
-        if (info.fallbackStratumURL.includes('public-pool.io')) {
-          const address = info.fallbackStratumUser.split('.')[0]
-          return `https://web.public-pool.io/#/app/${address}`;
-        } else if (info.fallbackStratumURL.includes('ocean.xyz')) {
-          const address = info.fallbackStratumUser.split('.')[0]
-          return `https://ocean.xyz/stats/${address}`;
-        } else if (info.fallbackStratumURL.includes('solo.d-central.tech')) {
-          const address = info.fallbackStratumUser.split('.')[0]
-          return `https://solo.d-central.tech/#/app/${address}`;
-        } else if (/solo[46]?.ckpool.org/.test(info.fallbackStratumURL)) {
-          const address = info.fallbackStratumUser.split('.')[0]
-          return `https://solostats.ckpool.org/users/${address}`;
-        } else {
-          return undefined;
-        }
-      })
-    )
+      map(info => this.getQuickLink(info.fallbackStratumURL, info.fallbackStratumUser))
+    );
 
   }
 
@@ -252,6 +220,21 @@ export class HomeComponent {
     if (data.length === 0) return 0;
     const sum = data.reduce((sum, value) => sum + value, 0);
     return sum / data.length;
+  }
+
+  private getQuickLink(stratumURL: string, stratumUser: string): string | undefined {
+    const address = stratumUser.split('.')[0];
+    
+    if (stratumURL.includes('public-pool.io')) {
+      return `https://web.public-pool.io/#/app/${address}`;
+    } else if (stratumURL.includes('ocean.xyz')) {
+      return `https://ocean.xyz/stats/${address}`;
+    } else if (stratumURL.includes('solo.d-central.tech')) {
+      return `https://solo.d-central.tech/#/app/${address}`;
+    } else if (/solo[46]?.ckpool.org/.test(stratumURL)) {
+      return `https://solostats.ckpool.org/users/${address}`;
+    }
+    return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
   }
 }
 
