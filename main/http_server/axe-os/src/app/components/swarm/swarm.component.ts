@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { BehaviorSubject, catchError, combineLatest, debounce, debounceTime, forkJoin, from, interval, map, mergeAll, mergeMap, Observable, of, startWith, switchMap, take, timeout, toArray } from 'rxjs';
+import { catchError, from, map, mergeMap, of, take, timeout, toArray } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { SystemService } from 'src/app/services/system.service';
 const REFRESH_TIME_SECONDS = 30;
@@ -42,7 +42,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const swarmData = this.localStorageService.getObject(SWARM_DATA);
-    console.log(swarmData);
+
     if (swarmData == null) {
       this.scanNetwork();
       //this.swarm$ = this.scanNetwork('192.168.1.23', '255.255.255.0').pipe(take(1));
@@ -53,7 +53,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.refreshIntervalRef = window.setInterval(() => {
       this.refreshIntervalTime --;
       if(this.refreshIntervalTime <= 0){
-        this.refreshIntervalTime = REFRESH_TIME_SECONDS;
         this.refreshList();
       }
     }, 1000);
@@ -61,6 +60,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     window.clearInterval(this.refreshIntervalRef);
+    this.form.reset();
   }
 
 
@@ -101,12 +101,15 @@ export class SwarmComponent implements OnInit, OnDestroy {
             return []; // Return an empty result or handle as desired
           })
         ),
-        256 // Limit concurrency to avoid overload
+        128 // Limit concurrency to avoid overload
       ),
       toArray() // Collect all results into a single array
     ).pipe(take(1)).subscribe({
       next: (result) => {
-        this.swarm = result;
+        // Merge new results with existing swarm entries
+        const existingIps = new Set(this.swarm.map(item => item.IP));
+        const newItems = result.filter(item => !existingIps.has(item.IP));
+        this.swarm = [...this.swarm, ...newItems].sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
       },
       complete: () => {
@@ -117,10 +120,17 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public add() {
     const newIp = this.form.value.manualAddIp;
+    
+    // Check if IP already exists
+    if (this.swarm.some(item => item.IP === newIp)) {
+      this.toastr.warning('This IP address already exists in the swarm', 'Duplicate Entry');
+      return;
+    }
 
     this.systemService.getInfo(`http://${newIp}`).subscribe((res) => {
       if (res.ASICModel) {
         this.swarm.push({ IP: newIp, ...res });
+        this.swarm = this.swarm.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
       }
     });
@@ -150,6 +160,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public refreshList() {
+    this.refreshIntervalTime = REFRESH_TIME_SECONDS;
     const ips = this.swarm.map(axeOs => axeOs.IP);
 
     from(ips).pipe(
@@ -163,21 +174,26 @@ export class SwarmComponent implements OnInit, OnDestroy {
           }),
           timeout(5000),
           catchError(error => {
+            this.toastr.error('Error', 'Failed to get info from ' + ipAddr + ' - ' + error);
             return of(this.swarm.find(axeOs => axeOs.IP == ipAddr));
           })
         ),
-        256 // Limit concurrency to avoid overload
+        128 // Limit concurrency to avoid overload
       ),
       toArray() // Collect all results into a single array
     ).pipe(take(1)).subscribe({
       next: (result) => {
-        this.swarm = result;
+        this.swarm = result.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
       },
       complete: () => {
       }
     });
 
+  }
+
+  private sortByIp(a: any, b: any): number {
+    return this.ipToInt(a.IP) - this.ipToInt(b.IP);
   }
 
 }

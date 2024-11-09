@@ -33,7 +33,10 @@
         </tr>
         <ng-container *ngFor="let axe of swarm">
             <tr>
-                <td><a [href]="'http://'+axe.IP" target="_blank">{{axe.IP}}</a></td>
+                <td>
+                    <a class="text-primary" [href]="'http://'+axe.IP" target="_blank">{{axe.IP}}</a>
+                    <div class="text-xs">{{axe.hostname}}</div>
+                </td>
                 <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
                 <td>{{axe.uptimeSeconds | dateAgo}}</td>
                 <td>{{axe.sharesAccepted | number: '1.0-0'}}</td>
