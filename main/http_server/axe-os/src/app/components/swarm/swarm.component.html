@@ -17,7 +17,9 @@
 <div class="flex gap-3 justify-content-between">
     <div class="flex gap-1 sm:gap-3 text-sm md:text-base">
         <button pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
-        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning">Refresh List ({{refreshIntervalTime}})</button>
+        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing">
+            {{isRefreshing ? 'Refreshing...' : 'Refresh List (' + refreshIntervalTime + ')'}}
+        </button>
     </div>
     <div class="text-sm md:text-base">
         Total Hash Rate: <span class="text-primary">{{totalHashRate * 1000000000 | hashSuffix}}</span>

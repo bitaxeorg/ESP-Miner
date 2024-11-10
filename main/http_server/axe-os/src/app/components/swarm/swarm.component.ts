@@ -28,6 +28,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public totalHashRate: number = 0;
 
+  public isRefreshing = false;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -54,9 +56,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
 
     this.refreshIntervalRef = window.setInterval(() => {
-      this.refreshIntervalTime --;
-      if(this.refreshIntervalTime <= 0){
-        this.refreshList();
+      if (!this.isRefreshing) {
+        this.refreshIntervalTime--;
+        if (this.refreshIntervalTime <= 0) {
+          this.refreshList();
+        }
       }
     }, 1000);
   }
@@ -168,6 +172,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshList() {
     this.refreshIntervalTime = REFRESH_TIME_SECONDS;
     const ips = this.swarm.map(axeOs => axeOs.IP);
+    this.isRefreshing = true;
 
     from(ips).pipe(
       mergeMap(ipAddr =>
@@ -180,8 +185,21 @@ export class SwarmComponent implements OnInit, OnDestroy {
           }),
           timeout(5000),
           catchError(error => {
-            this.toastr.error('Error', 'Failed to get info from ' + ipAddr + ' - ' + error);
-            return of(this.swarm.find(axeOs => axeOs.IP == ipAddr));
+            const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
+            this.toastr.error('Failed to get info from ' + ipAddr, errorMessage);
+            // Return existing device with zeroed stats instead of the previous state
+            const existingDevice = this.swarm.find(axeOs => axeOs.IP === ipAddr);
+            return of({
+              ...existingDevice,
+              hashRate: 0,
+              sharesAccepted: 0,
+              power: 0,
+              voltage: 0,
+              temp: 0,
+              bestDiff: 0,
+              version: 0,
+              uptimeSeconds: 0,
+            });
           })
         ),
         128 // Limit concurrency to avoid overload
@@ -192,11 +210,12 @@ export class SwarmComponent implements OnInit, OnDestroy {
         this.swarm = result.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
         this.calculateTotalHashRate();
+        this.isRefreshing = false;
       },
       complete: () => {
+        this.isRefreshing = false;
       }
     });
-
   }
 
   private sortByIp(a: any, b: any): number {
