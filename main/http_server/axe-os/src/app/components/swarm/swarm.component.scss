@@ -53,3 +53,23 @@ a {
     top: 20px;
     cursor: pointer;
 }
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin: 1rem 0;
+    
+    table {
+        min-width: 100%;
+        white-space: nowrap;
+        
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+
+            @media (max-width: 1150px) {
+                padding: 0.5rem;
+            }
+        }
+    }
+}

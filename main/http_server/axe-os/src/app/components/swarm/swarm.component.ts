@@ -26,6 +26,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalRef!: number;
   public refreshIntervalTime = REFRESH_TIME_SECONDS;
 
+  public totalHashRate: number = 0;
+
+  public isRefreshing = false;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -48,12 +52,15 @@ export class SwarmComponent implements OnInit, OnDestroy {
       //this.swarm$ = this.scanNetwork('192.168.1.23', '255.255.255.0').pipe(take(1));
     } else {
       this.swarm = swarmData;
+      this.calculateTotalHashRate();
     }
 
     this.refreshIntervalRef = window.setInterval(() => {
-      this.refreshIntervalTime --;
-      if(this.refreshIntervalTime <= 0){
-        this.refreshList();
+      if (!this.isRefreshing) {
+        this.refreshIntervalTime--;
+        if (this.refreshIntervalTime <= 0) {
+          this.refreshList();
+        }
       }
     }, 1000);
   }
@@ -111,6 +118,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
         const newItems = result.filter(item => !existingIps.has(item.IP));
         this.swarm = [...this.swarm, ...newItems].sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotalHashRate();
       },
       complete: () => {
         this.scanning = false;
@@ -132,6 +140,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
         this.swarm.push({ IP: newIp, ...res });
         this.swarm = this.swarm.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotalHashRate();
       }
     });
   }
@@ -157,11 +166,13 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public remove(axeOs: any) {
     this.swarm = this.swarm.filter(axe => axe.IP != axeOs.IP);
     this.localStorageService.setObject(SWARM_DATA, this.swarm);
+    this.calculateTotalHashRate();
   }
 
   public refreshList() {
     this.refreshIntervalTime = REFRESH_TIME_SECONDS;
     const ips = this.swarm.map(axeOs => axeOs.IP);
+    this.isRefreshing = true;
 
     from(ips).pipe(
       mergeMap(ipAddr =>
@@ -174,8 +185,21 @@ export class SwarmComponent implements OnInit, OnDestroy {
           }),
           timeout(5000),
           catchError(error => {
-            this.toastr.error('Error', 'Failed to get info from ' + ipAddr + ' - ' + error);
-            return of(this.swarm.find(axeOs => axeOs.IP == ipAddr));
+            const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
+            this.toastr.error('Failed to get info from ' + ipAddr, errorMessage);
+            // Return existing device with zeroed stats instead of the previous state
+            const existingDevice = this.swarm.find(axeOs => axeOs.IP === ipAddr);
+            return of({
+              ...existingDevice,
+              hashRate: 0,
+              sharesAccepted: 0,
+              power: 0,
+              voltage: 0,
+              temp: 0,
+              bestDiff: 0,
+              version: 0,
+              uptimeSeconds: 0,
+            });
           })
         ),
         128 // Limit concurrency to avoid overload
@@ -185,15 +209,21 @@ export class SwarmComponent implements OnInit, OnDestroy {
       next: (result) => {
         this.swarm = result.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotalHashRate();
+        this.isRefreshing = false;
       },
       complete: () => {
+        this.isRefreshing = false;
       }
     });
-
   }
 
   private sortByIp(a: any, b: any): number {
     return this.ipToInt(a.IP) - this.ipToInt(b.IP);
+  }
+
+  private calculateTotalHashRate() {
+    this.totalHashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
   }
 
 }

@@ -5,6 +5,10 @@
     justify-content: space-between;
     padding: 7rem 2rem 2rem 4rem;
     transition: margin-left $transitionDuration;
+
+    @media (max-width: 768px) {
+        padding: 7rem 1rem 1rem 1rem;
+    }
 }
 
 .layout-main {
