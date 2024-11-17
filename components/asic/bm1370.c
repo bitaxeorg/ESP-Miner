@@ -111,7 +111,7 @@ static void _send_simple(uint8_t * data, uint8_t total_length)
 {
     unsigned char * buf = malloc(total_length);
     memcpy(buf, data, total_length);
-    SERIAL_send(buf, total_length, false);
+    SERIAL_send(buf, total_length, BM1370_SERIALTX_DEBUG);
 
     free(buf);
 }
@@ -196,6 +196,11 @@ static void do_frequency_ramp_up(float target_frequency) {
     float current = 56.25;
     float step = 6.25;
 
+    if (target_frequency == 0) {
+        ESP_LOGI(TAG, "Skipping frequency ramp");
+        return;
+    }
+
     ESP_LOGI(TAG, "Ramping up frequency from %.2f MHz to %.2f MHz with step %.2f MHz", current, target_frequency, step);
 
     BM1370_send_hash_frequency(-1, current, 0.001);
@@ -233,14 +238,13 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     BM1370_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
     //Reg_A8
-    unsigned char init5[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00, 0x03};
-    _send_simple(init5, 11);
+    //unsigned char init5[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00, 0x03};
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0xA8, 0x00, 0x07, 0x00, 0x00}, 6, BM1370_SERIALTX_DEBUG);
 
     //Misc Control
-    //**TX: 55 AA 51 09 00 18 F0 00 C1 00 04 //command all chips, write chip address 00, register 18, data F0 00 C1 00 - Misc Control
-    //unsigned char init6[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x18, 0xF0, 0x00, 0xC1, 0x00, 0x04}; //from S21Pro dump
-    unsigned char init6[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x18, 0xFF, 0x0F, 0xC1, 0x00, 0x00};
-    _send_simple(init6, 11);
+    //TX: 55 AA 51 09 [00 18 F0 00 C1 00] 04 //command all chips, write chip address 00, register 18, data F0 00 C1 00 - Misc Control
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x18, 0xF0, 0x00, 0xC1, 0x00}, 6, BM1370_SERIALTX_DEBUG); //from S21Pro dump
+    //_send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x18, 0xFF, 0x0F, 0xC1, 0x00}, 6, BM1370_SERIALTX_DEBUG); //from S21 dump
 
     //chain inactive
     _send_chain_inactive();
@@ -256,52 +260,58 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     }
 
     //Core Register Control
-    unsigned char init9[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x8B, 0x00, 0x12};
-    _send_simple(init9, 11);
+    //unsigned char init9[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x8B, 0x00, 0x12};
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x3C, 0x80, 0x00, 0x8B, 0x00}, 6, BM1370_SERIALTX_DEBUG);
 
     //Core Register Control
-    //**TX: 55 AA 51 09 00 3C 80 00 80 0C 11  //command all chips, write chip address 00, register 3C, data 80 00 80 0C - Core Register Control
-    //unsigned char init10[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x80, 0x0C, 0x11}; //from S21Pro dump
-    unsigned char init10[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x80, 0x18, 0x1F};
-    _send_simple(init10, 11);
+    //TX: 55 AA 51 09 [00 3C 80 00 80 0C] 11  //command all chips, write chip address 00, register 3C, data 80 00 80 0C - Core Register Control
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x3C, 0x80, 0x00, 0x80, 0x0C}, 6, BM1370_SERIALTX_DEBUG); //from S21Pro dump
+    //_send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x3C, 0x80, 0x00, 0x80, 0x18}, 6, BM1370_SERIALTX_DEBUG); //from S21 dump
 
     //set ticket mask
     // unsigned char init11[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x14, 0x00, 0x00, 0x00, 0xFF, 0x08};
-    // _send_simple(init11, 11);
     BM1370_set_job_difficulty_mask(BM1370_ASIC_DIFFICULTY);
 
-    //Analog Mux Control
-    unsigned char init12[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x54, 0x00, 0x00, 0x00, 0x03, 0x1D};
-    _send_simple(init12, 11);
+    //Analog Mux Control -- not sent on S21 Pro?
+    // unsigned char init12[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x54, 0x00, 0x00, 0x00, 0x03, 0x1D};
+    // _send_simple(init12, 11);
 
     //Set the IO Driver Strength on chip 00
-    //**TX: 55 AA 51 09 00 58 00 01 11 11 0D  //command all chips, write chip address 00, register 58, data 01 11 11 11 - Set the IO Driver Strength on chip 00
-    //unsigned char init13[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x58, 0x00, 0x01, 0x11, 0x11, 0x0D}; //from S21Pro dump
-    unsigned char init13[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x58, 0x02, 0x11, 0x11, 0x11, 0x06};
-    _send_simple(init13, 11);
+    //TX: 55 AA 51 09 [00 58 00 01 11 11] 0D  //command all chips, write chip address 00, register 58, data 01 11 11 11 - Set the IO Driver Strength on chip 00
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x58, 0x00, 0x01, 0x11, 0x11}, 6, BM1370_SERIALTX_DEBUG); //from S21Pro dump
+    //_send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x58, 0x02, 0x11, 0x11, 0x11}, 6, BM1370_SERIALTX_DEBUG); //from S21Pro dump
+    
 
     for (uint8_t i = 0; i < chip_counter; i++) {
-        //Reg_A8
+        //TX: 55 AA 41 09 00 [A8 00 07 01 F0] 15    // Reg_A8
         unsigned char set_a8_register[6] = {i * address_interval, 0xA8, 0x00, 0x07, 0x01, 0xF0};
         _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_a8_register, 6, BM1370_SERIALTX_DEBUG);
-        //Misc Control
+        //TX: 55 AA 41 09 00 [18 F0 00 C1 00] 0C    // Misc Control
         unsigned char set_18_register[6] = {i * address_interval, 0x18, 0xF0, 0x00, 0xC1, 0x00};
         _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_18_register, 6, BM1370_SERIALTX_DEBUG);
-        //Core Register Control
+        //TX: 55 AA 41 09 00 [3C 80 00 8B 00] 1A    // Core Register Control
         unsigned char set_3c_register_first[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x8B, 0x00};
         _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_first, 6, BM1370_SERIALTX_DEBUG);
-        //Core Register Control
-        //unsigned char set_3c_register_second[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x80, 0x0C}; //from S21Pro dump
-        unsigned char set_3c_register_second[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x80, 0x18};
+        //TX: 55 AA 41 09 00 [3C 80 00 80 0C] 19    // Core Register Control
+        unsigned char set_3c_register_second[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x80, 0x0C};
         _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_second, 6, BM1370_SERIALTX_DEBUG);
-        //Core Register Control
+        //TX: 55 AA 41 09 00 [3C 80 00 82 AA] 05    // Core Register Control
         unsigned char set_3c_register_third[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x82, 0xAA};
         _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_third, 6, BM1370_SERIALTX_DEBUG);
     }
 
-    do_frequency_ramp_up(frequency);
+    //Some misc settings?
+    // TX: 55 AA 51 09 [00 B9 00 00 44 80] 0D    //command all chips, write chip address 00, register B9, data 00 00 44 80
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0xB9, 0x00, 0x00, 0x44, 0x80}, 6, BM1370_SERIALTX_DEBUG);
+    // TX: 55 AA 51 09 [00 54 00 00 00 02] 18    //command all chips, write chip address 00, register 54, data 00 00 00 02 - Analog Mux Control - rumored to control the temp diode
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x54, 0x00, 0x00, 0x00, 0x02}, 6, BM1370_SERIALTX_DEBUG);
+    // TX: 55 AA 51 09 [00 B9 00 00 44 80] 0D    //command all chips, write chip address 00, register B9, data 00 00 44 80 -- duplicate of first command in series
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0xB9, 0x00, 0x00, 0x44, 0x80}, 6, BM1370_SERIALTX_DEBUG);
+    // TX: 55 AA 51 09 [00 3C 80 00 8D EE] 1B    //command all chips, write chip address 00, register 3C, data 80 00 8D EE
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x3C, 0x80, 0x00, 0x8D, 0xEE}, 6, BM1370_SERIALTX_DEBUG);
 
-    //BM1370_send_hash_frequency(frequency);
+    //ramp up the hash frequency
+    do_frequency_ramp_up(frequency);
 
     //register 10 is still a bit of a mystery. discussion: https://github.com/skot/ESP-Miner/pull/167
 

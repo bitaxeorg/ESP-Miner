@@ -3,6 +3,80 @@
 
 #include "i2c_bitaxe.h"
 
+#define EMC2101_BETA_11         0x00
+#define EMC2101_BETA_18         0x01
+#define EMC2101_BETA_25         0x02
+#define EMC2101_BETA_33         0x03
+#define EMC2101_BETA_43         0x04
+#define EMC2101_BETA_100        0x05
+#define EMC2101_BETA_233        0x06
+#define EMC2101_BETA_DISABLED   0x07
+#define EMC2101_BETA_AUTO       0x08 //default
+
+#define EMC2101_FILTER_DISABLED 0x00 //default
+#define EMC2101_FILTER_1        0x01
+#define EMC2101_FILTER_2        0x02
+
+#define EMC2101_DATARATE_1_16_HZ 0x00
+#define EMC2101_DATARATE_1_8_HZ  0x01
+#define EMC2101_DATARATE_1_4_HZ  0x02
+#define EMC2101_DATARATE_1_2_HZ  0x03
+#define EMC2101_DATARATE_1_HZ    0x04
+#define EMC2101_DATARATE_2_HZ    0x05
+#define EMC2101_DATARATE_4_HZ    0x06
+#define EMC2101_DATARATE_8_HZ    0x07
+#define EMC2101_DATARATE_16_HZ   0x08 //default
+#define EMC2101_DATARATE_32_HZ   0x09
+
+#define EMC2101_IDEALITY_0_9949	0x08
+#define EMC2101_IDEALITY_0_9962	0x09
+#define EMC2101_IDEALITY_0_9975	0x0A
+#define EMC2101_IDEALITY_0_9988	0x0B
+#define EMC2101_IDEALITY_1_0001	0x0C
+#define EMC2101_IDEALITY_1_0014	0x0D
+#define EMC2101_IDEALITY_1_0027	0x0E
+#define EMC2101_IDEALITY_1_0040	0x0F
+#define EMC2101_IDEALITY_1_0053	0x10
+#define EMC2101_IDEALITY_1_0066	0x11
+#define EMC2101_IDEALITY_1_0080	0x12 //default
+#define EMC2101_IDEALITY_1_0093	0x13
+#define EMC2101_IDEALITY_1_0106	0x14
+#define EMC2101_IDEALITY_1_0119	0x15
+#define EMC2101_IDEALITY_1_0133	0x16
+#define EMC2101_IDEALITY_1_0146	0x17
+#define EMC2101_IDEALITY_1_0159	0x18
+#define EMC2101_IDEALITY_1_0172	0x19
+#define EMC2101_IDEALITY_1_0185	0x1A
+#define EMC2101_IDEALITY_1_0200	0x1B
+#define EMC2101_IDEALITY_1_0212	0x1C
+#define EMC2101_IDEALITY_1_0226	0x1D
+#define EMC2101_IDEALITY_1_0239	0x1E
+#define EMC2101_IDEALITY_1_0253	0x1F
+#define EMC2101_IDEALITY_1_0267	0x20
+#define EMC2101_IDEALITY_1_0280	0x21
+#define EMC2101_IDEALITY_1_0293	0x22
+#define EMC2101_IDEALITY_1_0306	0x23
+#define EMC2101_IDEALITY_1_0319	0x24
+#define EMC2101_IDEALITY_1_0332	0x25
+#define EMC2101_IDEALITY_1_0345	0x26
+#define EMC2101_IDEALITY_1_0358	0x27
+#define EMC2101_IDEALITY_1_0371	0x28
+#define EMC2101_IDEALITY_1_0384	0x29
+#define EMC2101_IDEALITY_1_0397	0x2A
+#define EMC2101_IDEALITY_1_0410	0x2B
+#define EMC2101_IDEALITY_1_0423	0x2C
+#define EMC2101_IDEALITY_1_0436	0x2D
+#define EMC2101_IDEALITY_1_0449	0x2E
+#define EMC2101_IDEALITY_1_0462	0x2F
+#define EMC2101_IDEALITY_1_0475	0x30
+#define EMC2101_IDEALITY_1_0488	0x31
+#define EMC2101_IDEALITY_1_0501	0x32
+#define EMC2101_IDEALITY_1_0514	0x33
+#define EMC2101_IDEALITY_1_0527	0x34
+#define EMC2101_IDEALITY_1_0540	0x35
+#define EMC2101_IDEALITY_1_0553	0x36
+#define EMC2101_IDEALITY_1_0566	0x37
+
 #define EMC2101_I2CADDR_DEFAULT 0x4C ///< EMC2101 default i2c address
 #define EMC2101_CHIP_ID 0x16         ///< EMC2101 default device id from part id
 #define EMC2101_ALT_CHIP_ID 0x28     ///< EMC2101 alternate device id from part id
@@ -18,6 +92,8 @@
 #define EMC2101_REG_CONFIG 0x03      ///< configuration register
 #define EMC2101_REG_DATA_RATE 0x04   ///< Data rate config
 #define EMC2101_TEMP_FORCE 0x0C      ///< Temp force setting for LUT testing
+#define EMC2101_IDEALITY_FACTOR 0x17      ///< Beta Compensation Register
+#define EMC2101_BETA_COMPENSATION 0x18      ///< Beta Compensation Register
 #define EMC2101_TACH_LSB 0x46        ///< Tach RPM data low byte
 #define EMC2101_TACH_MSB 0x47        ///< Tach RPM data high byte
 #define EMC2101_TACH_LIMIT_LSB 0x48  ///< Tach low-speed setting low byte. INVERSE OF THE SPEED
@@ -31,7 +107,6 @@
 
 #define EMC2101_LUT_START 0x50 ///< The first temp threshold register
 
-#define EMC2101_TEMP_FILTER 0xBF ///< The external temperature sensor filtering behavior
 #define EMC2101_REG_PARTID 0xFD  ///< 0x16
 #define EMC2101_REG_MFGID 0xFE   ///< 0xFF16
 
@@ -91,4 +166,6 @@ uint16_t EMC2101_get_fan_speed(void);
 esp_err_t EMC2101_init(bool);
 float EMC2101_get_external_temp(void);
 uint8_t EMC2101_get_internal_temp(void);
+void EMC2101_set_ideality_factor(uint8_t);
+void EMC2101_set_beta_compensation(uint8_t);
 #endif /* EMC2101_H_ */

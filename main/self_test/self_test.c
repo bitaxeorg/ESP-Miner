@@ -168,9 +168,14 @@ void self_test(void * pvParameters)
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
+            EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
+            EMC2101_set_fan_speed(1);
+            break;
         case DEVICE_GAMMA:
             EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
             EMC2101_set_fan_speed(1);
+            EMC2101_set_ideality_factor(EMC2101_IDEALITY_1_0319);
+            EMC2101_set_beta_compensation(EMC2101_BETA_11);
             break;
         default:
     }
