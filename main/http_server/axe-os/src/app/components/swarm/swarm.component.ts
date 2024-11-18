@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { BehaviorSubject, catchError, combineLatest, debounce, debounceTime, forkJoin, from, interval, map, mergeAll, mergeMap, Observable, of, startWith, switchMap, take, timeout, toArray } from 'rxjs';
+import { catchError, from, map, mergeMap, of, take, timeout, toArray } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { SystemService } from 'src/app/services/system.service';
 const REFRESH_TIME_SECONDS = 30;
@@ -26,6 +26,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalRef!: number;
   public refreshIntervalTime = REFRESH_TIME_SECONDS;
 
+  public totalHashRate: number = 0;
+
+  public isRefreshing = false;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -42,25 +46,28 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const swarmData = this.localStorageService.getObject(SWARM_DATA);
-    console.log(swarmData);
+
     if (swarmData == null) {
       this.scanNetwork();
       //this.swarm$ = this.scanNetwork('192.168.1.23', '255.255.255.0').pipe(take(1));
     } else {
       this.swarm = swarmData;
+      this.calculateTotalHashRate();
     }
 
     this.refreshIntervalRef = window.setInterval(() => {
-      this.refreshIntervalTime --;
-      if(this.refreshIntervalTime <= 0){
-        this.refreshIntervalTime = REFRESH_TIME_SECONDS;
-        this.refreshList();
+      if (!this.isRefreshing) {
+        this.refreshIntervalTime--;
+        if (this.refreshIntervalTime <= 0) {
+          this.refreshList();
+        }
       }
     }, 1000);
   }
 
   ngOnDestroy(): void {
     window.clearInterval(this.refreshIntervalRef);
+    this.form.reset();
   }
 
 
@@ -101,13 +108,17 @@ export class SwarmComponent implements OnInit, OnDestroy {
             return []; // Return an empty result or handle as desired
           })
         ),
-        256 // Limit concurrency to avoid overload
+        128 // Limit concurrency to avoid overload
       ),
       toArray() // Collect all results into a single array
     ).pipe(take(1)).subscribe({
       next: (result) => {
-        this.swarm = result;
+        // Merge new results with existing swarm entries
+        const existingIps = new Set(this.swarm.map(item => item.IP));
+        const newItems = result.filter(item => !existingIps.has(item.IP));
+        this.swarm = [...this.swarm, ...newItems].sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotalHashRate();
       },
       complete: () => {
         this.scanning = false;
@@ -117,11 +128,19 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public add() {
     const newIp = this.form.value.manualAddIp;
+    
+    // Check if IP already exists
+    if (this.swarm.some(item => item.IP === newIp)) {
+      this.toastr.warning('This IP address already exists in the swarm', 'Duplicate Entry');
+      return;
+    }
 
     this.systemService.getInfo(`http://${newIp}`).subscribe((res) => {
       if (res.ASICModel) {
         this.swarm.push({ IP: newIp, ...res });
+        this.swarm = this.swarm.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotalHashRate();
       }
     });
   }
@@ -132,19 +151,28 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public restart(axe: any) {
-    this.systemService.restart(`http://${axe.IP}`).subscribe(res => {
-
+    this.systemService.restart(`http://${axe.IP}`).pipe(
+      catchError(error => {
+        this.toastr.error('Failed to restart device', 'Error');
+        return of(null);
+      })
+    ).subscribe(res => {
+      if (res !== null) {
+        this.toastr.success('Bitaxe restarted', 'Success');
+      }
     });
-    this.toastr.success('Success!', 'Bitaxe restarted');
   }
 
   public remove(axeOs: any) {
     this.swarm = this.swarm.filter(axe => axe.IP != axeOs.IP);
     this.localStorageService.setObject(SWARM_DATA, this.swarm);
+    this.calculateTotalHashRate();
   }
 
   public refreshList() {
+    this.refreshIntervalTime = REFRESH_TIME_SECONDS;
     const ips = this.swarm.map(axeOs => axeOs.IP);
+    this.isRefreshing = true;
 
     from(ips).pipe(
       mergeMap(ipAddr =>
@@ -157,21 +185,45 @@ export class SwarmComponent implements OnInit, OnDestroy {
           }),
           timeout(5000),
           catchError(error => {
-            return of(this.swarm.find(axeOs => axeOs.IP == ipAddr));
+            const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
+            this.toastr.error('Failed to get info from ' + ipAddr, errorMessage);
+            // Return existing device with zeroed stats instead of the previous state
+            const existingDevice = this.swarm.find(axeOs => axeOs.IP === ipAddr);
+            return of({
+              ...existingDevice,
+              hashRate: 0,
+              sharesAccepted: 0,
+              power: 0,
+              voltage: 0,
+              temp: 0,
+              bestDiff: 0,
+              version: 0,
+              uptimeSeconds: 0,
+            });
           })
         ),
-        256 // Limit concurrency to avoid overload
+        128 // Limit concurrency to avoid overload
       ),
       toArray() // Collect all results into a single array
     ).pipe(take(1)).subscribe({
       next: (result) => {
-        this.swarm = result;
+        this.swarm = result.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotalHashRate();
+        this.isRefreshing = false;
       },
       complete: () => {
+        this.isRefreshing = false;
       }
     });
+  }
 
+  private sortByIp(a: any, b: any): number {
+    return this.ipToInt(a.IP) - this.ipToInt(b.IP);
+  }
+
+  private calculateTotalHashRate() {
+    this.totalHashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
   }
 
 }

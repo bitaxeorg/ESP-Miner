@@ -11,7 +11,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22'
+        node-version: '22.11.0'
     - name: Build web dist
       working-directory: ./main/http_server/axe-os
       run: |
@@ -32,17 +32,17 @@ jobs:
     - name: "Create factory/merged image"
       run: "./merge_bin.sh ./esp-miner-merged.bin"
     - name: upload esp-miner-merged.bin
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: esp-miner-factory.bin
         path: ./esp-miner-merged.bin
     - name: upload esp-miner.bin
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: esp-miner-ota.bin
+        name: esp-miner.bin
         path: ./build/esp-miner.bin
     - name: upload www.bin
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: www.bin
         path: ./build/www.bin

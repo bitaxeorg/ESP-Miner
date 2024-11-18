@@ -14,7 +14,7 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
   public info$: Observable<ISystemInfo>;
 
-  public logs: string[] = [];
+  public logs: { className: string, text: string }[] = [];
 
   private websocketSubscription?: Subscription;
 
@@ -55,7 +55,24 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
     if (this.showLogs) {
       this.websocketSubscription = this.websocketService.ws$.subscribe({
         next: (val) => {
-          this.logs.push(val);
+          const matches = val.matchAll(/\[(\d+;\d+)m(.*?)(?=\[|\n|$)/g);
+          let className = 'ansi-white'; // default color
+          
+          for (const match of matches) {
+            const colorCode = match[1].split(';')[1];
+            switch (colorCode) {
+              case '31': className = 'ansi-red'; break;
+              case '32': className = 'ansi-green'; break;
+              case '33': className = 'ansi-yellow'; break;
+              case '34': className = 'ansi-blue'; break;
+              case '35': className = 'ansi-magenta'; break;
+              case '36': className = 'ansi-cyan'; break;
+              case '37': className = 'ansi-white'; break;
+            }
+          }
+          
+          this.logs.push({ className, text: val });
+          
           if (this.logs.length > 256) {
             this.logs.shift();
           }

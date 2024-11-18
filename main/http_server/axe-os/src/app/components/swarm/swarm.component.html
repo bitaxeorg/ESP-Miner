@@ -14,10 +14,20 @@
 
     </form>
 </div>
-<button style="margin-right: 1rem;" pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
-<button pButton  severity="secondary" (click)="refreshList()" [disabled]="scanning">Refresh List ({{refreshIntervalTime}})</button>
-<div>
-    <table cellspacing="0" cellpadding="0" >
+<div class="flex gap-3 justify-content-between">
+    <div class="flex gap-1 sm:gap-3 text-sm md:text-base">
+        <button pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
+        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing">
+            {{isRefreshing ? 'Refreshing...' : 'Refresh List (' + refreshIntervalTime + ')'}}
+        </button>
+    </div>
+    <div class="text-sm md:text-base">
+        Total Hash Rate: <span class="text-primary">{{totalHashRate * 1000000000 | hashSuffix}}</span>
+    </div>
+</div>
+
+<div class="table-container">
+    <table cellspacing="0" cellpadding="0" class="text-sm md:text-base">
         <tr>
             <th>IP</th>
             <th>Hash Rate</th>
@@ -25,7 +35,7 @@
             <th>Accepted</th>
             <th>Power</th>
             <th>Temp</th>
-            <th>Best Difficulty</th>
+            <th>Best Diff</th>
             <th>Version</th>
             <th>Edit</th>
             <th>Restart</th>
@@ -33,12 +43,15 @@
         </tr>
         <ng-container *ngFor="let axe of swarm">
             <tr>
-                <td><a [href]="'http://'+axe.IP" target="_blank">{{axe.IP}}</a></td>
+                <td>
+                    <a class="text-primary" [href]="'http://'+axe.IP" target="_blank">{{axe.IP}}</a>
+                    <div class="text-xs">{{axe.hostname}}</div>
+                </td>
                 <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
                 <td>{{axe.uptimeSeconds | dateAgo}}</td>
                 <td>{{axe.sharesAccepted | number: '1.0-0'}}</td>
-                <td>{{axe.power | number: '1.2-2'}} <small>W</small> </td>
-                <td>{{axe.temp}}°<small>C</small></td>
+                <td>{{axe.power | number: '1.1-1'}} <small>W</small> </td>
+                <td [ngClass]="{'text-orange-500': axe.temp > 65}">{{axe.temp | number: '1.0-1'}}°<small>C</small></td>
                 <td>{{axe.bestDiff}}</td>
                 <td>{{axe.version}}</td>
              <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
