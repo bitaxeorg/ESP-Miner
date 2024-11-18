@@ -10,6 +10,7 @@ SRCS
     "main.c"
     "nvs_config.c"
     "oled.c"
+    "lvglDisplay.c"
     "system.c"
     "TPS546.c"
     "vcore.c"

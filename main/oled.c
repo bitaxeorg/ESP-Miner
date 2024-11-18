@@ -25,7 +25,7 @@
 #include "i2c_bitaxe.h"
 #include "oled.h"
 
-#define OLED_I2C_ADDR 0x3C
+#define OLED_I2C_ADDR 0x10
 
 extern unsigned char ucSmallFont[];
 static int iScreenOffset;            // current write offset of screen data

@@ -28,6 +28,7 @@
 #include "nvs_config.h"
 #include "oled.h"
 #include "vcore.h"
+#include "lvglDisplay.h"
 
 
 static const char * TAG = "SystemModule";
@@ -234,7 +235,7 @@ void SYSTEM_task(void * pvParameters)
             SYSTEM_update_overheat_mode(GLOBAL_STATE);  // Check for changes
             continue;  // Skip the normal screen cycle
         }
-
+        lvglUpdateDisplayValues(GLOBAL_STATE);
         // Update the current screen
         _clear_display(GLOBAL_STATE);
         module->screen_page = current_screen;
@@ -413,6 +414,7 @@ static void _update_screen_one(GlobalState * GLOBAL_STATE)
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
         case DEVICE_GAMMA:
+            
             if (OLED_status()) {
                 float efficiency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power / (module->current_hashrate / 1000.0);
 
