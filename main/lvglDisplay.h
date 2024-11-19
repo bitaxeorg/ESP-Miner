@@ -44,4 +44,5 @@ esp_err_t lvglDisplay_init(void);
 esp_err_t lvglUpdateDisplayValues(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE);
+esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE);
 #endif

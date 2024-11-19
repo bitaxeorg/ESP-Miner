@@ -72,6 +72,7 @@ Device Status:
 static i2c_master_dev_handle_t lvglDisplay_dev_handle;
 static TickType_t lastUpdateTime = 0;
 
+
 // Static Network Variables
 static char lastSsid[32] = {0};
 static char lastIpAddress[16] = {0};
@@ -79,6 +80,13 @@ static char lastWifiStatus[20] = {0};
 static char lastPoolUrl[128] = {0};
 static uint16_t lastPoolPort = 0;
 static uint16_t lastFallbackPoolPort = 0;
+
+// Static Device Status Variables
+static uint8_t lastFlags = 0;
+static DeviceModel lastDeviceModel = DEVICE_UNKNOWN;
+static AsicModel lastAsicModel = ASIC_UNKNOWN;
+static int lastBoardVersion = 0;
+static uint32_t lastClockSync = 0;
 
 esp_err_t lvglDisplay_init(void) {
     lastUpdateTime = xTaskGetTickCount();
@@ -286,7 +294,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
         free(monitorData);
         return ret;
     }
-S
+    
     // Send frequency
     monitorData[0] = LVGL_REG_ASIC_FREQ;
     monitorData[1] = sizeof(float);
@@ -329,4 +337,83 @@ S
     free(monitorData);
     return ESP_OK;
 }
+
+esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE) 
+{
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    esp_err_t ret;
+    bool hasChanges = false;
+
+    // Check flag changes
+    uint8_t flags = (module->FOUND_BLOCK ? 0x01 : 0) |
+                    (module->startup_done ? 0x02 : 0) |
+                    (module->overheat_mode ? 0x04 : 0);
+                    
+    if (lastFlags != flags) {
+        uint8_t *statusData = malloc(2);
+        if (statusData == NULL) return ESP_ERR_NO_MEM;
+
+        statusData[0] = LVGL_REG_FLAGS;
+        statusData[1] = 1;  // Length is 1 byte
+        statusData[2] = flags;
+        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, statusData, 3);
+        free(statusData);
+        if (ret != ESP_OK) return ret;
+        
+        lastFlags = flags;
+        hasChanges = true;
+    }
+
+    // Device info changes (device model and asic model)
+    if (lastDeviceModel != GLOBAL_STATE->device_model ||
+        lastAsicModel != GLOBAL_STATE->asic_model) {
+        
+        uint8_t deviceData[4];  // Fixed size for device info
+        deviceData[0] = LVGL_REG_DEVICE_INFO;
+        deviceData[1] = 2;  // Two bytes
+        deviceData[2] = GLOBAL_STATE->device_model;
+        deviceData[3] = GLOBAL_STATE->asic_model;
+        
+        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, deviceData, 4);
+        if (ret != ESP_OK) return ret;
+
+        lastDeviceModel = GLOBAL_STATE->device_model;
+        lastAsicModel = GLOBAL_STATE->asic_model;
+        hasChanges = true;
+    }
+
+    // Board info changes
+    if (lastBoardVersion != GLOBAL_STATE->board_version) {
+        uint8_t boardData[4];  // Fixed size for board info
+        boardData[0] = LVGL_REG_BOARD_INFO;
+        boardData[1] = 2;  // Two bytes for board version
+        boardData[2] = (GLOBAL_STATE->board_version >> 8) & 0xFF;
+        boardData[3] = GLOBAL_STATE->board_version & 0xFF;
+        
+        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, boardData, 4);
+        if (ret != ESP_OK) return ret;
+
+        lastBoardVersion = GLOBAL_STATE->board_version;
+        hasChanges = true;
+    }
+
+    if (lastClockSync != module->lastClockSync) {
+        uint8_t *clockData = malloc(sizeof(uint32_t) + 2);
+        if (clockData == NULL) return ESP_ERR_NO_MEM;
+
+        clockData[0] = LVGL_REG_CLOCK_SYNC;
+        clockData[1] = sizeof(uint32_t);
+        memcpy(&clockData[2], &module->lastClockSync, sizeof(uint32_t));
+        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, clockData, sizeof(uint32_t) + 2);
+        free(clockData);
+        if (ret != ESP_OK) return ret;
+
+        lastClockSync = module->lastClockSync;
+        hasChanges = true;
+    }
+
+    return ESP_OK;
+}
+
+
 
