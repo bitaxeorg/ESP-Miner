@@ -11,7 +11,7 @@
 #include "nvs_config.h"
 #include "i2c_bitaxe.h"
 
-// Add these register definitions
+// Network data registers (on change only)
 #define LVGL_REG_SSID           0x21
 #define LVGL_REG_IP_ADDR        0x22
 #define LVGL_REG_WIFI_STATUS    0x23
