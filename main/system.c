@@ -153,6 +153,13 @@ void SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
                 // clear the oled screen
                 OLED_fill(0);
             }
+            
+            // Initialize LVGL display
+            if (lvglDisplay_init() != ESP_OK) {
+                ESP_LOGI(TAG, "LVGL display init failed!");
+            } else {
+                ESP_LOGI(TAG, "LVGL display init success!");
+            }
             break;
         default:
     }
