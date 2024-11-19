@@ -51,6 +51,7 @@ static void _update_screen_one(GlobalState * GLOBAL_STATE);
 static void _update_screen_two(GlobalState * GLOBAL_STATE);
 static void show_ap_information(const char * error, GlobalState * GLOBAL_STATE);
 
+
 static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id);
 static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 

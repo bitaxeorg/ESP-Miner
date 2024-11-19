@@ -19,7 +19,7 @@
 
 
 #define lvglDisplayI2CAddr 0x50
-#define DISPLAY_UPDATE_INTERVAL_MS 5000
+#define DISPLAY_UPDATE_INTERVAL_MS 1000
 #define MAX_BUFFER_SIZE 256  // Adjust size based on your largest needed buffer
 
 // Add to the register definitions at the top
