@@ -5,10 +5,16 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_netif.h"
+#include "esp_timer.h"
+#include "lwip/ip4_addr.h"
+#include "lwip/inet.h"
 
 #include "nvs_config.h"
 #include "i2c_bitaxe.h"
 #include "global_state.h"
+#include "lvglDisplay.h"
+
 
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 5000

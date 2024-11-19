@@ -39,7 +39,7 @@
 #define LVGL_REG_UPTIME        0x51
 #define LVGL_REG_DEVICE_INFO   0x52
 #define LVGL_REG_BOARD_INFO    0x53
-
+#define LVGL_REG_CLOCK_SYNC    0x54
 esp_err_t lvglDisplay_init(void);
 esp_err_t lvglUpdateDisplayValues(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE);
