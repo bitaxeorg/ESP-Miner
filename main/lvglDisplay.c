@@ -15,6 +15,7 @@
 #include "global_state.h"
 #include "lvglDisplay.h"
 
+extern esp_netif_t *netif;
 
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 5000
@@ -107,7 +108,7 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
     esp_err_t ret;
     esp_netif_ip_info_t ipInfo;
     char ipAddressStr[IP4ADDR_STRLEN_MAX];
-    bool hasChanges = false;
+    
     
     // Check SSID changes
     if (strcmp(lastSsid, module->ssid) != 0) {
@@ -126,7 +127,7 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
     }
 
     // Check IP Address changes
-    if (esp_netif_get_ip_info(module->netif, &ipInfo) == ESP_OK) {
+    if (esp_netif_get_ip_info(netif, &ipInfo) == ESP_OK) {
         esp_ip4addr_ntoa(&ipInfo.ip, ipAddressStr, sizeof(ipAddressStr));
         if (strcmp(lastIpAddress, ipAddressStr) != 0) {
             strncpy(lastIpAddress, ipAddressStr, sizeof(lastIpAddress) - 1);
@@ -175,6 +176,18 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         networkData[5] = module->fallback_pool_port & 0xFF;
         if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, 6)) != ESP_OK)
             return ret;
+        hasChanges = true;
+    }
+
+    // Check WiFi Status changes
+    if (lastWifiStatus[0] != module->wifi_status) {
+        lastWifiStatus[0] = module->wifi_status;
+        uint8_t networkData[3];  // Fixed size for status byte
+        networkData[0] = LVGL_REG_WIFI_STATUS;
+        networkData[1] = 1;  // Length is 1 byte
+        networkData[2] = module->wifi_status;
+        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, 3);
+        if (ret != ESP_OK) return ret;
         hasChanges = true;
     }
 
@@ -233,7 +246,7 @@ esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE)
 
     // Send best difficulty string
     size_t bestDiffLen = strlen(module->best_diff_string);
-    uint8_t *miningData = malloc(bestDiffLen + 2);
+    miningData = realloc(miningData, bestDiffLen + 2);
     if (miningData == NULL) return ESP_ERR_NO_MEM;
 
     miningData[0] = LVGL_REG_BEST_DIFF;

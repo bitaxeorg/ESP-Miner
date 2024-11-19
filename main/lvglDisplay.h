@@ -18,6 +18,7 @@
 #define LVGL_REG_POOL_URL       0x24
 #define LVGL_REG_FALLBACK_URL   0x25
 #define LVGL_REG_POOL_PORTS     0x26
+#define LVGL_REG_PORTS         0x26
 
 // Mining data registers (5 second updates)
 #define LVGL_REG_HASHRATE        0x30
