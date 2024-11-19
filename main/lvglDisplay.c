@@ -25,7 +25,6 @@ Network:
 
 Mining:
     - Hashrate Global_STATE->SYSTEM_MODULE.current_hashrate
-    - Historical Hashrate Global_STATE->SYSTEM_MODULE.historical_hashrate_rolling_index
     - Efficiency Global_STATE->POWER_MANAGEMENT_MODULE.power / (module->current_hashrate / 1000.0)
     - Best Diff Global_STATE->SYSTEM_MODULE.best_diff_string
     - Best Session Diff Global_STATE->SYSTEM_MODULE.best_session_diff_string
@@ -49,10 +48,11 @@ Monitoring:
     - Current Global_STATE->POWER_MANAGEMENT_MODULE.current
     - ASIC Count Global_STATE->asic_count
     - Voltage Domain Global_STATE->voltage_domain
+    - Uptime current time - GLOBAL_STATE->SYSTEM_MODULE.start_time
 
 Device Status:
 
-    - Uptime current time - GLOBAL_STATE->SYSTEM_MODULE.start_time
+    
     - Found Block Global_STATE->SYSTEM_MODULE.FOUND_BLOCK
     - Startup Done Global_STATE->SYSTEM_MODULE.startup_done
     - Overheat Mode Global_STATE->SYSTEM_MODULE.overheat_mode
@@ -84,57 +84,7 @@ esp_err_t lvglDisplay_init(void) {
     return i2c_bitaxe_add_device(lvglDisplayI2CAddr, &lvglDisplay_dev_handle);
 }
 
-esp_err_t lvglUpdateDisplayValues(GlobalState *GLOBAL_STATE) 
-{
-    TickType_t currentTime = xTaskGetTickCount();
-    
-    // Only update if 5 seconds have passed
-    if ((currentTime - lastUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) {
-        return ESP_OK;
-    }
-    
-    lastUpdateTime = currentTime;
-    
-    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
-    PowerManagementModule *power = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-    uint8_t statusData[8];
-    esp_err_t ret;
-    
-    // Pack hashrate (as fixed point, multiply by 100 to preserve 2 decimal places)
-    uint32_t hashrateFixed = (uint32_t)(module->current_hashrate * 100);
-    statusData[0] = (hashrateFixed >> 24) & 0xFF;
-    statusData[1] = (hashrateFixed >> 16) & 0xFF;
-    statusData[2] = (hashrateFixed >> 8) & 0xFF;
-    statusData[3] = hashrateFixed & 0xFF;
-    
-    // Pack temperature (as fixed point, multiply by 10 to preserve 1 decimal place)
-    uint16_t tempFixed = (uint16_t)(power->chip_temp_avg * 10);
-    statusData[4] = (tempFixed >> 8) & 0xFF;
-    statusData[5] = tempFixed & 0xFF;
-    
-    // Calculate efficiency (J/Th)
-    float efficiency = power->power / (module->current_hashrate / 1000.0);
-    uint16_t efficiencyFixed = (uint16_t)(efficiency * 10);
-    statusData[6] = (efficiencyFixed >> 8) & 0xFF;
-    statusData[7] = efficiencyFixed & 0xFF;
-    
-    // Send hashrate
-    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, statusData, 4)) != ESP_OK)
-        return ret;
-    
-    // Send temperature and efficiency
-    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, &statusData[4], 4)) != ESP_OK)
-        return ret;
-    
-    // Send shares count
-    uint32_t shares = module->shares_accepted;
-    statusData[0] = (shares >> 24) & 0xFF;
-    statusData[1] = (shares >> 16) & 0xFF;
-    statusData[2] = (shares >> 8) & 0xFF;
-    statusData[3] = shares & 0xFF;
-    
-    return i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, statusData, 4);
-}
+
 
 esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE) 
 {
@@ -213,6 +163,84 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         hasChanges = true;
     }
 
+    return ESP_OK;
+}
+
+esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE) 
+{
+    TickType_t currentTime = xTaskGetTickCount();
+    if ((currentTime - lastUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) {
+        return ESP_OK;
+    }
+    lastUpdateTime = currentTime;
+
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    PowerManagementModule *power = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    esp_err_t ret;
+
+    // Allocate buffer for largest possible data
+    size_t maxLen = strlen(module->best_diff_string);
+    if (strlen(module->best_session_diff_string) > maxLen) {
+        maxLen = strlen(module->best_session_diff_string);
+    }
+    uint8_t *miningData = malloc(maxLen + 2);
+    if (miningData == NULL) return ESP_ERR_NO_MEM;
+
+    // Send hashrate
+    float hashrate = module->current_hashrate;
+    miningData[0] = LVGL_REG_HASHRATE;
+    miningData[1] = sizeof(float);
+    memcpy(&miningData[2], &hashrate, sizeof(float));
+    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, miningData, sizeof(float) + 2)) != ESP_OK) {
+        free(miningData);
+        return ret;
+    }
+
+    // Send efficiency
+    float efficiency = power->power / (hashrate / 1000.0);
+    miningData[0] = LVGL_REG_EFFICIENCY;
+    miningData[1] = sizeof(float);
+    memcpy(&miningData[2], &efficiency, sizeof(float));
+    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, miningData, sizeof(float) + 2)) != ESP_OK) {
+        free(miningData);
+        return ret;
+    }
+
+    // Send shares (accepted and rejected in one packet)
+    miningData[0] = LVGL_REG_SHARES;
+    miningData[1] = 8;  // 2 uint32_t values
+    uint32_t shares[2] = {module->shares_accepted, module->shares_rejected};
+    memcpy(&miningData[2], shares, 8);
+    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, miningData, 10)) != ESP_OK) {
+        free(miningData);
+        return ret;
+    }
+
+    // Send best difficulty string
+    size_t bestDiffLen = strlen(module->best_diff_string);
+    uint8_t *miningData = malloc(bestDiffLen + 2);
+    if (miningData == NULL) return ESP_ERR_NO_MEM;
+
+    miningData[0] = LVGL_REG_BEST_DIFF;
+    miningData[1] = bestDiffLen;
+    memcpy(&miningData[2], module->best_diff_string, bestDiffLen);
+    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, miningData, bestDiffLen + 2);
+    free(miningData);
+    if (ret != ESP_OK) return ret;
+
+    // Send session difficulty string
+    size_t sessionDiffLen = strlen(module->best_session_diff_string);
+    miningData = malloc(sessionDiffLen + 2);
+    if (miningData == NULL) return ESP_ERR_NO_MEM;
+
+    miningData[0] = LVGL_REG_SESSION_DIFF;
+    miningData[1] = sessionDiffLen;
+    memcpy(&miningData[2], module->best_session_diff_string, sessionDiffLen);
+    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, miningData, sessionDiffLen + 2);
+    free(miningData);
+    if (ret != ESP_OK) return ret;
+
+    free(miningData);
     return ESP_OK;
 }
 
