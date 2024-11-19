@@ -126,6 +126,7 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         free(networkData);
         if (ret != ESP_OK) return ret;
         hasChanges = true;
+        lastSsid = module->ssid;
     }
 
     // Check IP Address changes
@@ -144,6 +145,7 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
             free(networkData);
             if (ret != ESP_OK) return ret;
             hasChanges = true;
+            lastIpAddress = ipAddressStr;
         }
     }
 
@@ -162,13 +164,12 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         free(networkData);
         if (ret != ESP_OK) return ret;
         hasChanges = true;
+        lastPoolUrl = currentPoolUrl;
     }
 
     // Port changes can use stack allocation since size is fixed
     uint16_t currentPort = module->is_using_fallback ? module->fallback_pool_port : module->pool_port;
     if (lastPoolPort != currentPort || lastFallbackPoolPort != module->fallback_pool_port) {
-        lastPoolPort = currentPort;
-        lastFallbackPoolPort = module->fallback_pool_port;
         uint8_t networkData[6];  // Fixed size for ports
         networkData[0] = LVGL_REG_PORTS;
         networkData[1] = 4;  // Length for two ports
@@ -179,6 +180,8 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, 6)) != ESP_OK)
             return ret;
         hasChanges = true;
+        lastPoolPort = currentPort;
+        lastFallbackPoolPort = module->fallback_pool_port;
     }
 
     // Check WiFi Status changes
@@ -195,6 +198,7 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         free(networkData);
         if (ret != ESP_OK) return ret;
         hasChanges = true;
+        lastWifiStatus = module->wifi_status;
     }
 
     return ESP_OK;
