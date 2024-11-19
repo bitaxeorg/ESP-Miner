@@ -140,7 +140,6 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
 {
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     esp_err_t ret;
-    uint8_t networkData[8];
     esp_netif_ip_info_t ipInfo;
     char ipAddressStr[IP4ADDR_STRLEN_MAX];
     bool hasChanges = false;
@@ -148,11 +147,16 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
     // Check SSID changes
     if (strcmp(lastSsid, module->ssid) != 0) {
         strncpy(lastSsid, module->ssid, sizeof(lastSsid) - 1);
+        size_t dataLen = strlen(module->ssid);
+        uint8_t *networkData = malloc(dataLen + 2); // +2 for register and length
+        if (networkData == NULL) return ESP_ERR_NO_MEM;
+        
         networkData[0] = LVGL_REG_SSID;
-        networkData[1] = strlen(module->ssid);
-        memcpy(&networkData[2], module->ssid, networkData[1] > 6 ? 6 : networkData[1]);
-        if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, networkData[1] + 2)) != ESP_OK)
-            return ret;
+        networkData[1] = dataLen;
+        memcpy(&networkData[2], module->ssid, dataLen);
+        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, dataLen + 2);
+        free(networkData);
+        if (ret != ESP_OK) return ret;
         hasChanges = true;
     }
 
@@ -161,43 +165,43 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         esp_ip4addr_ntoa(&ipInfo.ip, ipAddressStr, sizeof(ipAddressStr));
         if (strcmp(lastIpAddress, ipAddressStr) != 0) {
             strncpy(lastIpAddress, ipAddressStr, sizeof(lastIpAddress) - 1);
+            size_t dataLen = strlen(ipAddressStr);
+            uint8_t *networkData = malloc(dataLen + 2);
+            if (networkData == NULL) return ESP_ERR_NO_MEM;
+
             networkData[0] = LVGL_REG_IP_ADDR;
-            networkData[1] = strlen(ipAddressStr);
-            memcpy(&networkData[2], ipAddressStr, networkData[1] > 6 ? 6 : networkData[1]);
-            if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, networkData[1] + 2)) != ESP_OK)
-                return ret;
+            networkData[1] = dataLen;
+            memcpy(&networkData[2], ipAddressStr, dataLen);
+            ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, dataLen + 2);
+            free(networkData);
+            if (ret != ESP_OK) return ret;
             hasChanges = true;
         }
-    }
-
-    // Check WiFi Status changes
-    if (strcmp(lastWifiStatus, module->wifi_status) != 0) {
-        strncpy(lastWifiStatus, module->wifi_status, sizeof(lastWifiStatus) - 1);
-        networkData[0] = LVGL_REG_WIFI_STATUS;
-        networkData[1] = strlen(module->wifi_status);
-        networkData[2] = module->wifi_status[0];
-        if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, 3)) != ESP_OK)
-            return ret;
-        hasChanges = true;
     }
 
     // Check Pool URL changes
     const char *currentPoolUrl = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
     if (strcmp(lastPoolUrl, currentPoolUrl) != 0) {
         strncpy(lastPoolUrl, currentPoolUrl, sizeof(lastPoolUrl) - 1);
+        size_t dataLen = strlen(currentPoolUrl);
+        uint8_t *networkData = malloc(dataLen + 2);
+        if (networkData == NULL) return ESP_ERR_NO_MEM;
+
         networkData[0] = LVGL_REG_POOL_URL;
-        networkData[1] = strlen(currentPoolUrl);
-        memcpy(&networkData[2], currentPoolUrl, networkData[1] > 6 ? 6 : networkData[1]);
-        if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, networkData[1] + 2)) != ESP_OK)
-            return ret;
+        networkData[1] = dataLen;
+        memcpy(&networkData[2], currentPoolUrl, dataLen);
+        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, dataLen + 2);
+        free(networkData);
+        if (ret != ESP_OK) return ret;
         hasChanges = true;
     }
 
-    // Check Port changes
+    // Port changes can use stack allocation since size is fixed
     uint16_t currentPort = module->is_using_fallback ? module->fallback_pool_port : module->pool_port;
     if (lastPoolPort != currentPort || lastFallbackPoolPort != module->fallback_pool_port) {
         lastPoolPort = currentPort;
         lastFallbackPoolPort = module->fallback_pool_port;
+        uint8_t networkData[6];  // Fixed size for ports
         networkData[0] = LVGL_REG_PORTS;
         networkData[1] = 4;  // Length for two ports
         networkData[2] = (currentPort >> 8) & 0xFF;
