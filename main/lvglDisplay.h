@@ -34,10 +34,11 @@
 #define LVGL_REG_FAN            0x42
 #define LVGL_REG_POWER_STATS    0x43
 #define LVGL_REG_ASIC_INFO      0x44
+#define LVGL_REG_UPTIME         0x45
 
 // Device status registers (on change only)
 #define LVGL_REG_FLAGS          0x50
-#define LVGL_REG_UPTIME        0x51
+
 #define LVGL_REG_DEVICE_INFO   0x52
 #define LVGL_REG_BOARD_INFO    0x53
 #define LVGL_REG_CLOCK_SYNC    0x54
