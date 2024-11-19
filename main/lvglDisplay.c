@@ -13,8 +13,71 @@
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 5000
 
+/* Order of the data sent to the display
+Network:
+    - SSID Global_STATE->SYSTEM_MODULE.ssid
+    - IP Address esp_ip4addr_ntoa(&ip_info.ip, ip_address_str, IP4ADDR_STRLEN_MAX);
+    - Wifi Status GLOBAL_STATE->SYSTEM_MODULE.wifi_status
+    - Pool URL Global_STATE->SYSTEM_MODULE.pool_url
+    - Fallback Pool URL Global_STATE->SYSTEM_MODULE.fallback_pool_url
+    - Pool Port Global_STATE->SYSTEM_MODULE.pool_port
+    - Fallback Pool Port Global_STATE->SYSTEM_MODULE.fallback_pool_port
+
+Mining:
+    - Hashrate Global_STATE->SYSTEM_MODULE.current_hashrate
+    - Historical Hashrate Global_STATE->SYSTEM_MODULE.historical_hashrate_rolling_index
+    - Efficiency Global_STATE->POWER_MANAGEMENT_MODULE.power / (module->current_hashrate / 1000.0)
+    - Best Diff Global_STATE->SYSTEM_MODULE.best_diff_string
+    - Best Session Diff Global_STATE->SYSTEM_MODULE.best_session_diff_string
+    - Shares Accepted Global_STATE->SYSTEM_MODULE.shares_accepted
+    - Shares Rejected Global_STATE->SYSTEM_MODULE.shares_rejected
+
+Monitoring:
+    - Asic Temp 1 Global_STATE->POWER_MANAGEMENT_MODULE.chip_temp[0]
+    - Asic Temp 2 Global_STATE->POWER_MANAGEMENT_MODULE.chip_temp[1]
+    - Asic Temp 3 Global_STATE->POWER_MANAGEMENT_MODULE.chip_temp[2]
+    - Asic Temp 4 Global_STATE->POWER_MANAGEMENT_MODULE.chip_temp[3]
+    - Asic Temp 5 Global_STATE->POWER_MANAGEMENT_MODULE.chip_temp[4]
+    - Asic Temp 6 Global_STATE->POWER_MANAGEMENT_MODULE.chip_temp[5]
+    - Asic Temp AVG Global_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg
+    - Asic Frequency Global_STATE->POWER_MANAGEMENT_MODULE.frequency_value
+    - Fan RPM Global_STATE->POWER_MANAGEMENT_MODULE.fan_rpm
+    - Fan Percent Global_STATE->POWER_MANAGEMENT_MODULE.fan_perc
+    - VR Temp Global_STATE->POWER_MANAGEMENT_MODULE.vr_temp
+    - Power Global_STATE->POWER_MANAGEMENT_MODULE.power
+    - Voltage Global_STATE->POWER_MANAGEMENT_MODULE.voltage
+    - Current Global_STATE->POWER_MANAGEMENT_MODULE.current
+    - ASIC Count Global_STATE->asic_count
+    - Voltage Domain Global_STATE->voltage_domain
+
+Device Status:
+
+    - Uptime current time - GLOBAL_STATE->SYSTEM_MODULE.start_time
+    - Found Block Global_STATE->SYSTEM_MODULE.FOUND_BLOCK
+    - Startup Done Global_STATE->SYSTEM_MODULE.startup_done
+    - Overheat Mode Global_STATE->SYSTEM_MODULE.overheat_mode
+    - Last Clock Sync Global_STATE->SYSTEM_MODULE.lastClockSync
+    - Device Model Global_STATE->device_model
+    - Device Model String Global_STATE->device_model_str
+    - Board Version Global_STATE->board_version
+    - ASIC Model Global_STATE->asic_model
+    - ASIC Model String Global_STATE->asic_model_str
+    
+
+
+
+*/
+
 static i2c_master_dev_handle_t lvglDisplay_dev_handle;
 static TickType_t lastUpdateTime = 0;
+
+// Static Network Variables
+static char lastSsid[32] = {0};
+static char lastIpAddress[16] = {0};
+static char lastWifiStatus[20] = {0};
+static char lastPoolUrl[128] = {0};
+static uint16_t lastPoolPort = 0;
+static uint16_t lastFallbackPoolPort = 0;
 
 esp_err_t lvglDisplay_init(void) {
     lastUpdateTime = xTaskGetTickCount();
@@ -73,154 +136,79 @@ esp_err_t lvglUpdateDisplayValues(GlobalState *GLOBAL_STATE)
     return i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, statusData, 4);
 }
 
-
-   httpd_resp_set_type(req, "application/json");
-
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
-        return ESP_OK;
+esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE) 
+{
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    esp_err_t ret;
+    uint8_t networkData[8];
+    esp_netif_ip_info_t ipInfo;
+    char ipAddressStr[IP4ADDR_STRLEN_MAX];
+    bool hasChanges = false;
+    
+    // Check SSID changes
+    if (strcmp(lastSsid, module->ssid) != 0) {
+        strncpy(lastSsid, module->ssid, sizeof(lastSsid) - 1);
+        networkData[0] = LVGL_REG_SSID;
+        networkData[1] = strlen(module->ssid);
+        memcpy(&networkData[2], module->ssid, networkData[1] > 6 ? 6 : networkData[1]);
+        if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, networkData[1] + 2)) != ESP_OK)
+            return ret;
+        hasChanges = true;
     }
 
-/*  //These are global variable available in the GLOBAL_STATE
-    char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
-    char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
-    uint8_t mac[6];
-    char formattedMac[18];
-    char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
-    char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
-    char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
-    char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
-    char * board_version = nvs_config_get_string(NVS_CONFIG_BOARD_VERSION, "unknown");
-
-    esp_wifi_get_mac(WIFI_IF_STA, mac);
-    snprintf(formattedMac, 18, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-        cJSON * root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
-    cJSON_AddNumberToObject(root, "voltage", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
-    cJSON_AddNumberToObject(root, "current", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.current);
-    cJSON_AddNumberToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
-    cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
-    cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
-    cJSON_AddStringToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_diff_string);
-    cJSON_AddStringToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_diff_string);
-
-    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
-
-    cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
-    cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
-    cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
-    cJSON_AddNumberToObject(root, "frequency", nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY));
-    cJSON_AddStringToObject(root, "ssid", ssid);
-    cJSON_AddStringToObject(root, "macAddr", formattedMac);
-    cJSON_AddStringToObject(root, "hostname", hostname);
-    cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
-    cJSON_AddNumberToObject(root, "sharesAccepted", GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
-    cJSON_AddNumberToObject(root, "sharesRejected", GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
-    cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000);
-    cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE->asic_count);
-    uint16_t small_core_count = 0;
-    switch (GLOBAL_STATE->asic_model){
-        case ASIC_BM1397:
-            small_core_count = BM1397_SMALL_CORE_COUNT;
-            break;
-        case ASIC_BM1366:
-            small_core_count = BM1366_SMALL_CORE_COUNT;
-            break;
-        case ASIC_BM1368:
-            small_core_count = BM1368_SMALL_CORE_COUNT;
-            break;
-        case ASIC_BM1370:
-            small_core_count = BM1370_SMALL_CORE_COUNT;
-            break;
-        case ASIC_UNKNOWN:
-        default:
-            small_core_count = -1;
-            break;
-    }
-    cJSON_AddNumberToObject(root, "smallCoreCount", small_core_count);
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->asic_model_str);
-    cJSON_AddStringToObject(root, "stratumURL", stratumURL);
-    cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
-    cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT));
-    cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT));
-    cJSON_AddStringToObject(root, "stratumUser", stratumUser);
-    cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
-
-    cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
-    cJSON_AddStringToObject(root, "boardVersion", board_version);
-    cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
-
-    cJSON_AddNumberToObject(root, "flipscreen", nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1));
-    cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
-    cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
-
-    cJSON_AddNumberToObject(root, "invertfanpolarity", nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
-    cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1));
-
-    cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
-    cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
-
-    if ((item = cJSON_GetObjectItem(root, "stratumURL")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_URL, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumURL")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "stratumUser")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_USER, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "stratumPassword")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumUser")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPassword")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "stratumPort")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPort")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "ssid")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_WIFI_SSID, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "wifiPass")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_WIFI_PASS, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "hostname")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_HOSTNAME, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
-        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL && item->valueint > 0) {
-        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "flipscreen")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FLIP_SCREEN, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-    }
-    if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "invertfanpolarity")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_INVERT_FAN_POLARITY, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "autofanspeed")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
+    // Check IP Address changes
+    if (esp_netif_get_ip_info(module->netif, &ipInfo) == ESP_OK) {
+        esp_ip4addr_ntoa(&ipInfo.ip, ipAddressStr, sizeof(ipAddressStr));
+        if (strcmp(lastIpAddress, ipAddressStr) != 0) {
+            strncpy(lastIpAddress, ipAddressStr, sizeof(lastIpAddress) - 1);
+            networkData[0] = LVGL_REG_IP_ADDR;
+            networkData[1] = strlen(ipAddressStr);
+            memcpy(&networkData[2], ipAddressStr, networkData[1] > 6 ? 6 : networkData[1]);
+            if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, networkData[1] + 2)) != ESP_OK)
+                return ret;
+            hasChanges = true;
+        }
     }
 
-    cJSON_Delete(root);
-    httpd_resp_send_chunk(req, NULL, 0);
+    // Check WiFi Status changes
+    if (strcmp(lastWifiStatus, module->wifi_status) != 0) {
+        strncpy(lastWifiStatus, module->wifi_status, sizeof(lastWifiStatus) - 1);
+        networkData[0] = LVGL_REG_WIFI_STATUS;
+        networkData[1] = strlen(module->wifi_status);
+        networkData[2] = module->wifi_status[0];
+        if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, 3)) != ESP_OK)
+            return ret;
+        hasChanges = true;
+    }
+
+    // Check Pool URL changes
+    const char *currentPoolUrl = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
+    if (strcmp(lastPoolUrl, currentPoolUrl) != 0) {
+        strncpy(lastPoolUrl, currentPoolUrl, sizeof(lastPoolUrl) - 1);
+        networkData[0] = LVGL_REG_POOL_URL;
+        networkData[1] = strlen(currentPoolUrl);
+        memcpy(&networkData[2], currentPoolUrl, networkData[1] > 6 ? 6 : networkData[1]);
+        if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, networkData[1] + 2)) != ESP_OK)
+            return ret;
+        hasChanges = true;
+    }
+
+    // Check Port changes
+    uint16_t currentPort = module->is_using_fallback ? module->fallback_pool_port : module->pool_port;
+    if (lastPoolPort != currentPort || lastFallbackPoolPort != module->fallback_pool_port) {
+        lastPoolPort = currentPort;
+        lastFallbackPoolPort = module->fallback_pool_port;
+        networkData[0] = LVGL_REG_PORTS;
+        networkData[1] = 4;  // Length for two ports
+        networkData[2] = (currentPort >> 8) & 0xFF;
+        networkData[3] = currentPort & 0xFF;
+        networkData[4] = (module->fallback_pool_port >> 8) & 0xFF;
+        networkData[5] = module->fallback_pool_port & 0xFF;
+        if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, 6)) != ESP_OK)
+            return ret;
+        hasChanges = true;
+    }
+
     return ESP_OK;
-*/
+}
+
