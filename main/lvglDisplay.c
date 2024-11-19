@@ -106,6 +106,23 @@ static float tempBuffer[8];  // For temperature data
 static float powerBuffer[4]; // For power stats
 static uint16_t infoBuffer[2]; // For ASIC info
 
+static esp_err_t sendRegisterData(uint8_t reg, const void* data, size_t dataLen) {
+    if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    
+    // Clear entire buffer first
+    memset(displayBuffer, 0, MAX_BUFFER_SIZE);
+    
+    // Prepare data
+    displayBuffer[0] = reg;
+    displayBuffer[1] = dataLen;
+    if (data != NULL && dataLen > 0) {
+        memcpy(&displayBuffer[2], data, dataLen);
+    }
+    
+    // Send data
+    return i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, dataLen + 2);
+}
+
 esp_err_t lvglDisplay_init(void) {
     lastUpdateTime = xTaskGetTickCount();
     return i2c_bitaxe_add_device(lvglDisplayI2CAddr, &lvglDisplay_dev_handle);
@@ -117,18 +134,15 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
 {
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     esp_err_t ret;
-    esp_netif_ip_info_t ipInfo;
-    char ipAddressStr[IP4ADDR_STRLEN_MAX];
+    esp_netif_ip_info_t ip_info;
+    char ip_address_str[IP4ADDR_STRLEN_MAX];
     
     // LVGL_REG_SSID (0x21)
     if (strcmp(lastSsid, module->ssid) != 0) {
         size_t dataLen = strlen(module->ssid);
         if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
         
-        displayBuffer[0] = LVGL_REG_SSID;
-        displayBuffer[1] = dataLen;
-        memcpy(&displayBuffer[2], module->ssid, dataLen);
-        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, dataLen + 2);
+        ret = sendRegisterData(LVGL_REG_SSID, module->ssid, dataLen);
         if (ret != ESP_OK) return ret;
         
         strncpy(lastSsid, module->ssid, sizeof(lastSsid) - 1);
@@ -136,21 +150,16 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
     }
 
     // LVGL_REG_IP_ADDR (0x22)
-    if (esp_netif_get_ip_info(netif, &ipInfo) == ESP_OK) {
-        esp_ip4addr_ntoa(&ipInfo.ip, ipAddressStr, sizeof(ipAddressStr));
-        if (strcmp(lastIpAddress, ipAddressStr) != 0) {
-            size_t dataLen = strlen(ipAddressStr);
-            if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
-
-            displayBuffer[0] = LVGL_REG_IP_ADDR;
-            displayBuffer[1] = dataLen;
-            memcpy(&displayBuffer[2], ipAddressStr, dataLen);
-            ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, dataLen + 2);
-            if (ret != ESP_OK) return ret;
-            
-            strncpy(lastIpAddress, ipAddressStr, sizeof(lastIpAddress) - 1);
-            lastIpAddress[sizeof(lastIpAddress) - 1] = '\0';
-        }
+    esp_netif_get_ip_info(netif, &ip_info);
+    esp_ip4addr_ntoa(&ip_info.ip, ip_address_str, IP4ADDR_STRLEN_MAX);
+    
+    if (strcmp(lastIpAddress, ip_address_str) != 0) {
+        size_t dataLen = strlen(ip_address_str);
+        ret = sendRegisterData(LVGL_REG_IP_ADDR, ip_address_str, dataLen);
+        if (ret != ESP_OK) return ret;
+        
+        strncpy(lastIpAddress, ip_address_str, sizeof(lastIpAddress) - 1);
+        lastIpAddress[sizeof(lastIpAddress) - 1] = '\0';
     }
 
     // LVGL_REG_WIFI_STATUS (0x23)
@@ -158,10 +167,7 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         size_t dataLen = strlen(module->wifi_status);
         if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
 
-        displayBuffer[0] = LVGL_REG_WIFI_STATUS;
-        displayBuffer[1] = dataLen;
-        memcpy(&displayBuffer[2], module->wifi_status, dataLen);
-        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, dataLen + 2);
+        ret = sendRegisterData(LVGL_REG_WIFI_STATUS, module->wifi_status, dataLen);
         if (ret != ESP_OK) return ret;
         
         strncpy(lastWifiStatus, module->wifi_status, sizeof(lastWifiStatus) - 1);
@@ -174,10 +180,7 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         size_t dataLen = strlen(currentPoolUrl);
         if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
 
-        displayBuffer[0] = LVGL_REG_POOL_URL;
-        displayBuffer[1] = dataLen;
-        memcpy(&displayBuffer[2], currentPoolUrl, dataLen);
-        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, dataLen + 2);
+        ret = sendRegisterData(LVGL_REG_POOL_URL, currentPoolUrl, dataLen);
         if (ret != ESP_OK) return ret;
         
         strncpy(lastPoolUrl, currentPoolUrl, sizeof(lastPoolUrl) - 1);
@@ -189,10 +192,7 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         size_t dataLen = strlen(module->fallback_pool_url);
         if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
 
-        displayBuffer[0] = LVGL_REG_FALLBACK_URL;
-        displayBuffer[1] = dataLen;
-        memcpy(&displayBuffer[2], module->fallback_pool_url, dataLen);
-        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, dataLen + 2);
+        ret = sendRegisterData(LVGL_REG_FALLBACK_URL, module->fallback_pool_url, dataLen);
         if (ret != ESP_OK) return ret;
         
         strncpy(lastFallbackUrl, module->fallback_pool_url, sizeof(lastFallbackUrl) - 1);
@@ -200,19 +200,12 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
     }
 
     // LVGL_REG_POOL_PORTS (0x26)
-    if (lastPoolPort != module->pool_port || lastFallbackPoolPort != module->fallback_pool_port) {
-        if (sizeof(uint16_t) * 2 + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
-        
-        displayBuffer[0] = LVGL_REG_POOL_PORTS;
-        displayBuffer[1] = sizeof(uint16_t) * 2;
-        memcpy(&displayBuffer[2], &module->pool_port, sizeof(uint16_t));
-        memcpy(&displayBuffer[2 + sizeof(uint16_t)], &module->fallback_pool_port, sizeof(uint16_t));
-        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, sizeof(uint16_t) * 2 + 2);
-        if (ret != ESP_OK) return ret;
-
-        lastPoolPort = module->pool_port;
-        lastFallbackPoolPort = module->fallback_pool_port;
-    }
+    uint16_t ports[2] = {
+        module->pool_port,
+        module->fallback_pool_port
+    };
+    ret = sendRegisterData(LVGL_REG_POOL_PORTS, ports, sizeof(uint16_t) * 2);
+    if (ret != ESP_OK) return ret;
 
     return ESP_OK;
 }
@@ -230,11 +223,15 @@ esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE)
     esp_err_t ret;
 
     // LVGL_REG_HASHRATE (0x30)
-    if (sizeof(float) + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
-    displayBuffer[0] = LVGL_REG_HASHRATE;
-    displayBuffer[1] = sizeof(float);
-    memcpy(&displayBuffer[2], &module->current_hashrate, sizeof(float));
-    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, sizeof(float) + 2);
+    float hashrate = module->current_hashrate;
+    ESP_LOGI("LVGL", "Sending hashrate: %.2f", hashrate);
+    ESP_LOGI("LVGL", "Bytes: %02X %02X %02X %02X", 
+        ((uint8_t*)&hashrate)[0],
+        ((uint8_t*)&hashrate)[1],
+        ((uint8_t*)&hashrate)[2],
+        ((uint8_t*)&hashrate)[3]);
+
+    ret = sendRegisterData(LVGL_REG_HASHRATE, &hashrate, sizeof(float));
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_HIST_HASHRATE (0x31)
@@ -247,19 +244,13 @@ esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE)
     if (module->current_hashrate > 0) {
         efficiency = power->power / (module->current_hashrate / 1000.0);
     }
-    displayBuffer[0] = LVGL_REG_EFFICIENCY;
-    displayBuffer[1] = sizeof(float);
-    memcpy(&displayBuffer[2], &efficiency, sizeof(float));
-    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, sizeof(float) + 2);
+    ret = sendRegisterData(LVGL_REG_EFFICIENCY, &efficiency, sizeof(float));
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_BEST_DIFF (0x33)
     size_t bestDiffLen = strlen(module->best_diff_string);
     if (bestDiffLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
-    displayBuffer[0] = LVGL_REG_BEST_DIFF;
-    displayBuffer[1] = bestDiffLen;
-    memcpy(&displayBuffer[2], module->best_diff_string, bestDiffLen);
-    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, bestDiffLen + 2);
+    ret = sendRegisterData(LVGL_REG_BEST_DIFF, module->best_diff_string, bestDiffLen);
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_SESSION_DIFF (0x34)
@@ -267,8 +258,7 @@ esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE)
     if (sessionDiffLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
     displayBuffer[0] = LVGL_REG_SESSION_DIFF;
     displayBuffer[1] = sessionDiffLen;
-    memcpy(&displayBuffer[2], module->best_session_diff_string, sessionDiffLen);
-    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, sessionDiffLen + 2);
+    ret = sendRegisterData(LVGL_REG_SESSION_DIFF, module->best_session_diff_string, sessionDiffLen);
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_SHARES (0x35)
@@ -276,8 +266,7 @@ esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE)
     displayBuffer[0] = LVGL_REG_SHARES;
     displayBuffer[1] = sizeof(uint32_t) * 2;
     memcpy(&displayBuffer[2], &module->shares_accepted, sizeof(uint32_t));
-    memcpy(&displayBuffer[2 + sizeof(uint32_t)], &module->shares_rejected, sizeof(uint32_t));
-    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, sizeof(uint32_t) * 2 + 2);
+    ret = sendRegisterData(LVGL_REG_SHARES, &module->shares_rejected, sizeof(uint32_t));
     if (ret != ESP_OK) return ret;
 
     return ESP_OK;
@@ -302,22 +291,12 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
     size_t tempDataSize = (GLOBAL_STATE->asic_count * sizeof(float)) + sizeof(float);
     if (tempDataSize + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
     
-    displayBuffer[0] = LVGL_REG_TEMPS;
-    displayBuffer[1] = tempDataSize;
-    // Copy individual chip temperatures
-    memcpy(&displayBuffer[2], power->chip_temp, GLOBAL_STATE->asic_count * sizeof(float));
-    // Copy average temperature at the end
-    memcpy(&displayBuffer[2 + (GLOBAL_STATE->asic_count * sizeof(float))], 
-           &power->chip_temp_avg, sizeof(float));
-    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, tempDataSize + 2);
+    ret = sendRegisterData(LVGL_REG_TEMPS, displayBuffer, tempDataSize + 2);
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_ASIC_FREQ (0x41)
     if (sizeof(float) + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
-    displayBuffer[0] = LVGL_REG_ASIC_FREQ;
-    displayBuffer[1] = sizeof(float);
-    memcpy(&displayBuffer[2], &power->frequency_value, sizeof(float));
-    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, sizeof(float) + 2);
+    ret = sendRegisterData(LVGL_REG_ASIC_FREQ, &power->frequency_value, sizeof(float));
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_FAN (0x42)
@@ -329,8 +308,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
         (float)power->fan_rpm,   // Fan RPM
         (float)power->fan_perc   // Fan Percentage
     };
-    memcpy(&displayBuffer[2], fanData, sizeof(float) * 2);
-    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, sizeof(float) * 2 + 2);
+    ret = sendRegisterData(LVGL_REG_FAN, fanData, sizeof(float) * 2);
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_POWER_STATS (0x43)
