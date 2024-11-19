@@ -14,6 +14,7 @@
 #include "i2c_bitaxe.h"
 #include "global_state.h"
 #include "lvglDisplay.h"
+#include "main.h"
 
 extern esp_netif_t *netif;
 
@@ -87,6 +88,7 @@ static char lastWifiStatus[20] = {0};
 static char lastPoolUrl[128] = {0};
 static uint16_t lastPoolPort = 0;
 static uint16_t lastFallbackPoolPort = 0;
+static bool hasChanges = false;
 
 // Static Device Status Variables
 static uint8_t lastFlags = 0;
@@ -180,13 +182,17 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
     }
 
     // Check WiFi Status changes
-    if (lastWifiStatus[0] != module->wifi_status) {
-        lastWifiStatus[0] = module->wifi_status;
-        uint8_t networkData[3];  // Fixed size for status byte
+    if (strcmp(lastWifiStatus, module->wifi_status) != 0) {
+        strncpy(lastWifiStatus, module->wifi_status, sizeof(lastWifiStatus) - 1);
+        size_t dataLen = strlen(module->wifi_status);
+        uint8_t *networkData = malloc(dataLen + 2);
+        if (networkData == NULL) return ESP_ERR_NO_MEM;
+
         networkData[0] = LVGL_REG_WIFI_STATUS;
-        networkData[1] = 1;  // Length is 1 byte
-        networkData[2] = module->wifi_status;
-        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, 3);
+        networkData[1] = dataLen;
+        memcpy(&networkData[2], module->wifi_status, dataLen);
+        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, networkData, dataLen + 2);
+        free(networkData);
         if (ret != ESP_OK) return ret;
         hasChanges = true;
     }
@@ -268,7 +274,6 @@ esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE)
     free(miningData);
     if (ret != ESP_OK) return ret;
 
-    free(miningData);
     return ESP_OK;
 }
 
