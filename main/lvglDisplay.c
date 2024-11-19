@@ -49,6 +49,7 @@ Monitoring:
     - ASIC Count Global_STATE->asic_count
     - Voltage Domain Global_STATE->voltage_domain
     - Uptime current time - GLOBAL_STATE->SYSTEM_MODULE.start_time
+    
 
 Device Status:
 
@@ -241,6 +242,91 @@ esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE)
     if (ret != ESP_OK) return ret;
 
     free(miningData);
+    return ESP_OK;
+}
+
+esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE) 
+{
+    TickType_t currentTime = xTaskGetTickCount();
+    if ((currentTime - lastUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) {
+        return ESP_OK;
+    }
+    lastUpdateTime = currentTime;
+
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    PowerManagementModule *power = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    esp_err_t ret;
+
+    // Calculate uptime in seconds
+    uint32_t uptimeSeconds = (esp_timer_get_time() - module->start_time) / 1000000;
+    
+    // Send uptime
+    uint8_t *monitorData = malloc(sizeof(uint32_t) + 2);
+    if (monitorData == NULL) return ESP_ERR_NO_MEM;
+    
+    monitorData[0] = LVGL_REG_UPTIME;
+    monitorData[1] = sizeof(uint32_t);
+    memcpy(&monitorData[2], &uptimeSeconds, sizeof(uint32_t));
+    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, sizeof(uint32_t) + 2)) != ESP_OK) {
+        free(monitorData);
+        return ret;
+    }
+
+    // Calculate temperature data size based on ASIC count
+    size_t tempDataSize = (GLOBAL_STATE->asic_count * sizeof(float)) + sizeof(float); // ASICs + avg temp
+    monitorData = realloc(monitorData, tempDataSize + 2); // +2 for register and length
+    if (monitorData == NULL) return ESP_ERR_NO_MEM;
+
+    // Send temperatures only for actual ASICs plus average
+    monitorData[0] = LVGL_REG_TEMPS;
+    monitorData[1] = tempDataSize;
+    memcpy(&monitorData[2], power->chip_temp, GLOBAL_STATE->asic_count * sizeof(float));
+    memcpy(&monitorData[2 + (GLOBAL_STATE->asic_count * sizeof(float))], &power->chip_temp_avg, sizeof(float));
+    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, tempDataSize + 2)) != ESP_OK) {
+        free(monitorData);
+        return ret;
+    }
+S
+    // Send frequency
+    monitorData[0] = LVGL_REG_ASIC_FREQ;
+    monitorData[1] = sizeof(float);
+    memcpy(&monitorData[2], &power->frequency_value, sizeof(float));
+    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, sizeof(float) + 2)) != ESP_OK) {
+        free(monitorData);
+        return ret;
+    }
+
+    // Send fan data
+    monitorData[0] = LVGL_REG_FAN;
+    monitorData[1] = sizeof(float) * 2;  // RPM and percentage
+    float fanData[2] = {(float)power->fan_rpm, (float)power->fan_perc};
+    memcpy(&monitorData[2], fanData, sizeof(float) * 2);
+    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, (sizeof(float) * 2) + 2)) != ESP_OK) {
+        free(monitorData);
+        return ret;
+    }
+
+    // Send power stats (voltage, current, power, vr_temp)
+    monitorData[0] = LVGL_REG_POWER_STATS;
+    monitorData[1] = sizeof(float) * 4;
+    float powerStats[4] = {power->voltage, power->current, power->power, power->vr_temp};
+    memcpy(&monitorData[2], powerStats, sizeof(float) * 4);
+    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, (sizeof(float) * 4) + 2)) != ESP_OK) {
+        free(monitorData);
+        return ret;
+    }
+
+    // Send ASIC info (count and voltage domain)
+    monitorData[0] = LVGL_REG_ASIC_INFO;
+    monitorData[1] = 4;  // Two uint16_t values
+    uint16_t asicInfo[2] = {GLOBAL_STATE->asic_count, GLOBAL_STATE->voltage_domain};
+    memcpy(&monitorData[2], asicInfo, 4);
+    if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, 6)) != ESP_OK) {
+        free(monitorData);
+        return ret;
+    }
+
+    free(monitorData);
     return ESP_OK;
 }
 
