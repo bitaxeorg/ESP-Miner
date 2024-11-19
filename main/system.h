@@ -2,6 +2,9 @@
 #define SYSTEM_H_
 
 #include "global_state.h"
+#include "esp_netif.h"
+
+extern esp_netif_t * netif;
 
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE);
 void SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE);

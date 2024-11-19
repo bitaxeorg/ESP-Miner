@@ -37,7 +37,7 @@ static const char * TAG = "SystemModule";
 
 static void _suffix_string(uint64_t, char *, size_t, int);
 
-static esp_netif_t * netif;
+esp_netif_t * netif;
 
 QueueHandle_t user_input_queue;
 
@@ -244,8 +244,13 @@ void SYSTEM_task(void * pvParameters)
             SYSTEM_update_overheat_mode(GLOBAL_STATE);  // Check for changes
             continue;  // Skip the normal screen cycle
         }
-        lvglUpdateDisplayValues(GLOBAL_STATE);
-        // Update the current screen
+        // Update the RGB display
+        lvglUpdateDisplayNetwork(GLOBAL_STATE);
+        lvglUpdateDisplayMining(GLOBAL_STATE);
+        lvglUpdateDisplayMonitoring(GLOBAL_STATE);
+        lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
+
+        // Update the current oled screen
         _clear_display(GLOBAL_STATE);
         module->screen_page = current_screen;
 

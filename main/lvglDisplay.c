@@ -15,8 +15,8 @@
 #include "global_state.h"
 #include "lvglDisplay.h"
 #include "main.h"
+#include "system.h"
 
-extern esp_netif_t *netif;
 
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 5000

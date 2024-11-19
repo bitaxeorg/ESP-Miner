@@ -43,6 +43,7 @@
 #define LVGL_REG_CLOCK_SYNC    0x54
 esp_err_t lvglDisplay_init(void);
 
+esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE);
