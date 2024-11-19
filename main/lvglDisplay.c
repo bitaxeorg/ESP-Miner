@@ -70,10 +70,8 @@ Device Status:
     - Startup Done Global_STATE->SYSTEM_MODULE.startup_done
     - Overheat Mode Global_STATE->SYSTEM_MODULE.overheat_mode
     - Last Clock Sync Global_STATE->SYSTEM_MODULE.lastClockSync
-    - Device Model Global_STATE->device_model
     - Device Model String Global_STATE->device_model_str
     - Board Version Global_STATE->board_version
-    - ASIC Model Global_STATE->asic_model
     - ASIC Model String Global_STATE->asic_model_str
     
 
@@ -93,6 +91,7 @@ static char lastPoolUrl[128] = {0};
 static uint16_t lastPoolPort = 0;
 static uint16_t lastFallbackPoolPort = 0;
 static bool hasChanges = false;
+static char lastFallbackUrl[128] = {0};
 
 // Static Device Status Variables
 static uint8_t lastFlags = 0;
@@ -325,7 +324,8 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
     if (sizeof(float) * 2 + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
     displayBuffer[0] = LVGL_REG_FAN;
     displayBuffer[1] = sizeof(float) * 2;
-    float fanData[2] = {
+    float fanData[2] = 
+    {
         (float)power->fan_rpm,   // Fan RPM
         (float)power->fan_perc   // Fan Percentage
     };
@@ -412,19 +412,22 @@ esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE)
     }
 
     // LVGL_REG_BOARD_INFO (0x53)
-    if (lastBoardVersion != GLOBAL_STATE->board_version) {
-        if (2 + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
-        displayBuffer[0] = LVGL_REG_BOARD_INFO;
-        displayBuffer[1] = 2;  // Two bytes for board version
-        displayBuffer[2] = (GLOBAL_STATE->board_version >> 8) & 0xFF;
-        displayBuffer[3] = GLOBAL_STATE->board_version & 0xFF;
-        
-        ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, 4);
-        if (ret != ESP_OK) return ret;
+    size_t deviceModelStrLen = strlen(GLOBAL_STATE->device_model_str);
+    if (deviceModelStrLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    displayBuffer[0] = LVGL_REG_BOARD_INFO;
+    displayBuffer[1] = deviceModelStrLen;
+    memcpy(&displayBuffer[2], GLOBAL_STATE->device_model_str, deviceModelStrLen);
+    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, deviceModelStrLen + 2);
+    if (ret != ESP_OK) return ret;
 
-        lastBoardVersion = GLOBAL_STATE->board_version;
-        hasChanges = true;
-    }
+    // Also send ASIC model string in the same register
+    size_t asicModelStrLen = strlen(GLOBAL_STATE->asic_model_str);
+    if (asicModelStrLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    displayBuffer[0] = LVGL_REG_BOARD_INFO;
+    displayBuffer[1] = asicModelStrLen;
+    memcpy(&displayBuffer[2], GLOBAL_STATE->asic_model_str, asicModelStrLen);
+    ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, asicModelStrLen + 2);
+    if (ret != ESP_OK) return ret;
 
     // LVGL_REG_CLOCK_SYNC (0x54)
     if (lastClockSync != module->lastClockSync) {
