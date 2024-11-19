@@ -111,12 +111,13 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
     esp_netif_ip_info_t ipInfo;
     char ipAddressStr[IP4ADDR_STRLEN_MAX];
     
-    
     // Check SSID changes
     if (strcmp(lastSsid, module->ssid) != 0) {
         strncpy(lastSsid, module->ssid, sizeof(lastSsid) - 1);
+        lastSsid[sizeof(lastSsid) - 1] = '\0';  // Ensure null termination
+        
         size_t dataLen = strlen(module->ssid);
-        uint8_t *networkData = malloc(dataLen + 2); // +2 for register and length
+        uint8_t *networkData = malloc(dataLen + 2);
         if (networkData == NULL) return ESP_ERR_NO_MEM;
         
         networkData[0] = LVGL_REG_SSID;
@@ -126,7 +127,6 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         free(networkData);
         if (ret != ESP_OK) return ret;
         hasChanges = true;
-        lastSsid = module->ssid;
     }
 
     // Check IP Address changes
@@ -134,6 +134,8 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         esp_ip4addr_ntoa(&ipInfo.ip, ipAddressStr, sizeof(ipAddressStr));
         if (strcmp(lastIpAddress, ipAddressStr) != 0) {
             strncpy(lastIpAddress, ipAddressStr, sizeof(lastIpAddress) - 1);
+            lastIpAddress[sizeof(lastIpAddress) - 1] = '\0';  // Ensure null termination
+            
             size_t dataLen = strlen(ipAddressStr);
             uint8_t *networkData = malloc(dataLen + 2);
             if (networkData == NULL) return ESP_ERR_NO_MEM;
@@ -145,7 +147,6 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
             free(networkData);
             if (ret != ESP_OK) return ret;
             hasChanges = true;
-            lastIpAddress = ipAddressStr;
         }
     }
 
@@ -153,6 +154,8 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
     const char *currentPoolUrl = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
     if (strcmp(lastPoolUrl, currentPoolUrl) != 0) {
         strncpy(lastPoolUrl, currentPoolUrl, sizeof(lastPoolUrl) - 1);
+        lastPoolUrl[sizeof(lastPoolUrl) - 1] = '\0';  // Ensure null termination
+        
         size_t dataLen = strlen(currentPoolUrl);
         uint8_t *networkData = malloc(dataLen + 2);
         if (networkData == NULL) return ESP_ERR_NO_MEM;
@@ -164,15 +167,14 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         free(networkData);
         if (ret != ESP_OK) return ret;
         hasChanges = true;
-        lastPoolUrl = currentPoolUrl;
     }
 
     // Port changes can use stack allocation since size is fixed
     uint16_t currentPort = module->is_using_fallback ? module->fallback_pool_port : module->pool_port;
     if (lastPoolPort != currentPort || lastFallbackPoolPort != module->fallback_pool_port) {
-        uint8_t networkData[6];  // Fixed size for ports
+        uint8_t networkData[6];
         networkData[0] = LVGL_REG_PORTS;
-        networkData[1] = 4;  // Length for two ports
+        networkData[1] = 4;
         networkData[2] = (currentPort >> 8) & 0xFF;
         networkData[3] = currentPort & 0xFF;
         networkData[4] = (module->fallback_pool_port >> 8) & 0xFF;
@@ -187,6 +189,8 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
     // Check WiFi Status changes
     if (strcmp(lastWifiStatus, module->wifi_status) != 0) {
         strncpy(lastWifiStatus, module->wifi_status, sizeof(lastWifiStatus) - 1);
+        lastWifiStatus[sizeof(lastWifiStatus) - 1] = '\0';  // Ensure null termination
+        
         size_t dataLen = strlen(module->wifi_status);
         uint8_t *networkData = malloc(dataLen + 2);
         if (networkData == NULL) return ESP_ERR_NO_MEM;
@@ -198,7 +202,6 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
         free(networkData);
         if (ret != ESP_OK) return ret;
         hasChanges = true;
-        lastWifiStatus = module->wifi_status;
     }
 
     return ESP_OK;
