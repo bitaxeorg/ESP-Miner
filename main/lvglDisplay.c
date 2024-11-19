@@ -279,11 +279,13 @@ esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE)
 
 esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE) 
 {
+    static TickType_t lastMonitorUpdateTime = 0;
     TickType_t currentTime = xTaskGetTickCount();
-    if ((currentTime - lastUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) {
+    
+    if ((currentTime - lastMonitorUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) {
         return ESP_OK;
     }
-    lastUpdateTime = currentTime;
+    lastMonitorUpdateTime = currentTime;
 
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule *power = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
@@ -300,6 +302,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
     monitorData[1] = sizeof(uint32_t);
     memcpy(&monitorData[2], &uptimeSeconds, sizeof(uint32_t));
     if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, sizeof(uint32_t) + 2)) != ESP_OK) {
+        ESP_LOGI("LVGL", "Sending monitor data type %d, length %d", monitorData[0], monitorData[1]);
         free(monitorData);
         return ret;
     }
@@ -315,6 +318,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
     memcpy(&monitorData[2], power->chip_temp, GLOBAL_STATE->asic_count * sizeof(float));
     memcpy(&monitorData[2 + (GLOBAL_STATE->asic_count * sizeof(float))], &power->chip_temp_avg, sizeof(float));
     if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, tempDataSize + 2)) != ESP_OK) {
+        ESP_LOGI("LVGL", "Sending monitor data type %d, length %d", monitorData[0], monitorData[1]);
         free(monitorData);
         return ret;
     }
@@ -324,6 +328,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
     monitorData[1] = sizeof(float);
     memcpy(&monitorData[2], &power->frequency_value, sizeof(float));
     if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, sizeof(float) + 2)) != ESP_OK) {
+        ESP_LOGI("LVGL", "Sending monitor data type %d, length %d", monitorData[0], monitorData[1]);
         free(monitorData);
         return ret;
     }
@@ -334,6 +339,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
     float fanData[2] = {(float)power->fan_rpm, (float)power->fan_perc};
     memcpy(&monitorData[2], fanData, sizeof(float) * 2);
     if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, (sizeof(float) * 2) + 2)) != ESP_OK) {
+        ESP_LOGI("LVGL", "Sending monitor data type %d, length %d", monitorData[0], monitorData[1]);
         free(monitorData);
         return ret;
     }
@@ -344,6 +350,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
     float powerStats[4] = {power->voltage, power->current, power->power, power->vr_temp};
     memcpy(&monitorData[2], powerStats, sizeof(float) * 4);
     if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, (sizeof(float) * 4) + 2)) != ESP_OK) {
+        ESP_LOGI("LVGL", "Sending monitor data type %d, length %d", monitorData[0], monitorData[1]);
         free(monitorData);
         return ret;
     }
@@ -354,6 +361,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
     uint16_t asicInfo[2] = {GLOBAL_STATE->asic_count, GLOBAL_STATE->voltage_domain};
     memcpy(&monitorData[2], asicInfo, 4);
     if ((ret = i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, monitorData, 6)) != ESP_OK) {
+        ESP_LOGI("LVGL", "Sending monitor data type %d, length %d", monitorData[0], monitorData[1]);
         free(monitorData);
         return ret;
     }
