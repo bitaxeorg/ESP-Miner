@@ -253,6 +253,9 @@ void stratum_task(void * pvParameters)
         //mining.suggest_difficulty - ID: 4
         STRATUM_V1_suggest_difficulty(GLOBAL_STATE->sock, STRATUM_DIFFICULTY);
 
+        // Everything is set up, lets make sure we don't abandon work unnecessarily.
+        GLOBAL_STATE->abandon_work = 0;
+
         while (1) {
             char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->sock);
             if (!line) {
