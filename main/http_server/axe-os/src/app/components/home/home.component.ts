@@ -231,6 +231,8 @@ export class HomeComponent {
       return `https://solo.d-central.tech/#/app/${address}`;
     } else if (/solo[46]?.ckpool.org/.test(stratumURL)) {
       return `https://solostats.ckpool.org/users/${address}`;
+    } else if (stratumURL.includes('satoshiradio.nl')) {
+      return `https://pool.satoshiradio.nl/user/${address}`;
     }
     return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
   }
