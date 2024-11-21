@@ -23,8 +23,8 @@ typedef enum
     CLIENT_RECONNECT
 } stratum_method;
 
-static const int  STRATUM_ID_SUBSCRIBE    = 1;
-static const int  STRATUM_ID_CONFIGURE    = 2;
+static const int  STRATUM_ID_CONFIGURE    = 1;
+static const int  STRATUM_ID_SUBSCRIBE    = 2;
 
 typedef struct
 {
