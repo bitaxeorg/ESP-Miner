@@ -264,32 +264,16 @@ void SYSTEM_task(void * pvParameters)
                 break;
         }
 
-        // Wait for user input or timeout
-        bool input_received = false;
-        TickType_t current_time = xTaskGetTickCount();
-        TickType_t wait_time = pdMS_TO_TICKS(10000) - (current_time - last_update_time);
-
-        if (wait_time > 0) {
-            if (xQueueReceive(user_input_queue, &input_event, wait_time) == pdTRUE) {
-                input_received = true;
-                if (strcmp(input_event, "SHORT") == 0) {
-                    ESP_LOGI(TAG, "Short button press detected, switching to next screen");
-                    current_screen = (current_screen + 1) % 2;
-                } else if (strcmp(input_event, "LONG") == 0) {
-                    ESP_LOGI(TAG, "Long button press detected, toggling WiFi SoftAP");
-                    toggle_wifi_softap();
-                }
-            }
+        // Non-blocking input check
+        if (xQueueReceive(user_input_queue, &input_event, 0) == pdTRUE) {
+            // Handle input
         }
-
-        // If no input received and 10 seconds have passed, switch to the next screen
-        if (!input_received && (xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) {
-            current_screen = (current_screen + 1) % 2;
-        }
-
-        last_update_time = xTaskGetTickCount();
-    
         
+        // Separate timer for screen switching
+        if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) {
+            current_screen = (current_screen + 1) % 2;
+            last_update_time = xTaskGetTickCount();
+        }
     }
 }
 
