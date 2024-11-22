@@ -250,27 +250,40 @@ void SYSTEM_task(void * pvParameters)
         lvglUpdateDisplayMining(GLOBAL_STATE);
         lvglUpdateDisplayMonitoring(GLOBAL_STATE);
         lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
+        if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) 
+        {
+            // Update the current oled screen
+            _clear_display(GLOBAL_STATE);
+            module->screen_page = current_screen;
 
-        // Update the current oled screen
-        _clear_display(GLOBAL_STATE);
-        module->screen_page = current_screen;
-
-        switch (current_screen) {
+            switch (current_screen)
+            {
             case 0:
                 _update_screen_one(GLOBAL_STATE);
                 break;
             case 1:
                 _update_screen_two(GLOBAL_STATE);
                 break;
+            }
         }
 
         // Non-blocking input check
-        if (xQueueReceive(user_input_queue, &input_event, 0) == pdTRUE) {
-            // Handle input
+        if (xQueueReceive(user_input_queue, &input_event, 0) == pdTRUE)
+        {
+            if (strcmp(input_event, "SHORT") == 0)
+            {
+                current_screen = (current_screen + 1) % 2;
+            }
+            else if (strcmp(input_event, "LONG") == 0)
+            {
+                toggle_wifi_softap();
+            }
+            last_update_time = xTaskGetTickCount();
         }
         
         // Separate timer for screen switching
-        if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) {
+        if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000))
+        {
             current_screen = (current_screen + 1) % 2;
             last_update_time = xTaskGetTickCount();
         }

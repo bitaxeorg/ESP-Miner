@@ -20,10 +20,8 @@
 
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 2500
-#define MAX_BUFFER_SIZE 256  // Adjust size based on your largest needed buffer
+#define MAX_BUFFER_SIZE 256  //Placeholder Buffer Size
 
-// Add to the register definitions at the top
-#define LVGL_REG_UPTIME         0x45  // Moved from 0x51 to 0x45
 
 /*  sent to the display
 Network:
@@ -100,6 +98,7 @@ static AsicModel lastAsicModel = ASIC_UNKNOWN;
 static int lastBoardVersion = 0;
 static uint32_t lastClockSync = 0;
 static char lastBoardInfo[128] = {0};
+
 // Static buffers for all display data
 static uint8_t displayBuffer[MAX_BUFFER_SIZE];
 static float tempBuffer[8];  // For temperature data
@@ -107,7 +106,8 @@ static float powerBuffer[4]; // For power stats
 static uint16_t infoBuffer[2]; // For ASIC info
 static char boardInfo[128]; // For board info
 
-static esp_err_t sendRegisterData(uint8_t reg, const void* data, size_t dataLen) {
+static esp_err_t sendRegisterData(uint8_t reg, const void* data, size_t dataLen) 
+{
     if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
     
     // Clear entire buffer first
@@ -124,7 +124,8 @@ static esp_err_t sendRegisterData(uint8_t reg, const void* data, size_t dataLen)
     return i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, dataLen + 2);
 }
 
-esp_err_t lvglDisplay_init(void) {
+esp_err_t lvglDisplay_init(void) 
+{
     lastUpdateTime = xTaskGetTickCount();
     return i2c_bitaxe_add_device(lvglDisplayI2CAddr, &lvglDisplay_dev_handle);
 }
@@ -201,12 +202,18 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
     }
 
     // LVGL_REG_POOL_PORTS (0x26)
-    uint16_t ports[2] = {
-        module->pool_port,
-        module->fallback_pool_port
-    };
-    ret = sendRegisterData(LVGL_REG_POOL_PORTS, ports, sizeof(uint16_t) * 2);
-    if (ret != ESP_OK) return ret;
+    if (lastPoolPort != module->pool_port || lastFallbackPoolPort != module->fallback_pool_port) 
+    {
+        uint16_t ports[2] = {
+            module->pool_port,
+            module->fallback_pool_port
+        };
+        ret = sendRegisterData(LVGL_REG_POOL_PORTS, ports, sizeof(uint16_t) * 2);
+        if (ret != ESP_OK) return ret;
+        
+        lastPoolPort = module->pool_port;
+        lastFallbackPoolPort = module->fallback_pool_port;
+    }
 
     return ESP_OK;
 }
