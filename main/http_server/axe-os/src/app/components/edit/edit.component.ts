@@ -19,7 +19,7 @@ export class EditComponent implements OnInit {
   public firmwareUpdateProgress: number | null = null;
   public websiteUpdateProgress: number | null = null;
 
-
+  public savedChanges: boolean = false;
   public devToolsOpen: boolean = false;
   public eASICModel = eASICModel;
   public ASICModel!: eASICModel;
@@ -205,9 +205,11 @@ export class EditComponent implements OnInit {
       .subscribe({
         next: () => {
           this.toastr.success('Success!', 'Saved.');
+          this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error('Error.', `Could not save. ${err.message}`);
+          this.savedChanges = false;
         }
       });
   }
@@ -230,6 +232,19 @@ export class EditComponent implements OnInit {
   showFallbackStratumPassword: boolean = false;
   toggleFallbackStratumPasswordVisibility() {
     this.showFallbackStratumPassword = !this.showFallbackStratumPassword;
+  }
+
+  public restart() {
+    this.systemService.restart()
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => {
+          this.toastr.success('Success!', 'Bitaxe restarted');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error('Error', `Could not restart. ${err.message}`);
+        }
+      });
   }
 
 }
