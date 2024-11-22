@@ -134,86 +134,68 @@ esp_err_t lvglDisplay_init(void)
 
 esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE) 
 {
+    TickType_t currentTime = xTaskGetTickCount();
+    if ((currentTime - lastUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS * 4)) // Doesn't need to be updated as often as mining data
+    {
+        return ESP_OK;
+    }
+    lastUpdateTime = currentTime;
+    
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     esp_err_t ret;
     esp_netif_ip_info_t ip_info;
     char ip_address_str[IP4ADDR_STRLEN_MAX];
     
     // LVGL_REG_SSID (0x21)
-    if (strcmp(lastSsid, module->ssid) != 0) {
-        size_t dataLen = strlen(module->ssid);
-        if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    size_t dataLen = strlen(module->ssid);
+    if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
         
-        ret = sendRegisterData(LVGL_REG_SSID, module->ssid, dataLen);
-        if (ret != ESP_OK) return ret;
-        
-        strncpy(lastSsid, module->ssid, sizeof(lastSsid) - 1);
-        lastSsid[sizeof(lastSsid) - 1] = '\0';
-    }
+    ret = sendRegisterData(LVGL_REG_SSID, module->ssid, dataLen);
+    if (ret != ESP_OK) return ret;
 
     // LVGL_REG_IP_ADDR (0x22)
     esp_netif_get_ip_info(netif, &ip_info);
     esp_ip4addr_ntoa(&ip_info.ip, ip_address_str, IP4ADDR_STRLEN_MAX);
     
-    if (strcmp(lastIpAddress, ip_address_str) != 0) {
-        size_t dataLen = strlen(ip_address_str);
-        ret = sendRegisterData(LVGL_REG_IP_ADDR, ip_address_str, dataLen);
-        if (ret != ESP_OK) return ret;
+    dataLen = strlen(ip_address_str);
+    if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    ret = sendRegisterData(LVGL_REG_IP_ADDR, ip_address_str, dataLen);
+    if (ret != ESP_OK) return ret;
         
-        strncpy(lastIpAddress, ip_address_str, sizeof(lastIpAddress) - 1);
-        lastIpAddress[sizeof(lastIpAddress) - 1] = '\0';
-    }
-
     // LVGL_REG_WIFI_STATUS (0x23)
-    if (strcmp(lastWifiStatus, module->wifi_status) != 0) {
-        size_t dataLen = strlen(module->wifi_status);
-        if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    dataLen = strlen(module->wifi_status);
+    if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
 
-        ret = sendRegisterData(LVGL_REG_WIFI_STATUS, module->wifi_status, dataLen);
-        if (ret != ESP_OK) return ret;
-        
-        strncpy(lastWifiStatus, module->wifi_status, sizeof(lastWifiStatus) - 1);
-        lastWifiStatus[sizeof(lastWifiStatus) - 1] = '\0';
-    }
+    ret = sendRegisterData(LVGL_REG_WIFI_STATUS, module->wifi_status, dataLen);
+    if (ret != ESP_OK) return ret;
+
 
     // LVGL_REG_POOL_URL (0x24)
     const char *currentPoolUrl = module->pool_url;
-    if (strcmp(lastPoolUrl, currentPoolUrl) != 0) {
-        size_t dataLen = strlen(currentPoolUrl);
-        if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    dataLen = strlen(currentPoolUrl);
+    if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
 
-        ret = sendRegisterData(LVGL_REG_POOL_URL, currentPoolUrl, dataLen);
-        if (ret != ESP_OK) return ret;
-        
-        strncpy(lastPoolUrl, currentPoolUrl, sizeof(lastPoolUrl) - 1);
-        lastPoolUrl[sizeof(lastPoolUrl) - 1] = '\0';
-    }
+    ret = sendRegisterData(LVGL_REG_POOL_URL, currentPoolUrl, dataLen);
+    if (ret != ESP_OK) return ret;
+
 
     // LVGL_REG_FALLBACK_URL (0x25)
-    if (strcmp(lastFallbackUrl, module->fallback_pool_url) != 0) {
-        size_t dataLen = strlen(module->fallback_pool_url);
-        if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    dataLen = strlen(module->fallback_pool_url);
+    if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
 
-        ret = sendRegisterData(LVGL_REG_FALLBACK_URL, module->fallback_pool_url, dataLen);
-        if (ret != ESP_OK) return ret;
-        
-        strncpy(lastFallbackUrl, module->fallback_pool_url, sizeof(lastFallbackUrl) - 1);
-        lastFallbackUrl[sizeof(lastFallbackUrl) - 1] = '\0';
-    }
+    ret = sendRegisterData(LVGL_REG_FALLBACK_URL, module->fallback_pool_url, dataLen);
+    if (ret != ESP_OK) return ret;
+
 
     // LVGL_REG_POOL_PORTS (0x26)
-    if (lastPoolPort != module->pool_port || lastFallbackPoolPort != module->fallback_pool_port) 
+    uint16_t ports[2] =
     {
-        uint16_t ports[2] = {
-            module->pool_port,
-            module->fallback_pool_port
-        };
-        ret = sendRegisterData(LVGL_REG_POOL_PORTS, ports, sizeof(uint16_t) * 2);
-        if (ret != ESP_OK) return ret;
-        
-        lastPoolPort = module->pool_port;
-        lastFallbackPoolPort = module->fallback_pool_port;
-    }
+        module->pool_port,
+        module->fallback_pool_port
+    };
+    if (sizeof(uint16_t) * 2 + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    ret = sendRegisterData(LVGL_REG_POOL_PORTS, ports, sizeof(uint16_t) * 2);
+    if (ret != ESP_OK) return ret;
 
     return ESP_OK;
 }

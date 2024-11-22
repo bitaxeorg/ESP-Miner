@@ -267,6 +267,7 @@ void SYSTEM_task(void * pvParameters)
                 break;
             }
         }
+        
         bool input_received = false;
         // Non-blocking input check
         if (xQueueReceive(user_input_queue, &input_event, 0) == pdTRUE)
