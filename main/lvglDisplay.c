@@ -134,12 +134,13 @@ esp_err_t lvglDisplay_init(void)
 
 esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE) 
 {
-    TickType_t currentTime = xTaskGetTickCount();
-    if ((currentTime - lastUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS * 4)) // Doesn't need to be updated as often as mining data
+    static TickType_t lastNetworkUpdateTime = 0;
+    TickType_t currentNetworkTime = xTaskGetTickCount();
+    if ((currentNetworkTime - lastNetworkUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS * 4)) // Doesn't need to be updated as often as mining data
     {
         return ESP_OK;
     }
-    lastUpdateTime = currentTime;
+    lastNetworkUpdateTime = currentNetworkTime;
     
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     esp_err_t ret;
@@ -202,11 +203,12 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
 
 esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE) 
 {
-    TickType_t currentTime = xTaskGetTickCount();
-    if ((currentTime - lastUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) {
+    static TickType_t lastMiningUpdateTime = 0;
+    TickType_t currentMiningTime = xTaskGetTickCount();
+    if ((currentMiningTime - lastMiningUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) {
         return ESP_OK;
     }
-    lastUpdateTime = currentTime;
+    lastMiningUpdateTime = currentMiningTime;
 
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule *power = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
