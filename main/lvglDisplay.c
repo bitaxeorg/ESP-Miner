@@ -20,7 +20,7 @@
 
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 2500
-#define MAX_BUFFER_SIZE 256  //Placeholder Buffer Size
+#define MAX_BUFFER_SIZE 512  //Placeholder Buffer Size
 
 
 /*  sent to the display
