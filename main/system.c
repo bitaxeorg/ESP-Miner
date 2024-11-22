@@ -274,10 +274,12 @@ void SYSTEM_task(void * pvParameters)
             input_received = true;
             if (strcmp(input_event, "SHORT") == 0)
             {
+                ESP_LOGI(TAG, "Short button press detected, switching to next screen");
                 current_screen = (current_screen + 1) % 2;
             }
             else if (strcmp(input_event, "LONG") == 0)
             {
+                ESP_LOGI(TAG, "Long button press detected, toggling WiFi SoftAP");
                 toggle_wifi_softap();
             }
             last_update_time = xTaskGetTickCount();
