@@ -250,6 +250,7 @@ void SYSTEM_task(void * pvParameters)
         lvglUpdateDisplayMining(GLOBAL_STATE);
         lvglUpdateDisplayMonitoring(GLOBAL_STATE);
         lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
+
         if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) 
         {
             // Update the current oled screen
@@ -266,10 +267,11 @@ void SYSTEM_task(void * pvParameters)
                 break;
             }
         }
-
+        bool input_received = false;
         // Non-blocking input check
         if (xQueueReceive(user_input_queue, &input_event, 0) == pdTRUE)
         {
+            input_received = true;
             if (strcmp(input_event, "SHORT") == 0)
             {
                 current_screen = (current_screen + 1) % 2;
