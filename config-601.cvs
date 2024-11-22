@@ -20,5 +20,5 @@ flipscreen,data,u16,1
 invertfanpol,data,u16,1
 autofanspeed,data,u16,1
 fanspeed,data,u16,100
-selftest,data,u16,1
+selftest,data,u16,0
 overheat_mode,data,u16,0
