@@ -14,6 +14,7 @@ import { SystemService } from 'src/app/services/system.service';
 export class NetworkEditComponent implements OnInit {
 
   public form!: FormGroup;
+  public savedChanges: boolean = false;
 
   @Input() uri = '';
 
@@ -56,9 +57,11 @@ export class NetworkEditComponent implements OnInit {
       .subscribe({
         next: () => {
           this.toastr.success('Success!', 'Saved.');
+          this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error('Error.', `Could not save. ${err.message}`);
+          this.savedChanges = false;
         }
       });
   }
@@ -66,5 +69,18 @@ export class NetworkEditComponent implements OnInit {
   showWifiPassword: boolean = false;
   toggleWifiPasswordVisibility() {
     this.showWifiPassword = !this.showWifiPassword;
+  }
+
+  public restart() {
+    this.systemService.restart()
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => {
+          this.toastr.success('Success!', 'Bitaxe restarted');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error('Error', `Could not restart. ${err.message}`);
+        }
+      });
   }
 }
