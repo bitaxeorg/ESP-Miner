@@ -1,11 +1,5 @@
-form {
-    margin-bottom: 20px;
-}
-
 table {
     width: 100%;
-    margin-top: 40px;
-    margin-bottom: 40px;
     border: 1px solid #304562;
 }
 
@@ -52,4 +46,24 @@ a {
     right: 20px;
     top: 20px;
     cursor: pointer;
+}
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin: 0;
+    
+    table {
+        min-width: 100%;
+        white-space: nowrap;
+        
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+
+            @media (max-width: 1150px) {
+                padding: 0.5rem;
+            }
+        }
+    }
 }

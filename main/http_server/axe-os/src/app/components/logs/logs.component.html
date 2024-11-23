@@ -48,7 +48,7 @@
             </h2>
 
             <div *ngIf="showLogs" id="logs" #scrollContainer>
-                <div *ngFor="let log of logs">₿ {{log | ANSI}}</div>
+                <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
             </div>
         </div>
     </div>

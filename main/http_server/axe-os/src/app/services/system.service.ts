@@ -69,7 +69,7 @@ export class SystemService {
   }
 
   public restart(uri: string = '') {
-    return this.httpClient.post(`${uri}/api/system/restart`, {});
+    return this.httpClient.post(`${uri}/api/system/restart`, {}, {responseType: 'text'});
   }
 
   public updateSystem(uri: string = '', update: any) {

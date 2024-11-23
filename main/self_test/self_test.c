@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "string.h"
 #include "TPS546.h"
+#include "esp_timer.h"
 
 #define POWER_CONSUMPTION_TARGET_SUB_402 12     //watts
 #define POWER_CONSUMPTION_TARGET_402 5          //watts
@@ -167,9 +168,14 @@ void self_test(void * pvParameters)
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
+            EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
+            EMC2101_set_fan_speed(1);
+            break;
         case DEVICE_GAMMA:
             EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
             EMC2101_set_fan_speed(1);
+            EMC2101_set_ideality_factor(EMC2101_IDEALITY_1_0319);
+            EMC2101_set_beta_compensation(EMC2101_BETA_11);
             break;
         default:
     }
@@ -225,6 +231,14 @@ void self_test(void * pvParameters)
     uint8_t chips_detected = (GLOBAL_STATE->ASIC_functions.init_fn)(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->asic_count);
     ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, GLOBAL_STATE->asic_count);
 
+    
+    if (chips_detected < 1) {
+        ESP_LOGE(TAG, "SELF TEST FAIL, NO CHIPS DETECTED");
+        // ESP_LOGE(TAG, "SELF TEST FAIL, INCORRECT NONCE DIFF");
+        display_msg("ASIC:FAIL 0 CHIPS", GLOBAL_STATE);
+        return;
+    }
+
     int baud = (*GLOBAL_STATE->ASIC_functions.set_max_baud_fn)();
     vTaskDelay(10 / portTICK_PERIOD_MS);
     SERIAL_set_baud(baud);
@@ -270,31 +284,54 @@ void self_test(void * pvParameters)
 
     bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000);
 
-    (*GLOBAL_STATE->ASIC_functions.set_difficulty_mask_fn)(32);
+    uint8_t difficulty_mask = 8;
+
+    (*GLOBAL_STATE->ASIC_functions.set_difficulty_mask_fn)(difficulty_mask);
 
     ESP_LOGI(TAG, "Sending work");
 
     (*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, &job);
-    // vTaskDelay((GLOBAL_STATE->asic_job_frequency_ms - 0.3) / portTICK_PERIOD_MS);
+    
+     double start = esp_timer_get_time();
+     double sum = 0;
+     double duration = 0;
+     double hash_rate = 0;
 
-    // ESP_LOGI(TAG, "Receiving work");
-
-    // task_result * asic_result = (*GLOBAL_STATE->ASIC_functions.receive_result_fn)(GLOBAL_STATE);
-    // if (asic_result != NULL) {
-
-    //     ESP_LOGI(TAG, "Received work");
-
-    //     // check the nonce difficulty
-    //     double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
-    //     ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
-
-    // if (asic_result->nonce == 4054974794) {
-    if (chips_detected < 1) {
-        ESP_LOGE(TAG, "SELF TEST FAIL, NO CHIPS DETECTED");
-        // ESP_LOGE(TAG, "SELF TEST FAIL, INCORRECT NONCE DIFF");
-        display_msg("ASIC:FAIL 0 CHIPS", GLOBAL_STATE);
-        return;
+    while(duration < 3){
+        task_result * asic_result = (*GLOBAL_STATE->ASIC_functions.receive_result_fn)(GLOBAL_STATE);
+        if (asic_result != NULL) {
+            // check the nonce difficulty
+            double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
+            sum += difficulty_mask;
+            duration = (double) (esp_timer_get_time() - start) / 1000000;
+            hash_rate = (sum * 4294967296) / (duration * 1000000000);
+            ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
+            ESP_LOGI(TAG, "%f Gh/s  , duration %f",hash_rate, duration);
+        }
     }
+
+    ESP_LOGI(TAG, "Hashrate: %f", hash_rate);
+
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+            break;
+        case DEVICE_SUPRA:
+            if(hash_rate < 500){
+                display_msg("HASHRATE:FAIL", GLOBAL_STATE);
+                return;
+            }
+            break;
+        case DEVICE_GAMMA:
+            if(hash_rate < 900){
+                display_msg("HASHRATE:FAIL", GLOBAL_STATE);
+                return;
+            }
+            break;
+        default:
+    }
+
+
 
     free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
     free(GLOBAL_STATE->valid_jobs);
