@@ -34,13 +34,4 @@ export class LocalStorageService {
     }
     return JSON.parse(item);
   }
-
-  setNumber(key: string, value: number) {
-    localStorage.setItem(key, value.toString());
-  }
-
-  getNumber(key: string): number | null {
-    const value = localStorage.getItem(key);
-    return value ? Number(value) : null;
-  }
 }
