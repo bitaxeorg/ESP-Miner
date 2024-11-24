@@ -24,6 +24,7 @@ import { DateAgoPipe } from './pipes/date-ago.pipe';
 import { HashSuffixPipe } from './pipes/hash-suffix.pipe';
 import { PrimeNGModule } from './prime-ng.module';
 import { MessageModule } from 'primeng/message';
+import { TooltipModule } from 'primeng/tooltip';
 
 const components = [
   AppComponent,
@@ -59,7 +60,8 @@ const components = [
     CommonModule,
     PrimeNGModule,
     AppLayoutModule,
-    MessageModule
+    MessageModule,
+    TooltipModule
   ],
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },

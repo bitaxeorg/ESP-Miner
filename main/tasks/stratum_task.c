@@ -236,11 +236,11 @@ void stratum_task(void * pvParameters)
         cleanQueue(GLOBAL_STATE);
 
         ///// Start Stratum Action
-        // mining.subscribe - ID: 1
-        STRATUM_V1_subscribe(GLOBAL_STATE->sock, GLOBAL_STATE->asic_model_str);
-
-        // mining.configure - ID: 2
+        // mining.configure - ID: 1
         STRATUM_V1_configure_version_rolling(GLOBAL_STATE->sock, &GLOBAL_STATE->version_mask);
+
+        // mining.subscribe - ID: 2
+        STRATUM_V1_subscribe(GLOBAL_STATE->sock, GLOBAL_STATE->asic_model_str);
 
         char * username = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, FALLBACK_STRATUM_USER) : nvs_config_get_string(NVS_CONFIG_STRATUM_USER, STRATUM_USER);
         char * password = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, FALLBACK_STRATUM_PW) : nvs_config_get_string(NVS_CONFIG_STRATUM_PASS, STRATUM_PW);
@@ -252,6 +252,9 @@ void stratum_task(void * pvParameters)
 
         //mining.suggest_difficulty - ID: 4
         STRATUM_V1_suggest_difficulty(GLOBAL_STATE->sock, STRATUM_DIFFICULTY);
+
+        // Everything is set up, lets make sure we don't abandon work unnecessarily.
+        GLOBAL_STATE->abandon_work = 0;
 
         while (1) {
             char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->sock);
