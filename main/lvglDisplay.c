@@ -16,7 +16,7 @@
 #include "lvglDisplay.h"
 #include "main.h"
 #include "system.h"
-
+#include "vcore.h"
 
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 2500
@@ -57,7 +57,7 @@ Monitoring:
     - Voltage Global_STATE->POWER_MANAGEMENT_MODULE.voltage
     - Current Global_STATE->POWER_MANAGEMENT_MODULE.current
     - ASIC Count Global_STATE->asic_count
-    - Voltage Domain Global_STATE->voltage_domain
+    - Voltage Domain VCORE_get_voltage_mv(GLOBAL_STATE)
     - Uptime current time - GLOBAL_STATE->SYSTEM_MODULE.start_time
     
 
@@ -309,16 +309,17 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
         power->voltage,    // Voltage
         power->current,    // Current
         power->power,      // Power
-        power->vr_temp     // VR Temperature
+        VCORE_get_voltage_mv(GLOBAL_STATE)      // Voltage Domain
     };
     ret = sendRegisterData(LVGL_REG_POWER_STATS, powerStats, sizeof(float) * 4);
+    ESP_LOGI("LVGL", "Sending power stats: %.2f %.2f %.2f %.2f", powerStats[0], powerStats[1], powerStats[2], powerStats[3]);
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_ASIC_INFO (0x44)
     if (sizeof(uint16_t) * 2 + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
     uint16_t asicInfo[2] = {
         GLOBAL_STATE->asic_count,      // ASIC Count
-        GLOBAL_STATE->voltage_domain   // Voltage Domain
+        //power->vr_temp  // VR Temperature
     };
     ret = sendRegisterData(LVGL_REG_ASIC_INFO, asicInfo, sizeof(uint16_t) * 2);
     if (ret != ESP_OK) return ret;
