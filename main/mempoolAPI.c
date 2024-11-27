@@ -14,6 +14,8 @@
 #include "cJSON.h"
 #include "esp_crt_bundle.h"
 
+#define MAX_RESPONSE_SIZE 8192  // 8KB max response size
+
 static char *responseBuffer = NULL;
 static size_t responseLength = 0;
 
@@ -24,9 +26,9 @@ MempoolApiState MEMPOOL_STATE = {
     .priceValid = false,
     .blockHeight = 0,
     .blockHeightValid = false,
-    .networkHashrate = 0,
+    .networkHashrate = 0.0,
     .networkHashrateValid = false,
-    .networkDifficulty = 0,
+    .networkDifficulty = 0.0,
     .networkDifficultyValid = false,
 };
 
@@ -41,6 +43,12 @@ static esp_err_t priceEventHandler(esp_http_client_event_t *evt) {
             ESP_LOGE("HTTP API", "HTTP_EVENT_ERROR");
             break;
         case HTTP_EVENT_ON_CONNECTED:
+            if (responseBuffer != NULL) 
+            {
+                free(responseBuffer);
+                responseBuffer = NULL;
+                responseLength = 0;
+            }
             break;
         case HTTP_EVENT_HEADERS_SENT:
             break;
@@ -50,23 +58,49 @@ static esp_err_t priceEventHandler(esp_http_client_event_t *evt) {
             break;
         case HTTP_EVENT_ON_DATA:
             ESP_LOGI("HTTP API", "Receiving price data chunk: %d bytes", evt->data_len);
+
+            if (responseBuffer == NULL) 
+            {
+                responseBuffer = malloc(MAX_RESPONSE_SIZE);
+                if (responseBuffer == NULL) 
+                {
+                    ESP_LOGE("HTTP API", "Initial memory allocation failed!");
+                    responseLength = 0;
+                    return ESP_ERR_NO_MEM;
+                }
+                // Clear the buffer
+                memset(responseBuffer, 0, MAX_RESPONSE_SIZE);
+                responseLength = 0;  // Reset length when allocating new buffer
+            }
             
-            char *newBuffer = realloc(responseBuffer, responseLength + evt->data_len + 1);
-            if (newBuffer == NULL) {
-                ESP_LOGE("HTTP API", "Memory allocation failed!");
+            if (responseLength + evt->data_len > MAX_RESPONSE_SIZE) {
+                ESP_LOGE("HTTP API", "Response too large, maximum size is %d bytes", MAX_RESPONSE_SIZE);
+                if (responseBuffer != NULL) {
+                    free(responseBuffer);
+                    responseBuffer = NULL;
+                }
+                responseLength = 0;
                 return ESP_ERR_NO_MEM;
             }
-            responseBuffer = newBuffer;
+
+            if (responseBuffer == NULL) {
+                responseBuffer = malloc(MAX_RESPONSE_SIZE);
+                if (responseBuffer == NULL) {
+                    ESP_LOGE("HTTP API", "Initial memory allocation failed!");
+                    responseLength = 0;
+                    return ESP_ERR_NO_MEM;
+                }
+            }
+
             memcpy(responseBuffer + responseLength, evt->data, evt->data_len);
             responseLength += evt->data_len;
             responseBuffer[responseLength] = '\0';
             break;
-            
+
         case HTTP_EVENT_ON_FINISH:
             if (responseBuffer != NULL) {
                 cJSON *json = cJSON_Parse(responseBuffer);
                 if (json != NULL) {
-                    // Parse price data
                     cJSON *priceUSD = cJSON_GetObjectItem(json, "USD");
                     if (priceUSD != NULL && cJSON_IsNumber(priceUSD)) {
                         MEMPOOL_STATE.priceUSD = priceUSD->valueint;
@@ -98,6 +132,12 @@ static esp_err_t blockHeightEventHandler(esp_http_client_event_t *evt) {
             ESP_LOGE("HTTP API", "HTTP_EVENT_ERROR");
             break;
         case HTTP_EVENT_ON_CONNECTED:
+            if (responseBuffer != NULL) 
+            {
+                free(responseBuffer);
+                responseBuffer = NULL;
+                responseLength = 0;
+            }
             break;
         case HTTP_EVENT_HEADERS_SENT:
             break;
@@ -106,19 +146,46 @@ static esp_err_t blockHeightEventHandler(esp_http_client_event_t *evt) {
         case HTTP_EVENT_REDIRECT:
             break;
         case HTTP_EVENT_ON_DATA:
-            ESP_LOGI("HTTP API", "Receiving block height data chunk: %d bytes", evt->data_len);
+        if (responseBuffer == NULL) 
+            {
+                responseBuffer = malloc(MAX_RESPONSE_SIZE);
+                if (responseBuffer == NULL) 
+                {
+                    ESP_LOGE("HTTP API", "Initial memory allocation failed!");
+                    responseLength = 0;
+                    return ESP_ERR_NO_MEM;
+                }
+                // Clear the buffer
+                memset(responseBuffer, 0, MAX_RESPONSE_SIZE);
+                responseLength = 0;  // Reset length when allocating new buffer
+            }
+
+            ESP_LOGI("HTTP API", "Receiving price data chunk: %d bytes", evt->data_len);
             
-            char *newBuffer = realloc(responseBuffer, responseLength + evt->data_len + 1);
-            if (newBuffer == NULL) {
-                ESP_LOGE("HTTP API", "Memory allocation failed!");
+            if (responseLength + evt->data_len > MAX_RESPONSE_SIZE) {
+                ESP_LOGE("HTTP API", "Response too large, maximum size is %d bytes", MAX_RESPONSE_SIZE);
+                if (responseBuffer != NULL) {
+                    free(responseBuffer);
+                    responseBuffer = NULL;
+                }
+                responseLength = 0;
                 return ESP_ERR_NO_MEM;
             }
-            responseBuffer = newBuffer;
+
+            if (responseBuffer == NULL) {
+                responseBuffer = malloc(MAX_RESPONSE_SIZE);
+                if (responseBuffer == NULL) {
+                    ESP_LOGE("HTTP API", "Initial memory allocation failed!");
+                    responseLength = 0;
+                    return ESP_ERR_NO_MEM;
+                }
+            }
+
             memcpy(responseBuffer + responseLength, evt->data, evt->data_len);
             responseLength += evt->data_len;
             responseBuffer[responseLength] = '\0';
             break;
-            
+
         case HTTP_EVENT_ON_FINISH:
             if (responseBuffer != NULL) {
                 char *endptr;
@@ -155,6 +222,12 @@ static esp_err_t networkHashrateEventHandler(esp_http_client_event_t *evt)
             ESP_LOGE("HTTP API", "HTTP_EVENT_ERROR");
             break;
         case HTTP_EVENT_ON_CONNECTED:
+            if (responseBuffer != NULL) 
+            {
+                free(responseBuffer);
+                responseBuffer = NULL;
+                responseLength = 0;
+            }
             break;
         case HTTP_EVENT_HEADERS_SENT:
             break;
@@ -163,15 +236,41 @@ static esp_err_t networkHashrateEventHandler(esp_http_client_event_t *evt)
         case HTTP_EVENT_REDIRECT:
             break;
         case HTTP_EVENT_ON_DATA:
-            ESP_LOGI("HTTP API", "Receiving network hashrate data chunk: %d bytes", evt->data_len);
+            ESP_LOGI("HTTP API", "Receiving price data chunk: %d bytes", evt->data_len);
             
-            char *newBuffer = realloc(responseBuffer, responseLength + evt->data_len + 1);
-            if (newBuffer == NULL)
+            if (responseBuffer == NULL) 
             {
-                ESP_LOGE("HTTP API", "Memory allocation failed!");
+                responseBuffer = malloc(MAX_RESPONSE_SIZE);
+                if (responseBuffer == NULL) 
+                {
+                    ESP_LOGE("HTTP API", "Initial memory allocation failed!");
+                    responseLength = 0;
+                    return ESP_ERR_NO_MEM;
+                }
+                // Clear the buffer
+                memset(responseBuffer, 0, MAX_RESPONSE_SIZE);
+                responseLength = 0;  // Reset length when allocating new buffer
+            }
+
+            if (responseLength + evt->data_len > MAX_RESPONSE_SIZE) {
+                ESP_LOGE("HTTP API", "Response too large, maximum size is %d bytes", MAX_RESPONSE_SIZE);
+                if (responseBuffer != NULL) {
+                    free(responseBuffer);
+                    responseBuffer = NULL;
+                }
+                responseLength = 0;
                 return ESP_ERR_NO_MEM;
             }
-            responseBuffer = newBuffer;
+
+            if (responseBuffer == NULL) {
+                responseBuffer = malloc(MAX_RESPONSE_SIZE);
+                if (responseBuffer == NULL) {
+                    ESP_LOGE("HTTP API", "Initial memory allocation failed!");
+                    responseLength = 0;
+                    return ESP_ERR_NO_MEM;
+                }
+            }
+
             memcpy(responseBuffer + responseLength, evt->data, evt->data_len);
             responseLength += evt->data_len;
             responseBuffer[responseLength] = '\0';
@@ -180,33 +279,35 @@ static esp_err_t networkHashrateEventHandler(esp_http_client_event_t *evt)
         case HTTP_EVENT_ON_FINISH:
             if (responseBuffer != NULL) 
             {
+                ESP_LOGI("HTTP API", "Parsing network hashrate data, buffer length: %d", responseLength);
+                if (responseLength > 0) {
+                    ESP_LOGI("HTTP API", "Response: %s", responseBuffer);
+                } else {
+                    ESP_LOGW("HTTP API", "Empty response buffer");
+                }
+                
                 cJSON *json = cJSON_Parse(responseBuffer);
-                if (json != NULL) 
-                {
-                    // Parse network hashrate data
-                    cJSON *hashrates = cJSON_GetObjectItem(json, "hashrates");
-                    if (hashrates != NULL && cJSON_IsArray(hashrates)) 
+                if (json == NULL) {
+                    ESP_LOGE("HTTP API", "JSON parsing failed: %s", cJSON_GetErrorPtr());
+                } else {
+                    // Get current hashrate (in EH/s)
+                    cJSON *currentHashrate = cJSON_GetObjectItem(json, "currentHashrate");
+                    if (currentHashrate != NULL && cJSON_IsNumber(currentHashrate)) 
                     {
-                        cJSON *hashrate = cJSON_GetArrayItem(hashrates, 0);
-                        if (hashrate != NULL && cJSON_IsNumber(hashrate)) 
-                        {
-                            MEMPOOL_STATE.networkHashrate = (uint32_t)(hashrate->valuedouble / 1e18);
-                            MEMPOOL_STATE.networkHashrateValid = true;
-                            ESP_LOGI("HTTP API", "Network hashrate: %lu EH/s", MEMPOOL_STATE.networkHashrate);
-                        }
+                        MEMPOOL_STATE.networkHashrate = currentHashrate->valuedouble;
+                        MEMPOOL_STATE.networkHashrateValid = true;
+                        ESP_LOGI("HTTP API", "Network hashrate: %.2f EH/s", MEMPOOL_STATE.networkHashrate / 1e18);
                     }
 
-                    cJSON *difficulty = cJSON_GetObjectItem(json, "difficulty");
-                    if (difficulty != NULL && cJSON_IsNumber(difficulty)) 
+                    // Get current difficulty
+                    cJSON *currentDifficulty = cJSON_GetObjectItem(json, "currentDifficulty");
+                    if (currentDifficulty != NULL && cJSON_IsNumber(currentDifficulty)) 
                     {
-                        cJSON *difficulty_target = cJSON_GetObjectItem(json, "difficulty");
-                        if (difficulty_target != NULL && cJSON_IsNumber(difficulty_target)) 
-                        {
-                            MEMPOOL_STATE.networkDifficulty = difficulty->valueint / difficulty_target->valueint;
-                            MEMPOOL_STATE.networkDifficultyValid = true;
-                            ESP_LOGI("HTTP API", "Network difficulty: %lu", MEMPOOL_STATE.networkDifficulty);
-                        }
+                        MEMPOOL_STATE.networkDifficulty = currentDifficulty->valuedouble;
+                        MEMPOOL_STATE.networkDifficultyValid = true;
+                        ESP_LOGI("HTTP API", "Network difficulty: %.2f", MEMPOOL_STATE.networkDifficulty);
                     }
+                    
                     cJSON_Delete(json);
                 }
                 free(responseBuffer);

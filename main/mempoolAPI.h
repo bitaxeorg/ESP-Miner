@@ -19,9 +19,9 @@ typedef struct {
     uint32_t priceTimestamp;
     uint32_t priceUSD;
     bool priceValid;
-    uint32_t networkHashrate;
+    double networkHashrate;
     bool networkHashrateValid;
-    uint32_t networkDifficulty;
+    double networkDifficulty;
     bool networkDifficultyValid;
     uint32_t blockHeight;
     bool blockHeightValid;
