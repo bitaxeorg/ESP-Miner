@@ -79,11 +79,11 @@ esp_err_t httpEventHandler(esp_http_client_event_t *evt)
                     ESP_LOGI("HTTP API", "Parsed JSON: %s", jsonStr);
                     free(jsonStr);
                     
-                    // Extract and log the "gecko_says" field This is the response from the ping API request
+                    // Extract and log the "time" field
                     cJSON *priceTimestamp = cJSON_GetObjectItem(json, "time");
-                    if (priceTimestamp != NULL && cJSON_IsString(priceTimestamp)) 
+                    if (priceTimestamp != NULL && cJSON_IsNumber(priceTimestamp)) 
                     {
-                        ESP_LOGI("HTTP API", "Price response: %s", priceTimestamp->valuestring);
+                        ESP_LOGI("HTTP API", "Price timestamp: %d", priceTimestamp->valueint);
                     } 
                     else 
                     {
@@ -91,9 +91,9 @@ esp_err_t httpEventHandler(esp_http_client_event_t *evt)
                     }
 
                     cJSON *priceUSD = cJSON_GetObjectItem(json, "USD");
-                    if (priceUSD != NULL && cJSON_IsString(priceUSD)) 
+                    if (priceUSD != NULL && cJSON_IsNumber(priceUSD)) 
                     {
-                        ESP_LOGI("HTTP API", "Price response: %s", priceUSD->valuestring);
+                        ESP_LOGI("HTTP API", "Price USD: %d", priceUSD->valueint);
                     } 
                     else 
                     {
