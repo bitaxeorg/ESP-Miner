@@ -15,7 +15,23 @@
 #include "cJSON.h"
 #include "esp_system.h"
 
+typedef struct {
+    uint32_t priceTimestamp;
+    uint32_t priceUSD;
+    bool priceValid;
+    uint32_t networkHashrate;
+    bool networkHashrateValid;
+    uint32_t networkDifficulty;
+    bool networkDifficultyValid;
+    uint32_t blockHeight;
+    bool blockHeightValid;
+} MempoolApiState;
+
+extern MempoolApiState MEMPOOL_STATE;  // Declare the global variable
 
 esp_err_t mempool_api_price(void);
+esp_err_t mempool_api_network_hashrate(void);
+esp_err_t mempool_api_network_difficulty_adjustement(void);
+MempoolApiState* getMempoolState(void);  // Add getter function
 
 #endif

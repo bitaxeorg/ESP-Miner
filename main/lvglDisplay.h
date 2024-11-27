@@ -42,6 +42,13 @@
 #define LVGL_REG_DEVICE_INFO   0x52
 #define LVGL_REG_BOARD_INFO    0x53
 #define LVGL_REG_CLOCK_SYNC    0x54
+
+// API data registers (5 second updates)
+#define LVGL_REG_API_BTC_PRICE   0x60
+#define LVGL_REG_API_NETWORK_HASHRATE 0x61
+#define LVGL_REG_API_NETWORK_DIFFICULTY 0x62
+
+
 esp_err_t lvglDisplay_init(void);
 
 esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE);

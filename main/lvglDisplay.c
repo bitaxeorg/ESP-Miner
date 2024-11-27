@@ -17,6 +17,7 @@
 #include "main.h"
 #include "system.h"
 #include "vcore.h"
+#include "mempoolAPI.h"
 
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 2500
@@ -72,9 +73,13 @@ Device Status:
     - Board Version Global_STATE->board_version
     - ASIC Model String Global_STATE->asic_model_str
     
-
-
-
+API Data:
+    - BTC Price MEMPOOL_STATE.priceUSD
+    - BTC Price Timestamp MEMPOOL_STATE.priceTimestamp
+    - Block Height MEMPOOL_STATE.btcBlockHeight
+    - Network Hashrate MEMPOOL_STATE.networkHashrate
+    - Network Difficulty MEMPOOL_STATE.networkDifficulty
+    - Network Fee MEMPOOL_STATE.networkFee
 */
 
 static i2c_master_dev_handle_t lvglDisplay_dev_handle;
@@ -382,5 +387,28 @@ esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE)
     return ESP_OK;
 }
 
+esp_err_t lvglUpdateDisplayAPIData(GlobalState *GLOBAL_STATE) 
+{
+static TickType_t lastPriceUpdateTime = 0;
+    TickType_t currentTime = xTaskGetTickCount();
+    
+    if ((currentTime - lastPriceUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS * 4)) {
+        return ESP_OK;
+    }
+    lastPriceUpdateTime = currentTime;
+
+    esp_err_t ret;
+    MempoolApiState* mempoolState = getMempoolState();
+
+    // Only send if we have valid price data
+    if (mempoolState->priceValid) {
+        // Send price
+        ret = sendRegisterData(LVGL_REG_API_BTC_PRICE, &mempoolState->priceUSD, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+
+    }
+
+    return ESP_OK;
+}
 
 
