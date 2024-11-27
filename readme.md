@@ -4,6 +4,24 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/t/skot/esp-miner)
 ![GitHub contributors](https://img.shields.io/github/contributors/skot/esp-miner)
 
+# ACS ESP Miner Fork
+![image](https://github.com/user-attachments/assets/afb6426b-1a2c-4353-8d57-4c85953c13e7)
+- Based on https://github.com/skot/ESP-Miner
+  
+## **Factory ACS images coming Soon** 
+
+# Goals
+- Creating a version of ESP-Miner that is more user interfacable outside of the existing Web GUI.
+- Creating a framework where data can be sent to supporting devices for display
+
+# Changes
+- Support for sending additional I2C Data for periphials
+- Support for API GET request
+- Tweaked System task to allow for faster data push intervals
+
+# Related Project
+### [ACS Bitaxe Hardware](https://github.com/Advanced-Crypto-Services/acs-bitaxe)
+### [800x480 LCD Add-On](https://github.com/Advanced-Crypto-Services/acs-bitaxe-lcd-800x480)
 
 # ESP-Miner
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/skot/bitaxe)
@@ -29,6 +47,7 @@ You need to provide a config.cvs file (see repo for examples) and the appropiate
 ```
 bitaxetool --config ./config.cvs --firmware ./esp-miner-factory-v2.0.3.bin
 ```
+
 
 ## AxeOS API
 The esp-miner UI is called AxeOS and provides an API to expose actions and information.
