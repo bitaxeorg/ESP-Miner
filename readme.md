@@ -6,7 +6,7 @@
 
 # ACS ESP Miner Fork
 ![image](https://github.com/user-attachments/assets/afb6426b-1a2c-4353-8d57-4c85953c13e7)
-- Based on https://github.com/skot/ESP-Miner
+- ### Based on [ESP Miner](https://github.com/skot/ESP-Miner)
   
 ## **Factory ACS images coming Soon** 
 
