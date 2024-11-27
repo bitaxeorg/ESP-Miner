@@ -32,6 +32,7 @@ extern MempoolApiState MEMPOOL_STATE;  // Declare the global variable
 esp_err_t mempool_api_price(void);
 esp_err_t mempool_api_network_hashrate(void);
 esp_err_t mempool_api_network_difficulty_adjustement(void);
+esp_err_t mempool_api_block_tip_height(void);
 MempoolApiState* getMempoolState(void);  // Add getter function
 
 #endif

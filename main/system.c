@@ -252,6 +252,9 @@ void SYSTEM_task(void * pvParameters)
         lvglUpdateDisplayMonitoring(GLOBAL_STATE);
         lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
         mempool_api_price();
+        mempool_api_block_tip_height();
+        //mempool_api_network_hashrate();
+        //mempool_api_network_difficulty_adjustement();
 
         if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) 
         {

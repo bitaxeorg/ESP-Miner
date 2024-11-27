@@ -126,7 +126,7 @@ static esp_err_t blockHeightEventHandler(esp_http_client_event_t *evt) {
                 if (endptr != responseBuffer && *endptr == '\0') {
                     MEMPOOL_STATE.blockHeight = blockHeight;
                     MEMPOOL_STATE.blockHeightValid = true;
-                    ESP_LOGI("HTTP API", "Block height: %d", blockHeight);
+                    ESP_LOGI("HTTP API", "Block height: %lu", blockHeight);
                 } else {
                     ESP_LOGE("HTTP API", "Failed to parse block height");
                 }
@@ -192,7 +192,7 @@ static esp_err_t networkHashrateEventHandler(esp_http_client_event_t *evt)
                         {
                             MEMPOOL_STATE.networkHashrate = (uint32_t)(hashrate->valuedouble / 1e18);
                             MEMPOOL_STATE.networkHashrateValid = true;
-                            ESP_LOGI("HTTP API", "Network hashrate: %d EH/s", MEMPOOL_STATE.networkHashrate);
+                            ESP_LOGI("HTTP API", "Network hashrate: %lu EH/s", MEMPOOL_STATE.networkHashrate);
                         }
                     }
 
@@ -204,7 +204,7 @@ static esp_err_t networkHashrateEventHandler(esp_http_client_event_t *evt)
                         {
                             MEMPOOL_STATE.networkDifficulty = difficulty->valueint / difficulty_target->valueint;
                             MEMPOOL_STATE.networkDifficultyValid = true;
-                            ESP_LOGI("HTTP API", "Network difficulty: %d", MEMPOOL_STATE.networkDifficulty);
+                            ESP_LOGI("HTTP API", "Network difficulty: %lu", MEMPOOL_STATE.networkDifficulty);
                         }
                     }
                     cJSON_Delete(json);
@@ -234,7 +234,7 @@ esp_err_t mempool_api_price(void) {
     int64_t currentTime = esp_timer_get_time();
     
     // Check if it's time to send the request. Limit the number of requests here
-    if (((currentTime - lastUpdate)/1000000) > 60 || lastUpdate == 0)
+    if (((currentTime - lastUpdate)/1000000) > 300 || lastUpdate == 0)
     {
         lastUpdate = currentTime;
         // Set up the HTTP client configuration using esp cert bndles
@@ -297,7 +297,7 @@ esp_err_t mempool_api_block_tip_height(void) {
     int64_t currentTime = esp_timer_get_time();
     
     // Check if it's time to send the request. Limit the number of requests here
-    if (((currentTime - lastUpdate)/1000000) > 60 || lastUpdate == 0)
+    if (((currentTime - lastUpdate)/1000000) > 300 || lastUpdate == 0)
     {
         lastUpdate = currentTime;
         // Set up the HTTP client configuration using esp cert bndles
@@ -360,14 +360,14 @@ esp_err_t mempool_api_network_hashrate(void)
     int64_t currentTime = esp_timer_get_time();
     
     // Check if it's time to send the request. Limit the number of requests here
-    if (((currentTime - lastUpdate)/1000000) > 60 || lastUpdate == 0)
+    if (((currentTime - lastUpdate)/1000000) > 300 || lastUpdate == 0)
     {
         lastUpdate = currentTime;
         // Set up the HTTP client configuration using esp cert bndles
         //Using Coingecko API key for testing
         // TODO: move this to own server for production to limit the number of requests
         esp_http_client_config_t config = {
-            .url = "https://mempool.space/api/v1/mining/hashrate/1d",
+            .url = "https://mempool.space/api/v1/mining/hashrate/3d",
             .event_handler = networkHashrateEventHandler,  // Use specific handler
             .transport_type = HTTP_TRANSPORT_OVER_SSL,
             .crt_bundle_attach = esp_crt_bundle_attach,

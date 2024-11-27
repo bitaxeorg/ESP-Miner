@@ -408,6 +408,16 @@ static TickType_t lastPriceUpdateTime = 0;
 
     }
 
+    if (mempoolState->networkHashrateValid) {
+        ret = sendRegisterData(LVGL_REG_API_NETWORK_HASHRATE, &mempoolState->networkHashrate, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+    }
+
+    if (mempoolState->networkDifficultyValid) {
+        ret = sendRegisterData(LVGL_REG_API_NETWORK_DIFFICULTY, &mempoolState->networkDifficulty, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+    }
+
     return ESP_OK;
 }
 
