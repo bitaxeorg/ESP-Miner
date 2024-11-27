@@ -291,7 +291,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
 
     // LVGL_REG_ASIC_FREQ (0x41)
     if (sizeof(float) + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
-    ret = sendRegisterData(LVGL_REG_ASIC_FREQ, &power->frequency_value, sizeof(float));
+    ret = sendRegisterData(LVGL_REG_ASIC_FREQ, &power->frequency_value, sizeof(float)); 
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_FAN (0x42)
@@ -326,7 +326,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
 
     // LVGL_REG_UPTIME (0x45)
     if (sizeof(uint32_t) + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
-    uint32_t uptimeSeconds = (esp_timer_get_time() - module->start_time) / 1000000;
+    uint32_t uptimeSeconds = ((esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000);
     ret = sendRegisterData(LVGL_REG_UPTIME, &uptimeSeconds, sizeof(uint32_t));
     if (ret != ESP_OK) return ret;
 

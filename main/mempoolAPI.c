@@ -1,4 +1,4 @@
-#include "coingeckoAPI.h"
+#include "mempoolAPI.h"
 #include <string.h>
 #include <stdlib.h>
 #include "esp_log.h"
@@ -174,6 +174,7 @@ esp_err_t mempool_api_price(void)
         }*/
 
         // Perform request 
+        esp_err_t err;
         err = esp_http_client_perform(client);
         
         if (err == ESP_OK) 

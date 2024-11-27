@@ -52,6 +52,7 @@ PRIV_REQUIRES
     "vfs"
     "esp_driver_i2c"
     "esp_http_client"
+    "mbedtls"
     
 )
 
