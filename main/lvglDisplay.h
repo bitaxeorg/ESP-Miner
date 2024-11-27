@@ -47,6 +47,7 @@
 #define LVGL_REG_API_BTC_PRICE   0x60
 #define LVGL_REG_API_NETWORK_HASHRATE 0x61
 #define LVGL_REG_API_NETWORK_DIFFICULTY 0x62
+#define LVGL_REG_API_BLOCK_HEIGHT 0x63
 
 
 esp_err_t lvglDisplay_init(void);
@@ -55,4 +56,5 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE);
+esp_err_t lvglUpdateDisplayAPI(void);
 #endif

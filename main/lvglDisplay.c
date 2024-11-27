@@ -111,21 +111,33 @@ static float powerBuffer[4]; // For power stats
 static uint16_t infoBuffer[2]; // For ASIC info
 static char boardInfo[128]; // For board info
 
+static uint32_t lastPrice = 0;
+static double lastNetworkHashrate = 0.0;
+static double lastNetworkDifficulty = 0.0;
+static uint32_t lastBlockHeight = 0;
+
 static esp_err_t sendRegisterData(uint8_t reg, const void* data, size_t dataLen) 
 {
-    if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    // Check total size including register byte and length byte
+    if (dataLen + 2 > MAX_BUFFER_SIZE) {
+        ESP_LOGE("LVGL", "Buffer overflow prevented: reg 0x%02X, size %d", reg, dataLen);
+        return ESP_ERR_NO_MEM;
+    }        
     
-    // Clear entire buffer first
-    memset(displayBuffer, 0, MAX_BUFFER_SIZE);
+    // Clear only the portion of buffer we'll use
+    memset(displayBuffer, 0, dataLen + 2);
     
     // Prepare data
     displayBuffer[0] = reg;
-    displayBuffer[1] = dataLen;
+    displayBuffer[1] = (uint8_t)dataLen; // Explicitly cast size to uint8_t
     if (data != NULL && dataLen > 0) {
         memcpy(&displayBuffer[2], data, dataLen);
     }
     
-    // Send data
+    // Add debug logging
+    ESP_LOGD("LVGL", "Sending reg 0x%02X, len %d", reg, dataLen);
+    
+    // Send data with exact length
     return i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, dataLen + 2);
 }
 
@@ -387,9 +399,9 @@ esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE)
     return ESP_OK;
 }
 
-esp_err_t lvglUpdateDisplayAPIData(GlobalState *GLOBAL_STATE) 
+esp_err_t lvglUpdateDisplayAPI(void) 
 {
-static TickType_t lastPriceUpdateTime = 0;
+    static TickType_t lastPriceUpdateTime = 0;
     TickType_t currentTime = xTaskGetTickCount();
     
     if ((currentTime - lastPriceUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS * 4)) {
@@ -405,17 +417,26 @@ static TickType_t lastPriceUpdateTime = 0;
         // Send price
         ret = sendRegisterData(LVGL_REG_API_BTC_PRICE, &mempoolState->priceUSD, sizeof(uint32_t));
         if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent BTC price: %lu", mempoolState->priceUSD);
 
     }
 
     if (mempoolState->networkHashrateValid) {
-        ret = sendRegisterData(LVGL_REG_API_NETWORK_HASHRATE, &mempoolState->networkHashrate, sizeof(uint32_t));
+        ret = sendRegisterData(LVGL_REG_API_NETWORK_HASHRATE, &mempoolState->networkHashrate, sizeof(double));
         if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent network hashrate: %.2f", mempoolState->networkHashrate);
     }
 
     if (mempoolState->networkDifficultyValid) {
-        ret = sendRegisterData(LVGL_REG_API_NETWORK_DIFFICULTY, &mempoolState->networkDifficulty, sizeof(uint32_t));
+        ret = sendRegisterData(LVGL_REG_API_NETWORK_DIFFICULTY, &mempoolState->networkDifficulty, sizeof(double));
         if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent network difficulty: %.2f", mempoolState->networkDifficulty);
+    }
+
+    if (mempoolState->blockHeightValid) {
+        ret = sendRegisterData(LVGL_REG_API_BLOCK_HEIGHT, &mempoolState->blockHeight, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent block height: %lu", mempoolState->blockHeight);
     }
 
     return ESP_OK;
