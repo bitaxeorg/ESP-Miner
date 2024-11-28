@@ -57,7 +57,7 @@
                             </div>
                         </div>
                         <span class="text-red-500 font-medium">{{info.sharesRejected | number: '1.0-0'}} </span>
-                        <span class="text-500">rejected</span>
+                        <span class="text-500">rejected</span> <span class="font-medium"> ({{(info.sharesRejected / (info.sharesAccepted + info.sharesRejected) * 100) | number: '1.2-2'}}%)</span>
                     </div>
                 </div>
 
