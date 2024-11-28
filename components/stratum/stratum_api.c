@@ -235,7 +235,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         }
         new_work->merkle_branches = malloc(HASH_SIZE * new_work->n_merkle_branches);
         for (size_t i = 0; i < new_work->n_merkle_branches; i++) {
-            hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE * 2);
+            hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE);
         }
 
         new_work->version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
