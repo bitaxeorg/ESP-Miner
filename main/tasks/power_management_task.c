@@ -171,6 +171,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
                     nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
                     nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
                     exit(EXIT_FAILURE);
                 }
                 break;
