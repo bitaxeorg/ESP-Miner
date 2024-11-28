@@ -35,7 +35,7 @@
         <div class="card">
             <h2>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}}%</span></h2>
             <!-- <input type="file" id="file" (change)="otaUpdate($event)" accept=".bin"> -->
-            <p-fileUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaUpdate($event)"
+            <p-fileUpload #firmwareUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaUpdate($event)"
                 [auto]="true" chooseLabel="Browse"></p-fileUpload>
 
             <small>(esp-miner.bin)</small>
@@ -46,7 +46,7 @@
         <div class="card">
             <h2>Update Website <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}}%</span></h2>
 
-            <p-fileUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
+            <p-fileUpload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
                 [auto]="true" chooseLabel="Browse"></p-fileUpload>
 
             <small>(www.bin)</small>
