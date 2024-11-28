@@ -37,11 +37,11 @@ void STRATUM_V1_initialize_buffer()
 {
     json_rpc_buffer = malloc(BUFFER_SIZE);
     json_rpc_buffer_size = BUFFER_SIZE;
-    memset(json_rpc_buffer, 0, BUFFER_SIZE);
     if (json_rpc_buffer == NULL) {
         printf("Error: Failed to allocate memory for buffer\n");
         exit(1);
     }
+    memset(json_rpc_buffer, 0, BUFFER_SIZE);
 }
 
 void cleanup_stratum_buffer()
