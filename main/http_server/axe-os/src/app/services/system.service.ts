@@ -92,14 +92,13 @@ export class SystemService {
             'Content-Type': 'application/octet-stream', // Set the content type
           },
         }).subscribe({
-          next: (e) => {
-
+          next: (event) => {
+            subscriber.next(event);
           },
           error: (err) => {
             subscriber.error(err)
           },
           complete: () => {
-            subscriber.next()
             subscriber.complete();
           }
         });
