@@ -25,6 +25,14 @@ typedef struct {
     bool networkDifficultyValid;
     uint32_t blockHeight;
     bool blockHeightValid;
+    float difficultyProgressPercent;
+    bool difficultyProgressPercentValid;
+    float difficultyChangePercent;
+    bool difficultyChangePercentValid;
+    uint32_t remainingBlocksToDifficultyAdjustment;
+    bool remainingBlocksToDifficultyAdjustmentValid;
+    uint32_t remainingTimeToDifficultyAdjustment;
+    bool remainingTimeToDifficultyAdjustmentValid;
 } MempoolApiState;
 
 extern MempoolApiState MEMPOOL_STATE;  // Declare the global variable
