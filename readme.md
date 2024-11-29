@@ -19,6 +19,13 @@
 - Support for API GET request
 - Tweaked System task to allow for faster data push intervals
 
+# API 
+### [MEMPOOL](https://mempool.space/docs/api/rest)
+
+We are testing the use of the Mempool API for Bitoin Newtowrk and Mining Related upadates. The first iteration is in testing, and building the Bitcoin News Page around this data
+
+
+
 # Related Project
 ### [ACS Bitaxe Hardware](https://github.com/Advanced-Crypto-Services/acs-bitaxe)
 ### [800x480 LCD Add-On](https://github.com/Advanced-Crypto-Services/acs-bitaxe-lcd-800x480)
