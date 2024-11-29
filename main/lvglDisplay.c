@@ -439,6 +439,30 @@ esp_err_t lvglUpdateDisplayAPI(void)
         ESP_LOGI("LVGL", "Sent block height: %lu", mempoolState->blockHeight);
     }
 
+    if (mempoolState->difficultyProgressPercentValid) {
+        ret = sendRegisterData(LVGL_REG_API_DIFFICULTY_PROGRESS, &mempoolState->difficultyProgressPercent, sizeof(double));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent difficulty progress: %.2f", mempoolState->difficultyProgressPercent);
+    }
+
+    if (mempoolState->difficultyChangePercentValid) {
+        ret = sendRegisterData(LVGL_REG_API_DIFFICULTY_CHANGE, &mempoolState->difficultyChangePercent, sizeof(double));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent difficulty change: %.2f", mempoolState->difficultyChangePercent);
+    }
+
+    if (mempoolState->remainingBlocksToDifficultyAdjustmentValid) {
+        ret = sendRegisterData(LVGL_REG_API_REMAINING_BLOCKS, &mempoolState->remainingBlocksToDifficultyAdjustment, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent remaining blocks: %lu", mempoolState->remainingBlocksToDifficultyAdjustment);
+    }
+
+    if (mempoolState->remainingTimeToDifficultyAdjustmentValid) {
+        ret = sendRegisterData(LVGL_REG_API_REMAINING_TIME, &mempoolState->remainingTimeToDifficultyAdjustment, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent remaining time: %lu", mempoolState->remainingTimeToDifficultyAdjustment);
+    }
+
     return ESP_OK;
 }
 

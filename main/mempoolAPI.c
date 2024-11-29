@@ -383,7 +383,7 @@ static esp_err_t networkHashrateEventHandler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-static esp_err_t networkDifficultyAdjustementHandler(esp_http_client_event_t *evt)
+static esp_err_t networkDifficultyAdjustementEventHandler(esp_http_client_event_t *evt)
 
 /* Expected JSON format
 {
@@ -481,6 +481,11 @@ static esp_err_t networkDifficultyAdjustementHandler(esp_http_client_event_t *ev
                         MEMPOOL_STATE.difficultyProgressPercentValid = true;
                         ESP_LOGI("HTTP API", "Difficulty progress: %.2f", MEMPOOL_STATE.difficultyProgressPercent);
                     }
+                    else
+                    {
+                        MEMPOOL_STATE.difficultyProgressPercentValid = false;
+                        ESP_LOGI("HTTP API", "Difficulty progress not found");
+                    }
 
                     // Get difficulty change percent This is the expected change in difficulty over the next adjustment
                     cJSON *difficultyChangePercent = cJSON_GetObjectItem(json, "difficultyChange");
@@ -489,6 +494,11 @@ static esp_err_t networkDifficultyAdjustementHandler(esp_http_client_event_t *ev
                         MEMPOOL_STATE.difficultyChangePercent = difficultyChangePercent->valuedouble;
                         MEMPOOL_STATE.difficultyChangePercentValid = true;
                         ESP_LOGI("HTTP API", "Difficulty change: %.2f", MEMPOOL_STATE.difficultyChangePercent);
+                    }
+                    else
+                    {
+                        MEMPOOL_STATE.difficultyChangePercentValid = false;
+                        ESP_LOGI("HTTP API", "Difficulty change not found");
                     }
 
                     // Get remaining blocks to difficulty adjustment
@@ -499,6 +509,11 @@ static esp_err_t networkDifficultyAdjustementHandler(esp_http_client_event_t *ev
                         MEMPOOL_STATE.remainingBlocksToDifficultyAdjustmentValid = true;
                         ESP_LOGI("HTTP API", "Remaining blocks to difficulty adjustment: %lu", MEMPOOL_STATE.remainingBlocksToDifficultyAdjustment);
                     }
+                    else
+                    {
+                        MEMPOOL_STATE.remainingBlocksToDifficultyAdjustmentValid = false;
+                        ESP_LOGI("HTTP API", "Remaining blocks to difficulty adjustment not found");
+                    }
                     
                     // Get remaining time to difficulty adjustment
                     cJSON *remainingTime = cJSON_GetObjectItem(json, "remainingTime");
@@ -507,6 +522,11 @@ static esp_err_t networkDifficultyAdjustementHandler(esp_http_client_event_t *ev
                         MEMPOOL_STATE.remainingTimeToDifficultyAdjustment = remainingTime->valueint;
                         MEMPOOL_STATE.remainingTimeToDifficultyAdjustmentValid = true;
                         ESP_LOGI("HTTP API", "Remaining time to difficulty adjustment: %lu", MEMPOOL_STATE.remainingTimeToDifficultyAdjustment);
+                    }
+                    else
+                    {
+                        MEMPOOL_STATE.remainingTimeToDifficultyAdjustmentValid = false;
+                        ESP_LOGI("HTTP API", "Remaining time to difficulty adjustment not found");
                     }
                     
                     cJSON_Delete(json);
@@ -731,7 +751,7 @@ esp_err_t mempool_api_network_difficulty_adjustement(void) {
         // TODO: move this to own server for production to limit the number of requests
         esp_http_client_config_t config = {
             .url = "https://mempool.space/api/v1/difficulty-adjustment",
-            .event_handler = networkHashrateEventHandler,  // Use specific handler
+            .event_handler = networkDifficultyAdjustementEventHandler,  // Use specific handler
             .transport_type = HTTP_TRANSPORT_OVER_SSL,
             .crt_bundle_attach = esp_crt_bundle_attach,
         };

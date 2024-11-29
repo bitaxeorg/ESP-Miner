@@ -25,9 +25,9 @@ typedef struct {
     bool networkDifficultyValid;
     uint32_t blockHeight;
     bool blockHeightValid;
-    float difficultyProgressPercent;
+    double difficultyProgressPercent;
     bool difficultyProgressPercentValid;
-    float difficultyChangePercent;
+    double difficultyChangePercent;
     bool difficultyChangePercentValid;
     uint32_t remainingBlocksToDifficultyAdjustment;
     bool remainingBlocksToDifficultyAdjustmentValid;
