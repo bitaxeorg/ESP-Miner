@@ -10,7 +10,7 @@
 #define CRC5_MASK 0x1F
 #define BM1366_ASIC_DIFFICULTY 256
 
-#define BM1366_SERIALTX_DEBUG true
+#define BM1366_SERIALTX_DEBUG false
 #define BM1366_SERIALRX_DEBUG false
 #define BM1366_DEBUG_WORK false //causes insane amount of debug output
 #define BM1366_DEBUG_JOBS false //causes insane amount of debug output
