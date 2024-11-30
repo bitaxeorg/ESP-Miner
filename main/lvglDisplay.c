@@ -463,6 +463,36 @@ esp_err_t lvglUpdateDisplayAPI(void)
         ESP_LOGI("LVGL", "Sent remaining time: %lu", mempoolState->remainingTimeToDifficultyAdjustment);
     }
 
+    if (mempoolState->fastestFeeValid) {
+        ret = sendRegisterData(LVGL_REG_API_FASTEST_FEE, &mempoolState->fastestFee, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent fastest fee: %lu", mempoolState->fastestFee);
+    }
+
+    if (mempoolState->halfHourFeeValid) {
+        ret = sendRegisterData(LVGL_REG_API_HALF_HOUR_FEE, &mempoolState->halfHourFee, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent half hour fee: %lu", mempoolState->halfHourFee);
+    }
+
+    if (mempoolState->hourFeeValid) {
+        ret = sendRegisterData(LVGL_REG_API_HOUR_FEE, &mempoolState->hourFee, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent hour fee: %lu", mempoolState->hourFee);
+    }
+
+    if (mempoolState->economyFeeValid) {
+        ret = sendRegisterData(LVGL_REG_API_ECONOMY_FEE, &mempoolState->economyFee, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent economy fee: %lu", mempoolState->economyFee);
+    }
+
+    if (mempoolState->minimumFeeValid) {
+        ret = sendRegisterData(LVGL_REG_API_MINIMUM_FEE, &mempoolState->minimumFee, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent minimum fee: %lu", mempoolState->minimumFee);
+    }
+
     return ESP_OK;
 }
 

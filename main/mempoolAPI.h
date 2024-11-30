@@ -33,6 +33,16 @@ typedef struct {
     bool remainingBlocksToDifficultyAdjustmentValid;
     uint32_t remainingTimeToDifficultyAdjustment;
     bool remainingTimeToDifficultyAdjustmentValid;
+    uint32_t fastestFee;
+    bool fastestFeeValid;
+    uint32_t halfHourFee;
+    bool halfHourFeeValid;
+    uint32_t hourFee;
+    bool hourFeeValid;
+    uint32_t economyFee;
+    bool economyFeeValid;
+    uint32_t minimumFee;
+    bool minimumFeeValid;
 } MempoolApiState;
 
 extern MempoolApiState MEMPOOL_STATE;  // Declare the global variable
@@ -41,6 +51,8 @@ esp_err_t mempool_api_price(void);
 esp_err_t mempool_api_network_hashrate(void);
 esp_err_t mempool_api_network_difficulty_adjustement(void);
 esp_err_t mempool_api_block_tip_height(void);
+esp_err_t mempool_api_network_recommended_fee(void);
+
 MempoolApiState* getMempoolState(void);  // Add getter function
 
 #endif
