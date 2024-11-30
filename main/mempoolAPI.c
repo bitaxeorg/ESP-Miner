@@ -38,6 +38,16 @@ MempoolApiState MEMPOOL_STATE = {
     .remainingBlocksToDifficultyAdjustmentValid = false,
     .remainingTimeToDifficultyAdjustment = 0,
     .remainingTimeToDifficultyAdjustmentValid = false,
+    .fastestFee = 0,
+    .fastestFeeValid = false,
+    .halfHourFee = 0,
+    .halfHourFeeValid = false,
+    .hourFee = 0,
+    .hourFeeValid = false,
+    .economyFee = 0,
+    .economyFeeValid = false,
+    .minimumFee = 0,
+    .minimumFeeValid = false,
 };
 
 // Add getter function implementation
@@ -549,6 +559,175 @@ static esp_err_t networkDifficultyAdjustementEventHandler(esp_http_client_event_
 }
 
 
+static esp_err_t networkRecommendedFeeEventHandler(esp_http_client_event_t *evt)
+
+/* Expected JSON format
+{
+  fastestFee: 1,
+  halfHourFee: 1,
+  hourFee: 1,
+  economyFee: 1,
+  minimumFee: 1
+}
+*/
+{
+        switch (evt->event_id) 
+    {
+        case HTTP_EVENT_ERROR:
+            ESP_LOGE("HTTP API", "HTTP_EVENT_ERROR");
+            break;
+        case HTTP_EVENT_ON_CONNECTED:
+            if (responseBuffer != NULL) 
+            {
+                free(responseBuffer);
+                responseBuffer = NULL;
+                responseLength = 0;
+            }
+            break;
+        case HTTP_EVENT_HEADERS_SENT:
+            break;
+        case HTTP_EVENT_ON_HEADER:
+            break;
+        case HTTP_EVENT_REDIRECT:
+            break;
+        case HTTP_EVENT_ON_DATA:
+            ESP_LOGI("HTTP API", "Receiving price data chunk: %d bytes", evt->data_len);
+            
+            if (responseBuffer == NULL) 
+            {
+                responseBuffer = malloc(MAX_RESPONSE_SIZE);
+                if (responseBuffer == NULL) 
+                {
+                    ESP_LOGE("HTTP API", "Initial memory allocation failed!");
+                    responseLength = 0;
+                    return ESP_ERR_NO_MEM;
+                }
+                // Clear the buffer
+                memset(responseBuffer, 0, MAX_RESPONSE_SIZE);
+                responseLength = 0;  // Reset length when allocating new buffer
+            }
+
+            if (responseLength + evt->data_len > MAX_RESPONSE_SIZE) {
+                ESP_LOGE("HTTP API", "Response too large, maximum size is %d bytes", MAX_RESPONSE_SIZE);
+                if (responseBuffer != NULL) {
+                    free(responseBuffer);
+                    responseBuffer = NULL;
+                }
+                responseLength = 0;
+                return ESP_ERR_NO_MEM;
+            }
+
+            if (responseBuffer == NULL) {
+                responseBuffer = malloc(MAX_RESPONSE_SIZE);
+                if (responseBuffer == NULL) {
+                    ESP_LOGE("HTTP API", "Initial memory allocation failed!");
+                    responseLength = 0;
+                    return ESP_ERR_NO_MEM;
+                }
+            }
+
+            memcpy(responseBuffer + responseLength, evt->data, evt->data_len);
+            responseLength += evt->data_len;
+            responseBuffer[responseLength] = '\0';
+            break;
+            
+        case HTTP_EVENT_ON_FINISH:
+            if (responseBuffer != NULL) 
+            {
+                ESP_LOGI("HTTP API", "Parsing difficulty adjustment data, buffer length: %d", responseLength);
+                if (responseLength > 0) {
+                    ESP_LOGI("HTTP API", "Response: %s", responseBuffer);
+                } else {
+                    ESP_LOGW("HTTP API", "Empty response buffer");
+                }
+                // Parse JSON
+                cJSON *json = cJSON_Parse(responseBuffer);
+                if (json == NULL) {
+                    ESP_LOGE("HTTP API", "JSON parsing failed: %s", cJSON_GetErrorPtr());
+                } else {
+                    // Get fastest fee
+                    cJSON *fastestFee = cJSON_GetObjectItem(json, "fastestFee");
+                    if (fastestFee != NULL && cJSON_IsNumber(fastestFee)) 
+                    {
+                        MEMPOOL_STATE.fastestFee = fastestFee->valueint;
+                        MEMPOOL_STATE.fastestFeeValid = true;
+                        ESP_LOGI("HTTP API", "Fastest fee: %lu", MEMPOOL_STATE.fastestFee);
+                    }
+                    else
+                    {
+                        MEMPOOL_STATE.fastestFeeValid = false;
+                        ESP_LOGI("HTTP API", "Fastest fee not found");
+                    }
+
+                    // Get half hour fee
+                    cJSON *halfHourFee = cJSON_GetObjectItem(json, "halfHourFee");
+                    if (halfHourFee != NULL && cJSON_IsNumber(halfHourFee)) 
+                    {
+                        MEMPOOL_STATE.halfHourFee = halfHourFee->valueint;
+                        MEMPOOL_STATE.halfHourFeeValid = true;
+                        ESP_LOGI("HTTP API", "Half hour fee: %lu", MEMPOOL_STATE.halfHourFee);
+                    }
+                    else
+                    {
+                        MEMPOOL_STATE.halfHourFeeValid = false;
+                        ESP_LOGI("HTTP API", "Half hour fee not found");
+                    }
+
+                    // Get hour fee
+                    cJSON *hourFee = cJSON_GetObjectItem(json, "hourFee");
+                    if (hourFee != NULL && cJSON_IsNumber(hourFee)) 
+                    {
+                        MEMPOOL_STATE.hourFee = hourFee->valueint;
+                        MEMPOOL_STATE.hourFeeValid = true;
+                        ESP_LOGI("HTTP API", "Hour fee: %lu", MEMPOOL_STATE.hourFee);
+                    }
+                    else
+                    {
+                        MEMPOOL_STATE.hourFeeValid = false;
+                        ESP_LOGI("HTTP API", "Hour fee not found");
+                    }
+                    
+                    // Get economy fee
+                    cJSON *economyFee = cJSON_GetObjectItem(json, "economyFee");
+                    if (economyFee != NULL && cJSON_IsNumber(economyFee)) 
+                    {
+                        MEMPOOL_STATE.economyFee = economyFee->valueint;
+                        MEMPOOL_STATE.economyFeeValid = true;
+                        ESP_LOGI("HTTP API", "Economy fee: %lu", MEMPOOL_STATE.economyFee);
+                    }
+                    else
+                    {
+                        MEMPOOL_STATE.economyFeeValid = false;
+                        ESP_LOGI("HTTP API", "Economy fee not found");
+                    }
+                    
+                    // Get minimum fee
+                    cJSON *minimumFee = cJSON_GetObjectItem(json, "minimumFee");
+                    if (minimumFee != NULL && cJSON_IsNumber(minimumFee)) 
+                    {
+                        MEMPOOL_STATE.minimumFee = minimumFee->valueint;
+                        MEMPOOL_STATE.minimumFeeValid = true;
+                        ESP_LOGI("HTTP API", "Minimum fee: %lu", MEMPOOL_STATE.minimumFee);
+                    }
+                    cJSON_Delete(json);
+                }
+                free(responseBuffer);
+                responseBuffer = NULL;
+                responseLength = 0;
+            }
+            break;
+            
+        case HTTP_EVENT_DISCONNECTED:
+            if (responseBuffer != NULL) {
+                free(responseBuffer);
+                responseBuffer = NULL;
+                responseLength = 0;
+            }
+            break;
+    }
+    return ESP_OK;
+}
+
 // Update the mempool_api_price function
 esp_err_t mempool_api_price(void) {
     static int64_t lastUpdate = 0;  
@@ -801,3 +980,65 @@ esp_err_t mempool_api_network_difficulty_adjustement(void) {
     return ESP_OK;
 }
 
+esp_err_t mempool_api_network_recommended_fee(void) {
+        static int64_t lastUpdate = 0;  
+    int64_t currentTime = esp_timer_get_time();
+    
+    // Check if it's time to send the request. Limit the number of requests here
+    if (((currentTime - lastUpdate)/1000000) > 300 || lastUpdate == 0)
+    {
+        lastUpdate = currentTime;
+        // Set up the HTTP client configuration using esp cert bndles
+        //Using Coingecko API key for testing
+        // TODO: move this to own server for production to limit the number of requests
+        esp_http_client_config_t config = {
+            .url = "https://mempool.space/api/v1/fees/recommended",
+            .event_handler = networkRecommendedFeeEventHandler,  // Use specific handler
+            .transport_type = HTTP_TRANSPORT_OVER_SSL,
+            .crt_bundle_attach = esp_crt_bundle_attach,
+        };
+
+        // Initialize client
+        esp_http_client_handle_t client = esp_http_client_init(&config);
+        if (client == NULL) 
+        {
+            ESP_LOGE("HTTP API", "Failed to initialize HTTP client");
+            return ESP_FAIL;
+        }
+
+        /* // Set headers with error checking Not needed for this API
+        esp_err_t err;
+        if ((err = esp_http_client_set_header(client, "accept", "application/json")) != ESP_OK) 
+        {
+            ESP_LOGE("HTTP API", "Failed to set accept header: %s", esp_err_to_name(err));
+            esp_http_client_cleanup(client);
+            return err;
+        }
+
+        if ((err = esp_http_client_set_header(client, "x-cg-demo-api-key", "CG-iUyVPGbu2nECCwVo8yXXUf57")) != ESP_OK) 
+        {
+            ESP_LOGE("HTTP API", "Failed to set API key header: %s", esp_err_to_name(err));
+            esp_http_client_cleanup(client);
+            return err;
+        }*/
+
+        // Perform request 
+        esp_err_t err;
+        err = esp_http_client_perform(client);
+        
+        if (err == ESP_OK) 
+        {
+            ESP_LOGI("HTTP API", "HTTP GET Status = %d", esp_http_client_get_status_code(client));
+        } 
+        else 
+        {
+            ESP_LOGE("HTTP API", "HTTP GET request failed: %s", esp_err_to_name(err));
+        }
+        
+        esp_http_client_cleanup(client);
+        return err;
+    }
+    
+    return ESP_OK;
+    return ESP_OK;
+}
