@@ -229,10 +229,10 @@ export class HomeComponent {
       return `https://ocean.xyz/stats/${address}`;
     } else if (stratumURL.includes('solo.d-central.tech')) {
       return `https://solo.d-central.tech/#/app/${address}`;
-    } else if (/solo[46]?.ckpool.org/.test(stratumURL)) {
-      return `https://solostats.ckpool.org/users/${address}`;
-    } else if (/eusolo[46]?.ckpool.org/.test(stratumURL)) {
+    } else if (/^eusolo[46]?.ckpool.org/.test(stratumURL)) {
       return `https://eusolostats.ckpool.org/users/${address}`;
+    } else if (/^solo[46]?.ckpool.org/.test(stratumURL)) {
+      return `https://solostats.ckpool.org/users/${address}`;
     } else if (stratumURL.includes('pool.noderunners.network')) {
       return `https://noderunners.network/en/pool/user/${address}`;
     } else if (stratumURL.includes('satoshiradio.nl')) {
