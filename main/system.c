@@ -259,6 +259,8 @@ void SYSTEM_task(void * pvParameters)
         mempool_api_network_difficulty_adjustement();
         mempool_api_network_recommended_fee();
         lvglUpdateDisplayAPI();
+        lvglGetSettings();
+        
 
         if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) 
         {
