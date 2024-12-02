@@ -218,6 +218,12 @@
             </div>
         </div>
 
+        <div class="col-12 lg:col-6">
+            <div class="card" *ngIf="info$ | async as info; else loading">
+                <h5>Uptime</h5>
+                {{info.uptimeSeconds | dateAgo}}
+            </div>
+        </div>
 
     </div>
 
