@@ -106,6 +106,7 @@ static char lastBoardInfo[128] = {0};
 
 // Static buffers for all display data
 static uint8_t displayBuffer[MAX_BUFFER_SIZE];
+static uint8_t settingsBuffer[MAX_BUFFER_SIZE];
 static float tempBuffer[8];  // For temperature data
 static float powerBuffer[4]; // For power stats
 static uint16_t infoBuffer[2]; // For ASIC info
@@ -147,7 +148,63 @@ esp_err_t lvglDisplay_init(void)
     return i2c_bitaxe_add_device(lvglDisplayI2CAddr, &lvglDisplay_dev_handle);
 }
 
+static esp_err_t lvglReadRegisterData(uint8_t reg, void* data, size_t dataLen) 
+{
+    // Add delay before reading
+    vTaskDelay(pdMS_TO_TICKS(10));  // Add 10ms delay
+    
+    // Add more detailed logging
+    ESP_LOGI("LVGL", "Attempting to read register 0x%02X, length %d", reg, dataLen);
+    
+    if (dataLen + 2 > MAX_BUFFER_SIZE) {
+        ESP_LOGE("LVGL", "Buffer overflow prevented: reg 0x%02X, size %d", reg, dataLen);
+        return ESP_ERR_NO_MEM;
+    }
 
+    // Clear buffer before reading
+    memset(settingsBuffer, 0, dataLen + 2);
+
+    // Read into temporary buffer first
+    esp_err_t ret = i2c_bitaxe_register_read(lvglDisplay_dev_handle, reg, settingsBuffer, dataLen + 2);
+    if (ret != ESP_OK) {
+        ESP_LOGE("LVGL", "Failed to read register 0x%02X: %d", reg, ret);
+        return ret;
+    }
+
+    // Add debug logging for raw response
+    ESP_LOGI("LVGL", "Raw response for reg 0x%02X: [%02X %02X %02X %02X]", 
+        reg, settingsBuffer[0], settingsBuffer[1], 
+        settingsBuffer[2], settingsBuffer[3]);
+
+    // Verify register byte matches
+    if (settingsBuffer[0] != reg) {
+        ESP_LOGE("LVGL", "Register mismatch: expected 0x%02X, got 0x%02X", reg, settingsBuffer[0]);
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    // Verify length byte
+    uint8_t actualLen = settingsBuffer[1];
+    if (actualLen > dataLen) {
+        ESP_LOGE("LVGL", "Received data length (%d) exceeds buffer size (%d)", actualLen, dataLen);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    // Copy actual data portion to output buffer, skipping register and length bytes
+    if (data != NULL && actualLen > 0) {
+        memcpy(data, &settingsBuffer[2], actualLen);
+        // Ensure null termination for string data
+        ((uint8_t*)data)[actualLen] = '\0';
+        
+        ESP_LOGD("LVGL", "Read reg 0x%02X: len=%d, first bytes: %02X %02X %02X %02X", 
+            reg, actualLen,
+            actualLen > 0 ? ((uint8_t*)data)[0] : 0,
+            actualLen > 1 ? ((uint8_t*)data)[1] : 0,
+            actualLen > 2 ? ((uint8_t*)data)[2] : 0,
+            actualLen > 3 ? ((uint8_t*)data)[3] : 0);
+    }
+
+    return ESP_OK;
+}
 
 esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE) 
 {
@@ -497,3 +554,56 @@ esp_err_t lvglUpdateDisplayAPI(void)
 }
 
 
+esp_err_t lvglGetSettings(void) {
+    static TickType_t lastSettingsUpdateTime = 0;
+    TickType_t currentTime = xTaskGetTickCount();
+    
+    if ((currentTime - lastSettingsUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS * 4)) {
+        return ESP_OK;
+    }
+    lastSettingsUpdateTime = currentTime;
+
+    uint8_t data[32];  // Buffer for max 32 bytes as specified in header
+    esp_err_t ret;
+
+    // Read hostname
+    memset(data, 0, sizeof(data));  // Clear buffer first
+    ret = lvglReadRegisterData(LVGL_REG_SETTINGS_HOSTNAME, data, sizeof(data));
+    if (ret != ESP_OK) {
+        ESP_LOGE("LVGL", "Failed to read hostname register: %d", ret);
+        return ret;
+    }
+    ESP_LOGI("LVGL", "Hostname raw bytes: [%02X %02X %02X %02X ...]", 
+             data[0], data[1], data[2], data[3]);
+    if (data[0] == 0) {
+        ESP_LOGI("LVGL", "No hostname data received");
+    } else {
+        ESP_LOGI("LVGL", "Hostname: %s (length: %d)", data, strlen((char*)data));
+    }
+
+    // Read SSID
+    ret = lvglReadRegisterData(LVGL_REG_SETTINGS_WIFI_SSID, data, sizeof(data));
+    if (ret != ESP_OK) {
+        ESP_LOGE("LVGL", "Failed to read SSID register");
+        return ret;
+    }
+    if (data[0] == 0) {
+        ESP_LOGI("LVGL", "No SSID data received");
+    } else {
+        ESP_LOGI("LVGL", "SSID: %s", data);
+    }
+
+    // Read WiFi password (might want to mask this in logs)
+    ret = lvglReadRegisterData(LVGL_REG_SETTINGS_WIFI_PASSWORD, data, sizeof(data));
+    if (ret != ESP_OK) {
+        ESP_LOGE("LVGL", "Failed to read WiFi password register");
+        return ret;
+    }
+    if (data[0] == 0) {
+        ESP_LOGI("LVGL", "No WiFi password data received");
+    } else {
+        ESP_LOGI("LVGL", "WiFi password: %s", data);
+    }
+
+    return ESP_OK;
+}

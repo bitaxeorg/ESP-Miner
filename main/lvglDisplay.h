@@ -58,6 +58,10 @@
 #define LVGL_REG_API_ECONOMY_FEE 0x6B
 #define LVGL_REG_API_MINIMUM_FEE 0x6C
 
+#define LVGL_REG_SETTINGS_HOSTNAME 0xA0 // 32 bytes
+#define LVGL_REG_SETTINGS_WIFI_SSID 0xA1 // 32 bytes
+#define LVGL_REG_SETTINGS_WIFI_PASSWORD 0xA2 // 32 bytes
+
 esp_err_t lvglDisplay_init(void);
 
 esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE);
@@ -65,4 +69,5 @@ esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayAPI(void);
+esp_err_t lvglGetSettings(void);
 #endif
