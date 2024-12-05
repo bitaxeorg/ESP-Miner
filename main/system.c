@@ -247,10 +247,10 @@ void SYSTEM_task(void * pvParameters)
             continue;  // Skip the normal screen cycle
         }
         // Update the RGB display
-        //lvglUpdateDisplayNetwork(GLOBAL_STATE);
-        //lvglUpdateDisplayMining(GLOBAL_STATE);
-        //lvglUpdateDisplayMonitoring(GLOBAL_STATE);
-        //lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
+        lvglUpdateDisplayNetworkBAP(GLOBAL_STATE);
+        lvglUpdateDisplayMiningBAP(GLOBAL_STATE);
+        lvglUpdateDisplayMonitoringBAP(GLOBAL_STATE);
+        lvglUpdateDisplayDeviceStatusBAP(GLOBAL_STATE);
         
 
         mempool_api_price();
@@ -258,8 +258,8 @@ void SYSTEM_task(void * pvParameters)
         mempool_api_network_hashrate();
         mempool_api_network_difficulty_adjustement();
         mempool_api_network_recommended_fee();
-        //lvglUpdateDisplayAPI();
-        //lvglGetSettings();
+        lvglUpdateDisplayAPIBAP();
+        //lvglGetSettingsBAP();
         
 
         if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) 

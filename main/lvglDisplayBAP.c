@@ -171,7 +171,7 @@ static esp_err_t lvglReadRegisterDataBAP(uint8_t reg, void* data, size_t dataLen
  return ESP_OK;
 }
 
-esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE) 
+esp_err_t lvglUpdateDisplayNetworkBAP(GlobalState *GLOBAL_STATE) 
 {
     static TickType_t lastNetworkUpdateTime = 0;
     TickType_t currentNetworkTime = xTaskGetTickCount();
@@ -241,7 +241,7 @@ esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE)
 }
 
 // TODO: Redo Function to send data in one call
-esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE) 
+esp_err_t lvglUpdateDisplayMiningBAP(GlobalState *GLOBAL_STATE) 
 {
     static TickType_t lastMiningUpdateTime = 0;
     TickType_t currentMiningTime = xTaskGetTickCount();
@@ -302,7 +302,7 @@ esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE)
     return ESP_OK;
 }
 
-esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE) 
+esp_err_t lvglUpdateDisplayMonitoringBAP(GlobalState *GLOBAL_STATE) 
 {
     static TickType_t lastMonitorUpdateTime = 0;
     TickType_t currentTime = xTaskGetTickCount();
@@ -373,7 +373,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
     return ESP_OK;
 }
 
-esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE) 
+esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE) 
 {
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     esp_err_t ret;
@@ -422,7 +422,7 @@ esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE)
     return ESP_OK;
 }
 
-esp_err_t lvglUpdateDisplayAPI(void) 
+esp_err_t lvglUpdateDisplayAPIBAP(void) 
 {
     static TickType_t lastPriceUpdateTime = 0;
     TickType_t currentTime = xTaskGetTickCount();
@@ -520,7 +520,7 @@ esp_err_t lvglUpdateDisplayAPI(void)
 }
 
 
-esp_err_t lvglGetSettings(void) {
+esp_err_t lvglGetSettingsBAP(void) {
     static TickType_t lastSettingsUpdateTime = 0;
     TickType_t currentTime = xTaskGetTickCount();
     
