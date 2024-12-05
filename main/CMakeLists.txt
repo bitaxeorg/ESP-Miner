@@ -17,6 +17,7 @@ SRCS
     "work_queue.c"
     "nvs_device.c"
     "mempoolAPI.c"
+    "lvglDisplayBAP.c"
     "./http_server/http_server.c"
     "./self_test/self_test.c"
     "./tasks/stratum_task.c"
