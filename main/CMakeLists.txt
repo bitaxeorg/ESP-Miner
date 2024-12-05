@@ -16,6 +16,7 @@ SRCS
     "vcore.c"
     "work_queue.c"
     "nvs_device.c"
+    "mempoolAPI.c"
     "./http_server/http_server.c"
     "./self_test/self_test.c"
     "./tasks/stratum_task.c"
@@ -50,6 +51,9 @@ PRIV_REQUIRES
     "spiffs"
     "vfs"
     "esp_driver_i2c"
+    "esp_http_client"
+    "mbedtls"
+    
 )
 
 set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/axe-os")

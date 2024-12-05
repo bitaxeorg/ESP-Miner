@@ -42,10 +42,32 @@
 #define LVGL_REG_DEVICE_INFO   0x52
 #define LVGL_REG_BOARD_INFO    0x53
 #define LVGL_REG_CLOCK_SYNC    0x54
+
+// API data registers (5 second updates)
+#define LVGL_REG_API_BTC_PRICE   0x60
+#define LVGL_REG_API_NETWORK_HASHRATE 0x61
+#define LVGL_REG_API_NETWORK_DIFFICULTY 0x62
+#define LVGL_REG_API_BLOCK_HEIGHT 0x63
+#define LVGL_REG_API_DIFFICULTY_PROGRESS 0x64
+#define LVGL_REG_API_DIFFICULTY_CHANGE 0x65
+#define LVGL_REG_API_REMAINING_BLOCKS 0x66
+#define LVGL_REG_API_REMAINING_TIME 0x67
+#define LVGL_REG_API_FASTEST_FEE 0x68
+#define LVGL_REG_API_HALF_HOUR_FEE 0x69
+#define LVGL_REG_API_HOUR_FEE 0x6A
+#define LVGL_REG_API_ECONOMY_FEE 0x6B
+#define LVGL_REG_API_MINIMUM_FEE 0x6C
+
+#define LVGL_REG_SETTINGS_HOSTNAME 0xA0 // 32 bytes
+#define LVGL_REG_SETTINGS_WIFI_SSID 0xA1 // 32 bytes
+#define LVGL_REG_SETTINGS_WIFI_PASSWORD 0xA2 // 32 bytes
+
 esp_err_t lvglDisplay_init(void);
 
 esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMining(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE);
+esp_err_t lvglUpdateDisplayAPI(void);
+esp_err_t lvglGetSettings(void);
 #endif

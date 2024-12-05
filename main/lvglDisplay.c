@@ -17,6 +17,7 @@
 #include "main.h"
 #include "system.h"
 #include "vcore.h"
+#include "mempoolAPI.h"
 
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 2500
@@ -72,9 +73,13 @@ Device Status:
     - Board Version Global_STATE->board_version
     - ASIC Model String Global_STATE->asic_model_str
     
-
-
-
+API Data:
+    - BTC Price MEMPOOL_STATE.priceUSD
+    - BTC Price Timestamp MEMPOOL_STATE.priceTimestamp
+    - Block Height MEMPOOL_STATE.btcBlockHeight
+    - Network Hashrate MEMPOOL_STATE.networkHashrate
+    - Network Difficulty MEMPOOL_STATE.networkDifficulty
+    - Network Fee MEMPOOL_STATE.networkFee
 */
 
 static i2c_master_dev_handle_t lvglDisplay_dev_handle;
@@ -101,26 +106,39 @@ static char lastBoardInfo[128] = {0};
 
 // Static buffers for all display data
 static uint8_t displayBuffer[MAX_BUFFER_SIZE];
+static uint8_t settingsBuffer[MAX_BUFFER_SIZE];
 static float tempBuffer[8];  // For temperature data
 static float powerBuffer[4]; // For power stats
 static uint16_t infoBuffer[2]; // For ASIC info
 static char boardInfo[128]; // For board info
 
+static uint32_t lastPrice = 0;
+static double lastNetworkHashrate = 0.0;
+static double lastNetworkDifficulty = 0.0;
+static uint32_t lastBlockHeight = 0;
+
 static esp_err_t sendRegisterData(uint8_t reg, const void* data, size_t dataLen) 
 {
-    if (dataLen + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
+    // Check total size including register byte and length byte
+    if (dataLen + 2 > MAX_BUFFER_SIZE) {
+        ESP_LOGE("LVGL", "Buffer overflow prevented: reg 0x%02X, size %d", reg, dataLen);
+        return ESP_ERR_NO_MEM;
+    }        
     
-    // Clear entire buffer first
-    memset(displayBuffer, 0, MAX_BUFFER_SIZE);
+    // Clear only the portion of buffer we'll use
+    memset(displayBuffer, 0, dataLen + 2);
     
     // Prepare data
     displayBuffer[0] = reg;
-    displayBuffer[1] = dataLen;
+    displayBuffer[1] = (uint8_t)dataLen; // Explicitly cast size to uint8_t
     if (data != NULL && dataLen > 0) {
         memcpy(&displayBuffer[2], data, dataLen);
     }
     
-    // Send data
+    // Add debug logging
+    ESP_LOGD("LVGL", "Sending reg 0x%02X, len %d", reg, dataLen);
+    
+    // Send data with exact length
     return i2c_bitaxe_register_write_bytes(lvglDisplay_dev_handle, displayBuffer, dataLen + 2);
 }
 
@@ -130,7 +148,63 @@ esp_err_t lvglDisplay_init(void)
     return i2c_bitaxe_add_device(lvglDisplayI2CAddr, &lvglDisplay_dev_handle);
 }
 
+static esp_err_t lvglReadRegisterData(uint8_t reg, void* data, size_t dataLen) 
+{
+    // Add delay before reading
+    vTaskDelay(pdMS_TO_TICKS(10));  // Add 10ms delay
+    
+    // Add more detailed logging
+    ESP_LOGI("LVGL", "Attempting to read register 0x%02X, length %d", reg, dataLen);
+    
+    if (dataLen + 2 > MAX_BUFFER_SIZE) {
+        ESP_LOGE("LVGL", "Buffer overflow prevented: reg 0x%02X, size %d", reg, dataLen);
+        return ESP_ERR_NO_MEM;
+    }
 
+    // Clear buffer before reading
+    memset(settingsBuffer, 0, dataLen + 2);
+
+    // Read into temporary buffer first
+    esp_err_t ret = i2c_bitaxe_register_read(lvglDisplay_dev_handle, reg, settingsBuffer, dataLen + 2);
+    if (ret != ESP_OK) {
+        ESP_LOGE("LVGL", "Failed to read register 0x%02X: %d", reg, ret);
+        return ret;
+    }
+
+    // Add debug logging for raw response
+    ESP_LOGI("LVGL", "Raw response for reg 0x%02X: [%02X %02X %02X %02X]", 
+        reg, settingsBuffer[0], settingsBuffer[1], 
+        settingsBuffer[2], settingsBuffer[3]);
+
+    // Verify register byte matches
+    if (settingsBuffer[0] != reg) {
+        ESP_LOGE("LVGL", "Register mismatch: expected 0x%02X, got 0x%02X", reg, settingsBuffer[0]);
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    // Verify length byte
+    uint8_t actualLen = settingsBuffer[1];
+    if (actualLen > dataLen) {
+        ESP_LOGE("LVGL", "Received data length (%d) exceeds buffer size (%d)", actualLen, dataLen);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    // Copy actual data portion to output buffer, skipping register and length bytes
+    if (data != NULL && actualLen > 0) {
+        memcpy(data, &settingsBuffer[2], actualLen);
+        // Ensure null termination for string data
+        ((uint8_t*)data)[actualLen] = '\0';
+        
+        ESP_LOGD("LVGL", "Read reg 0x%02X: len=%d, first bytes: %02X %02X %02X %02X", 
+            reg, actualLen,
+            actualLen > 0 ? ((uint8_t*)data)[0] : 0,
+            actualLen > 1 ? ((uint8_t*)data)[1] : 0,
+            actualLen > 2 ? ((uint8_t*)data)[2] : 0,
+            actualLen > 3 ? ((uint8_t*)data)[3] : 0);
+    }
+
+    return ESP_OK;
+}
 
 esp_err_t lvglUpdateDisplayNetwork(GlobalState *GLOBAL_STATE) 
 {
@@ -291,7 +365,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
 
     // LVGL_REG_ASIC_FREQ (0x41)
     if (sizeof(float) + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
-    ret = sendRegisterData(LVGL_REG_ASIC_FREQ, &power->frequency_value, sizeof(float));
+    ret = sendRegisterData(LVGL_REG_ASIC_FREQ, &power->frequency_value, sizeof(float)); 
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_FAN (0x42)
@@ -326,7 +400,7 @@ esp_err_t lvglUpdateDisplayMonitoring(GlobalState *GLOBAL_STATE)
 
     // LVGL_REG_UPTIME (0x45)
     if (sizeof(uint32_t) + 2 > MAX_BUFFER_SIZE) return ESP_ERR_NO_MEM;
-    uint32_t uptimeSeconds = (esp_timer_get_time() - module->start_time) / 1000000;
+    uint32_t uptimeSeconds = ((esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000);
     ret = sendRegisterData(LVGL_REG_UPTIME, &uptimeSeconds, sizeof(uint32_t));
     if (ret != ESP_OK) return ret;
 
@@ -382,5 +456,154 @@ esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE)
     return ESP_OK;
 }
 
+esp_err_t lvglUpdateDisplayAPI(void) 
+{
+    static TickType_t lastPriceUpdateTime = 0;
+    TickType_t currentTime = xTaskGetTickCount();
+    
+    if ((currentTime - lastPriceUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS * 4)) {
+        return ESP_OK;
+    }
+    lastPriceUpdateTime = currentTime;
+
+    esp_err_t ret;
+    MempoolApiState* mempoolState = getMempoolState();
+
+    // Only send if we have valid price data
+    if (mempoolState->priceValid) {
+        // Send price
+        ret = sendRegisterData(LVGL_REG_API_BTC_PRICE, &mempoolState->priceUSD, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent BTC price: %lu", mempoolState->priceUSD);
+
+    }
+
+    if (mempoolState->networkHashrateValid) {
+        ret = sendRegisterData(LVGL_REG_API_NETWORK_HASHRATE, &mempoolState->networkHashrate, sizeof(double));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent network hashrate: %.2f", mempoolState->networkHashrate);
+    }
+
+    if (mempoolState->networkDifficultyValid) {
+        ret = sendRegisterData(LVGL_REG_API_NETWORK_DIFFICULTY, &mempoolState->networkDifficulty, sizeof(double));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent network difficulty: %.2f", mempoolState->networkDifficulty);
+    }
+
+    if (mempoolState->blockHeightValid) {
+        ret = sendRegisterData(LVGL_REG_API_BLOCK_HEIGHT, &mempoolState->blockHeight, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent block height: %lu", mempoolState->blockHeight);
+    }
+
+    if (mempoolState->difficultyProgressPercentValid) {
+        ret = sendRegisterData(LVGL_REG_API_DIFFICULTY_PROGRESS, &mempoolState->difficultyProgressPercent, sizeof(double));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent difficulty progress: %.2f", mempoolState->difficultyProgressPercent);
+    }
+
+    if (mempoolState->difficultyChangePercentValid) {
+        ret = sendRegisterData(LVGL_REG_API_DIFFICULTY_CHANGE, &mempoolState->difficultyChangePercent, sizeof(double));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent difficulty change: %.2f", mempoolState->difficultyChangePercent);
+    }
+
+    if (mempoolState->remainingBlocksToDifficultyAdjustmentValid) {
+        ret = sendRegisterData(LVGL_REG_API_REMAINING_BLOCKS, &mempoolState->remainingBlocksToDifficultyAdjustment, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent remaining blocks: %lu", mempoolState->remainingBlocksToDifficultyAdjustment);
+    }
+
+    if (mempoolState->remainingTimeToDifficultyAdjustmentValid) {
+        ret = sendRegisterData(LVGL_REG_API_REMAINING_TIME, &mempoolState->remainingTimeToDifficultyAdjustment, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent remaining time: %lu", mempoolState->remainingTimeToDifficultyAdjustment);
+    }
+
+    if (mempoolState->fastestFeeValid) {
+        ret = sendRegisterData(LVGL_REG_API_FASTEST_FEE, &mempoolState->fastestFee, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent fastest fee: %lu", mempoolState->fastestFee);
+    }
+
+    if (mempoolState->halfHourFeeValid) {
+        ret = sendRegisterData(LVGL_REG_API_HALF_HOUR_FEE, &mempoolState->halfHourFee, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent half hour fee: %lu", mempoolState->halfHourFee);
+    }
+
+    if (mempoolState->hourFeeValid) {
+        ret = sendRegisterData(LVGL_REG_API_HOUR_FEE, &mempoolState->hourFee, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent hour fee: %lu", mempoolState->hourFee);
+    }
+
+    if (mempoolState->economyFeeValid) {
+        ret = sendRegisterData(LVGL_REG_API_ECONOMY_FEE, &mempoolState->economyFee, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent economy fee: %lu", mempoolState->economyFee);
+    }
+
+    if (mempoolState->minimumFeeValid) {
+        ret = sendRegisterData(LVGL_REG_API_MINIMUM_FEE, &mempoolState->minimumFee, sizeof(uint32_t));
+        if (ret != ESP_OK) return ret;
+        ESP_LOGI("LVGL", "Sent minimum fee: %lu", mempoolState->minimumFee);
+    }
+
+    return ESP_OK;
+}
 
 
+esp_err_t lvglGetSettings(void) {
+    static TickType_t lastSettingsUpdateTime = 0;
+    TickType_t currentTime = xTaskGetTickCount();
+    
+    if ((currentTime - lastSettingsUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS * 4)) {
+        return ESP_OK;
+    }
+    lastSettingsUpdateTime = currentTime;
+
+    uint8_t data[32];  // Buffer for max 32 bytes as specified in header
+    esp_err_t ret;
+
+    // Read hostname
+    memset(data, 0, sizeof(data));  // Clear buffer first
+    ret = lvglReadRegisterData(LVGL_REG_SETTINGS_HOSTNAME, data, sizeof(data));
+    if (ret != ESP_OK) {
+        ESP_LOGE("LVGL", "Failed to read hostname register: %d", ret);
+        return ret;
+    }
+    ESP_LOGI("LVGL", "Hostname raw bytes: [%02X %02X %02X %02X ...]", 
+             data[0], data[1], data[2], data[3]);
+    if (data[0] == 0) {
+        ESP_LOGI("LVGL", "No hostname data received");
+    } else {
+        ESP_LOGI("LVGL", "Hostname: %s (length: %d)", data, strlen((char*)data));
+    }
+
+    // Read SSID
+    ret = lvglReadRegisterData(LVGL_REG_SETTINGS_WIFI_SSID, data, sizeof(data));
+    if (ret != ESP_OK) {
+        ESP_LOGE("LVGL", "Failed to read SSID register");
+        return ret;
+    }
+    if (data[0] == 0) {
+        ESP_LOGI("LVGL", "No SSID data received");
+    } else {
+        ESP_LOGI("LVGL", "SSID: %s", data);
+    }
+
+    // Read WiFi password (might want to mask this in logs)
+    ret = lvglReadRegisterData(LVGL_REG_SETTINGS_WIFI_PASSWORD, data, sizeof(data));
+    if (ret != ESP_OK) {
+        ESP_LOGE("LVGL", "Failed to read WiFi password register");
+        return ret;
+    }
+    if (data[0] == 0) {
+        ESP_LOGI("LVGL", "No WiFi password data received");
+    } else {
+        ESP_LOGI("LVGL", "WiFi password: %s", data);
+    }
+
+    return ESP_OK;
+}
