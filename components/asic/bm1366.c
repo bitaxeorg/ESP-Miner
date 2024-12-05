@@ -705,3 +705,4 @@ task_result * BM1366_proccess_work(void * pvParameters)
 
     return &result;
 }
+
