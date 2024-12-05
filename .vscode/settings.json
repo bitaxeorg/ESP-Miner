@@ -17,7 +17,9 @@
         "string": "c",
         "string_view": "c",
         "*.tcc": "c",
-        "serial.h": "c"
+        "serial.h": "c",
+        "lvgldisplay.h": "c",
+        "i2c_bitaxe.h": "c"
     },
     "editor.formatOnSave": false,
     "cSpell.words": [

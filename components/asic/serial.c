@@ -104,7 +104,7 @@ void SERIAL_clear_buffer(void)
 }
 
 
-void SERIAL_init_BAP(void)
+esp_err_t SERIAL_init_BAP(void)
 {
     ESP_LOGI(TAG, "Initializing serial");
     // Configure UART1 parameters
@@ -125,6 +125,7 @@ void SERIAL_init_BAP(void)
     // tx buffer 0 so the tx time doesn't overlap with the job wait time
     //  by returning before the job is written
     uart_driver_install(UART_NUM_2, BUF_SIZE * 2, BUF_SIZE * 2, 0, NULL, 0);
+    return ESP_OK;
 }
 
 int SERIAL_send_BAP(uint8_t *data, int len, bool debug)

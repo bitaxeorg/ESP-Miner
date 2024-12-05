@@ -28,7 +28,7 @@
 #include "nvs_config.h"
 #include "oled.h"
 #include "vcore.h"
-#include "lvglDisplay.h"
+#include "lvglDisplayBAP.h"
 #include "mempoolAPI.h"
 
 
@@ -159,7 +159,7 @@ void SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
             }
             
             // Initialize LVGL display
-            if (lvglDisplay_init() != ESP_OK) {
+            if (lvglDisplay_initBAP() != ESP_OK) {
                 ESP_LOGI(TAG, "LVGL display init failed!");
             } else {
                 ESP_LOGI(TAG, "LVGL display init success!");
@@ -247,10 +247,10 @@ void SYSTEM_task(void * pvParameters)
             continue;  // Skip the normal screen cycle
         }
         // Update the RGB display
-        lvglUpdateDisplayNetwork(GLOBAL_STATE);
-        lvglUpdateDisplayMining(GLOBAL_STATE);
-        lvglUpdateDisplayMonitoring(GLOBAL_STATE);
-        lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
+        //lvglUpdateDisplayNetwork(GLOBAL_STATE);
+        //lvglUpdateDisplayMining(GLOBAL_STATE);
+        //lvglUpdateDisplayMonitoring(GLOBAL_STATE);
+        //lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
         
 
         mempool_api_price();
@@ -258,7 +258,7 @@ void SYSTEM_task(void * pvParameters)
         mempool_api_network_hashrate();
         mempool_api_network_difficulty_adjustement();
         mempool_api_network_recommended_fee();
-        lvglUpdateDisplayAPI();
+        //lvglUpdateDisplayAPI();
         //lvglGetSettings();
         
 
