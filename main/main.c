@@ -20,6 +20,8 @@
 #include "adc.h"
 #include "nvs_device.h"
 #include "self_test.h"
+#include "lvglDisplayBAP.h"
+#include "serial.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -84,7 +86,9 @@ void app_main(void)
 
     //start the API for AxeOS
     start_rest_server((void *) &GLOBAL_STATE);
+    
     EventBits_t result_bits = wifi_connect();
+
 
     if (result_bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);

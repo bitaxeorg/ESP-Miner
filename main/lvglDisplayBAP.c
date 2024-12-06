@@ -556,14 +556,17 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                     case BAP_HOSTNAME_BUFFER_REG:
                     ESP_LOGI("Serial BAP", "Received hostname");
                     ESP_LOGI("Serial BAP", "Hostname: %s", buf + 4);
+                    nvs_config_set_string(NVS_CONFIG_HOSTNAME, (const char *)(buf + 4));
                     break;
                 case BAP_WIFI_SSID_BUFFER_REG:
                     ESP_LOGI("Serial BAP", "Received wifi ssid");
                     ESP_LOGI("Serial BAP", "SSID: %s", buf + 4);
+                    nvs_config_set_string(NVS_CONFIG_WIFI_SSID, (const char *)(buf + 4));
                     break;
                 case BAP_WIFI_PASS_BUFFER_REG:
                     ESP_LOGI("Serial BAP", "Received wifi password");
                     ESP_LOGI("Serial BAP", "Password: %s", buf + 4);
+                    nvs_config_set_string(NVS_CONFIG_WIFI_PASS, (const char *)(buf + 4));
                     break;
                 default:
                         ESP_LOGI("Serial BAP", "Received unknown register");
