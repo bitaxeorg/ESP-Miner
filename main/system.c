@@ -240,6 +240,9 @@ void SYSTEM_task(void * pvParameters)
 
     while (1) {
         // Check for overheat mode
+        uint8_t displayBufferBAP[1024];
+        SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
+
         if (module->overheat_mode == 1) {
             _show_overheat_screen(GLOBAL_STATE);
             vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
