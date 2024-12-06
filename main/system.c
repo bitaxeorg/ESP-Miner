@@ -229,8 +229,18 @@ void SYSTEM_task(void * pvParameters)
 
     // show the connection screen
     while (!module->startup_done) {
-        _update_connection(GLOBAL_STATE);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // Check for BAP messages
+        SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
+
+        // non-blocking update of the connection screen
+        static uint64_t lastUpdateTime = 0;
+        uint64_t currentTime = esp_timer_get_time() / 1000; // Convert to milliseconds
+        
+        if (currentTime - lastUpdateTime > 1000) {
+            _update_connection(GLOBAL_STATE);
+            lastUpdateTime = currentTime;
+        }
+        //vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
     
     OLED_showBitmap(0, 0, bitaxe_splash, 128, 32);
