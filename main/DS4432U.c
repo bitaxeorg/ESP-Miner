@@ -47,12 +47,13 @@ esp_err_t DS4432U_get_current_code(uint8_t output, uint8_t *code) {
     return i2c_bitaxe_register_read(ds4432u_dev_handle, reg, code, 1);
 }
 
-bool DS4432U_test(void)
+esp_err_t DS4432U_test(void)
 {
     uint8_t data;
 
     /* Read the DS4432U+ WHO_AM_I register, on power up the register should have the value 0x00 */
-    esp_err_t register_result = i2c_bitaxe_register_read(ds4432u_dev_handle, DS4432U_OUT0_REG, &data, 1);
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_read(ds4432u_dev_handle, DS4432U_OUT0_REG, &data, 1), TAG, "Failed to read DS4432U+ OUT0 register");
     ESP_LOGI(TAG, "DS4432U+ OUT0 = 0x%02X", data);
-    return register_result == ESP_OK;
+    
+    return ESP_OK;
 }

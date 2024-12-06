@@ -20,12 +20,15 @@
 #include <string.h>
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_check.h"
 
 #include "nvs_config.h"
 #include "i2c_bitaxe.h"
 #include "oled.h"
 
 #define OLED_I2C_ADDR 0x3C
+
+static const char * TAG = "oled";
 
 extern unsigned char ucSmallFont[];
 static int iScreenOffset;            // current write offset of screen data
@@ -44,9 +47,7 @@ esp_err_t OLED_init(void)
 {
 
     //init the I2C device
-    if (i2c_bitaxe_add_device(OLED_I2C_ADDR, &ssd1306_dev_handle) != ESP_OK) {
-        return ESP_FAIL;
-    }
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_add_device(OLED_I2C_ADDR, &ssd1306_dev_handle), TAG, "Failed to add display i2c device");
 
     uint8_t oled32_initbuf[] = {0x00,
                                 0xae, // cmd: display off
@@ -115,7 +116,8 @@ esp_err_t OLED_init(void)
         uc[1] = 0xc0;
         write(uc, 2);
     }
-    return true;
+
+    return ESP_OK;
 }
 
 // Sends a command to turn off the OLED display

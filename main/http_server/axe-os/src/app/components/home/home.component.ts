@@ -222,14 +222,16 @@ export class HomeComponent {
 
   private getQuickLink(stratumURL: string, stratumUser: string): string | undefined {
     const address = stratumUser.split('.')[0];
-    
+
     if (stratumURL.includes('public-pool.io')) {
       return `https://web.public-pool.io/#/app/${address}`;
     } else if (stratumURL.includes('ocean.xyz')) {
       return `https://ocean.xyz/stats/${address}`;
     } else if (stratumURL.includes('solo.d-central.tech')) {
       return `https://solo.d-central.tech/#/app/${address}`;
-    } else if (/solo[46]?.ckpool.org/.test(stratumURL)) {
+    } else if (/^eusolo[46]?.ckpool.org/.test(stratumURL)) {
+      return `https://eusolostats.ckpool.org/users/${address}`;
+    } else if (/^solo[46]?.ckpool.org/.test(stratumURL)) {
       return `https://solostats.ckpool.org/users/${address}`;
     } else if (stratumURL.includes('pool.noderunners.network')) {
       return `https://noderunners.network/en/pool/user/${address}`;
