@@ -215,7 +215,8 @@ void SYSTEM_task(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
+    static uint8_t displayBufferBAP[1024];
+    
     //_init_system(GLOBAL_STATE);
 
     char input_event[10];
@@ -240,7 +241,6 @@ void SYSTEM_task(void * pvParameters)
 
     while (1) {
         // Check for overheat mode
-        uint8_t displayBufferBAP[1024];
         SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
 
         if (module->overheat_mode == 1) {
