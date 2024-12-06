@@ -11,17 +11,6 @@
 #include "nvs_config.h"
 #include "serial.h"
 
-// Recieve Registers
-#define BAP_HOSTNAME_BUFFER_REG 0x90
-#define BAP_HOSTNAME_BUFFER_SIZE 32
-
-// WiFi SSID
-#define BAP_WIFI_SSID_BUFFER_REG 0x91
-#define BAP_WIFI_SSID_BUFFER_SIZE 128
-
-// WiFi Password
-#define BAP_WIFI_PASS_BUFFER_REG 0x92
-#define BAP_WIFI_PASS_BUFFER_SIZE 128
 
 // Network data registers (on change only)
 #define LVGL_REG_SSID           0x21
@@ -75,7 +64,6 @@
 #define LVGL_REG_SETTINGS_HOSTNAME 0x90 // 32 bytes
 #define LVGL_REG_SETTINGS_WIFI_SSID 0x91 // 64 bytes
 #define LVGL_REG_SETTINGS_WIFI_PASSWORD 0x92 // 64 bytes
-
 // Mining settings
 #define LVGL_REG_SETTINGS_STRATUM_URL_MAIN 0x93 // 64 bytes
 #define LVGL_REG_SETTINGS_STRATUM_PORT_MAIN 0x94 // 2 bytes
@@ -85,14 +73,14 @@
 #define LVGL_REG_SETTINGS_STRATUM_PORT_FALLBACK 0x98 // 2 bytes
 #define LVGL_REG_SETTINGS_STRATUM_USER_FALLBACK 0x99 // 64 bytes
 #define LVGL_REG_SETTINGS_STRATUM_PASSWORD_FALLBACK 0x9A // 64 bytes
-
 // ASIC settings
 #define LVGL_REG_SETTINGS_ASIC_VOLTAGE 0x9B // 2 bytes
 #define LVGL_REG_SETTINGS_ASIC_FREQ 0x9C // 2 bytes
-
 // Fan settings
 #define LVGL_REG_SETTINGS_FAN_SPEED 0x9D // 2 bytes
 #define LVGL_REG_SETTINGS_AUTO_FAN_SPEED 0x9E // 2 bytes
+
+// Special registers
 
 esp_err_t lvglDisplay_initBAP(void);
 
