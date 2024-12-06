@@ -611,12 +611,26 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                 case LVGL_REG_SETTINGS_ASIC_VOLTAGE:
                     ESP_LOGI("Serial BAP", "Received asic voltage");
                     ESP_LOGI("Serial BAP", "Voltage: %d", buf[4] * 256 + buf[5]);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, buf[4] * 256 + buf[5]);
+                    uint16_t voltage = buf[4] * 256 + buf[5];
+                    if (voltage <= 1250 && voltage >= 1000) {
+                        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, voltage);
+                    }
+                    else 
+                    {
+                        ESP_LOGE("Serial BAP", "Invalid voltage: %d", voltage);
+                    }
                     break;
                 case LVGL_REG_SETTINGS_ASIC_FREQ:
                     ESP_LOGI("Serial BAP", "Received asic frequency");
                     ESP_LOGI("Serial BAP", "Frequency: %d", buf[4] * 256 + buf[5]);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, buf[4] * 256 + buf[5]);
+                    uint16_t frequency = buf[4] * 256 + buf[5];
+                    if (frequency <= 575 && frequency >= 200) {
+                        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, frequency);
+                    }
+                    else 
+                    {
+                        ESP_LOGE("Serial BAP", "Invalid frequency: %d", frequency);
+                    }
                     break;
                 default:
                         ESP_LOGI("Serial BAP", "Received unknown register");
