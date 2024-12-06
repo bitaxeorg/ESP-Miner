@@ -70,11 +70,29 @@
 #define LVGL_REG_API_ECONOMY_FEE 0x6B
 #define LVGL_REG_API_MINIMUM_FEE 0x6C
 
+// Settings registers 
+// Network settings
 #define LVGL_REG_SETTINGS_HOSTNAME 0xA0 // 32 bytes
-#define LVGL_REG_SETTINGS_WIFI_SSID 0xA1 // 32 bytes
-#define LVGL_REG_SETTINGS_WIFI_PASSWORD 0xA2 // 32 bytes
+#define LVGL_REG_SETTINGS_WIFI_SSID 0xA1 // 64 bytes
+#define LVGL_REG_SETTINGS_WIFI_PASSWORD 0xA2 // 64 bytes
 
+// Mining settings
+#define LVGL_REG_SETTINGS_STRATUM_URL_MAIN 0xA3 // 64 bytes
+#define LVGL_REG_SETTINGS_STRATUM_PORT_MAIN 0xA4 // 2 bytes
+#define LVGL_REG_SETTINGS_STRATUM_USER_MAIN 0xA5 // 64 bytes
+#define LVGL_REG_SETTINGS_STRATUM_PASSWORD_MAIN 0xA6 // 64 bytes
+#define LVGL_REG_SETTINGS_STRATUM_URL_FALLBACK 0xA7 // 64 bytes
+#define LVGL_REG_SETTINGS_STRATUM_PORT_FALLBACK 0xA8 // 2 bytes
+#define LVGL_REG_SETTINGS_STRATUM_USER_FALLBACK 0xA9 // 64 bytes
+#define LVGL_REG_SETTINGS_STRATUM_PASSWORD_FALLBACK 0xAA // 64 bytes
 
+// ASIC settings
+#define LVGL_REG_SETTINGS_ASIC_VOLTAGE 0xAB // 2 bytes
+#define LVGL_REG_SETTINGS_ASIC_FREQ 0xAC // 2 bytes
+
+// Fan settings
+#define LVGL_REG_SETTINGS_FAN_SPEED 0xAD // 2 bytes
+#define LVGL_REG_SETTINGS_AUTO_FAN_SPEED 0xAE // 2 bytes
 
 esp_err_t lvglDisplay_initBAP(void);
 
