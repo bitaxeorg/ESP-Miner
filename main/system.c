@@ -231,6 +231,7 @@ void SYSTEM_task(void * pvParameters)
     while (!module->startup_done) {
         // Check for BAP messages
         SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
+        lvglStartupLoopBAP(GLOBAL_STATE);
 
         // non-blocking update of the connection screen
         static uint64_t lastUpdateTime = 0;
