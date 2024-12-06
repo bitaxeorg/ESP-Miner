@@ -80,9 +80,18 @@
 #define LVGL_REG_SETTINGS_FAN_SPEED 0x9D // 2 bytes
 #define LVGL_REG_SETTINGS_AUTO_FAN_SPEED 0x9E // 2 bytes
 
-// Special registers
+// Special registers (0xF0 - 0xFF)
+#define LVGL_REG_SPECIAL_RESTART 0xFE
+
+// Flags (0xE0 - 0xEF)
+#define LVGL_FLAG_STARTUP_DONE 0xE0
+#define LVGL_FLAG_OVERHEAT_MODE 0xE1
+#define LVGL_FLAG_FOUND_BLOCK 0xE2
+
+
 
 esp_err_t lvglDisplay_initBAP(void);
+esp_err_t lvglStartupLoopBAP(GlobalState *GLOBAL_STATE);
 
 esp_err_t lvglUpdateDisplayNetworkBAP(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMiningBAP(GlobalState *GLOBAL_STATE);
@@ -90,4 +99,5 @@ esp_err_t lvglUpdateDisplayMonitoringBAP(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayAPIBAP(void);
 esp_err_t lvglGetSettingsBAP(void);
+
 #endif

@@ -632,6 +632,11 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                         ESP_LOGE("Serial BAP", "Invalid frequency: %d", frequency);
                     }
                     break;
+                case LVGL_REG_SPECIAL_RESTART:
+                    ESP_LOGI("Serial BAP", "Received restart command");
+                    vTaskDelay(pdMS_TO_TICKS(2000));
+                    esp_restart();
+                    break;
                 default:
                         ESP_LOGI("Serial BAP", "Received unknown register");
                         break;
@@ -646,3 +651,25 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
 
     return bytes_read;
 }
+
+esp_err_t lvglStartupLoopBAP(GlobalState *GLOBAL_STATE) 
+{
+
+    static TickType_t lastMonitorUpdateTime = 0;
+    TickType_t currentTime = xTaskGetTickCount();
+    
+    if ((currentTime - lastMonitorUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) 
+    {
+        return ESP_OK;
+    }
+    lastMonitorUpdateTime = currentTime;
+
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    if (!module->startup_done) 
+    {
+        sendRegisterDataBAP(LVGL_FLAG_STARTUP_DONE, &module->startup_done, sizeof(uint8_t));
+    }
+
+    return ESP_OK;
+}
+
