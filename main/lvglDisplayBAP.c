@@ -539,32 +539,31 @@ esp_err_t lvglUpdateDisplayAPIBAP(void)
 /// @return number of bytes read, or -1 on error
 int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
 {
+    memset(buf, 0, size);
     int16_t bytes_read = uart_read_bytes(UART_NUM_2, buf, size, timeout_ms / portTICK_PERIOD_MS);
 
-    size_t buff_len = 0;
     if (bytes_read > 0) 
     {
-        uart_get_buffered_data_len(UART_NUM_2, &buff_len);
         ESP_LOGI("Serial BAP", "rx: ");
         prettyHex((unsigned char*) buf, bytes_read);
-        ESP_LOGI("Serial BAP", " [%d]\n", buff_len);
+        ESP_LOGI("Serial BAP", " [%d]\n", bytes_read);
 
         if (buf[0] == 0xFF && buf[1] == 0xAA) {
             ESP_LOGI("Serial BAP", "Received Preamble");
 
-            if (buf[2] == buff_len - 3) {
+            if (buf[2] == bytes_read - 4) {
                 switch (buf[3]) {
                     case BAP_HOSTNAME_BUFFER_REG:
                     ESP_LOGI("Serial BAP", "Received hostname");
-                    ESP_LOGI("Serial BAP", "Hostname: %s", buf + 3);
+                    ESP_LOGI("Serial BAP", "Hostname: %s", buf + 4);
                     break;
                 case BAP_WIFI_SSID_BUFFER_REG:
                     ESP_LOGI("Serial BAP", "Received wifi ssid");
-                    ESP_LOGI("Serial BAP", "SSID: %s", buf + 3);
+                    ESP_LOGI("Serial BAP", "SSID: %s", buf + 4);
                     break;
                 case BAP_WIFI_PASS_BUFFER_REG:
                     ESP_LOGI("Serial BAP", "Received wifi password");
-                    ESP_LOGI("Serial BAP", "Password: %s", buf + 3);
+                    ESP_LOGI("Serial BAP", "Password: %s", buf + 4);
                     break;
                 default:
                         ESP_LOGI("Serial BAP", "Received unknown register");
@@ -573,7 +572,7 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
             }
             else {
                 ESP_LOGI("Serial BAP", "Received invalid length");
-                ESP_LOGI("Serial BAP", "Expected: %d, Received: %d", buf[2], buff_len - 3);
+                ESP_LOGI("Serial BAP", "Expected: %d, Received: %d", buf[2], bytes_read - 4);
             }
         }
     }
