@@ -568,6 +568,56 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                     ESP_LOGI("Serial BAP", "Password: %s", buf + 4);
                     nvs_config_set_string(NVS_CONFIG_WIFI_PASS, (const char *)(buf + 4));
                     break;
+                case LVGL_REG_SETTINGS_STRATUM_URL_MAIN:
+                    ESP_LOGI("Serial BAP", "Received stratum url main");
+                    ESP_LOGI("Serial BAP", "URL: %s", buf + 4);
+                    //nvs_config_set_string(NVS_CONFIG_STRATUM_URL, (const char *)(buf + 4));
+                    break;
+                case LVGL_REG_SETTINGS_STRATUM_PORT_MAIN:
+                    ESP_LOGI("Serial BAP", "Received stratum port main");
+                    ESP_LOGI("Serial BAP", "Port: %d", buf[4] * 256 + buf[5]);
+                    //nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, buf[4] * 256 + buf[5]);
+                    break;
+                case LVGL_REG_SETTINGS_STRATUM_USER_MAIN:
+                    ESP_LOGI("Serial BAP", "Received stratum user main");
+                    ESP_LOGI("Serial BAP", "User: %s", buf + 4);
+                    //nvs_config_set_string(NVS_CONFIG_STRATUM_USER, (const char *)(buf + 4));
+                    break;
+                case LVGL_REG_SETTINGS_STRATUM_PASSWORD_MAIN:
+                    ESP_LOGI("Serial BAP", "Received stratum password main");
+                    ESP_LOGI("Serial BAP", "Password: %s", buf + 4);
+                    //nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, (const char *)(buf + 4));
+                    break;
+                case LVGL_REG_SETTINGS_STRATUM_URL_FALLBACK:
+                    ESP_LOGI("Serial BAP", "Received stratum url fallback");
+                    ESP_LOGI("Serial BAP", "URL: %s", buf + 4);
+                    //nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, (const char *)(buf + 4));
+                    break;
+                case LVGL_REG_SETTINGS_STRATUM_PORT_FALLBACK:
+                    ESP_LOGI("Serial BAP", "Received stratum port fallback");
+                    ESP_LOGI("Serial BAP", "Port: %d", buf[4] * 256 + buf[5]);
+                    //nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, buf[4] * 256 + buf[5]);
+                    break;
+                case LVGL_REG_SETTINGS_STRATUM_USER_FALLBACK:
+                    ESP_LOGI("Serial BAP", "Received stratum user fallback");
+                    ESP_LOGI("Serial BAP", "User: %s", buf + 4);
+                    //nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, (const char *)(buf + 4));
+                    break;
+                case LVGL_REG_SETTINGS_STRATUM_PASSWORD_FALLBACK:
+                    ESP_LOGI("Serial BAP", "Received stratum password fallback");
+                    ESP_LOGI("Serial BAP", "Password: %s", buf + 4);
+                    //nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, (const char *)(buf + 4));
+                    break;
+                case LVGL_REG_SETTINGS_ASIC_VOLTAGE:
+                    ESP_LOGI("Serial BAP", "Received asic voltage");
+                    ESP_LOGI("Serial BAP", "Voltage: %d", buf[4] * 256 + buf[5]);
+                    //nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, buf[4] * 256 + buf[5]);
+                    break;
+                case LVGL_REG_SETTINGS_ASIC_FREQ:
+                    ESP_LOGI("Serial BAP", "Received asic frequency");
+                    ESP_LOGI("Serial BAP", "Frequency: %d", buf[4] * 256 + buf[5]);
+                    //nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, buf[4] * 256 + buf[5]);
+                    break;
                 default:
                         ESP_LOGI("Serial BAP", "Received unknown register");
                         break;
