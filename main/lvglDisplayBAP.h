@@ -15,17 +15,13 @@
 #define BAP_HOSTNAME_BUFFER_REG 0x90
 #define BAP_HOSTNAME_BUFFER_SIZE 32
 
-
 // WiFi SSID
 #define BAP_WIFI_SSID_BUFFER_REG 0x91
 #define BAP_WIFI_SSID_BUFFER_SIZE 128
 
-
 // WiFi Password
 #define BAP_WIFI_PASS_BUFFER_REG 0x92
 #define BAP_WIFI_PASS_BUFFER_SIZE 128
-
-
 
 // Network data registers (on change only)
 #define LVGL_REG_SSID           0x21
@@ -77,6 +73,8 @@
 #define LVGL_REG_SETTINGS_HOSTNAME 0xA0 // 32 bytes
 #define LVGL_REG_SETTINGS_WIFI_SSID 0xA1 // 32 bytes
 #define LVGL_REG_SETTINGS_WIFI_PASSWORD 0xA2 // 32 bytes
+
+
 
 esp_err_t lvglDisplay_initBAP(void);
 
