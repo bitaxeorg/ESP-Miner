@@ -1,5 +1,5 @@
-#ifndef LVGLDISPLAY_H
-#define LVGLDISPLAY_H
+#ifndef LVGLDISPLAYBAP_H
+#define LVGLDISPLAYBAP_H
 
 #include "esp_err.h"
 #include <stdbool.h>
@@ -10,6 +10,21 @@
 
 #include "nvs_config.h"
 #include "serial.h"
+
+// Recieve Registers
+#define BAP_HOSTNAME_BUFFER_REG 0x90
+#define BAP_HOSTNAME_BUFFER_SIZE 32
+
+
+// WiFi SSID
+#define BAP_WIFI_SSID_BUFFER_REG 0x91
+#define BAP_WIFI_SSID_BUFFER_SIZE 128
+
+
+// WiFi Password
+#define BAP_WIFI_PASS_BUFFER_REG 0x92
+#define BAP_WIFI_PASS_BUFFER_SIZE 128
+
 
 
 // Network data registers (on change only)

@@ -9,11 +9,15 @@
 #include "esp_timer.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/inet.h"
+#include "serial.h"
+#include "utils.h"
+#include "driver/uart.h"
 
 #include "nvs_config.h"
 #include "i2c_bitaxe.h"
 #include "global_state.h"
 #include "lvglDisplay.h"
+#include "lvglDisplayBAP.h"
 #include "main.h"
 #include "system.h"
 #include "vcore.h"
@@ -137,9 +141,9 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
     
     // Add debug logging
     ESP_LOGI("LVGL", "Sending reg 0x%02X, len %d", reg, dataLen);
-    
+    SERIAL_send_BAP(displayBufferBAP, dataLen + 2, false);
     // Send data with exact length
-    return SERIAL_send_BAP(displayBufferBAP, dataLen + 2, false);
+    return ESP_OK;
 }
 
 esp_err_t lvglDisplay_initBAP(void) 
@@ -375,6 +379,15 @@ esp_err_t lvglUpdateDisplayMonitoringBAP(GlobalState *GLOBAL_STATE)
 
 esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE) 
 {
+
+    static TickType_t lastMonitorUpdateTime = 0;
+    TickType_t currentTime = xTaskGetTickCount();
+    
+    if ((currentTime - lastMonitorUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) {
+        return ESP_OK;
+    }
+    lastMonitorUpdateTime = currentTime;
+
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     esp_err_t ret;
     bool hasChanges = false;
@@ -520,56 +533,50 @@ esp_err_t lvglUpdateDisplayAPIBAP(void)
 }
 
 
-esp_err_t lvglGetSettingsBAP(void) {
-    static TickType_t lastSettingsUpdateTime = 0;
-    TickType_t currentTime = xTaskGetTickCount();
-    
-    if ((currentTime - lastSettingsUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS * 4)) {
-        return ESP_OK;
-    }
-    lastSettingsUpdateTime = currentTime;
+/// @brief waits for a serial response from the device
+/// @param buf buffer to read data into
+/// @param buf number of ms to wait before timing out
+/// @return number of bytes read, or -1 on error
+int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
+{
+    int16_t bytes_read = uart_read_bytes(UART_NUM_2, buf, size, timeout_ms / portTICK_PERIOD_MS);
 
-    uint8_t data[32];  // Buffer for max 32 bytes as specified in header
-    esp_err_t ret;
+    size_t buff_len = 0;
+    if (bytes_read > 0) 
+    {
+        uart_get_buffered_data_len(UART_NUM_2, &buff_len);
+        ESP_LOGI("Serial BAP", "rx: ");
+        prettyHex((unsigned char*) buf, bytes_read);
+        ESP_LOGI("Serial BAP", " [%d]\n", buff_len);
 
-    // Read hostname
-    //memset(data, 0, sizeof(data));  // Clear buffer first
-    ret = lvglReadRegisterDataBAP(LVGL_REG_SETTINGS_HOSTNAME, data, sizeof(data));
-    if (ret != ESP_OK) {
-        ESP_LOGE("LVGL", "Failed to read hostname register: %d", ret);
-        return ret;
-    }
-    ESP_LOGI("LVGL", "Hostname raw bytes: [%02X %02X %02X %02X ...]", 
-             data[0], data[1], data[2], data[3]);
-    if (data[0] == 0) {
-        ESP_LOGI("LVGL", "No hostname data received");
-    } else {
-        ESP_LOGI("LVGL", "Hostname: %s (length: %d)", data, strlen((char*)data));
-    }
+        if (buf[0] == 0xFF && buf[1] == 0xAA) {
+            ESP_LOGI("Serial BAP", "Received Preamble");
 
-    // Read SSID
-    ret = lvglReadRegisterDataBAP(LVGL_REG_SETTINGS_WIFI_SSID, data, sizeof(data));
-    if (ret != ESP_OK) {
-        ESP_LOGE("LVGL", "Failed to read SSID register");
-        return ret;
-    }
-    if (data[0] == 0) {
-        ESP_LOGI("LVGL", "No SSID data received");
-    } else {
-        ESP_LOGI("LVGL", "SSID: %s", data);
-    }
-
-    // Read WiFi password (might want to mask this in logs)
-    ret = lvglReadRegisterDataBAP(LVGL_REG_SETTINGS_WIFI_PASSWORD, data, sizeof(data));
-    if (ret != ESP_OK) {
-        ESP_LOGE("LVGL", "Failed to read WiFi password register");
-        return ret;
-    }
-    if (data[0] == 0) {
-        ESP_LOGI("LVGL", "No WiFi password data received");
-    } else {
-        ESP_LOGI("LVGL", "WiFi password: %s", data);
+            if (buf[2] == buff_len - 3) {
+                switch (buf[3]) {
+                    case BAP_HOSTNAME_BUFFER_REG:
+                    ESP_LOGI("Serial BAP", "Received hostname");
+                    ESP_LOGI("Serial BAP", "Hostname: %s", buf + 3);
+                    break;
+                case BAP_WIFI_SSID_BUFFER_REG:
+                    ESP_LOGI("Serial BAP", "Received wifi ssid");
+                    ESP_LOGI("Serial BAP", "SSID: %s", buf + 3);
+                    break;
+                case BAP_WIFI_PASS_BUFFER_REG:
+                    ESP_LOGI("Serial BAP", "Received wifi password");
+                    ESP_LOGI("Serial BAP", "Password: %s", buf + 3);
+                    break;
+                default:
+                        ESP_LOGI("Serial BAP", "Received unknown register");
+                        break;
+                }
+            }
+            else {
+                ESP_LOGI("Serial BAP", "Received invalid length");
+                ESP_LOGI("Serial BAP", "Expected: %d, Received: %d", buf[2], buff_len - 3);
+            }
+        }
     }
 
-    return ESP_OK;
+    return bytes_read;
 }
