@@ -642,6 +642,13 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                     vTaskDelay(pdMS_TO_TICKS(2000));
                     esp_restart();
                     break;
+                case LVGL_FLAG_OVERHEAT_MODE:
+                    ESP_LOGI("Serial BAP", "Received overheat mode flag");
+                    ESP_LOGI("Serial BAP", "RAW HEX: %02X", buf[4]);
+                    uint16_t flag_overheat_mode = 0x0000 + buf[4];
+                    ESP_LOGI("Serial BAP", "Overheat mode: %d", flag_overheat_mode);
+                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, flag_overheat_mode);
+                    break;
                 default:
                         ESP_LOGI("Serial BAP", "Received unknown register");
                         break;
