@@ -374,6 +374,9 @@ esp_err_t lvglUpdateDisplayMonitoringBAP(GlobalState *GLOBAL_STATE)
     ret = sendRegisterDataBAP(LVGL_REG_UPTIME, &uptimeSeconds, sizeof(uint32_t));
     if (ret != ESP_OK) return ret;
 
+    // startup done flag
+    sendRegisterDataBAP(LVGL_FLAG_STARTUP_DONE, &module->startup_done, sizeof(uint8_t));
+
     return ESP_OK;
 }
 
@@ -667,6 +670,7 @@ esp_err_t lvglStartupLoopBAP(GlobalState *GLOBAL_STATE)
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     if (!module->startup_done) 
     {
+        ESP_LOGI("LVGL", "Sending startup done flag false");
         sendRegisterDataBAP(LVGL_FLAG_STARTUP_DONE, &module->startup_done, sizeof(uint8_t));
     }
 
