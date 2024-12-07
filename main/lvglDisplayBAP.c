@@ -303,6 +303,8 @@ esp_err_t lvglUpdateDisplayMiningBAP(GlobalState *GLOBAL_STATE)
     ret = sendRegisterDataBAP(LVGL_REG_SHARES, shares, sizeof(uint32_t) * 2);
     if (ret != ESP_OK) return ret;
 
+    
+
     return ESP_OK;
 }
 
@@ -677,3 +679,22 @@ esp_err_t lvglStartupLoopBAP(GlobalState *GLOBAL_STATE)
     return ESP_OK;
 }
 
+esp_err_t lvglOverheatLoopBAP(GlobalState *GLOBAL_STATE) {
+    static TickType_t lastMonitorUpdateTime = 0;
+    TickType_t currentTime = xTaskGetTickCount();
+    
+    if ((currentTime - lastMonitorUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) 
+    {
+        return ESP_OK;
+    }
+    lastMonitorUpdateTime = currentTime;
+
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    if (module->overheat_mode) 
+    {
+        ESP_LOGI("LVGL", "Sending overheat mode flag true");
+        sendRegisterDataBAP(LVGL_FLAG_OVERHEAT_MODE, &module->overheat_mode, sizeof(uint8_t));
+    }
+
+    return ESP_OK;
+}
