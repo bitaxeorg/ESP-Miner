@@ -92,6 +92,7 @@
 
 esp_err_t lvglDisplay_initBAP(void);
 esp_err_t lvglStartupLoopBAP(GlobalState *GLOBAL_STATE);
+esp_err_t lvglOverheatLoopBAP(GlobalState *GLOBAL_STATE);
 
 esp_err_t lvglUpdateDisplayNetworkBAP(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayMiningBAP(GlobalState *GLOBAL_STATE);
