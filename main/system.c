@@ -230,7 +230,7 @@ void SYSTEM_task(void * pvParameters)
     // show the connection screen
     while (!module->startup_done) {
         // Check for BAP messages
-        SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
+        SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 50);
         lvglStartupLoopBAP(GLOBAL_STATE);
 
         // non-blocking update of the connection screen
@@ -255,9 +255,10 @@ void SYSTEM_task(void * pvParameters)
         SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
 
         if (module->overheat_mode == 1) {
+            gpio_set_level(GPIO_NUM_1, 0);
             _show_overheat_screen(GLOBAL_STATE);
             lvglOverheatLoopBAP(GLOBAL_STATE);
-            vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
+            //  vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
             SYSTEM_update_overheat_mode(GLOBAL_STATE);  // Check for changes
             continue;  // Skip the normal screen cycle
         }

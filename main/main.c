@@ -122,7 +122,12 @@ void app_main(void)
 
     xTaskCreate(USER_INPUT_task, "user input", 8192, (void *) &GLOBAL_STATE, 5, NULL);
 
-    if (GLOBAL_STATE.ASIC_functions.init_fn != NULL) {
+    if (GLOBAL_STATE.SYSTEM_MODULE.overheat_mode) {
+        gpio_set_direction(GPIO_NUM_1, GPIO_MODE_OUTPUT);
+        gpio_set_level(GPIO_NUM_1, 0);
+    }
+
+    if (GLOBAL_STATE.ASIC_functions.init_fn != NULL && !GLOBAL_STATE.SYSTEM_MODULE.overheat_mode) {
         wifi_softap_off();
 
         queue_init(&GLOBAL_STATE.stratum_queue);
