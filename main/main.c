@@ -125,7 +125,7 @@ void app_main(void)
     if (GLOBAL_STATE.SYSTEM_MODULE.overheat_mode) {
         gpio_set_direction(GPIO_NUM_1, GPIO_MODE_OUTPUT);
         gpio_set_level(GPIO_NUM_1, 0);
-        continue;
+        
     }
 
     if (GLOBAL_STATE.ASIC_functions.init_fn != NULL && !GLOBAL_STATE.SYSTEM_MODULE.overheat_mode) {
