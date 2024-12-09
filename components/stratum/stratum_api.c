@@ -146,6 +146,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         // parse results
         cJSON * result_json = cJSON_GetObjectItem(json, "result");
         cJSON * error_json = cJSON_GetObjectItem(json, "error");
+        cJSON * reject_reason_json = cJSON_GetObjectItem(json, "reject-reason");
 
         //if the result is null, then it's a fail
         if (result_json == NULL) {
@@ -157,6 +158,15 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 result = STRATUM_RESULT_SETUP;
             } else {
                 result = STRATUM_RESULT;
+            }
+            if (cJSON_IsArray(error_json)) {
+                int len = cJSON_GetArraySize(error_json);
+                if (len >= 2) {
+                    cJSON * error_msg = cJSON_GetArrayItem(error_json, 1);
+                    if (cJSON_IsString(error_msg)) {
+                        message->error_str = strdup(cJSON_GetStringValue(error_msg));
+                    }
+                }
             }
             message->response_success = false;
 
@@ -171,6 +181,9 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 message->response_success = true;
             } else {
                 message->response_success = false;
+                if (cJSON_IsString(reject_reason_json)) {
+                    message->error_str = strdup(cJSON_GetStringValue(reject_reason_json));
+                }                
             }
         
         //if the id is STRATUM_ID_SUBSCRIBE parse it
