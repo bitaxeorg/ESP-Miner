@@ -26,7 +26,6 @@
         <p-slider id="refresh-interval" class="pl-2 pr-2"
                  [min]="5" 
                  [max]="30" 
-                 [(ngModel)]="refreshTimeSet" 
                  [style]="{'width': '150px'}"
                  [formControl]="refreshIntervalControl">
         </p-slider>
@@ -68,7 +67,7 @@
                     <div class="text-sm">{{axe.hostname}}</div>
                 </td>
                 <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
-                <td>{{axe.uptimeSeconds | dateAgo}}</td>
+                <td>{{axe.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
                 <td>
                     <div class="w-min cursor-pointer" 
                          pTooltip="Shares Accepted"
