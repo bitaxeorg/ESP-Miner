@@ -231,6 +231,9 @@ void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * host
     /* Start WiFi */
     ESP_ERROR_CHECK(esp_wifi_start());
 
+    /* Disable power savings for best performance */
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+
     /* Set Hostname */
     esp_err_t err = esp_netif_set_hostname(esp_netif_sta, hostname);
     if (err != ERR_OK) {
