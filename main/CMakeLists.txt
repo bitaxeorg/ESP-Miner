@@ -3,25 +3,27 @@ SRCS
     "adc.c"
     "DS4432U.c"
     "EMC2101.c"
-    "fonts.c"
     "i2c_bitaxe.c"
     "INA260.c"
     "led_controller.c"
     "main.c"
     "nvs_config.c"
-    "oled.c"
+    "display.c"
+    "screen.c"
+    "input.c"
     "system.c"
     "TPS546.c"
     "vcore.c"
     "work_queue.c"
     "nvs_device.c"
+    "lv_font_portfolio-6x8.c"
+    "logo.c"
     "./http_server/http_server.c"
     "./self_test/self_test.c"
     "./tasks/stratum_task.c"
     "./tasks/create_jobs_task.c"
     "./tasks/asic_task.c"
     "./tasks/asic_result_task.c"
-    "./tasks/user_input_task.c"
     "./tasks/power_management_task.c"
 
 INCLUDE_DIRS
@@ -50,6 +52,9 @@ PRIV_REQUIRES
     "vfs"
     "esp_driver_i2c"
 )
+
+idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_INCLUDE_SIMPLE=1" APPEND)
+idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH= ${CMAKE_SOURCE_DIR}/main/lv_conf.h" APPEND)
 
 set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/axe-os")
 
