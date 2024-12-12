@@ -59,6 +59,7 @@ typedef struct
     uint32_t version_mask;
     // result
     bool response_success;
+    char * error_str;
 } StratumApiV1Message;
 
 void STRATUM_V1_reset_uid();

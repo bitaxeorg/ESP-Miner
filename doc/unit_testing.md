@@ -2,7 +2,7 @@
 ESP-Miner includes unit tests that can run on the target (the esp32s3).
 Tests are located in the `test` subdirectory of a component (e.g. `components/stratum/test`).
 
-For more information on unit testing with the esp32s3, see https://docs.espressif.com/projects/esp-idf/en/v5.3.1/esp32/api-guides/unit-tests.html.
+For more information on unit testing with the esp32s3, see https://docs.espressif.com/projects/esp-idf/en/v5.3.2/esp32/api-guides/unit-tests.html.
 
 ### Building
 To built unit tests (examples provided on Ubuntu 24.04), from the ESP-Miner root directory:

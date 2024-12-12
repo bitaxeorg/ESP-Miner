@@ -15,7 +15,6 @@
 #include "nvs_config.h"
 #include "serial.h"
 #include "stratum_task.h"
-#include "user_input_task.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
 #include "nvs_device.h"
@@ -60,7 +59,7 @@ void app_main(void)
     //should we run the self test?
     if (should_test(&GLOBAL_STATE)) {
         self_test((void *) &GLOBAL_STATE);
-        vTaskDelay(60 * 60 * 1000 / portTICK_PERIOD_MS);
+        return;
     }
 
     SYSTEM_init_system(&GLOBAL_STATE);
@@ -75,11 +74,12 @@ void app_main(void)
     GLOBAL_STATE.SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE.SYSTEM_MODULE.ssid)-1] = 0;
 
     // init and connect to wifi
-    wifi_init(wifi_ssid, wifi_pass, hostname);
+    wifi_init(wifi_ssid, wifi_pass, hostname, GLOBAL_STATE.SYSTEM_MODULE.ip_addr_str);
+
+    generate_ssid(GLOBAL_STATE.SYSTEM_MODULE.ap_ssid);
 
     SYSTEM_init_peripherals(&GLOBAL_STATE);
 
-    xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void *) &GLOBAL_STATE, 3, NULL);
     xTaskCreate(POWER_MANAGEMENT_task, "power mangement", 8192, (void *) &GLOBAL_STATE, 10, NULL);
 
     //start the API for AxeOS
@@ -112,11 +112,7 @@ void app_main(void)
     free(wifi_pass);
     free(hostname);
 
-    // set the startup_done flag
-    GLOBAL_STATE.SYSTEM_MODULE.startup_done = true;
     GLOBAL_STATE.new_stratum_version_rolling_msg = false;
-
-    xTaskCreate(USER_INPUT_task, "user input", 8192, (void *) &GLOBAL_STATE, 5, NULL);
 
     if (GLOBAL_STATE.ASIC_functions.init_fn != NULL) {
         wifi_softap_off();
@@ -138,17 +134,33 @@ void app_main(void)
     }
 }
 
-void MINER_set_wifi_status(wifi_status_t status, uint16_t retry_count)
+void MINER_set_wifi_status(wifi_status_t status, int retry_count, int reason)
 {
-    if (status == WIFI_CONNECTED) {
-        snprintf(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, 20, "Connected!");
-        return;
+    switch(status) {
+        case WIFI_CONNECTING:
+            snprintf(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, 20, "Connecting...");
+            return;
+        case WIFI_CONNECTED:
+            snprintf(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, 20, "Connected!");
+            return;
+        case WIFI_RETRYING:
+            // See https://github.com/espressif/esp-idf/blob/master/components/esp_wifi/include/esp_wifi_types_generic.h for codes
+            switch(reason) {
+                case 201:
+                    snprintf(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, 20, "No AP found (%d)", retry_count);
+                    return;
+                case 15:
+                case 205:
+                    snprintf(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, 20, "Password error (%d)", retry_count);
+                    return;
+                default:
+                    snprintf(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, 20, "Error %d (%d)", reason, retry_count);
+                    return;
+            }
     }
-    else if (status == WIFI_RETRYING) {
-        snprintf(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, 20, "Retrying: %d", retry_count);
-        return;
-    } else if (status == WIFI_CONNECT_FAILED) {
-        snprintf(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, 20, "Connect Failed!");
-        return;
-    }
+    ESP_LOGW(TAG, "Unknown status: %d", status);
+}
+
+void MINER_set_ap_status(bool enabled) {
+    GLOBAL_STATE.SYSTEM_MODULE.ap_enabled = enabled;
 }

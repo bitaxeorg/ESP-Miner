@@ -1,7 +1,7 @@
 <ng-container *ngIf="form != null">
     <form [formGroup]="form">
         <div class="field grid p-fluid">
-            <label htmlFor="stratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Stratum URL:</label>
+            <label htmlFor="stratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Host:</label>
             <div class="col-12 md:col-10">
                 <input pInputText id="stratumURL" type="text" formControlName="stratumURL"
                     formControlName="stratumURL" />
@@ -34,7 +34,7 @@
             </div>
         </div>
         <div class="field grid p-fluid">
-            <label htmlFor="stratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum URL:</label>
+            <label htmlFor="stratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum Host:</label>
             <div class="col-12 md:col-10">
                 <input pInputText id="fallbackStratumURL" type="text" formControlName="fallbackStratumURL"
                     formControlName="fallbackStratumURL" />
@@ -154,8 +154,8 @@
         </ng-container>
 
         <div class="col-12" *ngIf="form.get('overheat_mode')?.value === 1">
-            <button pButton type="button" label="Disable Overheat Mode" 
-                    class="p-button-danger w-full py-3" 
+            <button pButton type="button" label="Disable Overheat Mode"
+                    class="p-button-danger w-full py-3"
                     (click)="disableOverheatMode()">
             </button>
             <small class="block mt-1 text-center" style="color: #ff0000;">

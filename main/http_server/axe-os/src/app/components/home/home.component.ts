@@ -237,6 +237,8 @@ export class HomeComponent {
       return `https://noderunners.network/en/pool/user/${address}`;
     } else if (stratumURL.includes('satoshiradio.nl')) {
       return `https://pool.satoshiradio.nl/user/${address}`;
+    } else if (stratumURL.includes('solohash.co.uk')) {
+      return `https://solohash.co.uk/user/${address}`;
     }
     return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
   }
