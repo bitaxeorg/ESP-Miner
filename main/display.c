@@ -109,18 +109,19 @@ esp_err_t display_init(void * pvParameters)
 
     lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
 
-    if (lvgl_port_lock(0)) {
-        lv_style_init(&scr_style);
-        lv_style_set_text_font(&scr_style, &lv_font_portfolio_6x8);
-        lv_style_set_bg_opa(&scr_style, LV_OPA_COVER);
-
-        lv_theme_set_apply_cb(&theme, theme_apply);
-
-        lv_display_set_theme(disp, &theme);
-        lvgl_port_unlock();
-    }
-
     if (esp_lcd_panel_init_err == ESP_OK) {
+
+        if (lvgl_port_lock(0)) {
+            lv_style_init(&scr_style);
+            lv_style_set_text_font(&scr_style, &lv_font_portfolio_6x8);
+            lv_style_set_bg_opa(&scr_style, LV_OPA_COVER);
+
+            lv_theme_set_apply_cb(&theme, theme_apply);
+
+            lv_display_set_theme(disp, &theme);
+            lvgl_port_unlock();
+        }
+
         // Only turn on the screen when it has been cleared
         ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, true), TAG, "Panel display on failed");   
 
