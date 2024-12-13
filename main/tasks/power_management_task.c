@@ -88,8 +88,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     //int last_frequency_increase = 0;
     //uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
-    uint16_t auto_fan_speed = nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1);
-
     switch (GLOBAL_STATE->device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
@@ -245,7 +243,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
 
-        if (auto_fan_speed == 1) {
+        if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
 
             power_management->fan_perc = (float)automatic_fan_speed(power_management->chip_temp_avg, GLOBAL_STATE);
 
