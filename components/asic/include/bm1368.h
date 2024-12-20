@@ -7,6 +7,7 @@
 
 #define ASIC_BM1368_JOB_FREQUENCY_MS 500
 
+#define CRC5_MASK 0x1F
 #define BM1368_ASIC_DIFFICULTY 256
 
 #define BM1368_SERIALTX_DEBUG false
@@ -20,9 +21,9 @@ static const float BM1368_NONCE_PERCENT = (float)BM1368_CORE_COUNT/256.0; //maxi
 static const float BM1368_MIDSTATE_ENGINES = 16.0;
 static const int BM1368_HCN = 5540;
 static const float BM1368_HCN_MAX = 430000.0;
-static const float BM1368_HCN_PERCENT = (float)BM1368_HCN/BM1368_HCN_MAX;       //hcn limit effect
-static const float BM1368_VERSION_PERCENT = 1.0;                   //version scan percent
-static const float BM1368_FULLSCAN_PERCENT = 1.0;                  //normalised value 1 means do the maximum space, 0 dont wait before sending work
+static const float BM1368_HCN_PERCENT = (float)BM1368_HCN/BM1368_HCN_MAX; //hcn limit effect
+static const float BM1368_VERSION_PERCENT = 1.0;                          //version scan percent
+static const float BM1368_FULLSCAN_PERCENT = 0.5;                         //normalised value 1 means do the maximum space, 0 dont wait before sending work
 
 typedef struct
 {
