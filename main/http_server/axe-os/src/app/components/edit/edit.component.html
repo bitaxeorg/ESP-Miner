@@ -49,6 +49,15 @@
             </small>
         </div>
 
+        <div class="field grid p-fluid">
+            <label htmlFor="displayTimeout" class="col-12 mb-2 md:col-2 md:mb-0">Display Timeout</label>
+            <div class="col-12 md:col-10">
+                <label>{{form.controls['displayTimeout'].value}} Minute(s)
+                    <b *ngIf="form.controls['displayTimeout'].value == 0" style="color: #F2A900">Disabled</b></label>
+                <p-slider formControlName="displayTimeout" [min]="0" [max]="60"></p-slider>
+            </div>
+        </div>
+
         <div class="col-12 md:col-4">
             <div class="field-checkbox">
                 <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
