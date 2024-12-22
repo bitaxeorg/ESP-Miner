@@ -23,6 +23,7 @@
 #define NVS_CONFIG_BOARD_VERSION "boardversion"
 #define NVS_CONFIG_FLIP_SCREEN "flipscreen"
 #define NVS_CONFIG_INVERT_SCREEN "invertscreen"
+#define NVS_CONFIG_DISPLAY_TIMEOUT "displayTimeout"
 #define NVS_CONFIG_AUTO_FAN_SPEED "autofanspeed"
 #define NVS_CONFIG_FAN_SPEED "fanspeed"
 #define NVS_CONFIG_TEMP_TARGET "temptarget"
