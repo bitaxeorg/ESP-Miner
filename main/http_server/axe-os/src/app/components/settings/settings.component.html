@@ -1,21 +1,24 @@
 <div class="card">
     <h2>Settings</h2>
-
     <app-edit></app-edit>
+</div>
 
-
+<div class="grid">
+    <div class="col-12">
+        <app-theme-config></app-theme-config>
+    </div>
 </div>
 
 <div class="grid">
     <div class="col-12 lg:col-6 xl:col-4">
         <div class="card" *ngIf="checkLatestRelease == false">
-            <h5>Current Version: {{(info$ | async)?.version}}</h5> 
+            <h5>Current Version: {{(info$ | async)?.version}}</h5>
             <h2>Latest Release: <p-button (onClick)="checkLatestRelease = true">Check</p-button></h2>
             <small>Clicking this button will connect to GitHub to check for recent updates</small>
         </div>
         <div class="card" *ngIf="checkLatestRelease == true">
             <ng-container *ngIf="latestRelease$ | async as latestRelease">
-            <h5>Current Version: {{(info$ | async)?.version}}</h5> 
+            <h5>Current Version: {{(info$ | async)?.version}}</h5>
             <h2>Latest Release: {{latestRelease.name}}</h2>
 
             <div *ngFor="let asset of latestRelease.assets">

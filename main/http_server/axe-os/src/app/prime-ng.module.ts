@@ -1,4 +1,5 @@
 import { NgModule } from '@angular/core';
+import { RadioButtonModule } from 'primeng/radiobutton';
 import { ButtonModule } from 'primeng/button';
 import { ChartModule } from 'primeng/chart';
 import { CheckboxModule } from 'primeng/checkbox';
@@ -22,7 +23,8 @@ const primeNgModules = [
     KnobModule,
     ChartModule,
     InputGroupModule,
-    InputGroupAddonModule
+    InputGroupAddonModule,
+    RadioButtonModule
 ];
 
 @NgModule({
