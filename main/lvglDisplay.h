@@ -11,6 +11,9 @@
 #include "nvs_config.h"
 #include "i2c_bitaxe.h"
 
+// Mode Selection
+#define LVGL_MODE_I2C 1
+
 // Network data registers (on change only)
 #define LVGL_REG_SSID           0x21
 #define LVGL_REG_IP_ADDR        0x22

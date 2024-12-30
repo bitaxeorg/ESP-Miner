@@ -11,6 +11,8 @@
 #include "nvs_config.h"
 #include "serial.h"
 
+// Mode Selection
+#define LVGL_MODE_BAP 0
 
 // Network data registers (on change only)
 #define LVGL_REG_SSID           0x21
