@@ -263,10 +263,17 @@ void SYSTEM_task(void * pvParameters)
             continue;  // Skip the normal screen cycle
         }
         // Update the RGB display
-        lvglUpdateDisplayNetworkBAP(GLOBAL_STATE);
-        lvglUpdateDisplayMiningBAP(GLOBAL_STATE);
-        lvglUpdateDisplayMonitoringBAP(GLOBAL_STATE);
-        lvglUpdateDisplayDeviceStatusBAP(GLOBAL_STATE);
+        #if LVGL_MODE_BAP == 1
+            lvglUpdateDisplayNetworkBAP(GLOBAL_STATE);
+            lvglUpdateDisplayMiningBAP(GLOBAL_STATE);
+            lvglUpdateDisplayMonitoringBAP(GLOBAL_STATE);
+            lvglUpdateDisplayDeviceStatusBAP(GLOBAL_STATE);
+        #elif LVGL_MODE_I2C == 1
+            lvglUpdateDisplayNetwork(GLOBAL_STATE);
+            lvglUpdateDisplayMining(GLOBAL_STATE);
+            lvglUpdateDisplayMonitoring(GLOBAL_STATE);
+            lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
+        #endif
         
 
         mempool_api_price();
@@ -274,8 +281,15 @@ void SYSTEM_task(void * pvParameters)
         mempool_api_network_hashrate();
         mempool_api_network_difficulty_adjustement();
         mempool_api_network_recommended_fee();
-        lvglUpdateDisplayAPIBAP();
-        //lvglGetSettingsBAP();
+        #if LVGL_MODE_BAP == 1
+            lvglUpdateDisplayAPIBAP();
+        #elif LVGL_MODE_I2C == 1
+            lvglUpdateDisplayAPI();
+        #endif
+
+        #if LVGL_MODE_I2C == 1
+            lvglGetSettings();
+        #endif
         
 
         if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) 
