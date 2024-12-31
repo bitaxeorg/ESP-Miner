@@ -1,3 +1,4 @@
+
 #include "mempoolAPI.h"
 #include <string.h>
 #include <stdlib.h>
@@ -13,6 +14,8 @@
 #include "lwip/sys.h"
 #include "cJSON.h"
 #include "esp_crt_bundle.h"
+
+#if USE_MEMPOOL_API == 1
 
 #define MAX_RESPONSE_SIZE 8192  // 8KB max response size
 
@@ -1042,3 +1045,4 @@ esp_err_t mempool_api_network_recommended_fee(void) {
     return ESP_OK;
     return ESP_OK;
 }
+#endif

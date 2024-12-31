@@ -456,6 +456,7 @@ esp_err_t lvglUpdateDisplayDeviceStatus(GlobalState *GLOBAL_STATE)
     return ESP_OK;
 }
 
+#if USE_MEMPOOL_API == 1
 esp_err_t lvglUpdateDisplayAPI(void) 
 {
     static TickType_t lastPriceUpdateTime = 0;
@@ -552,7 +553,7 @@ esp_err_t lvglUpdateDisplayAPI(void)
 
     return ESP_OK;
 }
-
+#endif
 
 esp_err_t lvglGetSettings(void) {
     static TickType_t lastSettingsUpdateTime = 0;

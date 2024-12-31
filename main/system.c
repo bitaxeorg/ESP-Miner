@@ -28,7 +28,7 @@
 #include "nvs_config.h"
 #include "oled.h"
 #include "vcore.h"
-#include "lvglDisplay.h"
+#include "lvglDisplayBAP.h"
 #include "mempoolAPI.h"
 
 
@@ -159,7 +159,7 @@ void SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
             }
             
             // Initialize LVGL display
-            if (lvglDisplay_init() != ESP_OK) {
+            if (lvglDisplay_initBAP() != ESP_OK) {
                 ESP_LOGI(TAG, "LVGL display init failed!");
             } else {
                 ESP_LOGI(TAG, "LVGL display init success!");
@@ -215,7 +215,8 @@ void SYSTEM_task(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
+    static uint8_t displayBufferBAP[1024];
+    
     //_init_system(GLOBAL_STATE);
 
     char input_event[10];
@@ -228,8 +229,19 @@ void SYSTEM_task(void * pvParameters)
 
     // show the connection screen
     while (!module->startup_done) {
-        _update_connection(GLOBAL_STATE);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // Check for BAP messages
+        SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 50);
+        lvglStartupLoopBAP(GLOBAL_STATE);
+
+        // non-blocking update of the connection screen
+        static uint64_t lastUpdateTime = 0;
+        uint64_t currentTime = esp_timer_get_time() / 1000; // Convert to milliseconds
+        
+        if (currentTime - lastUpdateTime > 1000) {
+            _update_connection(GLOBAL_STATE);
+            lastUpdateTime = currentTime;
+        }
+        //vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
     
     OLED_showBitmap(0, 0, bitaxe_splash, 128, 32);
@@ -240,26 +252,46 @@ void SYSTEM_task(void * pvParameters)
 
     while (1) {
         // Check for overheat mode
+        SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
+
         if (module->overheat_mode == 1) {
+            gpio_set_level(GPIO_NUM_1, 0);
             _show_overheat_screen(GLOBAL_STATE);
-            vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
+            lvglOverheatLoopBAP(GLOBAL_STATE);
+            //  vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
             SYSTEM_update_overheat_mode(GLOBAL_STATE);  // Check for changes
             continue;  // Skip the normal screen cycle
         }
         // Update the RGB display
-        lvglUpdateDisplayNetwork(GLOBAL_STATE);
-        lvglUpdateDisplayMining(GLOBAL_STATE);
-        lvglUpdateDisplayMonitoring(GLOBAL_STATE);
-        lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
+        #if LVGL_MODE_BAP == 1
+            lvglUpdateDisplayNetworkBAP(GLOBAL_STATE);
+            lvglUpdateDisplayMiningBAP(GLOBAL_STATE);
+            lvglUpdateDisplayMonitoringBAP(GLOBAL_STATE);
+            lvglUpdateDisplayDeviceStatusBAP(GLOBAL_STATE);
+        #elif LVGL_MODE_I2C == 1
+            lvglUpdateDisplayNetwork(GLOBAL_STATE);
+            lvglUpdateDisplayMining(GLOBAL_STATE);
+            lvglUpdateDisplayMonitoring(GLOBAL_STATE);
+            lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
+        #endif
         
-
+        #if USE_MEMPOOL_API == 1
         mempool_api_price();
         mempool_api_block_tip_height();
         mempool_api_network_hashrate();
         mempool_api_network_difficulty_adjustement();
         mempool_api_network_recommended_fee();
-        lvglUpdateDisplayAPI();
-        //lvglGetSettings();
+        #if LVGL_MODE_BAP == 1
+            lvglUpdateDisplayAPIBAP();
+        #elif LVGL_MODE_I2C == 1
+            lvglUpdateDisplayAPI();
+        #endif
+        #endif
+
+        #if LVGL_MODE_I2C == 1
+            lvglGetSettings();
+        #endif
+        
         
 
         if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) 
