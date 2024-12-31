@@ -440,6 +440,7 @@ esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE)
     return ESP_OK;
 }
 
+#if USE_MEMPOOL_API == 1
 esp_err_t lvglUpdateDisplayAPIBAP(void) 
 {
     static TickType_t lastPriceUpdateTime = 0;
@@ -536,7 +537,7 @@ esp_err_t lvglUpdateDisplayAPIBAP(void)
 
     return ESP_OK;
 }
-
+#endif
 
 /// @brief waits for a serial response from the device
 /// @param buf buffer to read data into

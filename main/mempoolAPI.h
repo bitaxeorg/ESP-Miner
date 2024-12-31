@@ -15,6 +15,10 @@
 #include "cJSON.h"
 #include "esp_system.h"
 
+#define USE_MEMPOOL_API 0
+
+#if USE_MEMPOOL_API == 1
+
 typedef struct {
     uint32_t priceTimestamp;
     uint32_t priceUSD;
@@ -54,5 +58,7 @@ esp_err_t mempool_api_block_tip_height(void);
 esp_err_t mempool_api_network_recommended_fee(void);
 
 MempoolApiState* getMempoolState(void);  // Add getter function
+
+#endif
 
 #endif
