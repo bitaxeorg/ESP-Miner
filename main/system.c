@@ -275,7 +275,7 @@ void SYSTEM_task(void * pvParameters)
             lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
         #endif
         
-
+        #if USE_MEMPOOL_API == 1
         mempool_api_price();
         mempool_api_block_tip_height();
         mempool_api_network_hashrate();
@@ -286,10 +286,12 @@ void SYSTEM_task(void * pvParameters)
         #elif LVGL_MODE_I2C == 1
             lvglUpdateDisplayAPI();
         #endif
+        #endif
 
         #if LVGL_MODE_I2C == 1
             lvglGetSettings();
         #endif
+        
         
 
         if ((xTaskGetTickCount() - last_update_time) >= pdMS_TO_TICKS(10000)) 
