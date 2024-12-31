@@ -309,5 +309,5 @@ static esp_err_t write(uint8_t * data, uint8_t len)
 {
     //return i2c_master_write_to_device(I2C_MASTER_NUM, 0x3C, data, len, I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 
-    return i2c_bitaxe_register_write_bytes(ssd1306_dev_handle, data, len);
+    return ESP_OK; //i2c_bitaxe_register_write_bytes(ssd1306_dev_handle, data, len); Disabled for now
 }
