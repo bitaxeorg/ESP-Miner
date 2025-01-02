@@ -20,14 +20,22 @@ Install bitaxetool from pip. pip is included with Python 3.4 but if you need to 
 ```
 pip install --upgrade bitaxetool
 ```
-The bitaxetool includes all necessary library for flashing the binary file to the Bitaxe Hardware.
+The bitaxetool includes all necessary library for flashing the binaries to the Bitaxe Hardware.
 
-You need to provide a config.cvs file (see repo for examples) and the appropiate firmware.bin file in it's executed directory.
-
-- Flash with the bitaxetool
+- Flash a "factory" image to a Bitaxe to reset to factory settings. Make sure to choose an image built for your hardware version (401) in this case:
 
 ```
-bitaxetool --config ./config.cvs --firmware ./esp-miner-factory-v2.0.3.bin
+bitaxetool --firmware ./esp-miner-factory-401-v2.4.2.bin
+```
+- Flash just the NVS config to a bitaxe:
+
+```
+bitaxetool --config ./config-401.cvs
+```
+- Flash both a factory image _and_ a config to your Bitaxe: note the settings in the config file will overwrite the config already baked into the factory image:
+
+```
+bitaxetool --config ./config-401.cvs --firmware ./esp-miner-factory-401-v2.4.2.bin
 ```
 
 ## AxeOS API
