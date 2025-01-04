@@ -360,8 +360,8 @@ void self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, TESTS_FAILED);
     }
 
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_malloc(sizeof(bm_job *) * 128, MALLOC_CAP_SPIRAM);
-    GLOBAL_STATE->valid_jobs = heap_caps_malloc(sizeof(uint8_t) * 128, MALLOC_CAP_SPIRAM);
+    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
+    GLOBAL_STATE->valid_jobs = malloc(sizeof(uint8_t) * 128);
 
     for (int i = 0; i < 128; i++) {
         GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[i] = NULL;

@@ -38,7 +38,6 @@ static const char * TAG = "http_server";
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
 QueueHandle_t log_queue = NULL;
-StaticQueue_t log_queue_static;
 
 static int fd = -1;
 
@@ -383,11 +382,6 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
 
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
-    cJSON_AddNumberToObject(root, "freeInternalHeap", esp_get_free_internal_heap_size());
-    cJSON_AddNumberToObject(root, "minimumFreeHeap", esp_get_minimum_free_heap_size());
-
-    cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
-
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
     cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "frequency", nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY));
@@ -574,7 +568,7 @@ int log_to_queue(const char * format, va_list args)
     va_end(args_copy);
 
     // Allocate the buffer dynamically
-    char *log_buffer = (char *) heap_caps_calloc(needed_size + 2, sizeof(char), MALLOC_CAP_SPIRAM);
+    char * log_buffer = (char *) calloc(needed_size + 2, sizeof(char));  // +2 for potential \n and \0
     if (log_buffer == NULL) {
         return 0;
     }
@@ -690,17 +684,11 @@ esp_err_t start_rest_server(void * pvParameters)
     }
 
     REST_CHECK(base_path, "wrong base path", err);
-
-    rest_server_context_t *rest_context = (rest_server_context_t*) heap_caps_calloc(1, sizeof(rest_server_context_t), MALLOC_CAP_SPIRAM);
-
+    rest_server_context_t * rest_context = calloc(1, sizeof(rest_server_context_t));
     REST_CHECK(rest_context, "No memory for rest context", err);
     strlcpy(rest_context->base_path, base_path, sizeof(rest_context->base_path));
 
-    size_t queue_memory_size = MESSAGE_QUEUE_SIZE * sizeof(char*);
-    void *queue_memory = heap_caps_malloc(queue_memory_size, MALLOC_CAP_SPIRAM);
-    REST_CHECK(queue_memory, "No memory for queue memory", err);
-    log_queue = xQueueCreateStatic(MESSAGE_QUEUE_SIZE, sizeof(char*), queue_memory, &log_queue_static);
-    REST_CHECK(log_queue, "No memory for log queue", err);
+    log_queue = xQueueCreate(MESSAGE_QUEUE_SIZE, sizeof(char*));
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;

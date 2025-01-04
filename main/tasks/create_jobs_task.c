@@ -94,7 +94,7 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
 
     bm_job next_job = construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask);
 
-    bm_job *queued_next_job = heap_caps_malloc(sizeof(bm_job), MALLOC_CAP_SPIRAM);
+    bm_job *queued_next_job = malloc(sizeof(bm_job));
     if (queued_next_job == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for queued_next_job");
         free(extranonce_2_str);
