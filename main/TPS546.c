@@ -22,7 +22,7 @@
 
 #define SMBUS_DEFAULT_TIMEOUT (1000 / portTICK_PERIOD_MS)
 
-static const char *TAG = "TPS546.c";
+static const char *TAG = "TPS546";
 
 static uint8_t DEVICE_ID1[] = {0x54, 0x49, 0x54, 0x6B, 0x24, 0x41}; // TPS546D24A
 static uint8_t DEVICE_ID2[] = {0x54, 0x49, 0x54, 0x6D, 0x24, 0x41}; // TPS546D24A
@@ -330,7 +330,7 @@ int TPS546_init(void)
 
     ESP_LOGI(TAG, "Initializing the core voltage regulator");
 
-    if (i2c_bitaxe_add_device(TPS546_I2CADDR, &tps546_dev_handle) != ESP_OK) {
+    if (i2c_bitaxe_add_device(TPS546_I2CADDR, &tps546_dev_handle, TAG) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add I2C device");
         return -1;
     }

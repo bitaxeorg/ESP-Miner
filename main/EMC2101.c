@@ -6,8 +6,6 @@
 
 static const char * TAG = "EMC2101";
 
-// static const char *TAG = "EMC2101.c";
-
 static i2c_master_dev_handle_t emc2101_dev_handle;
 
 /**
@@ -17,7 +15,7 @@ static i2c_master_dev_handle_t emc2101_dev_handle;
  */
 esp_err_t EMC2101_init(bool invertPolarity) {
 
-    if (i2c_bitaxe_add_device(EMC2101_I2CADDR_DEFAULT, &emc2101_dev_handle) != ESP_OK) {
+    if (i2c_bitaxe_add_device(EMC2101_I2CADDR_DEFAULT, &emc2101_dev_handle, TAG) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add device");
         return ESP_FAIL;
     }

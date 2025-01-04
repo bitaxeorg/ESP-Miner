@@ -20,7 +20,7 @@ static i2c_master_dev_handle_t ds4432u_dev_handle;
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
 esp_err_t DS4432U_init(void) {
-    return i2c_bitaxe_add_device(DS4432U_SENSOR_ADDR, &ds4432u_dev_handle);
+    return i2c_bitaxe_add_device(DS4432U_SENSOR_ADDR, &ds4432u_dev_handle, TAG);
 }
 
 /**
