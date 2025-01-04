@@ -130,7 +130,7 @@ TEST_CASE("Parse stratum result success with large id", "[stratum]")
     StratumApiV1Message stratum_api_v1_message = {};
     const char *json_string = "{\"id\":32769,\"error\":null,\"result\":true}";
     STRATUM_V1_parse(&stratum_api_v1_message, json_string);
-    TEST_ASSERT_EQUAL(32768, stratum_api_v1_message.message_id);
+    TEST_ASSERT_EQUAL(32769, stratum_api_v1_message.message_id);
     TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
     TEST_ASSERT_TRUE(stratum_api_v1_message.response_success);
 }
