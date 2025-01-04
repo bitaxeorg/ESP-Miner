@@ -1,4 +1,5 @@
 #include "bm1368.h"
+
 #include "crc.h"
 #include "global_state.h"
 #include "serial.h"
@@ -14,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define BM1368_RST_PIN GPIO_NUM_1
+#define GPIO_ASIC_RESET CONFIG_GPIO_ASIC_RESET
 
 #define TYPE_JOB 0x20
 #define TYPE_CMD 0x40
@@ -121,9 +122,9 @@ void BM1368_set_version_mask(uint32_t version_mask)
 
 static void _reset(void)
 {
-    gpio_set_level(BM1368_RST_PIN, 0);
+    gpio_set_level(GPIO_ASIC_RESET, 0);
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    gpio_set_level(BM1368_RST_PIN, 1);
+    gpio_set_level(GPIO_ASIC_RESET, 1);
     vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
@@ -242,8 +243,8 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
 
     memset(asic_response_buffer, 0, CHUNK_SIZE);
 
-    esp_rom_gpio_pad_select_gpio(BM1368_RST_PIN);
-    gpio_set_direction(BM1368_RST_PIN, GPIO_MODE_OUTPUT);
+    esp_rom_gpio_pad_select_gpio(GPIO_ASIC_RESET);
+    gpio_set_direction(GPIO_ASIC_RESET, GPIO_MODE_OUTPUT);
 
     _reset();
 

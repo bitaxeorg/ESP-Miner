@@ -2,8 +2,10 @@
 #include "esp_log.h"
 #include "i2c_bitaxe.h"
 
-#define I2C_MASTER_SCL_IO 48        /*!< GPIO number used for I2C master clock */
-#define I2C_MASTER_SDA_IO 47        /*!< GPIO number used for I2C master data  */
+#define GPIO_I2C_SDA CONFIG_GPIO_I2C_SDA
+#define GPIO_I2C_SCL CONFIG_GPIO_I2C_SCL
+
+#define I2C_MASTER_FREQ_HZ 100000   /*!< I2C master clock frequency */
 
 #define I2C_MASTER_NUM 0            /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
 #define I2C_MASTER_TIMEOUT_MS 1000
@@ -21,8 +23,8 @@ esp_err_t i2c_bitaxe_init(void)
     i2c_master_bus_config_t i2c_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .i2c_port = I2C_MASTER_NUM,
-        .scl_io_num = I2C_MASTER_SCL_IO,
-        .sda_io_num = I2C_MASTER_SDA_IO,
+        .scl_io_num = GPIO_I2C_SCL,
+        .sda_io_num = GPIO_I2C_SDA,
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
     };

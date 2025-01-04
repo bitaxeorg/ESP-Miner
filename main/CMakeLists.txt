@@ -5,7 +5,6 @@ SRCS
     "EMC2101.c"
     "i2c_bitaxe.c"
     "INA260.c"
-    "led_controller.c"
     "main.c"
     "nvs_config.c"
     "display.c"

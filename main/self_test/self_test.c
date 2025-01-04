@@ -22,6 +22,8 @@
 #include "utils.h"
 #include "TPS546.h"
 
+#define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
+
 #define TESTS_FAILED 0
 #define TESTS_PASSED 1
 
@@ -212,8 +214,8 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
             // turn ASIC on
-            gpio_set_direction(GPIO_NUM_10, GPIO_MODE_OUTPUT);
-            gpio_set_level(GPIO_NUM_10, 0);
+            gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
+            gpio_set_level(GPIO_ASIC_ENABLE, 0);
             break;
         case DEVICE_GAMMA:
         default:

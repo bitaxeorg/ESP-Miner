@@ -1,3 +1,4 @@
+#include <string.h>
 #include "EMC2101.h"
 #include "INA260.h"
 #include "bm1397.h"
@@ -11,7 +12,10 @@
 #include "serial.h"
 #include "TPS546.h"
 #include "vcore.h"
-#include <string.h>
+
+#define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
+#define GPIO_ASIC_RESET  CONFIG_GPIO_ASIC_RESET
+#define GPIO_PLUG_SENSE  CONFIG_GPIO_PLUG_SENSE
 
 #define POLL_RATE 2000
 #define MAX_TEMP 90.0
@@ -93,21 +97,21 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
 			if (GLOBAL_STATE->board_version < 402 || GLOBAL_STATE->board_version > 499) {
-                // Configure GPIO12 as input(barrel jack) 1 is plugged in
+                // Configure plug sense pin as input(barrel jack) 1 is plugged in
                 gpio_config_t barrel_jack_conf = {
-                    .pin_bit_mask = (1ULL << GPIO_NUM_12),
+                    .pin_bit_mask = (1ULL << GPIO_PLUG_SENSE),
                     .mode = GPIO_MODE_INPUT,
                 };
                 gpio_config(&barrel_jack_conf);
-                int barrel_jack_plugged_in = gpio_get_level(GPIO_NUM_12);
+                int barrel_jack_plugged_in = gpio_get_level(GPIO_PLUG_SENSE);
 
-                gpio_set_direction(GPIO_NUM_10, GPIO_MODE_OUTPUT);
+                gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
                 if (barrel_jack_plugged_in == 1 || !power_management->HAS_PLUG_SENSE) {
                     // turn ASIC on
-                    gpio_set_level(GPIO_NUM_10, 0);
+                    gpio_set_level(GPIO_ASIC_ENABLE, 0);
                 } else {
                     // turn ASIC off
-                    gpio_set_level(GPIO_NUM_10, 1);
+                    gpio_set_level(GPIO_ASIC_ENABLE, 1);
                 }
 			}
             break;
@@ -165,7 +169,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
                     EMC2101_set_fan_speed(1);
                     if (power_management->HAS_POWER_EN) {
-                        gpio_set_level(GPIO_NUM_10, 1);
+                        gpio_set_level(GPIO_ASIC_ENABLE, 1);
                     }
                     nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
                     nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
@@ -201,7 +205,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                         // Turn off core voltage
                         VCORE_set_voltage(0.0, GLOBAL_STATE);
                     } else if (power_management->HAS_POWER_EN) {
-                        gpio_set_level(GPIO_NUM_10, 1);
+                        gpio_set_level(GPIO_ASIC_ENABLE, 1);
                     }
                     nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
                     nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
@@ -263,12 +267,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             }
         }
 
-        // Read the state of GPIO12
+        // Read the state of plug sense pin
         if (power_management->HAS_PLUG_SENSE) {
-            int gpio12_state = gpio_get_level(GPIO_NUM_12);
-            if (gpio12_state == 0) {
+            int gpio_plug_sense_state = gpio_get_level(GPIO_PLUG_SENSE);
+            if (gpio_plug_sense_state == 0) {
                 // turn ASIC off
-                gpio_set_level(GPIO_NUM_10, 1);
+                gpio_set_level(GPIO_ASIC_ENABLE, 1);
             }
         }
 
