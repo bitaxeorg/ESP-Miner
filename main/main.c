@@ -56,8 +56,10 @@ void app_main(void)
         return;
     }
 
+    // Optionally hold the boot button
+    bool pressed = gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
     //should we run the self test?
-    if (should_test(&GLOBAL_STATE)) {
+    if (should_test(&GLOBAL_STATE) || pressed) {
         self_test((void *) &GLOBAL_STATE);
         return;
     }
