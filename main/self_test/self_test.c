@@ -503,12 +503,6 @@ void self_test(void * pvParameters)
 
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result) 
 {
-    if (test_result == TESTS_PASSED) {
-        ESP_LOGI(TAG, "SELF TESTS PASS -- Press RESET to continue");
-    } else {
-        ESP_LOGI(TAG, "SELF TESTS FAIL -- Press RESET to continue");
-    }
-    
     switch (GLOBAL_STATE->device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
@@ -520,6 +514,10 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool test_result)
         default:
     }
 
-    //wait here for a long press to reboot
-    vTaskDelay(portMAX_DELAY);
+    if (test_result != TESTS_PASSED) {
+        ESP_LOGI(TAG, "SELF TESTS FAIL -- Press RESET to continue");  
+        //wait here for a long press to reboot
+        vTaskDelay(portMAX_DELAY);
+    }
+
 }
