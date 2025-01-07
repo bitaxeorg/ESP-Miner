@@ -620,6 +620,7 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                     uint16_t voltage = buf[4] * 256 + buf[5];
                     if (voltage <= 1250 && voltage >= 1000) {
                         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, voltage);
+                        ESP_LOGI("Serial BAP", "Setting ASIC voltage to %d", voltage);
                     }
                     else 
                     {
@@ -630,13 +631,30 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                     ESP_LOGI("Serial BAP", "Received asic frequency");
                     ESP_LOGI("Serial BAP", "Frequency: %d", buf[4] * 256 + buf[5]);
                     uint16_t frequency = buf[4] * 256 + buf[5];
-                    if (frequency <= 575 && frequency >= 200) {
+                    if (frequency <= 625 && frequency >= 200) {
                         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, frequency);
+                        ESP_LOGI("Serial BAP", "Setting ASIC frequency to %d", frequency);
                     }
                     else 
                     {
                         ESP_LOGE("Serial BAP", "Invalid frequency: %d", frequency);
                     }
+                    break;
+                case LVGL_REG_SETTINGS_FAN_SPEED:
+                    ESP_LOGI("Serial BAP", "Received fan speed");
+                    ESP_LOGI("Serial BAP", "Speed: %d", buf[5]);    
+                    uint16_t fan_speed = buf[5];
+                    if (fan_speed <= 100 && fan_speed >= 0) {
+                        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, fan_speed);
+                        ESP_LOGI("Serial BAP", "Setting fan speed to %d", fan_speed);
+                    }
+                    break;
+                case LVGL_REG_SETTINGS_AUTO_FAN_SPEED:
+                    ESP_LOGI("Serial BAP", "Received auto fan enable flag");
+                    ESP_LOGI("Serial BAP", "RAW HEX: %02X", buf[5]);
+                    uint16_t auto_fan_enabled = 0x0000 + buf[5];  // Convert to bool (0 or 1)
+                    ESP_LOGI("Serial BAP", "Auto fan enabled: %d", auto_fan_enabled);
+                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, auto_fan_enabled ? 1 : 0);
                     break;
                 case LVGL_REG_SPECIAL_RESTART:
                     ESP_LOGI("Serial BAP", "Received restart command");
