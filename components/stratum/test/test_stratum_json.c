@@ -174,10 +174,10 @@ TEST_CASE("Parse stratum result error", "[stratum]")
 TEST_CASE("Parse stratum result alternative error", "[stratum]")
 {
     StratumApiV1Message stratum_api_v1_message = {};
-    const char *json_string = "{\"reject-reason\":\"Above target\",\"result\":false,\"error\":null,\"id\":8}";
+    const char *json_string = "{\"reject-reason\":\"Above target 2\",\"result\":false,\"error\":null,\"id\":8}";
     STRATUM_V1_parse(&stratum_api_v1_message, json_string);
-    TEST_ASSERT_EQUAL(1, stratum_api_v1_message.message_id);
+    TEST_ASSERT_EQUAL(8, stratum_api_v1_message.message_id);
     TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
-    TEST_ASSERT_EQUAL("Above target 2", stratum_api_v1_message.error_str);
+    TEST_ASSERT_EQUAL_STRING("Above target 2", stratum_api_v1_message.error_str);
 }
