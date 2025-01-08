@@ -12,7 +12,7 @@
 #include "i2c_bitaxe.h"
 
 // Mode Selection
-#define LVGL_MODE_I2C 1
+#define LVGL_MODE_I2C 0
 
 // Network data registers (on change only)
 #define LVGL_REG_SSID           0x21
