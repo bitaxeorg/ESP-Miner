@@ -44,6 +44,7 @@ PRIV_REQUIRES
     "esp_event"
     "esp_http_server"
     "esp_netif"
+    "esp_psram"
     "esp_timer"
     "esp_wifi"
     "json"
