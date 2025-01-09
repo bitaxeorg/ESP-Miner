@@ -165,7 +165,7 @@ static lv_obj_t * create_scr_urls(SystemModule * module) {
     lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
     lv_obj_t *label1 = lv_label_create(scr);
-    lv_label_set_text(label1, "Mining URL:");
+    lv_label_set_text(label1, "Stratum Host:");
 
     mining_url_scr_urls_label = lv_label_create(scr);
     lv_obj_set_width(mining_url_scr_urls_label, LV_HOR_RES);

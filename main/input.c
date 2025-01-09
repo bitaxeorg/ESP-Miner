@@ -5,7 +5,8 @@
 #include "esp_lvgl_port.h"
 #include "driver/gpio.h"
 
-#define BUTTON_BOOT_GPIO       GPIO_NUM_0
+#define GPIO_BUTTON_BOOT CONFIG_GPIO_BUTTON_BOOT
+
 #define ESP_INTR_FLAG_DEFAULT  0
 #define LONG_PRESS_DURATION_MS 2000
 
@@ -24,7 +25,7 @@ static void button_read(lv_indev_t *indev, lv_indev_data_t *data)
 
 static void IRAM_ATTR button_isr_handler(void *arg) 
 {
-    bool pressed = gpio_get_level(BUTTON_BOOT_GPIO) == 0; // LOW when pressed
+    bool pressed = gpio_get_level(GPIO_BUTTON_BOOT) == 0; // LOW when pressed
     button_state = pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
 }
 
@@ -46,7 +47,7 @@ esp_err_t input_init(void (*button_short_clicked_cb)(void), void (*button_long_p
 
     // Button handling
     gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << BUTTON_BOOT_GPIO),
+        .pin_bit_mask = (1ULL << GPIO_BUTTON_BOOT),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .intr_type = GPIO_INTR_ANYEDGE
@@ -55,7 +56,7 @@ esp_err_t input_init(void (*button_short_clicked_cb)(void), void (*button_long_p
 
     // Install ISR service and hook the interrupt handler
     ESP_RETURN_ON_ERROR(gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT), TAG, "Error installing ISR service");
-    ESP_RETURN_ON_ERROR(gpio_isr_handler_add(BUTTON_BOOT_GPIO, button_isr_handler, NULL), TAG, "Error adding ISR handler");
+    ESP_RETURN_ON_ERROR(gpio_isr_handler_add(GPIO_BUTTON_BOOT, button_isr_handler, NULL), TAG, "Error adding ISR handler");
 
     lv_group_t * group = lv_group_create();
     lv_group_set_default(group);

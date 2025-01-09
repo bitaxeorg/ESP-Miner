@@ -7,6 +7,10 @@
         text="Bitaxe has overheated - See settings">
     </p-message>
 
+    <p-message *ngIf="!info.frequency || info.frequency < 400" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
+        text="Bitaxe frequency is set low - See settings">
+    </p-message>
+
     <div class="grid" *ngIf="info$ | async as info; else loading">
         <div class="col-12">
             <div class="grid">

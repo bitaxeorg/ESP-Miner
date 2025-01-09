@@ -52,6 +52,7 @@ export class SystemService {
           isUsingFallbackStratum: true,
           frequency: 485,
           version: "2.0",
+          idfVersion: "v5.1.2",
           boardVersion: "204",
           flipscreen: 1,
           invertscreen: 0,
