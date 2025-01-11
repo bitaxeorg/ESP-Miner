@@ -78,6 +78,37 @@ The firmware hosts a small web server on port 80 for administrative purposes. On
 
 In the event that the admin web front end is inaccessible, for example because of an unsuccessful firmware update (`www.bin`), a recovery page can be accessed at `http://<IP>/recovery`.
 
+## Development
+
+### Prerequisites
+
+- Install the ESP-IDF toolchain from https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/
+- Install nodejs/npm from https://nodejs.org/en/download
+- (Optional) Install the ESP-IDF extension for VSCode from https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension
+
+### Building
+
+At the root of the repository, run:
+```
+idf.py build && ./merge_bin.sh ./esp-miner-merged.bin
+```
+
+Note: the merge_bin.sh script is a custom script that merges the bootloader, partition table, and the application binary into a single file.
+
+Note: if using VSCode, you may have to configure the settings.json file to match your esp hardware version. For example, if your bitaxe has something other than an esp32-s3, you will need to change the version in the `.vscode/settings.json` file.
+
+### Flashing
+
+With the bitaxe connected to your computer via USB, run:
+
+```
+bitaxetool --config ./config-xxx.cvs --firmware ./esp-miner-merged.bin
+```
+
+where xxx is the config file for your hardware version. You can see the list of available config files in the root of the repository.
+
+Note: if you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
+
 ## Attributions
 
 The display font is Portfolio 6x8 from https://int10h.org/oldschool-pc-fonts/ by VileR.
