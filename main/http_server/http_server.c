@@ -61,6 +61,100 @@ typedef struct rest_server_context
 
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
+static esp_err_t ip_in_private_range(uint32_t ip){
+        //Private IP ranges (little endian, 192.168.0.0 => 0.0.168.192)
+    //192.168.0.0
+    uint32_t sixteen_bit_block = 0b00000000000000001010100011000000;
+    uint32_t sixteen_bit_mask =  0b00000000000000001111111111111111;
+
+    if((ip & sixteen_bit_mask) == sixteen_bit_block){
+         return ESP_OK;
+    }
+    //172.16.0.0 
+    uint32_t twenty_bit_block = 0b00000000000000000001000010101100;
+    uint32_t twenty_bit_mask = 0b00000000000000001111000011111111;
+    if((ip & twenty_bit_mask) == twenty_bit_block){
+         return ESP_OK;
+    }
+    //10.0.0.0
+    uint32_t twenty_four_bit_block = 0b00000000000000000000000000001010;
+    uint32_t twenty_four_bit_mask = 0b00000000000000000000000011111111;
+    if((ip & twenty_four_bit_mask) == twenty_four_bit_block){
+         return ESP_OK;
+    }
+
+    return ESP_FAIL;
+}
+static esp_err_t check_is_same_network(httpd_req_t * req){
+
+    int sockfd = httpd_req_to_sockfd(req);
+    char ipstr[INET6_ADDRSTRLEN];
+    struct sockaddr_in6 addr;   // esp_http_server uses IPv6 addressing
+    socklen_t addr_size = sizeof(addr);
+    
+    if (getpeername(sockfd, (struct sockaddr *)&addr, &addr_size) < 0) {
+        ESP_LOGE(TAG, "Error getting client IP");
+        return ESP_FAIL;
+    }
+
+
+    uint32_t request_ip_addr = addr.sin6_addr.un.u32_addr[3];
+
+    // // Convert to IPv6 string
+    // inet_ntop(AF_INET, &addr.sin6_addr, ipstr, sizeof(ipstr));
+
+    // Convert to IPv4 string
+    inet_ntop(AF_INET, &request_ip_addr, ipstr, sizeof(ipstr));
+
+   
+
+    char origin[128]; 
+    char ip_str[16];  // Buffer to hold the extracted IP address string
+    uint32_t origin_ip_addr = 0;
+    // Attempt to get the Origin header
+    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK) {
+        ESP_LOGI("CORS", "Origin header: %s", origin);
+
+        // Find the start of the IP address in the Origin header
+        const char *prefix = "http://";
+        char *ip_start = strstr(origin, prefix);
+        if (ip_start) {
+            ip_start += strlen(prefix); // Move past "http://"
+
+            // Extract the IP address portion (up to the next '/')
+            char *ip_end = strchr(ip_start, '/');
+            size_t ip_len = ip_end ? (size_t)(ip_end - ip_start) : strlen(ip_start);
+            if (ip_len < sizeof(ip_str)) {
+                strncpy(ip_str, ip_start, ip_len);
+                ip_str[ip_len] = '\0'; // Null-terminate the string
+
+                // Convert the IP address string to uint32_t
+                origin_ip_addr = inet_addr(ip_str);
+                if (origin_ip_addr == INADDR_NONE) {
+                    ESP_LOGW("CORS", "Invalid IP address: %s", ip_str);
+                } else {
+                    ESP_LOGI("CORS", "Extracted IP address %lu", origin_ip_addr);
+                }
+            } else {
+                ESP_LOGW("CORS", "IP address string is too long");
+            }
+        }
+    }else {
+        // Origin is sent for CSRF sensitive requests, if there is no header it's not a concern.
+        origin_ip_addr = request_ip_addr;
+    }
+
+
+    if(ip_in_private_range(origin_ip_addr) == ESP_OK && ip_in_private_range(request_ip_addr) == ESP_OK){
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Client is NOT in the private ip ranges or same range as server.");
+    return ESP_FAIL;
+
+}
+
+
 esp_err_t init_fs(void)
 {
     esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = NULL, .max_files = 5, .format_if_mount_failed = false};
@@ -118,6 +212,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
 
 static esp_err_t set_cors_headers(httpd_req_t * req)
 {
+
     esp_err_t err;
 
     err = httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -141,6 +236,10 @@ static esp_err_t set_cors_headers(httpd_req_t * req)
 /* Recovery handler */
 static esp_err_t rest_recovery_handler(httpd_req_t * req)
 {
+    if(check_is_same_network(req) != ESP_OK){
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     httpd_resp_send(req, recovery_page, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
@@ -209,6 +308,10 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
 
 static esp_err_t handle_options_request(httpd_req_t * req)
 {
+    if(check_is_same_network(req) != ESP_OK){
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     // Set CORS headers for OPTIONS request
     if (set_cors_headers(req) != ESP_OK) {
         httpd_resp_send_500(req);
@@ -223,6 +326,11 @@ static esp_err_t handle_options_request(httpd_req_t * req)
 
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
+
+    if(check_is_same_network(req) != ESP_OK){
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     // Set CORS headers
     if (set_cors_headers(req) != ESP_OK) {
         httpd_resp_send_500(req);
@@ -321,6 +429,10 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
 static esp_err_t POST_restart(httpd_req_t * req)
 {
+    if(check_is_same_network(req) != ESP_OK){
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     // Set CORS headers
     if (set_cors_headers(req) != ESP_OK) {
         httpd_resp_send_500(req);
@@ -346,6 +458,10 @@ static esp_err_t POST_restart(httpd_req_t * req)
 /* Simple handler for getting system handler */
 static esp_err_t GET_system_info(httpd_req_t * req)
 {
+    if(check_is_same_network(req) != ESP_OK){
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     httpd_resp_set_type(req, "application/json");
 
     // Set CORS headers
@@ -453,6 +569,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
 esp_err_t POST_WWW_update(httpd_req_t * req)
 {
+    if(check_is_same_network(req) != ESP_OK){
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     wifi_mode_t mode;
     esp_wifi_get_mode(&mode);
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
@@ -507,6 +627,10 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
  */
 esp_err_t POST_OTA_update(httpd_req_t * req)
 {
+    if(check_is_same_network(req) != ESP_OK){
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     wifi_mode_t mode;
     esp_wifi_get_mode(&mode);
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
@@ -626,6 +750,10 @@ void send_log_to_websocket(char *message)
  */
 esp_err_t echo_handler(httpd_req_t * req)
 {
+    if(check_is_same_network(req) != ESP_OK){
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     if (req->method == HTTP_GET) {
         ESP_LOGI(TAG, "Handshake done, the new connection was opened");
         fd = httpd_req_to_sockfd(req);
@@ -700,7 +828,11 @@ esp_err_t start_rest_server(void * pvParameters)
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
 
     httpd_uri_t recovery_explicit_get_uri = {
-        .uri = "/recovery", .method = HTTP_GET, .handler = rest_recovery_handler, .user_ctx = rest_context};
+        .uri = "/recovery", 
+        .method = HTTP_GET, 
+        .handler = rest_recovery_handler, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &recovery_explicit_get_uri);
     
     // Register theme API endpoints
@@ -708,7 +840,11 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
-        .uri = "/api/system/info", .method = HTTP_GET, .handler = GET_system_info, .user_ctx = rest_context};
+        .uri = "/api/system/info", 
+        .method = HTTP_GET, 
+        .handler = GET_system_info, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &system_info_get_uri);
 
     httpd_uri_t swarm_options_uri = {
@@ -720,15 +856,26 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &swarm_options_uri);
 
     httpd_uri_t system_restart_uri = {
-        .uri = "/api/system/restart", .method = HTTP_POST, .handler = POST_restart, .user_ctx = rest_context};
+        .uri = "/api/system/restart", .method = HTTP_POST, 
+        .handler = POST_restart, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &system_restart_uri);
 
     httpd_uri_t system_restart_options_uri = {
-        .uri = "/api/system/restart", .method = HTTP_OPTIONS, .handler = handle_options_request, .user_ctx = NULL};
+        .uri = "/api/system/restart", 
+        .method = HTTP_OPTIONS, 
+        .handler = handle_options_request, 
+        .user_ctx = NULL
+    };
     httpd_register_uri_handler(server, &system_restart_options_uri);
 
     httpd_uri_t update_system_settings_uri = {
-        .uri = "/api/system", .method = HTTP_PATCH, .handler = PATCH_update_settings, .user_ctx = rest_context};
+        .uri = "/api/system", 
+        .method = HTTP_PATCH, 
+        .handler = PATCH_update_settings, 
+        .user_ctx = rest_context
+    };
     httpd_register_uri_handler(server, &update_system_settings_uri);
 
     httpd_uri_t system_options_uri = {
@@ -740,25 +887,47 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &system_options_uri);
 
     httpd_uri_t update_post_ota_firmware = {
-        .uri = "/api/system/OTA", .method = HTTP_POST, .handler = POST_OTA_update, .user_ctx = NULL};
+        .uri = "/api/system/OTA", 
+        .method = HTTP_POST, 
+        .handler = POST_OTA_update, 
+        .user_ctx = NULL
+    };
     httpd_register_uri_handler(server, &update_post_ota_firmware);
 
     httpd_uri_t update_post_ota_www = {
-        .uri = "/api/system/OTAWWW", .method = HTTP_POST, .handler = POST_WWW_update, .user_ctx = NULL};
+        .uri = "/api/system/OTAWWW", 
+        .method = HTTP_POST, 
+        .handler = POST_WWW_update, 
+        .user_ctx = NULL
+    };
     httpd_register_uri_handler(server, &update_post_ota_www);
 
-    httpd_uri_t ws = {.uri = "/api/ws", .method = HTTP_GET, .handler = echo_handler, .user_ctx = NULL, .is_websocket = true};
+    httpd_uri_t ws = {
+        .uri = "/api/ws", 
+        .method = HTTP_GET, 
+        .handler = echo_handler, 
+        .user_ctx = NULL, 
+        .is_websocket = true
+    };
     httpd_register_uri_handler(server, &ws);
 
     if (enter_recovery) {
         /* Make default route serve Recovery */
         httpd_uri_t recovery_implicit_get_uri = {
-            .uri = "/*", .method = HTTP_GET, .handler = rest_recovery_handler, .user_ctx = rest_context};
+            .uri = "/*", .method = HTTP_GET, 
+            .handler = rest_recovery_handler, 
+            .user_ctx = rest_context
+        };
         httpd_register_uri_handler(server, &recovery_implicit_get_uri);
 
     } else {
         /* URI handler for getting web server files */
-        httpd_uri_t common_get_uri = {.uri = "/*", .method = HTTP_GET, .handler = rest_common_get_handler, .user_ctx = rest_context};
+        httpd_uri_t common_get_uri = {
+            .uri = "/*", 
+            .method = HTTP_GET, 
+            .handler = rest_common_get_handler, 
+            .user_ctx = rest_context
+        };
         httpd_register_uri_handler(server, &common_get_uri);
     }
 
