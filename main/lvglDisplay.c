@@ -568,7 +568,7 @@ esp_err_t lvglGetSettings(void)
     }
     lastSettingsUpdateTime = currentTime;
     // read settings from i2c
-    i2c_master_receive(lvglDisplay_dev_handle, settingsBuffer, sizeof(settingsBuffer), 1000);
+    i2c_master_receive(lvglDisplay_dev_handle, settingsBuffer, sizeof(settingsBuffer), 50);
 
     // parse received data
 

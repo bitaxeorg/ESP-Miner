@@ -197,7 +197,7 @@ void BM1366_send_hash_frequency(float target_freq)
 }
 
 static void do_frequency_ramp_up(float target_frequency) {
-    float step = 6.25;
+    float step = 20;
     float current = current_frequency;
     float target = target_frequency;
 

@@ -254,7 +254,7 @@ void SYSTEM_task(void * pvParameters)
             _update_connection(GLOBAL_STATE);
             lastUpdateTime = currentTime;
         }
-        //vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
     
     OLED_showBitmap(0, 0, bitaxe_splash, 128, 32);
