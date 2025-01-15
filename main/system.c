@@ -29,6 +29,7 @@
 #include "oled.h"
 #include "vcore.h"
 #include "lvglDisplayBAP.h"
+#include "lvglDisplay.h"
 #include "mempoolAPI.h"
 
 
@@ -157,13 +158,21 @@ void SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
                 // clear the oled screen
                 OLED_fill(0);
             }
-            
+            #if LVGL_MODE_BAP == 1
             // Initialize LVGL display
             if (lvglDisplay_initBAP() != ESP_OK) {
                 ESP_LOGI(TAG, "LVGL display init failed!");
             } else {
                 ESP_LOGI(TAG, "LVGL display init success!");
             }
+            #elif LVGL_MODE_I2C == 1
+            // Initialize LVGL display
+            if (lvglDisplay_init() != ESP_OK) {
+                ESP_LOGI(TAG, "LVGL display init failed!");
+            } else {
+                ESP_LOGI(TAG, "LVGL display init success!");
+            }
+            #endif
             break;
         default:
     }
@@ -230,8 +239,12 @@ void SYSTEM_task(void * pvParameters)
     // show the connection screen
     while (!module->startup_done) {
         // Check for BAP messages
+        #if LVGL_MODE_BAP == 1
         SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 50);
         lvglStartupLoopBAP(GLOBAL_STATE);
+        #elif LVGL_MODE_I2C == 1
+        // TODO: Implement I2C startup loop
+        #endif
 
         // non-blocking update of the connection screen
         static uint64_t lastUpdateTime = 0;
@@ -241,7 +254,7 @@ void SYSTEM_task(void * pvParameters)
             _update_connection(GLOBAL_STATE);
             lastUpdateTime = currentTime;
         }
-        //vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
     
     OLED_showBitmap(0, 0, bitaxe_splash, 128, 32);
@@ -252,12 +265,20 @@ void SYSTEM_task(void * pvParameters)
 
     while (1) {
         // Check for overheat mode
-        SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
+        #if LVGL_MODE_BAP == 1
+            SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
+        #elif LVGL_MODE_I2C == 1
+            // TODO: 
+        #endif
 
         if (module->overheat_mode == 1) {
             gpio_set_level(GPIO_NUM_1, 0);
             _show_overheat_screen(GLOBAL_STATE);
-            lvglOverheatLoopBAP(GLOBAL_STATE);
+            #if LVGL_MODE_BAP == 1
+                lvglOverheatLoopBAP(GLOBAL_STATE);
+            #elif LVGL_MODE_I2C == 1
+                // TODO: Implement I2C overheat loop
+            #endif
             //  vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
             SYSTEM_update_overheat_mode(GLOBAL_STATE);  // Check for changes
             continue;  // Skip the normal screen cycle
