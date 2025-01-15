@@ -12,7 +12,7 @@
 #include "serial.h"
 
 // Mode Selection
-#define LVGL_MODE_BAP  0
+#define LVGL_MODE_BAP  1
 
 // Network data registers (on change only)
 #define LVGL_REG_SSID           0x21
