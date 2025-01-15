@@ -12,7 +12,7 @@
 #include "i2c_bitaxe.h"
 
 // Mode Selection
-#define LVGL_MODE_I2C 0
+#define LVGL_MODE_I2C 1
 
 // Network data registers (on change only)
 #define LVGL_REG_SSID           0x21
@@ -61,9 +61,34 @@
 #define LVGL_REG_API_ECONOMY_FEE 0x6B
 #define LVGL_REG_API_MINIMUM_FEE 0x6C
 
-#define LVGL_REG_SETTINGS_HOSTNAME 0xA0 // 32 bytes
-#define LVGL_REG_SETTINGS_WIFI_SSID 0xA1 // 32 bytes
-#define LVGL_REG_SETTINGS_WIFI_PASSWORD 0xA2 // 32 bytes
+// Settings registers 
+// Network settings
+#define LVGL_REG_SETTINGS_HOSTNAME 0x90 // 32 bytes
+#define LVGL_REG_SETTINGS_WIFI_SSID 0x91 // 64 bytes
+#define LVGL_REG_SETTINGS_WIFI_PASSWORD 0x92 // 64 bytes
+// Mining settings
+#define LVGL_REG_SETTINGS_STRATUM_URL_MAIN 0x93 // 64 bytes
+#define LVGL_REG_SETTINGS_STRATUM_PORT_MAIN 0x94 // 2 bytes
+#define LVGL_REG_SETTINGS_STRATUM_USER_MAIN 0x95 // 64 bytes
+#define LVGL_REG_SETTINGS_STRATUM_PASSWORD_MAIN 0x96 // 64 bytes
+#define LVGL_REG_SETTINGS_STRATUM_URL_FALLBACK 0x97 // 64 bytes
+#define LVGL_REG_SETTINGS_STRATUM_PORT_FALLBACK 0x98 // 2 bytes
+#define LVGL_REG_SETTINGS_STRATUM_USER_FALLBACK 0x99 // 64 bytes
+#define LVGL_REG_SETTINGS_STRATUM_PASSWORD_FALLBACK 0x9A // 64 bytes
+// ASIC settings
+#define LVGL_REG_SETTINGS_ASIC_VOLTAGE 0x9B // 2 bytes
+#define LVGL_REG_SETTINGS_ASIC_FREQ 0x9C // 2 bytes
+// Fan settings
+#define LVGL_REG_SETTINGS_FAN_SPEED 0x9D // 2 bytes
+#define LVGL_REG_SETTINGS_AUTO_FAN_SPEED 0x9E // 2 bytes
+
+// Special registers (0xF0 - 0xFF)
+#define LVGL_REG_SPECIAL_RESTART 0xFE
+
+// Flags (0xE0 - 0xEF)
+#define LVGL_FLAG_STARTUP_DONE 0xE0
+#define LVGL_FLAG_OVERHEAT_MODE 0xE1
+#define LVGL_FLAG_FOUND_BLOCK 0xE2
 
 esp_err_t lvglDisplay_init(void);
 

@@ -24,6 +24,7 @@
 #define MAX_BUFFER_SIZE 512  //Placeholder Buffer Size
 
 
+
 /*  sent to the display
 Network:
     - SSID Global_STATE->SYSTEM_MODULE.ssid
@@ -84,6 +85,8 @@ API Data:
 
 static i2c_master_dev_handle_t lvglDisplay_dev_handle;
 static TickType_t lastUpdateTime = 0;
+
+static esp_err_t parseSettingsData(uint8_t* buffer, size_t length);
 
 
 // Static Network Variables
@@ -555,7 +558,8 @@ esp_err_t lvglUpdateDisplayAPI(void)
 }
 #endif
 
-esp_err_t lvglGetSettings(void) {
+esp_err_t lvglGetSettings(void)
+ {
     static TickType_t lastSettingsUpdateTime = 0;
     TickType_t currentTime = xTaskGetTickCount();
     
@@ -563,48 +567,151 @@ esp_err_t lvglGetSettings(void) {
         return ESP_OK;
     }
     lastSettingsUpdateTime = currentTime;
+    // read settings from i2c
+    i2c_master_receive(lvglDisplay_dev_handle, settingsBuffer, sizeof(settingsBuffer), 50);
 
-    uint8_t data[32];  // Buffer for max 32 bytes as specified in header
-    esp_err_t ret;
+    // parse received data
 
-    // Read hostname
-    memset(data, 0, sizeof(data));  // Clear buffer first
-    ret = lvglReadRegisterData(LVGL_REG_SETTINGS_HOSTNAME, data, sizeof(data));
-    if (ret != ESP_OK) {
-        ESP_LOGE("LVGL", "Failed to read hostname register: %d", ret);
-        return ret;
-    }
-    ESP_LOGI("LVGL", "Hostname raw bytes: [%02X %02X %02X %02X ...]", 
-             data[0], data[1], data[2], data[3]);
-    if (data[0] == 0) {
-        ESP_LOGI("LVGL", "No hostname data received");
-    } else {
-        ESP_LOGI("LVGL", "Hostname: %s (length: %d)", data, strlen((char*)data));
+    // no data received
+    if (settingsBuffer[0] == 0) 
+    {
+        ESP_LOGI("LVGL", "No settings received");
+        return ESP_OK;
     }
 
-    // Read SSID
-    ret = lvglReadRegisterData(LVGL_REG_SETTINGS_WIFI_SSID, data, sizeof(data));
-    if (ret != ESP_OK) {
-        ESP_LOGE("LVGL", "Failed to read SSID register");
-        return ret;
-    }
-    if (data[0] == 0) {
-        ESP_LOGI("LVGL", "No SSID data received");
-    } else {
-        ESP_LOGI("LVGL", "SSID: %s", data);
+    // settings received
+    else
+    {
+        ESP_LOGI("LVGL", "Settings received");
+        // Print first 16 bytes in hex format
+        ESP_LOGI("LVGL", "Settings (hex): %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+            settingsBuffer[0], settingsBuffer[1], settingsBuffer[2], settingsBuffer[3],
+            settingsBuffer[4], settingsBuffer[5], settingsBuffer[6], settingsBuffer[7],
+            settingsBuffer[8], settingsBuffer[9], settingsBuffer[10], settingsBuffer[11],
+            settingsBuffer[12], settingsBuffer[13], settingsBuffer[14], settingsBuffer[15]);
+
+        return parseSettingsData(settingsBuffer, sizeof(settingsBuffer));
     }
 
-    // Read WiFi password (might want to mask this in logs)
-    ret = lvglReadRegisterData(LVGL_REG_SETTINGS_WIFI_PASSWORD, data, sizeof(data));
-    if (ret != ESP_OK) {
-        ESP_LOGE("LVGL", "Failed to read WiFi password register");
-        return ret;
-    }
-    if (data[0] == 0) {
-        ESP_LOGI("LVGL", "No WiFi password data received");
-    } else {
-        ESP_LOGI("LVGL", "WiFi password: %s", data);
+    
+}
+
+static esp_err_t parseSettingsData(uint8_t* buffer, size_t length) {
+    size_t pos = 0;
+    esp_err_t ret = ESP_OK;
+
+    while (pos + 4 < length) {  // Need at least 4 bytes for header + register + length
+        // Check for preamble
+        if (buffer[pos] != 0xFF || buffer[pos + 1] != 0xAA) {
+            ESP_LOGE("LVGL", "Invalid preamble at position %d", pos);
+            return ESP_ERR_INVALID_STATE;
+        }
+
+        uint8_t reg = buffer[pos + 2];
+        uint8_t dataLen = buffer[pos + 3];
+
+        // Check if we have enough data
+        if (pos + 4 + dataLen > length) {
+            ESP_LOGE("LVGL", "Buffer overflow prevented at register 0x%02X", reg);
+            return ESP_ERR_INVALID_SIZE;
+        }
+
+        // Point to start of data
+        uint8_t* data = &buffer[pos + 4];
+
+        // Process based on register
+        switch (reg) {
+            case LVGL_REG_SETTINGS_HOSTNAME:
+                nvs_config_set_string(NVS_CONFIG_HOSTNAME, (const char*)data);
+                break;
+
+            case LVGL_REG_SETTINGS_WIFI_SSID:
+                nvs_config_set_string(NVS_CONFIG_WIFI_SSID, (const char*)data);
+                break;
+
+            case LVGL_REG_SETTINGS_WIFI_PASSWORD:
+                nvs_config_set_string(NVS_CONFIG_WIFI_PASS, (const char*)data);
+                break;
+
+            case LVGL_REG_SETTINGS_STRATUM_URL_MAIN:
+                nvs_config_set_string(NVS_CONFIG_STRATUM_URL, (const char*)data);
+                break;
+
+            case LVGL_REG_SETTINGS_STRATUM_PORT_MAIN:
+                if (dataLen == 2) {
+                    uint16_t port = (data[0] << 8) | data[1];
+                    nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, port);
+                }
+                break;
+
+            case LVGL_REG_SETTINGS_STRATUM_USER_MAIN:
+                nvs_config_set_string(NVS_CONFIG_STRATUM_USER, (const char*)data);
+                break;
+
+            case LVGL_REG_SETTINGS_STRATUM_PASSWORD_MAIN:
+                nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, (const char*)data);
+                break;
+
+            case LVGL_REG_SETTINGS_STRATUM_URL_FALLBACK:
+                nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, (const char*)data);
+                break;
+
+            case LVGL_REG_SETTINGS_STRATUM_PORT_FALLBACK:
+                if (dataLen == 2) {
+                    uint16_t port = (data[0] << 8) | data[1];
+                    nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, port);
+                }
+                break;
+
+            case LVGL_REG_SETTINGS_STRATUM_USER_FALLBACK:
+                nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, (const char*)data);
+                break;
+
+            case LVGL_REG_SETTINGS_STRATUM_PASSWORD_FALLBACK:
+                nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, (const char*)data);
+                break;
+
+            case LVGL_REG_SETTINGS_ASIC_VOLTAGE:
+                if (dataLen == 2) {
+                    uint16_t voltage = (data[0] << 8) | data[1];
+                    if (voltage >= 1000 && voltage <= 1250) {
+                        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, voltage);
+                    }
+                }
+                break;
+
+            case LVGL_REG_SETTINGS_ASIC_FREQ:
+                if (dataLen == 2) {
+                    uint16_t freq = (data[0] << 8) | data[1];
+                    if (freq >= 200 && freq <= 625) {
+                        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, freq);
+                    }
+                }
+                break;
+
+            case LVGL_REG_SETTINGS_FAN_SPEED:
+                if (dataLen == 2) {
+                    uint16_t speed = (data[0] << 8) | data[1];
+                    if (speed <= 100) {
+                        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, speed);
+                    }
+                }
+                break;
+
+            case LVGL_REG_SETTINGS_AUTO_FAN_SPEED:
+                if (dataLen == 1) {
+                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, data[0] ? 1 : 0);
+                }
+                break;
+
+            default:
+                ESP_LOGW("LVGL", "Unknown settings register: 0x%02X", reg);
+                break;
+        }
+
+        // Move to next setting
+        pos += 4 + dataLen;
     }
 
-    return ESP_OK;
+    return ret;
 }
