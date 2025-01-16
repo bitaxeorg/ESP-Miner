@@ -87,6 +87,23 @@ static esp_err_t ip_in_private_range(uint32_t ip){
 }
 static esp_err_t check_is_same_network(httpd_req_t * req){
 
+    wifi_mode_t mode;
+    esp_err_t err = esp_wifi_get_mode(&mode);
+
+    if (err == ESP_OK) {
+        switch (mode) {
+            case WIFI_MODE_STA:
+            case WIFI_MODE_APSTA:
+                ESP_LOGI(TAG, "WiFi is in AP+/STA mode.");
+                return ESP_OK;
+            default:
+                break;
+        }
+    } else {
+        ESP_LOGE(TAG, "Failed to get WiFi mode: %s", esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+
     int sockfd = httpd_req_to_sockfd(req);
     char ipstr[INET6_ADDRSTRLEN];
     struct sockaddr_in6 addr;   // esp_http_server uses IPv6 addressing
