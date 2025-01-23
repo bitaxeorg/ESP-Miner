@@ -224,8 +224,8 @@ export class HomeComponent {
       }),
       tap(info => {
         // Only collect and update chart data if there's no power fault
-        if (!info.power_fault) {
-          this.hashrateData.push(info.hashRate * 1000000000);
+        if (!info.powerFault) {
+          this.hashrateData.push(info.hashrate * 1000000000);
           this.temperatureData.push(info.temp);
           this.powerData.push(info.power);
           this.dataLabel.push(new Date().getTime());

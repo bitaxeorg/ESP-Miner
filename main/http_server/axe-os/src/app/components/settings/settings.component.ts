@@ -53,11 +53,11 @@ export class SettingsComponent {
 
       this.info$.pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
-        this.ASICModel = info.ASICModel;
+        this.ASICModel = info.asicModel;
         this.form = this.fb.group({
           display: [info.display, [Validators.required]],
-          flipscreen: [info.flipscreen == 1],
-          invertscreen: [info.invertscreen == 1],
+          flipScreen: [info.flipScreen == 1],
+          invertScreen: [info.invertScreen == 1],
           displayTimeout: [info.displayTimeout, [Validators.required]],
           stratumURL: [info.stratumURL, [
             Validators.required,
@@ -74,20 +74,20 @@ export class SettingsComponent {
           stratumPassword: ['*****', [Validators.required]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
-          autofanspeed: [info.autofanspeed == 1, [Validators.required]],
-          temptarget: [info.temptarget, [Validators.required]],
-          fanspeed: [info.fanspeed, [Validators.required]],
+          autoFanSpeed: [info.autoFanSpeed == 1, [Validators.required]],
+          tempTarget: [info.tempTarget, [Validators.required]],
+          fanSpeed: [info.fanSpeed, [Validators.required]],
         });
 
-        this.form.controls['autofanspeed'].valueChanges.pipe(
-          startWith(this.form.controls['autofanspeed'].value)
+        this.form.controls['autoFanSpeed'].valueChanges.pipe(
+          startWith(this.form.controls['autoFanSpeed'].value)
         ).subscribe(autofanspeed => {
           if (autofanspeed) {
-            this.form.controls['fanspeed'].disable();
-            this.form.controls['temptarget'].enable();
+            this.form.controls['fanSpeed'].disable();
+            this.form.controls['tempTarget'].enable();
           } else {
-            this.form.controls['fanspeed'].enable();
-            this.form.controls['temptarget'].disable();
+            this.form.controls['fanSpeed'].enable();
+            this.form.controls['tempTarget'].disable();
           }
         });
       });
@@ -101,9 +101,9 @@ export class SettingsComponent {
     form.coreVoltage = parseInt(form.coreVoltage);
 
     // bools to ints
-    form.flipscreen = form.flipscreen == true ? 1 : 0;
-    form.invertscreen = form.invertscreen == true ? 1 : 0;
-    form.autofanspeed = form.autofanspeed == true ? 1 : 0;
+    form.flipScreen = form.flipScreen == true ? 1 : 0;
+    form.invertScreen = form.invertScreen == true ? 1 : 0;
+    form.autoFanSpeed = form.autoFanSpeed == true ? 1 : 0;
 
     if (form.stratumPassword === '*****') {
       delete form.stratumPassword;

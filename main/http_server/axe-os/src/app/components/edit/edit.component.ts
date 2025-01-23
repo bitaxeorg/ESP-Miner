@@ -106,7 +106,7 @@ export class EditComponent implements OnInit, OnDestroy {
       takeUntil(this.destroy$)
     )
     .subscribe(({ info, asicSettings }) => {
-      this.ASICModel = info.ASICModel;
+      this.ASICModel = info.asicModel;
 
       // Store the frequency and voltage options from the API
       this.defaultFrequency = asicSettings.defaultFrequency;
@@ -125,8 +125,8 @@ export class EditComponent implements OnInit, OnDestroy {
 
         this.form = this.fb.group({
           display: [info.display, [Validators.required]],
-          flipscreen: [info.flipscreen == 1],
-          invertscreen: [info.invertscreen == 1],
+          flipscreen: [info.flipScreen == 1],
+          invertscreen: [info.invertScreen == 1],
           displayTimeout: [info.displayTimeout, [
             Validators.required,
             Validators.pattern(/^[^:]*$/),
@@ -135,24 +135,24 @@ export class EditComponent implements OnInit, OnDestroy {
           ]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
-          autofanspeed: [info.autofanspeed == 1, [Validators.required]],
-          fanspeed: [info.fanspeed, [Validators.required]],
-          temptarget: [info.temptarget, [Validators.required]],
-          overheat_mode: [info.overheat_mode, [Validators.required]],
+          autoFanSpeed: [info.autoFanSpeed == 1, [Validators.required]],
+          fanSpeed: [info.fanSpeed, [Validators.required]],
+          tempTarget: [info.tempTarget, [Validators.required]],
+          overheatMode: [info.overheatMode, [Validators.required]],
           statsLimit: [info.statsLimit, [Validators.required]],
           statsDuration: [info.statsDuration, [Validators.required]],
         });
 
-      this.form.controls['autofanspeed'].valueChanges.pipe(
-        startWith(this.form.controls['autofanspeed'].value),
+      this.form.controls['autoFanSpeed'].valueChanges.pipe(
+        startWith(this.form.controls['autoFanSpeed'].value),
         takeUntil(this.destroy$)
       ).subscribe(autofanspeed => {
         if (autofanspeed) {
-          this.form.controls['fanspeed'].disable();
-          this.form.controls['temptarget'].enable();
+          this.form.controls['fanSpeed'].disable();
+          this.form.controls['tempTarget'].enable();
         } else {
-          this.form.controls['fanspeed'].enable();
-          this.form.controls['temptarget'].disable();
+          this.form.controls['fanSpeed'].enable();
+          this.form.controls['tempTarget'].disable();
         }
       });
 
@@ -201,7 +201,7 @@ export class EditComponent implements OnInit, OnDestroy {
   }
 
   disableOverheatMode() {
-    this.form.patchValue({ overheat_mode: 0 });
+    this.form.patchValue({ overheatMode: 0 });
     this.updateSystem();
   }
 

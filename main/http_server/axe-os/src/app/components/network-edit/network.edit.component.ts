@@ -89,7 +89,7 @@ export class NetworkEditComponent implements OnInit {
 
   public scanWifi() {
     this.scanning = true;
-    this.http.get<{networks: WifiNetwork[]}>('/api/system/wifi/scan')
+    this.http.get<{networks: WifiNetwork[]}>('/api/v2/system/wifi/scan')
       .pipe(
         finalize(() => this.scanning = false)
       )
