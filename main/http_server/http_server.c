@@ -147,7 +147,7 @@ static esp_err_t GET_wifi_scan(httpd_req_t *req)
         cJSON *network = cJSON_CreateObject();
         cJSON_AddStringToObject(network, "ssid", (char *)ap_records[i].ssid);
         cJSON_AddNumberToObject(network, "rssi", ap_records[i].rssi);
-        cJSON_AddNumberToObject(network, "authmode", ap_records[i].authmode);
+        cJSON_AddNumberToObject(network, "authMode", ap_records[i].authmode);
         cJSON_AddItemToArray(networks, network);
     }
 
@@ -792,7 +792,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000);
     cJSON_AddNumberToObject(root, "smallCoreCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count);
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+    cJSON_AddStringToObject(root, "asicModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT));
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
@@ -812,28 +812,27 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
-    cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE));
-    cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED));
+    cJSON_AddNumberToObject(root, "overheatMode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE));
+    cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED));
     cJSON_AddStringToObject(root, "display", display);
     cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION));
-    cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_bool(NVS_CONFIG_INVERT_SCREEN));
+    cJSON_AddNumberToObject(root, "invertScreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN));
     cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT));
 
-    cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED));
-
-    cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
+    cJSON_AddNumberToObject(root, "autoFanSpeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED));
+    cJSON_AddNumberToObject(root, "fanSpeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "manualFanSpeed", nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED));
     cJSON_AddNumberToObject(root, "minFanSpeed", nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED));
-    cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET));
-    cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
-    cJSON_AddNumberToObject(root, "fan2rpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan2_rpm);
+    cJSON_AddNumberToObject(root, "tempTarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET));
+    cJSON_AddNumberToObject(root, "fanRPM", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
+    cJSON_AddNumberToObject(root, "fan2RPM", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan2_rpm);
 
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY));
 
     cJSON_AddNumberToObject(root, "blockFound", GLOBAL_STATE->SYSTEM_MODULE.block_found);
 
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
-        cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
+        cJSON_AddStringToObject(root, "powerFault", VCORE_get_fault_string(GLOBAL_STATE));
     }
 
     if (GLOBAL_STATE->block_height > 0) {
