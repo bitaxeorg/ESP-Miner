@@ -1,5 +1,4 @@
 #include "http_server.h"
-#include "recovery_page.h"
 #include "theme_api.h"  // Add theme API include
 #include "cJSON.h"
 #include "esp_chip_info.h"
@@ -34,6 +33,7 @@
 #include <pthread.h>
 
 static const char * TAG = "http_server";
+static const char * CORS_TAG = "CORS";
 
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
@@ -61,42 +61,84 @@ typedef struct rest_server_context
 
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
-static esp_err_t ip_in_private_range(uint32_t ip){
-        //Private IP ranges (little endian, 192.168.0.0 => 0.0.168.192)
-    //192.168.0.0
-    uint32_t sixteen_bit_block = 0b00000000000000001010100011000000;
-    uint32_t sixteen_bit_mask =  0b00000000000000001111111111111111;
+static esp_err_t ip_in_private_range(uint32_t address) {
+    uint32_t ip_address = ntohl(address);
 
-    if((ip & sixteen_bit_mask) == sixteen_bit_block){
-         return ESP_OK;
+    // 10.0.0.0 - 10.255.255.255 (Class A)
+    if ((ip_address >= 0x0A000000) && (ip_address <= 0x0AFFFFFF)) {
+        return ESP_OK;
     }
-    //172.16.0.0 
-    uint32_t twenty_bit_block = 0b00000000000000000001000010101100;
-    uint32_t twenty_bit_mask = 0b00000000000000001111000011111111;
-    if((ip & twenty_bit_mask) == twenty_bit_block){
-         return ESP_OK;
+
+    // 172.16.0.0 - 172.31.255.255 (Class B)
+    if ((ip_address >= 0xAC100000) && (ip_address <= 0xAC1FFFFF)) {
+        return ESP_OK;
     }
-    //10.0.0.0
-    uint32_t twenty_four_bit_block = 0b00000000000000000000000000001010;
-    uint32_t twenty_four_bit_mask = 0b00000000000000000000000011111111;
-    if((ip & twenty_four_bit_mask) == twenty_four_bit_block){
-         return ESP_OK;
+
+    // 192.168.0.0 - 192.168.255.255 (Class C)
+    if ((ip_address >= 0xC0A80000) && (ip_address <= 0xC0A8FFFF)) {
+        return ESP_OK;
     }
 
     return ESP_FAIL;
 }
-static esp_err_t check_is_same_network(httpd_req_t * req){
+
+static uint32_t extract_origin_ip_addr(httpd_req_t *req)
+{
+    char origin[128];
+    char ip_str[16];
+    uint32_t origin_ip_addr = 0;
+
+    // Attempt to get the Origin header.
+    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) != ESP_OK) {
+        ESP_LOGD(CORS_TAG, "No origin header found.");
+        return 0;
+    }
+    ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
+
+    // Find the start of the IP address in the Origin header
+    const char *prefix = "http://";
+    char *ip_start = strstr(origin, prefix);
+    if (ip_start) {
+        ip_start += strlen(prefix); // Move past "http://"
+
+        // Extract the IP address portion (up to the next '/')
+        char *ip_end = strchr(ip_start, '/');
+        size_t ip_len = ip_end ? (size_t)(ip_end - ip_start) : strlen(ip_start);
+        if (ip_len < sizeof(ip_str)) {
+            strncpy(ip_str, ip_start, ip_len);
+            ip_str[ip_len] = '\0'; // Null-terminate the string
+
+            // Convert the IP address string to uint32_t
+            origin_ip_addr = inet_addr(ip_str);
+            if (origin_ip_addr == INADDR_NONE) {
+                ESP_LOGW(CORS_TAG, "Invalid IP address: %s", ip_str);
+            } else {
+                ESP_LOGD(CORS_TAG, "Extracted IP address %lu", origin_ip_addr);
+            }
+        } else {
+            ESP_LOGW(CORS_TAG, "IP address string is too long: %s", ip_start);
+        }
+    }
+
+    return origin_ip_addr;
+}
+
+static esp_err_t is_network_allowed(httpd_req_t * req)
+{
+    if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
+        ESP_LOGI(CORS_TAG, "Device in AP mode. Allowing CORS.");
+        return ESP_OK;
+    }
 
     int sockfd = httpd_req_to_sockfd(req);
     char ipstr[INET6_ADDRSTRLEN];
     struct sockaddr_in6 addr;   // esp_http_server uses IPv6 addressing
     socklen_t addr_size = sizeof(addr);
-    
+
     if (getpeername(sockfd, (struct sockaddr *)&addr, &addr_size) < 0) {
-        ESP_LOGE(TAG, "Error getting client IP");
+        ESP_LOGE(CORS_TAG, "Error getting client IP");
         return ESP_FAIL;
     }
-
 
     uint32_t request_ip_addr = addr.sin6_addr.un.u32_addr[3];
 
@@ -106,54 +148,18 @@ static esp_err_t check_is_same_network(httpd_req_t * req){
     // Convert to IPv4 string
     inet_ntop(AF_INET, &request_ip_addr, ipstr, sizeof(ipstr));
 
-   
-
-    char origin[128]; 
-    char ip_str[16];  // Buffer to hold the extracted IP address string
-    uint32_t origin_ip_addr = 0;
-    // Attempt to get the Origin header
-    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK) {
-        ESP_LOGI("CORS", "Origin header: %s", origin);
-
-        // Find the start of the IP address in the Origin header
-        const char *prefix = "http://";
-        char *ip_start = strstr(origin, prefix);
-        if (ip_start) {
-            ip_start += strlen(prefix); // Move past "http://"
-
-            // Extract the IP address portion (up to the next '/')
-            char *ip_end = strchr(ip_start, '/');
-            size_t ip_len = ip_end ? (size_t)(ip_end - ip_start) : strlen(ip_start);
-            if (ip_len < sizeof(ip_str)) {
-                strncpy(ip_str, ip_start, ip_len);
-                ip_str[ip_len] = '\0'; // Null-terminate the string
-
-                // Convert the IP address string to uint32_t
-                origin_ip_addr = inet_addr(ip_str);
-                if (origin_ip_addr == INADDR_NONE) {
-                    ESP_LOGW("CORS", "Invalid IP address: %s", ip_str);
-                } else {
-                    ESP_LOGI("CORS", "Extracted IP address %lu", origin_ip_addr);
-                }
-            } else {
-                ESP_LOGW("CORS", "IP address string is too long");
-            }
-        }
-    }else {
-        // Origin is sent for CSRF sensitive requests, if there is no header it's not a concern.
+    uint32_t origin_ip_addr = extract_origin_ip_addr(req);
+    if (origin_ip_addr == 0) {
         origin_ip_addr = request_ip_addr;
     }
 
-
-    if(ip_in_private_range(origin_ip_addr) == ESP_OK && ip_in_private_range(request_ip_addr) == ESP_OK){
+    if (ip_in_private_range(origin_ip_addr) == ESP_OK && ip_in_private_range(request_ip_addr) == ESP_OK) {
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Client is NOT in the private ip ranges or same range as server.");
+    ESP_LOGI(CORS_TAG, "Client is NOT in the private ip ranges or same range as server.");
     return ESP_FAIL;
-
 }
-
 
 esp_err_t init_fs(void)
 {
@@ -236,11 +242,15 @@ static esp_err_t set_cors_headers(httpd_req_t * req)
 /* Recovery handler */
 static esp_err_t rest_recovery_handler(httpd_req_t * req)
 {
-    if(check_is_same_network(req) != ESP_OK){
+    if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
-    httpd_resp_send(req, recovery_page, HTTPD_RESP_USE_STRLEN);
+    extern const unsigned char recovery_page_start[] asm("_binary_recovery_page_html_start");
+    extern const unsigned char recovery_page_end[] asm("_binary_recovery_page_html_end");
+    const size_t recovery_page_size = (recovery_page_end - recovery_page_start);
+    httpd_resp_send_chunk(req, (const char*)recovery_page_start, recovery_page_size);
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
 
@@ -308,7 +318,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
 
 static esp_err_t handle_options_request(httpd_req_t * req)
 {
-    if(check_is_same_network(req) != ESP_OK){
+    if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -327,7 +337,7 @@ static esp_err_t handle_options_request(httpd_req_t * req)
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
 
-    if(check_is_same_network(req) != ESP_OK){
+    if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -429,7 +439,7 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
 static esp_err_t POST_restart(httpd_req_t * req)
 {
-    if(check_is_same_network(req) != ESP_OK){
+    if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -458,7 +468,7 @@ static esp_err_t POST_restart(httpd_req_t * req)
 /* Simple handler for getting system handler */
 static esp_err_t GET_system_info(httpd_req_t * req)
 {
-    if(check_is_same_network(req) != ESP_OK){
+    if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -496,6 +506,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "stratumDiff", GLOBAL_STATE->stratum_difficulty);
 
     cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
+
+    cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
 
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
@@ -569,7 +581,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
 esp_err_t POST_WWW_update(httpd_req_t * req)
 {
-    if(check_is_same_network(req) != ESP_OK){
+    if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -627,7 +639,7 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
  */
 esp_err_t POST_OTA_update(httpd_req_t * req)
 {
-    if(check_is_same_network(req) != ESP_OK){
+    if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -750,7 +762,7 @@ void send_log_to_websocket(char *message)
  */
 esp_err_t echo_handler(httpd_req_t * req)
 {
-    if(check_is_same_network(req) != ESP_OK){
+    if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 

@@ -50,6 +50,8 @@
 
 static const char * TAG = "self_test";
 
+SemaphoreHandle_t BootSemaphore;
+
 //local function prototypes
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
@@ -64,9 +66,9 @@ bool should_test(GlobalState * GLOBAL_STATE) {
 }
 
 static void reset_self_test() {
-    ESP_LOGI(TAG, "Long press detected, resetting self test flag and rebooting...");
-    nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
-    esp_restart();
+    ESP_LOGI(TAG, "Long press detected...");
+    // Give the semaphore back
+    xSemaphoreGive(BootSemaphore);
 }
 
 static void display_msg(char * msg, GlobalState * GLOBAL_STATE) 
@@ -314,6 +316,14 @@ void self_test(void * pvParameters)
 
     GLOBAL_STATE->SELF_TEST_MODULE.active = true;
 
+    // Create a binary semaphore
+    BootSemaphore = xSemaphoreCreateBinary();
+
+    if (BootSemaphore == NULL) {
+        ESP_LOGE(TAG, "Failed to create semaphore");
+        return;
+    }
+
     //Run PSRAM test
     if(test_psram(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "NO PSRAM on device!");
@@ -513,7 +523,7 @@ void self_test(void * pvParameters)
     }
 
     tests_done(GLOBAL_STATE, TESTS_PASSED);
-    ESP_LOGI(TAG, "Self Tests Passed!!!");
+
     return;  
 }
 
@@ -530,10 +540,20 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool test_result)
         default:
     }
 
-    if (test_result != TESTS_PASSED) {
+    if (test_result == TESTS_FAILED) {
         ESP_LOGI(TAG, "SELF TESTS FAIL -- Press RESET to continue");  
-        //wait here for a long press to reboot
-        vTaskDelay(portMAX_DELAY);
+        while (1) {
+            // Wait here forever until reset_self_test() gives the BootSemaphore
+            if (xSemaphoreTake(BootSemaphore, portMAX_DELAY) == pdTRUE) {
+                nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
+                //wait 100ms for nvs write to finish?
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+                esp_restart();
+            }
+        }
+    } else {
+        nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
+        ESP_LOGI(TAG, "Self Tests Passed!!!");
     }
 
 }

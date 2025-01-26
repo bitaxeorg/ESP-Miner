@@ -213,11 +213,13 @@ export class EditComponent implements OnInit, OnDestroy {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.success('Success!', 'Saved.');
+          const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
+          this.toastr.success(successMessage, 'Success!');
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error.', `Could not save. ${err.message}`);
+          const errorMessage = this.uri ? `Could not save settings for ${this.uri}. ${err.message}` : `Could not save settings. ${err.message}`;
+          this.toastr.error(errorMessage, 'Error');
           this.savedChanges = false;
         }
       });
@@ -248,10 +250,12 @@ export class EditComponent implements OnInit, OnDestroy {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.success('Success!', 'Bitaxe restarted');
+          const successMessage = this.uri ? `Bitaxe at ${this.uri} restarted` : 'Bitaxe restarted';
+          this.toastr.success(successMessage, 'Success');
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error', `Could not restart. ${err.message}`);
+          const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
+          this.toastr.error(errorMessage, 'Error');
         }
       });
   }

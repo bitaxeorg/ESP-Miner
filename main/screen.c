@@ -59,7 +59,7 @@ static lv_obj_t * create_scr_self_test() {
     lv_obj_set_width(self_test_finished_label, LV_HOR_RES);
     lv_obj_add_flag(self_test_finished_label, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_long_mode(self_test_finished_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(self_test_finished_label, "Self test finished. Press BOOT button for 2 seconds to reset self test status and reboot the device.");
+    lv_label_set_text(self_test_finished_label, "Hold BOOT button for 2 seconds to cancel self test, or press RESET to run again.");
 
     return scr;
 }

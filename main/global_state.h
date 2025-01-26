@@ -74,6 +74,10 @@ typedef struct
     char * fallback_pool_url;
     uint16_t pool_port;
     uint16_t fallback_pool_port;
+    char * pool_user;
+    char * fallback_pool_user;
+    char * pool_pass;
+    char * fallback_pool_pass;
     bool is_using_fallback;
     uint16_t overheat_mode;
     uint32_t lastClockSync;
@@ -123,6 +127,7 @@ typedef struct
 
     int sock;
     bool ASIC_initalized;
+    bool psram_is_available;
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */

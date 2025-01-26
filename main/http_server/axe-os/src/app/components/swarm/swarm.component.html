@@ -63,7 +63,19 @@
         <ng-container *ngFor="let axe of swarm">
             <tr>
                 <td>
-                    <a class="text-primary" [href]="'http://'+axe.IP" target="_blank">{{axe.IP}}</a>
+                    <a
+                       [ngClass]="[
+                            axe.asicCount > 1 ? 'text-orange-500' :
+                            axe.ASICModel === 'BM1397' ? 'text-red-500' :
+                            axe.ASICModel === 'BM1366' ? 'text-purple-500' :
+                            axe.ASICModel === 'BM1368' ? 'text-blue-500' :
+                            axe.ASICModel === 'BM1370' ? 'text-green-500' :
+                            ''
+                       ]"
+                       [href]="'http://'+axe.IP" 
+                       target="_blank"
+                       [pTooltip]="axe.ASICModel"
+                       tooltipPosition="top">{{axe.IP}}</a>
                     <div class="text-sm">{{axe.hostname}}</div>
                 </td>
                 <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
@@ -108,6 +120,30 @@
             </tr>
         </ng-container>
     </table>
+
+    <div class="flex flex-wrap gap-2 mt-3 text-sm justify-content-center">
+        <div class="flex align-items-center gap-1" [style.opacity]="hasModel('BM1397')">
+            <span class="text-red-500">●</span>
+            <span>BM1397 (Max)</span>
+        </div>
+        <div class="flex align-items-center gap-1" [style.opacity]="hasModel('BM1366')">
+            <span class="text-purple-500">●</span>
+            <span>BM1366 (Ultra)</span>
+        </div>
+        <div class="flex align-items-center gap-1" [style.opacity]="hasModel('BM1368')">
+            <span class="text-blue-500">●</span>
+            <span>BM1368 (Supra)</span>
+        </div>
+        <div class="flex align-items-center gap-1" [style.opacity]="hasModel('BM1370')">
+            <span class="text-green-500">●</span>
+            <span>BM1370 (Gamma)</span>
+        </div>
+        <div class="flex align-items-center gap-1" [style.opacity]="hasMultipleChips()">
+            <span class="text-orange-500">●</span>
+            <span>Multiple Chip Device</span>
+        </div>
+    </div>
+
 </div>
 
 <div class="modal-backdrop" *ngIf="showEdit" (click)="showEdit = false"></div>

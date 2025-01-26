@@ -1,5 +1,5 @@
-#ifndef MINING_H
-#define MINING_H
+#ifndef MINING_H_
+#define MINING_H_
 
 #include "stratum_api.h"
 
@@ -40,4 +40,4 @@ char *extranonce_2_generate(uint32_t extranonce_2, uint32_t length);
 
 uint32_t increment_bitmask(const uint32_t value, const uint32_t mask);
 
-#endif // MINING_H
+#endif /* MINING_H_ */

@@ -52,6 +52,8 @@ PRIV_REQUIRES
     "spiffs"
     "vfs"
     "esp_driver_i2c"
+
+EMBED_FILES "http_server/recovery_page.html"
 )
 
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_INCLUDE_SIMPLE=1" APPEND)
