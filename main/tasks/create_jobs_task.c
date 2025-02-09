@@ -33,23 +33,9 @@ void create_jobs_task(void *pvParameters)
         ESP_LOGI(TAG, "New Work Dequeued %s", mining_notification->job_id);
 
         if (GLOBAL_STATE->new_stratum_version_rolling_msg) {
-<<<<<<< HEAD
             ESP_LOGI(TAG, "Set chip version rolls %i", (int)(GLOBAL_STATE->version_mask >> 13));
             //(GLOBAL_STATE->ASIC_functions.set_version_mask)(GLOBAL_STATE->version_mask);
             ASIC_set_version_mask(GLOBAL_STATE, GLOBAL_STATE->version_mask);
-=======
-            int version_rolls = (int)(GLOBAL_STATE->version_mask >> 13);
-            ESP_LOGI(TAG, "Set chip version rolls %i", version_rolls);
-
-            //calulate update to fullscan_ms as new version rolling
-            double new_version_percent = (double)(version_rolls+1) / (double)VERSION_ROLLS_MAX;
-            double prcnt_change = new_version_percent/GLOBAL_STATE->version_space_percent;
-            GLOBAL_STATE->asic_job_frequency_ms *= prcnt_change;
-            GLOBAL_STATE->version_space_percent = new_version_percent;
-            ESP_LOGI(TAG, "Set chip fullscan %f", GLOBAL_STATE->asic_job_frequency_ms);
-
-            (GLOBAL_STATE->ASIC_functions.set_version_mask)(GLOBAL_STATE->version_mask);
->>>>>>> cf56ff1 (add mutatrum fix)
             GLOBAL_STATE->new_stratum_version_rolling_msg = false;
         }
 

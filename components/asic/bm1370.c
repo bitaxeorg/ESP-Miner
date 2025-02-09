@@ -217,6 +217,17 @@ bool BM1370_set_frequency(float target_freq) {
     return do_frequency_transition(target_freq, BM1370_send_hash_frequency, 1370);
 }
 
+uint8_t BM1370_get_chip_address_interval(int chips) {
+    return (uint8_t)(256/_largest_power_of_two(chips));
+}
+
+int BM1370_get_timeout(uint64_t frequency, uint16_t asic_count, int versions_to_roll) {
+    int versions_per_core = versions_to_roll/BM1368_MIDSTATE_ENGINES;
+    int address_interval = BM1370_get_chip_address_interval(asic_count);
+    int cno = calculate_cno(asic_count);
+    return calculate_timeout_ms(address_interval,(int)frequency,cno,BM1370_TIMEOUT_PERCENT,BM1370_NONCE_PERCENT,versions_per_core);
+}
+
 static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 {
     // set version mask
@@ -252,7 +263,7 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     // _send_simple(init7, 7);
 
     // split the chip address space evenly
-    uint8_t address_interval = (uint8_t) (256 / chip_counter);
+    uint8_t address_interval = BM1370_get_chip_address_interval(chip_counter);
     for (uint8_t i = 0; i < chip_counter; i++) {
         _set_chip_address(i * address_interval);
         // unsigned char init8[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
@@ -313,18 +324,31 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     //ramp up the hash frequency
     do_frequency_ramp_up(frequency);
 
-    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x11, 0x5A}; //S19k Pro Default
-    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x14, 0x46}; //S19XP-Luxos Default
-    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x15, 0x1C}; //S19XP-Stock Default
-    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x15, 0xA4}; //S21-Stock Default
-    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x1E, 0xB5}; //S21 Pro-Stock Default
-    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x0F, 0x00, 0x00}; //supposedly the "full" 32bit nonce range
+    // CNO: Dividing by chain 
+    int cno = calculate_cno(chip_counter);
+    int cno_chip_value = 0;
+    unsigned char set_0C_chip_nonce_offset[6] = {0x00,0x0C, 0x00, 0x00, 0x00, 0x00};
+    for (uint8_t chip_idx = 0; chip_idx < chip_counter; chip_idx++) {
+        
+        if (chip_idx > 0) cno_chip_value = (int)(cno*(float)chip_idx) + 1;
+        set_0C_chip_nonce_offset[0] = chip_idx * address_interval;
+        set_0C_chip_nonce_offset[2] = 0x80; //CNOV,  CNO valid flag only use cno if this bit is on
+        set_0C_chip_nonce_offset[3] = 0x00; // reserved
+        set_0C_chip_nonce_offset[4] = (cno_chip_value >> 8) & 0xFF;
+        set_0C_chip_nonce_offset[5] = cno_chip_value & 0xFF;
+        _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_0C_chip_nonce_offset, 6, BM1370_SERIALTX_DEBUG);
+    }
+
+    // HCN: Percentage of nonce space
+    int hcn = calulate_hcn_from_nonce_percent(address_interval,frequency,BM1370_NONCE_PERCENT);
     uint8_t set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x00, 0x00};
-    set_10_hash_counting[2] = (BM1370_HCN >> 24) & 0xFF;
-    set_10_hash_counting[3] = (BM1370_HCN >> 16) & 0xFF;
-    set_10_hash_counting[4] = (BM1370_HCN >> 8) & 0xFF;
-    set_10_hash_counting[5] = BM1370_HCN & 0xFF;
+    set_10_hash_counting[2] = (hcn >> 24) & 0xFF;
+    set_10_hash_counting[3] = (hcn >> 16) & 0xFF;
+    set_10_hash_counting[4] = (hcn >> 8) & 0xFF;
+    set_10_hash_counting[5] = hcn & 0xFF;
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1370_SERIALTX_DEBUG);
+
+    ESP_LOGI(TAG, "chips=%i freq=%i hcn=%i cno=%i timeout_percent=%.3f nonce_percent=%.3f",chip_counter,(int)frequency,hcn,cno,BM1370_TIMEOUT_PERCENT,BM1370_NONCE_PERCENT);
 
     return chip_counter;
 }

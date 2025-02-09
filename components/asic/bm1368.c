@@ -193,6 +193,16 @@ static void do_frequency_ramp_up(float target_frequency) {
     do_frequency_transition(target_frequency, BM1368_send_hash_frequency, 1368);
 }
 
+uint8_t BM1368_get_chip_address_interval(int chips) {
+    return (uint8_t)(256/_largest_power_of_two(chips));
+}
+
+int BM1368_get_timeout(uint64_t frequency, uint16_t asic_count, int versions_to_roll) {
+    int versions_per_core = versions_to_roll/BM1368_MIDSTATE_ENGINES;
+    int address_interval = BM1368_get_chip_address_interval(asic_count);
+    return calculate_timeout_ms(address_interval,(int)frequency,0,BM1368_TIMEOUT_PERCENT,BM1368_NONCE_PERCENT,versions_per_core);
+}
+
 uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
 {
     ESP_LOGI(TAG, "Initializing BM1368");
@@ -231,7 +241,7 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
         _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, init_cmds[i], 6, false);
     }
 
-    uint8_t address_interval = (uint8_t) (256 / chip_counter);
+    uint8_t address_interval = BM1368_get_chip_address_interval(chip_counter);
     for (int i = 0; i < chip_counter; i++) {
         _set_chip_address(i * address_interval);
     }
@@ -255,12 +265,15 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
 
     do_frequency_ramp_up((float)frequency);
 
+    // HCN: Percentage of nonce space
+    int hcn = calulate_hcn_from_nonce_percent(address_interval,frequency,BM1368_NONCE_PERCENT);
     uint8_t set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x00, 0x00};
-    set_10_hash_counting[2] = (BM1368_HCN >> 24) & 0xFF;
-    set_10_hash_counting[3] = (BM1368_HCN >> 16) & 0xFF;
-    set_10_hash_counting[4] = (BM1368_HCN >> 8) & 0xFF;
-    set_10_hash_counting[5] = BM1368_HCN & 0xFF;
-    _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, set_10_hash_counting, 6, false);
+    set_10_hash_counting[2] = (hcn >> 24) & 0xFF;
+    set_10_hash_counting[3] = (hcn >> 16) & 0xFF;
+    set_10_hash_counting[4] = (hcn >> 8) & 0xFF;
+    set_10_hash_counting[5] = hcn & 0xFF;
+    _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1368_SERIALTX_DEBUG);
+
     BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
     return chip_counter;

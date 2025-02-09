@@ -227,6 +227,14 @@ void BM1397_send_hash_frequency(float frequency)
     ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
 }
 
+uint8_t BM1397_get_chip_address_interval(int chips) {
+    return (uint8_t)(256/_largest_power_of_two(chips));
+}
+
+int BM1397_get_timeout(uint64_t frequency, uint16_t asic_count, int versions_to_roll) {
+    return calculate_timeout_ms(1<<24,(int)frequency,0,BM1397_TIMEOUT_PERCENT,1.0,1);
+}
+
 static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 {
     // send the init command
@@ -270,6 +278,8 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     BM1397_set_default_baud();
 
     BM1397_send_hash_frequency(frequency);
+
+    ESP_LOGI(TAG, "chips=%i freq=%i timeout_percent=%.3f",chip_counter,(int)frequency,BM1397_TIMEOUT_PERCENT);
 
     return chip_counter;
 }
