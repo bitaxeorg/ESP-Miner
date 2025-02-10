@@ -10,6 +10,8 @@
 
 static const char * TAG = "common";
 
+# define XTAL_OSC_MHZ 25 // related to version rolling
+
 unsigned char _reverse_bits(unsigned char num)
 {
     unsigned char reversed = 0;
