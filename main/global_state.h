@@ -133,7 +133,8 @@ typedef struct
     uint32_t stratum_difficulty;
     uint32_t version_mask;
     bool new_stratum_version_rolling_msg;
-    double version_space_percent;
+    double asic_nonce_percent;
+    double asic_timeout_percent;
 
     int sock;
 

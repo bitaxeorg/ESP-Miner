@@ -9,15 +9,19 @@
 
 #define BM1397_ASIC_DIFFICULTY 256
 
+<<<<<<< HEAD
 #define BM1937_SERIALTX_DEBUG true
 #define BM1937_SERIALRX_DEBUG false
+=======
+#define BM1397_SERIALTX_DEBUG false
+#define BM1397_SERIALRX_DEBUG false
+>>>>>>> 40c499a (cleaner code)
 #define BM1397_DEBUG_WORK false //causes insane amount of debug output
 #define BM1397_DEBUG_JOBS false //causes insane amount of debug output
 
 static const uint64_t BM1397_CORE_COUNT = 168;
 static const uint64_t BM1397_SMALL_CORE_COUNT = 672;
 static const float BM1397_MIDSTATE_ENGINES = 4.0;
-static const float BM1397_TIMEOUT_PERCENT = 1.0;
 
 typedef struct
 {

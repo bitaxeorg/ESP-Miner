@@ -18,9 +18,6 @@
 static const uint64_t BM1368_CORE_COUNT = 80;
 static const uint64_t BM1368_SMALL_CORE_COUNT = 1276;
 static const float BM1368_MIDSTATE_ENGINES = 16.0;
-static const float BM1368_NONCE_PERCENT = 1.0;
-static const float BM1368_VERSION_PERCENT = 1.0;  
-static const float BM1368_TIMEOUT_PERCENT = 1.0; 
 
 typedef struct
 {
