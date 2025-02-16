@@ -239,6 +239,10 @@ static lv_obj_t * create_scr_stats() {
 
 static void screen_show(screen_t screen)
 {
+    if (SCR_CAROUSEL_START > current_screen) {
+        lv_display_trigger_activity(NULL);
+    }
+
     if (current_screen != screen) {
         lv_obj_t * scr = screens[screen];
 
