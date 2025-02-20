@@ -38,6 +38,7 @@
 #define LVGL_REG_POWER_STATS    0x43
 #define LVGL_REG_ASIC_INFO      0x44
 #define LVGL_REG_UPTIME         0x45
+#define LVGL_REG_TARGET_VOLTAGE 0x46 // (uint16_t )
 
 // Device status registers (on change only)
 #define LVGL_REG_FLAGS          0x50
