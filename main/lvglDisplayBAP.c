@@ -376,6 +376,13 @@ esp_err_t lvglUpdateDisplayMonitoringBAP(GlobalState *GLOBAL_STATE)
     ret = sendRegisterDataBAP(LVGL_REG_UPTIME, &uptimeSeconds, sizeof(uint32_t));
     if (ret != ESP_OK) return ret;
 
+    // LVGL_REG_TARGET_VOLTAGE 0x46
+    uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
+    ret = sendRegisterDataBAP(LVGL_REG_TARGET_VOLTAGE, &core_voltage, sizeof(uint16_t));
+    if (ret != ESP_OK) 
+    {
+    return ret;
+    }
     // startup done flag
     sendRegisterDataBAP(LVGL_FLAG_STARTUP_DONE, &module->startup_done, sizeof(uint8_t));
 
