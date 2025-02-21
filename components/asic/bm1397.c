@@ -15,7 +15,11 @@
 #include "mining.h"
 #include "global_state.h"
 
+#ifdef CONFIG_GPIO_ASIC_RESET
 #define GPIO_ASIC_RESET CONFIG_GPIO_ASIC_RESET
+#else
+#define GPIO_ASIC_RESET 1
+#endif
 
 #define TYPE_JOB 0x20
 #define TYPE_CMD 0x40
@@ -454,7 +458,7 @@ task_result *BM1397_proccess_work(void *pvParameters)
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
     if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0)
     {
-        ESP_LOGI(TAG, "Invalid job nonce found, id=%d", rx_job_id);
+        ESP_LOGW(TAG, "Invalid job nonce found, id=%d", rx_job_id);
         return NULL;
     }
 

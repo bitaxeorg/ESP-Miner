@@ -1,6 +1,6 @@
 <div class="layout-wrapper" [ngClass]="containerClass">
-    <app-topbar></app-topbar>
-    <div class="layout-sidebar">
+    <app-topbar [isAPMode]="isAPMode"></app-topbar>
+    <div class="layout-sidebar" *ngIf="!isAPMode">
         <app-sidebar></app-sidebar>
     </div>
     <div class="layout-main-container">

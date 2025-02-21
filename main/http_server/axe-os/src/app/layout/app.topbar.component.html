@@ -3,7 +3,7 @@
         <div [routerLink]="['/']" class="header-text"><span style="font-family: Angel Wish; font-size: 4rem;">Axe</span><span class="os" style=" font-size: 3rem;">OS</span></div>
     </a>
 
-    <button #menubutton class="p-link layout-menu-button layout-topbar-button" (click)="layoutService.onMenuToggle()">
+    <button *ngIf="!isAPMode" #menubutton class="p-link layout-menu-button layout-topbar-button" (click)="layoutService.onMenuToggle()">
         <i class="pi pi-bars"></i>
     </button>
 

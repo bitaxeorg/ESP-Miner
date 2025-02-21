@@ -15,6 +15,7 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "vcore.h"
+#include "connect.h"
 #include <fcntl.h>
 #include <string.h>
 #include <sys/param.h>
@@ -31,9 +32,50 @@
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
 #include <pthread.h>
+#include "connect.h"
+
+#include "asic.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
+
+/* Handler for WiFi scan endpoint */
+static esp_err_t GET_wifi_scan(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    
+    // Give some time for the connected flag to take effect
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    
+    wifi_ap_record_simple_t ap_records[20];
+    uint16_t ap_count = 0;
+
+    esp_err_t err = wifi_scan(ap_records, &ap_count);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "WiFi scan failed");
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *networks = cJSON_CreateArray();
+
+    for (int i = 0; i < ap_count; i++) {
+        cJSON *network = cJSON_CreateObject();
+        cJSON_AddStringToObject(network, "ssid", (char *)ap_records[i].ssid);
+        cJSON_AddNumberToObject(network, "rssi", ap_records[i].rssi);
+        cJSON_AddNumberToObject(network, "authmode", ap_records[i].authmode);
+        cJSON_AddItemToArray(networks, network);
+    }
+
+    cJSON_AddItemToObject(root, "networks", networks);
+
+    const char *response = cJSON_Print(root);
+    httpd_resp_sendstr(req, response);
+
+    free((void *)response);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
 
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
@@ -82,18 +124,10 @@ static esp_err_t ip_in_private_range(uint32_t address) {
     return ESP_FAIL;
 }
 
-static uint32_t extract_origin_ip_addr(httpd_req_t *req)
+static uint32_t extract_origin_ip_addr(char *origin)
 {
-    char origin[128];
     char ip_str[16];
     uint32_t origin_ip_addr = 0;
-
-    // Attempt to get the Origin header.
-    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) != ESP_OK) {
-        ESP_LOGD(CORS_TAG, "No origin header found.");
-        return 0;
-    }
-    ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
 
     // Find the start of the IP address in the Origin header
     const char *prefix = "http://";
@@ -148,8 +182,14 @@ static esp_err_t is_network_allowed(httpd_req_t * req)
     // Convert to IPv4 string
     inet_ntop(AF_INET, &request_ip_addr, ipstr, sizeof(ipstr));
 
-    uint32_t origin_ip_addr = extract_origin_ip_addr(req);
-    if (origin_ip_addr == 0) {
+    // Attempt to get the Origin header.
+    char origin[128];
+    uint32_t origin_ip_addr;
+    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK) {
+        ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
+        origin_ip_addr = extract_origin_ip_addr(origin);
+    } else {
+        ESP_LOGD(CORS_TAG, "No origin header found.");
         origin_ip_addr = request_ip_addr;
     }
 
@@ -517,30 +557,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
     cJSON_AddStringToObject(root, "hostname", hostname);
     cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
+    cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
     cJSON_AddNumberToObject(root, "sharesAccepted", GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
     cJSON_AddNumberToObject(root, "sharesRejected", GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
     cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000);
-    cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE->asic_count);
-    uint16_t small_core_count = 0;
-    switch (GLOBAL_STATE->asic_model){
-        case ASIC_BM1397:
-            small_core_count = BM1397_SMALL_CORE_COUNT;
-            break;
-        case ASIC_BM1366:
-            small_core_count = BM1366_SMALL_CORE_COUNT;
-            break;
-        case ASIC_BM1368:
-            small_core_count = BM1368_SMALL_CORE_COUNT;
-            break;
-        case ASIC_BM1370:
-            small_core_count = BM1370_SMALL_CORE_COUNT;
-            break;
-        case ASIC_UNKNOWN:
-        default:
-            small_core_count = -1;
-            break;
-    }
-    cJSON_AddNumberToObject(root, "smallCoreCount", small_core_count);
+    cJSON_AddNumberToObject(root, "asicCount", ASIC_get_asic_count(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "smallCoreCount", ASIC_get_small_core_count(GLOBAL_STATE));
     cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->asic_model_str);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
@@ -833,6 +855,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
+    config.stack_size = 8192;
     config.max_open_sockets = 10;
     config.max_uri_handlers = 20;
 
@@ -858,6 +881,15 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_info_get_uri);
+
+    /* URI handler for WiFi scan */
+    httpd_uri_t wifi_scan_get_uri = {
+        .uri = "/api/system/wifi/scan",
+        .method = HTTP_GET,
+        .handler = GET_wifi_scan,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &wifi_scan_get_uri);
 
     httpd_uri_t swarm_options_uri = {
         .uri = "/api/swarm",

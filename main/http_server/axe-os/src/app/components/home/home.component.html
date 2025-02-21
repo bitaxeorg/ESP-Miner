@@ -19,15 +19,24 @@
                         <div class="flex justify-content-between mb-3">
                             <div>
                                 <span class="block text-500 font-medium mb-3">Hash Rate</span>
-                                <div class="text-900 font-medium text-xl">{{info.hashRate * 1000000000 | hashSuffix}}
+                                <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
+                                    <span>
+                                        {{info.hashRate * 1000000000 | hashSuffix}}
+                                    </span>
                                 </div>
                             </div>
                         </div>
-                        <ng-container *ngIf="expectedHashRate$ | async as expectedHashRate">
-                            <span class="text-green-500 font-medium">{{expectedHashRate * 1000000000 |
-                                hashSuffix}}</span>
-                            <span class="text-500"> expected</span>
+                        
+                        <ng-container>
+                            Average: 
+                            <span class="text-green-500 font-medium">
+                                {{calculateAverage(hashrateData) | hashSuffix}}
+                            </span>
                         </ng-container>
+
+                        <div class="text-500 text-xs" *ngIf="expectedHashRate$ | async as expectedHashRate">
+                            Expected: {{expectedHashRate * 1000000000 | hashSuffix}}
+                        </div>
                     </div>
                 </div>
                 <div class="col-12 md:col-6 xl:col-3">
@@ -35,20 +44,24 @@
                         <div class="flex justify-content-between mb-3">
                             <div>
                                 <span class="block text-500 font-medium mb-3">Efficiency</span>
-                                <div class="text-900 font-medium text-xl">
-                                    <td>{{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/TH</small>
-                                    </td>
+                                <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
+                                    <span>
+                                        {{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/TH</small>
+                                    </span>
                                 </div>
                             </div>
                         </div>
-                        <ng-container *ngIf="expectedHashRate$ | async as expectedHashRate">
-                            <span class="text-green-500 font-medium">{{info.power / (expectedHashRate/1000) | number:
-                                '1.2-2'}} <small>J/TH</small>
+                        
+                        <ng-container>
+                            Average: 
+                            <span class="text-green-500 font-medium">
+                                {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} <small>J/TH</small>
                             </span>
-                            <span class="text-500"> expected</span>
                         </ng-container>
-                        <!-- <span class="text-green-500 font-medium">%52+ </span>
-                        <span class="text-500">since last week</span> -->
+
+                        <div class="text-500 text-xs " *ngIf="expectedHashRate$ | async as expectedHashRate" >
+                            Expected: {{info.power / (expectedHashRate/1000) | number: '1.2-2'}} J/TH
+                        </div>
                     </div>
                 </div>
                 <div class="col-12 md:col-6 xl:col-3">
@@ -56,7 +69,7 @@
                         <div class="flex justify-content-between mb-3">
                             <div>
                                 <span class="block text-500 font-medium mb-3">Shares</span>
-                                <div class="text-900 font-medium text-xl">{{info.sharesAccepted | number: '1.0-0'}}
+                                <div class="text-900 font-medium text-2xl">{{info.sharesAccepted | number: '1.0-0'}}
                                 </div>
                             </div>
                         </div>
@@ -70,8 +83,8 @@
                         <div class="flex justify-content-between mb-3">
                             <div>
                                 <span class="block text-500 font-medium mb-3">Best Difficulty</span>
-                                <div class="text-900 font-medium text-xl">{{info.bestDiff}}
-                                    <span class="text-500">all-time best</span>
+                                <div class="text-900 font-medium text-2xl">{{info.bestDiff}}
+                                    <span class="text-500 text-lg">all-time best</span>
                                 </div>
                             </div>
                         </div>
@@ -146,7 +159,14 @@
                 <div class="grid">
                     <div class="col-12">
 
-                        <h6>ASIC Temperature <span style="float: right;">{{info.temp}}&deg;C</span></h6>
+                        <h6>ASIC Temperature 
+                            <span style="float: right;">
+                                <ng-template #noTemp>--</ng-template>
+                                <ng-container *ngIf="info.temp > 0; else noTemp">
+                                    {{info.temp}}&deg;C
+                                </ng-container>
+                            </span>
+                        </h6>
                         <p-progressBar [value]="(info.temp / maxTemp) * 100" [style]="{ height: '6px' }" >
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>

@@ -20,9 +20,11 @@ export class EditComponent implements OnInit, OnDestroy {
   public websiteUpdateProgress: number | null = null;
 
   public savedChanges: boolean = false;
-  public devToolsOpen: boolean = false;
+  public settingsUnlocked: boolean = false;
   public eASICModel = eASICModel;
   public ASICModel!: eASICModel;
+  public restrictedModels: eASICModel[] = Object.values(eASICModel)
+    .filter((v): v is eASICModel => typeof v === 'string');
 
   @Input() uri = '';
 
@@ -124,8 +126,11 @@ export class EditComponent implements OnInit, OnDestroy {
     private toastr: ToastrService,
     private loadingService: LoadingService
   ) {
-    window.addEventListener('resize', this.checkDevTools.bind(this));
-    this.checkDevTools();
+    // Add unlockSettings to window object for console access
+    (window as any).unlockSettings = () => {
+      this.settingsUnlocked = true;
+      console.log('Settings unlocked. You can now set custom frequency and voltage values.');
+    };
   }
 
   ngOnInit(): void {
@@ -139,30 +144,6 @@ export class EditComponent implements OnInit, OnDestroy {
         this.form = this.fb.group({
           flipscreen: [info.flipscreen == 1],
           invertscreen: [info.invertscreen == 1],
-          stratumURL: [info.stratumURL, [
-            Validators.required,
-            Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
-            Validators.pattern(/^[^:]*$/),
-          ]],
-          stratumPort: [info.stratumPort, [
-            Validators.required,
-            Validators.pattern(/^[^:]*$/),
-            Validators.min(0),
-            Validators.max(65353)
-          ]],
-          fallbackStratumURL: [info.fallbackStratumURL, [
-            Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
-          ]],
-          fallbackStratumPort: [info.fallbackStratumPort, [
-            Validators.required,
-            Validators.pattern(/^[^:]*$/),
-            Validators.min(0),
-            Validators.max(65353)
-          ]],
-          stratumUser: [info.stratumUser, [Validators.required]],
-          stratumPassword: ['*****', [Validators.required]],
-          fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
-          fallbackStratumPassword: ['password', [Validators.required]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
@@ -185,20 +166,10 @@ export class EditComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    window.removeEventListener('resize', this.checkDevTools.bind(this));
+    // Remove unlockSettings from window object
+    delete (window as any).unlockSettings;
     this.destroy$.next();
     this.destroy$.complete();
-  }
-
-  private checkDevTools(): void {
-    if (
-      window.outerWidth - window.innerWidth > 160 ||
-      window.outerHeight - window.innerHeight > 160
-    ) {
-      this.devToolsOpen = true;
-    } else {
-      this.devToolsOpen = false;
-    }
   }
 
   public updateSystem() {
@@ -225,11 +196,6 @@ export class EditComponent implements OnInit, OnDestroy {
       });
   }
 
-  showStratumPassword: boolean = false;
-  toggleStratumPasswordVisibility() {
-    this.showStratumPassword = !this.showStratumPassword;
-  }
-
   showWifiPassword: boolean = false;
   toggleWifiPasswordVisibility() {
     this.showWifiPassword = !this.showWifiPassword;
@@ -238,11 +204,6 @@ export class EditComponent implements OnInit, OnDestroy {
   disableOverheatMode() {
     this.form.patchValue({ overheat_mode: 0 });
     this.updateSystem();
-  }
-
-  showFallbackStratumPassword: boolean = false;
-  toggleFallbackStratumPasswordVisibility() {
-    this.showFallbackStratumPassword = !this.showFallbackStratumPassword;
   }
 
   public restart() {

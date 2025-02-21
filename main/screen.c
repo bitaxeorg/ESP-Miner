@@ -35,7 +35,7 @@ static lv_obj_t *self_test_finished_label;
 static double current_hashrate;
 static float current_power;
 static uint64_t current_difficulty;
-static float curreny_chip_temp;
+static float current_chip_temp;
 static bool found_block;
 
 #define SCREEN_UPDATE_MS 500
@@ -97,7 +97,7 @@ static lv_obj_t * create_scr_invalid_asic(SystemModule * module) {
     lv_label_set_text(label1, "ASIC MODEL INVALID");
 
     lv_obj_t *label2 = lv_label_create(scr);
-    lv_label_set_text(label2, "Configuration SSID:");
+    lv_label_set_text(label2, "Wi-Fi (for setup):");
 
     lv_obj_t *label3 = lv_label_create(scr);
     lv_label_set_text(label3, module->ap_ssid);
@@ -113,11 +113,15 @@ static lv_obj_t * create_scr_configure(SystemModule * module) {
 
     lv_obj_t *label1 = lv_label_create(scr);
     lv_obj_set_width(label1, LV_HOR_RES);
+    lv_obj_set_style_anim_duration(label1, 15000, LV_PART_MAIN);
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(label1, "Welcome to your new Bitaxe! Connect to the configuration Wifi and connect the Bitaxe to your network.");
+    lv_label_set_text(label1, "Welcome to your new Bitaxe! Connect to the configuration Wi-Fi and connect the Bitaxe to your network.");
+
+    // skip a line, it looks nicer this way
+    lv_label_create(scr);
 
     lv_obj_t *label2 = lv_label_create(scr);
-    lv_label_set_text(label2, "Configuration SSID:");
+    lv_label_set_text(label2, "Wi-Fi (for setup):");
 
     lv_obj_t *label3 = lv_label_create(scr);
     lv_label_set_text(label3, module->ap_ssid);
@@ -134,13 +138,13 @@ static lv_obj_t * create_scr_connection(SystemModule * module) {
     lv_obj_t *label1 = lv_label_create(scr);
     lv_obj_set_width(label1, LV_HOR_RES);    
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text_fmt(label1, "SSID: %s", module->ssid);
+    lv_label_set_text_fmt(label1, "Wi-Fi: %s", module->ssid);
 
     wifi_status_label = lv_label_create(scr);
     lv_label_set_text(wifi_status_label, module->wifi_status);
 
     lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, "Configuration SSID:");
+    lv_label_set_text(label3, "Wi-Fi (for setup):");
 
     lv_obj_t *label4 = lv_label_create(scr);
     lv_label_set_text(label4, module->ap_ssid);
@@ -188,16 +192,16 @@ static lv_obj_t * create_scr_stats() {
     lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
     hashrate_label = lv_label_create(scr);
-    lv_label_set_text(hashrate_label, "Gh/s: n/a");
+    lv_label_set_text(hashrate_label, "Gh/s: --");
 
     efficiency_label = lv_label_create(scr);
-    lv_label_set_text(efficiency_label, "J/Th: n/a");
+    lv_label_set_text(efficiency_label, "J/Th: --");
 
     difficulty_label = lv_label_create(scr);
-    lv_label_set_text(difficulty_label, "Best: n/a");
+    lv_label_set_text(difficulty_label, "Best: --");
 
     chip_temp_label = lv_label_create(scr);
-    lv_label_set_text(chip_temp_label, "Temp: n/a");
+    lv_label_set_text(chip_temp_label, "Temp: --");
 
     return scr;
 }
@@ -236,7 +240,7 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (GLOBAL_STATE->ASIC_functions.init_fn == NULL) {
+    if (GLOBAL_STATE->valid_model == false) {
         screen_show(SCR_INVALID_ASIC);
         return;
     }
@@ -319,14 +323,14 @@ static void screen_update_cb(lv_timer_t * timer)
         }
     }
 
-    if (curreny_chip_temp != power_management->chip_temp_avg) {
+    if (current_chip_temp != power_management->chip_temp_avg && power_management->chip_temp_avg > 0) {
         lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", power_management->chip_temp_avg);
     }
 
     current_hashrate = module->current_hashrate;
     current_power = power_management->power;
     current_difficulty = module->best_session_nonce_diff;
-    curreny_chip_temp = power_management->chip_temp_avg;
+    current_chip_temp = power_management->chip_temp_avg;
 
     if (CAROUSEL_DELAY_COUNT > current_screen_counter || found_block) {
         return;
