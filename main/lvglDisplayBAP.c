@@ -625,7 +625,7 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                     ESP_LOGI("Serial BAP", "Received asic voltage");
                     ESP_LOGI("Serial BAP", "Voltage: %d", buf[4] * 256 + buf[5]);
                     uint16_t voltage = buf[4] * 256 + buf[5];
-                    if (voltage <= 1250 && voltage >= 1000) {
+                    if (voltage <= 1350 && voltage >= 900) {
                         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, voltage);
                         ESP_LOGI("Serial BAP", "Setting ASIC voltage to %d", voltage);
                     }
