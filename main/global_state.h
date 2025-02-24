@@ -83,6 +83,9 @@ typedef struct
     uint16_t overheat_mode;
     uint32_t lastClockSync;
     bool is_screen_active;
+    bool is_firmware_update;
+    char firmware_update_filename[20];
+    char firmware_update_status[20];
 } SystemModule;
 
 typedef struct

@@ -23,6 +23,8 @@ static lv_obj_t *efficiency_label;
 static lv_obj_t *difficulty_label;
 static lv_obj_t *chip_temp_label;
 
+static lv_obj_t *firmware_update_scr_filename_label;
+static lv_obj_t *firmware_update_scr_status_label;
 static lv_obj_t *ip_addr_scr_overheat_label;
 static lv_obj_t *ip_addr_scr_urls_label;
 static lv_obj_t *mining_url_scr_urls_label;
@@ -125,6 +127,23 @@ static lv_obj_t * create_scr_configure(SystemModule * module) {
 
     lv_obj_t *label3 = lv_label_create(scr);
     lv_label_set_text(label3, module->ap_ssid);
+
+    return scr;
+}
+
+static lv_obj_t * create_scr_ota(SystemModule * module) {
+    lv_obj_t * scr = lv_obj_create(NULL);
+
+    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+
+    lv_obj_t *label1 = lv_label_create(scr);
+    lv_obj_set_width(label1, LV_HOR_RES);
+    lv_label_set_text(label1, "Firmware update");
+
+    firmware_update_scr_filename_label = lv_label_create(scr);
+
+    firmware_update_scr_status_label = lv_label_create(scr);
 
     return scr;
 }
@@ -237,6 +256,17 @@ static void screen_update_cb(lv_timer_t * timer)
             lv_obj_remove_flag(self_test_finished_label, LV_OBJ_FLAG_HIDDEN);
         }
 
+        return;
+    }
+
+    if (GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update) {
+        if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_filename_label, GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename);
+        }
+        if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_status_label, GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status);
+        }
+        screen_show(SCR_FIRMWARE_UPDATE);
         return;
     }
 
@@ -357,6 +387,7 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_OVERHEAT] = create_scr_overheat(module);
         screens[SCR_INVALID_ASIC] = create_scr_invalid_asic(module);
         screens[SCR_CONFIGURE] = create_scr_configure(module);
+        screens[SCR_FIRMWARE_UPDATE] = create_scr_ota(module);
         screens[SCR_CONNECTION] = create_scr_connection(module);
         screens[SCR_LOGO] = create_scr_logo();
         screens[SCR_URLS] = create_scr_urls(module);
