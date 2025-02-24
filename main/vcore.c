@@ -21,23 +21,30 @@
 
 static const char *TAG = "vcore.c";
 
-uint8_t VCORE_init(GlobalState * global_state) {
-    uint8_t result = 0;
+esp_err_t VCORE_init(GlobalState * global_state) {
     switch (global_state->device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
             if (global_state->board_version >= 402 && global_state->board_version <= 499) {
-                result = TPS546_init();
+                if (TPS546_init() != ESP_OK) {
+                    ESP_LOGE(TAG, "TPS546 init failed!");
+                    return ESP_FAIL;
+                }
+            } else {
+                ESP_RETURN_ON_ERROR(DS4432U_init(), TAG, "DS4432 init failed!");
             }
             break;
         case DEVICE_GAMMA:
-            result = TPS546_init();
+            if (TPS546_init() != ESP_OK) {
+                ESP_LOGE(TAG, "TPS546 init failed!");
+                return ESP_FAIL;
+            }
             break;
         // case DEVICE_HEX:
         default:
     }
-    return result;
+    return ESP_OK;
 }
 
 /**
@@ -68,7 +75,7 @@ static uint8_t ds4432_tps40305_bitaxe_voltage_to_reg(float vout)
     return reg;
 }
 
-bool VCORE_set_voltage(float core_voltage, GlobalState * global_state)
+esp_err_t VCORE_set_voltage(float core_voltage, GlobalState * global_state)
 {
     switch (global_state->device_model) {
         case DEVICE_MAX:
@@ -78,11 +85,9 @@ bool VCORE_set_voltage(float core_voltage, GlobalState * global_state)
                 ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
                 TPS546_set_vout(core_voltage * (float)global_state->voltage_domain);
             } else {
-                DS4432U_init();
-                
                 uint8_t reg_setting = ds4432_tps40305_bitaxe_voltage_to_reg(core_voltage * (float)global_state->voltage_domain);
                 ESP_LOGI(TAG, "Set ASIC voltage = %.3fV [0x%02X]", core_voltage, reg_setting);
-                DS4432U_set_current_code(0, reg_setting); /// eek!
+                ESP_RETURN_ON_ERROR(DS4432U_set_current_code(0, reg_setting), TAG, "DS4432U set current code failed!");
             }
             break;
         case DEVICE_GAMMA:
@@ -93,7 +98,7 @@ bool VCORE_set_voltage(float core_voltage, GlobalState * global_state)
         default:
     }
 
-    return true;
+    return ESP_OK;
 }
 
 uint16_t VCORE_get_voltage_mv(GlobalState * global_state) {

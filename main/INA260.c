@@ -4,7 +4,8 @@
 #include "i2c_bitaxe.h"
 #include "INA260.h"
 
-// static const char *TAG = "INA260.c";
+static const char *TAG = "INA260";
+
 static i2c_master_dev_handle_t ina260_dev_handle;
 
 /**
@@ -13,7 +14,7 @@ static i2c_master_dev_handle_t ina260_dev_handle;
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
 esp_err_t INA260_init(void) {
-    return i2c_bitaxe_add_device(INA260_I2CADDR_DEFAULT, &ina260_dev_handle);
+    return i2c_bitaxe_add_device(INA260_I2CADDR_DEFAULT, &ina260_dev_handle, TAG);
 }
 
 

@@ -148,7 +148,7 @@ static esp_err_t sendRegisterData(uint8_t reg, const void* data, size_t dataLen)
 esp_err_t lvglDisplay_init(void) 
 {
     lastUpdateTime = xTaskGetTickCount();
-    return i2c_bitaxe_add_device(lvglDisplayI2CAddr, &lvglDisplay_dev_handle);
+    return i2c_bitaxe_add_device(lvglDisplayI2CAddr, &lvglDisplay_dev_handle, "BAP");
 }
 
 static esp_err_t lvglReadRegisterData(uint8_t reg, void* data, size_t dataLen) 

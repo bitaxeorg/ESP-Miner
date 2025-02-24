@@ -37,3 +37,127 @@ p-chart>div {
         padding: 10px;
     }
 }
+
+/* PrimeNG Component Theme Overrides */
+.p-slider {
+    .p-slider-range {
+        background: var(--slider-range-bg);
+    }
+    .p-slider-handle {
+        background: var(--slider-handle-bg);
+        border: 2px solid var(--slider-handle-bg);
+    }
+}
+
+.p-checkbox {
+    .p-checkbox-box {
+        &.p-highlight {
+            border-color: var(--checkbox-border);
+            background: var(--checkbox-bg);
+
+            &:hover {
+                background: var(--checkbox-hover-bg);
+                border-color: var(--checkbox-hover-bg);
+            }
+        }
+    }
+}
+
+.p-button {
+    background: var(--button-bg);
+    border: 1px solid var(--button-bg);
+
+    &:enabled:hover {
+        background: var(--button-hover-bg);
+        border-color: var(--button-hover-bg);
+    }
+
+    &:focus {
+        box-shadow: var(--button-focus-shadow);
+    }
+}
+
+.p-button.p-button-text.color-dot {
+    &:enabled:hover {
+        background: var(--button-bg);
+    }
+    &:focus {
+        box-shadow: none;
+    }
+    &:enabled:focus {
+        box-shadow: none;
+    }
+}
+
+// Remove focus ring from theme color buttons
+button.color-dot {
+    &:focus {
+        outline: none !important;
+        box-shadow: none !important;
+    }
+}
+
+.p-togglebutton {
+    &.p-highlight {
+        background: var(--togglebutton-bg);
+        border-color: var(--togglebutton-bg);
+
+        &:hover {
+            background: var(--togglebutton-hover-bg);
+            border-color: var(--togglebutton-hover-bg);
+        }
+    }
+}
+
+.p-inputtext {
+    background: transparent !important;
+    transition: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+
+    &:enabled:hover,
+    &:enabled:focus {
+        border-color: var(--togglebutton-hover-bg) !important;
+    }
+}
+
+/* Progress Bar Theme Override */
+.p-progressbar {
+    background: var(--progressbar-bg);
+
+    .p-progressbar-value {
+        background: var(--progressbar-value-bg);
+    }
+}
+
+/* Dropdown Theme*/
+.p-dropdown {
+    background: transparent !important;
+    transition: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+
+    &:hover,
+    &:focus,
+    &.p-dropdown-open {
+        border-color: var(--togglebutton-hover-bg) !important;
+    }
+
+    .p-dropdown-panel {
+        background: var(--surface-overlay) !important;
+
+        .p-dropdown-items {
+            .p-dropdown-item {
+                &:hover {
+                    background: var(--highlight-bg) !important;
+                    color: var(--highlight-text-color) !important;
+                }
+
+                &.p-highlight {
+                    background: var(--highlight-bg) !important;
+                    color: var(--highlight-text-color) !important;
+                }
+            }
+        }
+    }
+}

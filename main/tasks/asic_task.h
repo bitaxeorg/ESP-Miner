@@ -16,4 +16,4 @@ typedef struct
 
 void ASIC_task(void *pvParameters);
 
-#endif
+#endif /* ASIC_TASK_H_ */

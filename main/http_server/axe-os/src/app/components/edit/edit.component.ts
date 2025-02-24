@@ -1,8 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { startWith } from 'rxjs';
+import { startWith, Subject, takeUntil } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
@@ -12,14 +12,14 @@ import { eASICModel } from 'src/models/enum/eASICModel';
   templateUrl: './edit.component.html',
   styleUrls: ['./edit.component.scss']
 })
-export class EditComponent implements OnInit {
+export class EditComponent implements OnInit, OnDestroy {
 
   public form!: FormGroup;
 
   public firmwareUpdateProgress: number | null = null;
   public websiteUpdateProgress: number | null = null;
 
-
+  public savedChanges: boolean = false;
   public devToolsOpen: boolean = false;
   public eASICModel = eASICModel;
   public ASICModel!: eASICModel;
@@ -116,21 +116,24 @@ export class EditComponent implements OnInit {
     { name: '1300', value: 1300 },
   ];
 
+  private destroy$ = new Subject<void>();
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
     private toastr: ToastrService,
-    private toastrService: ToastrService,
     private loadingService: LoadingService
   ) {
-
-    window.addEventListener('resize', this.checkDevTools);
+    window.addEventListener('resize', this.checkDevTools.bind(this));
     this.checkDevTools();
-
   }
+
   ngOnInit(): void {
     this.systemService.getInfo(this.uri)
-      .pipe(this.loadingService.lockUIUntilComplete())
+      .pipe(
+        this.loadingService.lockUIUntilComplete(),
+        takeUntil(this.destroy$)
+      )
       .subscribe(info => {
         this.ASICModel = info.ASICModel;
         this.form = this.fb.group({
@@ -169,7 +172,8 @@ export class EditComponent implements OnInit {
         });
 
         this.form.controls['autofanspeed'].valueChanges.pipe(
-          startWith(this.form.controls['autofanspeed'].value)
+          startWith(this.form.controls['autofanspeed'].value),
+          takeUntil(this.destroy$)
         ).subscribe(autofanspeed => {
           if (autofanspeed) {
             this.form.controls['fanspeed'].disable();
@@ -180,8 +184,13 @@ export class EditComponent implements OnInit {
       });
   }
 
+  ngOnDestroy(): void {
+    window.removeEventListener('resize', this.checkDevTools.bind(this));
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
-  private checkDevTools = () => {
+  private checkDevTools(): void {
     if (
       window.outerWidth - window.innerWidth > 160 ||
       window.outerHeight - window.innerHeight > 160
@@ -190,7 +199,7 @@ export class EditComponent implements OnInit {
     } else {
       this.devToolsOpen = false;
     }
-  };
+  }
 
   public updateSystem() {
 
@@ -205,9 +214,11 @@ export class EditComponent implements OnInit {
       .subscribe({
         next: () => {
           this.toastr.success('Success!', 'Saved.');
+          this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error('Error.', `Could not save. ${err.message}`);
+          this.savedChanges = false;
         }
       });
   }
@@ -230,6 +241,73 @@ export class EditComponent implements OnInit {
   showFallbackStratumPassword: boolean = false;
   toggleFallbackStratumPasswordVisibility() {
     this.showFallbackStratumPassword = !this.showFallbackStratumPassword;
+  }
+
+  public restart() {
+    this.systemService.restart(this.uri)
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => {
+          this.toastr.success('Success!', 'Bitaxe restarted');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error('Error', `Could not restart. ${err.message}`);
+        }
+      });
+  }
+
+  getDropdownFrequency() {
+    // Get base frequency options based on ASIC model
+    let options = [];
+    switch(this.ASICModel) {
+        case this.eASICModel.BM1366: options = [...this.BM1366DropdownFrequency]; break;
+        case this.eASICModel.BM1368: options = [...this.BM1368DropdownFrequency]; break;
+        case this.eASICModel.BM1370: options = [...this.BM1370DropdownFrequency]; break;
+        case this.eASICModel.BM1397: options = [...this.BM1397DropdownFrequency]; break;
+        default: return [];
+    }
+
+    // Get current frequency value from form
+    const currentFreq = this.form?.get('frequency')?.value;
+
+    // If current frequency exists and isn't in the options
+    if (currentFreq && !options.some(opt => opt.value === currentFreq)) {
+        options.push({
+            name: `${currentFreq} (Custom)`,
+            value: currentFreq
+        });
+        // Sort options by frequency value
+        options.sort((a, b) => a.value - b.value);
+    }
+
+    return options;
+  }
+
+  getCoreVoltage() {
+    // Get base voltage options based on ASIC model
+    let options = [];
+    switch(this.ASICModel) {
+        case this.eASICModel.BM1366: options = [...this.BM1366CoreVoltage]; break;
+        case this.eASICModel.BM1368: options = [...this.BM1368CoreVoltage]; break;
+        case this.eASICModel.BM1370: options = [...this.BM1370CoreVoltage]; break;
+        case this.eASICModel.BM1397: options = [...this.BM1397CoreVoltage]; break;
+        default: return [];
+    }
+
+    // Get current voltage value from form
+    const currentVoltage = this.form?.get('coreVoltage')?.value;
+
+    // If current voltage exists and isn't in the options
+    if (currentVoltage && !options.some(opt => opt.value === currentVoltage)) {
+        options.push({
+            name: `${currentVoltage} (Custom)`,
+            value: currentVoltage
+        });
+        // Sort options by voltage value
+        options.sort((a, b) => a.value - b.value);
+    }
+
+    return options;
   }
 
 }

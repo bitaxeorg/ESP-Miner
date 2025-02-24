@@ -22,16 +22,13 @@
 typedef enum
 {
     WIFI_CONNECTED,
-    WIFI_DISCONNECTED,
     WIFI_CONNECTING,
-    WIFI_DISCONNECTING,
-    WIFI_CONNECT_FAILED,
     WIFI_RETRYING,
 } wifi_status_t;
 
 void toggle_wifi_softap(void);
 void wifi_softap_on(void);
 void wifi_softap_off(void);
-void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * hostname);
+void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * hostname, char * ip_addr_str);
 EventBits_t wifi_connect(void);
 void generate_ssid(char * ssid);

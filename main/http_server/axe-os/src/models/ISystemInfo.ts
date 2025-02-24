@@ -33,6 +33,7 @@ export interface ISystemInfo {
     fallbackStratumUser: string,
     frequency: number,
     version: string,
+    idfVersion: string,
     boardVersion: string,
     invertfanpolarity: number,
     autofanspeed: number,
