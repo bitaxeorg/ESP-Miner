@@ -83,7 +83,8 @@ void app_main(void)
     generate_ssid(GLOBAL_STATE.SYSTEM_MODULE.ap_ssid);
 
     SYSTEM_init_peripherals(&GLOBAL_STATE);
-
+    
+    xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void *) &GLOBAL_STATE, 3, NULL);
     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL);
 
     //start the API for AxeOS
