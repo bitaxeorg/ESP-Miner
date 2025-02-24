@@ -1,6 +1,6 @@
 {
     "idf.flashType": "UART",
-    "idf.portWin": "COM72",
+    "idf.portWin": "COM32",
     "idf.adapterTargetName": "esp32s3",
     "idf.openOcdConfigs": [
         "board/esp32s3-builtin.cfg"
@@ -55,7 +55,13 @@
         "cmath": "c",
         "utils.h": "c",
         "task.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "serial.h": "c",
+        "lvgldisplay.h": "c",
+        "i2c_bitaxe.h": "c",
+        "nvs_config.h": "c",
+        "bm1368.h": "c",
+        "string.h": "c"
     },
     "editor.formatOnSave": false,
     "cSpell.words": [

@@ -10,6 +10,7 @@ SRCS
     "display.c"
     "screen.c"
     "input.c"
+    "lvglDisplay.c"
     "system.c"
     "TPS546.c"
     "vcore.c"
@@ -17,6 +18,8 @@ SRCS
     "nvs_device.c"
     "lv_font_portfolio-6x8.c"
     "logo.c"
+    "mempoolAPI.c"
+    "lvglDisplayBAP.c"
     "./http_server/http_server.c"
     "./http_server/theme_api.c"
     "./self_test/self_test.c"
@@ -52,6 +55,9 @@ PRIV_REQUIRES
     "spiffs"
     "vfs"
     "esp_driver_i2c"
+    "esp_http_client"
+    "mbedtls"
+    
 )
 
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_INCLUDE_SIMPLE=1" APPEND)
