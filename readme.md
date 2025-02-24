@@ -4,6 +4,31 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/t/skot/esp-miner)
 ![GitHub contributors](https://img.shields.io/github/contributors/skot/esp-miner)
 
+# ACS ESP Miner Fork
+![image](https://github.com/user-attachments/assets/afb6426b-1a2c-4353-8d57-4c85953c13e7)
+- ### Based on [ESP Miner](https://github.com/skot/ESP-Miner)
+  
+## **Factory ACS images coming Soon** 
+
+# Goals
+- Creating a version of ESP-Miner that is more user interfacable outside of the existing Web GUI.
+- Creating a framework where data can be sent to supporting devices for display
+
+# Changes
+- Support for sending additional I2C Data for periphials
+- Support for API GET request
+- Tweaked System task to allow for faster data push intervals
+
+# API 
+### [MEMPOOL](https://mempool.space/docs/api/rest)
+
+We are testing the use of the Mempool API for Bitoin Newtowrk and Mining Related upadates. The first iteration is in testing, and building the Bitcoin News Page around this data
+
+
+
+# Related Project
+### [ACS Bitaxe Hardware](https://github.com/Advanced-Crypto-Services/acs-bitaxe)
+### [800x480 LCD Add-On](https://github.com/Advanced-Crypto-Services/acs-bitaxe-lcd-800x480)
 
 # ESP-Miner
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/skot/bitaxe)
@@ -37,6 +62,7 @@ bitaxetool --config ./config-401.cvs
 ```
 bitaxetool --config ./config-401.cvs --firmware ./esp-miner-factory-401-v2.4.2.bin
 ```
+
 
 ## AxeOS API
 The esp-miner UI is called AxeOS and provides an API to expose actions and information.

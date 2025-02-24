@@ -1,12 +1,12 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { catchError, from, map, mergeMap, of, take, timeout, toArray } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { SystemService } from 'src/app/services/system.service';
+const REFRESH_TIME_SECONDS = 30;
 const SWARM_DATA = 'SWARM_DATA'
-const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 @Component({
   selector: 'app-swarm',
   templateUrl: './swarm.component.html',
@@ -24,14 +24,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public scanning = false;
 
   public refreshIntervalRef!: number;
-  public refreshIntervalTime = 30;
-  public refreshTimeSet = 30;
+  public refreshIntervalTime = REFRESH_TIME_SECONDS;
 
-  public totals: { hashRate: number, power: number, bestDiff: string } = { hashRate: 0, power: 0, bestDiff: '0' };
+  public totalHashRate: number = 0;
 
   public isRefreshing = false;
-
-  public refreshIntervalControl: FormControl;
 
   constructor(
     private fb: FormBuilder,
@@ -43,18 +40,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     this.form = this.fb.group({
       manualAddIp: [null, [Validators.required, Validators.pattern('(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')]]
-    });
-
-    const storedRefreshTime = this.localStorageService.getNumber(SWARM_REFRESH_TIME) ?? 30;
-    this.refreshIntervalTime = storedRefreshTime;
-    this.refreshTimeSet = storedRefreshTime;
-    this.refreshIntervalControl = new FormControl(storedRefreshTime);
-    
-    this.refreshIntervalControl.valueChanges.subscribe(value => {
-      this.refreshIntervalTime = value;
-      this.refreshTimeSet = value;
-      this.localStorageService.setNumber(SWARM_REFRESH_TIME, value);
-    });
+    })
 
   }
 
@@ -65,7 +51,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       this.scanNetwork();
     } else {
       this.swarm = swarmData;
-      this.refreshList();
+      this.calculateTotalHashRate();
     }
 
     this.refreshIntervalRef = window.setInterval(() => {
@@ -134,7 +120,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
         const newItems = validResults.filter(item => !existingIps.has(item.IP));
         this.swarm = [...this.swarm, ...newItems].sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
-        this.calculateTotals();
+        this.calculateTotalHashRate();
       },
       complete: () => {
         this.scanning = false;
@@ -156,7 +142,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
         this.swarm.push({ IP: newIp, ...res });
         this.swarm = this.swarm.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
-        this.calculateTotals();
+        this.calculateTotalHashRate();
       }
     });
   }
@@ -182,7 +168,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public remove(axeOs: any) {
     this.swarm = this.swarm.filter(axe => axe.IP != axeOs.IP);
     this.localStorageService.setObject(SWARM_DATA, this.swarm);
-    this.calculateTotals();
+    this.calculateTotalHashRate();
   }
 
   public refreshList() {
@@ -229,7 +215,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       next: (result) => {
         this.swarm = result.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
-        this.calculateTotals();
+        this.calculateTotalHashRate();
         this.isRefreshing = false;
       },
       complete: () => {
@@ -242,32 +228,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
     return this.ipToInt(a.IP) - this.ipToInt(b.IP);
   }
 
-  private convertBestDiffToNumber(bestDiff: string): number {
-    if (!bestDiff) return 0;
-    const value = parseFloat(bestDiff);
-    const unit = bestDiff.slice(-1).toUpperCase();
-    switch (unit) {
-      case 'T': return value * 1000000000000;
-      case 'G': return value * 1000000000;
-      case 'M': return value * 1000000;
-      case 'K': return value * 1000;
-      default: return value;
-    }
-  }
-
-  private formatBestDiff(value: number): string {
-    if (value >= 1000000000000) return `${(value / 1000000000000).toFixed(2)}T`;
-    if (value >= 1000000000) return `${(value / 1000000000).toFixed(2)}G`;
-    if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`;
-    if (value >= 1000) return `${(value / 1000).toFixed(2)}K`;
-    return value.toFixed(2);
-  }
-
-  private calculateTotals() {
-    this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
-    this.totals.power = this.swarm.reduce((sum, axe) => sum + (axe.power || 0), 0);
-    const maxDiff = Math.max(...this.swarm.map(axe => this.convertBestDiffToNumber(axe.bestDiff)));
-    this.totals.bestDiff = this.formatBestDiff(maxDiff);
+  private calculateTotalHashRate() {
+    this.totalHashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
   }
 
 }

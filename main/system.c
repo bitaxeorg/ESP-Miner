@@ -29,15 +29,21 @@
 #include "input.h"
 #include "screen.h"
 #include "vcore.h"
+#include "lvglDisplayBAP.h"
+#include "lvglDisplay.h"
+#include "mempoolAPI.h"
+
+
 
 static const char * TAG = "SystemModule";
 
 static void _suffix_string(uint64_t, char *, size_t, int);
 
-static esp_netif_t * netif;
+esp_netif_t * netif;
 
 //local function prototypes
 static esp_err_t ensure_overheat_mode_config();
+
 
 static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id);
 static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
@@ -138,6 +144,21 @@ void SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
             } else {
                 ESP_LOGI(TAG, "OLED init success!");
             }
+            #if LVGL_MODE_BAP == 1
+            // Initialize LVGL display
+            if (lvglDisplay_initBAP() != ESP_OK) {
+                ESP_LOGI(TAG, "LVGL display init failed!");
+            } else {
+                ESP_LOGI(TAG, "LVGL display init success!");
+            }
+            #elif LVGL_MODE_I2C == 1
+            // Initialize LVGL display
+            if (lvglDisplay_init() != ESP_OK) {
+                ESP_LOGI(TAG, "LVGL display init failed!");
+            } else {
+                ESP_LOGI(TAG, "LVGL display init success!");
+            }
+            #endif
             break;
         default:
     }
@@ -151,7 +172,88 @@ void SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     }
 
     netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+};
+
+void SYSTEM_task(void * pvParameters)
+{
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    static uint8_t displayBufferBAP[1024];
+    
+    //_init_system(GLOBAL_STATE);
+
+    char input_event[10];
+    ESP_LOGI(TAG, "SYSTEM_task started");
+
+    while (GLOBAL_STATE->ASIC_functions.init_fn == NULL) {
+        show_ap_information("ASIC MODEL INVALID", GLOBAL_STATE);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
+
+    // show the connection screen
+    while (!module->startup_done) {
+        // Check for BAP messages
+        #if LVGL_MODE_BAP == 1
+        SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 50);
+        lvglStartupLoopBAP(GLOBAL_STATE);
+        #elif LVGL_MODE_I2C == 1
+        // TODO: Implement I2C startup loop
+        #endif
+    }
+    int current_screen = 0;
+    TickType_t last_update_time = xTaskGetTickCount();
+
+    while (1) {
+        // Check for overheat mode
+        #if LVGL_MODE_BAP == 1
+            SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
+        #elif LVGL_MODE_I2C == 1
+            // TODO: 
+        #endif
+
+        if (module->overheat_mode == 1) {
+            gpio_set_level(GPIO_NUM_1, 0);
+            #if LVGL_MODE_BAP == 1
+                lvglOverheatLoopBAP(GLOBAL_STATE);
+            #elif LVGL_MODE_I2C == 1
+                // TODO: Implement I2C overheat loop
+            #endif
+            //  vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
+            continue;  // Skip the normal screen cycle
+        }
+        // Update the RGB display
+        #if LVGL_MODE_BAP == 1
+            lvglUpdateDisplayNetworkBAP(GLOBAL_STATE);
+            lvglUpdateDisplayMiningBAP(GLOBAL_STATE);
+            lvglUpdateDisplayMonitoringBAP(GLOBAL_STATE);
+            lvglUpdateDisplayDeviceStatusBAP(GLOBAL_STATE);
+        #elif LVGL_MODE_I2C == 1
+            lvglUpdateDisplayNetwork(GLOBAL_STATE);
+            lvglUpdateDisplayMining(GLOBAL_STATE);
+            lvglUpdateDisplayMonitoring(GLOBAL_STATE);
+            lvglUpdateDisplayDeviceStatus(GLOBAL_STATE);
+        #endif
+        
+        #if USE_MEMPOOL_API == 1
+        mempool_api_price();
+        mempool_api_block_tip_height();
+        mempool_api_network_hashrate();
+        mempool_api_network_difficulty_adjustement();
+        mempool_api_network_recommended_fee();
+        #if LVGL_MODE_BAP == 1
+            lvglUpdateDisplayAPIBAP();
+        #elif LVGL_MODE_I2C == 1
+            lvglUpdateDisplayAPI();
+        #endif
+        #endif
+
+        #if LVGL_MODE_I2C == 1
+            lvglGetSettings();
+        #endif
+    }
+   
 }
+    
 
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
 {
