@@ -4,7 +4,7 @@
 
 #include "TMP1075.h"
 
-// static const char *TAG = "TMP1075.c";
+static const char *TAG = "TMP1075";
 
 static i2c_master_dev_handle_t tmp1075_dev_handle;
 
@@ -14,7 +14,7 @@ static i2c_master_dev_handle_t tmp1075_dev_handle;
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
 esp_err_t TMP1075_init(void) {
-    return i2c_bitaxe_add_device(TMP1075_I2CADDR_DEFAULT, &tmp1075_dev_handle);
+    return i2c_bitaxe_add_device(TMP1075_I2CADDR_DEFAULT, &tmp1075_dev_handle, TAG);
 }
 
 bool TMP1075_installed(int device_index)

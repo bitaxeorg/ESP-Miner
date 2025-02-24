@@ -53,10 +53,13 @@ static const char * TAG = "wifi_station";
 
 static int s_retry_num = 0;
 
+static char * _ip_addr_str;
+
 static void event_handler(void * arg, esp_event_base_t event_base, int32_t event_id, void * event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
+        MINER_set_wifi_status(WIFI_CONNECTING, 0, 0);
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         //lookup the exact reason code
         wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
@@ -72,14 +75,17 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         esp_wifi_connect();
         s_retry_num++;
         ESP_LOGI(TAG, "Retrying WiFi connection...");
-        MINER_set_wifi_status(WIFI_RETRYING, s_retry_num);
+        MINER_set_wifi_status(WIFI_RETRYING, s_retry_num, event->reason);
 
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+
         ip_event_got_ip_t * event = (ip_event_got_ip_t *) event_data;
-        ESP_LOGI(TAG, "Bitaxe ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        snprintf(_ip_addr_str, IP4ADDR_STRLEN_MAX, IPSTR, IP2STR(&event->ip_info.ip));
+
+        ESP_LOGI(TAG, "Bitaxe ip: %s", _ip_addr_str);
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        MINER_set_wifi_status(WIFI_CONNECTED, 0);
+        MINER_set_wifi_status(WIFI_CONNECTED, 0, 0);
     }
 }
 
@@ -121,11 +127,9 @@ void toggle_wifi_softap(void)
     ESP_ERROR_CHECK(esp_wifi_get_mode(&mode));
 
     if (mode == WIFI_MODE_APSTA) {
-        ESP_LOGI(TAG, "ESP_WIFI Access Point Off");
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+        wifi_softap_off();
     } else {
-        ESP_LOGI(TAG, "ESP_WIFI Access Point On");
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+        wifi_softap_on();
     }
 }
 
@@ -133,12 +137,14 @@ void wifi_softap_off(void)
 {
     ESP_LOGI(TAG, "ESP_WIFI Access Point Off");
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    MINER_set_ap_status(false);
 }
 
 void wifi_softap_on(void)
 {
     ESP_LOGI(TAG, "ESP_WIFI Access Point On");
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+    MINER_set_ap_status(true);
 }
 
 /* Initialize wifi station */
@@ -194,8 +200,10 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
     return esp_netif_sta;
 }
 
-void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * hostname)
+void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * hostname, char * ip_addr_str)
 {
+    _ip_addr_str = ip_addr_str;
+
     s_wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
@@ -210,7 +218,7 @@ void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * host
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+    wifi_softap_on();
 
     /* Initialize AP */
     ESP_LOGI(TAG, "ESP_WIFI Access Point On");
@@ -222,6 +230,9 @@ void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * host
 
     /* Start WiFi */
     ESP_ERROR_CHECK(esp_wifi_start());
+
+    /* Disable power savings for best performance */
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
     /* Set Hostname */
     esp_err_t err = esp_netif_set_hostname(esp_netif_sta, hostname);

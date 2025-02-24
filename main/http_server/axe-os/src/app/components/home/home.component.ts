@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { SystemService } from 'src/app/services/system.service';
+import { ThemeService } from 'src/app/services/theme.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 
@@ -12,11 +13,10 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 })
 export class HomeComponent {
 
-  public info$: Observable<ISystemInfo>;
-
-  public quickLink$: Observable<string | undefined>;
-  public fallbackQuickLink$: Observable<string | undefined>;
-  public expectedHashRate$: Observable<number | undefined>;
+  public info$!: Observable<ISystemInfo>;
+  public quickLink$!: Observable<string | undefined>;
+  public fallbackQuickLink$!: Observable<string | undefined>;
+  public expectedHashRate$!: Observable<number | undefined>;
 
 
   public chartOptions: any;
@@ -31,9 +31,50 @@ export class HomeComponent {
   public maxFrequency: number = 800;
 
   constructor(
-    private systemService: SystemService
+    private systemService: SystemService,
+    private themeService: ThemeService
   ) {
+    this.initializeChart();
 
+    // Subscribe to theme changes
+    this.themeService.getThemeSettings().subscribe(() => {
+      this.updateChartColors();
+    });
+  }
+
+  private updateChartColors() {
+    const documentStyle = getComputedStyle(document.documentElement);
+    const textColor = documentStyle.getPropertyValue('--text-color');
+    const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
+    const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
+    const primaryColor = documentStyle.getPropertyValue('--primary-color');
+
+    // Update chart colors
+    if (this.chartData && this.chartData.datasets) {
+      this.chartData.datasets[0].backgroundColor = primaryColor + '30';
+      this.chartData.datasets[0].borderColor = primaryColor;
+      this.chartData.datasets[1].backgroundColor = primaryColor + '30';
+      this.chartData.datasets[1].borderColor = primaryColor + '60';
+      this.chartData.datasets[2].backgroundColor = textColorSecondary;
+      this.chartData.datasets[2].borderColor = textColorSecondary;
+    }
+
+    // Update chart options
+    if (this.chartOptions) {
+      this.chartOptions.plugins.legend.labels.color = textColor;
+      this.chartOptions.scales.x.ticks.color = textColorSecondary;
+      this.chartOptions.scales.x.grid.color = surfaceBorder;
+      this.chartOptions.scales.y.ticks.color = textColorSecondary;
+      this.chartOptions.scales.y.grid.color = surfaceBorder;
+      this.chartOptions.scales.y2.ticks.color = textColorSecondary;
+      this.chartOptions.scales.y2.grid.color = surfaceBorder;
+    }
+
+    // Force chart update
+    this.chartData = { ...this.chartData };
+  }
+
+  private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
     const textColor = documentStyle.getPropertyValue('--text-color');
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
@@ -222,17 +263,24 @@ export class HomeComponent {
 
   private getQuickLink(stratumURL: string, stratumUser: string): string | undefined {
     const address = stratumUser.split('.')[0];
-    
+
     if (stratumURL.includes('public-pool.io')) {
       return `https://web.public-pool.io/#/app/${address}`;
     } else if (stratumURL.includes('ocean.xyz')) {
       return `https://ocean.xyz/stats/${address}`;
     } else if (stratumURL.includes('solo.d-central.tech')) {
       return `https://solo.d-central.tech/#/app/${address}`;
-    } else if (/solo[46]?.ckpool.org/.test(stratumURL)) {
+    } else if (/^eusolo[46]?.ckpool.org/.test(stratumURL)) {
+      return `https://eusolostats.ckpool.org/users/${address}`;
+    } else if (/^solo[46]?.ckpool.org/.test(stratumURL)) {
       return `https://solostats.ckpool.org/users/${address}`;
+    } else if (stratumURL.includes('pool.noderunners.network')) {
+      return `https://noderunners.network/en/pool/user/${address}`;
+    } else if (stratumURL.includes('satoshiradio.nl')) {
+      return `https://pool.satoshiradio.nl/user/${address}`;
+    } else if (stratumURL.includes('solohash.co.uk')) {
+      return `https://solohash.co.uk/user/${address}`;
     }
     return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
   }
 }
-

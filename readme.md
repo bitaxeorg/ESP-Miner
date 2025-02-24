@@ -45,14 +45,22 @@ Install bitaxetool from pip. pip is included with Python 3.4 but if you need to 
 ```
 pip install --upgrade bitaxetool
 ```
-The bitaxetool includes all necessary library for flashing the binary file to the Bitaxe Hardware.
+The bitaxetool includes all necessary library for flashing the binaries to the Bitaxe Hardware.
 
-You need to provide a config.cvs file (see repo for examples) and the appropiate firmware.bin file in it's executed directory.
-
-- Flash with the bitaxetool
+- Flash a "factory" image to a Bitaxe to reset to factory settings. Make sure to choose an image built for your hardware version (401) in this case:
 
 ```
-bitaxetool --config ./config.cvs --firmware ./esp-miner-factory-v2.0.3.bin
+bitaxetool --firmware ./esp-miner-factory-401-v2.4.2.bin
+```
+- Flash just the NVS config to a bitaxe:
+
+```
+bitaxetool --config ./config-401.cvs
+```
+- Flash both a factory image _and_ a config to your Bitaxe: note the settings in the config file will overwrite the config already baked into the factory image:
+
+```
+bitaxetool --config ./config-401.cvs --firmware ./esp-miner-factory-401-v2.4.2.bin
 ```
 
 
@@ -91,3 +99,42 @@ Some API examples in curl:
 ## Administration
 
 The firmware hosts a small web server on port 80 for administrative purposes. Once the Bitaxe device is connected to the local network, the admin web front end may be accessed via a web browser connected to the same network at `http://<IP>`, replacing `IP` with the LAN IP address of the Bitaxe device, or `http://bitaxe`, provided your network supports mDNS configuration.
+
+### Recovery
+
+In the event that the admin web front end is inaccessible, for example because of an unsuccessful firmware update (`www.bin`), a recovery page can be accessed at `http://<IP>/recovery`.
+
+## Development
+
+### Prerequisites
+
+- Install the ESP-IDF toolchain from https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/
+- Install nodejs/npm from https://nodejs.org/en/download
+- (Optional) Install the ESP-IDF extension for VSCode from https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension
+
+### Building
+
+At the root of the repository, run:
+```
+idf.py build && ./merge_bin.sh ./esp-miner-merged.bin
+```
+
+Note: the merge_bin.sh script is a custom script that merges the bootloader, partition table, and the application binary into a single file.
+
+Note: if using VSCode, you may have to configure the settings.json file to match your esp hardware version. For example, if your bitaxe has something other than an esp32-s3, you will need to change the version in the `.vscode/settings.json` file.
+
+### Flashing
+
+With the bitaxe connected to your computer via USB, run:
+
+```
+bitaxetool --config ./config-xxx.cvs --firmware ./esp-miner-merged.bin
+```
+
+where xxx is the config file for your hardware version. You can see the list of available config files in the root of the repository.
+
+Note: if you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
+
+## Attributions
+
+The display font is Portfolio 6x8 from https://int10h.org/oldschool-pc-fonts/ by VileR.

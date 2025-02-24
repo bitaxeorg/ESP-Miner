@@ -52,6 +52,7 @@ export class SystemService {
           isUsingFallbackStratum: true,
           frequency: 485,
           version: "2.0",
+          idfVersion: "v5.1.2",
           boardVersion: "204",
           flipscreen: 1,
           invertscreen: 0,
@@ -92,14 +93,13 @@ export class SystemService {
             'Content-Type': 'application/octet-stream', // Set the content type
           },
         }).subscribe({
-          next: (e) => {
-
+          next: (event) => {
+            subscriber.next(event);
           },
           error: (err) => {
             subscriber.error(err)
           },
           complete: () => {
-            subscriber.next()
             subscriber.complete();
           }
         });
