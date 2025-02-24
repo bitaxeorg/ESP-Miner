@@ -120,7 +120,6 @@ void app_main(void)
 
     GLOBAL_STATE.new_stratum_version_rolling_msg = false;
 
-    xTaskCreate(USER_INPUT_task, "user input", 8192, (void *) &GLOBAL_STATE, 5, NULL);
 
     if (GLOBAL_STATE.SYSTEM_MODULE.overheat_mode) {
         gpio_set_direction(GPIO_NUM_1, GPIO_MODE_OUTPUT);

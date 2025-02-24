@@ -185,11 +185,6 @@ void SYSTEM_task(void * pvParameters)
     char input_event[10];
     ESP_LOGI(TAG, "SYSTEM_task started");
 
-    while (GLOBAL_STATE->ASIC_functions.init_fn == NULL) {
-        show_ap_information("ASIC MODEL INVALID", GLOBAL_STATE);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-    }
-
     // show the connection screen
     while (!module->startup_done) {
         // Check for BAP messages
