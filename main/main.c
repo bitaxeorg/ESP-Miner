@@ -118,7 +118,7 @@ void app_main(void)
     free(wifi_ssid);
     free(wifi_pass);
     free(hostname);
-
+    GLOBAL_STATE.SYSTEM_MODULE.startup_done = true;
     GLOBAL_STATE.new_stratum_version_rolling_msg = false;
 
 
