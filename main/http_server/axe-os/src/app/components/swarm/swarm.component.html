@@ -1,7 +1,7 @@
-<div class="card">
+<div class="card p-3">
 
     <form [formGroup]="form">
-        <div class="field grid p-fluid">
+        <div class="field grid p-fluid mb-0">
             <label htmlFor="ip" class="col-12 mb-2 md:col-4 md:mb-0">Manual Addition</label>
             <div class="col-12 md:col-8">
                 <p-inputGroup>
@@ -14,7 +14,7 @@
 
     </form>
 </div>
-<div class="flex gap-3 justify-content-between">
+<div class="flex flex-column sm:flex-row gap-4 justify-content-between">
     <div class="flex gap-1 sm:gap-3 text-sm md:text-base">
         <button pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
         <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing">
@@ -51,7 +51,7 @@
             <th>IP</th>
             <th>Hash Rate</th>
             <th>Uptime</th>
-            <th>Accepted</th>
+            <th>Shares</th>
             <th>Power</th>
             <th>Temp</th>
             <th>Best Diff</th>
@@ -64,7 +64,7 @@
             <tr>
                 <td>
                     <a class="text-primary" [href]="'http://'+axe.IP" target="_blank">{{axe.IP}}</a>
-                    <div class="text-xs">{{axe.hostname}}</div>
+                    <div class="text-sm">{{axe.hostname}}</div>
                 </td>
                 <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
                 <td>{{axe.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
@@ -81,8 +81,26 @@
                     </div>
                 </td>
                 <td>{{axe.power | number: '1.1-1'}} <small>W</small> </td>
-                <td [ngClass]="{'text-orange-500': axe.temp > 65}">{{axe.temp | number: '1.0-1'}}°<small>C</small></td>
-                <td>{{axe.bestDiff}}</td>
+                <td>
+                    <div [ngClass]="{'text-orange-500': axe.temp > 68}">
+                        {{axe.temp | number: '1.0-1'}}°<small>C</small>
+                    </div>
+                    <div class="text-sm w-min cursor-pointer" 
+                         [ngClass]="{'text-orange-500': axe.vrTemp > 90}" 
+                         *ngIf="axe.vrTemp"
+                         pTooltip="Voltage Regulator Temperature"
+                         tooltipPosition="top">
+                        {{axe.vrTemp | number: '1.0-1'}}°<small>C</small>
+                    </div>
+                </td>
+                <td>
+                    <div>{{axe.bestDiff}}</div>
+                    <div class="text-sm w-min cursor-pointer" 
+                         pTooltip="Best Session Diff"
+                         tooltipPosition="top">
+                        {{axe.bestSessionDiff}}
+                    </div>
+                </td>
                 <td>{{axe.version}}</td>
              <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
                 <td><p-button icon="pi pi-sync" pp-button severity="danger" (click)="restart(axe)"></p-button></td>
