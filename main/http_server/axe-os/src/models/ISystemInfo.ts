@@ -18,6 +18,7 @@ export interface ISystemInfo {
     macAddr: string,
     ssid: string,
     wifiStatus: string,
+    apEnabled: number,
     sharesAccepted: number,
     sharesRejected: number,
     uptimeSeconds: number,

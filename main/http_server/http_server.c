@@ -32,6 +32,9 @@
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
 #include <pthread.h>
+#include "connect.h"
+
+#include "asic.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -40,7 +43,10 @@ static const char * CORS_TAG = "CORS";
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/json");
-
+    
+    // Give some time for the connected flag to take effect
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    
     wifi_ap_record_simple_t ap_records[20];
     uint16_t ap_count = 0;
 
@@ -551,30 +557,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
     cJSON_AddStringToObject(root, "hostname", hostname);
     cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
+    cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
     cJSON_AddNumberToObject(root, "sharesAccepted", GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
     cJSON_AddNumberToObject(root, "sharesRejected", GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
     cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000);
-    cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE->asic_count);
-    uint16_t small_core_count = 0;
-    switch (GLOBAL_STATE->asic_model){
-        case ASIC_BM1397:
-            small_core_count = BM1397_SMALL_CORE_COUNT;
-            break;
-        case ASIC_BM1366:
-            small_core_count = BM1366_SMALL_CORE_COUNT;
-            break;
-        case ASIC_BM1368:
-            small_core_count = BM1368_SMALL_CORE_COUNT;
-            break;
-        case ASIC_BM1370:
-            small_core_count = BM1370_SMALL_CORE_COUNT;
-            break;
-        case ASIC_UNKNOWN:
-        default:
-            small_core_count = -1;
-            break;
-    }
-    cJSON_AddNumberToObject(root, "smallCoreCount", small_core_count);
+    cJSON_AddNumberToObject(root, "asicCount", ASIC_get_asic_count(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "smallCoreCount", ASIC_get_small_core_count(GLOBAL_STATE));
     cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->asic_model_str);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
@@ -627,6 +615,10 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         return ESP_OK;
     }
 
+    GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "www.bin");
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
+
     char buf[1000];
     int remaining = req->content_len;
 
@@ -652,19 +644,30 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
             continue;
         } else if (recv_len <= 0) {
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
             return ESP_OK;
         }
 
         if (esp_partition_write(www_partition, www_partition->size - remaining, (const void *) buf, recv_len) != ESP_OK) {
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
             return ESP_OK;
         }
+
+
+        uint8_t percentage = 100 - ((remaining * 100 / req->content_len));
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Working (%d%%)", percentage);
 
         remaining -= recv_len;
     }
 
     httpd_resp_sendstr(req, "WWW update complete\n");
+
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Finished...");
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+
     return ESP_OK;
 }
 
@@ -685,6 +688,10 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         return ESP_OK;
     }
     
+    GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "esp-miner.bin");
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
+
     char buf[1000];
     esp_ota_handle_t ota_handle;
     int remaining = req->content_len;
@@ -701,6 +708,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
             // Serious Error: Abort OTA
         } else if (recv_len <= 0) {
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
             return ESP_OK;
         }
@@ -708,18 +716,26 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         // Successful Upload: Flash firmware chunk
         if (esp_ota_write(ota_handle, (const void *) buf, recv_len) != ESP_OK) {
             esp_ota_abort(ota_handle);
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Flash Error");
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
             return ESP_OK;
         }
+
+        uint8_t percentage = 100 - ((remaining * 100 / req->content_len));
+
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Working (%d%%)", percentage);
 
         remaining -= recv_len;
     }
 
     // Validate and switch to new OTA image and reboot
     if (esp_ota_end(ota_handle) != ESP_OK || esp_ota_set_boot_partition(ota_partition) != ESP_OK) {
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Validation Error");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Validation / Activation Error");
         return ESP_OK;
     }
+
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
 
     httpd_resp_sendstr(req, "Firmware update complete, rebooting now!\n");
     ESP_LOGI(TAG, "Restarting System because of Firmware update complete");
@@ -867,6 +883,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
+    config.stack_size = 8192;
     config.max_open_sockets = 10;
     config.max_uri_handlers = 20;
 

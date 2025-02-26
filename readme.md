@@ -4,6 +4,8 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/t/skot/esp-miner)
 ![GitHub contributors](https://img.shields.io/github/contributors/skot/esp-miner)
 
+![Alt](https://repobeats.axiom.co/api/embed/9830d39ca088153c7db39a7c0e1645c62a0454fd.svg "Repobeats analytics image")
+
 
 # ESP-Miner
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/skot/bitaxe)
@@ -77,6 +79,10 @@ The firmware hosts a small web server on port 80 for administrative purposes. On
 ### Recovery
 
 In the event that the admin web front end is inaccessible, for example because of an unsuccessful firmware update (`www.bin`), a recovery page can be accessed at `http://<IP>/recovery`.
+
+### Unlock Settings
+
+In order to unlock the Input fields for ASIC Mhz and ASIC Voltage you need to open up your Browser console (mostly done by pressing F12). If you submit the command `unlockSettings()` your input fields for ASIC Mhz and ASIC Voltage will be unlocked and you can place other values out of the predefined scope into them.
 
 ## Development
 
