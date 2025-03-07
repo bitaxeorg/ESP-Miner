@@ -24,8 +24,8 @@
     <div class="flex align-items-center gap-2">
         <label for="refresh-interval" class="text-sm md:text-base">Refresh Interval:</label>
         <p-slider id="refresh-interval" class="pl-2 pr-2"
-                 [min]="5" 
-                 [max]="30" 
+                 [min]="5"
+                 [max]="30"
                  [style]="{'width': '150px'}"
                  [formControl]="refreshIntervalControl">
         </p-slider>
@@ -48,7 +48,26 @@
 <div class="table-container">
     <table cellspacing="0" cellpadding="0" class="text-sm md:text-base">
         <tr>
-            <th>IP</th>
+            <th>
+                <div class="flex items-center cursor-pointer select-none h-full" (click)="sortBy('IP')">
+                    <span class="flex-1">IP</span>
+                    <i class="pi text-xs flex items-center" [ngClass]="{
+                        'pi-sort-alt': sortField !== 'IP',
+                        'pi-sort-amount-up-alt': sortField === 'IP' && sortDirection === 'asc',
+                        'pi-sort-amount-down': sortField === 'IP' && sortDirection === 'desc'
+                    }"></i>
+                </div>
+            </th>
+            <th>
+                <div class="flex items-center cursor-pointer select-none h-full" (click)="sortBy('hostname')">
+                    <span class="flex-1">Hostname</span>
+                    <i class="pi text-xs flex items-center" [ngClass]="{
+                        'pi-sort-alt': sortField !== 'hostname',
+                        'pi-sort-amount-up-alt': sortField === 'hostname' && sortDirection === 'asc',
+                        'pi-sort-amount-down': sortField === 'hostname' && sortDirection === 'desc'
+                    }"></i>
+                </div>
+            </th>
             <th>Hash Rate</th>
             <th>Uptime</th>
             <th>Shares</th>
@@ -72,21 +91,21 @@
                             axe.ASICModel === 'BM1370' ? 'text-green-500' :
                             ''
                        ]"
-                       [href]="'http://'+axe.IP" 
+                       [href]="'http://'+axe.IP"
                        target="_blank"
                        [pTooltip]="axe.ASICModel"
                        tooltipPosition="top">{{axe.IP}}</a>
-                    <div class="text-sm">{{axe.hostname}}</div>
                 </td>
+                <td>{{axe.hostname}}</td>
                 <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
                 <td>{{axe.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
                 <td>
-                    <div class="w-min cursor-pointer" 
+                    <div class="w-min cursor-pointer"
                          pTooltip="Shares Accepted"
                          tooltipPosition="top">
                         {{axe.sharesAccepted | number: '1.0-0'}}
                     </div>
-                    <div class="text-sm w-min cursor-pointer" 
+                    <div class="text-sm w-min cursor-pointer"
                          pTooltip="Shares Rejected"
                          tooltipPosition="top">
                         {{axe.sharesRejected | number: '1.0-0'}}
@@ -97,8 +116,8 @@
                     <div [ngClass]="{'text-orange-500': axe.temp > 68}">
                         {{axe.temp | number: '1.0-1'}}°<small>C</small>
                     </div>
-                    <div class="text-sm w-min cursor-pointer" 
-                         [ngClass]="{'text-orange-500': axe.vrTemp > 90}" 
+                    <div class="text-sm w-min cursor-pointer"
+                         [ngClass]="{'text-orange-500': axe.vrTemp > 90}"
                          *ngIf="axe.vrTemp"
                          pTooltip="Voltage Regulator Temperature"
                          tooltipPosition="top">
@@ -107,14 +126,14 @@
                 </td>
                 <td>
                     <div>{{axe.bestDiff}}</div>
-                    <div class="text-sm w-min cursor-pointer" 
+                    <div class="text-sm w-min cursor-pointer"
                          pTooltip="Best Session Diff"
                          tooltipPosition="top">
                         {{axe.bestSessionDiff}}
                     </div>
                 </td>
                 <td>{{axe.version}}</td>
-             <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
+                <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
                 <td><p-button icon="pi pi-sync" pp-button severity="danger" (click)="restart(axe)"></p-button></td>
                 <td><p-button icon="pi pi-trash" pp-button severity="secondary" (click)="remove(axe)"></p-button></td>
             </tr>

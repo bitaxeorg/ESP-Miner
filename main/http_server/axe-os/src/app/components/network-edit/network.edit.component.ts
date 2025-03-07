@@ -62,6 +62,11 @@ export class NetworkEditComponent implements OnInit {
       delete form.wifiPass;
     }
 
+    // Trim SSID to remove any leading/trailing whitespace
+    if (form.ssid) {
+      form.ssid = form.ssid.trim();
+    }
+
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
