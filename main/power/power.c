@@ -11,6 +11,14 @@
 #define GAMMA_POWER_OFFSET 5 //Watts
 #define GAMMATURBO_POWER_OFFSET 5 //Watts
 
+// max power settings
+
+#define MAX_MAX_POWER 30 //watts
+#define ULTRA_MAX_POWER 35 //Watts
+#define SUPRA_MAX_POWER 40 //watts
+#define GAMMA_MAX_POWER 50 //Watts
+#define GAMMATURBO_MAX_POWER 60 //Watts
+
 esp_err_t Power_disable(GlobalState * GLOBAL_STATE) {
 
     switch (GLOBAL_STATE->device_model) {
@@ -33,6 +41,22 @@ esp_err_t Power_disable(GlobalState * GLOBAL_STATE) {
     }
     return ESP_OK;
 
+}
+
+float Power_get_max_settings(GlobalState * GLOBAL_STATE) {
+
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+            return MAX_MAX_POWER;
+        case DEVICE_ULTRA:
+            return ULTRA_MAX_POWER;
+        case DEVICE_SUPRA:
+            return SUPRA_MAX_POWER;
+        case DEVICE_GAMMA:
+            return GAMMA_MAX_POWER;
+        case DEVICE_GAMMATURBO:
+            return GAMMATURBO_MAX_POWER;
+    }
 }
 
 float Power_get_current(GlobalState * GLOBAL_STATE) {
