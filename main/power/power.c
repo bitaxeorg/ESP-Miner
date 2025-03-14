@@ -56,6 +56,8 @@ float Power_get_max_settings(GlobalState * GLOBAL_STATE) {
             return GAMMA_MAX_POWER;
         case DEVICE_GAMMATURBO:
             return GAMMATURBO_MAX_POWER;
+        default:
+        return GAMMA_MAX_POWER;
     }
 }
 

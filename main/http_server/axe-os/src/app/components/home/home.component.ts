@@ -3,8 +3,9 @@ import { interval, map, Observable, shareReplay, startWith, switchMap, tap } fro
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
-import { eASICModel } from 'src/models/enum/eASICModel';
+import { eASICModel } from 'src/models/enum/eASICModel'; // can be removed?
 import { ISystemInfo } from 'src/models/ISystemInfo';
+
 
 @Component({
   selector: 'app-home',
@@ -26,7 +27,7 @@ export class HomeComponent {
   public powerData: number[] = [];
   public chartData?: any;
 
-  public maxPower: number = 50;
+  public maxPower: number = 0;
   public maxTemp: number = 75;
   public maxFrequency: number = 800;
 
@@ -209,7 +210,7 @@ export class HomeComponent {
           ...this.chartData
         };
 
-        this.maxPower = Math.max(50, info.power);
+        this.maxPower = Math.max(info.maxPower, info.power);
         this.maxTemp = Math.max(75, info.temp);
         this.maxFrequency = Math.max(800, info.frequency);
 
@@ -272,13 +273,13 @@ export class HomeComponent {
 
   public calculateEfficiencyAverage(hashrateData: number[], powerData: number[]): number {
     if (hashrateData.length === 0 || powerData.length === 0) return 0;
-    
+
     // Calculate efficiency for each data point and average them
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       return power / (hashrate/1000000000000); // Convert to J/TH
     });
-    
+
     return this.calculateAverage(efficiencies);
   }
 }

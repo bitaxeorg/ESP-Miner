@@ -14,6 +14,7 @@ export interface ISystemInfo {
     current: number,
     temp: number,
     vrTemp: number,
+    maxPower: number,
     hashRate: number,
     bestDiff: string,
     bestSessionDiff: string,
