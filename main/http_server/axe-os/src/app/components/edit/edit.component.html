@@ -59,6 +59,13 @@
 
         <div class="col-12">
             <div class="field-checkbox">
+                <p-checkbox name="invertfanpolarity" formControlName="invertfanpolarity" inputId="invertfanpolarity"
+                    [binary]="true"></p-checkbox>
+                <label for="invertfanpolarity">Invert Fan Duty Cycle</label>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="field-checkbox">
                 <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed"
                     [binary]="true"></p-checkbox>
                 <label for="autofanspeed">Automatic Fan Control</label>
