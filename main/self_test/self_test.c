@@ -206,6 +206,16 @@ esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
+esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
+    //check for faults on the voltage regulator
+    ESP_RETURN_ON_ERROR(VCORE_check_fault(GLOBAL_STATE), TAG, "VCORE check fault failed!");
+
+    if (GLOBAL_STATE->SYSTEM_MODULE.power_fault) {
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
 esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
     
     //enable the voltage regulator GPIO on HW that supports it
@@ -373,6 +383,15 @@ void self_test(void * pvParameters)
         ESP_LOGE(TAG, "SELF TEST FAIL, %d of %d CHIPS DETECTED", chips_detected, chips_expected);
         char error_buf[20];
         snprintf(error_buf, 20, "ASIC:FAIL %d CHIPS", chips_detected);
+        display_msg(error_buf, GLOBAL_STATE);
+        tests_done(GLOBAL_STATE, TESTS_FAILED);
+    }
+
+    //test for voltage regulator faults
+    if (test_vreg_faults(GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "VCORE check fault failed!");
+        char error_buf[20];
+        snprintf(error_buf, 20, "VCORE:PWR FAULT");
         display_msg(error_buf, GLOBAL_STATE);
         tests_done(GLOBAL_STATE, TESTS_FAILED);
     }
