@@ -208,6 +208,7 @@ export class HomeComponent {
 
         if (this.hashrateData.length >= 720) {
           this.hashrateData.shift();
+          this.temperatureData.shift();
           this.dataLabel.shift();
         }
 
