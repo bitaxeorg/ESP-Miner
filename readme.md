@@ -10,7 +10,7 @@
 # ESP-Miner
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/skot/bitaxe)
 
-If you are looking for premade images to load on your Bitaxe, check out the [releases](https://github.com/skot/ESP-Miner/releases) page. Maybe you want [instructions](https://github.com/skot/ESP-Miner/blob/master/flashing.md) for loading factory images.
+If you are looking for premade images to load on your Bitaxe, check out the [releases](https://github.com/bitaxeorg/ESP-Miner/releases) page. Maybe you want [instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md) for loading factory images.
 
 # Bitaxetool
 We also have a command line python tool for flashing Bitaxe and updating the config called Bitaxetool 
@@ -82,7 +82,7 @@ In the event that the admin web front end is inaccessible, for example because o
 
 ### Unlock Settings
 
-In order to unlock the Input fields for ASIC Mhz and ASIC Voltage you need to open up your Browser console (mostly done by pressing F12). If you submit the command `unlockSettings()` your input fields for ASIC Mhz and ASIC Voltage will be unlocked and you can place other values out of the predefined scope into them.
+In order to unlock the Input fields for ASIC Frequency and ASIC Core Voltage you need to append `?oc` to the end of the settings tab URL in your browser. Be aware that without additional cooling overclocking can overheat and/or damage your Bitaxe.
 
 ## Development
 

@@ -10,6 +10,7 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_check.h"
 
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
@@ -82,6 +83,9 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
     ESP_LOGI(TAG, "Initial overheat_mode value: %d", module->overheat_mode);
 
+    //Initialize power_fault fault mode
+    module->power_fault = 0;
+
     // set the best diff string
     _suffix_string(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     _suffix_string(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
@@ -93,20 +97,20 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     memset(module->wifi_status, 0, 20);
 }
 
-void SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
-    // Initialize the core voltage regulator
-    VCORE_init(GLOBAL_STATE);
-    VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE);
+esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
+    
+    ESP_RETURN_ON_ERROR(gpio_install_isr_service(0), TAG, "Error installing ISR service");
 
-    Thermal_init(GLOBAL_STATE->device_model, nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
+    // Initialize the core voltage regulator
+    ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
+
+    ESP_RETURN_ON_ERROR(Thermal_init(GLOBAL_STATE->device_model, nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1)), TAG, "Thermal init failed!");
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
     // Ensure overheat_mode config exists
-    esp_err_t ret = ensure_overheat_mode_config();
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to ensure overheat_mode config");
-    }
+    ESP_RETURN_ON_ERROR(ensure_overheat_mode_config(), TAG, "Failed to ensure overheat_mode config");
 
     //Init the DISPLAY
     switch (GLOBAL_STATE->device_model) {
@@ -125,15 +129,13 @@ void SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
         default:
     }
 
-    if (input_init(screen_next, toggle_wifi_softap) != ESP_OK) {
-        ESP_LOGW(TAG, "Input init failed!");
-    }
+    ESP_RETURN_ON_ERROR(input_init(screen_next, toggle_wifi_softap), TAG, "Input init failed!");
 
-    if (screen_start(GLOBAL_STATE) != ESP_OK) {
-        ESP_LOGW(TAG, "Screen init failed");
-    }
+    ESP_RETURN_ON_ERROR(screen_start(GLOBAL_STATE), TAG, "Screen start failed!");
 
     netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+
+    return ESP_OK;
 }
 
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)

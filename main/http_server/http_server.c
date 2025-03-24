@@ -1,6 +1,11 @@
-#include "http_server.h"
-#include "theme_api.h"  // Add theme API include
-#include "cJSON.h"
+#include <pthread.h>
+#include <fcntl.h>
+#include <string.h>
+#include <sys/param.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
+#include "freertos/task.h"
 #include "esp_chip_info.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -9,17 +14,6 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "esp_vfs.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/event_groups.h"
-#include "freertos/task.h"
-#include "global_state.h"
-#include "nvs_config.h"
-#include "vcore.h"
-#include "power.h"
-#include "connect.h"
-#include <fcntl.h>
-#include <string.h>
-#include <sys/param.h>
 
 #include "dns_server.h"
 #include "esp_mac.h"
@@ -32,10 +26,17 @@
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
-#include <pthread.h>
-#include "connect.h"
 
+#include "cJSON.h"
+#include "global_state.h"
+#include "nvs_config.h"
+#include "vcore.h"
+#include "power.h"
+#include "connect.h"
 #include "asic.h"
+#include "TPS546.h"
+#include "theme_api.h"  // Add theme API include
+#include "http_server.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -415,22 +416,22 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         return ESP_OK;
     }
 
-    if ((item = cJSON_GetObjectItem(root, "stratumURL")) != NULL) {
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumURL"))) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_URL, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumURL")) != NULL) {
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumURL"))) {
         nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "stratumUser")) != NULL) {
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumUser"))) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_USER, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "stratumPassword")) != NULL) {
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumPassword"))) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumUser")) != NULL) {
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumUser"))) {
         nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPassword")) != NULL) {
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumPassword"))) {
         nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "stratumPort")) != NULL) {
@@ -439,13 +440,13 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "fallbackStratumPort")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "ssid")) != NULL) {
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "ssid"))) {
         nvs_config_set_string(NVS_CONFIG_WIFI_SSID, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "wifiPass")) != NULL) {
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "wifiPass"))) {
         nvs_config_set_string(NVS_CONFIG_WIFI_PASS, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "hostname")) != NULL) {
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "hostname"))) {
         nvs_config_set_string(NVS_CONFIG_HOSTNAME, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
@@ -602,6 +603,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
+    
+    if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
+        cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
+    }
 
     free(ssid);
     free(hostname);
