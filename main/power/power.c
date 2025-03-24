@@ -12,12 +12,15 @@
 #define GAMMATURBO_POWER_OFFSET 5 //Watts
 
 // max power settings
-
 #define MAX_MAX_POWER 30 //watts
-#define ULTRA_MAX_POWER 35 //Watts
+#define ULTRA_MAX_POWER 30 //Watts
 #define SUPRA_MAX_POWER 40 //watts
-#define GAMMA_MAX_POWER 50 //Watts
+#define GAMMA_MAX_POWER 40 //Watts
 #define GAMMATURBO_MAX_POWER 60 //Watts
+
+// max voltage settings
+#define MAX_NORMAL_VOLTAGE 5.5 //volts
+#define MAX_NEW_VOLTAGE 12.5 //volts
 
 esp_err_t Power_disable(GlobalState * GLOBAL_STATE) {
 
@@ -145,6 +148,21 @@ float Power_get_input_voltage(GlobalState * GLOBAL_STATE) {
     }
 
     return 0.0;
+}
+
+float Power_get_max_voltage(GlobalState * GLOBAL_STATE) {
+
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+        case DEVICE_GAMMA:
+            return MAX_NORMAL_VOLTAGE;
+        case DEVICE_GAMMATURBO:
+            return MAX_NEW_VOLTAGE;
+        default:
+        return MAX_NORMAL_VOLTAGE;
+    }
 }
 
 float Power_get_vreg_temp(GlobalState * GLOBAL_STATE) {

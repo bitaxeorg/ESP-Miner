@@ -28,6 +28,7 @@ export class HomeComponent {
   public chartData?: any;
 
   public maxPower: number = 0;
+  public maxVoltage: number = 0;
   public maxTemp: number = 75;
   public maxFrequency: number = 800;
 
@@ -211,6 +212,7 @@ export class HomeComponent {
         };
 
         this.maxPower = Math.max(info.maxPower, info.power);
+        this.maxVoltage = Math.max(info.maxVoltage, info.voltage);
         this.maxTemp = Math.max(75, info.temp);
         this.maxFrequency = Math.max(800, info.frequency);
 

@@ -87,7 +87,7 @@
                                 <span class="text-500">{{sharesRejectedReason.message}}</span>
                                 ({{(sharesRejectedReason.count / (info.sharesAccepted + info.sharesRejected) * 100) | number: '1.2-2'}}%)
                             </div>
-                        </div>                        
+                        </div>
                     </div>
                 </div>
 
@@ -121,7 +121,7 @@
                 <div class="grid">
                     <div class="col-12">
                         <h6>Power <span style="float: right;">{{info.power}} W</span></h6>
-                        <p-progressBar [value]="(info.power / maxPower) * 100" [style]="{ height: '6px' }" >
+                        <p-progressBar [value]="(info.power / info.maxPower) * 100" [style]="{ height: '6px' }" >
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
                     </div>
@@ -130,15 +130,27 @@
 
                         <h6>Input Voltage <span style="float: right;">{{info.voltage}} V</span></h6>
                         <div class="relative">
-                            <p-progressBar [value]="(info.voltage / 5.5) * 100" [style]="{ height: '6px' }">
+                            <p-progressBar [value]="(info.voltage / info.maxVoltage) * 100" [style]="{ height: '6px' }">
                                 <ng-template pTemplate="content" let-value></ng-template>
                             </p-progressBar>
-                            <!-- Add marker at 5.0V (90.91% of 5.5V) -->
-                            <div class="absolute bg-white" style="left: 90.5%; top: 0; width: 3px; height: 6px;">
-                                <small class="absolute text-white" style="top: -1.25rem; transform: translateX(-50%)">5.0</small>
+
+                            <!-- Conditional marker based on max voltage -->
+                            <div class="absolute bg-white"
+                              [style.left]="(5 / info.maxVoltage) * 100 + '%'"
+                              *ngIf="info.maxVoltage === 5.5"
+                              style="top: 0; width: 3px; height: 6px;">
+                              <small class="absolute text-white" style="top: -1.25rem; transform: translateX(-50%)">5.0</small>
+                            </div>
+
+                            <!-- Marker for 12V model -->
+                            <div class="absolute bg-white"
+                              [style.left]="(12 / info.maxVoltage) * 100 + '%'"
+                              *ngIf="info.maxVoltage === 12.5"
+                               style="top: 0; width: 3px; height: 6px;">
+                             <small class="absolute text-white" style="top: -1.25rem; transform: translateX(-50%)">12.0</small>
                             </div>
                         </div>
-                        <span class="danger" *ngIf="info.voltage < 4.8">&nbsp; Danger: Low voltage</span>
+                        <span class="danger" *ngIf="info.voltage < info.maxVoltage * 0.87">&nbsp; Danger: Low voltage</span>
                     </div>
 
                     <div class="col-12">
