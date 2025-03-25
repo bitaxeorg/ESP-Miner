@@ -94,6 +94,43 @@ void nvs_config_set_u16(const char * key, const uint16_t value)
     nvs_close(handle);
 }
 
+int32_t nvs_config_get_i32(const char * key, const int32_t default_value)
+{
+    nvs_handle handle;
+    esp_err_t err;
+    err = nvs_open(NVS_CONFIG_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return default_value;
+    }
+
+    int32_t out;
+    err = nvs_get_i32(handle, key, &out);
+    nvs_close(handle);
+
+    if (err != ESP_OK) {
+        return default_value;
+    }
+    return out;
+}
+
+void nvs_config_set_i32(const char * key, const int32_t value)
+{
+    nvs_handle handle;
+    esp_err_t err;
+    err = nvs_open(NVS_CONFIG_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Could not open nvs");
+        return;
+    }
+
+    err = nvs_set_i32(handle, key, value);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Could not write nvs key: %s, value: %li", key, value);
+    }
+
+    nvs_close(handle);
+}
+
 uint64_t nvs_config_get_u64(const char * key, const uint64_t default_value)
 {
     nvs_handle handle;
