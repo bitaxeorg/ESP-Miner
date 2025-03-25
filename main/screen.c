@@ -371,13 +371,23 @@ static void screen_update_cb(lv_timer_t * timer)
     current_difficulty = module->best_session_nonce_diff;
     current_chip_temp = power_management->chip_temp_avg;
 
-    const uint32_t display_inactive_time = lv_display_get_inactive_time(NULL);
-    const uint16_t display_timeout_config = nvs_config_get_u16(NVS_CONFIG_DISPLAY_TIMEOUT, 0) * 60 * 1000;
+    int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1);
 
-    if ((0 != display_timeout_config) && (display_inactive_time > display_timeout_config)) {
+    if (0 > display_timeout_config) {
+        // display always on
+        display_on();
+    } else if (0 == display_timeout_config) {
+        // display off
         display_off();
     } else {
-        display_on();
+        // display timeout
+        const uint32_t display_timeout = display_timeout_config * 60 * 1000;
+
+        if (lv_display_get_inactive_time(NULL) > display_timeout) {
+            display_off();
+        } else {
+            display_on();
+        }
     }
 
     if (current_screen_time_ms <= current_screen_delay_ms || found_block) {
