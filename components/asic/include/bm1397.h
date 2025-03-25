@@ -17,11 +17,6 @@
 static const uint64_t BM1397_CORE_COUNT = 168;
 static const uint64_t BM1397_SMALL_CORE_COUNT = 672;
 
-typedef struct
-{
-    float frequency;
-} bm1397Module;
-
 typedef enum
 {
     JOB_PACKET = 0,
