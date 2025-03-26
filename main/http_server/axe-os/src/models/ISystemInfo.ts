@@ -2,14 +2,14 @@ import { eASICModel } from './enum/eASICModel';
 
 export interface ISystemInfo {
 
-    flipscreen: number;
-    invertscreen: number;
+    flipScreen: number;
+    invertScreen: number;
     power: number,
     voltage: number,
     current: number,
     temp: number,
     vrTemp: number,
-    hashRate: number,
+    hashrate: number,
     bestDiff: string,
     bestSessionDiff: string,
     freeHeap: number,
@@ -23,7 +23,7 @@ export interface ISystemInfo {
     uptimeSeconds: number,
     asicCount: number,
     smallCoreCount: number,
-    ASICModel: eASICModel,
+    asicModel: eASICModel,
     stratumURL: string,
     stratumPort: number,
     fallbackStratumURL: string,
@@ -35,13 +35,13 @@ export interface ISystemInfo {
     version: string,
     idfVersion: string,
     boardVersion: string,
-    invertfanpolarity: number,
-    autofanspeed: number,
-    fanspeed: number,
-    fanrpm: number,
+    invertFanPolarity: number,
+    autoFanSpeed: number,
+    fanSpeed: number,
+    fanRPM: number,
     coreVoltageActual: number,
 
     boardtemp1?: number,
     boardtemp2?: number,
-    overheat_mode: number
+    overheatMode: number
 }

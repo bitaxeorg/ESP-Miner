@@ -57,10 +57,10 @@ export class SettingsComponent {
 
       this.info$.pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
-        this.ASICModel = info.ASICModel;
+        this.ASICModel = info.asicModel;
         this.form = this.fb.group({
-          flipscreen: [info.flipscreen == 1],
-          invertscreen: [info.invertscreen == 1],
+          flipScreen: [info.flipScreen == 1],
+          invertScreen: [info.invertScreen == 1],
           stratumURL: [info.stratumURL, [
             Validators.required,
             Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
@@ -76,18 +76,18 @@ export class SettingsComponent {
           stratumPassword: ['*****', [Validators.required]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
-          autofanspeed: [info.autofanspeed == 1, [Validators.required]],
-          invertfanpolarity: [info.invertfanpolarity == 1, [Validators.required]],
-          fanspeed: [info.fanspeed, [Validators.required]],
+          autoFanSpeed: [info.autoFanSpeed == 1, [Validators.required]],
+          invertFanPolarity: [info.invertFanPolarity == 1, [Validators.required]],
+          fanSpeed: [info.fanSpeed, [Validators.required]],
         });
 
-        this.form.controls['autofanspeed'].valueChanges.pipe(
-          startWith(this.form.controls['autofanspeed'].value)
+        this.form.controls['autoFanSpeed'].valueChanges.pipe(
+          startWith(this.form.controls['autoFanSpeed'].value)
         ).subscribe(autofanspeed => {
           if (autofanspeed) {
-            this.form.controls['fanspeed'].disable();
+            this.form.controls['fanSpeed'].disable();
           } else {
-            this.form.controls['fanspeed'].enable();
+            this.form.controls['fanSpeed'].enable();
           }
         });
       });
@@ -112,10 +112,10 @@ export class SettingsComponent {
     form.coreVoltage = parseInt(form.coreVoltage);
 
     // bools to ints
-    form.flipscreen = form.flipscreen == true ? 1 : 0;
-    form.invertscreen = form.invertscreen == true ? 1 : 0;
-    form.invertfanpolarity = form.invertfanpolarity == true ? 1 : 0;
-    form.autofanspeed = form.autofanspeed == true ? 1 : 0;
+    form.flipScreen = form.flipScreen == true ? 1 : 0;
+    form.invertScreen = form.invertScreen == true ? 1 : 0;
+    form.invertFanPolarity = form.invertFanPolarity == true ? 1 : 0;
+    form.autoFanSpeed = form.autoFanSpeed == true ? 1 : 0;
 
     if (form.stratumPassword === '*****') {
       delete form.stratumPassword;
@@ -136,7 +136,7 @@ export class SettingsComponent {
   otaUpdate(event: FileUploadHandlerEvent) {
     const file = event.files[0];
     this.firmwareUpload.clear(); // clear the file upload component
-    
+
     if (file.name != 'esp-miner.bin') {
       this.toastrService.error('Incorrect file, looking for esp-miner.bin.', 'Error');
       return;

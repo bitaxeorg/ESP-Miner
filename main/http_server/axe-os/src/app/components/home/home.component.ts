@@ -201,7 +201,7 @@ export class HomeComponent {
         return this.systemService.getInfo()
       }),
       tap(info => {
-        this.hashrateData.push(info.hashRate * 1000000000);
+        this.hashrateData.push(info.hashrate * 1000000000);
         this.temperatureData.push(info.temp);
 
         this.dataLabel.push(new Date().getTime());

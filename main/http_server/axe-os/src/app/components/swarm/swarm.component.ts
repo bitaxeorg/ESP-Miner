@@ -27,7 +27,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalTime = 30;
   public refreshTimeSet = 30;
 
-  public totals: { hashRate: number, power: number, bestDiff: string } = { hashRate: 0, power: 0, bestDiff: '0' };
+  public totals: { hashrate: number, power: number, bestDiff: string } = { hashrate: 0, power: 0, bestDiff: '0' };
 
   public isRefreshing = false;
 
@@ -108,7 +108,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       mergeMap(ipAddr =>
         this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
           map(result => {
-            if ('hashRate' in result) {
+            if ('hashrate' in result) {
               return {
                 IP: ipAddr,
                 ...result
@@ -152,7 +152,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
 
     this.systemService.getInfo(`http://${newIp}`).subscribe((res) => {
-      if (res.ASICModel) {
+      if (res.asicModel) {
         this.swarm.push({ IP: newIp, ...res });
         this.swarm = this.swarm.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
@@ -211,7 +211,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
             const existingDevice = this.swarm.find(axeOs => axeOs.IP === ipAddr);
             return of({
               ...existingDevice,
-              hashRate: 0,
+              hashrate: 0,
               sharesAccepted: 0,
               power: 0,
               voltage: 0,
@@ -264,7 +264,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   private calculateTotals() {
-    this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
+    this.totals.hashrate = this.swarm.reduce((sum, axe) => sum + (axe.hashrate || 0), 0);
     this.totals.power = this.swarm.reduce((sum, axe) => sum + (axe.power || 0), 0);
     const maxDiff = Math.max(...this.swarm.map(axe => this.convertBestDiffToNumber(axe.bestDiff)));
     this.totals.bestDiff = this.formatBestDiff(maxDiff);

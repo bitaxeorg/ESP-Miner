@@ -35,7 +35,7 @@
 
 <div class="flex flex-column sm:flex-row w-full gap-2 xl:gap-4 mt-4 mb-4">
     <div class="card mb-0 w-full text-center p-4">
-        Total Hash Rate: <span class="text-primary">{{totals.hashRate * 1000000000 | hashSuffix}}</span>
+        Total Hash Rate: <span class="text-primary">{{totals.hashrate * 1000000000 | hashSuffix}}</span>
     </div>
     <div class="card mb-0 w-full text-center p-4">
         Total Power: <span class="text-primary">{{totals.power | number: '1.1-1'}} <small>W</small></span>
@@ -66,7 +66,7 @@
                     <a class="text-primary" [href]="'http://'+axe.IP" target="_blank">{{axe.IP}}</a>
                     <div class="text-sm">{{axe.hostname}}</div>
                 </td>
-                <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
+                <td>{{axe.hashrate * 1000000000 | hashSuffix}}</td>
                 <td>{{axe.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
                 <td>
                     <div class="w-min cursor-pointer" 

@@ -123,6 +123,7 @@ typedef struct
 
     int sock;
     bool ASIC_initalized;
+    bool psram_is_available;
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */

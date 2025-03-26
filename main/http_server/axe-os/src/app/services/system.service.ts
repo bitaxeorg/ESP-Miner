@@ -26,7 +26,7 @@ export class SystemService {
           current: 2237.5,
           temp: 60,
           vrTemp: 45,
-          hashRate: 475,
+          hashrate: 475,
           bestDiff: "0",
           bestSessionDiff: "0",
           freeHeap: 200504,
@@ -42,7 +42,7 @@ export class SystemService {
           uptimeSeconds: 38,
           asicCount: 1,
           smallCoreCount: 672,
-          ASICModel: eASICModel.BM1366,
+          asicModel: eASICModel.BM1366,
           stratumURL: "public-pool.io",
           stratumPort: 21496,
           fallbackStratumURL: "test.public-pool.io",
@@ -54,16 +54,16 @@ export class SystemService {
           version: "2.0",
           idfVersion: "v5.1.2",
           boardVersion: "204",
-          flipscreen: 1,
-          invertscreen: 0,
-          invertfanpolarity: 1,
-          autofanspeed: 1,
-          fanspeed: 100,
-          fanrpm: 0,
+          flipScreen: 1,
+          invertScreen: 0,
+          invertFanPolarity: 1,
+          autoFanSpeed: 1,
+          fanSpeed: 100,
+          fanRPM: 0,
 
           boardtemp1: 30,
           boardtemp2: 40,
-          overheat_mode: 0
+          overheatMode: 0
         }
       ).pipe(delay(1000));
     }

@@ -3,7 +3,7 @@
 </ng-template>
 <ng-container *ngIf="info$ | async as info; else loading">
     <!-- Temp warning alert -->
-    <p-message *ngIf="info.overheat_mode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
+    <p-message *ngIf="info.overheatMode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
         text="Bitaxe has overheated - See settings">
     </p-message>
 
@@ -19,7 +19,7 @@
                         <div class="flex justify-content-between mb-3">
                             <div>
                                 <span class="block text-500 font-medium mb-3">Hash Rate</span>
-                                <div class="text-900 font-medium text-xl">{{info.hashRate * 1000000000 | hashSuffix}}
+                                <div class="text-900 font-medium text-xl">{{info.hashrate * 1000000000 | hashSuffix}}
                                 </div>
                             </div>
                         </div>
@@ -36,7 +36,7 @@
                             <div>
                                 <span class="block text-500 font-medium mb-3">Efficiency</span>
                                 <div class="text-900 font-medium text-xl">
-                                    <td>{{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/TH</small>
+                                    <td>{{info.power / (info.hashrate/1000) | number: '1.2-2'}} <small>J/TH</small>
                                     </td>
                                 </div>
                             </div>
@@ -167,8 +167,8 @@
                             High Temperature</span>
                     </div>
                     <div class="col-12">
-                        <h6>Fan Speed<span style="float: right;">{{info.fanspeed}}%  ({{info.fanrpm}} RPM)</span></h6>
-                        <p-progressBar [value]="info.fanspeed" [style]="{ height: '6px' }" >
+                        <h6>Fan Speed<span style="float: right;">{{info.fanSpeed}}%  ({{info.fanRPM}} RPM)</span></h6>
+                        <p-progressBar [value]="info.fanSpeed" [style]="{ height: '6px' }" >
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
                     </div>
