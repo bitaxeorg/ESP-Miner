@@ -36,8 +36,6 @@ typedef struct __attribute__((__packed__))
 } BM1368_job;
 
 uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count);
-
-uint8_t BM1368_send_init(void);
 void BM1368_send_work(void * GLOBAL_STATE, bm_job * next_bm_job);
 void BM1368_set_job_difficulty_mask(int);
 void BM1368_set_version_mask(uint32_t version_mask);

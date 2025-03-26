@@ -23,7 +23,7 @@ export class HomeComponent {
   public dataLabel: number[] = [];
   public hashrateData: number[] = [];
   public temperatureData: number[] = [];
-  public dataDataAverage: number[] = [];
+  public powerData: number[] = [];
   public chartData?: any;
 
   public maxPower: number = 50;
@@ -96,19 +96,6 @@ export class HomeComponent {
           borderWidth: 1,
           yAxisID: 'y',
           fill: true,
-        },
-        {
-          type: 'line',
-          label: 'Average Hashrate',
-          data: [],
-          fill: false,
-          backgroundColor: primaryColor +  '30',
-          borderColor: primaryColor + '60',
-          tension: 0,
-          pointRadius: 0,
-          borderWidth: 2,
-          borderDash: [5, 5],
-          yAxisID: 'y',
         },
         {
           type: 'line',
@@ -203,21 +190,20 @@ export class HomeComponent {
       tap(info => {
         this.hashrateData.push(info.hashRate * 1000000000);
         this.temperatureData.push(info.temp);
+        this.powerData.push(info.power);
 
         this.dataLabel.push(new Date().getTime());
 
         if (this.hashrateData.length >= 720) {
           this.hashrateData.shift();
+          this.temperatureData.shift();
+          this.powerData.shift();
           this.dataLabel.shift();
         }
 
         this.chartData.labels = this.dataLabel;
         this.chartData.datasets[0].data = this.hashrateData;
-        this.chartData.datasets[2].data = this.temperatureData;
-
-        // Calculate average hashrate and fill the array with the same value for the average line
-        const averageHashrate = this.calculateAverage(this.hashrateData);
-        this.chartData.datasets[1].data = Array(this.hashrateData.length).fill(averageHashrate);
+        this.chartData.datasets[1].data = this.temperatureData;
 
         this.chartData = {
           ...this.chartData
@@ -255,7 +241,7 @@ export class HomeComponent {
 
   }
 
-  private calculateAverage(data: number[]): number {
+  public calculateAverage(data: number[]): number {
     if (data.length === 0) return 0;
     const sum = data.reduce((sum, value) => sum + value, 0);
     return sum / data.length;
@@ -282,5 +268,17 @@ export class HomeComponent {
       return `https://solohash.co.uk/user/${address}`;
     }
     return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
+  }
+
+  public calculateEfficiencyAverage(hashrateData: number[], powerData: number[]): number {
+    if (hashrateData.length === 0 || powerData.length === 0) return 0;
+    
+    // Calculate efficiency for each data point and average them
+    const efficiencies = hashrateData.map((hashrate, index) => {
+      const power = powerData[index] || 0;
+      return power / (hashrate/1000000000000); // Convert to J/TH
+    });
+    
+    return this.calculateAverage(efficiencies);
   }
 }

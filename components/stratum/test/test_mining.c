@@ -138,7 +138,7 @@ TEST_CASE("Test extranonce 2 generation", "[mining extranonce2]")
     free(fifth);
 }
 
-TEST_CASE("Test nonce diff checking", "[mining test_nonce]")
+TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
 {
     mining_notify notify_message;
     notify_message.prev_block_hash = "d02b10fc0d4711eae1a805af50a8a83312a2215e00017f2b0000000000000000";
@@ -153,7 +153,7 @@ TEST_CASE("Test nonce diff checking", "[mining test_nonce]")
     TEST_ASSERT_EQUAL_INT(18, (int)diff);
 }
 
-TEST_CASE("Test nonce diff checking 2", "[mining test_nonce]")
+TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
 {
     mining_notify notify_message;
     notify_message.prev_block_hash = "0c859545a3498373a57452fac22eb7113df2a465000543520000000000000000";

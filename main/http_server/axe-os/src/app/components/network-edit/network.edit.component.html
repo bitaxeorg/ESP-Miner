@@ -8,31 +8,32 @@
             </div>
         </div>
         <div class="field grid p-fluid">
-            <label htmlFor="ssid" class="col-12 mb-2 md:col-2 md:mb-0">WiFi SSID:</label>
-            <div class="col-12 md:col-10">
+            <label htmlFor="ssid" class="col-12 mb-2 md:col-2 md:mb-0">Wi-Fi SSID:</label>
+            <div class="col-12 md:col-10 p-inputgroup">
                 <input pInputText id="ssid" type="text" formControlName="ssid" />
+                <button pButton type="button" icon="pi pi-search" (click)="scanWifi()" [loading]="scanning"></button>
             </div>
         </div>
         <div class="field grid p-fluid">
-            <label htmlFor="wifiPass" class="col-12 mb-2 md:col-2 md:mb-0">WiFi Password:</label>
+            <label htmlFor="wifiPass" class="col-12 mb-2 md:col-2 md:mb-0">Wi-Fi Password:</label>
             <div class="col-12 md:col-10 p-input-icon-right">
                 <i *ngIf="form.get('wifiPass')?.dirty" class="pi"
                    [ngClass]="{'pi-eye': !showWifiPassword, 'pi-eye-slash': showWifiPassword}"
                    (click)="toggleWifiPasswordVisibility()" style="cursor: pointer;"></i>
                 <input pInputText id="wifiPass" formControlName="wifiPass"
                        [type]="showWifiPassword ? 'text' : 'password'"
-                       placeholder="Enter WiFi password" />
+                       placeholder="Enter Wi-Fi password" />
             </div>
         </div>
 
         <div class="mt-2">
             <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
                 class="btn btn-primary mr-2">Save</button>
-            <b style="line-height: 34px;">You must restart this device after saving for changes to take effect.</b>
+            <button pButton [disabled]="!savedChanges" *ngIf="requiresRestart()" (click)="restart()">Restart</button>
         </div>
 
         <div class="mt-2">
-            <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
+            <b style="line-height: 34px;" *ngIf="requiresRestart()">You must restart this device after saving for changes to take effect.</b>
         </div>
     </form>
 </ng-container>

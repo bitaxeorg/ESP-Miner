@@ -23,6 +23,8 @@
 #include "TPS546.h"
 #include "esp_psram.h"
 
+#include "asic.h"
+
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
 #define TESTS_FAILED 0
@@ -366,11 +368,12 @@ void self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, TESTS_FAILED);
     }
 
-    uint8_t chips_detected = (GLOBAL_STATE->ASIC_functions.init_fn)(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->asic_count);
-    ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, GLOBAL_STATE->asic_count);
+    uint8_t chips_detected = ASIC_init(GLOBAL_STATE);
+    uint8_t chips_expected = ASIC_get_asic_count(GLOBAL_STATE);
+    ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, chips_expected);
 
-    if (chips_detected != GLOBAL_STATE->asic_count) {
-        ESP_LOGE(TAG, "SELF TEST FAIL, %d of %d CHIPS DETECTED", chips_detected, GLOBAL_STATE->asic_count);
+    if (chips_detected != chips_expected) {
+        ESP_LOGE(TAG, "SELF TEST FAIL, %d of %d CHIPS DETECTED", chips_detected, chips_expected);
         char error_buf[20];
         snprintf(error_buf, 20, "ASIC:FAIL %d CHIPS", chips_detected);
         display_msg(error_buf, GLOBAL_STATE);
@@ -378,7 +381,7 @@ void self_test(void * pvParameters)
     }
 
     //setup and test hashrate
-    int baud = (*GLOBAL_STATE->ASIC_functions.set_max_baud_fn)();
+    int baud = ASIC_set_max_baud(GLOBAL_STATE);
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     if (SERIAL_set_baud(baud) != ESP_OK) {
@@ -437,11 +440,13 @@ void self_test(void * pvParameters)
 
     uint8_t difficulty_mask = 8;
 
-    (*GLOBAL_STATE->ASIC_functions.set_difficulty_mask_fn)(difficulty_mask);
+    //(*GLOBAL_STATE->ASIC_functions.set_difficulty_mask_fn)(difficulty_mask);
+    ASIC_set_job_difficulty_mask(GLOBAL_STATE, difficulty_mask);
 
     ESP_LOGI(TAG, "Sending work");
 
-    (*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, &job);
+    //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, &job);
+    ASIC_send_work(GLOBAL_STATE, &job);
     
      double start = esp_timer_get_time();
      double sum = 0;
@@ -449,7 +454,7 @@ void self_test(void * pvParameters)
      double hash_rate = 0;
 
     while(duration < 3){
-        task_result * asic_result = (*GLOBAL_STATE->ASIC_functions.receive_result_fn)(GLOBAL_STATE);
+        task_result * asic_result = ASIC_proccess_work(GLOBAL_STATE);
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);

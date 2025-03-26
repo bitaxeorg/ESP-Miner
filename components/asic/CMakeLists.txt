@@ -7,6 +7,7 @@ SRCS
     "serial.c"
     "crc.c"
     "common.c"
+    "asic.c"
 
 INCLUDE_DIRS 
     "include"

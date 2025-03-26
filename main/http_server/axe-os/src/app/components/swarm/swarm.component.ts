@@ -169,12 +169,12 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public restart(axe: any) {
     this.systemService.restart(`http://${axe.IP}`).pipe(
       catchError(error => {
-        this.toastr.error('Failed to restart device', 'Error');
+        this.toastr.error(`Failed to restart device at ${axe.IP}`, 'Error');
         return of(null);
       })
     ).subscribe(res => {
       if (res !== null) {
-        this.toastr.success('Bitaxe restarted', 'Success');
+        this.toastr.success(`Bitaxe at ${axe.IP} restarted`, 'Success');
       }
     });
   }
@@ -268,6 +268,14 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.totals.power = this.swarm.reduce((sum, axe) => sum + (axe.power || 0), 0);
     const maxDiff = Math.max(...this.swarm.map(axe => this.convertBestDiffToNumber(axe.bestDiff)));
     this.totals.bestDiff = this.formatBestDiff(maxDiff);
+  }
+
+  hasModel(model: string): string {
+    return this.swarm.some(axe => axe.ASICModel === model) ? '1' : '0.5';
+  }
+
+  hasMultipleChips(): string {
+    return this.swarm.some(axe => axe.asicCount > 1) ? '1' : '0.5';
   }
 
 }

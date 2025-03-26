@@ -1,6 +1,7 @@
 
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_psram.h"
 #include "nvs_flash.h"
 
 // #include "protocol_examples_common.h"
@@ -19,6 +20,7 @@
 #include "adc.h"
 #include "nvs_device.h"
 #include "self_test.h"
+#include "asic.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -32,7 +34,14 @@ static const char * TAG = "bitaxe";
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "Welcome to the bitaxe - hack the planet!");
+    ESP_LOGI(TAG, "Welcome to the bitaxe - FOSS || GTFO!");
+
+    if (!esp_psram_is_initialized()) {
+        ESP_LOGE(TAG, "No PSRAM available on ESP32 device!");
+        GLOBAL_STATE.psram_is_available = false;
+    } else {
+        GLOBAL_STATE.psram_is_available = true;
+    }
 
     // Init I2C
     ESP_ERROR_CHECK(i2c_bitaxe_init());
@@ -75,7 +84,7 @@ void app_main(void)
     strncpy(GLOBAL_STATE.SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE.SYSTEM_MODULE.ssid));
     GLOBAL_STATE.SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE.SYSTEM_MODULE.ssid)-1] = 0;
 
-    // init and connect to wifi
+    // init AP and connect to wifi
     wifi_init(wifi_ssid, wifi_pass, hostname, GLOBAL_STATE.SYSTEM_MODULE.ip_addr_str);
 
     generate_ssid(GLOBAL_STATE.SYSTEM_MODULE.ap_ssid);
@@ -116,15 +125,15 @@ void app_main(void)
 
     GLOBAL_STATE.new_stratum_version_rolling_msg = false;
 
-    if (GLOBAL_STATE.ASIC_functions.init_fn != NULL) {
-        wifi_softap_off();
+    wifi_softap_off();
 
+    if (GLOBAL_STATE.valid_model) {
         queue_init(&GLOBAL_STATE.stratum_queue);
         queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
 
         SERIAL_init();
-        (*GLOBAL_STATE.ASIC_functions.init_fn)(GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE.asic_count);
-        SERIAL_set_baud((*GLOBAL_STATE.ASIC_functions.set_max_baud_fn)());
+        ASIC_init(&GLOBAL_STATE);
+        SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
         SERIAL_clear_buffer();
 
         GLOBAL_STATE.ASIC_initalized = true;
