@@ -27,7 +27,6 @@ export class SystemService {
           temp: 60,
           vrTemp: 45,
           maxPower: 25,
-          maxVoltage: 12.5,
           nominalVoltage: 5,
           hashRate: 475,
           bestDiff: "0",

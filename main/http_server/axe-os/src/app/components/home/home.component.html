@@ -130,18 +130,18 @@
 
                         <h6>Input Voltage <span style="float: right;">{{info.voltage}} V</span></h6>
                         <div class="relative">
-                            <p-progressBar [value]="(info.voltage / info.maxVoltage) * 100" [style]="{ height: '6px' }">
+                            <p-progressBar [value]="(info.voltage / (info.nominalVoltage + .5)) * 100" [style]="{ height: '6px' }">
                                 <ng-template pTemplate="content" let-value></ng-template>
                             </p-progressBar>
 
                             <!-- Conditional marker based on nominal voltage-->
                             <div class="absolute bg-white"
-                                [style.left]="(info.nominalVoltage / info.maxVoltage) * 100 + '%'"
+                                [style.left]="(info.nominalVoltage / (info.nominalVoltage + .5)) * 100 + '%'"
                                 style="top: 0; width: 3px; height: 6px;">
                                 <small class="absolute text-white" style="top: -1.25rem; transform: translateX(-50%)">{{info.nominalVoltage}}V</small>
                             </div>
                         </div>
-                        <span class="danger" *ngIf="info.voltage < info.maxVoltage * 0.87">&nbsp; Danger: Low voltage</span>
+                        <span class="danger" *ngIf="info.voltage < (info.nominalVoltage + .5) * 0.87">&nbsp; Danger: Low voltage</span>
                     </div>
 
                     <div class="col-12">
