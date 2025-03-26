@@ -13,5 +13,6 @@ float Power_get_input_voltage(GlobalState * GLOBAL_STATE);
 float Power_get_vreg_temp(GlobalState * GLOBAL_STATE);
 float Power_get_max_settings(GlobalState * GLOBAL_STATE);
 float Power_get_max_voltage(GlobalState * GLOBAL_STATE);
+int Power_get_nominal_voltage(GlobalState * GLOBAL_STATE);
 
 #endif // POWER_H

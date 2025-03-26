@@ -16,6 +16,7 @@ export interface ISystemInfo {
     vrTemp: number,
     maxPower: number,
     maxVoltage: number,
+    nominalVoltage: number,
     hashRate: number,
     bestDiff: string,
     bestSessionDiff: string,
