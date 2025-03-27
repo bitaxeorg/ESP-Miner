@@ -404,18 +404,8 @@ esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE)
     esp_err_t ret;
     bool hasChanges = false;
 
-    // LVGL_REG_FLAGS (0x50)
-    uint8_t flags = (module->FOUND_BLOCK ? 0x01 : 0) |
-                    (module->startup_done ? 0x02 : 0) |
-                    (module->overheat_mode ? 0x04 : 0);
-                    
-    if (lastFlags != flags) {
-        ret = sendRegisterDataBAP(LVGL_REG_FLAGS, &flags, 1);
-        if (ret != ESP_OK) return ret;
-        
-        lastFlags = flags;
-        hasChanges = true;
-    }
+    // LVGL_REG_FLAGS (0x50) (No Longer used. See serperated flags)
+
 
     // LVGL_REG_DEVICE_INFO (0x52)
 
@@ -434,16 +424,14 @@ esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE)
         lastBoardInfo[sizeof(lastBoardInfo) - 1] = '\0';
     }
 
-    // LVGL_REG_CLOCK_SYNC (0x54)
-    if (lastClockSync != module->lastClockSync) {
-        if (sizeof(uint32_t) + 2 > MAX_BUFFER_SIZE_BAP) return ESP_ERR_NO_MEM;
-        ret = sendRegisterDataBAP(LVGL_REG_CLOCK_SYNC, &module->lastClockSync, sizeof(uint32_t));
-        if (ret != ESP_OK) return ret;
+    // New Flags 0x0E to
 
-        lastClockSync = module->lastClockSync;
-        hasChanges = true;
+    if (GLOBAL_STATE->SYSTEM_MODULE.FOUND_BLOCK) {
+        sendRegisterDataBAP(LVGL_FLAG_FOUND_BLOCK, &GLOBAL_STATE->SYSTEM_MODULE.FOUND_BLOCK, sizeof(uint8_t));
     }
-
+    if (GLOBAL_STATE->SYSTEM_MODULE.overheat_mode) {
+        sendRegisterDataBAP(LVGL_FLAG_OVERHEAT_MODE, &GLOBAL_STATE->SYSTEM_MODULE.overheat_mode, sizeof(uint8_t));
+    }
     return ESP_OK;
 }
 
@@ -667,13 +655,6 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                     ESP_LOGI("Serial BAP", "Received restart command");
                     vTaskDelay(pdMS_TO_TICKS(2000));
                     esp_restart();
-                    break;
-                case LVGL_FLAG_OVERHEAT_MODE:
-                    ESP_LOGI("Serial BAP", "Received overheat mode flag");
-                    ESP_LOGI("Serial BAP", "RAW HEX: %02X", buf[4]);
-                    uint16_t flag_overheat_mode = 0x0000 + buf[4];
-                    ESP_LOGI("Serial BAP", "Overheat mode: %d", flag_overheat_mode);
-                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, flag_overheat_mode);
                     break;
                 default:
                         ESP_LOGI("Serial BAP", "Received unknown register");
