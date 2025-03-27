@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: ESP-Miner API
   description: API specification for ESP-Miner HTTP server
-  version: 1.0.0
+  version: 2.0.0
   license:
     name: GNU General Public License version 3
     url: https://opensource.org/license/gpl-3-0
@@ -36,7 +36,7 @@ components:
       required:
         - ssid
         - rssi
-        - authmode
+        - authMode
       properties:
         ssid:
           type: string
@@ -48,7 +48,7 @@ components:
           description: Signal strength in dBm
           examples:
             - -65
-        authmode:
+        authMode:
           type: integer
           minimum: 0
           maximum: 12
@@ -105,9 +105,9 @@ components:
     SystemInfo:
       type: object
       required:
-        - ASICModel
+        - asicModel
         - apEnabled
-        - autofanspeed
+        - autoFanSpeed
         - bestDiff
         - bestSessionDiff
         - boardVersion
@@ -119,27 +119,27 @@ components:
         - fallbackStratumSuggestedDifficulty
         - fallbackStratumURL
         - fallbackStratumUser
-        - fanrpm
-        - fanspeed
-        - temptarget
+        - fanRPM
+        - fanSpeed
+        - tempTarget
         - rotation
         - freeHeap
         - freeHeapInternal
         - freeHeapSpiram
         - frequency
-        - hashRate
+        - hashrate
         - expectedHashrate
         - errorPercentage
         - hostname
         - idfVersion
-        - invertscreen
+        - invertScreen
         - isPSRAMAvailable
         - isUsingFallbackStratum
         - macAddr
         - maxPower
         - minimumFanSpeed
         - nominalVoltage
-        - overheat_mode
+        - overheatMode
         - overclockEnabled
         - poolDifficulty
         - power
@@ -174,13 +174,13 @@ components:
         - blockFound
         - hashrateMonitor
       properties:
-        ASICModel:
+        asicModel:
           type: string
           description: ASIC model identifier
         apEnabled:
           type: number
           description: Whether AP mode is enabled (0=no, 1=yes)
-        autofanspeed:
+        autoFanSpeed:
           type: number
           description: Automatic fan speed control (0=manual, 1=auto)
         bestDiff:
@@ -216,13 +216,13 @@ components:
         fallbackStratumUser:
           type: string
           description: Fallback stratum username
-        fanrpm:
+        fanRPM:
           type: number
           description: Current fan speed in RPM
-        fanspeed:
+        fanSpeed:
           type: number
           description: Current fan speed percentage
-        temptarget:
+        tempTarget:
           type: number
           description: Target Temperature for the PID Controller
         rotation:
@@ -240,7 +240,7 @@ components:
         frequency:
           type: number
           description: ASIC frequency in MHz
-        hashRate:
+        hashrate:
           type: number
           description: Current hashrate
         errorPercentage:
@@ -252,7 +252,7 @@ components:
         idfVersion:
           type: string
           description: ESP-IDF version
-        invertscreen:
+        invertScreen:
           type: number
           description: Screen invert setting (0=normal, 1=inverted)
         isPSRAMAvailable:
@@ -273,7 +273,7 @@ components:
         nominalVoltage:
           type: integer
           description: Nominal board voltage
-        overheat_mode:
+        overheatMode:
           type: number
           description: Overheat protection mode
         overclockEnabled:
@@ -285,7 +285,7 @@ components:
         power:
           type: number
           description: Power consumption in watts
-        power_fault:
+        powerFault:
           type: string
           description: Voltage regulator fault reason, if any
         runningPartition:
@@ -474,7 +474,7 @@ components:
           enum: [0, 1]
           examples:
             - 0
-        overheat_mode:
+        overheatMode:
           type: integer
           description: Overheat protection mode (0=disabled)
           enum: [0]
@@ -486,21 +486,21 @@ components:
           enum: [0,1]
           examples:
             - 0
-        invertscreen:
+        invertScreen:
           type: integer
           description: Whether to invert screen colors (0=normal, 1=inverted)
           enum: [0, 1]
           examples:
             - 0
-        autofanspeed:
+        autoFanSpeed:
           type: integer
           description: Whether to enable automatic fan speed control (0=manual, 1=auto)
           enum: [0, 1]
           examples:
             - 1
-        fanspeed:
+        fanSpeed:
           type: integer
-          description: Manual fan speed percentage when autofanspeed is disabled
+          description: Manual fan speed percentage when autoFanSpeed is disabled
           minimum: 0
           maximum: 100
           examples:
@@ -535,7 +535,7 @@ components:
       description: Internal server error
 
 paths:
-  /api/system/wifi/scan:
+  /api/v2/system/wifi/scan:
     get:
       summary: Scan for available WiFi networks
       description: Returns a list of available WiFi networks in range
@@ -561,7 +561,7 @@ paths:
         '500':
           description: Internal server error
 
-  /api/system/info:
+  /api/v2/system/info:
     get:
       summary: Get system information
       description: Returns current system status and information
@@ -580,7 +580,7 @@ paths:
         '500':
           description: Internal server error
 
-  /api/system/asic:
+  /api/v2/system/asic:
     get:
       summary: Get ASIC settings information
       description: Returns current ASIC model and corresponding available frequency and voltage options
@@ -604,7 +604,7 @@ paths:
                   - defaultVoltage
                   - voltageOptions
                 properties:
-                  ASICModel:
+                  asicModel:
                     type: string
                     description: ASIC model identifier
                     enum:
@@ -656,7 +656,7 @@ paths:
         '500':
           description: Internal server error
 
-  /api/system/statistics:
+  /api/v2/system/statistics:
     get:
       summary: Get system statistics
       description: Returns system statistics
@@ -706,7 +706,7 @@ paths:
         '500':
           description: Internal server error
 
-  /api/system/restart:
+  /api/v2/system/restart:
     post:
       summary: Restart the system
       description: Triggers a system restart
@@ -721,7 +721,7 @@ paths:
         '500':
           description: Internal server error
 
-  /api/system:
+  /api/v2/system:
     patch:
       summary: Update system settings
       description: Updates system configuration settings
@@ -744,7 +744,7 @@ paths:
         '500':
           description: Internal server error
 
-  /api/system/OTA:
+  /api/v2/system/ota:
     post:
       summary: Update system firmware
       description: Upload and apply new firmware via OTA update
@@ -768,7 +768,7 @@ paths:
         '500':
           description: Internal server error
 
-  /api/system/OTAWWW:
+  /api/v2/system/otawww:
     post:
       summary: Update web interface
       description: Upload and apply new web interface files
