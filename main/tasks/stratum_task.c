@@ -285,8 +285,8 @@ void stratum_task(void * pvParameters)
                     ESP_LOGI(TAG, "message result accepted");
                     SYSTEM_notify_accepted_share(GLOBAL_STATE);
                 } else {
-                    ESP_LOGW(TAG, "message result rejected: %s", stratum_api_v1_message.error_str ? stratum_api_v1_message.error_str : "unknown");
-                    SYSTEM_notify_rejected_share(GLOBAL_STATE);
+                    ESP_LOGW(TAG, "message result rejected: %s", stratum_api_v1_message.error_str);
+                    SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
                 }
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {
                 // Reset retry attempts after successfully receiving data.
@@ -294,7 +294,7 @@ void stratum_task(void * pvParameters)
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "setup message accepted");
                 } else {
-                    ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str ? stratum_api_v1_message.error_str : "unknown");
+                    ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);
                 }
             }
         }

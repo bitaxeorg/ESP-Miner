@@ -58,6 +58,20 @@ static bool is_scanning = false;
 static uint16_t ap_number = 0;
 static wifi_ap_record_t ap_info[MAX_AP_COUNT];
 
+
+esp_err_t get_wifi_current_rssi(int8_t *rssi)
+{
+    wifi_ap_record_t current_ap_info;
+    esp_err_t err = esp_wifi_sta_get_ap_info(&current_ap_info);
+
+    if (err == ESP_OK) {
+        *rssi = current_ap_info.rssi;
+        return ERR_OK;
+    }
+
+    return err;
+}
+
 // Function to scan for available WiFi networks
 esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
 {

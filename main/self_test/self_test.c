@@ -2,7 +2,7 @@
 
 // #include "freertos/event_groups.h"
 // #include "freertos/timers.h"
-// #include "driver/gpio.h"
+#include "driver/gpio.h"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -22,6 +22,7 @@
 #include "utils.h"
 #include "TPS546.h"
 #include "esp_psram.h"
+#include "power.h"
 
 #include "asic.h"
 
@@ -43,12 +44,6 @@
 #define POWER_CONSUMPTION_TARGET_402 5          //watts
 #define POWER_CONSUMPTION_TARGET_GAMMA 11       //watts
 #define POWER_CONSUMPTION_MARGIN 3              //+/- watts
-
-//test hashrate
-#define HASHRATE_TARGET_GAMMA 900 //GH/s
-#define HASHRATE_TARGET_SUPRA 500 //GH/s
-// #define HASHRATE_TARGET_ULTRA 1000 //GH/s
-// #define HASHRATE_TARGET_MAX 2000 //GH/s
 
 static const char * TAG = "self_test";
 
@@ -211,6 +206,16 @@ esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
+esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
+    //check for faults on the voltage regulator
+    ESP_RETURN_ON_ERROR(VCORE_check_fault(GLOBAL_STATE), TAG, "VCORE check fault failed!");
+
+    if (GLOBAL_STATE->SYSTEM_MODULE.power_fault) {
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
 esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
     
     //enable the voltage regulator GPIO on HW that supports it
@@ -321,6 +326,8 @@ void self_test(void * pvParameters)
     // Create a binary semaphore
     BootSemaphore = xSemaphoreCreateBinary();
 
+    gpio_install_isr_service(0);
+
     if (BootSemaphore == NULL) {
         ESP_LOGE(TAG, "Failed to create semaphore");
         return;
@@ -376,6 +383,15 @@ void self_test(void * pvParameters)
         ESP_LOGE(TAG, "SELF TEST FAIL, %d of %d CHIPS DETECTED", chips_detected, chips_expected);
         char error_buf[20];
         snprintf(error_buf, 20, "ASIC:FAIL %d CHIPS", chips_detected);
+        display_msg(error_buf, GLOBAL_STATE);
+        tests_done(GLOBAL_STATE, TESTS_FAILED);
+    }
+
+    //test for voltage regulator faults
+    if (test_vreg_faults(GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "VCORE check fault failed!");
+        char error_buf[20];
+        snprintf(error_buf, 20, "VCORE:PWR FAULT");
         display_msg(error_buf, GLOBAL_STATE);
         tests_done(GLOBAL_STATE, TESTS_FAILED);
     }
@@ -448,43 +464,53 @@ void self_test(void * pvParameters)
     //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, &job);
     ASIC_send_work(GLOBAL_STATE, &job);
     
-     double start = esp_timer_get_time();
-     double sum = 0;
-     double duration = 0;
-     double hash_rate = 0;
+    double start = esp_timer_get_time();
+    double sum = 0;
+    double duration = 0;
+    double hash_rate = 0;
+    double hashtest_timeout = 5;
 
-    while(duration < 3){
-        task_result * asic_result = ASIC_proccess_work(GLOBAL_STATE);
+    while (duration < hashtest_timeout) {
+        task_result * asic_result = ASIC_process_work(GLOBAL_STATE);
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
             sum += difficulty_mask;
-            duration = (double) (esp_timer_get_time() - start) / 1000000;
+            
             hash_rate = (sum * 4294967296) / (duration * 1000000000);
             ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
             ESP_LOGI(TAG, "%f Gh/s  , duration %f",hash_rate, duration);
         }
+        duration = (double) (esp_timer_get_time() - start) / 1000000;
     }
 
     ESP_LOGI(TAG, "Hashrate: %f", hash_rate);
 
+    float hashrate_test_percentage_target = 0.85;
+    float expected_hashrate_mhs = (float)GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+
     switch (GLOBAL_STATE->device_model) {
         case DEVICE_MAX:
+            expected_hashrate_mhs *= BM1397_CORE_COUNT * 4;
+            break;
         case DEVICE_ULTRA:
+            expected_hashrate_mhs *= BM1366_CORE_COUNT * 8;
             break;
         case DEVICE_SUPRA:
-            if(hash_rate < HASHRATE_TARGET_SUPRA){
-                display_msg("HASHRATE:FAIL", GLOBAL_STATE);
-                tests_done(GLOBAL_STATE, TESTS_FAILED);
-            }
+            expected_hashrate_mhs *= BM1368_CORE_COUNT * 8;
+            // lower target due to temp sensitivity
+            hashrate_test_percentage_target = 0.8; 
             break;
         case DEVICE_GAMMA:
-            if(hash_rate < HASHRATE_TARGET_GAMMA){
-                display_msg("HASHRATE:FAIL", GLOBAL_STATE);
-                tests_done(GLOBAL_STATE, TESTS_FAILED);
-            }
+            expected_hashrate_mhs *= BM1370_CORE_COUNT * 16;
+            hashrate_test_percentage_target = 0.85; 
             break;
         default:
+    }
+
+    if (hash_rate < hashrate_test_percentage_target * (expected_hashrate_mhs/1000.0) ){
+        display_msg("HASHRATE:FAIL", GLOBAL_STATE);
+        tests_done(GLOBAL_STATE, TESTS_FAILED);
     }
 
     free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
@@ -534,16 +560,10 @@ void self_test(void * pvParameters)
 
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result) 
 {
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
-            GLOBAL_STATE->SELF_TEST_MODULE.result = test_result;
-            GLOBAL_STATE->SELF_TEST_MODULE.finished = true;
-            break;
-        default:
-    }
+
+    GLOBAL_STATE->SELF_TEST_MODULE.result = test_result;
+    GLOBAL_STATE->SELF_TEST_MODULE.finished = true;
+    Power_disable(GLOBAL_STATE);
 
     if (test_result == TESTS_FAILED) {
         ESP_LOGI(TAG, "SELF TESTS FAIL -- Press RESET to continue");  

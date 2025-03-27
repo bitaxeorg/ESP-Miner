@@ -35,6 +35,31 @@ esp_err_t Power_disable(GlobalState * GLOBAL_STATE) {
 
 }
 
+float Power_get_current(GlobalState * GLOBAL_STATE) {
+    float current = 0.0;
+
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
+                current = TPS546_get_iout() * 1000.0;
+            } else {
+                if (INA260_installed() == true) {
+                    current = INA260_read_current();
+                }
+            }
+            break;
+        case DEVICE_GAMMA:
+        case DEVICE_GAMMATURBO:
+            current = TPS546_get_iout() * 1000.0;
+            break;
+        default:
+    }
+
+    return current;
+}
+
 float Power_get_power(GlobalState * GLOBAL_STATE) {
     float power = 0.0;
     float current = 0.0;

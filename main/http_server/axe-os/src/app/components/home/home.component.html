@@ -11,6 +11,10 @@
         text="Bitaxe frequency is set low - See settings">
     </p-message>
 
+    <p-message *ngIf="info.power_fault" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
+        text="{{info.power_fault}} Check your Power Supply.">
+    </p-message>
+
     <div class="grid" *ngIf="info$ | async as info; else loading">
         <div class="col-12">
             <div class="grid">
@@ -26,9 +30,9 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <ng-container>
-                            Average: 
+                            Average:
                             <span class="text-green-500 font-medium">
                                 {{calculateAverage(hashrateData) | hashSuffix}}
                             </span>
@@ -51,9 +55,9 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <ng-container>
-                            Average: 
+                            Average:
                             <span class="text-green-500 font-medium">
                                 {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} <small>J/TH</small>
                             </span>
@@ -73,8 +77,17 @@
                                 </div>
                             </div>
                         </div>
-                        <span class="text-red-500 font-medium">{{info.sharesRejected | number: '1.0-0'}} </span>
-                        <span class="text-500">rejected</span> <span class="font-medium"> ({{(info.sharesRejected / (info.sharesAccepted + info.sharesRejected) * 100) | number: '1.2-2'}}%)</span>
+                        <div *ngIf="info.sharesRejected === 0">
+                            <span class="text-red-500 font-medium">0 </span>
+                            <span class="text-500">rejected</span>
+                        </div>
+                        <div *ngIf="info.sharesRejected > 0">
+                            <div *ngFor="let sharesRejectedReason of info.sharesRejectedReasons">
+                                <span class="text-red-500 font-medium">{{sharesRejectedReason.count | number: '1.0-0'}} </span>
+                                <span class="text-500">{{sharesRejectedReason.message}}</span>
+                                ({{(sharesRejectedReason.count / (info.sharesAccepted + info.sharesRejected) * 100) | number: '1.2-2'}}%)
+                            </div>
+                        </div>                        
                     </div>
                 </div>
 
@@ -159,7 +172,7 @@
                 <div class="grid">
                     <div class="col-12">
 
-                        <h6>ASIC Temperature 
+                        <h6>ASIC Temperature
                             <span style="float: right;">
                                 <ng-template #noTemp>--</ng-template>
                                 <ng-container *ngIf="info.temp > 0; else noTemp">

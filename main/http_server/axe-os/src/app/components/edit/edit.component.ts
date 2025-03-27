@@ -6,6 +6,7 @@ import { startWith, Subject, takeUntil } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-edit',
@@ -124,13 +125,44 @@ export class EditComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private systemService: SystemService,
     private toastr: ToastrService,
-    private loadingService: LoadingService
+    private loadingService: LoadingService,
+    private route: ActivatedRoute,
   ) {
-    // Add unlockSettings to window object for console access
-    (window as any).unlockSettings = () => {
-      this.settingsUnlocked = true;
-      console.log('Settings unlocked. You can now set custom frequency and voltage values.');
-    };
+    // Check URL parameter for settings unlock
+    this.route.queryParams.subscribe(params => {
+      const urlOcParam = params['oc'] !== undefined;
+      if (urlOcParam) {
+        // If ?oc is in URL, enable overclock and save to NVS
+        this.settingsUnlocked = true;
+        this.saveOverclockSetting(1);
+        console.log(
+          '🎉 The ancient seals have been broken!\n' +
+          '⚡ Unlimited power flows through your miner...\n' +
+          '🔧 You can now set custom frequency and voltage values.\n' +
+          '⚠️ Remember: with great power comes great responsibility!'
+        );
+      } else {
+        // If ?oc is not in URL, check NVS setting (will be loaded in ngOnInit)
+        console.log('🔒 Here be dragons! Advanced settings are locked for your protection. \n' +
+          'Only the bravest miners dare to venture forth... \n' +
+          'If you wish to unlock dangerous overclocking powers, add: %c?oc',
+          'color: #ff4400; text-decoration: underline; cursor: pointer; font-weight: bold;',
+          'to the current URL'
+        );
+      }
+    });
+  }
+
+  private saveOverclockSetting(enabled: number) {
+    this.systemService.updateSystem(this.uri, { overclockEnabled: enabled })
+      .subscribe({
+        next: () => {
+          console.log(`Overclock setting saved: ${enabled === 1 ? 'enabled' : 'disabled'}`);
+        },
+        error: (err) => {
+          console.error(`Failed to save overclock setting: ${err.message}`);
+        }
+      });
   }
 
   ngOnInit(): void {
@@ -141,6 +173,16 @@ export class EditComponent implements OnInit, OnDestroy {
       )
       .subscribe(info => {
         this.ASICModel = info.ASICModel;
+
+        // Check if overclock is enabled in NVS
+        if (info.overclockEnabled === 1) {
+          this.settingsUnlocked = true;
+          console.log(
+            '🎉 Overclock mode is enabled from NVS settings!\n' +
+            '⚡ Custom frequency and voltage values are available.'
+          );
+        }
+
         this.form = this.fb.group({
           flipscreen: [info.flipscreen == 1],
           invertscreen: [info.invertscreen == 1],
@@ -166,8 +208,6 @@ export class EditComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // Remove unlockSettings from window object
-    delete (window as any).unlockSettings;
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -204,6 +244,20 @@ export class EditComponent implements OnInit, OnDestroy {
   disableOverheatMode() {
     this.form.patchValue({ overheat_mode: 0 });
     this.updateSystem();
+  }
+
+  toggleOverclockMode(enable: boolean) {
+    this.settingsUnlocked = enable;
+    this.saveOverclockSetting(enable ? 1 : 0);
+
+    if (enable) {
+      console.log(
+        '🎉 Overclock mode enabled!\n' +
+        '⚡ Custom frequency and voltage values are now available.'
+      );
+    } else {
+      console.log('🔒 Overclock mode disabled. Using safe preset values only.');
+    }
   }
 
   public restart() {

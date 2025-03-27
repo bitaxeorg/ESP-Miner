@@ -50,6 +50,11 @@ typedef enum
 //     void (*set_version_mask)(uint32_t);
 // } AsicFunctions;
 
+typedef struct {
+    char message[64];
+    uint32_t count;
+} RejectedReasonStat;
+
 typedef struct
 {
     double duration_start;
@@ -61,6 +66,8 @@ typedef struct
     int64_t start_time;
     uint64_t shares_accepted;
     uint64_t shares_rejected;
+    RejectedReasonStat rejected_reason_stats[10];
+    int rejected_reason_stats_count;
     int screen_page;
     uint64_t best_nonce_diff;
     char best_diff_string[DIFF_STRING_SIZE];
@@ -86,6 +93,7 @@ typedef struct
     char * fallback_pool_cert;
     bool is_using_fallback;
     uint16_t overheat_mode;
+    uint16_t power_fault;
     uint32_t lastClockSync;
     bool is_screen_active;
     bool is_firmware_update;
@@ -115,7 +123,6 @@ typedef struct
     work_queue stratum_queue;
     work_queue ASIC_jobs_queue;
 
-    bm1397Module BM1397_MODULE;
     SystemModule SYSTEM_MODULE;
     AsicTaskModule ASIC_TASK_MODULE;
     PowerManagementModule POWER_MANAGEMENT_MODULE;

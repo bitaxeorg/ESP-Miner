@@ -8,12 +8,17 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "frequency_transition_bmXX.h"
 
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
+
+#define BM1368_CHIP_ID 0x1368
+#define BM1368_CHIP_ID_RESPONSE_LENGTH 11
 
 #ifdef CONFIG_GPIO_ASIC_RESET
 #define GPIO_ASIC_RESET CONFIG_GPIO_ASIC_RESET
@@ -49,21 +54,18 @@
 #define TICKET_MASK 0x14
 #define MISC_CONTROL 0x18
 
-#define BM1368_TIMEOUT_MS 10000
-#define BM1368_TIMEOUT_THRESHOLD 2
 typedef struct __attribute__((__packed__))
 {
-    uint8_t preamble[2];
+    uint16_t preamble;
     uint32_t nonce;
     uint8_t midstate_num;
     uint8_t job_id;
     uint16_t version;
     uint8_t crc;
-} asic_result;
+} bm1368_asic_result_t;
 
 static const char * TAG = "bm1368Module";
 
-static uint8_t asic_response_buffer[CHUNK_SIZE];
 static task_result result;
 
 static float current_frequency = 56.25;
@@ -132,7 +134,7 @@ static void _reset(void)
     vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
-bool BM1368_send_hash_frequency(float target_freq) {
+void BM1368_send_hash_frequency(float target_freq) {
     float max_diff = 0.001;
     uint8_t freqbuf[6] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41};
     uint8_t postdiv_min = 255;
@@ -168,7 +170,7 @@ bool BM1368_send_hash_frequency(float target_freq) {
 
     if (!found) {
         ESP_LOGE(TAG, "Didn't find PLL settings for target frequency %.2f", target_freq);
-        return false;
+        return;
     }
 
     freqbuf[2] = (best_fbdiv * 25 / best_refdiv >= 2400) ? 0x50 : 0x40;
@@ -180,72 +182,20 @@ bool BM1368_send_hash_frequency(float target_freq) {
 
     ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", target_freq, best_freq);
     current_frequency = target_freq;
-    return true;
-}
-
-bool do_frequency_transition(float target_frequency) {
-    float step = 6.25;
-    float current = current_frequency;
-    float target = target_frequency;
-
-    float direction = (target > current) ? step : -step;
-
-    if (fmod(current, step) != 0) {
-        float next_dividable;
-        if (direction > 0) {
-            next_dividable = ceil(current / step) * step;
-        } else {
-            next_dividable = floor(current / step) * step;
-        }
-        current = next_dividable;
-        BM1368_send_hash_frequency(current);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-
-    while ((direction > 0 && current < target) || (direction < 0 && current > target)) {
-        float next_step = fmin(fabs(direction), fabs(target - current));
-        current += direction > 0 ? next_step : -next_step;
-        BM1368_send_hash_frequency(current);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-    BM1368_send_hash_frequency(target);
-    return true;
 }
 
 bool BM1368_set_frequency(float target_freq) {
-    return do_frequency_transition(target_freq);
+    return do_frequency_transition(target_freq, BM1368_send_hash_frequency, 1368);
 }
-
-static int count_asic_chips(void) {
-    _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_READ, (uint8_t[]){0x00, 0x00}, 2, false);
-
-    int chip_counter = 0;
-    while (true) {
-        if (SERIAL_rx(asic_response_buffer, 11, 5000) <= 0) {
-            break;
-        }
-
-        if (memcmp(asic_response_buffer, "\xaa\x55\x13\x68\x00\x00", 6) == 0) {
-            chip_counter++;
-        }
-    }
-
-    _send_chain_inactive();
-    return chip_counter;
-}
-
-
 
 static void do_frequency_ramp_up(float target_frequency) {
     ESP_LOGI(TAG, "Ramping up frequency from %.2f MHz to %.2f MHz", current_frequency, target_frequency);
-    do_frequency_transition(target_frequency);
+    do_frequency_transition(target_frequency, BM1368_send_hash_frequency, 1368);
 }
 
 uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
 {
     ESP_LOGI(TAG, "Initializing BM1368");
-
-    memset(asic_response_buffer, 0, CHUNK_SIZE);
 
     esp_rom_gpio_pad_select_gpio(GPIO_ASIC_RESET);
     gpio_set_direction(GPIO_ASIC_RESET, GPIO_MODE_OUTPUT);
@@ -257,13 +207,16 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
         BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
     }
 
-    int chip_counter = count_asic_chips();
+    _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_READ, (uint8_t[]){0x00, 0x00}, 2, false);
 
-    if (chip_counter != asic_count) {
-        ESP_LOGE(TAG, "Chip count mismatch. Expected: %d, Actual: %d", asic_count, chip_counter);
+    int chip_counter = count_asic_chips(asic_count, BM1368_CHIP_ID, BM1368_CHIP_ID_RESPONSE_LENGTH);
+
+    if (chip_counter == 0) {
         return 0;
     }
 
+    _send_chain_inactive();
+    
     uint8_t init_cmds[][6] = {
         {0x00, 0xA8, 0x00, 0x07, 0x00, 0x00},
         {0x00, 0x18, 0xFF, 0x0F, 0xC1, 0x00},
@@ -305,7 +258,6 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, (uint8_t[]){0x00, 0x10, 0x00, 0x00, 0x15, 0xa4}, 6, false);
     BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
-    ESP_LOGI(TAG, "%i chip(s) detected on the chain, expected %i", chip_counter, asic_count);
     return chip_counter;
 }
 
@@ -375,63 +327,18 @@ void BM1368_send_work(void * pvParameters, bm_job * next_bm_job)
     _send_BM1368((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1368_job), BM1368_DEBUG_WORK);
 }
 
-asic_result * BM1368_receive_work(void)
+task_result * BM1368_process_work(void * pvParameters)
 {
-    // wait for a response
-    int received = SERIAL_rx(asic_response_buffer, 11, BM1368_TIMEOUT_MS);
+    bm1368_asic_result_t asic_result = {0};
 
-    bool uart_err = received < 0;
-    bool uart_timeout = received == 0;
-    uint8_t asic_timeout_counter = 0;
-
-    // handle response
-    if (uart_err) {
-        ESP_LOGI(TAG, "UART Error in serial RX");
-        return NULL;
-    } else if (uart_timeout) {
-        if (asic_timeout_counter >= BM1368_TIMEOUT_THRESHOLD) {
-            ESP_LOGE(TAG, "ASIC not sending data");
-            asic_timeout_counter = 0;
-        }
-        asic_timeout_counter++;
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
         return NULL;
     }
 
-    if (received != 11 || asic_response_buffer[0] != 0xAA || asic_response_buffer[1] != 0x55) {
-        ESP_LOGE(TAG, "Serial RX invalid %i", received);
-        ESP_LOG_BUFFER_HEX(TAG, asic_response_buffer, received);
-        SERIAL_clear_buffer();
-        return NULL;
-    }
-
-    return (asic_result *) asic_response_buffer;
-}
-
-static uint16_t reverse_uint16(uint16_t num)
-{
-    return (num >> 8) | (num << 8);
-}
-
-static uint32_t reverse_uint32(uint32_t val)
-{
-    return ((val >> 24) & 0xff) |
-           ((val << 8) & 0xff0000) |
-           ((val >> 8) & 0xff00) |
-           ((val << 24) & 0xff000000);
-}
-
-task_result * BM1368_proccess_work(void * pvParameters)
-{
-    asic_result * asic_result = BM1368_receive_work();
-
-    if (asic_result == NULL) {
-        return NULL;
-    }
-
-    uint8_t job_id = (asic_result->job_id & 0xf0) >> 1;
-    uint8_t core_id = (uint8_t)((reverse_uint32(asic_result->nonce) >> 25) & 0x7f);
-    uint8_t small_core_id = asic_result->job_id & 0x0f;
-    uint32_t version_bits = (reverse_uint16(asic_result->version) << 13);
+    uint8_t job_id = (asic_result.job_id & 0xf0) >> 1;
+    uint8_t core_id = (uint8_t)((ntohl(asic_result.nonce) >> 25) & 0x7f);
+    uint8_t small_core_id = asic_result.job_id & 0x0f;
+    uint32_t version_bits = (ntohs(asic_result.version) << 13);
     ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -444,7 +351,7 @@ task_result * BM1368_proccess_work(void * pvParameters)
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
 
     result.job_id = job_id;
-    result.nonce = asic_result->nonce;
+    result.nonce = asic_result.nonce;
     result.rolled_version = rolled_version;
 
     return &result;

@@ -1,5 +1,11 @@
 name: Unit Test
 on: [push, pull_request]
+
+permissions:
+  checks: write
+  pull-requests: write
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest

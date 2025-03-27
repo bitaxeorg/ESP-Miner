@@ -28,6 +28,16 @@
         </ng-container>
         </div>
     </div>
+    <div class="col-12 lg:col-12 xl:col-4">
+      <div class="card">
+          <h2>Update Website <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}}%</span></h2>
+
+          <p-fileUpload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
+              [auto]="true" chooseLabel="Browse"></p-fileUpload>
+
+          <small>(www.bin)</small>
+      </div>
+    </div>
     <div class="col-12 lg:col-6 xl:col-4">
         <div class="card">
             <h2>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}}%</span></h2>
@@ -38,15 +48,5 @@
             <small>(esp-miner.bin)</small>
         </div>
 
-    </div>
-    <div class="col-12 lg:col-12 xl:col-4">
-        <div class="card">
-            <h2>Update Website <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}}%</span></h2>
-
-            <p-fileUpload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
-                [auto]="true" chooseLabel="Browse"></p-fileUpload>
-
-            <small>(www.bin)</small>
-        </div>
     </div>
 </div>

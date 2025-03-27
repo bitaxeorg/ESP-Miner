@@ -7,7 +7,6 @@
 
 #define GPIO_BUTTON_BOOT CONFIG_GPIO_BUTTON_BOOT
 
-#define ESP_INTR_FLAG_DEFAULT  0
 #define LONG_PRESS_DURATION_MS 2000
 
 static const char * TAG = "input";
@@ -55,7 +54,6 @@ esp_err_t input_init(void (*button_short_clicked_cb)(void), void (*button_long_p
     gpio_config(&io_conf);
 
     // Install ISR service and hook the interrupt handler
-    ESP_RETURN_ON_ERROR(gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT), TAG, "Error installing ISR service");
     ESP_RETURN_ON_ERROR(gpio_isr_handler_add(GPIO_BUTTON_BOOT, button_isr_handler, NULL), TAG, "Error adding ISR handler");
 
     lv_group_t * group = lv_group_create();

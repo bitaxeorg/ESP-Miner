@@ -40,6 +40,7 @@ export class SystemService {
           apEnabled: 0,
           sharesAccepted: 1,
           sharesRejected: 0,
+          sharesRejectedReasons: [],
           uptimeSeconds: 38,
           asicCount: 1,
           smallCoreCount: 672,
