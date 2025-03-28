@@ -19,6 +19,26 @@
             </div>
         </div>
         <div class="field grid p-fluid">
+            <label htmlFor="stratumTLS" class="col-12 mb-2 md:col-2 md:mb-0">Stratum TLS:</label>
+            <div class="col-12 md:col-10">
+                <div class="field-checkbox mb-0">
+                    <p-checkbox name="stratumTLS" formControlName="stratumTLS" inputId="stratumTLS"
+                        [binary]="true"></p-checkbox>
+                </div>
+            </div>
+        </div>
+        <div class="field grid p-fluid" *ngIf="form.get('stratumTLS')?.value">
+            <label htmlFor="stratumCert" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Certificate:</label>
+            <div class="col-12 md:col-10">
+                <textarea pInputTextarea id="stratumCert" formControlName="stratumCert" rows="5"
+                    placeholder="Enter SSL/TLS certificate if required" 
+                    style="font-family: monospace;"></textarea>
+                <small class="p-error" *ngIf="form.get('stratumCert')?.errors?.['invalidCertificate']">
+                    Please enter a valid SSL/TLS certificate
+                </small>
+            </div>
+        </div>
+        <div class="field grid p-fluid">
             <label htmlFor="stratumUser" class="col-12 mb-2 md:col-2 md:mb-0">Stratum User:</label>
             <div class="col-12 md:col-10">
                 <input pInputText id="stratumUser" formControlName="stratumUser" type="text" />
@@ -48,6 +68,27 @@
             <label htmlFor="fallbackStratumPort" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum Port:</label>
             <div class="col-12 md:col-10">
                 <input pInputText id="fallbackStratumPort" formControlName="fallbackStratumPort" type="number" />
+            </div>
+        </div>
+        <div class="field grid p-fluid">
+            <label htmlFor="fallbackStratumTLS" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum TLS:</label>
+            <div class="col-12 md:col-10">
+                <div class="field-checkbox mb-0">
+                    <p-checkbox name="fallbackStratumTLS" formControlName="fallbackStratumTLS"
+                        inputId="fallbackStratumTLS" [binary]="true"></p-checkbox>
+                </div>
+            </div>
+        </div>
+        <div class="field grid p-fluid" *ngIf="form.get('fallbackStratumTLS')?.value">
+            <label htmlFor="fallbackStratumCert" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum
+                Certificate:</label>
+            <div class="col-12 md:col-10">
+                <textarea pInputTextarea id="fallbackStratumCert" formControlName="fallbackStratumCert" rows="5"
+                    placeholder="Enter SSL/TLS certificate if required"
+                    style="font-family: monospace;"></textarea>
+                <small class="p-error" *ngIf="form.get('fallbackStratumCert')?.errors?.['invalidCertificate']">
+                    Please enter a valid SSL/TLS certificate
+                </small>
             </div>
         </div>
         <div class="field grid p-fluid">
