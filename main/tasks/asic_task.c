@@ -8,6 +8,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "asic.h"
+
 static const char *TAG = "ASIC_task";
 
 // static bm_job ** active_jobs; is required to keep track of the active jobs since the
@@ -42,7 +44,8 @@ void ASIC_task(void *pvParameters)
             GLOBAL_STATE->stratum_difficulty = next_bm_job->pool_diff;
         }
 
-        (*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, next_bm_job); // send the job to the ASIC
+        //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, next_bm_job); // send the job to the ASIC
+        ASIC_send_work(GLOBAL_STATE, next_bm_job);
 
         // Time to execute the above code is ~0.3ms
         // Delay for ASIC(s) to finish the job

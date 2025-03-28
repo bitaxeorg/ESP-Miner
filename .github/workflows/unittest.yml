@@ -1,0 +1,28 @@
+name: Unit Test
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+    - name: esp-idf build
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: v5.4
+        target: esp32s3
+        command: GITHUB_ACTIONS="true" idf.py build
+        path: 'test-ci'
+    - name: Run tests and show result
+      uses: bitaxeorg/esp32-qemu-test-action@main
+      with:
+        path: 'test-ci'
+    - name: Inspect log
+      run: cat report.xml
+    - name: Publish Unit Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v1
+      if: always()
+      with:
+          files: report.xml

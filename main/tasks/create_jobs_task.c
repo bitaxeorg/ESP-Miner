@@ -1,16 +1,23 @@
+#include <sys/time.h>
+#include <limits.h>
+
 #include "work_queue.h"
 #include "global_state.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "mining.h"
-#include <limits.h>
 #include "string.h"
+#include "common.h"
 
-#include <sys/time.h>
+#include "asic.h"
 
 static const char *TAG = "create_jobs_task";
 
 #define QUEUE_LOW_WATER_MARK 10 // Adjust based on your requirements
+
+// job control
+#define NONCE_PERCENT 1.0
+#define TIMEOUT_PERCENT 1.0
 
 static bool should_generate_more_work(GlobalState *GLOBAL_STATE);
 static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint32_t extranonce_2);
@@ -32,7 +39,8 @@ void create_jobs_task(void *pvParameters)
 
         if (GLOBAL_STATE->new_stratum_version_rolling_msg) {
             ESP_LOGI(TAG, "Set chip version rolls %i", (int)(GLOBAL_STATE->version_mask >> 13));
-            (GLOBAL_STATE->ASIC_functions.set_version_mask)(GLOBAL_STATE->version_mask);
+            //(GLOBAL_STATE->ASIC_functions.set_version_mask)(GLOBAL_STATE->version_mask);
+            ASIC_set_version_mask(GLOBAL_STATE, GLOBAL_STATE->version_mask);
             GLOBAL_STATE->new_stratum_version_rolling_msg = false;
         }
 

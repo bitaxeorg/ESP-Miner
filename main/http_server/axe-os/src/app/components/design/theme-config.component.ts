@@ -34,8 +34,8 @@ interface ThemeOption {
 
         <div class="col-12">
           <h6>Theme Colors</h6>
-          <div class="grid">
-            <div *ngFor="let theme of themes" class="col-3">
+          <div class="grid gap-2">
+            <div *ngFor="let theme of themes" class="col-2">
               <button pButton [class]="'p-button-rounded p-button-text color-dot'"
                       [style.backgroundColor]="theme.primaryColor"
                       style="width: 2rem; height: 2rem; border: none;"
@@ -52,6 +52,38 @@ interface ThemeOption {
 export class ThemeConfigComponent implements OnInit {
   selectedScheme: string;
   themes: ThemeOption[] = [
+    {
+      name: 'Orange',
+      primaryColor: '#F7931A',
+      accentColors: {
+        '--primary-color': '#F7931A',
+        '--primary-color-text': '#ffffff',
+        '--highlight-bg': '#F7931A',
+        '--highlight-text-color': '#ffffff',
+        '--focus-ring': '0 0 0 0.2rem rgba(247,147,26,0.2)',
+        // PrimeNG Slider
+        '--slider-bg': '#dee2e6',
+        '--slider-range-bg': '#F7931A',
+        '--slider-handle-bg': '#F7931A',
+        // Progress Bar
+        '--progressbar-bg': '#dee2e6',
+        '--progressbar-value-bg': '#F7931A',
+        // PrimeNG Checkbox
+        '--checkbox-border': '#F7931A',
+        '--checkbox-bg': '#F7931A',
+        '--checkbox-hover-bg': '#e58617',
+        // PrimeNG Button
+        '--button-bg': '#F7931A',
+        '--button-hover-bg': '#e58617',
+        '--button-focus-shadow': '0 0 0 2px #ffffff, 0 0 0 4px #F7931A',
+        // Toggle button
+        '--togglebutton-bg': '#F7931A',
+        '--togglebutton-border': '1px solid #F7931A',
+        '--togglebutton-hover-bg': '#e58617',
+        '--togglebutton-hover-border': '1px solid #e58617',
+        '--togglebutton-text-color': '#ffffff'
+      }
+    },
     {
       name: 'Red',
       primaryColor: '#F80421',

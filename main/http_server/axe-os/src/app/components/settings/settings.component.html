@@ -4,12 +4,6 @@
 </div>
 
 <div class="grid">
-    <div class="col-12">
-        <app-theme-config></app-theme-config>
-    </div>
-</div>
-
-<div class="grid">
     <div class="col-12 lg:col-6 xl:col-4">
         <div class="card" *ngIf="checkLatestRelease == false">
             <h5>Current Version: {{(info$ | async)?.version}}</h5>

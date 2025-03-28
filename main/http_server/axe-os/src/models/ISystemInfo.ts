@@ -1,5 +1,10 @@
 import { eASICModel } from './enum/eASICModel';
 
+interface ISharesRejectedStat {
+    message: string;
+    count: number;
+}
+
 export interface ISystemInfo {
 
     flipscreen: number;
@@ -18,8 +23,10 @@ export interface ISystemInfo {
     macAddr: string,
     ssid: string,
     wifiStatus: string,
+    apEnabled: number,
     sharesAccepted: number,
     sharesRejected: number,
+    sharesRejectedReasons: ISharesRejectedStat[];
     uptimeSeconds: number,
     asicCount: number,
     smallCoreCount: number,

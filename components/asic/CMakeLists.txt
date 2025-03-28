@@ -7,6 +7,8 @@ SRCS
     "serial.c"
     "crc.c"
     "common.c"
+    "asic.c"
+    "frequency_transition_bmXX.c"
 
 INCLUDE_DIRS 
     "include"
