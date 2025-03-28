@@ -11,6 +11,7 @@
 #include "TPS546.h"
 #include "vcore.h"
 #include "thermal.h"
+#include "PID.h"
 #include "power.h"
 #include "asic.h"
 
@@ -28,39 +29,6 @@
 
 static const char * TAG = "power_management";
 
-// static float _fbound(float value, float lower_bound, float upper_bound)
-// {
-//     if (value < lower_bound)
-//         return lower_bound;
-//     if (value > upper_bound)
-//         return upper_bound;
-
-//     return value;
-// }
-
-// Set the fan speed between 20% min and 100% max based on chip temperature as input.
-// The fan speed increases from 20% to 100% proportionally to the temperature increase from 50 and THROTTLE_TEMP
-static double automatic_fan_speed(float chip_temp, GlobalState * GLOBAL_STATE)
-{
-    double result = 0.0;
-    double min_temp = 45.0;
-    double min_fan_speed = 35.0;
-
-    if (chip_temp < min_temp) {
-        result = min_fan_speed;
-    } else if (chip_temp >= THROTTLE_TEMP) {
-        result = 100;
-    } else {
-        double temp_range = THROTTLE_TEMP - min_temp;
-        double fan_range = 100 - min_fan_speed;
-        result = ((chip_temp - min_temp) / temp_range) * fan_range + min_fan_speed;
-    }
-    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-    power_management->fan_perc = result;
-    Thermal_set_fan_percent(GLOBAL_STATE->device_model, result/100.0);
-
-	return result;
-}
 
 void POWER_MANAGEMENT_task(void * pvParameters)
 {
@@ -70,6 +38,22 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    // PID Controller Initialization
+    PIDController fan_pid;
+    PID_init(
+        &fan_pid,
+        5.0,    // Kp (Proportional gain) - 5% fan speed increase per degree above setpoint
+        0.5,    // Ki (Integral gain) - Accumulate error over time for steady-state correction
+        0.2,    // Kd (Derivative gain) - Respond to rate of temperature change
+        THROTTLE_TEMP - 15.0,  // Setpoint (60°C)
+        25.0,   // Minimum fan speed (%)
+        100.0,  // Maximum fan speed (%)
+        true    // Use inverse control for fan (higher temp = higher fan speed)
+    );
+    
+    // Reset integral term to zero to start fresh
+    PID_reset(&fan_pid);
 
     power_management->frequency_multiplier = 1;
 
@@ -112,25 +96,55 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
             exit(EXIT_FAILURE);
         }
-
+        
         if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
+            // Calculate error for logging
+            float error = power_management->chip_temp_avg - fan_pid.setpoint;
+            
+            // PID-based fan control
+            float fan_speed_percent = PID_compute(
+                &fan_pid, 
+                power_management->chip_temp_avg, 
+                POLL_RATE / 1000.0  // Convert milliseconds to seconds
+            );
+            
+            // True fallback mechanism: Only activate if PID controller isn't responding properly
+            // This is a safety measure for extreme cases
+            bool fallback_active = false;
+            
+            // If temperature is significantly above setpoint but fan speed is still at minimum,
+            // or if temperature is very high, activate fallback
+            if ((error > 2.0f && fan_speed_percent <= 36.0f) || error > 10.0f) {
+                // Calculate a linear fan speed based on temperature
+                float linear_fan_speed = 35.0f + (error * 5.0f);  // 5% increase per degree above setpoint
+                linear_fan_speed = fminf(linear_fan_speed, 100.0f);  // Cap at 100%
+                
+                // Use the linear calculation instead of PID output
+                fan_speed_percent = linear_fan_speed;
+                fallback_active = true;
+                
+                ESP_LOGW(TAG, "FALLBACK ACTIVATED: PID not responding properly, using linear control");
+            }
+            
+            // Detailed debug log to see what's happening
+            //ESP_LOGI(TAG, "PID: Temp=%.1f°C, Setpoint=%.1f°C, Error=%.1f°C, Fan=%.1f%%, P=%.1f, I=%.1f%s", 
+            //         power_management->chip_temp_avg, 
+            //         fan_pid.setpoint,
+            //         error,
+            //         fan_speed_percent,
+            //         fan_pid.kp * error,  // P term
+            //         fan_pid.ki * fan_pid.integral,  // I term
+            //         fallback_active ? " (FALLBACK)" : ""
+            //        );
 
-            power_management->fan_perc = (float)automatic_fan_speed(power_management->chip_temp_avg, GLOBAL_STATE);
-
+            power_management->fan_perc = fan_speed_percent;
+            Thermal_set_fan_percent(GLOBAL_STATE->device_model, fan_speed_percent / 100.0);
         } else {
+            // Manual fan speed setting (existing logic)
             float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
             power_management->fan_perc = fs;
             Thermal_set_fan_percent(GLOBAL_STATE->device_model, (float) fs / 100.0);
         }
-
-        // Read the state of plug sense pin
-        // if (power_management->HAS_PLUG_SENSE) {
-        //     int gpio_plug_sense_state = gpio_get_level(GPIO_PLUG_SENSE);
-        //     if (gpio_plug_sense_state == 0) {
-        //         // turn ASIC off
-        //         gpio_set_level(GPIO_ASIC_ENABLE, 1);
-        //     }
-        // }
 
         // New voltage and frequency adjustment code
         uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
