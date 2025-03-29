@@ -120,7 +120,7 @@
                             valueTemplate="{value}"></p-knob>
                         ASIC Frequency (MHz) -->
 
-                        <h6>ASIC Frequency <span style="float: right;">{{info.frequency}} Mhz</span></h6>
+                        <h6>ASIC Frequency <span style="float: right;">{{info.frequency}} MHz</span></h6>
                         <p-progressBar [value]="(info.frequency / maxFrequency) * 100" [style]="{ height: '6px' }" >
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
