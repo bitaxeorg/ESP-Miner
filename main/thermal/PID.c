@@ -1,4 +1,4 @@
-#include "pid.h"
+#include "PID.h"
 #include "esp_timer.h" // For esp_timer_get_time()
 
 static unsigned long millis() {
