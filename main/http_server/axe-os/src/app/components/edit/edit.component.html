@@ -49,6 +49,16 @@
             </small>
         </div>
 
+        <div class="field grid p-fluid">
+            <label htmlFor="displayTimeout" class="col-12 mb-2 md:col-2 md:mb-0">Display Timeout</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="displayTimeout" formControlName="displayTimeout" required min="-1" max="71582" type="number" />
+                <div>
+                    <small>In minutes (-1=display always on, 0=display off).</small>
+                </div>
+            </div>
+        </div>
+
         <div class="col-12 md:col-4">
             <div class="field-checkbox">
                 <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
