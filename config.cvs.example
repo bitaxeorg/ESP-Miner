@@ -18,3 +18,7 @@ autofanspeed,data,u16,1
 fanspeed,data,u16,100
 selftest,data,u16,1
 overheat_mode,data,u16,0
+influx_enable,data,u16,0
+influx_url,data,string,http://192.168.0.123
+influx_port,data,u16,8086
+influx_token,data,string,f37fh783hf8hq

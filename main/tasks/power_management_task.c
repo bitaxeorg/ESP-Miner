@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "global_state.h"
+#include "influx_task.h"
 #include "math.h"
 #include "mining.h"
 #include "nvs_config.h"
@@ -123,7 +124,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
     uint16_t last_asic_frequency = power_management->frequency_value;
-    
+
     while (1) {
 
         switch (GLOBAL_STATE->device_model) {
@@ -144,7 +145,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                         power_management->power = INA260_read_power() / 1000;
                     }
 				}
-            
+
                 break;
             case DEVICE_GAMMA:
                     power_management->voltage = TPS546_get_vin() * 1000;
@@ -181,7 +182,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 break;
             case DEVICE_ULTRA:
             case DEVICE_SUPRA:
-                
+
                 if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
                     power_management->chip_temp_avg = GLOBAL_STATE->ASIC_initalized ? EMC2101_get_external_temp() : -1;
                     power_management->vr_temp = (float)TPS546_get_temperature();
@@ -296,11 +297,22 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             }
             last_asic_frequency = asic_frequency;
         }
+        // monitor into influx
+
+        influx_task_set_pwr(
+            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage,
+            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.current,
+            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power
+        );
+        influx_task_set_temperature(
+            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg, 
+            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp
+        );
 
         // Check for changing of overheat mode
         SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
         uint16_t new_overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-        
+
         if (new_overheat_mode != module->overheat_mode) {
             module->overheat_mode = new_overheat_mode;
             ESP_LOGI(TAG, "Overheat mode updated to: %d", module->overheat_mode);

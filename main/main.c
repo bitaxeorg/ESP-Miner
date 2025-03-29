@@ -12,6 +12,7 @@
 #include "esp_netif.h"
 #include "system.h"
 #include "http_server.h"
+#include "influx_task.h"
 #include "nvs_config.h"
 #include "serial.h"
 #include "stratum_task.h"
@@ -21,9 +22,9 @@
 #include "self_test.h"
 
 static GlobalState GLOBAL_STATE = {
-    .extranonce_str = NULL, 
-    .extranonce_2_len = 0, 
-    .abandon_work = 0, 
+    .extranonce_str = NULL,
+    .extranonce_2_len = 0,
+    .abandon_work = 0,
     .version_mask = 0,
     .ASIC_initalized = false
 };
@@ -133,6 +134,7 @@ void app_main(void)
         xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
         xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
         xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
+        xTaskCreate(influx_task, "influx", 8192, NULL, 1, NULL);
     }
 }
 

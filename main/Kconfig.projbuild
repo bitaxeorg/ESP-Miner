@@ -31,15 +31,15 @@ menu "Bitaxe Configuration"
             default 47
             help
                 GPIO pin for I2C clock line (SCL).
-            
+
         config GPIO_I2C_SCL
             int "I2C SCL Pin"
             default 48
             help
                 GPIO pin for I2C clock line (SCL).
-            
+
     endmenu
-    
+
     config ASIC_VOLTAGE
         int "ASIC Core Voltage (mV)"
         range 1000 1800
@@ -113,5 +113,65 @@ menu "Stratum Configuration"
         default 1000
         help
             A starting difficulty to use with the pool.
+
+endmenu
+
+menu "InfluxDB Configuration"
+    # Enable or disable the InfluxDB integration
+    config INFLUX_ENABLE
+        bool "Enable InfluxDB"
+        default y
+        help
+            Enable or disable the InfluxDB integration in the firmware.
+            When enabled, the firmware will send data to the specified InfluxDB server.
+
+    # Specify the URL of the InfluxDB server
+    config INFLUX_URL
+        string "InfluxDB URL"
+        default "http://192.168.0.123"
+        help
+            The URL of the InfluxDB server in your home network.
+            This should include the protocol (e.g., http://) and the IP address or hostname of the server.
+
+    # Set the port number for the InfluxDB server
+    config INFLUX_PORT
+        int "InfluxDB Port"
+        range 0 65535
+        default 21496
+        help
+            The port number used to connect to the InfluxDB server.
+            Ensure that this port is open and correctly configured on your server.
+
+    # Token used for authentication with InfluxDB
+    config INFLUX_TOKEN
+        string "InfluxDB Token"
+        default "x"
+        help
+            The authentication token required to connect to your InfluxDB instance.
+            This token must have appropriate permissions to write data to the specified bucket.
+
+    # Specify the InfluxDB bucket where data will be stored
+    config INFLUX_BUCKET
+        string "InfluxDB Bucket"
+        default "nerdqaxe"
+        help
+            The bucket in InfluxDB where your data will be stored.
+            A bucket is a named location in InfluxDB that stores data, similar to a database in other systems.
+
+    # Specify the organization in InfluxDB
+    config INFLUX_ORG
+        string "InfluxDB Org"
+        default "nerdqaxe"
+        help
+            The organization in InfluxDB that owns the specified bucket.
+            Organizations are used to logically separate data and resources within InfluxDB.
+
+    # Set the prefix for measurement names in InfluxDB
+    config INFLUX_PREFIX
+        string "InfluxDB Prefix"
+        default "mainnet_stats"
+        help
+            The prefix for measurement names in InfluxDB.
+            This prefix will be prepended to all measurement names, allowing you to easily identify related data.
 
 endmenu

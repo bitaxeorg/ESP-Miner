@@ -31,6 +31,15 @@
 #define NVS_CONFIG_OVERHEAT_MODE "overheat_mode"
 #define NVS_CONFIG_SWARM "swarmconfig"
 
+// Influx
+#define NVS_CONFIG_INFLUX_ENABLE "influx_enable"
+#define NVS_CONFIG_INFLUX_URL "influx_url"
+#define NVS_CONFIG_INFLUX_TOKEN "influx_token"
+#define NVS_CONFIG_INFLUX_PORT "influx_port"
+#define NVS_CONFIG_INFLUX_BUCKET "influx_bucket"
+#define NVS_CONFIG_INFLUX_ORG "influx_org"
+#define NVS_CONFIG_INFLUX_PREFIX "influx_prefix"
+
 // Theme configuration
 #define NVS_CONFIG_THEME_SCHEME "themescheme"
 #define NVS_CONFIG_THEME_NAME "themename"

@@ -1,0 +1,70 @@
+<div class="card">
+    <h2>InfluxDB</h2>
+
+    <ng-container *ngIf="form != null">
+        <form [formGroup]="form">
+
+            <div class="col-12 md:col-4">
+                <div class="field-checkbox">
+                    <p-checkbox name="influxEnable" formControlName="influxEnable" inputId="influxEnable"
+                        [binary]="true"></p-checkbox>
+                    <label for="influxEnable">Enable</label>
+                </div>
+            </div>
+
+            <div class="field grid p-fluid">
+                <label htmlFor="stratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Influx URL:</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="influxURL" type="text" formControlName="influxURL"
+                        formControlName="influxURL" />
+                    <div>
+                        <small>e.g. http://192.168.0.123</small>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="field grid p-fluid">
+                <label htmlFor="influxPort" class="col-12 mb-2 md:col-2 md:mb-0">Influx Port:</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="influxPort" formControlName="influxPort" type="number" />
+                </div>
+            </div>
+            <div class="field grid p-fluid">
+                <label htmlFor="influxToken" class="col-12 mb-2 md:col-2 md:mb-0">Token:</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="influxToken" formControlName="influxToken" type="password" />
+                </div>
+            </div>
+            <div class="field grid p-fluid">
+                <label htmlFor="influxBucket" class="col-12 mb-2 md:col-2 md:mb-0">Bucket:</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="influxBucket" formControlName="influxBucket" type="text" />
+                </div>
+            </div>
+            <div class="field grid p-fluid">
+                <label htmlFor="influxOrg" class="col-12 mb-2 md:col-2 md:mb-0">Org:</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="influxOrg" formControlName="influxOrg" type="text" />
+                </div>
+            </div>
+            <div class="field grid p-fluid">
+                <label htmlFor="influxPrefix" class="col-12 mb-2 md:col-2 md:mb-0">Prefix:</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="influxPrefix" formControlName="influxPrefix" type="text" />
+                </div>
+            </div>
+
+            <div class="mt-2">
+                <button pButton [disabled]="form.invalid" (click)="updateSystem()"
+                    class="btn btn-primary mr-2">Save</button>
+                <b style="line-height: 34px;">You must restart this device after saving for changes to take effect.</b>
+            </div>
+
+
+        </form>
+    </ng-container>
+
+
+</div>
+

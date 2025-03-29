@@ -24,6 +24,7 @@ SRCS
     "./tasks/create_jobs_task.c"
     "./tasks/asic_task.c"
     "./tasks/asic_result_task.c"
+    "./tasks/influx_task.cpp"
     "./tasks/power_management_task.c"
 
 INCLUDE_DIRS
@@ -35,6 +36,7 @@ INCLUDE_DIRS
     "../components/connect/include"
     "../components/dns_server/include"
     "../components/stratum/include"
+    "../components/influx/include"
 
 PRIV_REQUIRES
     "app_update"
