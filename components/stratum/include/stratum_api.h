@@ -62,25 +62,23 @@ typedef struct
     char * error_str;
 } StratumApiV1Message;
 
-void STRATUM_V1_reset_uid();
-
 void STRATUM_V1_initialize_buffer();
 
 char *STRATUM_V1_receive_jsonrpc_line(int sockfd);
 
-int STRATUM_V1_subscribe(int socket, char * model);
+int STRATUM_V1_subscribe(int socket, int send_uid, char * model);
 
 void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
 
 void STRATUM_V1_free_mining_notify(mining_notify *params);
 
-int STRATUM_V1_authenticate(int socket, const char *username, const char *pass);
+int STRATUM_V1_authenticate(int socket, int send_uid, const char *username, const char *pass);
 
-int STRATUM_V1_configure_version_rolling(int socket, uint32_t * version_mask);
+int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * version_mask);
 
-int STRATUM_V1_suggest_difficulty(int socket, uint32_t difficulty);
+int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty);
 
-int STRATUM_V1_submit_share(int socket, const char *username, const char *jobid,
+int STRATUM_V1_submit_share(int socket, int send_uid, const char *username, const char *jobid,
                             const char *extranonce_2, const uint32_t ntime, const uint32_t nonce,
                             const uint32_t version);
 

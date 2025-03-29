@@ -1,12 +1,14 @@
+#include <sys/time.h>
+#include <limits.h>
+
 #include "work_queue.h"
 #include "global_state.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "mining.h"
-#include <limits.h>
 #include "string.h"
 
-#include <sys/time.h>
+#include "asic.h"
 
 static const char *TAG = "create_jobs_task";
 
@@ -32,7 +34,8 @@ void create_jobs_task(void *pvParameters)
 
         if (GLOBAL_STATE->new_stratum_version_rolling_msg) {
             ESP_LOGI(TAG, "Set chip version rolls %i", (int)(GLOBAL_STATE->version_mask >> 13));
-            (GLOBAL_STATE->ASIC_functions.set_version_mask)(GLOBAL_STATE->version_mask);
+            //(GLOBAL_STATE->ASIC_functions.set_version_mask)(GLOBAL_STATE->version_mask);
+            ASIC_set_version_mask(GLOBAL_STATE, GLOBAL_STATE->version_mask);
             GLOBAL_STATE->new_stratum_version_rolling_msg = false;
         }
 

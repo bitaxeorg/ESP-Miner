@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "bm1397.h"
+#define CRC5_MASK 0x1F
 
 /* compute crc5 over given number of bytes */
 // adapted from https://mightydevices.com/index.php/2018/02/reverse-engineering-antminer-s1/

@@ -11,6 +11,10 @@
         text="Bitaxe frequency is set low - See settings">
     </p-message>
 
+    <p-message *ngIf="info.power_fault" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
+        text="{{info.power_fault}} Check your Power Supply.">
+    </p-message>
+
     <div class="grid" *ngIf="info$ | async as info; else loading">
         <div class="col-12">
             <div class="grid">
@@ -19,15 +23,27 @@
                         <div class="flex justify-content-between mb-3">
                             <div>
                                 <span class="block text-500 font-medium mb-3">Hash Rate</span>
-                                <div class="text-900 font-medium text-xl">{{info.hashRate * 1000000000 | hashSuffix}}
+                                <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
+                                    <span *ngIf="!info.power_fault">
+                                        {{info.hashRate * 1000000000 | hashSuffix}}
+                                    </span>
+                                    <span *ngIf="info.power_fault" class="text-red-500">
+                                        Not available - Power fault
+                                    </span>
                                 </div>
                             </div>
                         </div>
-                        <ng-container *ngIf="expectedHashRate$ | async as expectedHashRate">
-                            <span class="text-green-500 font-medium">{{expectedHashRate * 1000000000 |
-                                hashSuffix}}</span>
-                            <span class="text-500"> expected</span>
+
+                        <ng-container *ngIf="!info.power_fault">
+                            Average:
+                            <span class="text-green-500 font-medium">
+                                {{calculateAverage(hashrateData) | hashSuffix}}
+                            </span>
                         </ng-container>
+
+                        <div class="text-500 text-xs" *ngIf="!info.power_fault && (expectedHashRate$ | async) as expectedHashRate">
+                            Expected: {{expectedHashRate * 1000000000 | hashSuffix}}
+                        </div>
                     </div>
                 </div>
                 <div class="col-12 md:col-6 xl:col-3">
@@ -35,20 +51,27 @@
                         <div class="flex justify-content-between mb-3">
                             <div>
                                 <span class="block text-500 font-medium mb-3">Efficiency</span>
-                                <div class="text-900 font-medium text-xl">
-                                    <td>{{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/TH</small>
-                                    </td>
+                                <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
+                                    <span *ngIf="!info.power_fault">
+                                        {{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/TH</small>
+                                    </span>
+                                    <span *ngIf="info.power_fault" class="text-red-500">
+                                        Not available - Power fault
+                                    </span>
                                 </div>
                             </div>
                         </div>
-                        <ng-container *ngIf="expectedHashRate$ | async as expectedHashRate">
-                            <span class="text-green-500 font-medium">{{info.power / (expectedHashRate/1000) | number:
-                                '1.2-2'}} <small>J/TH</small>
+
+                        <ng-container *ngIf="!info.power_fault">
+                            Average:
+                            <span class="text-green-500 font-medium">
+                                {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} <small>J/TH</small>
                             </span>
-                            <span class="text-500"> expected</span>
                         </ng-container>
-                        <!-- <span class="text-green-500 font-medium">%52+ </span>
-                        <span class="text-500">since last week</span> -->
+
+                        <div class="text-500 text-xs" *ngIf="!info.power_fault && (expectedHashRate$ | async) as expectedHashRate">
+                            Expected: {{info.power / (expectedHashRate/1000) | number: '1.2-2'}} J/TH
+                        </div>
                     </div>
                 </div>
                 <div class="col-12 md:col-6 xl:col-3">
@@ -56,12 +79,21 @@
                         <div class="flex justify-content-between mb-3">
                             <div>
                                 <span class="block text-500 font-medium mb-3">Shares</span>
-                                <div class="text-900 font-medium text-xl">{{info.sharesAccepted | number: '1.0-0'}}
+                                <div class="text-900 font-medium text-2xl">{{info.sharesAccepted | number: '1.0-0'}}
                                 </div>
                             </div>
                         </div>
-                        <span class="text-red-500 font-medium">{{info.sharesRejected | number: '1.0-0'}} </span>
-                        <span class="text-500">rejected</span> <span class="font-medium"> ({{(info.sharesRejected / (info.sharesAccepted + info.sharesRejected) * 100) | number: '1.2-2'}}%)</span>
+                        <div *ngIf="info.sharesRejected === 0">
+                            <span class="text-red-500 font-medium">0 </span>
+                            <span class="text-500">rejected</span>
+                        </div>
+                        <div *ngIf="info.sharesRejected > 0">
+                            <div *ngFor="let sharesRejectedReason of info.sharesRejectedReasons">
+                                <span class="text-red-500 font-medium">{{sharesRejectedReason.count | number: '1.0-0'}} </span>
+                                <span class="text-500">{{sharesRejectedReason.message}}</span>
+                                ({{(sharesRejectedReason.count / (info.sharesAccepted + info.sharesRejected) * 100) | number: '1.2-2'}}%)
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -70,8 +102,8 @@
                         <div class="flex justify-content-between mb-3">
                             <div>
                                 <span class="block text-500 font-medium mb-3">Best Difficulty</span>
-                                <div class="text-900 font-medium text-xl">{{info.bestDiff}}
-                                    <span class="text-500">all-time best</span>
+                                <div class="text-900 font-medium text-2xl">{{info.bestDiff}}
+                                    <span class="text-500 text-lg">all-time best</span>
                                 </div>
                             </div>
                         </div>
@@ -84,7 +116,7 @@
 
             </div>
         </div>
-        <div class="col-12  mb-4">
+        <div class="col-12 mb-4" *ngIf="!info.power_fault">
             <div class="card">
                 <p-chart [data]="chartData" [options]="chartOptions"></p-chart>
             </div>
@@ -95,7 +127,7 @@
                 <div class="grid">
                     <div class="col-12">
                         <h6>Power <span style="float: right;">{{info.power}} W</span></h6>
-                        <p-progressBar [value]="(info.power / maxPower) * 100" [style]="{ height: '6px' }" >
+                        <p-progressBar [value]="(info.power / info.maxPower) * 100" [style]="{ height: '6px' }" >
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
                     </div>
@@ -104,15 +136,18 @@
 
                         <h6>Input Voltage <span style="float: right;">{{info.voltage}} V</span></h6>
                         <div class="relative">
-                            <p-progressBar [value]="(info.voltage / 5.5) * 100" [style]="{ height: '6px' }">
+                            <p-progressBar [value]="(info.voltage / (info.nominalVoltage + .5)) * 100" [style]="{ height: '6px' }">
                                 <ng-template pTemplate="content" let-value></ng-template>
                             </p-progressBar>
-                            <!-- Add marker at 5.0V (90.91% of 5.5V) -->
-                            <div class="absolute bg-white" style="left: 90.5%; top: 0; width: 3px; height: 6px;">
-                                <small class="absolute text-white" style="top: -1.25rem; transform: translateX(-50%)">5.0</small>
+
+                            <!-- Conditional marker based on nominal voltage-->
+                            <div class="absolute bg-white"
+                                [style.left]="(info.nominalVoltage / (info.nominalVoltage + .5)) * 100 + '%'"
+                                style="top: 0; width: 3px; height: 6px;">
+                                <small class="absolute text-white" style="top: -1.25rem; transform: translateX(-50%)">{{info.nominalVoltage}}V</small>
                             </div>
                         </div>
-                        <span class="danger" *ngIf="info.voltage < 4.8">&nbsp; Danger: Low voltage</span>
+                        <span class="danger" *ngIf="info.voltage < (info.nominalVoltage + .5) * 0.87">&nbsp; Danger: Low voltage</span>
                     </div>
 
                     <div class="col-12">
@@ -146,7 +181,14 @@
                 <div class="grid">
                     <div class="col-12">
 
-                        <h6>ASIC Temperature <span style="float: right;">{{info.temp}}&deg;C</span></h6>
+                        <h6>ASIC Temperature
+                            <span style="float: right;">
+                                <ng-template #noTemp>--</ng-template>
+                                <ng-container *ngIf="info.temp > 0; else noTemp">
+                                    {{info.temp}}&deg;C
+                                </ng-container>
+                            </span>
+                        </h6>
                         <p-progressBar [value]="(info.temp / maxTemp) * 100" [style]="{ height: '6px' }" >
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>

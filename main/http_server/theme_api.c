@@ -4,7 +4,7 @@
 #include "nvs_config.h"
 #include "cJSON.h"
 
-static const char *TAG = "theme_api";
+//static const char *TAG = "theme_api";
 
 // Helper function to set CORS headers
 static esp_err_t set_cors_headers(httpd_req_t *req)

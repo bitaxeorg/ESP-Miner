@@ -6,6 +6,7 @@ import { startWith, Subject, takeUntil } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-edit',
@@ -20,9 +21,11 @@ export class EditComponent implements OnInit, OnDestroy {
   public websiteUpdateProgress: number | null = null;
 
   public savedChanges: boolean = false;
-  public devToolsOpen: boolean = false;
+  public settingsUnlocked: boolean = false;
   public eASICModel = eASICModel;
   public ASICModel!: eASICModel;
+  public restrictedModels: eASICModel[] = Object.values(eASICModel)
+    .filter((v): v is eASICModel => typeof v === 'string');
 
   @Input() uri = '';
 
@@ -122,10 +125,44 @@ export class EditComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private systemService: SystemService,
     private toastr: ToastrService,
-    private loadingService: LoadingService
+    private loadingService: LoadingService,
+    private route: ActivatedRoute,
   ) {
-    window.addEventListener('resize', this.checkDevTools.bind(this));
-    this.checkDevTools();
+    // Check URL parameter for settings unlock
+    this.route.queryParams.subscribe(params => {
+      const urlOcParam = params['oc'] !== undefined;
+      if (urlOcParam) {
+        // If ?oc is in URL, enable overclock and save to NVS
+        this.settingsUnlocked = true;
+        this.saveOverclockSetting(1);
+        console.log(
+          '🎉 The ancient seals have been broken!\n' +
+          '⚡ Unlimited power flows through your miner...\n' +
+          '🔧 You can now set custom frequency and voltage values.\n' +
+          '⚠️ Remember: with great power comes great responsibility!'
+        );
+      } else {
+        // If ?oc is not in URL, check NVS setting (will be loaded in ngOnInit)
+        console.log('🔒 Here be dragons! Advanced settings are locked for your protection. \n' +
+          'Only the bravest miners dare to venture forth... \n' +
+          'If you wish to unlock dangerous overclocking powers, add: %c?oc',
+          'color: #ff4400; text-decoration: underline; cursor: pointer; font-weight: bold;',
+          'to the current URL'
+        );
+      }
+    });
+  }
+
+  private saveOverclockSetting(enabled: number) {
+    this.systemService.updateSystem(this.uri, { overclockEnabled: enabled })
+      .subscribe({
+        next: () => {
+          console.log(`Overclock setting saved: ${enabled === 1 ? 'enabled' : 'disabled'}`);
+        },
+        error: (err) => {
+          console.error(`Failed to save overclock setting: ${err.message}`);
+        }
+      });
   }
 
   ngOnInit(): void {
@@ -136,33 +173,19 @@ export class EditComponent implements OnInit, OnDestroy {
       )
       .subscribe(info => {
         this.ASICModel = info.ASICModel;
+
+        // Check if overclock is enabled in NVS
+        if (info.overclockEnabled === 1) {
+          this.settingsUnlocked = true;
+          console.log(
+            '🎉 Overclock mode is enabled from NVS settings!\n' +
+            '⚡ Custom frequency and voltage values are available.'
+          );
+        }
+
         this.form = this.fb.group({
           flipscreen: [info.flipscreen == 1],
           invertscreen: [info.invertscreen == 1],
-          stratumURL: [info.stratumURL, [
-            Validators.required,
-            Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
-            Validators.pattern(/^[^:]*$/),
-          ]],
-          stratumPort: [info.stratumPort, [
-            Validators.required,
-            Validators.pattern(/^[^:]*$/),
-            Validators.min(0),
-            Validators.max(65353)
-          ]],
-          fallbackStratumURL: [info.fallbackStratumURL, [
-            Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
-          ]],
-          fallbackStratumPort: [info.fallbackStratumPort, [
-            Validators.required,
-            Validators.pattern(/^[^:]*$/),
-            Validators.min(0),
-            Validators.max(65353)
-          ]],
-          stratumUser: [info.stratumUser, [Validators.required]],
-          stratumPassword: ['*****', [Validators.required]],
-          fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
-          fallbackStratumPassword: ['password', [Validators.required]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
@@ -185,20 +208,8 @@ export class EditComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    window.removeEventListener('resize', this.checkDevTools.bind(this));
     this.destroy$.next();
     this.destroy$.complete();
-  }
-
-  private checkDevTools(): void {
-    if (
-      window.outerWidth - window.innerWidth > 160 ||
-      window.outerHeight - window.innerHeight > 160
-    ) {
-      this.devToolsOpen = true;
-    } else {
-      this.devToolsOpen = false;
-    }
   }
 
   public updateSystem() {
@@ -213,19 +224,16 @@ export class EditComponent implements OnInit, OnDestroy {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.success('Success!', 'Saved.');
+          const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
+          this.toastr.success(successMessage, 'Success!');
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error.', `Could not save. ${err.message}`);
+          const errorMessage = this.uri ? `Could not save settings for ${this.uri}. ${err.message}` : `Could not save settings. ${err.message}`;
+          this.toastr.error(errorMessage, 'Error');
           this.savedChanges = false;
         }
       });
-  }
-
-  showStratumPassword: boolean = false;
-  toggleStratumPasswordVisibility() {
-    this.showStratumPassword = !this.showStratumPassword;
   }
 
   showWifiPassword: boolean = false;
@@ -238,9 +246,18 @@ export class EditComponent implements OnInit, OnDestroy {
     this.updateSystem();
   }
 
-  showFallbackStratumPassword: boolean = false;
-  toggleFallbackStratumPasswordVisibility() {
-    this.showFallbackStratumPassword = !this.showFallbackStratumPassword;
+  toggleOverclockMode(enable: boolean) {
+    this.settingsUnlocked = enable;
+    this.saveOverclockSetting(enable ? 1 : 0);
+
+    if (enable) {
+      console.log(
+        '🎉 Overclock mode enabled!\n' +
+        '⚡ Custom frequency and voltage values are now available.'
+      );
+    } else {
+      console.log('🔒 Overclock mode disabled. Using safe preset values only.');
+    }
   }
 
   public restart() {
@@ -248,10 +265,12 @@ export class EditComponent implements OnInit, OnDestroy {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.success('Success!', 'Bitaxe restarted');
+          const successMessage = this.uri ? `Bitaxe at ${this.uri} restarted` : 'Bitaxe restarted';
+          this.toastr.success(successMessage, 'Success');
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error', `Could not restart. ${err.message}`);
+          const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
+          this.toastr.error(errorMessage, 'Error');
         }
       });
   }

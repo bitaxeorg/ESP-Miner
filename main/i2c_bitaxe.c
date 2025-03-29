@@ -115,6 +115,18 @@ esp_err_t i2c_bitaxe_register_read(i2c_master_dev_handle_t dev_handle, uint8_t r
 }
 
 /**
+ * @brief Just write a register address to the I2C device
+ * 
+ * @param dev_handle 
+ * @param reg_addr 
+ * @return esp_err_t 
+ */
+esp_err_t i2c_bitaxe_register_write_addr(i2c_master_dev_handle_t dev_handle, uint8_t reg_addr)
+{
+    return log_on_error(i2c_master_transmit(dev_handle, &reg_addr, 1, I2C_DEFAULT_TIMEOUT), dev_handle);
+}
+
+/**
  * @brief Write a byte to a I2C register
  * @param dev_handle The I2C device handle
  * @param reg_addr The register address to write to

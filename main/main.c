@@ -1,6 +1,7 @@
 
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_psram.h"
 #include "nvs_flash.h"
 
 // #include "protocol_examples_common.h"
@@ -19,6 +20,7 @@
 #include "adc.h"
 #include "nvs_device.h"
 #include "self_test.h"
+#include "asic.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -32,7 +34,14 @@ static const char * TAG = "bitaxe";
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "Welcome to the bitaxe - hack the planet!");
+    ESP_LOGI(TAG, "Welcome to the bitaxe - FOSS || GTFO!");
+
+    if (!esp_psram_is_initialized()) {
+        ESP_LOGE(TAG, "No PSRAM available on ESP32 device!");
+        GLOBAL_STATE.psram_is_available = false;
+    } else {
+        GLOBAL_STATE.psram_is_available = true;
+    }
 
     // Init I2C
     ESP_ERROR_CHECK(i2c_bitaxe_init());
@@ -56,6 +65,11 @@ void app_main(void)
         return;
     }
 
+    if (ASIC_set_device_model(&GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Error setting ASIC model");
+        return;
+    }
+
     // Optionally hold the boot button
     bool pressed = gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
     //should we run the self test?
@@ -75,7 +89,7 @@ void app_main(void)
     strncpy(GLOBAL_STATE.SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE.SYSTEM_MODULE.ssid));
     GLOBAL_STATE.SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE.SYSTEM_MODULE.ssid)-1] = 0;
 
-    // init and connect to wifi
+    // init AP and connect to wifi
     wifi_init(wifi_ssid, wifi_pass, hostname, GLOBAL_STATE.SYSTEM_MODULE.ip_addr_str);
 
     generate_ssid(GLOBAL_STATE.SYSTEM_MODULE.ap_ssid);
@@ -116,24 +130,28 @@ void app_main(void)
 
     GLOBAL_STATE.new_stratum_version_rolling_msg = false;
 
-    if (GLOBAL_STATE.ASIC_functions.init_fn != NULL) {
-        wifi_softap_off();
+    wifi_softap_off();
 
-        queue_init(&GLOBAL_STATE.stratum_queue);
-        queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
+    queue_init(&GLOBAL_STATE.stratum_queue);
+    queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
 
-        SERIAL_init();
-        (*GLOBAL_STATE.ASIC_functions.init_fn)(GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE.asic_count);
-        SERIAL_set_baud((*GLOBAL_STATE.ASIC_functions.set_max_baud_fn)());
-        SERIAL_clear_buffer();
+    SERIAL_init();
 
-        GLOBAL_STATE.ASIC_initalized = true;
-
-        xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
-        xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-        xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-        xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
+    if (ASIC_init(&GLOBAL_STATE) == 0) {
+        GLOBAL_STATE.SYSTEM_MODULE.asic_status = "Chip count 0";
+        ESP_LOGE(TAG, "Chip count 0");
+        return;
     }
+
+    SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
+    SERIAL_clear_buffer();
+
+    GLOBAL_STATE.ASIC_initalized = true;
+
+    xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
+    xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
 }
 
 void MINER_set_wifi_status(wifi_status_t status, int retry_count, int reason)

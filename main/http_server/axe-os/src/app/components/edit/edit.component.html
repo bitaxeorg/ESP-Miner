@@ -1,73 +1,11 @@
 <ng-container *ngIf="form != null">
     <form [formGroup]="form">
-        <div class="field grid p-fluid">
-            <label htmlFor="stratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Host:</label>
-            <div class="col-12 md:col-10">
-                <input pInputText id="stratumURL" type="text" formControlName="stratumURL"
-                    formControlName="stratumURL" />
-                <div>
-                    <small>Do not include 'stratum+tcp://' or port.</small>
-                </div>
-            </div>
-        </div>
-        <div class="field grid p-fluid">
-            <label htmlFor="stratumPort" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Port:</label>
-            <div class="col-12 md:col-10">
-                <input pInputText id="stratumPort" formControlName="stratumPort" type="number" />
-            </div>
-        </div>
-        <div class="field grid p-fluid">
-            <label htmlFor="stratumUser" class="col-12 mb-2 md:col-2 md:mb-0">Stratum User:</label>
-            <div class="col-12 md:col-10">
-                <input pInputText id="stratumUser" formControlName="stratumUser" type="text" />
-            </div>
-        </div>
-        <div class="field grid p-fluid">
-            <label htmlFor="stratumPassword" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Password:</label>
-            <div class="col-12 md:col-10 p-input-icon-right">
-                <i *ngIf="form.get('stratumPassword')?.dirty" class="pi"
-                   [ngClass]="{'pi-eye': !showStratumPassword, 'pi-eye-slash': showStratumPassword}"
-                   (click)="toggleStratumPasswordVisibility()" style="cursor: pointer;"></i>
-                <input pInputText id="stratumPassword" formControlName="stratumPassword"
-                       [type]="showStratumPassword ? 'text' : 'password'"
-                       placeholder="Enter stratum password" />
-            </div>
-        </div>
-        <div class="field grid p-fluid">
-            <label htmlFor="stratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum Host:</label>
-            <div class="col-12 md:col-10">
-                <input pInputText id="fallbackStratumURL" type="text" formControlName="fallbackStratumURL"
-                    formControlName="fallbackStratumURL" />
-                <div>
-                    <small>Do not include 'stratum+tcp://' or port.</small>
-                </div>
-            </div>
-        </div>
-        <div class="field grid p-fluid">
-            <label htmlFor="fallbackStratumPort" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum Port:</label>
-            <div class="col-12 md:col-10">
-                <input pInputText id="fallbackStratumPort" formControlName="fallbackStratumPort" type="number" />
-            </div>
-        </div>
-        <div class="field grid p-fluid">
-            <label htmlFor="fallbackStratumUser" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum User:</label>
-            <div class="col-12 md:col-10">
-                <input pInputText id="fallbackStratumUser" formControlName="fallbackStratumUser" type="text" />
-            </div>
-        </div>
-        <div class="field grid p-fluid">
-            <label htmlFor="fallbackStratumPassword" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum Password:</label>
-            <div class="col-12 md:col-10 p-input-icon-right">
-                <i *ngIf="form.get('fallbackStratumPassword')?.dirty" class="pi"
-                   [ngClass]="{'pi-eye': !showFallbackStratumPassword, 'pi-eye-slash': showFallbackStratumPassword}"
-                   (click)="toggleFallbackStratumPasswordVisibility()" style="cursor: pointer;"></i>
-                <input pInputText id="fallbackStratumPassword" formControlName="fallbackStratumPassword"
-                       [type]="showFallbackStratumPassword ? 'text' : 'password'"
-                       placeholder="Enter fallback stratum password" />
-            </div>
-        </div>
 
-        <ng-container *ngIf="!devToolsOpen && [eASICModel.BM1366, eASICModel.BM1368, eASICModel.BM1370, eASICModel.BM1397].includes(ASICModel)">
+        <p-message *ngIf="settingsUnlocked" severity="warn" styleClass="w-full mb-3 py-4 border-round-xl"
+            text="Custom settings can cause damage & system instability. Only modify these settings if you understand the risks of running outside designed parameters.">
+        </p-message>
+
+        <ng-container *ngIf="!settingsUnlocked && restrictedModels.includes(ASICModel)">
             <div class="field grid p-fluid">
                 <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
                 <div class="col-12 md:col-10">
@@ -83,7 +21,7 @@
             </div>
         </ng-container>
 
-        <ng-container *ngIf="devToolsOpen === true">
+        <ng-container *ngIf="settingsUnlocked === true">
 
             <div class="field grid p-fluid">
                 <label htmlFor="frequency" class="col-12 mb-2 md:col-2 md:mb-0">Frequency</label>
@@ -115,7 +53,7 @@
             <div class="field-checkbox">
                 <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
                     [binary]="true"></p-checkbox>
-                <label for="flipscreen">Flip Screen</label>
+                <label for="flipscreen">Flip Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Rotates the LCD screen by 180 degrees"></i></label>
             </div>
         </div>
 
@@ -123,7 +61,7 @@
             <div class="field-checkbox">
                 <p-checkbox name="invertfanpolarity" formControlName="invertfanpolarity" inputId="invertfanpolarity"
                     [binary]="true"></p-checkbox>
-                <label for="invertfanpolarity">Invert Fan Polarity</label>
+                <label for="invertfanpolarity">Invert Fan Duty Cycle <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Inverting the polarity of the fan PWM signal"></i></label>
             </div>
         </div>
         <div class="col-12">
@@ -153,6 +91,11 @@
 
         <div class="mt-2">
             <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
+
+            <button *ngIf="settingsUnlocked" pButton pButton="p-button-danger" (click)="toggleOverclockMode(false)"
+                    class="p-button-danger" pTooltip="Return to safe preset values only">
+                Disable Overclock Mode
+            </button>
         </div>
 
 
