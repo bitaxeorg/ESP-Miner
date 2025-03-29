@@ -1,65 +1,61 @@
 #ifndef PID_H
 #define PID_H
 
-#include <stdint.h>
 #include <stdbool.h>
 
+#define AUTOMATIC 1
+#define MANUAL 0
+#define DIRECT 0
+#define REVERSE 1
+#define P_ON_M 0
+#define P_ON_E 1
+
 typedef struct {
-    // Tuning parameters
-    float kp;           // Proportional gain
-    float ki;           // Integral gain
-    float kd;           // Derivative gain
+    double dispKp;
+    double dispKi;
+    double dispKd;
 
-    // Control parameters
-    float setpoint;     // Target value
-    float output_min;   // Minimum output limit
-    float output_max;   // Maximum output limit
+    double kp;
+    double ki;
+    double kd;
 
-    // Internal state
-    float last_error;   // Previous error for derivative calculation
-    float integral;     // Accumulated error
-    float last_input;   // Last measured input for derivative calculation
+    int controllerDirection;
+    int pOn;
+    bool pOnE;
 
-    // Anti-windup and configuration
-    float max_integral; // Maximum integral accumulation
-    bool inverse;       // Inverse control mode
+    double *input;
+    double *output;
+    double *setpoint;
+
+    unsigned long lastTime;
+    unsigned long sampleTime;
+    double outMin;
+    double outMax;
+    bool inAuto;
+
+    double outputSum;
+    double lastInput;
 } PIDController;
 
-// Initialize PID controller
-void PID_init(
-    PIDController* pid, 
-    float kp, 
-    float ki, 
-    float kd, 
-    float setpoint, 
-    float output_min, 
-    float output_max,
-    bool inverse
-);
+void pid_init(PIDController *pid, double *input, double *output, double *setpoint,
+              double Kp, double Ki, double Kd, int POn, int ControllerDirection);
 
-// Compute PID output
-float PID_compute(
-    PIDController* pid, 
-    float measured_value, 
-    float dt
-);
+void pid_set_mode(PIDController *pid, int mode);
+bool pid_compute(PIDController *pid);
+void pid_set_output_limits(PIDController *pid, double min, double max);
+void pid_set_tunings(PIDController *pid, double Kp, double Ki, double Kd);
+void pid_set_tunings_adv(PIDController *pid, double Kp, double Ki, double Kd, int POn);
+void pid_set_sample_time(PIDController *pid, int newSampleTime);
+void pid_set_controller_direction(PIDController *pid, int direction);
+void pid_initialize(PIDController *pid);
 
-// Reset PID controller state
-void PID_reset(PIDController* pid);
+// Getter functions
+double pid_get_kp(PIDController *pid);
+double pid_get_ki(PIDController *pid);
+double pid_get_kd(PIDController *pid);
+double pid_get_ti(PIDController *pid);
+double pid_get_td(PIDController *pid);
+int pid_get_mode(PIDController *pid);
+int pid_get_direction(PIDController *pid);
 
-// Set new PID tunings
-void PID_set_tunings(
-    PIDController* pid, 
-    float kp, 
-    float ki, 
-    float kd
-);
-
-// Set output limits
-void PID_set_output_limits(
-    PIDController* pid, 
-    float min, 
-    float max
-);
-
-#endif // PID_H
+#endif

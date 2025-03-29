@@ -1,134 +1,139 @@
-#include "PID.h"
-#include <math.h>
+#include "pid.h"
+#include "esp_timer.h" // For esp_timer_get_time()
 
-void PID_init(
-    PIDController* pid, 
-    float kp, 
-    float ki, 
-    float kd, 
-    float setpoint, 
-    float output_min, 
-    float output_max,
-    bool inverse
-) {
-    // Initialize PID parameters
-    pid->kp = kp;
-    pid->ki = ki;
-    pid->kd = kd;
+static unsigned long millis() {
+    return (unsigned long)(esp_timer_get_time() / 1000);
+}
+
+void pid_init(PIDController *pid, double *input, double *output, double *setpoint,
+              double Kp, double Ki, double Kd, int POn, int ControllerDirection) {
+    pid->input = input;
+    pid->output = output;
     pid->setpoint = setpoint;
-    pid->output_min = output_min;
-    pid->output_max = output_max;
-    pid->inverse = inverse;
+    pid->inAuto = false;
 
-    // Reset internal state
-    pid->last_error = 0;
-    pid->integral = 0;
-    pid->last_input = 0;
+    pid_set_output_limits(pid, 0, 255);
+    pid->sampleTime = 100;
 
-    // Set a reasonable max integral to prevent windup
-    pid->max_integral = (output_max - output_min) / 2.0;
+    pid_set_controller_direction(pid, ControllerDirection);
+    pid_set_tunings_adv(pid, Kp, Ki, Kd, POn);
+
+    pid->lastTime = millis() - pid->sampleTime;
 }
 
-float PID_compute(
-    PIDController* pid, 
-    float measured_value, 
-    float dt
-) {
-    float error;
-    
-    // For temperature-to-fan control
-    if (pid->inverse) {
-        // For inverse control (fan control):
-        // - Positive error when temperature is ABOVE setpoint (need more cooling)
-        // - Negative error when temperature is BELOW setpoint (need less cooling)
-        error = measured_value - pid->setpoint;
-    } else {
-        // Standard control:
-        // - Positive error when measured value is BELOW setpoint
-        // - Negative error when measured value is ABOVE setpoint
-        error = pid->setpoint - measured_value;
+void pid_set_mode(PIDController *pid, int mode) {
+    bool newAuto = (mode == AUTOMATIC);
+    if (newAuto && !pid->inAuto) {
+        pid_initialize(pid);
     }
+    pid->inAuto = newAuto;
+}
 
-    // For fan control, if temperature is below setpoint, just return minimum fan speed
-    if (pid->inverse && error <= 0) {
-        pid->last_error = error;
-        pid->last_input = measured_value;
-        pid->integral = 0; // Reset integral when below setpoint
-        return pid->output_min;
-    }
+bool pid_compute(PIDController *pid) {
+    if (!pid->inAuto) return false;
 
-    // Compute proportional term
-    float p_term = pid->kp * error;
+    unsigned long now = millis();
+    unsigned long timeChange = now - pid->lastTime;
 
-    // Compute integral term with anti-windup
-    pid->integral += error * dt;
-    
-    // Limit integral to prevent windup
-    pid->integral = fmaxf(0, fminf(pid->integral, pid->max_integral));
-    
-    float i_term = pid->ki * pid->integral;
+    if (timeChange >= pid->sampleTime) {
+        double input = *(pid->input);
+        double error = *(pid->setpoint) - input;
+        double dInput = input - pid->lastInput;
+        pid->outputSum += pid->ki * error;
 
-    // Compute derivative term
-    float derivative = (measured_value - pid->last_input) / dt;
-    
-    // For fan control, we want to increase fan when temperature is rising
-    float d_term = pid->inverse ? pid->kd * derivative : -pid->kd * derivative;
+        if (!pid->pOnE) pid->outputSum -= pid->kp * dInput;
 
-    // Compute total output
-    float output;
-    
-    if (pid->inverse) {
-        // For fan control, directly map the PID terms to fan speed
-        // This ensures the fan responds immediately to temperature changes
-        output = pid->output_min + p_term + i_term + d_term;
-        
-        // Ensure a minimum response for small errors
-        if (error > 0) {
-            float min_response = pid->output_min + (error * 5.0f);
-            output = fmaxf(output, min_response);
+        if (pid->outputSum > pid->outMax) pid->outputSum = pid->outMax;
+        else if (pid->outputSum < pid->outMin) pid->outputSum = pid->outMin;
+
+        double output = pid->pOnE ? pid->kp * error : 0;
+        output += pid->outputSum - pid->kd * dInput;
+
+        if (output > pid->outMax) {
+            pid->outputSum -= output - pid->outMax;
+            output = pid->outMax;
+        } else if (output < pid->outMin) {
+            pid->outputSum += pid->outMin - output;
+            output = pid->outMin;
         }
-    } else {
-        // Standard PID control for non-inverse applications
-        output = p_term + i_term + d_term;
+
+        *(pid->output) = output;
+        pid->lastInput = input;
+        pid->lastTime = now;
+        return true;
     }
-
-    // Map the output to the range [output_min, output_max]
-    output = fmaxf(pid->output_min, fminf(output, pid->output_max));
-
-    // Update state for next iteration
-    pid->last_error = error;
-    pid->last_input = measured_value;
-
-    return output;
+    return false;
 }
 
-void PID_reset(PIDController* pid) {
-    pid->last_error = 0;
-    pid->integral = 0;
-    pid->last_input = 0;
+void pid_set_tunings_adv(PIDController *pid, double Kp, double Ki, double Kd, int POn) {
+    if (Kp < 0 || Ki < 0 || Kd < 0) return;
+
+    pid->pOn = POn;
+    pid->pOnE = (POn == P_ON_E);
+
+    pid->dispKp = Kp;
+    pid->dispKi = Ki;
+    pid->dispKd = Kd;
+
+    double sampleTimeInSec = ((double)pid->sampleTime) / 1000.0;
+    pid->kp = Kp;
+    pid->ki = Ki * sampleTimeInSec;
+    pid->kd = Kd / sampleTimeInSec;
+
+    if (pid->controllerDirection == REVERSE) {
+        pid->kp = -pid->kp;
+        pid->ki = -pid->ki;
+        pid->kd = -pid->kd;
+    }
 }
 
-void PID_set_tunings(
-    PIDController* pid, 
-    float kp, 
-    float ki, 
-    float kd
-) {
-    pid->kp = kp;
-    pid->ki = ki;
-    pid->kd = kd;
+void pid_set_tunings(PIDController *pid, double Kp, double Ki, double Kd) {
+    pid_set_tunings_adv(pid, Kp, Ki, Kd, pid->pOn);
 }
 
-void PID_set_output_limits(
-    PIDController* pid, 
-    float min, 
-    float max
-) {
-    pid->output_min = min;
-    pid->output_max = max;
-    pid->max_integral = (max - min) / 2.0;
-
-    // Adjust current integral if it's outside new limits
-    pid->integral = fmaxf(-pid->max_integral, 
-                           fminf(pid->integral, pid->max_integral));
+void pid_set_sample_time(PIDController *pid, int newSampleTime) {
+    if (newSampleTime > 0) {
+        double ratio = (double)newSampleTime / (double)pid->sampleTime;
+        pid->ki *= ratio;
+        pid->kd /= ratio;
+        pid->sampleTime = newSampleTime;
+    }
 }
+
+void pid_set_output_limits(PIDController *pid, double min, double max) {
+    if (min >= max) return;
+    pid->outMin = min;
+    pid->outMax = max;
+
+    if (pid->inAuto) {
+        if (*(pid->output) > max) *(pid->output) = max;
+        else if (*(pid->output) < min) *(pid->output) = min;
+
+        if (pid->outputSum > max) pid->outputSum = max;
+        else if (pid->outputSum < min) pid->outputSum = min;
+    }
+}
+
+void pid_set_controller_direction(PIDController *pid, int direction) {
+    if (pid->inAuto && direction != pid->controllerDirection) {
+        pid->kp = -pid->kp;
+        pid->ki = -pid->ki;
+        pid->kd = -pid->kd;
+    }
+    pid->controllerDirection = direction;
+}
+
+void pid_initialize(PIDController *pid) {
+    pid->outputSum = *(pid->output);
+    pid->lastInput = *(pid->input);
+    if (pid->outputSum > pid->outMax) pid->outputSum = pid->outMax;
+    else if (pid->outputSum < pid->outMin) pid->outputSum = pid->outMin;
+}
+
+double pid_get_kp(PIDController *pid) { return pid->dispKp; }
+double pid_get_ki(PIDController *pid) { return pid->dispKi; }
+double pid_get_kd(PIDController *pid) { return pid->dispKd; }
+double pid_get_ti(PIDController *pid) { return pid->dispKp / pid->dispKi; }
+double pid_get_td(PIDController *pid) { return pid->dispKd / pid->dispKp; }
+int pid_get_mode(PIDController *pid) { return pid->inAuto ? AUTOMATIC : MANUAL; }
+int pid_get_direction(PIDController *pid) { return pid->controllerDirection; }
