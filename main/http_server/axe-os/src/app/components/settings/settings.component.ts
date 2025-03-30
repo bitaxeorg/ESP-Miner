@@ -137,8 +137,8 @@ export class SettingsComponent {
     const file = event.files[0];
     this.firmwareUpload.clear(); // clear the file upload component
     
-    if (file.name != 'esp-miner.bin') {
-      this.toastrService.error('Incorrect file, looking for esp-miner.bin.', 'Error');
+    if (file.name != 'acs-esp-miner.bin') {
+      this.toastrService.error('Incorrect file, looking for acs-esp-miner.bin.', 'Error');
       return;
     }
 
