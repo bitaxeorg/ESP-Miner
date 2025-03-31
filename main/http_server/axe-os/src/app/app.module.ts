@@ -11,7 +11,6 @@ import { ToastrModule } from 'ngx-toastr';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { EditComponent } from './components/edit/edit.component';
-import { PoolComponent } from './components/pool/pool.component';
 import { NetworkEditComponent } from './components/network-edit/network.edit.component';
 import { HomeComponent } from './components/home/home.component';
 import { LoadingComponent } from './components/loading/loading.component';
@@ -19,8 +18,7 @@ import { LogsComponent } from './components/logs/logs.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
-import { ThemeConfigComponent } from './components/design/theme-config.component';
-import { DesignComponent } from './components/design/design.component';
+import { ThemeConfigComponent } from './components/settings/theme-config.component';
 import { AppLayoutModule } from './layout/app.layout.module';
 import { ANSIPipe } from './pipes/ansi.pipe';
 import { DateAgoPipe } from './pipes/date-ago.pipe';
@@ -28,9 +26,6 @@ import { HashSuffixPipe } from './pipes/hash-suffix.pipe';
 import { PrimeNGModule } from './prime-ng.module';
 import { MessageModule } from 'primeng/message';
 import { TooltipModule } from 'primeng/tooltip';
-import { DialogModule } from 'primeng/dialog';
-import { DynamicDialogModule, DialogService as PrimeDialogService } from 'primeng/dynamicdialog';
-import { DialogService, DialogListComponent } from './services/dialog.service';
 
 const components = [
   AppComponent,
@@ -40,8 +35,7 @@ const components = [
   LoadingComponent,
   NetworkComponent,
   SettingsComponent,
-  LogsComponent,
-  PoolComponent
+  LogsComponent
 ];
 
 @NgModule({
@@ -53,10 +47,7 @@ const components = [
     SwarmComponent,
     SettingsComponent,
     HashSuffixPipe,
-    ThemeConfigComponent,
-    DesignComponent,
-    PoolComponent,
-    DialogListComponent
+    ThemeConfigComponent
   ],
   imports: [
     BrowserModule,
@@ -72,14 +63,10 @@ const components = [
     PrimeNGModule,
     AppLayoutModule,
     MessageModule,
-    TooltipModule,
-    DialogModule,
-    DynamicDialogModule
+    TooltipModule
   ],
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },
-    DialogService,
-    PrimeDialogService
   ],
   bootstrap: [AppComponent]
 })

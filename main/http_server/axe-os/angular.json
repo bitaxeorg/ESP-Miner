@@ -27,8 +27,7 @@
             "inlineStyleLanguage": "scss",
             "assets": [
               "src/favicon.ico",
-              "src/assets",
-              "src/bitcoin.pdf"
+              "src/assets"
             ],
             "styles": [
               "src/styles.scss",

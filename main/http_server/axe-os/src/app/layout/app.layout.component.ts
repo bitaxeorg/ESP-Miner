@@ -109,10 +109,6 @@ export class AppLayoutComponent implements OnDestroy {
         }
     }
 
-    get isAPMode(): boolean {
-        return this.router.url.startsWith('/ap');
-    }
-
     ngOnDestroy() {
         if (this.overlayMenuOpenSubscription) {
             this.overlayMenuOpenSubscription.unsubscribe();

@@ -22,6 +22,7 @@ export class SettingsComponent {
   public websiteUpdateProgress: number | null = null;
 
 
+  public devToolsOpen: boolean = false;
   public eASICModel = eASICModel;
   public ASICModel!: eASICModel;
 
@@ -43,6 +44,9 @@ export class SettingsComponent {
   ) {
 
 
+
+    window.addEventListener('resize', this.checkDevTools);
+    this.checkDevTools();
 
     this.latestRelease$ = this.githubUpdateService.getReleases().pipe(map(releases => {
       return releases[0];
@@ -89,6 +93,17 @@ export class SettingsComponent {
       });
 
   }
+  private checkDevTools = () => {
+    if (
+      window.outerWidth - window.innerWidth > 160 ||
+      window.outerHeight - window.innerHeight > 160
+    ) {
+      this.devToolsOpen = true;
+    } else {
+      this.devToolsOpen = false;
+    }
+  };
+
   public updateSystem() {
 
     const form = this.form.getRawValue();
@@ -121,7 +136,7 @@ export class SettingsComponent {
   otaUpdate(event: FileUploadHandlerEvent) {
     const file = event.files[0];
     this.firmwareUpload.clear(); // clear the file upload component
-
+    
     if (file.name != 'esp-miner.bin') {
       this.toastrService.error('Incorrect file, looking for esp-miner.bin.', 'Error');
       return;

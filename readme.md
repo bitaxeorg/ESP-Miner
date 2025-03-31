@@ -4,13 +4,11 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/t/skot/esp-miner)
 ![GitHub contributors](https://img.shields.io/github/contributors/skot/esp-miner)
 
-![Alt](https://repobeats.axiom.co/api/embed/9830d39ca088153c7db39a7c0e1645c62a0454fd.svg "Repobeats analytics image")
-
 
 # ESP-Miner
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/skot/bitaxe)
 
-If you are looking for premade images to load on your Bitaxe, check out the [releases](https://github.com/bitaxeorg/ESP-Miner/releases) page. Maybe you want [instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md) for loading factory images.
+If you are looking for premade images to load on your Bitaxe, check out the [releases](https://github.com/skot/ESP-Miner/releases) page. Maybe you want [instructions](https://github.com/skot/ESP-Miner/blob/master/flashing.md) for loading factory images.
 
 # Bitaxetool
 We also have a command line python tool for flashing Bitaxe and updating the config called Bitaxetool 
@@ -79,10 +77,6 @@ The firmware hosts a small web server on port 80 for administrative purposes. On
 ### Recovery
 
 In the event that the admin web front end is inaccessible, for example because of an unsuccessful firmware update (`www.bin`), a recovery page can be accessed at `http://<IP>/recovery`.
-
-### Unlock Settings
-
-In order to unlock the Input fields for ASIC Frequency and ASIC Core Voltage you need to append `?oc` to the end of the settings tab URL in your browser. Be aware that without additional cooling overclocking can overheat and/or damage your Bitaxe.
 
 ## Development
 

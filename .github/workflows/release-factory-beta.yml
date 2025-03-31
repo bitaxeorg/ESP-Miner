@@ -4,11 +4,6 @@ on:
   release:
     types: [prereleased]
 
-permissions:
-  checks: write
-  pull-requests: write
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
