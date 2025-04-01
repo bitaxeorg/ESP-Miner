@@ -321,7 +321,6 @@ void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * host
     ESP_LOGI(TAG, "ESP_WIFI Access Point On");
     wifi_init_softap();
 
-
     /* Skip connection if SSID is null */
     if (strlen(wifi_ssid) == 0) {
         ESP_LOGI(TAG, "No WiFi SSID provided, skipping connection");
@@ -360,6 +359,8 @@ void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * host
 
 EventBits_t wifi_connect(void)
 {
+    esp_wifi_connect();
+
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
