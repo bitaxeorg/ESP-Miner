@@ -62,6 +62,7 @@ export class SystemService {
           invertscreen: 0,
           invertfanpolarity: 1,
           autofanspeed: 1,
+          autoscreenswap: 1,
           fanspeed: 100,
           fanrpm: 0,
 

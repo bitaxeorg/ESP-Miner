@@ -5,6 +5,7 @@
 #include "lvgl.h"
 #include "esp_lvgl_port.h"
 #include "global_state.h"
+#include "nvs_config.h"
 #include "screen.h"
 
 // static const char * TAG = "screen";
@@ -376,7 +377,10 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    screen_next();
+    if(nvs_config_get_u16(NVS_CONFIG_AUTO_SCREEN_CAROUSEL,1) == 1) {
+        screen_next();
+    }
+    
 }
 
 void screen_next()
