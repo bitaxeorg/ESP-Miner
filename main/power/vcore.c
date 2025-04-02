@@ -2,6 +2,7 @@
 #include <math.h>
 #include "esp_log.h"
 
+#include "driver/gpio.h"
 #include "vcore.h"
 #include "adc.h"
 #include "DS4432U.h"

@@ -24,6 +24,10 @@
 #include "esp_psram.h"
 #include "power.h"
 
+#include "bm1397.h"
+#include "bm1366.h"
+#include "bm1368.h"
+#include "bm1370.h"
 #include "asic.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE

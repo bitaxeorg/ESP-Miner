@@ -4,10 +4,13 @@ SRCS
 
 INCLUDE_DIRS 
     "include"
+    "../asic/include"
     "../../main"
+    "../../main/tasks"
 
 REQUIRES
     "nvs_flash"
     "esp_wifi"
     "esp_event"
+    "stratum"
 )
