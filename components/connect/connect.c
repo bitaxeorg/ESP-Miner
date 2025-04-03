@@ -58,6 +58,7 @@ static wifi_ap_record_t ap_info[MAX_AP_COUNT];
 static int s_retry_num = 0;
 
 static bool *_ap_enabled;
+static int clients_connected_to_ap = 0;
 
 static const char *get_wifi_reason_string(int reason);
 
@@ -165,12 +166,21 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
             ESP_LOGI(TAG, "Could not connect to '%s' [rssi %d]: reason %d", event->ssid, event->rssi, event->reason);
 
+            if (clients_connected_to_ap > 0) {
+                ESP_LOGI(TAG, "Client(s) connected to AP, not retrying...");
+                return;
+            }
+
             // Wait a little
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "Retrying Wi-Fi connection...");
             sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
             vTaskDelay(5000 / portTICK_PERIOD_MS);
+        } else if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+            clients_connected_to_ap += 1;
+        } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+            clients_connected_to_ap -= 1;
         }
     }
 
