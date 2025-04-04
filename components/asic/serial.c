@@ -9,8 +9,6 @@
 #include "esp_log.h"
 #include "soc/uart_struct.h"
 
-#include "bm1397.h"
-#include "bm1368.h"
 #include "serial.h"
 #include "utils.h"
 
