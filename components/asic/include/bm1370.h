@@ -17,11 +17,6 @@
 static const uint64_t BM1370_CORE_COUNT = 128;
 static const uint64_t BM1370_SMALL_CORE_COUNT = 2040;
 
-typedef struct
-{
-    float frequency;
-} bm1370Module;
-
 typedef struct __attribute__((__packed__))
 {
     uint8_t job_id;
