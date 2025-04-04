@@ -61,7 +61,6 @@ static lv_obj_t * create_scr_self_test() {
 
     self_test_finished_label = lv_label_create(scr);
     lv_obj_set_width(self_test_finished_label, LV_HOR_RES);
-    lv_obj_add_flag(self_test_finished_label, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_long_mode(self_test_finished_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     return scr;
