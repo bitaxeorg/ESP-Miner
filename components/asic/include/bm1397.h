@@ -17,18 +17,6 @@
 static const uint64_t BM1397_CORE_COUNT = 168;
 static const uint64_t BM1397_SMALL_CORE_COUNT = 672;
 
-typedef enum
-{
-    JOB_PACKET = 0,
-    CMD_PACKET = 1,
-} packet_type_t;
-
-typedef enum
-{
-    JOB_RESP = 0,
-    CMD_RESP = 1,
-} response_type_t;
-
 typedef struct __attribute__((__packed__))
 {
     uint8_t job_id;

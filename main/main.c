@@ -1,16 +1,13 @@
+#include "main.h"
 
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "nvs_flash.h"
 
-// #include "protocol_examples_common.h"
-#include "main.h"
-
 #include "asic_result_task.h"
 #include "asic_task.h"
 #include "create_jobs_task.h"
-#include "esp_netif.h"
 #include "system.h"
 #include "http_server.h"
 #include "nvs_config.h"
@@ -21,6 +18,7 @@
 #include "nvs_device.h"
 #include "self_test.h"
 #include "asic.h"
+#include "driver/gpio.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 

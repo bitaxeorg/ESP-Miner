@@ -1,4 +1,4 @@
-
+#include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -10,10 +10,9 @@
 #include "lwip/lwip_napt.h"
 #include "lwip/sys.h"
 #include "nvs_flash.h"
-#include <string.h>
-
 #include "connect.h"
 #include "main.h"
+#include "global_state.h"
 
 // Maximum number of access points to scan
 #define MAX_AP_COUNT 20

@@ -4,10 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "asic_task.h"
-#include "bm1370.h"
-#include "bm1368.h"
-#include "bm1366.h"
-#include "bm1397.h"
 #include "common.h"
 #include "power_management_task.h"
 #include "serial.h"

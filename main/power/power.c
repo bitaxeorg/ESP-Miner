@@ -4,6 +4,7 @@
 
 #include "power.h"
 #include "vcore.h"
+#include "driver/gpio.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 

@@ -1,6 +1,4 @@
 #include "esp_log.h"
-// #include "addr_from_stdin.h"
-#include "bm1397.h"
 #include "connect.h"
 #include "system.h"
 #include "global_state.h"
