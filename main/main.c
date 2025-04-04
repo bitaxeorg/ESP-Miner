@@ -100,6 +100,7 @@ void app_main(void)
 
     //start the API for AxeOS
     start_rest_server((void *) &GLOBAL_STATE);
+
     EventBits_t result_bits = wifi_connect();
 
     if (result_bits & WIFI_CONNECTED_BIT) {

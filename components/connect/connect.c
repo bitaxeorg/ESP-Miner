@@ -58,7 +58,6 @@ static bool is_scanning = false;
 static uint16_t ap_number = 0;
 static wifi_ap_record_t ap_info[MAX_AP_COUNT];
 
-
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
     wifi_ap_record_t current_ap_info;
@@ -133,6 +132,7 @@ esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
 }
 
 static int s_retry_num = 0;
+static int clients_connected_to_ap = 0;
 
 static char * _ip_addr_str;
 
@@ -166,12 +166,21 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
             ESP_LOGI(TAG, "Could not connect to '%s' [rssi %d]: reason %d", event->ssid, event->rssi, event->reason);
 
+            if (clients_connected_to_ap > 0) {
+                ESP_LOGI(TAG, "Client(s) connected to AP, not retrying...");
+                return;
+            }
+
             // Wait a little
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "Retrying Wi-Fi connection...");
             MINER_set_wifi_status(WIFI_RETRYING, s_retry_num, event->reason);
             vTaskDelay(5000 / portTICK_PERIOD_MS);
+        } else if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+            clients_connected_to_ap += 1;
+        } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+            clients_connected_to_ap -= 1;
         }
     }
 
@@ -320,7 +329,6 @@ void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * host
     /* Initialize AP */
     ESP_LOGI(TAG, "ESP_WIFI Access Point On");
     wifi_init_softap();
-
 
     /* Skip connection if SSID is null */
     if (strlen(wifi_ssid) == 0) {
