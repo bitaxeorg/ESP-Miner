@@ -54,9 +54,7 @@ static const char * TAG = "wifi_station";
 static bool is_scanning = false;
 static uint16_t ap_number = 0;
 static wifi_ap_record_t ap_info[MAX_AP_COUNT];
-
 static int s_retry_num = 0;
-
 static int clients_connected_to_ap = 0;
 
 static const char *get_wifi_reason_string(int reason);
