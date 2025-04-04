@@ -8,11 +8,15 @@
 #include "cJSON.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
-#include "lwip/sockets.h"
+#include "esp_app_desc.h"
+#include "esp_transport.h"
+#include "esp_transport_ssl.h"
+#include "esp_transport_tcp.h"
 #include "utils.h"
 #include <stdio.h>
 #include <string.h>
 
+#define TRANSPORT_TIMEOUT_MS 5000
 #define BUFFER_SIZE 1024
 static const char * TAG = "stratum_api";
 
@@ -21,6 +25,33 @@ static size_t json_rpc_buffer_size = 0;
 
 static void debug_stratum_tx(const char *);
 int _parse_stratum_subscribe_result_message(const char * result_json_str, char ** extranonce, int * extranonce2_len);
+
+esp_transport_handle_t STRATUM_V1_transport_init(bool is_tls, char * cert)
+{
+    // tls_transport
+    if (is_tls) {
+        ESP_LOGI(TAG, "Using TLS transport");
+        esp_transport_handle_t transport = esp_transport_ssl_init();
+        ESP_LOGI(TAG, "Setting cert data: \n%s", cert);
+        esp_transport_ssl_set_cert_data(transport, cert, strlen(cert));
+        return transport;
+    }
+    // tcp_transport
+    esp_transport_handle_t transport = esp_transport_tcp_init();
+    return transport;
+}
+
+esp_err_t STRATUM_V1_transport_connect(const char * host, int port, esp_transport_handle_t transport)
+{
+    esp_err_t ret = esp_transport_connect(transport, host, port, TRANSPORT_TIMEOUT_MS);
+    return ret;
+}
+
+esp_err_t STRATUM_V1_transport_close(esp_transport_handle_t transport)
+{
+    esp_err_t ret = esp_transport_close(transport);
+    return ret;
+}
 
 void STRATUM_V1_initialize_buffer()
 {
@@ -64,7 +95,7 @@ static void realloc_json_buffer(size_t len)
     json_rpc_buffer_size = new;
 }
 
-char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
+char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
 {
     if (json_rpc_buffer == NULL) {
         STRATUM_V1_initialize_buffer();
@@ -77,16 +108,16 @@ char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
     if (!strstr(json_rpc_buffer, "\n")) {
         do {
             memset(recv_buffer, 0, BUFFER_SIZE);
-            nbytes = recv(sockfd, recv_buffer, BUFFER_SIZE - 1, 0);
-            if (nbytes == -1) {
-                ESP_LOGI(TAG, "Error: recv (errno %d: %s)", errno, strerror(errno));
+            nbytes = esp_transport_read(transport, recv_buffer, BUFFER_SIZE - 1, TRANSPORT_TIMEOUT_MS);
+            if (nbytes == ESP_FAIL) {
+                ESP_LOGE(TAG, "Error: transport read failed");
                 if (json_rpc_buffer) {
                     free(json_rpc_buffer);
                     json_rpc_buffer=0;
                 }
                 return 0;
             }
-
+            
             realloc_json_buffer(nbytes);
             strncat(json_rpc_buffer, recv_buffer, nbytes);
         } while (!strstr(json_rpc_buffer, "\n"));
@@ -311,7 +342,7 @@ int _parse_stratum_subscribe_result_message(const char * result_json_str, char *
     return 0;
 }
 
-int STRATUM_V1_subscribe(int socket, int send_uid, char * model)
+int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, char * model)
 {
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];
@@ -320,35 +351,35 @@ int STRATUM_V1_subscribe(int socket, int send_uid, char * model)
     sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe/%s/%s\"]}\n", send_uid, model, version);
     debug_stratum_tx(subscribe_msg);
 
-    return write(socket, subscribe_msg, strlen(subscribe_msg));
+    return esp_transport_write(transport, subscribe_msg, strlen(subscribe_msg), TRANSPORT_TIMEOUT_MS);
 }
 
-int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty)
+int STRATUM_V1_suggest_difficulty(esp_transport_handle_t transport, int send_uid, uint32_t difficulty)
 {
     char difficulty_msg[BUFFER_SIZE];
     sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%ld]}\n", send_uid, difficulty);
     debug_stratum_tx(difficulty_msg);
 
-    return write(socket, difficulty_msg, strlen(difficulty_msg));
+    return esp_transport_write(transport, difficulty_msg, strlen(difficulty_msg), TRANSPORT_TIMEOUT_MS);
 }
 
-int STRATUM_V1_authenticate(int socket, int send_uid, const char * username, const char * pass)
+int STRATUM_V1_authenticate(esp_transport_handle_t transport, int send_uid, const char * username, const char * pass)
 {
     char authorize_msg[BUFFER_SIZE];
     sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"%s\"]}\n", send_uid, username,
             pass);
     debug_stratum_tx(authorize_msg);
 
-    return write(socket, authorize_msg, strlen(authorize_msg));
+    return esp_transport_write(transport, authorize_msg, strlen(authorize_msg), TRANSPORT_TIMEOUT_MS);
 }
 
-/// @param socket Socket to write to
+/// @param transport Transport to write to
 /// @param username The client’s user name.
 /// @param jobid The job ID for the work being submitted.
 /// @param ntime The hex-encoded time value use in the block header.
 /// @param extranonce_2 The hex-encoded value of extra nonce 2.
 /// @param nonce The hex-encoded nonce value to use in the block header.
-int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, const char * jobid,
+int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, const char * username, const char * jobid, 
                             const char * extranonce_2, const uint32_t ntime,
                             const uint32_t nonce, const uint32_t version)
 {
@@ -358,10 +389,10 @@ int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, con
             send_uid, username, jobid, extranonce_2, ntime, nonce, version);
     debug_stratum_tx(submit_msg);
 
-    return write(socket, submit_msg, strlen(submit_msg));
+    return esp_transport_write(transport, submit_msg, strlen(submit_msg), TRANSPORT_TIMEOUT_MS);
 }
 
-int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * version_mask)
+int STRATUM_V1_configure_version_rolling(esp_transport_handle_t transport, int send_uid, uint32_t * version_mask)
 {
     char configure_msg[BUFFER_SIZE * 2];
     sprintf(configure_msg,
@@ -370,7 +401,7 @@ int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * ve
             send_uid);
     debug_stratum_tx(configure_msg);
 
-    return write(socket, configure_msg, strlen(configure_msg));
+    return esp_transport_write(transport, configure_msg, strlen(configure_msg), TRANSPORT_TIMEOUT_MS);
 }
 
 static void debug_stratum_tx(const char * msg)
