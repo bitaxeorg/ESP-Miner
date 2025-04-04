@@ -45,6 +45,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     
     // Initialize PID controller
+    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60);
     pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, PID_P_ON_E, PID_DIRECT);
     pid_set_sample_time(&pid, POLL_RATE - 1);
     pid_set_output_limits(&pid, 35, 100);

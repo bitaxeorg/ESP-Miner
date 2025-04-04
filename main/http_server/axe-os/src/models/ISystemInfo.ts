@@ -47,6 +47,7 @@ export interface ISystemInfo {
     invertfanpolarity: number,
     autofanspeed: number,
     fanspeed: number,
+    temptarget: number,
     fanrpm: number,
     coreVoltageActual: number,
 
