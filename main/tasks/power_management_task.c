@@ -45,11 +45,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     
     // Initialize PID controller
-    pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, P_ON_E, DIRECT);
+    pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, PID_P_ON_E, PID_DIRECT);
     pid_set_sample_time(&pid, POLL_RATE - 1);
     pid_set_output_limits(&pid, 35, 100);
     pid_set_mode(&pid, AUTOMATIC);
-    pid_set_controller_direction(&pid, REVERSE);
+    pid_set_controller_direction(&pid, PID_REVERSE);
     pid_initialize(&pid);
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;

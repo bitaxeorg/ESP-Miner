@@ -6,7 +6,7 @@ static unsigned long millis() {
 }
 
 void pid_init(PIDController *pid, double *input, double *output, double *setpoint,
-              double Kp, double Ki, double Kd, int POn, int ControllerDirection) {
+              double Kp, double Ki, double Kd, PIDProportionalMode POn, PIDDirection ControllerDirection) {
     pid->input = input;
     pid->output = output;
     pid->setpoint = setpoint;
@@ -65,11 +65,11 @@ bool pid_compute(PIDController *pid) {
     return false;
 }
 
-void pid_set_tunings_adv(PIDController *pid, double Kp, double Ki, double Kd, int POn) {
+void pid_set_tunings_adv(PIDController *pid, double Kp, double Ki, double Kd, PIDProportionalMode POn) {
     if (Kp < 0 || Ki < 0 || Kd < 0) return;
 
     pid->pOn = POn;
-    pid->pOnE = (POn == P_ON_E);
+    pid->pOnE = (POn == PID_P_ON_E);
 
     pid->dispKp = Kp;
     pid->dispKi = Ki;
@@ -80,7 +80,7 @@ void pid_set_tunings_adv(PIDController *pid, double Kp, double Ki, double Kd, in
     pid->ki = Ki * sampleTimeInSec;
     pid->kd = Kd / sampleTimeInSec;
 
-    if (pid->controllerDirection == REVERSE) {
+    if (pid->controllerDirection == PID_REVERSE) {
         pid->kp = -pid->kp;
         pid->ki = -pid->ki;
         pid->kd = -pid->kd;
@@ -114,7 +114,7 @@ void pid_set_output_limits(PIDController *pid, double min, double max) {
     }
 }
 
-void pid_set_controller_direction(PIDController *pid, int direction) {
+void pid_set_controller_direction(PIDController *pid, PIDDirection direction) {
     if (pid->inAuto && direction != pid->controllerDirection) {
         pid->kp = -pid->kp;
         pid->ki = -pid->ki;
@@ -136,4 +136,4 @@ double pid_get_kd(PIDController *pid) { return pid->dispKd; }
 double pid_get_ti(PIDController *pid) { return pid->dispKp / pid->dispKi; }
 double pid_get_td(PIDController *pid) { return pid->dispKd / pid->dispKp; }
 int pid_get_mode(PIDController *pid) { return pid->inAuto ? AUTOMATIC : MANUAL; }
-int pid_get_direction(PIDController *pid) { return pid->controllerDirection; }
+PIDDirection pid_get_direction(PIDController *pid) { return pid->controllerDirection; }
