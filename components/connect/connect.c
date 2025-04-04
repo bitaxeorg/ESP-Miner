@@ -57,7 +57,6 @@ static wifi_ap_record_t ap_info[MAX_AP_COUNT];
 
 static int s_retry_num = 0;
 
-static bool *_ap_enabled;
 static int clients_connected_to_ap = 0;
 
 static const char *get_wifi_reason_string(int reason);
@@ -155,9 +154,17 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         }
 
         if (event_id == WIFI_EVENT_STA_START) {
-            esp_wifi_connect();
+            ESP_LOGI(TAG, "Connecting...");
             strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connecting...");
-        } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
+            esp_wifi_connect();
+        }
+
+        if (event_id == WIFI_EVENT_STA_CONNECTED) {
+            ESP_LOGI(TAG, "Connected!");
+            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
+        }
+
+        if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
             wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
             if (event->reason == WIFI_REASON_ROAMING) {
                 ESP_LOGI(TAG, "We are roaming, nothing to do");
@@ -168,6 +175,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
             if (clients_connected_to_ap > 0) {
                 ESP_LOGI(TAG, "Client(s) connected to AP, not retrying...");
+                sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "AP connected!");
                 return;
             }
 
@@ -177,19 +185,32 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             ESP_LOGI(TAG, "Retrying Wi-Fi connection...");
             sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
             vTaskDelay(5000 / portTICK_PERIOD_MS);
-        } else if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+        }
+        
+        if (event_id == WIFI_EVENT_AP_START) {
+            ESP_LOGI(TAG, "ESP_WIFI Access Point On");
+            GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = true;
+        }
+                
+        if (event_id == WIFI_EVENT_AP_STOP) {
+            ESP_LOGI(TAG, "ESP_WIFI Access Point Off");
+            GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = false;
+        }
+
+        if (event_id == WIFI_EVENT_AP_STACONNECTED) {
             clients_connected_to_ap += 1;
-        } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+        }
+        
+        if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
             clients_connected_to_ap -= 1;
         }
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
         ip_event_got_ip_t * event = (ip_event_got_ip_t *) event_data;
         snprintf(GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str, IP4ADDR_STRLEN_MAX, IPSTR, IP2STR(&event->ip_info.ip));
 
-        ESP_LOGI(TAG, "Bitaxe ip: %s", GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str);
+        ESP_LOGI(TAG, "IP Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str);
         s_retry_num = 0;
 
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
@@ -233,16 +254,12 @@ void toggle_wifi_softap(void)
 
 void wifi_softap_off(void)
 {
-    ESP_LOGI(TAG, "ESP_WIFI Access Point Off");
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    *_ap_enabled = false;
 }
 
 void wifi_softap_on(void)
 {
-    ESP_LOGI(TAG, "ESP_WIFI Access Point On");
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-    *_ap_enabled = true;
 }
 
 /* Initialize wifi station */
@@ -301,8 +318,6 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
 void wifi_init(void * pvParameters, const char * wifi_ssid, const char * wifi_pass, const char * hostname)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
-    _ap_enabled = &GLOBAL_STATE->SYSTEM_MODULE.ap_enabled;
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
