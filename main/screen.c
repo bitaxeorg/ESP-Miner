@@ -158,7 +158,6 @@ static lv_obj_t * create_scr_connection(SystemModule * module) {
 
     wifi_status_label = lv_label_create(scr);
     lv_obj_set_width(wifi_status_label, LV_HOR_RES);
-    lv_obj_set_style_anim_duration(wifi_status_label, 5000, LV_PART_MAIN);    
     lv_label_set_long_mode(wifi_status_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     lv_obj_t *label3 = lv_label_create(scr);

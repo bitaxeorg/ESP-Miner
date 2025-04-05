@@ -49,7 +49,7 @@
 #define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WAPI_PSK
 #endif
 
-static const char * TAG = "wifi_station";
+static const char * TAG = "connect";
 
 static bool is_scanning = false;
 static uint16_t ap_number = 0;
@@ -173,25 +173,28 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
             if (clients_connected_to_ap > 0) {
                 ESP_LOGI(TAG, "Client(s) connected to AP, not retrying...");
-                sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "AP connected!");
+                sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Config AP connected!");
                 return;
             }
 
+            sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
+            ESP_LOGI(TAG, "Wi-Fi status: %s", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
+
             // Wait a little
-            esp_wifi_connect();
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+
             s_retry_num++;
             ESP_LOGI(TAG, "Retrying Wi-Fi connection...");
-            sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
-            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            esp_wifi_connect();
         }
         
         if (event_id == WIFI_EVENT_AP_START) {
-            ESP_LOGI(TAG, "ESP_WIFI Access Point On");
+            ESP_LOGI(TAG, "Configuration Access Point enabled");
             GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = true;
         }
                 
         if (event_id == WIFI_EVENT_AP_STOP) {
-            ESP_LOGI(TAG, "ESP_WIFI Access Point Off");
+            ESP_LOGI(TAG, "Configuration Access Point disabled");
             GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = false;
         }
 
