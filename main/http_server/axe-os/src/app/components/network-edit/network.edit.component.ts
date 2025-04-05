@@ -132,6 +132,13 @@ export class NetworkEditComponent implements OnInit {
       });
   }
 
+  public requiresRestart(): boolean {
+    if (!this.form) return false;
+    const ssid = this.form.get('ssid');
+    const password = this.form.get('wifiPass');
+    return (ssid?.dirty || password?.dirty) ?? false;
+  }
+
   public restart() {
     this.systemService.restart()
       .pipe(this.loadingService.lockUIUntilComplete())

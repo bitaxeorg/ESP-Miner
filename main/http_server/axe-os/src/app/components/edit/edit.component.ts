@@ -259,6 +259,14 @@ export class EditComponent implements OnInit, OnDestroy {
       console.log('🔒 Overclock mode disabled. Using safe preset values only.');
     }
   }
+  
+  public requiresRestart(): boolean {
+    if (!this.form) return false;
+    const flipscreen = this.form.get('flipscreen');
+    const invertscreen = this.form.get('invertscreen');
+    const invertfanpolarity = this.form.get('invertfanpolarity');
+    return (flipscreen?.dirty || invertscreen?.dirty || invertfanpolarity?.dirty) ?? false;
+  }
 
   public restart() {
     this.systemService.restart(this.uri)
