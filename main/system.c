@@ -86,12 +86,6 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     // set the best diff string
     _suffix_string(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     _suffix_string(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
-
-    // set the ssid string to blank
-    memset(module->ssid, 0, sizeof(module->ssid));
-
-    // set the wifi_status to blank
-    memset(module->wifi_status, 0, 20);
 }
 
 esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
