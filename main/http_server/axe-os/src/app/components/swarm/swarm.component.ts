@@ -1,10 +1,10 @@
-import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { catchError, from, map, mergeMap, of, take, timeout, toArray } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { SystemService } from 'src/app/services/system.service';
+import { environment } from 'src/environments/environment';
 const SWARM_DATA = 'SWARM_DATA'
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 @Component({
@@ -33,7 +33,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public refreshIntervalControl: FormControl;
 
-  public sortField: string = '';
+  public sortField: string = 'IP';
   public sortDirection: 'asc' | 'desc' = 'asc';
 
   constructor(
@@ -41,7 +41,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
     private systemService: SystemService,
     private toastr: ToastrService,
     private localStorageService: LocalStorageService,
-    private httpClient: HttpClient
   ) {
 
     this.form = this.fb.group({
@@ -105,11 +104,17 @@ export class SwarmComponent implements OnInit, OnDestroy {
   scanNetwork() {
     this.scanning = true;
 
-    const { start, end } = this.calculateIpRange(window.location.hostname, '255.255.255.0');
-    const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
+    let ips: string[] = [];
+    if (environment.production) {
+      const { start, end } = this.calculateIpRange(window.location.hostname, '255.255.255.0');
+      ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
+    } else {
+      ips = ['192.168.1.100', '192.168.1.101', '192.168.1.102'];
+    }
+    
     from(ips).pipe(
       mergeMap(ipAddr =>
-        this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
+        this.systemService.getInfo(`http://${ipAddr}`).pipe(
           map(result => {
             if ('hashRate' in result) {
               return {
@@ -135,9 +140,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
         // Merge new results with existing swarm entries
         const existingIps = new Set(this.swarm.map(item => item.IP));
         const newItems = validResults.filter(item => !existingIps.has(item.IP));
-        this.swarm = [...this.swarm, ...newItems].sort(this.sortByIp.bind(this));
+        this.swarm = [...this.swarm, ...newItems];
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
         this.calculateTotals();
+        this.sortSwarm();
       },
       complete: () => {
         this.scanning = false;
@@ -157,9 +163,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.systemService.getInfo(`http://${newIp}`).subscribe((res) => {
       if (res.ASICModel) {
         this.swarm.push({ IP: newIp, ...res });
-        this.swarm = this.swarm.sort(this.sortByIp.bind(this));
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
         this.calculateTotals();
+        this.sortSwarm();
       }
     });
   }
@@ -199,7 +205,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     from(ips).pipe(
       mergeMap(ipAddr =>
-        this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
+        this.systemService.getInfo(`http://${ipAddr}`).pipe(
           map(result => {
             return {
               IP: ipAddr,
@@ -230,9 +236,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
       toArray() // Collect all results into a single array
     ).pipe(take(1)).subscribe({
       next: (result) => {
-        this.swarm = result.sort(this.sortByIp.bind(this));
+        this.swarm = result
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
         this.calculateTotals();
+        this.sortSwarm();
         this.isRefreshing = false;
       },
       complete: () => {
@@ -241,11 +248,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
-  private sortByIp(a: any, b: any): number {
-    return this.ipToInt(a.IP) - this.ipToInt(b.IP);
-  }
-
-  sortBy(field: string) {
+  updateSort(field: string) {
     // If clicking the same field, toggle direction
     if (this.sortField === field) {
       this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -254,7 +257,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
       this.sortField = field;
       this.sortDirection = 'asc';
     }
+    this.sortSwarm();
+  }
 
+  private sortSwarm() {
+    const field = this.sortField;
     this.swarm.sort((a, b) => {
       let comparison = 0;
       if (field === 'IP') {
