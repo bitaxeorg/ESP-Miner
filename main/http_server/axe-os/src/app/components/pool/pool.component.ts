@@ -41,7 +41,7 @@ export class PoolComponent implements OnInit {
             Validators.min(0),
             Validators.max(65353)
           ]],
-          stratumTLS: [info.stratumTLS == 1],
+          stratumTLS: [info.stratumTLS || 0],
           stratumCert: [info.stratumCert],
           fallbackStratumURL: [info.fallbackStratumURL, [
             Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
@@ -52,7 +52,7 @@ export class PoolComponent implements OnInit {
             Validators.min(0),
             Validators.max(65353)
           ]],
-          fallbackStratumTLS: [info.fallbackStratumTLS == 1],
+          fallbackStratumTLS: [info.fallbackStratumTLS || 0],
           fallbackStratumCert: [info.fallbackStratumCert],
           stratumUser: [info.stratumUser, [Validators.required]],
           stratumPassword: ['*****', [Validators.required]],
@@ -61,9 +61,9 @@ export class PoolComponent implements OnInit {
         });
 
         // Add conditional validation for primary stratumCert
-        this.form.get('stratumTLS')?.valueChanges.subscribe(useTLS => {
+        this.form.get('stratumTLS')?.valueChanges.subscribe(value => {
           const certControl = this.form.get('stratumCert');
-          if (useTLS) {
+          if (value === 2) { // Only validate certificate when "Custom CA" (value 2) is selected
             certControl?.setValidators([
               Validators.required,
               this.pemCertificateValidator()
@@ -75,9 +75,9 @@ export class PoolComponent implements OnInit {
         });
 
         // Add conditional validation for fallback stratumCert
-        this.form.get('fallbackStratumTLS')?.valueChanges.subscribe(useTLS => {
+        this.form.get('fallbackStratumTLS')?.valueChanges.subscribe(value => {
           const certControl = this.form.get('fallbackStratumCert');
-          if (useTLS) {
+          if (value === 2) { // Only validate certificate when "Custom CA" (value 2) is selected
             certControl?.setValidators([
               Validators.required,
               this.pemCertificateValidator()
@@ -141,6 +141,40 @@ export class PoolComponent implements OnInit {
         }
       });
   }
+
+  /**
+   * Handles certificate file selection and reads the file content
+   * @param event File selection event
+   * @param formControlName Form control name ('stratumCert' or 'fallbackStratumCert')
+   */
+  onCertFileSelected(event: Event, formControlName: 'stratumCert' | 'fallbackStratumCert'): void {
+    const fileInput = event.target as HTMLInputElement;
+    
+    if (fileInput.files && fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+        const fileContent = reader.result as string;
+        // Update the corresponding certificate field in the form
+        this.form.get(formControlName)?.setValue(fileContent);
+        this.form.get(formControlName)?.markAsDirty();
+        
+        // Reset file input so the same file can be selected again
+        fileInput.value = '';
+      };
+      
+      reader.onerror = () => {
+        // Error handling when reading the certificate file
+        this.toastr.error('Failed to read certificate file', 'Error');
+        fileInput.value = '';
+      };
+      
+      // Read the file as text
+      reader.readAsText(file);
+    }
+  }
+
   private pemCertificateValidator(): ValidatorFn {
     return (control: AbstractControl): ValidationErrors | null => {
       if (!control.value?.trim()) return null;

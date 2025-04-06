@@ -54,6 +54,9 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
         "\"--togglebutton-hover-bg\":\"#df031d\","
         "\"--togglebutton-hover-border\":\"1px solid #df031d\","
         "\"--togglebutton-text-color\":\"#ffffff\""
+        "\"--radiobutton-border\":\"#F80421\","
+        "\"--radiobutton-bg\":\"#F80421\","
+        "\"--radiobutton-hover-border\":\"#df031d\","
         "}"
     );
 

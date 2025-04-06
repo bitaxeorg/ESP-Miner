@@ -21,21 +21,46 @@
         <div class="field grid p-fluid">
             <label htmlFor="stratumTLS" class="col-12 mb-2 md:col-2 md:mb-0">Stratum TLS:</label>
             <div class="col-12 md:col-10">
-                <div class="field-checkbox mb-0">
-                    <p-checkbox name="stratumTLS" formControlName="stratumTLS" inputId="stratumTLS"
-                        [binary]="true"></p-checkbox>
+                <div class="flex flex-wrap gap-3">
+                    <div class="field-radiobutton mb-0">
+                        <p-radioButton name="stratumTLS" [value]="0" formControlName="stratumTLS" inputId="stratumTLS_0"></p-radioButton>
+                        <label for="stratumTLS_0" class="ml-2">Disable</label>
+                    </div>
+                    <div class="field-radiobutton mb-0">
+                        <p-radioButton name="stratumTLS" [value]="1" formControlName="stratumTLS" inputId="stratumTLS_1"></p-radioButton>
+                        <label for="stratumTLS_1" class="ml-2">Bundled CA</label>
+                    </div>
+                    <div class="field-radiobutton mb-0">
+                        <p-radioButton name="stratumTLS" [value]="2" formControlName="stratumTLS" inputId="stratumTLS_2"></p-radioButton>
+                        <label for="stratumTLS_2" class="ml-2">Custom CA</label>
+                    </div>
+                    <div class="field-radiobutton mb-0">
+                        <p-radioButton name="stratumTLS" [value]="3" formControlName="stratumTLS" inputId="stratumTLS_3"></p-radioButton>
+                        <label for="stratumTLS_3" class="ml-2">Skip CA verify</label>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="field grid p-fluid" *ngIf="form.get('stratumTLS')?.value">
+        <div class="field grid p-fluid" *ngIf="form.get('stratumTLS')?.value === 2">
             <label htmlFor="stratumCert" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Certificate:</label>
             <div class="col-12 md:col-10">
-                <textarea pInputTextarea id="stratumCert" formControlName="stratumCert" rows="5"
-                    placeholder="Enter SSL/TLS certificate if required" 
-                    style="font-family: monospace;"></textarea>
-                <small class="p-error" *ngIf="form.get('stratumCert')?.errors?.['invalidCertificate']">
-                    Please enter a valid SSL/TLS certificate
-                </small>
+                <div class="p-inputgroup">
+                    <textarea pInputTextarea id="stratumCert" formControlName="stratumCert" rows="5"
+                        placeholder="Enter SSL/TLS certificate or choose a certificate file" 
+                        style="font-family: monospace;"></textarea>
+                    <span class="p-inputgroup-addon">
+                        <button pButton type="button" icon="pi pi-upload" class="p-button-secondary" 
+                            (click)="stratumCertFileInput.click()"></button>
+                        <input #stratumCertFileInput type="file" (change)="onCertFileSelected($event, 'stratumCert')" 
+                            style="display:none" accept=".pem,.crt,.cer">
+                    </span>
+                </div>
+                <small>Enter or <a href="#" (click)="$event.preventDefault(); stratumCertFileInput.click()">choose a certificate file</a> (.pem, .crt, .cer)</small>
+                <div>
+                    <small class="p-error" *ngIf="form.get('stratumCert')?.errors?.['invalidCertificate']">
+                        Please enter a valid SSL/TLS certificate
+                    </small>
+                </div>
             </div>
         </div>
         <div class="field grid p-fluid">
@@ -73,22 +98,46 @@
         <div class="field grid p-fluid">
             <label htmlFor="fallbackStratumTLS" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum TLS:</label>
             <div class="col-12 md:col-10">
-                <div class="field-checkbox mb-0">
-                    <p-checkbox name="fallbackStratumTLS" formControlName="fallbackStratumTLS"
-                        inputId="fallbackStratumTLS" [binary]="true"></p-checkbox>
+                <div class="flex flex-wrap gap-3">
+                    <div class="field-radiobutton mb-0">
+                        <p-radioButton name="fallbackStratumTLS" [value]="0" formControlName="fallbackStratumTLS" inputId="fallbackStratumTLS_0"></p-radioButton>
+                        <label for="fallbackStratumTLS_0" class="ml-2">Disable</label>
+                    </div>
+                    <div class="field-radiobutton mb-0">
+                        <p-radioButton name="fallbackStratumTLS" [value]="1" formControlName="fallbackStratumTLS" inputId="fallbackStratumTLS_1"></p-radioButton>
+                        <label for="fallbackStratumTLS_1" class="ml-2">Bundled CA</label>
+                    </div>
+                    <div class="field-radiobutton mb-0">
+                        <p-radioButton name="fallbackStratumTLS" [value]="2" formControlName="fallbackStratumTLS" inputId="fallbackStratumTLS_2"></p-radioButton>
+                        <label for="fallbackStratumTLS_2" class="ml-2">Custom CA</label>
+                    </div>
+                    <div class="field-radiobutton mb-0">
+                        <p-radioButton name="fallbackStratumTLS" [value]="3" formControlName="fallbackStratumTLS" inputId="fallbackStratumTLS_3"></p-radioButton>
+                        <label for="fallbackStratumTLS_3" class="ml-2">Skip CA verify</label>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="field grid p-fluid" *ngIf="form.get('fallbackStratumTLS')?.value">
-            <label htmlFor="fallbackStratumCert" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum
-                Certificate:</label>
+        <div class="field grid p-fluid" *ngIf="form.get('fallbackStratumTLS')?.value === 2">
+            <label htmlFor="fallbackStratumCert" class="col-12 mb-2 md:col-2 md:mb-0">Fallback Stratum Certificate:</label>
             <div class="col-12 md:col-10">
-                <textarea pInputTextarea id="fallbackStratumCert" formControlName="fallbackStratumCert" rows="5"
-                    placeholder="Enter SSL/TLS certificate if required"
-                    style="font-family: monospace;"></textarea>
-                <small class="p-error" *ngIf="form.get('fallbackStratumCert')?.errors?.['invalidCertificate']">
-                    Please enter a valid SSL/TLS certificate
-                </small>
+                <div class="p-inputgroup">
+                    <textarea pInputTextarea id="fallbackStratumCert" formControlName="fallbackStratumCert" rows="5"
+                        placeholder="Enter SSL/TLS certificate or choose a certificate file"
+                        style="font-family: monospace;"></textarea>
+                    <span class="p-inputgroup-addon">
+                        <button pButton type="button" icon="pi pi-upload" class="p-button-secondary" 
+                            (click)="fallbackStratumCertFileInput.click()"></button>
+                        <input #fallbackStratumCertFileInput type="file" (change)="onCertFileSelected($event, 'fallbackStratumCert')" 
+                            style="display:none" accept=".pem,.crt,.cer">
+                    </span>
+                </div>
+                <small>Enter or <a href="#" (click)="$event.preventDefault(); fallbackStratumCertFileInput.click()">choose a certificate file</a> (.pem, .crt, .cer)</small>
+                <div>
+                    <small class="p-error" *ngIf="form.get('fallbackStratumCert')?.errors?.['invalidCertificate']">
+                        Please enter a valid SSL/TLS certificate
+                    </small>
+                </div>
             </div>
         </div>
         <div class="field grid p-fluid">

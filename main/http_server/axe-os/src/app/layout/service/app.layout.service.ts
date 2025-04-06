@@ -128,7 +128,11 @@ export class LayoutService {
                             '--togglebutton-border': '1px solid #F80421',
                             '--togglebutton-hover-bg': '#df031d',
                             '--togglebutton-hover-border': '1px solid #df031d',
-                            '--togglebutton-text-color': '#ffffff'
+                            '--togglebutton-text-color': '#ffffff',
+                            '--radiobutton-border': '#F80421',
+                            '--radiobutton-bg': '#F80421',
+                            '--radiobutton-hover-border': '#df031d'
+
                         }
                     }).subscribe();
                 }
