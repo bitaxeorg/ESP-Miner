@@ -22,9 +22,9 @@
             <h2>Latest Release: {{latestRelease.name}}</h2>
 
             <div *ngFor="let asset of latestRelease.assets">
-                <div *ngIf="asset.name == 'esp-miner.bin'">
+                <div *ngIf="asset.name == 'acs-esp-miner.bin'">
                     <a style="text-decoration: underline;" target="_blank"
-                        [href]="asset.browser_download_url">esp-miner.bin</a>
+                        [href]="asset.browser_download_url">acs-esp-miner.bin</a>
                 </div>
                 <div *ngIf="asset.name == 'www.bin'">
                     <a style="text-decoration: underline;" target="_blank"
