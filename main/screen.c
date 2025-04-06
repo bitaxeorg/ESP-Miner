@@ -9,7 +9,8 @@
 
 // static const char * TAG = "screen";
 
-extern const lv_img_dsc_t logo;
+extern const lv_img_dsc_t bitaxe_logo;
+extern const lv_img_dsc_t osmu_logo;
 
 static lv_obj_t * screens[MAX_SCREENS];
 
@@ -44,7 +45,7 @@ static float current_chip_temp;
 static bool found_block;
 
 #define SCREEN_UPDATE_MS 500
-#define LOGO_DELAY_COUNT 5000 / SCREEN_UPDATE_MS
+#define LOGO_DELAY_COUNT 3000 / SCREEN_UPDATE_MS
 #define CAROUSEL_DELAY_COUNT 10000 / SCREEN_UPDATE_MS
 
 static lv_obj_t * create_scr_self_test() {
@@ -176,11 +177,11 @@ static lv_obj_t * create_scr_connection(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_logo() {
+static lv_obj_t * create_scr_logo(const lv_img_dsc_t *logo) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_t *img = lv_img_create(scr);
-    lv_img_set_src(img, &logo);
+    lv_img_set_src(img, logo);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
     return scr;
@@ -312,12 +313,20 @@ static void screen_update_cb(lv_timer_t * timer)
 
     // Logo
 
-    if (current_screen < SCR_LOGO) {
-        screen_show(SCR_LOGO);
+    if (current_screen < SCR_BITAXE_LOGO) {
+        screen_show(SCR_BITAXE_LOGO);
         return;
     }
 
-    if (current_screen == SCR_LOGO) {
+    if (current_screen == SCR_BITAXE_LOGO) {
+        if (LOGO_DELAY_COUNT > current_screen_counter) {
+            return;
+        }
+        screen_show(SCR_OSMU_LOGO);
+        return;
+    }
+
+    if (current_screen == SCR_OSMU_LOGO) {
         if (LOGO_DELAY_COUNT > current_screen_counter) {
             return;
         }
@@ -399,7 +408,8 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_CONFIGURE] = create_scr_configure(module);
         screens[SCR_FIRMWARE_UPDATE] = create_scr_ota(module);
         screens[SCR_CONNECTION] = create_scr_connection(module);
-        screens[SCR_LOGO] = create_scr_logo();
+        screens[SCR_BITAXE_LOGO] = create_scr_logo(&bitaxe_logo);
+        screens[SCR_OSMU_LOGO] = create_scr_logo(&osmu_logo);
         screens[SCR_URLS] = create_scr_urls(module);
         screens[SCR_STATS] = create_scr_stats();
 
