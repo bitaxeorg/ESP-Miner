@@ -40,7 +40,7 @@ static SystemTaskModule SYSTEM_TASK_MODULE = {.stratum_difficulty = 8192};
 
 static const char * primary_stratum_url;
 static uint16_t primary_stratum_port;
-static uint16_t primary_stratum_is_tls;
+static uint16_t primary_stratum_tls;
 static char * primary_stratum_cert;
 
 bool is_wifi_connected() {
@@ -101,18 +101,18 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
        
-        uint16_t is_tls = GLOBAL_STATE->SYSTEM_MODULE.pool_is_tls;
+        tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
         char * cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
-        esp_transport_handle_t transport = STRATUM_V1_transport_init(is_tls, cert);
+        esp_transport_handle_t transport = STRATUM_V1_transport_init(tls, cert);
         if (transport == NULL) {
             ESP_LOGD(TAG, "Heartbeat. Failed transport init check!");
             vTaskDelay(60000 / portTICK_PERIOD_MS);
             continue;
         }
         esp_err_t err = STRATUM_V1_transport_connect(primary_stratum_url, primary_stratum_port, transport);
-        if (err != 0) 
+        if (err != ESP_OK) 
         {
-            ESP_LOGD(TAG, "Heartbeat. Failed connect check: %s:%d (errno %d: %s)", primary_stratum_url, primary_stratum_port, errno, strerror(errno));
+            ESP_LOGD(TAG, "Heartbeat. Failed connect check: %s:%d (errno %d: %s)", primary_stratum_url, primary_stratum_port, err, strerror(err));
             STRATUM_V1_transport_close(transport);
             vTaskDelay(60000 / portTICK_PERIOD_MS);
             continue;
@@ -132,7 +132,6 @@ void stratum_primary_heartbeat(void * pvParameters)
             vTaskDelay(60000 / portTICK_PERIOD_MS);
             continue;
         }
-        STRATUM_V1_transport_close(transport);
 
         if (strstr(recv_buffer, "mining.notify") != NULL) {
             ESP_LOGI(TAG, "Heartbeat successful and in fallback mode. Switching back to primary.");
@@ -151,11 +150,11 @@ void stratum_task(void * pvParameters)
     
     primary_stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pool_url;
     primary_stratum_port = GLOBAL_STATE->SYSTEM_MODULE.pool_port;
-    primary_stratum_is_tls = GLOBAL_STATE->SYSTEM_MODULE.pool_is_tls;
+    primary_stratum_tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
     primary_stratum_cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
     char * stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pool_url;
     uint16_t port = GLOBAL_STATE->SYSTEM_MODULE.pool_port;
-    uint16_t is_tls = GLOBAL_STATE->SYSTEM_MODULE.pool_is_tls;
+    tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
     char * cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
 
     STRATUM_V1_initialize_buffer();
@@ -188,11 +187,11 @@ void stratum_task(void * pvParameters)
 
         stratum_url = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
         port = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
-        is_tls = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_is_tls : GLOBAL_STATE->SYSTEM_MODULE.pool_is_tls;
+        tls = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_tls : GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
         cert = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_cert : GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
         retry_critical_attempts = 0;
 
-        GLOBAL_STATE->transport = STRATUM_V1_transport_init(is_tls, cert);
+        GLOBAL_STATE->transport = STRATUM_V1_transport_init(tls, cert);
         // Check if transport was initialized
         if(GLOBAL_STATE->transport == NULL) {
             ESP_LOGE(TAG, "Transport initialization failed.");

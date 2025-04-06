@@ -12,6 +12,7 @@
 #include "esp_transport.h"
 #include "esp_transport_ssl.h"
 #include "esp_transport_tcp.h"
+#include "esp_crt_bundle.h"
 #include "utils.h"
 #include <stdio.h>
 #include <string.h>
@@ -26,18 +27,42 @@ static size_t json_rpc_buffer_size = 0;
 static void debug_stratum_tx(const char *);
 int _parse_stratum_subscribe_result_message(const char * result_json_str, char ** extranonce, int * extranonce2_len);
 
-esp_transport_handle_t STRATUM_V1_transport_init(bool is_tls, char * cert)
+esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert)
 {
+    
+    esp_transport_handle_t transport;
     // tls_transport
-    if (is_tls) {
-        ESP_LOGI(TAG, "Using TLS transport");
-        esp_transport_handle_t transport = esp_transport_ssl_init();
-        ESP_LOGI(TAG, "Setting cert data: \n%s", cert);
-        esp_transport_ssl_set_cert_data(transport, cert, strlen(cert));
-        return transport;
+    if (tls == DISABLED)
+    {
+        // tcp_transport
+        ESP_LOGI(TAG, "TLS disabled, Using TCP transport");
+        transport = esp_transport_tcp_init();
     }
-    // tcp_transport
-    esp_transport_handle_t transport = esp_transport_tcp_init();
+    else{
+        // tls_transport
+        ESP_LOGI(TAG, "Using TLS transport");
+        transport = esp_transport_ssl_init();
+        if (transport == NULL) {
+            ESP_LOGE(TAG, "Failed to initialize SSL transport");
+            return NULL;
+        }
+        switch(tls){
+            case BUNDLED_CRT:
+                ESP_LOGI(TAG, "Using default cert bundle");
+                esp_transport_ssl_crt_bundle_attach(transport, esp_crt_bundle_attach);
+                break;
+            case CUSTOM_CRT:
+                ESP_LOGI(TAG, "Using custom cert");
+                esp_transport_ssl_set_cert_data(transport, cert, strlen(cert));
+                break;
+            case SKIP_VERIFICATION:
+                esp_transport_ssl_skip_common_name_check(transport);
+                break;
+            default:
+                ESP_LOGE(TAG, "Invalid TLS mode");
+                return NULL;
+        }
+    }
     return transport;
 }
 

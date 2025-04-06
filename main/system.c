@@ -69,8 +69,8 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->fallback_pool_port = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT);
 
     // set the pool tls
-    module->pool_is_tls = nvs_config_get_u16(NVS_CONFIG_STRATUM_TLS, CONFIG_STRATUM_TLS);
-    module->fallback_pool_is_tls = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS, CONFIG_FALLBACK_STRATUM_TLS);
+    module->pool_tls = nvs_config_get_u16(NVS_CONFIG_STRATUM_TLS, CONFIG_STRATUM_TLS);
+    module->fallback_pool_tls = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS, CONFIG_FALLBACK_STRATUM_TLS);
 
     // set the pool cert
     module->pool_cert = nvs_config_get_string(NVS_CONFIG_STRATUM_CERT, CONFIG_STRATUM_CERT);

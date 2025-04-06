@@ -24,6 +24,14 @@ typedef enum
     CLIENT_RECONNECT
 } stratum_method;
 
+typedef enum
+{
+    DISABLED = 0,
+    BUNDLED_CRT = 1,
+    CUSTOM_CRT = 2,
+    SKIP_VERIFICATION = 3,
+} tls_mode;
+
 static const int  STRATUM_ID_CONFIGURE    = 1;
 static const int  STRATUM_ID_SUBSCRIBE    = 2;
 
@@ -63,7 +71,7 @@ typedef struct
     char * error_str;
 } StratumApiV1Message;
 
-esp_transport_handle_t STRATUM_V1_transport_init(bool is_tls, char * cert);
+esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert);
 
 esp_err_t STRATUM_V1_transport_connect(const char * host, int port, esp_transport_handle_t transport);
 

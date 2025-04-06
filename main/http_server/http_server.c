@@ -424,10 +424,10 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumURL"))) {
         nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "stratumTLS")) != NULL) {
+    if ((item = cJSON_GetObjectItem(root, "stratumTLS")) != NULL && item->valueint < 4) {
         nvs_config_set_u16(NVS_CONFIG_STRATUM_TLS, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumTLS")) != NULL) {
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumTLS")) != NULL && item->valueint < 4) {
         nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS, item->valueint);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumCert"))) {
