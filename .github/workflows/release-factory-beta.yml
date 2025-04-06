@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build_type: ["102", "202", "204", "205", "401", "402", "403", "601"]
+        build_type: ["102", "202", "204", "205", "401", "402", "403", "601", "602"]
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4

@@ -18,6 +18,8 @@ static TickType_t current_screen_counter;
 
 static GlobalState * GLOBAL_STATE;
 
+static lv_obj_t *asic_status_label;
+
 static lv_obj_t *hashrate_label;
 static lv_obj_t *efficiency_label;
 static lv_obj_t *difficulty_label;
@@ -95,20 +97,17 @@ static lv_obj_t * create_scr_overheat(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_invalid_asic(SystemModule * module) {
+static lv_obj_t * create_scr_asic_status(SystemModule * module) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
     lv_obj_t *label1 = lv_label_create(scr);
-    lv_label_set_text(label1, "ASIC MODEL INVALID");
+    lv_label_set_text(label1, "ASIC STATUS:");
 
-    lv_obj_t *label2 = lv_label_create(scr);
-    lv_label_set_text(label2, "Wi-Fi (for setup):");
-
-    lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, module->ap_ssid);
+    asic_status_label = lv_label_create(scr);
+    lv_label_set_long_mode(asic_status_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     return scr;
 }
@@ -280,12 +279,13 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (GLOBAL_STATE->valid_model == false) {
-        screen_show(SCR_INVALID_ASIC);
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    if (module->asic_status) {
+        lv_label_set_text(asic_status_label, module->asic_status);
+        screen_show(SCR_ASIC_STATUS);
         return;
     }
-
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     if (module->overheat_mode == 1) {
         if (strcmp(module->ip_addr_str, lv_label_get_text(ip_addr_scr_overheat_label)) != 0) {
@@ -395,7 +395,7 @@ esp_err_t screen_start(void * pvParameters)
 
         screens[SCR_SELF_TEST] = create_scr_self_test();
         screens[SCR_OVERHEAT] = create_scr_overheat(module);
-        screens[SCR_INVALID_ASIC] = create_scr_invalid_asic(module);
+        screens[SCR_ASIC_STATUS] = create_scr_asic_status(module);
         screens[SCR_CONFIGURE] = create_scr_configure(module);
         screens[SCR_FIRMWARE_UPDATE] = create_scr_ota(module);
         screens[SCR_CONNECTION] = create_scr_connection(module);

@@ -11,6 +11,17 @@
 #define GAMMA_POWER_OFFSET 5 //Watts
 #define GAMMATURBO_POWER_OFFSET 5 //Watts
 
+// max power settings
+#define MAX_MAX_POWER 25 //watts
+#define ULTRA_MAX_POWER 25 //Watts
+#define SUPRA_MAX_POWER 40 //watts
+#define GAMMA_MAX_POWER 40 //Watts
+#define GAMMATURBO_MAX_POWER 60 //Watts
+
+// nominal voltage settings
+#define NOMINAL_VOLTAGE_5 5 //volts
+#define NOMINAL_VOLTAGE_12 12//volts
+
 esp_err_t Power_disable(GlobalState * GLOBAL_STATE) {
 
     switch (GLOBAL_STATE->device_model) {
@@ -33,6 +44,24 @@ esp_err_t Power_disable(GlobalState * GLOBAL_STATE) {
     }
     return ESP_OK;
 
+}
+
+float Power_get_max_settings(GlobalState * GLOBAL_STATE) {
+
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+            return MAX_MAX_POWER;
+        case DEVICE_ULTRA:
+            return ULTRA_MAX_POWER;
+        case DEVICE_SUPRA:
+            return SUPRA_MAX_POWER;
+        case DEVICE_GAMMA:
+            return GAMMA_MAX_POWER;
+        case DEVICE_GAMMATURBO:
+            return GAMMATURBO_MAX_POWER;
+        default:
+        return GAMMA_MAX_POWER;
+    }
 }
 
 float Power_get_current(GlobalState * GLOBAL_STATE) {
@@ -119,6 +148,21 @@ float Power_get_input_voltage(GlobalState * GLOBAL_STATE) {
     }
 
     return 0.0;
+}
+
+int Power_get_nominal_voltage(GlobalState * GLOBAL_STATE) {
+    switch (GLOBAL_STATE->device_model)
+    {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+        case DEVICE_GAMMA:
+            return NOMINAL_VOLTAGE_5;
+        case DEVICE_GAMMATURBO:
+            return NOMINAL_VOLTAGE_12;
+        default:
+        return NOMINAL_VOLTAGE_5;
+    }
 }
 
 float Power_get_vreg_temp(GlobalState * GLOBAL_STATE) {

@@ -3,8 +3,8 @@ import { interval, map, Observable, shareReplay, startWith, switchMap, tap } fro
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
-import { eASICModel } from 'src/models/enum/eASICModel';
 import { ISystemInfo } from 'src/models/ISystemInfo';
+
 
 @Component({
   selector: 'app-home',
@@ -26,7 +26,8 @@ export class HomeComponent {
   public powerData: number[] = [];
   public chartData?: any;
 
-  public maxPower: number = 50;
+  public maxPower: number = 0;
+  public nominalVoltage: number = 0;
   public maxTemp: number = 75;
   public maxFrequency: number = 800;
 
@@ -188,28 +189,32 @@ export class HomeComponent {
         return this.systemService.getInfo()
       }),
       tap(info => {
-        this.hashrateData.push(info.hashRate * 1000000000);
-        this.temperatureData.push(info.temp);
-        this.powerData.push(info.power);
+        // Only collect and update chart data if there's no power fault
+        if (!info.power_fault) {
+          this.hashrateData.push(info.hashRate * 1000000000);
+          this.temperatureData.push(info.temp);
+          this.powerData.push(info.power);
 
-        this.dataLabel.push(new Date().getTime());
+          this.dataLabel.push(new Date().getTime());
 
-        if (this.hashrateData.length >= 720) {
-          this.hashrateData.shift();
-          this.temperatureData.shift();
-          this.powerData.shift();
-          this.dataLabel.shift();
+          if (this.hashrateData.length >= 720) {
+            this.hashrateData.shift();
+            this.temperatureData.shift();
+            this.powerData.shift();
+            this.dataLabel.shift();
+          }
+
+          this.chartData.labels = this.dataLabel;
+          this.chartData.datasets[0].data = this.hashrateData;
+          this.chartData.datasets[1].data = this.temperatureData;
+
+          this.chartData = {
+            ...this.chartData
+          };
         }
 
-        this.chartData.labels = this.dataLabel;
-        this.chartData.datasets[0].data = this.hashrateData;
-        this.chartData.datasets[1].data = this.temperatureData;
-
-        this.chartData = {
-          ...this.chartData
-        };
-
-        this.maxPower = Math.max(50, info.power);
+        this.maxPower = Math.max(info.maxPower, info.power);
+        this.nominalVoltage = info.nominalVoltage;
         this.maxTemp = Math.max(75, info.temp);
         this.maxFrequency = Math.max(800, info.frequency);
 
@@ -272,13 +277,13 @@ export class HomeComponent {
 
   public calculateEfficiencyAverage(hashrateData: number[], powerData: number[]): number {
     if (hashrateData.length === 0 || powerData.length === 0) return 0;
-    
+
     // Calculate efficiency for each data point and average them
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       return power / (hashrate/1000000000000); // Convert to J/TH
     });
-    
+
     return this.calculateAverage(efficiencies);
   }
 }

@@ -99,6 +99,7 @@ typedef struct
     bool is_firmware_update;
     char firmware_update_filename[20];
     char firmware_update_status[20];
+    char * asic_status;
 } SystemModule;
 
 typedef struct
@@ -115,7 +116,6 @@ typedef struct
     char * device_model_str;
     int board_version;
     AsicModel asic_model;
-    bool valid_model;
     char * asic_model_str;
     double asic_job_frequency_ms;
     uint32_t ASIC_difficulty;

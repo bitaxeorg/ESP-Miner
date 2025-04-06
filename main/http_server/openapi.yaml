@@ -1,0 +1,508 @@
+openapi: 3.1.0
+info:
+  title: ESP-Miner API
+  description: API specification for ESP-Miner HTTP server
+  version: 1.0.0
+  license:
+    name: GNU General Public License version 3
+    url: https://opensource.org/license/gpl-3-0
+
+servers:
+  - url: http://{device_ip}
+    description: ESP-Miner device
+    variables:
+      device_ip:
+        default: "192.168.1.1"
+        description: IP address of the ESP-Miner device
+
+components:
+  schemas:
+    WifiNetwork:
+      type: object
+      required:
+        - ssid
+        - rssi
+        - authmode
+      properties:
+        ssid:
+          type: string
+          description: Network SSID
+          examples:
+            - "MyWiFiNetwork"
+        rssi:
+          type: integer
+          description: Signal strength in dBm
+          examples:
+            - -65
+        authmode:
+          type: integer
+          minimum: 0
+          maximum: 12
+          enum:
+            - 0  # WIFI_AUTH_OPEN
+            - 1  # WIFI_AUTH_WEP
+            - 2  # WIFI_AUTH_WPA_PSK
+            - 3  # WIFI_AUTH_WPA2_PSK
+            - 4  # WIFI_AUTH_WPA_WPA2_PSK
+            - 5  # WIFI_AUTH_WPA2_ENTERPRISE
+            - 6  # WIFI_AUTH_WPA3_PSK
+            - 7  # WIFI_AUTH_WPA2_WPA3_PSK
+            - 8  # WIFI_AUTH_WAPI_PSK
+            - 9  # WIFI_AUTH_OWE
+            - 10 # WIFI_AUTH_WPA3_ENT_192
+            - 11 # WIFI_AUTH_WPA3_PSK_192 (deprecated)
+            - 12 # WIFI_AUTH_WPA3_EXT_PSK (deprecated)
+          description: |
+            Authentication mode:
+            * 0 - OPEN
+            * 1 - WEP
+            * 2 - WPA_PSK
+            * 3 - WPA2_PSK
+            * 4 - WPA_WPA2_PSK
+            * 5 - WPA2_ENTERPRISE
+            * 6 - WPA3_PSK
+            * 7 - WPA2_WPA3_PSK
+            * 8 - WAPI_PSK
+            * 9 - OWE (Opportunistic Wireless Encryption)
+            * 10 - WPA3_ENT_192 (Enterprise Suite-B)
+            * 11 - WPA3_PSK_192 (deprecated, use WPA3_PSK)
+            * 12 - WPA3_EXT_PSK (deprecated, use WPA3_PSK)
+          examples:
+            - 3
+
+    SystemInfo:
+      type: object
+      required:
+        - ASICModel
+        - apEnabled
+        - asicCount
+        - autofanspeed
+        - bestDiff
+        - bestSessionDiff
+        - boardVersion
+        - coreVoltage
+        - coreVoltageActual
+        - current
+        - fallbackStratumPort
+        - fallbackStratumURL
+        - fallbackStratumUser
+        - fanrpm
+        - fanspeed
+        - flipscreen
+        - freeHeap
+        - frequency
+        - hashRate
+        - hostname
+        - idfVersion
+        - invertfanpolarity
+        - invertscreen
+        - isPSRAMAvailable
+        - isUsingFallbackStratum
+        - macAddr
+        - overheat_mode
+        - power
+        - runningPartition
+        - sharesAccepted
+        - sharesRejected
+        - smallCoreCount
+        - ssid
+        - stratumDiff
+        - stratumPort
+        - stratumURL
+        - stratumUser
+        - temp
+        - uptimeSeconds
+        - version
+        - voltage
+        - vrTemp
+        - wifiStatus
+      properties:
+        ASICModel:
+          type: string
+          description: ASIC model identifier
+        apEnabled:
+          type: number
+          description: Whether AP mode is enabled (0=no, 1=yes)
+        asicCount:
+          type: number
+          description: Number of ASICs detected
+        autofanspeed:
+          type: number
+          description: Automatic fan speed control (0=manual, 1=auto)
+        bestDiff:
+          type: string
+          description: Best difficulty achieved
+        bestSessionDiff:
+          type: string
+          description: Best difficulty achieved in current session
+        boardVersion:
+          type: string
+          description: Hardware board version
+        coreVoltage:
+          type: number
+          description: Configured ASIC core voltage
+        coreVoltageActual:
+          type: number
+          description: Actual measured ASIC core voltage
+        current:
+          type: number
+          description: Current draw in milliamps
+        fallbackStratumPort:
+          type: number
+          description: Fallback stratum server port
+        fallbackStratumURL:
+          type: string
+          description: Fallback stratum server URL
+        fallbackStratumUser:
+          type: string
+          description: Fallback stratum username
+        fanrpm:
+          type: number
+          description: Current fan speed in RPM
+        fanspeed:
+          type: number
+          description: Current fan speed percentage
+        flipscreen:
+          type: number
+          description: Screen flip setting (0=normal, 1=flipped)
+        freeHeap:
+          type: number
+          description: Available heap memory in bytes
+        frequency:
+          type: number
+          description: ASIC frequency in MHz
+        hashRate:
+          type: number
+          description: Current hash rate
+        hostname:
+          type: string
+          description: Device hostname
+        idfVersion:
+          type: string
+          description: ESP-IDF version
+        invertfanpolarity:
+          type: number
+          description: Fan polarity setting (0=normal, 1=inverted)
+        invertscreen:
+          type: number
+          description: Screen invert setting (0=normal, 1=inverted)
+        isPSRAMAvailable:
+          type: number
+          description: Whether PSRAM is available (0=no, 1=yes)
+        isUsingFallbackStratum:
+          type: number
+          description: Whether using fallback stratum (0=no, 1=yes)
+        macAddr:
+          type: string
+          description: Device MAC address
+        overheat_mode:
+          type: number
+          description: Overheat protection mode
+        power:
+          type: number
+          description: Power consumption in watts
+        runningPartition:
+          type: string
+          description: Currently active OTA partition
+        sharesAccepted:
+          type: number
+          description: Number of accepted shares
+        sharesRejected:
+          type: number
+          description: Number of rejected shares
+        smallCoreCount:
+          type: number
+          description: Number of small cores
+        ssid:
+          type: string
+          description: Connected WiFi network SSID
+        stratumDiff:
+          type: number
+          description: Current stratum difficulty
+        stratumPort:
+          type: number
+          description: Primary stratum server port
+        stratumURL:
+          type: string
+          description: Primary stratum server URL
+        stratumUser:
+          type: string
+          description: Primary stratum username
+        temp:
+          type: number
+          description: Average chip temperature
+        uptimeSeconds:
+          type: number
+          description: System uptime in seconds
+        version:
+          type: string
+          description: Firmware version
+        voltage:
+          type: number
+          description: Input voltage
+        vrTemp:
+          type: number
+          description: Voltage regulator temperature
+        wifiStatus:
+          type: string
+          description: WiFi connection status
+
+    Settings:
+      type: object
+      properties:
+        stratumURL:
+          type: string
+          description: Primary stratum server URL
+          examples:
+            - "stratum+tcp://pool.example.com"
+        fallbackStratumURL:
+          type: string
+          description: Fallback stratum server URL used when primary is unavailable
+          examples:
+            - "stratum+tcp://backup.example.com"
+        stratumUser:
+          type: string
+          description: Username for primary stratum server
+          examples:
+            - "worker1"
+        stratumPassword:
+          type: string
+          description: Password for primary stratum server
+          writeOnly: true
+          examples:
+            - "x"
+        fallbackStratumUser:
+          type: string
+          description: Username for fallback stratum server
+          examples:
+            - "worker1"
+        fallbackStratumPassword:
+          type: string
+          description: Password for fallback stratum server
+          writeOnly: true
+          examples:
+            - "x"
+        stratumPort:
+          type: integer
+          description: Port number for primary stratum server
+          minimum: 1
+          maximum: 65535
+          examples:
+            - 3333
+        fallbackStratumPort:
+          type: integer
+          description: Port number for fallback stratum server
+          minimum: 1
+          maximum: 65535
+          examples:
+            - 3333
+        ssid:
+          type: string
+          description: WiFi network SSID
+          minLength: 1
+          maxLength: 32
+          examples:
+            - "MyWiFiNetwork"
+        wifiPass:
+          type: string
+          description: WiFi network password
+          writeOnly: true
+          minLength: 8
+          maxLength: 63
+          examples:
+            - "MySecurePassword123"
+        hostname:
+          type: string
+          description: Device hostname
+          pattern: "^[a-zA-Z0-9-]+$"
+          examples:
+            - "esp-miner-1"
+        coreVoltage:
+          type: integer
+          description: ASIC core voltage in millivolts
+          minimum: 1
+          examples:
+            - 850
+        frequency:
+          type: integer
+          description: ASIC frequency in MHz
+          minimum: 1
+          examples:
+            - 450
+        flipscreen:
+          type: integer
+          description: Whether to flip the screen orientation (0=normal, 1=flipped)
+          enum: [0, 1]
+          examples:
+            - 0
+        overheat_mode:
+          type: integer
+          description: Overheat protection mode (0=disabled)
+          enum: [0]
+          examples:
+            - 0
+        invertscreen:
+          type: integer
+          description: Whether to invert screen colors (0=normal, 1=inverted)
+          enum: [0, 1]
+          examples:
+            - 0
+        invertfanpolarity:
+          type: integer
+          description: Whether to invert fan polarity (0=normal, 1=inverted)
+          enum: [0, 1]
+          examples:
+            - 0
+        autofanspeed:
+          type: integer
+          description: Whether to enable automatic fan speed control (0=manual, 1=auto)
+          enum: [0, 1]
+          examples:
+            - 1
+        fanspeed:
+          type: integer
+          description: Manual fan speed percentage when autofanspeed is disabled
+          minimum: 0
+          maximum: 100
+          examples:
+            - 80
+      additionalProperties: true
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - Client not in allowed network range
+
+    InternalError:
+      description: Internal server error
+
+paths:
+  /api/system/wifi/scan:
+    get:
+      summary: Scan for available WiFi networks
+      description: Returns a list of available WiFi networks in range
+      operationId: scanWifiNetworks
+      tags:
+        - wifi
+      responses:
+        '200':
+          description: Successful scan
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - networks
+                properties:
+                  networks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WifiNetwork'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/info:
+    get:
+      summary: Get system information
+      description: Returns current system status and information
+      operationId: getSystemInfo
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemInfo'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/restart:
+    post:
+      summary: Restart the system
+      description: Triggers a system restart
+      operationId: restartSystem
+      tags:
+        - system
+      responses:
+        '200':
+          description: System restart initiated
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system:
+    patch:
+      summary: Update system settings
+      description: Updates system configuration settings
+      operationId: updateSystemSettings
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Settings'
+      responses:
+        '200':
+          description: Settings updated successfully
+        '400':
+          description: Invalid settings provided
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/OTA:
+    post:
+      summary: Update system firmware
+      description: Upload and apply new firmware via OTA update
+      operationId: updateFirmware
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Firmware update successful
+        '400':
+          description: Invalid firmware file
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/OTAWWW:
+    post:
+      summary: Update web interface
+      description: Upload and apply new web interface files
+      operationId: updateWebInterface
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Web interface update successful
+        '400':
+          description: Invalid web interface file
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error

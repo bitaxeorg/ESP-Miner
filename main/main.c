@@ -65,6 +65,11 @@ void app_main(void)
         return;
     }
 
+    if (ASIC_set_device_model(&GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Error setting ASIC model");
+        return;
+    }
+
     // Optionally hold the boot button
     bool pressed = gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
     //should we run the self test?
@@ -127,22 +132,26 @@ void app_main(void)
 
     wifi_softap_off();
 
-    if (GLOBAL_STATE.valid_model) {
-        queue_init(&GLOBAL_STATE.stratum_queue);
-        queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
+    queue_init(&GLOBAL_STATE.stratum_queue);
+    queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
 
-        SERIAL_init();
-        ASIC_init(&GLOBAL_STATE);
-        SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
-        SERIAL_clear_buffer();
+    SERIAL_init();
 
-        GLOBAL_STATE.ASIC_initalized = true;
-
-        xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
-        xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-        xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-        xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
+    if (ASIC_init(&GLOBAL_STATE) == 0) {
+        GLOBAL_STATE.SYSTEM_MODULE.asic_status = "Chip count 0";
+        ESP_LOGE(TAG, "Chip count 0");
+        return;
     }
+
+    SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
+    SERIAL_clear_buffer();
+
+    GLOBAL_STATE.ASIC_initalized = true;
+
+    xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
+    xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
 }
 
 void MINER_set_wifi_status(wifi_status_t status, int retry_count, int reason)

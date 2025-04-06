@@ -9,7 +9,6 @@
 
 #include "connect.h"
 #include "global_state.h"
-#include "asic.h"
 
 static const char * TAG = "nvs_device";
 
@@ -47,8 +46,6 @@ esp_err_t NVSDevice_parse_config(GlobalState * GLOBAL_STATE) {
     free(board_version);
     ESP_LOGI(TAG, "Found Device Model: %s", GLOBAL_STATE->device_model_str);
     ESP_LOGI(TAG, "Found Board Version: %d", GLOBAL_STATE->board_version);
-
-    ESP_RETURN_ON_ERROR(ASIC_set_device_model(GLOBAL_STATE), TAG, "Failed to get device model");
 
     return ESP_OK;
 }
