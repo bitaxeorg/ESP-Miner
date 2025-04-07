@@ -55,9 +55,6 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert)
                 ESP_LOGI(TAG, "Using custom cert");
                 esp_transport_ssl_set_cert_data(transport, cert, strlen(cert));
                 break;
-            case SKIP_VERIFICATION:
-                esp_transport_ssl_skip_common_name_check(transport);
-                break;
             default:
                 ESP_LOGE(TAG, "Invalid TLS mode");
                 return NULL;
