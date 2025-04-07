@@ -88,6 +88,7 @@ components:
         - fallbackStratumUser
         - fanrpm
         - fanspeed
+        - temptarget
         - flipscreen
         - freeHeap
         - frequency
@@ -162,6 +163,9 @@ components:
         fanspeed:
           type: number
           description: Current fan speed percentage
+        temptarget:
+          type: number
+          description: Target Temperature for the PID Controller
         flipscreen:
           type: number
           description: Screen flip setting (0=normal, 1=flipped)
@@ -366,6 +370,13 @@ components:
           maximum: 100
           examples:
             - 80
+        temptarget:
+          type: integer
+          description: Manual Temperature Target in °C when autofanspeed is enabled
+          minimum: 0
+          maximum: 100
+          examples:
+            - 66
       additionalProperties: true
 
   responses:
