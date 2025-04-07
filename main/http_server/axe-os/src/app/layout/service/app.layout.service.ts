@@ -131,8 +131,8 @@ export class LayoutService {
                             '--togglebutton-text-color': '#ffffff',
                             '--radiobutton-border': '#F80421',
                             '--radiobutton-bg': '#F80421',
-                            '--radiobutton-hover-border': '#df031d'
-
+                            '--radiobutton-hover-border': '#df031d',
+                            '--radiobutton-focus-shadow': '0 0 0 1px #df031d',
                         }
                     }).subscribe();
                 }

@@ -57,6 +57,7 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
         "\"--radiobutton-border\":\"#F80421\","
         "\"--radiobutton-bg\":\"#F80421\","
         "\"--radiobutton-hover-border\":\"#df031d\","
+        "\"--radiobutton-focus-shadow\":\"#df031d\","
         "}"
     );
 
