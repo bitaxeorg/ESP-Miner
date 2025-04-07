@@ -67,6 +67,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     
     while (1) {
 
+        // Refresh PID setpoint from NVS in case it was changed via API
+        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 66);
+
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);
 
