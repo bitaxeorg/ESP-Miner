@@ -189,26 +189,29 @@ export class HomeComponent {
         return this.systemService.getInfo()
       }),
       tap(info => {
-        this.hashrateData.push(info.hashRate * 1000000000);
-        this.temperatureData.push(info.temp);
-        this.powerData.push(info.power);
+        // Only collect and update chart data if there's no power fault
+        if (!info.power_fault) {
+          this.hashrateData.push(info.hashRate * 1000000000);
+          this.temperatureData.push(info.temp);
+          this.powerData.push(info.power);
 
-        this.dataLabel.push(new Date().getTime());
+          this.dataLabel.push(new Date().getTime());
 
-        if (this.hashrateData.length >= 720) {
-          this.hashrateData.shift();
-          this.temperatureData.shift();
-          this.powerData.shift();
-          this.dataLabel.shift();
+          if (this.hashrateData.length >= 720) {
+            this.hashrateData.shift();
+            this.temperatureData.shift();
+            this.powerData.shift();
+            this.dataLabel.shift();
+          }
+
+          this.chartData.labels = this.dataLabel;
+          this.chartData.datasets[0].data = this.hashrateData;
+          this.chartData.datasets[1].data = this.temperatureData;
+
+          this.chartData = {
+            ...this.chartData
+          };
         }
-
-        this.chartData.labels = this.dataLabel;
-        this.chartData.datasets[0].data = this.hashrateData;
-        this.chartData.datasets[1].data = this.temperatureData;
-
-        this.chartData = {
-          ...this.chartData
-        };
 
         this.maxPower = Math.max(info.maxPower, info.power);
         this.nominalVoltage = info.nominalVoltage;
