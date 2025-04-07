@@ -31,7 +31,7 @@ static const char * TAG = "power_management";
 
 double pid_input = 0.0;
 double pid_output = 0.0;
-double pid_setPoint = 60.0;
+double pid_setPoint = 66.0;
 double pid_p = 2.0;
 double pid_i = 0.1;
 double pid_d = 5.0;
@@ -45,7 +45,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     
     // Initialize PID controller
-    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60);
+    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 66);
     pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, PID_P_ON_E, PID_DIRECT);
     pid_set_sample_time(&pid, POLL_RATE - 1);
     pid_set_output_limits(&pid, 15, 100);
@@ -97,14 +97,18 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
             exit(EXIT_FAILURE);
         }
-
+        //enable the PID auto control for the FAN if set
         if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
-
-            pid_input = power_management->chip_temp_avg;
-            pid_compute(&pid);
-            power_management->fan_perc = (uint16_t) pid_output;
-            Thermal_set_fan_percent(GLOBAL_STATE->device_model, pid_output / 100.0);
-            ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%%", pid_input, pid_setPoint, pid_output);
+            // Ignore invalid temperature readings (-1) during startup
+            if (power_management->chip_temp_avg >= 0) {
+                pid_input = power_management->chip_temp_avg;
+                pid_compute(&pid);
+                power_management->fan_perc = (uint16_t) pid_output;
+                Thermal_set_fan_percent(GLOBAL_STATE->device_model, pid_output / 100.0);
+                ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%%", pid_input, pid_setPoint, pid_output);
+            } else {
+                ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f°C", power_management->chip_temp_avg);
+            }
 
         } else {
             float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
