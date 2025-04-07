@@ -5,6 +5,15 @@ static unsigned long millis() {
     return (unsigned long)(esp_timer_get_time() / 1000);
 }
 
+/**
+ * @param DIRECT
+ * An increase in input (e.g., temperature) causes an increase in output (e.g., fan speed).
+ * Use this when the output should move in the same direction as the error.
+ * 
+ * @param REVERSE
+ * An increase in input causes a decrease in output.
+ * Use this when the output should move in the opposite direction of the error.
+ */
 void pid_init(PIDController *pid, double *input, double *output, double *setpoint,
               double Kp, double Ki, double Kd, PIDProportionalMode POn, PIDDirection ControllerDirection) {
     pid->input = input;
@@ -20,6 +29,13 @@ void pid_init(PIDController *pid, double *input, double *output, double *setpoin
 
     pid->lastTime = millis() - pid->sampleTime;
 }
+/**
+ * @param AUTOMATIC mode:
+ * The PID controller continuously calculates the output based on the current input, setpoint, and tuning parameters. It actively adjusts the output to minimize the error.
+ * 
+ * @param MANUAL mode:
+ * The PID controller stops automatic adjustments. The output is either fixed or controlled externally. This is useful for tuning, testing, or when you want to override the PID temporarily.
+ */
 
 void pid_set_mode(PIDController *pid, int mode) {
     bool newAuto = (mode == AUTOMATIC);
