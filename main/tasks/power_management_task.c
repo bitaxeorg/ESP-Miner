@@ -31,7 +31,7 @@ static const char * TAG = "power_management";
 
 double pid_input = 0.0;
 double pid_output = 0.0;
-double pid_setPoint = 66.0;
+double pid_setPoint = 60.0;
 double pid_p = 2.0;
 double pid_i = 0.1;
 double pid_d = 5.0;
@@ -45,7 +45,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     
     // Initialize PID controller
-    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 66);
+    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
     pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, PID_P_ON_E, PID_DIRECT);
     pid_set_sample_time(&pid, POLL_RATE - 1);
     pid_set_output_limits(&pid, 15, 100);
@@ -68,7 +68,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     while (1) {
 
         // Refresh PID setpoint from NVS in case it was changed via API
-        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 66);
+        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
 
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);

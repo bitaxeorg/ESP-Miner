@@ -63,7 +63,7 @@ export class SystemService {
           invertfanpolarity: 1,
           autofanspeed: 1,
           fanspeed: 100,
-          temptarget: 66,
+          temptarget: 60,
           fanrpm: 0,
 
           boardtemp1: 30,
