@@ -4,9 +4,9 @@ SRCS
 
 INCLUDE_DIRS 
     "include"
-    "../asic/include"
     "../../main"
     "../../main/tasks"
+    "../asic/include"
 
 REQUIRES
     "nvs_flash"
