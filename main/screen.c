@@ -34,8 +34,7 @@ static lv_obj_t *wifi_status_label;
 
 static lv_obj_t *self_test_message_label;
 static lv_obj_t *self_test_result_label;
-static lv_obj_t *self_test_finished_label_pass;
-static lv_obj_t *self_test_finished_label_fail;
+static lv_obj_t *self_test_finished_label;
 
 static double current_hashrate;
 static float current_power;
@@ -59,17 +58,9 @@ static lv_obj_t * create_scr_self_test() {
     self_test_message_label = lv_label_create(scr);
     self_test_result_label = lv_label_create(scr);
 
-    self_test_finished_label_pass = lv_label_create(scr);
-    lv_obj_set_width(self_test_finished_label_pass, LV_HOR_RES);
-    lv_obj_add_flag(self_test_finished_label_pass, LV_OBJ_FLAG_HIDDEN);
+    self_test_finished_label = lv_label_create(scr);
+    lv_obj_set_width(self_test_finished_label, LV_HOR_RES);
     lv_label_set_long_mode(self_test_finished_label_pass, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(self_test_finished_label_pass, "Press RESET button to start Bitaxe.");
-
-    self_test_finished_label_fail = lv_label_create(scr);
-    lv_obj_set_width(self_test_finished_label_fail, LV_HOR_RES);
-    lv_obj_add_flag(self_test_finished_label_fail, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_long_mode(self_test_finished_label_fail, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(self_test_finished_label_fail, "Hold BOOT button for 2 seconds to cancel self test, or press RESET to run again.");
 
     return scr;
 }
@@ -258,10 +249,10 @@ static void screen_update_cb(lv_timer_t * timer)
         if (self_test->finished) {
             if (self_test->result) {
                 lv_label_set_text(self_test_result_label, "TESTS PASS!");
-                lv_obj_remove_flag(self_test_finished_label_pass, LV_OBJ_FLAG_HIDDEN);
+                lv_label_set_text(self_test_finished_label, "Press RESET button to start Bitaxe.");
             } else {
                 lv_label_set_text(self_test_result_label, "TESTS FAIL!");
-                lv_obj_remove_flag(self_test_finished_label_fail, LV_OBJ_FLAG_HIDDEN);
+                lv_label_set_text(self_test_finished_label, "Hold BOOT button for 2 seconds to cancel self test, or press RESET to run again.");
             }
         }
 
