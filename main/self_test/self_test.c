@@ -543,7 +543,12 @@ void self_test(void * pvParameters)
             }
             break;
         case DEVICE_GAMMA:
-                if (test_TPS546_power_consumption(POWER_CONSUMPTION_TARGET_GAMMA, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
+                int power_correction = 0;
+                // The 602 has a higher apparent power consumption due to less resistive losses and higher measured voltage. 
+                if(GLOBAL_STATE->board_version >= 602){
+                    power_correction += 3;
+                }
+                if (test_TPS546_power_consumption(POWER_CONSUMPTION_TARGET_GAMMA + power_correction, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
                     ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)POWER_CONSUMPTION_TARGET_GAMMA);
                     display_msg("POWER:FAIL", GLOBAL_STATE);
                     tests_done(GLOBAL_STATE, TESTS_FAILED);
