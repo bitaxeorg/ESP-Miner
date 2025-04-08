@@ -14,7 +14,8 @@ typedef enum {
     SCR_CONFIGURE,
     SCR_FIRMWARE_UPDATE,
     SCR_CONNECTION,
-    SCR_LOGO,
+    SCR_BITAXE_LOGO,
+    SCR_OSMU_LOGO,
     SCR_URLS,
     SCR_STATS,
     MAX_SCREENS,
@@ -29,7 +30,7 @@ extern const lv_img_dsc_t bitaxe_logo;
 extern const lv_img_dsc_t osmu_logo;
 
 static lv_obj_t * screens[MAX_SCREENS];
-static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 5000, 10000, 10000};
+static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000};
 
 static screen_t current_screen = -1;
 static int current_screen_time_ms;
