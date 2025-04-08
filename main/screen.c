@@ -44,7 +44,6 @@ static float current_chip_temp;
 static bool found_block;
 
 #define SCREEN_UPDATE_MS 500
-#define CONNECTED_DELAY_COUNT 1000 / SCREEN_UPDATE_MS
 #define LOGO_DELAY_COUNT 5000 / SCREEN_UPDATE_MS
 #define CAROUSEL_DELAY_COUNT 10000 / SCREEN_UPDATE_MS
 
@@ -307,16 +306,14 @@ static void screen_update_cb(lv_timer_t * timer)
             lv_label_set_text(wifi_status_label, module->wifi_status);
         }
         screen_show(SCR_CONNECTION);
-        current_screen_counter = 0;
         return;
     }
 
     current_screen_counter++;
 
-    if (current_screen == SCR_CONNECTION) {
-        if (CONNECTED_DELAY_COUNT > current_screen_counter) {
-            return;
-        }
+    // Logo
+
+    if (current_screen < SCR_LOGO) {
         screen_show(SCR_LOGO);
         return;
     }
