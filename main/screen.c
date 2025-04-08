@@ -61,10 +61,6 @@ static uint64_t current_difficulty;
 static float current_chip_temp;
 static bool found_block;
 
-#define SCREEN_UPDATE_MS 500
-#define LOGO_DELAY_COUNT 5000 / SCREEN_UPDATE_MS
-#define CAROUSEL_DELAY_COUNT 10000 / SCREEN_UPDATE_MS
-
 static lv_obj_t * create_scr_self_test() {
     lv_obj_t * scr = lv_obj_create(NULL);
 
