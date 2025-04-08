@@ -7,6 +7,7 @@ interface ISharesRejectedStat {
 
 export interface ISystemInfo {
 
+    display: string;
     flipscreen: number;
     invertscreen: number;
     displayTimeout: number;

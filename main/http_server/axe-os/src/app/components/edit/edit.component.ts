@@ -110,6 +110,7 @@ export class EditComponent implements OnInit, OnDestroy {
       }
 
         this.form = this.fb.group({
+          display: [info.display, [Validators.required]],
           flipscreen: [info.flipscreen == 1],
           invertscreen: [info.invertscreen == 1],
           displayTimeout: [info.displayTimeout, [
@@ -123,7 +124,7 @@ export class EditComponent implements OnInit, OnDestroy {
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
           temptarget: [info.temptarget, [Validators.required]],
-          overheat_mode: [info.overheat_mode, [Validators.required]]
+          overheat_mode: [info.overheat_mode, [Validators.required]],
         });
 
       this.form.controls['autofanspeed'].valueChanges.pipe(
@@ -271,4 +272,7 @@ export class EditComponent implements OnInit, OnDestroy {
     return options;
   }
 
+  getDisplays() {
+    return ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (128x64)", "SH1107 (128x128)"];
+  }
 }

@@ -1,3 +1,4 @@
+#include <string.h>
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -17,10 +18,12 @@
 #include "driver/i2c_types.h"
 #include "esp_lcd_panel_ssd1306.h"
 
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 #define SSD1306_I2C_ADDRESS    0x3C
 
-#define LCD_H_RES              128
-#define LCD_V_RES              32
+#define DEFAULT_DISPLAY        "SSD1306 (128x32)"
+
 #define LCD_CMD_BITS           8
 #define LCD_PARAM_BITS         8
 
@@ -42,9 +45,30 @@ static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
     }
 }
 
+static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
+{
+    char * display_config = nvs_config_get_string(NVS_CONFIG_DISPLAY, DEFAULT_DISPLAY);
+
+    for (int i = 0 ; i < ARRAY_SIZE(display_configs); i++) {
+        if (strcmp(display_configs[i].name, display_config) == 0) {
+            GLOBAL_STATE->DISPLAY_CONFIG = display_configs[i];
+
+            ESP_LOGI(TAG, "Display: %s", GLOBAL_STATE->DISPLAY_CONFIG.name);
+            free(display_config);
+            return ESP_OK;
+        }
+    }
+
+    free(display_config);
+
+    return ESP_FAIL;
+}
+
 esp_err_t display_init(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+
+    ESP_RETURN_ON_ERROR(read_display_config(GLOBAL_STATE), TAG, "Failed to read display config");
 
     uint8_t flip_screen = nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1);
     uint8_t invert_screen = nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0);
@@ -72,7 +96,7 @@ esp_err_t display_init(void * pvParameters)
     };
 
     esp_lcd_panel_ssd1306_config_t ssd1306_config = {
-        .height = LCD_V_RES,
+        .height = GLOBAL_STATE->DISPLAY_CONFIG.v_res,
     };
     panel_config.vendor_config = &ssd1306_config;
 
@@ -94,10 +118,10 @@ esp_err_t display_init(void * pvParameters)
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,
         .panel_handle = panel_handle,
-        .buffer_size = LCD_H_RES * LCD_V_RES,
+        .buffer_size = GLOBAL_STATE->DISPLAY_CONFIG.h_res * GLOBAL_STATE->DISPLAY_CONFIG.v_res,
         .double_buffer = true,
-        .hres = LCD_H_RES,
-        .vres = LCD_V_RES,
+        .hres = GLOBAL_STATE->DISPLAY_CONFIG.h_res,
+        .vres = GLOBAL_STATE->DISPLAY_CONFIG.v_res,
         .monochrome = true,
         .color_format = LV_COLOR_FORMAT_RGB565,
         .rotation = {
@@ -137,6 +161,8 @@ esp_err_t display_init(void * pvParameters)
         ESP_LOGW(TAG, "No display found.");
     }
 
+    ESP_LOGI(TAG, "Display init success!");
+    
     return ESP_OK;
 }
 
