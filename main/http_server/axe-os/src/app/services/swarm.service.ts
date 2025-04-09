@@ -25,7 +25,7 @@ export class SwarmService {
     return this.forIp(ip).getSystemInfo();
   }
 
-  public restartSystem(ip: string): Observable<void> {
+  public restartSystem(ip: string): Observable<string> {
     return this.forIp(ip).restartSystem();
   }
 

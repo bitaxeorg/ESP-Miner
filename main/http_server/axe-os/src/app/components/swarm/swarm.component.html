@@ -169,5 +169,5 @@
 <div class="modal card" *ngIf="showEdit">
     <div class="close" (click)="showEdit = false">&#10006;</div>
     <h1>{{selectedAxeOs.IP}}</h1>
-    <app-edit [uri]="'http://' + selectedAxeOs.IP"></app-edit>
+    <app-edit [uri]="selectedAxeOs.IP"></app-edit>
 </div>

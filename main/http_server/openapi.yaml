@@ -498,10 +498,22 @@ paths:
         - system
       responses:
         '200':
+          content:
+            text/plain:
+              schema:
+                type: string
           description: System restart initiated
-        '401':
+        '401':          
+          content:
+            text/plain:
+              schema:
+                type: string
           description: Unauthorized - Client not in allowed network range
-        '500':
+        '500':          
+          content:
+            text/plain:
+              schema:
+                type: string
           description: Internal server error
 
   /api/system:
