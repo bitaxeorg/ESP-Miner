@@ -3,7 +3,6 @@ import { Injectable } from '@angular/core';
 import { delay, Observable, of } from 'rxjs';
 import { eASICModel } from 'src/models/enum/eASICModel';
 import { ISystemInfo } from 'src/models/ISystemInfo';
-
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -34,7 +33,7 @@ export class SystemService {
           freeHeap: 200504,
           coreVoltage: 1200,
           coreVoltageActual: 1200,
-          hostname: "Bitaxe",
+          hostname: "Bitaxe " + Math.random().toString(36).substring(2, 15),
           macAddr: "2C:54:91:88:C9:E3",
           ssid: "default",
           wifiPass: "password",
