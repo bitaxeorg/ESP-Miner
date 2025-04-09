@@ -75,7 +75,7 @@
         <div *ngIf="form.controls['autofanspeed'].value == true">
           <div class="col-12" *ngIf="form.controls['autofanspeed'].value == true">
               <label>Target Temperature {{form.controls['temptarget'].value}}°C</label>
-              <p-slider formControlName="temptarget"></p-slider>
+              <p-slider [min]="35" [max]="66" formControlName="temptarget"></p-slider>
           </div>
       </div>
 
