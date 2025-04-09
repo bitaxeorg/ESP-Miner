@@ -3,7 +3,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemService } from 'src/app/generated/api/system.service';
 
 @Component({
   selector: 'app-pool',
@@ -14,8 +14,6 @@ export class PoolComponent implements OnInit {
   public form!: FormGroup;
   public savedChanges: boolean = false;
 
-  @Input() uri = '';
-
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -24,7 +22,7 @@ export class PoolComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.systemService.getInfo(this.uri)
+    this.systemService.getSystemInfo()
       .pipe(
         this.loadingService.lockUIUntilComplete()
       )
@@ -65,16 +63,16 @@ export class PoolComponent implements OnInit {
       delete form.stratumPassword;
     }
 
-    this.systemService.updateSystem(this.uri, form)
+    this.systemService.updateSystemSettings(form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
+          const successMessage = 'Saved pool settings';
           this.toastr.success(successMessage, 'Success!');
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Could not save pool settings for ${this.uri}. ${err.message}` : `Could not save pool settings. ${err.message}`;
+          const errorMessage = `Could not save pool settings. ${err.message}`;
           this.toastr.error(errorMessage, 'Error');
           this.savedChanges = false;
         }
@@ -92,15 +90,15 @@ export class PoolComponent implements OnInit {
   }
 
   public restart() {
-    this.systemService.restart(this.uri)
+    this.systemService.restartSystem()
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Bitaxe at ${this.uri} restarted` : 'Bitaxe restarted';
+          const successMessage = 'Bitaxe restarted';
           this.toastr.success(successMessage, 'Success');
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
+          const errorMessage = `Failed to restart device. ${err.message}`;
           this.toastr.error(errorMessage, 'Error');
         }
       });

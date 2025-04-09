@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 
-import { SystemService } from './system.service';
+import { SwarmService } from './swarm.service';
 
-describe('SystemService', () => {
-  let service: SystemService;
+describe('SwarmService', () => {
+  let service: SwarmService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(SystemService);
+    service = TestBed.inject(SwarmService);
   });
 
   it('should be created', () => {

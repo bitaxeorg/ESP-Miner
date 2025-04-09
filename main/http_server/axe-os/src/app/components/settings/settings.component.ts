@@ -6,8 +6,7 @@ import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
 import { map, Observable, shareReplay, startWith } from 'rxjs';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
-import { eASICModel } from 'src/models/enum/eASICModel';
+import { SystemService } from 'src/app/generated/api/system.service';
 
 @Component({
   selector: 'app-settings',
@@ -21,9 +20,7 @@ export class SettingsComponent {
   public firmwareUpdateProgress: number | null = null;
   public websiteUpdateProgress: number | null = null;
 
-
-  public eASICModel = eASICModel;
-  public ASICModel!: eASICModel;
+  public ASICModel: string | undefined;
 
   public checkLatestRelease: boolean = false;
   public latestRelease$: Observable<any>;
@@ -48,9 +45,7 @@ export class SettingsComponent {
       return releases[0];
     }));
 
-    this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}))
-
-
+    this.info$ = this.systemService.getSystemInfo().pipe(shareReplay({refCount: true, bufferSize: 1}))
       this.info$.pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
         this.ASICModel = info.ASICModel;
@@ -108,7 +103,7 @@ export class SettingsComponent {
       delete form.stratumPassword;
     }
 
-    this.systemService.updateSystem(undefined, form)
+    this.systemService.updateSystemSettings(form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
@@ -129,7 +124,7 @@ export class SettingsComponent {
       return;
     }
 
-    this.systemService.performOTAUpdate(file)
+    this.systemService.updateFirmware(file, 'events', true)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: (event) => {
@@ -166,7 +161,7 @@ export class SettingsComponent {
       return;
     }
 
-    this.systemService.performWWWOTAUpdate(file)
+    this.systemService.updateWebInterface(file, 'events', true)
       .pipe(
         this.loadingService.lockUIUntilComplete(),
       ).subscribe({
@@ -200,7 +195,7 @@ export class SettingsComponent {
   }
 
   public restart() {
-    this.systemService.restart().subscribe(res => {
+    this.systemService.restartSystem().subscribe(res => {
 
     });
     this.toastr.success('Success!', 'Bitaxe restarted');

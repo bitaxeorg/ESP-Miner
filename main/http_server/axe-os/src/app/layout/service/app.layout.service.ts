@@ -1,6 +1,6 @@
 import { Injectable, effect, signal } from '@angular/core';
 import { Subject } from 'rxjs';
-import { ThemeService } from '../../services/theme.service';
+import { ThemeService } from '../../generated/api/theme.service';
 
 export interface AppConfig {
     inputStyle: string;

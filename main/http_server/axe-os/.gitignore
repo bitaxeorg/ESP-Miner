@@ -11,6 +11,9 @@
 npm-debug.log
 yarn-error.log
 
+# Openapi generator
+**/generated
+
 # IDEs and editors
 .idea/
 .project

@@ -138,6 +138,11 @@ components:
       properties:
         ASICModel:
           type: string
+          enum:
+            - "BM1366"
+            - "BM1368"
+            - "BM1370"
+            - "BM1397"
           description: ASIC model identifier
         apEnabled:
           type: number
@@ -285,6 +290,23 @@ components:
         wifiRSSI:
           type: number
           description: WiFi signal strength
+
+    ThemeSettings:
+      type: object
+      required:
+        - colorScheme
+        - theme
+      properties:
+        colorScheme:
+          type: string
+          description: Base color scheme (e.g., 'light' or 'dark')
+        theme:
+          type: string
+        accentColors:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of accent color keys to hex color values
 
     Settings:
       type: object
@@ -522,8 +544,18 @@ paths:
       responses:
         '200':
           description: Firmware update successful
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "OK"
         '400':
           description: Invalid firmware file
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Invalid file"
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
@@ -545,9 +577,60 @@ paths:
               format: binary
       responses:
         '200':
-          description: Web interface update successful
+          description: Web interface firmware update successful
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "OK"
         '400':
-          description: Invalid web interface file
+          description: Invalid web firmware file
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Invalid web firmware file"
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/theme:
+    get:
+      summary: Get current theme settings
+      description: Returns the current theme settings
+      operationId: getThemeSettings
+      tags:
+        - theme
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThemeSettings'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+    post:
+      summary: Update theme settings
+      description: Updates the theme settings
+      operationId: saveThemeSettings
+      tags:
+        - theme
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThemeSettings'
+      responses:
+        '200':
+          description: Theme settings updated successfully
+        '400':
+          description: Invalid theme settings provided
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

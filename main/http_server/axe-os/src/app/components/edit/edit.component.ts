@@ -4,9 +4,10 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { startWith, Subject, takeUntil } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
-import { eASICModel } from 'src/models/enum/eASICModel';
+import { SystemService } from 'src/app/generated/api/system.service';
 import { ActivatedRoute } from '@angular/router';
+import { Settings, SystemInfoASICModelEnum } from 'src/app/generated';
+import { SwarmService } from 'src/app/services/swarm.service';
 
 @Component({
   selector: 'app-edit',
@@ -22,10 +23,10 @@ export class EditComponent implements OnInit, OnDestroy {
 
   public savedChanges: boolean = false;
   public settingsUnlocked: boolean = false;
-  public eASICModel = eASICModel;
-  public ASICModel!: eASICModel;
-  public restrictedModels: eASICModel[] = Object.values(eASICModel)
-    .filter((v): v is eASICModel => typeof v === 'string');
+  public eASICModel = SystemInfoASICModelEnum;
+  public ASICModel!: SystemInfoASICModelEnum;
+  public restrictedModels: SystemInfoASICModelEnum[] = Object.values(SystemInfoASICModelEnum)
+    .filter((v): v is SystemInfoASICModelEnum => typeof v === 'string');
 
   @Input() uri = '';
 
@@ -123,7 +124,7 @@ export class EditComponent implements OnInit, OnDestroy {
 
   constructor(
     private fb: FormBuilder,
-    private systemService: SystemService,
+    private swarmService: SwarmService,
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private route: ActivatedRoute,
@@ -154,7 +155,7 @@ export class EditComponent implements OnInit, OnDestroy {
   }
 
   private saveOverclockSetting(enabled: number) {
-    this.systemService.updateSystem(this.uri, { overclockEnabled: enabled })
+    this.swarmService.updateSystemSettings(this.uri, { overclockEnabled: enabled } as Settings)
       .subscribe({
         next: () => {
           console.log(`Overclock setting saved: ${enabled === 1 ? 'enabled' : 'disabled'}`);
@@ -166,7 +167,7 @@ export class EditComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.systemService.getInfo(this.uri)
+    this.swarmService.getSystemInfo(this.uri)
       .pipe(
         this.loadingService.lockUIUntilComplete(),
         takeUntil(this.destroy$)
@@ -228,7 +229,7 @@ export class EditComponent implements OnInit, OnDestroy {
       delete form.stratumPassword;
     }
 
-    this.systemService.updateSystem(this.uri, form)
+    this.swarmService.updateSystemSettings(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
@@ -269,7 +270,7 @@ export class EditComponent implements OnInit, OnDestroy {
   }
 
   public restart() {
-    this.systemService.restart(this.uri)
+    this.swarmService.restartSystem(this.uri)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {

@@ -47,7 +47,6 @@ const components = [
 @NgModule({
   declarations: [
     ...components,
-
     ANSIPipe,
     DateAgoPipe,
     SwarmComponent,

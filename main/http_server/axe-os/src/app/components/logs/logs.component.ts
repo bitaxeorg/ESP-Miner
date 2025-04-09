@@ -1,8 +1,8 @@
 import { AfterViewChecked, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap } from 'rxjs';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemInfo } from 'src/app/generated';
+import { SystemService } from 'src/app/generated/api/system.service';
 import { WebsocketService } from 'src/app/services/web-socket.service';
-import { ISystemInfo } from 'src/models/ISystemInfo';
 
 @Component({
   selector: 'app-logs',
@@ -12,7 +12,7 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 export class LogsComponent implements OnDestroy, AfterViewChecked {
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
-  public info$: Observable<ISystemInfo>;
+  public info$: Observable<SystemInfo>;
 
   public logs: { className: string, text: string }[] = [];
 
@@ -26,12 +26,10 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
     private websocketService: WebsocketService,
     private systemService: SystemService
   ) {
-
-
     this.info$ = interval(5000).pipe(
-      startWith(() => this.systemService.getInfo()),
+      startWith(() => this.systemService.getSystemInfo()),
       switchMap(() => {
-        return this.systemService.getInfo()
+        return this.systemService.getSystemInfo()
       }),
       map(info => {
         info.power = parseFloat(info.power.toFixed(1))
@@ -46,9 +44,11 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
 
 
   }
+
   ngOnDestroy(): void {
     this.websocketSubscription?.unsubscribe();
   }
+
   public toggleLogs() {
     this.showLogs = !this.showLogs;
 

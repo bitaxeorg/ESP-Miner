@@ -5,7 +5,7 @@ import { ToastrService } from 'ngx-toastr';
 import { finalize } from 'rxjs/operators';
 import { DialogService } from 'src/app/services/dialog.service';
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemService } from 'src/app/generated/api/system.service';
 
 interface WifiNetwork {
   ssid: string;
@@ -24,8 +24,6 @@ export class NetworkEditComponent implements OnInit {
   public savedChanges: boolean = false;
   public scanning: boolean = false;
 
-  @Input() uri = '';
-
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -38,7 +36,7 @@ export class NetworkEditComponent implements OnInit {
 
   }
   ngOnInit(): void {
-    this.systemService.getInfo(this.uri)
+    this.systemService.getSystemInfo()
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
         this.form = this.fb.group({
@@ -67,7 +65,7 @@ export class NetworkEditComponent implements OnInit {
       form.ssid = form.ssid.trim();
     }
 
-    this.systemService.updateSystem(this.uri, form)
+    this.systemService.updateSystemSettings(form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
@@ -133,7 +131,7 @@ export class NetworkEditComponent implements OnInit {
   }
 
   public restart() {
-    this.systemService.restart()
+    this.systemService.restartSystem()
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {

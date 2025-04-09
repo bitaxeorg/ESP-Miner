@@ -7,10 +7,11 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "ng build --configuration=production && gzipper compress --verbose --gzip --gzip-level 9 ./dist/axe-os && node only-gzip.js",
+    "build": "npm run generate:api && ng build --configuration=production && gzipper compress --verbose --gzip --gzip-level 9 ./dist/axe-os && node only-gzip.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "bundle-report": "ng build --configuration=production --stats-json && webpack-bundle-analyzer dist/axe-os/stats.json"
+    "bundle-report": "ng build --configuration=production --stats-json && webpack-bundle-analyzer dist/axe-os/stats.json",
+    "generate:api": "rm -rf ./src/app/generated && openapi-generator-cli generate"
   },
   "private": true,
   "dependencies": {
@@ -38,6 +39,7 @@
     "@angular-devkit/build-angular": "^18.2.14",
     "@angular/cli": "18.2.14",
     "@angular/compiler-cli": "18.2.13",
+    "@openapitools/openapi-generator-cli": "^2.18.4",
     "@types/jasmine": "~5.1.5",
     "chokidar": "^3.6.0",
     "gzipper": "^8.2.0",

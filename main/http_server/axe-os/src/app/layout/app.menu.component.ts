@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
 
-import { SystemService } from '../services/system.service';
+import { SystemService } from '../generated/api/system.service';
 import { LayoutService } from './service/app.layout.service';
 
 @Component({
@@ -36,7 +36,7 @@ export class AppMenuComponent implements OnInit {
     }
 
     public restart() {
-        this.systemService.restart().subscribe(res => {
+        this.systemService.restartSystem().subscribe(res => {
 
         });
         this.toastr.success('Success!', 'Bitaxe restarted');
