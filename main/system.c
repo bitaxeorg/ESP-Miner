@@ -14,7 +14,6 @@
 
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
-#include "esp_netif.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "lwip/inet.h"
@@ -34,8 +33,6 @@
 static const char * TAG = "SystemModule";
 
 static void _suffix_string(uint64_t, char *, size_t, int);
-
-static esp_netif_t * netif;
 
 //local function prototypes
 static esp_err_t ensure_overheat_mode_config();
@@ -89,12 +86,6 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     // set the best diff string
     _suffix_string(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     _suffix_string(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
-
-    // set the ssid string to blank
-    memset(module->ssid, 0, sizeof(module->ssid));
-
-    // set the wifi_status to blank
-    memset(module->wifi_status, 0, 20);
 }
 
 esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
@@ -132,8 +123,6 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     ESP_RETURN_ON_ERROR(input_init(screen_next, toggle_wifi_softap), TAG, "Input init failed!");
 
     ESP_RETURN_ON_ERROR(screen_start(GLOBAL_STATE), TAG, "Screen start failed!");
-
-    netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
 
     return ESP_OK;
 }

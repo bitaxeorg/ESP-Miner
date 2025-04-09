@@ -7,14 +7,34 @@
 #include "global_state.h"
 #include "screen.h"
 
-// static const char * TAG = "screen";
+typedef enum {
+    SCR_SELF_TEST,
+    SCR_OVERHEAT,
+    SCR_ASIC_STATUS,
+    SCR_CONFIGURE,
+    SCR_FIRMWARE_UPDATE,
+    SCR_CONNECTION,
+    SCR_BITAXE_LOGO,
+    SCR_OSMU_LOGO,
+    SCR_URLS,
+    SCR_STATS,
+    MAX_SCREENS,
+} screen_t;
 
-extern const lv_img_dsc_t logo;
+#define SCREEN_UPDATE_MS 500
+
+#define SCR_CAROUSEL_START SCR_URLS
+#define SCR_CAROUSEL_END SCR_STATS
+
+extern const lv_img_dsc_t bitaxe_logo;
+extern const lv_img_dsc_t osmu_logo;
 
 static lv_obj_t * screens[MAX_SCREENS];
+static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000};
 
 static screen_t current_screen = -1;
-static TickType_t current_screen_counter;
+static int current_screen_time_ms;
+static int current_screen_delay_ms;
 
 static GlobalState * GLOBAL_STATE;
 
@@ -34,18 +54,13 @@ static lv_obj_t *wifi_status_label;
 
 static lv_obj_t *self_test_message_label;
 static lv_obj_t *self_test_result_label;
-static lv_obj_t *self_test_finished_label_pass;
-static lv_obj_t *self_test_finished_label_fail;
+static lv_obj_t *self_test_finished_label;
 
 static double current_hashrate;
 static float current_power;
 static uint64_t current_difficulty;
 static float current_chip_temp;
 static bool found_block;
-
-#define SCREEN_UPDATE_MS 500
-#define LOGO_DELAY_COUNT 5000 / SCREEN_UPDATE_MS
-#define CAROUSEL_DELAY_COUNT 10000 / SCREEN_UPDATE_MS
 
 static lv_obj_t * create_scr_self_test() {
     lv_obj_t * scr = lv_obj_create(NULL);
@@ -59,17 +74,9 @@ static lv_obj_t * create_scr_self_test() {
     self_test_message_label = lv_label_create(scr);
     self_test_result_label = lv_label_create(scr);
 
-    self_test_finished_label_pass = lv_label_create(scr);
-    lv_obj_set_width(self_test_finished_label_pass, LV_HOR_RES);
-    lv_obj_add_flag(self_test_finished_label_pass, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_long_mode(self_test_finished_label_pass, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(self_test_finished_label_pass, "Press RESET button to start Bitaxe.");
-
-    self_test_finished_label_fail = lv_label_create(scr);
-    lv_obj_set_width(self_test_finished_label_fail, LV_HOR_RES);
-    lv_obj_add_flag(self_test_finished_label_fail, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_long_mode(self_test_finished_label_fail, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(self_test_finished_label_fail, "Hold BOOT button for 2 seconds to cancel self test, or press RESET to run again.");
+    self_test_finished_label = lv_label_create(scr);
+    lv_obj_set_width(self_test_finished_label, LV_HOR_RES);
+    lv_label_set_long_mode(self_test_finished_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     return scr;
 }
@@ -89,10 +96,9 @@ static lv_obj_t * create_scr_overheat(SystemModule * module) {
     lv_label_set_text(label2, "Power, frequency and fan configurations have been reset. Go to AxeOS to reconfigure device.");
 
     lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, "Device IP:");
+    lv_label_set_text(label3, "IP Address:");
 
     ip_addr_scr_overheat_label = lv_label_create(scr);
-    lv_label_set_text(ip_addr_scr_overheat_label, module->ip_addr_str);
 
     return scr;
 }
@@ -160,12 +166,13 @@ static lv_obj_t * create_scr_connection(SystemModule * module) {
     lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
     lv_obj_t *label1 = lv_label_create(scr);
-    lv_obj_set_width(label1, LV_HOR_RES);    
+    lv_obj_set_width(label1, LV_HOR_RES);
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text_fmt(label1, "Wi-Fi: %s", module->ssid);
 
     wifi_status_label = lv_label_create(scr);
-    lv_label_set_text(wifi_status_label, module->wifi_status);
+    lv_obj_set_width(wifi_status_label, LV_HOR_RES);
+    lv_label_set_long_mode(wifi_status_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     lv_obj_t *label3 = lv_label_create(scr);
     lv_label_set_text(label3, "Wi-Fi (for setup):");
@@ -176,11 +183,11 @@ static lv_obj_t * create_scr_connection(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_logo() {
+static lv_obj_t * create_scr_logo(const lv_img_dsc_t *logo) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_t *img = lv_img_create(scr);
-    lv_img_set_src(img, &logo);
+    lv_img_set_src(img, logo);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
     return scr;
@@ -198,13 +205,11 @@ static lv_obj_t * create_scr_urls(SystemModule * module) {
     mining_url_scr_urls_label = lv_label_create(scr);
     lv_obj_set_width(mining_url_scr_urls_label, LV_HOR_RES);
     lv_label_set_long_mode(mining_url_scr_urls_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(mining_url_scr_urls_label, module->is_using_fallback ? module->fallback_pool_url : module->pool_url);
 
     lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, "Bitaxe IP:");
+    lv_label_set_text(label3, "IP Address:");
 
     ip_addr_scr_urls_label = lv_label_create(scr);
-    lv_label_set_text(ip_addr_scr_urls_label, module->ip_addr_str);
 
     return scr;
 }
@@ -241,7 +246,8 @@ static void screen_show(screen_t screen)
         }
 
         current_screen = screen;
-        current_screen_counter = 0;
+        current_screen_time_ms = 0;
+        current_screen_delay_ms = delays_ms[screen];
     }
 }
 
@@ -258,10 +264,10 @@ static void screen_update_cb(lv_timer_t * timer)
         if (self_test->finished) {
             if (self_test->result) {
                 lv_label_set_text(self_test_result_label, "TESTS PASS!");
-                lv_obj_remove_flag(self_test_finished_label_pass, LV_OBJ_FLAG_HIDDEN);
+                lv_label_set_text(self_test_finished_label, "Press RESET button to start Bitaxe.");
             } else {
                 lv_label_set_text(self_test_result_label, "TESTS FAIL!");
-                lv_obj_remove_flag(self_test_finished_label_fail, LV_OBJ_FLAG_HIDDEN);
+                lv_label_set_text(self_test_finished_label, "Hold BOOT button for 2 seconds to cancel self test, or press RESET to run again.");
             }
         }
 
@@ -305,27 +311,13 @@ static void screen_update_cb(lv_timer_t * timer)
             lv_label_set_text(wifi_status_label, module->wifi_status);
         }
         screen_show(SCR_CONNECTION);
-        return;
-    }
-
-    current_screen_counter++;
-
-    // Logo
-
-    if (current_screen < SCR_LOGO) {
-        screen_show(SCR_LOGO);
-        return;
-    }
-
-    if (current_screen == SCR_LOGO) {
-        if (LOGO_DELAY_COUNT > current_screen_counter) {
-            return;
-        }
-        screen_show(SCR_CAROUSEL_START);
+        current_screen_time_ms = 0;
         return;
     }
 
     // Carousel
+
+    current_screen_time_ms += SCREEN_UPDATE_MS;
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
@@ -372,7 +364,7 @@ static void screen_update_cb(lv_timer_t * timer)
     current_difficulty = module->best_session_nonce_diff;
     current_chip_temp = power_management->chip_temp_avg;
 
-    if (CAROUSEL_DELAY_COUNT > current_screen_counter || found_block) {
+    if (current_screen_time_ms <= current_screen_delay_ms || found_block) {
         return;
     }
 
@@ -381,9 +373,7 @@ static void screen_update_cb(lv_timer_t * timer)
 
 void screen_next()
 {
-    if (current_screen >= SCR_CAROUSEL_START) {
-        screen_show(current_screen == SCR_CAROUSEL_END ? SCR_CAROUSEL_START : current_screen + 1);
-    }
+    screen_show(current_screen == SCR_CAROUSEL_END ? SCR_CAROUSEL_START : current_screen + 1);
 }
 
 esp_err_t screen_start(void * pvParameters)
@@ -399,7 +389,8 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_CONFIGURE] = create_scr_configure(module);
         screens[SCR_FIRMWARE_UPDATE] = create_scr_ota(module);
         screens[SCR_CONNECTION] = create_scr_connection(module);
-        screens[SCR_LOGO] = create_scr_logo();
+        screens[SCR_BITAXE_LOGO] = create_scr_logo(&bitaxe_logo);
+        screens[SCR_OSMU_LOGO] = create_scr_logo(&osmu_logo);
         screens[SCR_URLS] = create_scr_urls(module);
         screens[SCR_STATS] = create_scr_stats();
 

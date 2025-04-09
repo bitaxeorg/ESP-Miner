@@ -1,7 +1,6 @@
 #include "system.h"
 #include "work_queue.h"
 #include "serial.h"
-#include "bm1397.h"
 #include <string.h>
 #include "esp_log.h"
 
