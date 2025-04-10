@@ -375,18 +375,18 @@ static void screen_update_cb(lv_timer_t * timer)
 
     if (0 > display_timeout_config) {
         // display always on
-        display_on();
+        display_on(true);
     } else if (0 == display_timeout_config) {
         // display off
-        display_off();
+        display_on(false);
     } else {
         // display timeout
         const uint32_t display_timeout = display_timeout_config * 60 * 1000;
 
         if (lv_display_get_inactive_time(NULL) > display_timeout) {
-            display_off();
+            display_on(false);
         } else {
-            display_on();
+            display_on(true);
         }
     }
 
