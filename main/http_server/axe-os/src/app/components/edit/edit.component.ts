@@ -2,11 +2,11 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { Observable, startWith, Subject, takeUntil } from 'rxjs';
+import { startWith, Subject, takeUntil } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/generated/api/system.service';
 import { ActivatedRoute } from '@angular/router';
-import { Settings, SystemInfo, SystemInfoASICModelEnum } from 'src/app/generated';
+import { Settings, SystemInfoASICModelEnum } from 'src/app/generated';
 import { SwarmService } from 'src/app/services/swarm.service';
 
 @Component({
@@ -155,23 +155,21 @@ export class EditComponent implements OnInit, OnDestroy {
     });
   }
 
-  private saveOverclockSetting(enabled: number) {
-    let $response : Observable<void>
-    if (!this.uri) {
-      $response = this.systemService.updateSystemSettings({ overclockEnabled: enabled } as Settings);
-    } else {
-      $response = this.swarmService.updateSystemSettings(this.uri, { overclockEnabled: enabled } as Settings);
-    }
-
-    $response.subscribe({
+  private saveOverclockSetting(enabled: number): void {
+    const isSwarm = !!this.uri;
+    const update$ = isSwarm
+      ? this.swarmService.updateSystemSettings(this.uri!, { overclockEnabled: enabled } as Settings)
+      : this.systemService.updateSystemSettings({ overclockEnabled: enabled } as Settings);
+  
+    update$.subscribe({
       next: () => {
         console.log(`Overclock setting saved: ${enabled === 1 ? 'enabled' : 'disabled'}`);
       },
       error: (err) => {
-        console.error(`Failed to save overclock setting: ${err.message}`);
+        console.error(`Failed to save overclock setting${isSwarm ? ` for ${this.uri}` : ''}: ${err.message}`);
       }
     });
-  }
+  }  
 
   ngOnInit(): void {
     const isSwarm = !!this.uri;

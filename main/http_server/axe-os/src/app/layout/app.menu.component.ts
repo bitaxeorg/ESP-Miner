@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
-
 import { SystemService } from '../generated/api/system.service';
 import { LayoutService } from './service/app.layout.service';
 
