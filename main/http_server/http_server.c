@@ -472,6 +472,9 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "autofanspeed")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, item->valueint);
     }
+    if ((item = cJSON_GetObjectItem(root, "autoscreenswap")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_AUTO_SCREEN_CAROUSEL, item->valueint);
+    }
     if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
     }
@@ -610,6 +613,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "invertfanpolarity", nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
     cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1));
+    cJSON_AddNumberToObject(root, "autoscreenswap", nvs_config_get_u16(NVS_CONFIG_AUTO_SCREEN_CAROUSEL, 1));
 
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));

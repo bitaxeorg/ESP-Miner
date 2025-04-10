@@ -65,6 +65,16 @@
             </div>
         </div>
         <div class="col-12">
+          <div class="field-checkbox">
+              <p-checkbox name="autoscreenswap" formControlName="autoscreenswap" inputId="autoscreenswap"
+                  [binary]="true"></p-checkbox>
+              <label for="autoscreenswap">Enable/Disable Screen Carousel</label>
+              <small class="block ml-2" style="color: #ff0000;" *ngIf="!form.get('autoscreenswap')?.value">
+                Warning: Screen carousel is disabled, might cause Display burn in!
+              </small>
+          </div>
+      </div>
+        <div class="col-12">
             <div class="field-checkbox">
                 <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed"
                     [binary]="true"></p-checkbox>
