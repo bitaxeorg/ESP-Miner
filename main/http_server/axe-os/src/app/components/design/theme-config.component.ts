@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { LayoutService } from '../../layout/service/app.layout.service';
-import { ThemeService } from '../../services/theme.service';
+import { ThemeService } from '../../generated/api/theme.service';
 
 interface ThemeOption {
   name: string;

@@ -4,9 +4,10 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { startWith, Subject, takeUntil } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
-import { eASICModel } from 'src/models/enum/eASICModel';
+import { SystemService } from 'src/app/generated/api/system.service';
 import { ActivatedRoute } from '@angular/router';
+import { Settings, SystemInfoASICModelEnum } from 'src/app/generated';
+import { SwarmService } from 'src/app/services/swarm.service';
 
 @Component({
   selector: 'app-edit',
@@ -22,12 +23,12 @@ export class EditComponent implements OnInit, OnDestroy {
 
   public savedChanges: boolean = false;
   public settingsUnlocked: boolean = false;
-  public eASICModel = eASICModel;
-  public ASICModel!: eASICModel;
-  public restrictedModels: eASICModel[] = Object.values(eASICModel)
-    .filter((v): v is eASICModel => typeof v === 'string');
+  public eASICModel = SystemInfoASICModelEnum;
+  public ASICModel!: SystemInfoASICModelEnum;
+  public restrictedModels: SystemInfoASICModelEnum[] = Object.values(SystemInfoASICModelEnum)
+    .filter((v): v is SystemInfoASICModelEnum => typeof v === 'string');
 
-  @Input() uri = '';
+  @Input() uri = undefined;
 
   public BM1397DropdownFrequency = [
     { name: '400', value: 400 },
@@ -123,6 +124,7 @@ export class EditComponent implements OnInit, OnDestroy {
 
   constructor(
     private fb: FormBuilder,
+    private swarmService: SwarmService,
     private systemService: SystemService,
     private toastr: ToastrService,
     private loadingService: LoadingService,
@@ -153,20 +155,29 @@ export class EditComponent implements OnInit, OnDestroy {
     });
   }
 
-  private saveOverclockSetting(enabled: number) {
-    this.systemService.updateSystem(this.uri, { overclockEnabled: enabled })
-      .subscribe({
-        next: () => {
-          console.log(`Overclock setting saved: ${enabled === 1 ? 'enabled' : 'disabled'}`);
-        },
-        error: (err) => {
-          console.error(`Failed to save overclock setting: ${err.message}`);
-        }
-      });
-  }
+  private saveOverclockSetting(enabled: number): void {
+    const isSwarm = !!this.uri;
+    const update$ = isSwarm
+      ? this.swarmService.updateSystemSettings(this.uri!, { overclockEnabled: enabled } as Settings)
+      : this.systemService.updateSystemSettings({ overclockEnabled: enabled } as Settings);
+  
+    update$.subscribe({
+      next: () => {
+        console.log(`Overclock setting saved: ${enabled === 1 ? 'enabled' : 'disabled'}`);
+      },
+      error: (err) => {
+        console.error(`Failed to save overclock setting${isSwarm ? ` for ${this.uri}` : ''}: ${err.message}`);
+      }
+    });
+  }  
 
   ngOnInit(): void {
-    this.systemService.getInfo(this.uri)
+    const isSwarm = !!this.uri;
+    const info$ = isSwarm
+      ? this.swarmService.getSystemInfo(this.uri!)
+      : this.systemService.getSystemInfo();
+  
+    info$
       .pipe(
         this.loadingService.lockUIUntilComplete(),
         takeUntil(this.destroy$)
@@ -210,34 +221,43 @@ export class EditComponent implements OnInit, OnDestroy {
       });
   }
 
+
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
   }
 
-  public updateSystem() {
-
+  public updateSystem(): void {
     const form = this.form.getRawValue();
-
+  
     if (form.stratumPassword === '*****') {
       delete form.stratumPassword;
     }
-
-    this.systemService.updateSystem(this.uri, form)
+  
+    const isSwarm = !!this.uri;
+    const update$ = isSwarm
+      ? this.swarmService.updateSystemSettings(this.uri!, form)
+      : this.systemService.updateSystemSettings(form);
+  
+    update$
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
-          this.toastr.success(successMessage, 'Success!');
+          this.toastr.success(
+            `Saved settings${isSwarm ? ` for ${this.uri}` : ''}`,
+            'Success!'
+          );
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Could not save settings for ${this.uri}. ${err.message}` : `Could not save settings. ${err.message}`;
-          this.toastr.error(errorMessage, 'Error');
+          this.toastr.error(
+            `Could not save settings${isSwarm ? ` for ${this.uri}` : ''}. ${err.message}`,
+            'Error'
+          );
           this.savedChanges = false;
         }
       });
-  }
+  }  
 
   showWifiPassword: boolean = false;
   toggleWifiPasswordVisibility() {
@@ -263,20 +283,29 @@ export class EditComponent implements OnInit, OnDestroy {
     }
   }
 
-  public restart() {
-    this.systemService.restart(this.uri)
+  public restart(): void {
+    const isSwarm = !!this.uri;
+    const restart$ = isSwarm
+      ? this.swarmService.restartSystem(this.uri!)
+      : this.systemService.restartSystem();
+  
+    restart$
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Bitaxe at ${this.uri} restarted` : 'Bitaxe restarted';
-          this.toastr.success(successMessage, 'Success');
+          this.toastr.success(
+            `Bitaxe${isSwarm ? ` at ${this.uri}` : ''} restarted`,
+            'Success'
+          );
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
-          this.toastr.error(errorMessage, 'Error');
+          this.toastr.error(
+            `Failed to restart device${isSwarm ? ` at ${this.uri}` : ''}. ${err.message}`,
+            'Error'
+          );
         }
       });
-  }
+  }  
 
   getDropdownFrequency() {
     // Get base frequency options based on ASIC model

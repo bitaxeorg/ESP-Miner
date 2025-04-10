@@ -1,9 +1,9 @@
 import { Component } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
-import { SystemService } from 'src/app/services/system.service';
-import { ThemeService } from 'src/app/services/theme.service';
-import { ISystemInfo } from 'src/models/ISystemInfo';
+import { SystemService } from 'src/app/generated/api/system.service';
+import { ThemeService } from 'src/app/generated/api/theme.service';
+import { SystemInfo } from 'src/app/generated';
 
 
 @Component({
@@ -13,7 +13,7 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 })
 export class HomeComponent {
 
-  public info$!: Observable<ISystemInfo>;
+  public info$!: Observable<SystemInfo>;
   public quickLink$!: Observable<string | undefined>;
   public fallbackQuickLink$!: Observable<string | undefined>;
   public expectedHashRate$!: Observable<number | undefined>;
@@ -182,9 +182,9 @@ export class HomeComponent {
 
 
     this.info$ = interval(5000).pipe(
-      startWith(() => this.systemService.getInfo()),
+      startWith(() => this.systemService.getSystemInfo()),
       switchMap(() => {
-        return this.systemService.getInfo()
+        return this.systemService.getSystemInfo()
       }),
       tap(info => {
         // Only collect and update chart data if there's no power fault

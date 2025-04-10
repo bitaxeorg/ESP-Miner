@@ -1,10 +1,10 @@
-import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { catchError, from, map, mergeMap, of, take, timeout, toArray } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
-import { SystemService } from 'src/app/services/system.service';
+import { SwarmService } from 'src/app/services/swarm.service';
+
 const SWARM_DATA = 'SWARM_DATA'
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 @Component({
@@ -38,10 +38,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   constructor(
     private fb: FormBuilder,
-    private systemService: SystemService,
+    private swarmService: SwarmService,
     private toastr: ToastrService,
-    private localStorageService: LocalStorageService,
-    private httpClient: HttpClient
+    private localStorageService: LocalStorageService
   ) {
 
     this.form = this.fb.group({
@@ -109,7 +108,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
     from(ips).pipe(
       mergeMap(ipAddr =>
-        this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
+        this.swarmService.getSystemInfo(ipAddr).pipe(
           map(result => {
             if ('hashRate' in result) {
               return {
@@ -154,7 +153,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.systemService.getInfo(`http://${newIp}`).subscribe((res) => {
+    this.swarmService.getSystemInfo(newIp).subscribe((res) => {
       if (res.ASICModel) {
         this.swarm.push({ IP: newIp, ...res });
         this.swarm = this.swarm.sort(this.sortByIp.bind(this));
@@ -170,7 +169,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public restart(axe: any) {
-    this.systemService.restart(`http://${axe.IP}`).pipe(
+    this.swarmService.restartSystem(axe.IP).pipe(
       catchError(error => {
         this.toastr.error(`Failed to restart device at ${axe.IP}`, 'Error');
         return of(null);
@@ -199,7 +198,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     from(ips).pipe(
       mergeMap(ipAddr =>
-        this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
+        this.swarmService.getSystemInfo(ipAddr).pipe(
           map(result => {
             return {
               IP: ipAddr,
