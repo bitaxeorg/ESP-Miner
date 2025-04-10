@@ -13,7 +13,9 @@
         <div class="card" *ngIf="checkLatestRelease == true">
             <ng-container *ngIf="latestRelease$ | async as latestRelease">
             <h5>Current Version: {{(info$ | async)?.version}}</h5>
-            <h2>Latest Release: {{latestRelease.name}}</h2>
+            <h2>Latest Release
+                <a style="text-decoration: underline;" target="_blank"
+                [href]="latestRelease.html_url">{{latestRelease.name}}</a></h2>
 
             <div *ngFor="let asset of latestRelease.assets">
                 <div *ngIf="asset.name == 'esp-miner.bin'">
