@@ -17,8 +17,9 @@
 <div class="flex flex-column sm:flex-row gap-4 justify-content-between">
     <div class="flex gap-1 sm:gap-3 text-sm md:text-base">
         <button pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
-        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing">
-            {{isRefreshing ? 'Refreshing...' : 'Refresh List (' + refreshIntervalTime + ')'}}
+        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing" class="refresh-button">
+          <span aria-hidden="true">Refresh List (30)</span>
+          <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh List (' + refreshIntervalTime + ')' }}</span>
         </button>
     </div>
     <div class="flex align-items-center gap-2">
