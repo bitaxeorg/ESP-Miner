@@ -34,8 +34,7 @@ static lv_style_t scr_style;
 
 extern const lv_font_t lv_font_portfolio_6x8;
 
-esp_err_t display_on(void);
-esp_err_t display_off(void);
+esp_err_t display_on(bool display_on);
 
 static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
     if (lv_obj_get_parent(obj) == NULL) {
@@ -128,7 +127,7 @@ esp_err_t display_init(void * pvParameters)
         }
 
         // Only turn on the screen when it has been cleared
-        esp_err_t esp_err = display_on();
+        esp_err_t esp_err = display_on(true);
         if (ESP_OK != esp_err) {
             return esp_err;
         }
@@ -141,20 +140,18 @@ esp_err_t display_init(void * pvParameters)
     return ESP_OK;
 }
 
-esp_err_t display_on(void)
+esp_err_t display_on(bool display_on)
 {
-    if (!display_state_on && (NULL != panel_handle)) {
-        ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, true), TAG, "Panel display on failed");
-        display_state_on = true;
-    }
-
-    return ESP_OK;
-}
-esp_err_t display_off(void)
-{
-    if (display_state_on && (NULL != panel_handle)) {
-        ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, false), TAG, "Panel display off failed");
-        display_state_on = false;
+    if (NULL != panel_handle) {
+        if (display_on && !display_state_on) {
+            ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, true), TAG, "Panel display on failed");
+            display_state_on = true;
+        }
+        else if (!display_on && display_state_on)
+        {
+            ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, false), TAG, "Panel display off failed");
+            display_state_on = false;
+        }
     }
 
     return ESP_OK;
