@@ -132,7 +132,22 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
             memset(recv_buffer, 0, BUFFER_SIZE);
             nbytes = esp_transport_read(transport, recv_buffer, BUFFER_SIZE - 1, TRANSPORT_TIMEOUT_MS);
             if (nbytes < 0) {
-                ESP_LOGE(TAG, "Error: transport read failed");
+                const char *err_str;
+                switch(nbytes) {
+                    case ERR_TCP_TRANSPORT_NO_MEM:
+                        err_str = "No memory available";
+                        break;
+                    case ERR_TCP_TRANSPORT_CONNECTION_FAILED:
+                        err_str = "Connection failed";
+                        break;
+                    case ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN:
+                        err_str = "Connection closed by peer";
+                        break;
+                    default:
+                        err_str = "Unknown error";
+                        break;
+                }
+                ESP_LOGE(TAG, "Error: transport read failed: %s (code: %d)", err_str, nbytes);
                 if (json_rpc_buffer) {
                     free(json_rpc_buffer);
                     json_rpc_buffer=0;
