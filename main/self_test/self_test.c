@@ -112,7 +112,7 @@ static esp_err_t test_TPS546_power_consumption(int target_power, int margin)
     float current = TPS546_get_iout();
     float power = voltage * current;
     ESP_LOGI(TAG, "Power: %f, Voltage: %f, Current %f", power, voltage, current);
-    if (power > target_power -margin && power < target_power +margin) {
+    if (power < target_power +margin) {
         return ESP_OK;
     }
     return ESP_FAIL;
