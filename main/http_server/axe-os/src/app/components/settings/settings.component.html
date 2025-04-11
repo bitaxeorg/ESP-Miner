@@ -4,7 +4,7 @@
 </div>
 
 <div class="grid">
-    <div class="col-12 lg:col-6 xl:col-4">
+    <div class="col-12 xl:col-4">
         <div class="card" *ngIf="checkLatestRelease == false">
             <h5>Current Version: {{(info$ | async)?.version}}</h5>
             <h2>Latest Release: <p-button (onClick)="checkLatestRelease = true">Check</p-button></h2>
@@ -28,7 +28,7 @@
         </ng-container>
         </div>
     </div>
-    <div class="col-12 lg:col-12 xl:col-4">
+    <div class="col-12 lg:col-6 xl:col-4">
       <div class="card h-full">
           <h2>Update Website <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}}%</span></h2>
 
