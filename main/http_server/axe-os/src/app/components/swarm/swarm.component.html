@@ -17,8 +17,9 @@
 <div class="flex flex-column sm:flex-row gap-4 justify-content-between">
     <div class="flex gap-1 sm:gap-3 text-sm md:text-base">
         <button pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
-        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing">
-            {{isRefreshing ? 'Refreshing...' : 'Refresh List (' + refreshIntervalTime + ')'}}
+        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing" class="refresh-button">
+          <span aria-hidden="true">Refresh List (30)</span>
+          <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh List (' + refreshIntervalTime + ')' }}</span>
         </button>
     </div>
     <div class="flex align-items-center gap-2">
@@ -49,7 +50,7 @@
     <table cellspacing="0" cellpadding="0" class="text-sm md:text-base">
         <tr>
             <th>
-                <div class="flex items-center cursor-pointer select-none h-full" (click)="sortBy('IP')">
+                <div class="flex align-items-center cursor-pointer select-none h-full" (click)="sortBy('IP')">
                     <span class="flex-1">IP</span>
                     <i class="pi text-xs flex items-center" [ngClass]="{
                         'pi-sort-alt': sortField !== 'IP',
@@ -59,7 +60,7 @@
                 </div>
             </th>
             <th>
-                <div class="flex items-center cursor-pointer select-none h-full" (click)="sortBy('hostname')">
+                <div class="flex align-items-center cursor-pointer select-none h-full" (click)="sortBy('hostname')">
                     <span class="flex-1">Hostname</span>
                     <i class="pi text-xs flex items-center" [ngClass]="{
                         'pi-sort-alt': sortField !== 'hostname',
