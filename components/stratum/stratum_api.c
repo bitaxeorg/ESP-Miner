@@ -131,7 +131,7 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
         do {
             memset(recv_buffer, 0, BUFFER_SIZE);
             nbytes = esp_transport_read(transport, recv_buffer, BUFFER_SIZE - 1, TRANSPORT_TIMEOUT_MS);
-            if (nbytes == ESP_FAIL) {
+            if (nbytes < 0) {
                 ESP_LOGE(TAG, "Error: transport read failed");
                 if (json_rpc_buffer) {
                     free(json_rpc_buffer);
