@@ -50,7 +50,7 @@
     <table cellspacing="0" cellpadding="0" class="text-sm md:text-base">
         <tr>
             <th>
-                <div class="flex items-center cursor-pointer select-none h-full" (click)="sortBy('IP')">
+                <div class="flex align-items-center cursor-pointer select-none h-full" (click)="sortBy('IP')">
                     <span class="flex-1">IP</span>
                     <i class="pi text-xs flex items-center" [ngClass]="{
                         'pi-sort-alt': sortField !== 'IP',
@@ -60,7 +60,7 @@
                 </div>
             </th>
             <th>
-                <div class="flex items-center cursor-pointer select-none h-full" (click)="sortBy('hostname')">
+                <div class="flex align-items-center cursor-pointer select-none h-full" (click)="sortBy('hostname')">
                     <span class="flex-1">Hostname</span>
                     <i class="pi text-xs flex items-center" [ngClass]="{
                         'pi-sort-alt': sortField !== 'hostname',
