@@ -78,10 +78,7 @@ export class LayoutService {
         menuHoverActive: false,
     };
 
-    private configUpdate = new Subject<AppConfig>();
     private overlayOpen = new Subject<any>();
-
-    configUpdate$ = this.configUpdate.asObservable();
     overlayOpen$ = this.overlayOpen.asObservable();
 
     constructor(private themeService: ThemeService) {
@@ -145,7 +142,6 @@ export class LayoutService {
             const config = this.config();
             this.changeTheme();
             this.changeScale(config.scale);
-            this.onConfigUpdate();
         });
     }
 
@@ -191,13 +187,6 @@ export class LayoutService {
 
     isMobile() {
         return !this.isDesktop();
-    }
-
-    onConfigUpdate() {
-        this._config = { ...this.config() };
-        this.configUpdate.next(this.config());
-        // Apply theme changes immediately
-        this.changeTheme();
     }
 
     changeTheme() {
