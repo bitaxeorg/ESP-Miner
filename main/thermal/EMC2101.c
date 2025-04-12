@@ -23,8 +23,23 @@ esp_err_t EMC2101_init(bool invertPolarity) {
     // set the TACH input
     ESP_ERROR_CHECK(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_REG_CONFIG, 0x04));
 
+    // --- Configure Fan Settings (Register 0x4A) ---
+    // Start with a base configuration:
+    // Bit 7 (MASK) = 0: Tach Alert Enabled
+    // Bit 6 (EN)   = 1: *** FAN DRIVER ENABLED ***
+    // Bit 5 (LEVEL)= 1: Direct Setting Mode (use PWM Duty Cycle Reg 0x4C)
+    // Bit 4 (POL)  = 0: Normal Polarity (placeholder, set below)
+    // Bit 3:2(EDGES)=00: 2 Tach pulses per revolution (standard)
+    // Bit 1:0(RANGE)=00: PWM Frequency ~22.5 kHz (common setting)
+    uint8_t fan_config_value = 0b01100000; // Base: EN=1, LEVEL=1, POL=0, EDGES=00, RANGE=00
+
     if (invertPolarity) {
-        ESP_ERROR_CHECK(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_FAN_CONFIG, 0b00100011));
+        // Set Bit 4 (POL) to 1 for Inverted Polarity
+        fan_config_value |= (1 << 4); // Set POL bit
+        ESP_LOGI(TAG, "Setting Fan Config: Inverted Polarity (Active Low PWM)");
+    } else {
+        // Bit 4 (POL) is already 0 for Normal Polarity
+        ESP_LOGI(TAG, "Setting Fan Config: Normal Polarity (Active High PWM)");
     }
 
 
