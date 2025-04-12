@@ -35,4 +35,4 @@ jobs:
       if: always()
       with:
         name: coverage-report
-        path: ./main/http_server/axe-os/coverage/
+        path: ./main/http_server/axe-os/coverage/cobertura-coverage.xml
