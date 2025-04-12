@@ -9,11 +9,12 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <math.h>
+#include "serial.h"
+#include "bm1397.h"
+#include "utils.h"
+#include "crc.h"
+#include "mining.h"
+#include "global_state.h"
 
 #define BM1397_CHIP_ID 0x1397
 #define BM1397_CHIP_ID_RESPONSE_LENGTH 9
@@ -114,7 +115,7 @@ static void _send_read_address(void)
 {
     unsigned char read_address[2] = {0x00, 0x00};
     // send serial data
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, BM1937_SERIALTX_DEBUG);
 }
 
 static void _send_chain_inactive(void)
@@ -122,7 +123,7 @@ static void _send_chain_inactive(void)
 
     unsigned char read_address[2] = {0x00, 0x00};
     // send serial data
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_INACTIVE), read_address, 2, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_INACTIVE), read_address, 2, BM1937_SERIALTX_DEBUG);
 }
 
 static void _set_chip_address(uint8_t chipAddr)
@@ -130,7 +131,7 @@ static void _set_chip_address(uint8_t chipAddr)
 
     unsigned char read_address[2] = {chipAddr, 0x00};
     // send serial data
-    _send_BM1397((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, BM1937_SERIALTX_DEBUG);
 }
 
 void BM1397_set_version_mask(uint32_t version_mask) {
@@ -213,12 +214,12 @@ void BM1397_send_hash_frequency(float frequency)
     for (i = 0; i < 2; i++)
     {
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, BM1397_SERIALTX_DEBUG);
+        _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, BM1937_SERIALTX_DEBUG);
     }
     for (i = 0; i < 2; i++)
     {
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, BM1397_SERIALTX_DEBUG);
+        _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, BM1937_SERIALTX_DEBUG);
     }
 
     vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -236,10 +237,22 @@ void BM1397_set_hash_counting_number(int hcn) {
     set_10_hash_counting[3] = (hcn >> 16) & 0xFF;
     set_10_hash_counting[4] = (hcn >> 8) & 0xFF;
     set_10_hash_counting[5] = hcn & 0xFF;
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1937_SERIALTX_DEBUG);
 }
 
-float BM1397_set_nonce_percent_and_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent, float timeout_percent) {
+void BM1397_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent) {
+    // with the bm1397 there is not a nonce percent
+    nonce_percent = 1.0;
+
+    int address_interval = BM1397_get_chip_address_interval(chain_chip_count);
+
+    // some evidence that hcn is used for bm1397 in a chain unknown as for now
+    int hcn = 0;
+    
+    ESP_LOGI(TAG, "Chip setting chips=%i freq=%i hcn=%i addr_interval=%i nonce_percent=%.3f",chain_chip_count,(int)frequency,hcn,address_interval,nonce_percent);    
+}
+
+float BM1397_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent, float timeout_percent) {
     // with the bm1397 there is not a nonce percent
     nonce_percent = 1.0;
     timeout_percent = limit_percent(timeout_percent,1.0);
@@ -250,12 +263,12 @@ float BM1397_set_nonce_percent_and_get_timeout(uint64_t frequency, uint16_t chai
     int cno_interval = 0;
     int hcn = 0;
     
-    // no version rollwing for bm1397
+    // no version rolling for bm1397
     int versions_per_core = 1;
 
     float timeout_ms = calculate_timeout_ms(BM1397_CORE_COUNT,address_interval,(int)frequency,cno_interval,nonce_percent,timeout_percent,versions_per_core);
     
-    ESP_LOGI(TAG, "Chip setting chips=%i freq=%i hcn=%i addr_interval=%i nonce_percent=%.3f timeout_percent=%.3f timeout=%.4f",chain_chip_count,(int)frequency,hcn,address_interval,nonce_percent,timeout_percent,timeout_ms);    
+    ESP_LOGI(TAG, "Chip setting timeout_percent=%.3f timeout=%.4f",timeout_percent,timeout_ms);    
     return timeout_ms;
 }
 
@@ -280,29 +293,29 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     }
 
     unsigned char init[6] = {0x00, CLOCK_ORDER_CONTROL_0, 0x00, 0x00, 0x00, 0x00}; // init1 - clock_order_control0
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init, 6, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init, 6, BM1937_SERIALTX_DEBUG);
 
     unsigned char init2[6] = {0x00, CLOCK_ORDER_CONTROL_1, 0x00, 0x00, 0x00, 0x00}; // init2 - clock_order_control1
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init2, 6, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init2, 6, BM1937_SERIALTX_DEBUG);
 
     unsigned char init3[9] = {0x00, ORDERED_CLOCK_ENABLE, 0x00, 0x00, 0x00, 0x01}; // init3 - ordered_clock_enable
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init3, 6, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init3, 6, BM1937_SERIALTX_DEBUG);
 
     unsigned char init4[9] = {0x00, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x80, 0x74}; // init4 - init_4_?
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, BM1937_SERIALTX_DEBUG);
 
     BM1397_set_job_difficulty_mask(BM1397_ASIC_DIFFICULTY);
 
     unsigned char init5[9] = {0x00, PLL3_PARAMETER, 0xC0, 0x70, 0x01, 0x11}; // init5 - pll3_parameter
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5, 6, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5, 6, BM1937_SERIALTX_DEBUG);
 
     unsigned char init6[9] = {0x00, FAST_UART_CONFIGURATION, 0x06, 0x00, 0x00, 0x0F}; // init6 - fast_uart_configuration
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6, 6, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init6, 6, BM1937_SERIALTX_DEBUG);
 
     BM1397_set_default_baud();
 
     BM1397_send_hash_frequency(frequency);
-    BM1397_set_nonce_percent_and_get_timeout(frequency,chip_counter,4,1.0,1.0);
+    BM1397_set_nonce_percent(frequency,chip_counter,BM1397_MIDSTATE_ENGINES,1.0);
 
     return chip_counter;
 }
@@ -341,7 +354,7 @@ int BM1397_set_default_baud(void)
 {
     // default divider of 26 (11010) for 115,749
     unsigned char baudrate[9] = {0x00, MISC_CONTROL, 0x00, 0x00, 0b01111010, 0b00110001}; // baudrate - misc_control
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, BM1937_SERIALTX_DEBUG);
     return 115749;
 }
 
@@ -351,7 +364,7 @@ int BM1397_set_max_baud(void)
     ESP_LOGI(TAG, "Setting max baud of 3125000");
     unsigned char baudrate[9] = {0x00, MISC_CONTROL, 0x00, 0x00, 0b01100000, 0b00110001};
     ; // baudrate - misc_control
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, BM1937_SERIALTX_DEBUG);
     return 3125000;
 }
 
@@ -381,7 +394,7 @@ void BM1397_set_job_difficulty_mask(int difficulty)
 
     ESP_LOGI(TAG, "Setting job ASIC mask to %d", difficulty);
 
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, BM1397_SERIALTX_DEBUG);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, BM1937_SERIALTX_DEBUG);
 }
 
 static uint8_t id = 0;

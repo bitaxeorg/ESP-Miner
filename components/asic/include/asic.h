@@ -21,5 +21,5 @@ void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job);
 void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask);
 bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency);
 esp_err_t ASIC_set_device_model(GlobalState * GLOBAL_STATE);
-
+esp_err_t ASIC_set_nonce_percent_and_timeout(GlobalState * GLOBAL_STATE);
 #endif // ASIC_H

@@ -250,12 +250,11 @@ void BM1370_set_chip_nonce_offset(int chips_in_chain,int cno_interval) {
     ESP_LOGI(TAG, "Chip setting cno_interval=%i",cno_interval);
 }
 
-float BM1370_set_nonce_percent_and_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent, float timeout_percent) {
-    // This functions set registers to achieve nonce percent and returns the correct timeout
+void BM1370_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent) {
+    // This functions set registers to achieve nonce percent and returns the correct timeout for that setting
     
     // ensure percents are not greater than 100%
     nonce_percent = limit_percent(nonce_percent,1.0);
-    timeout_percent = limit_percent(timeout_percent,1.0);
 
     int address_interval = BM1370_get_chip_address_interval(chain_chip_count);
 
@@ -266,11 +265,29 @@ float BM1370_set_nonce_percent_and_get_timeout(uint64_t frequency, uint16_t chai
     //HCN: dividing nonce space
     int hcn = calculate_version_rolling_hcn(BM1370_CORE_COUNT,address_interval,cno_interval,(int)frequency,nonce_percent);
     BM1370_set_hash_counting_number(hcn);
+
+    ESP_LOGI(TAG, "Chip setting chips=%i freq=%i hcn=%i addr_interval=%i nonce_percent=%.3f",chain_chip_count,(int)frequency,hcn,address_interval,nonce_percent);
+
+}
+float BM1370_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent, float timeout_percent) {
+    // This functions gets the timeout value for a specific setting
+    
+    // ensure percents are not greater than 100%
+    nonce_percent = limit_percent(nonce_percent,1.0);
+    timeout_percent = limit_percent(timeout_percent,1.0);
+
+    int address_interval = BM1370_get_chip_address_interval(chain_chip_count);
+
+    //CNO: dividing nonce by chain
+    int cno_interval = calculate_cno_interval(chain_chip_count);
+
+    //HCN: dividing nonce space
+    int hcn = calculate_version_rolling_hcn(BM1370_CORE_COUNT,address_interval,cno_interval,(int)frequency,nonce_percent);
     
     int versions_per_core = versions_to_roll/BM1370_MIDSTATE_ENGINES;
     float timeout_ms = calculate_timeout_ms(BM1370_CORE_COUNT,address_interval,(int)frequency,cno_interval,nonce_percent,timeout_percent,versions_per_core);
     
-    ESP_LOGI(TAG, "Chip setting chips=%i freq=%i hcn=%i addr_interval=%i nonce_percent=%.3f timeout_percent=%.3f timeout=%.4f",chain_chip_count,(int)frequency,hcn,address_interval,nonce_percent,timeout_percent,timeout_ms);
+    ESP_LOGI(TAG, "Chip setting timeout_percent=%.3f timeout=%.4f",timeout_percent,timeout_ms);
     return timeout_ms;
 }
 
@@ -371,7 +388,7 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     //ramp up the hash frequency
     do_frequency_ramp_up(frequency);
 
-    BM1370_set_nonce_percent_and_get_timeout(frequency, chip_counter, STRATUM_DEFAULT_VERSION_MASK>>13, 1.0, 1.0);
+    BM1370_set_nonce_percent(frequency, chip_counter, STRATUM_DEFAULT_VERSION_MASK>>13, 1.0);
     BM1370_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
     return chip_counter;

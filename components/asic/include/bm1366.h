@@ -45,5 +45,8 @@ int BM1366_set_default_baud(void);
 void BM1366_send_hash_frequency(float frequency);
 bool BM1366_set_frequency(float target_freq);
 task_result * BM1366_process_work(void * GLOBAL_STATE);
+void BM1366_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent);
+float BM1366_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent, float timeout_percent);
+
 
 #endif /* BM1366_H_ */

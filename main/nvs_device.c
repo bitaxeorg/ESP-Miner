@@ -12,10 +12,6 @@
 #include "asic.h"
 
 static const char * TAG = "nvs_device";
-<<<<<<< HEAD
-=======
-
->>>>>>> 1138572 (merge)
 
 esp_err_t NVSDevice_init(void) {
     esp_err_t err = nvs_flash_init();

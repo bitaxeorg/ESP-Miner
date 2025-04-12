@@ -208,18 +208,27 @@ void BM1368_set_hash_counting_number(int hcn) {
     _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1368_SERIALTX_DEBUG);
 }
 
-float BM1368_set_nonce_percent_and_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent, float timeout_percent) {
+void BM1368_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent) {
     nonce_percent = limit_percent(nonce_percent,1.0);
-
     int address_interval = BM1368_get_chip_address_interval(chain_chip_count);
     int cno_interval = 0; //not used by bm1368
     int hcn = calculate_version_rolling_hcn(BM1368_CORE_COUNT,address_interval, frequency,cno_interval,nonce_percent);
     BM1368_set_hash_counting_number(hcn);
+    
+    ESP_LOGI(TAG, "Chip setting chips=%i freq=%i hcn=%i addr_interval=%i nonce_percent=%.3f",chain_chip_count,(int)frequency,hcn,address_interval,nonce_percent);
+}
 
+float BM1368_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent, float timeout_percent) {
+    nonce_percent = limit_percent(nonce_percent,1.0);
+    
+    int address_interval = BM1368_get_chip_address_interval(chain_chip_count);
+    int cno_interval = 0; //not used by bm1368
+    int hcn = calculate_version_rolling_hcn(BM1368_CORE_COUNT,address_interval, frequency,cno_interval,nonce_percent);
     int versions_per_core = versions_to_roll/BM1368_MIDSTATE_ENGINES;
     float timeout_ms = calculate_timeout_ms(BM1368_CORE_COUNT,address_interval,(int)frequency,cno_interval,nonce_percent,timeout_percent,versions_per_core);
     
-    ESP_LOGI(TAG, "Chip setting chips=%i freq=%i hcn=%i addr_interval=%i nonce_percent=%.3f timeout_percent=%.3f timeout=%.4f",chain_chip_count,(int)frequency,hcn,address_interval,nonce_percent,timeout_percent,timeout_ms);    return timeout_ms;
+    ESP_LOGI(TAG, "Chip setting timeout_percent=%.3f timeout=%.4f",timeout_percent,timeout_ms); 
+    return timeout_ms;
 }
 
 uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
@@ -284,7 +293,7 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
 
     do_frequency_ramp_up((float)frequency);
 
-    BM1368_set_nonce_percent_and_get_timeout(frequency,chip_counter,STRATUM_DEFAULT_VERSION_MASK>>13,1.0,1.0);
+    BM1368_set_nonce_percent(frequency,chip_counter,STRATUM_DEFAULT_VERSION_MASK>>13,1.0);
     BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
     return chip_counter;

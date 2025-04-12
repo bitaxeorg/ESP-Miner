@@ -9,13 +9,8 @@
 
 #define BM1397_ASIC_DIFFICULTY 256
 
-<<<<<<< HEAD
-#define BM1937_SERIALTX_DEBUG true
+#define BM1937_SERIALTX_DEBUG false
 #define BM1937_SERIALRX_DEBUG false
-=======
-#define BM1397_SERIALTX_DEBUG false
-#define BM1397_SERIALRX_DEBUG false
->>>>>>> 40c499a (cleaner code)
 #define BM1397_DEBUG_WORK false //causes insane amount of debug output
 #define BM1397_DEBUG_JOBS false //causes insane amount of debug output
 
@@ -62,5 +57,7 @@ int BM1397_set_max_baud(void);
 int BM1397_set_default_baud(void);
 void BM1397_send_hash_frequency(float frequency);
 task_result * BM1397_process_work(void * GLOBAL_STATE);
+void BM1397_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent);
+float BM1397_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent, float timeout_percent);
 
 #endif /* BM1397_H_ */

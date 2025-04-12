@@ -31,6 +31,28 @@ uint8_t ASIC_init(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
+esp_err_t ASIC_get_chip_count(GlobalState * GLOBAL_STATE) {
+    if (!GLOBAL_STATE->ASIC_initalized) {
+        ESP_LOGE(TAG, "ASIC not initialised cannot get chip count");
+        return ESP_FAIL;
+    }
+
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+            return BITAXE_MAX_ASIC_COUNT;
+        case DEVICE_ULTRA:
+            return BITAXE_ULTRA_ASIC_COUNT;
+        case DEVICE_SUPRA:
+            return BITAXE_SUPRA_ASIC_COUNT;
+        case DEVICE_GAMMA:
+            return BITAXE_GAMMA_ASIC_COUNT;
+        case DEVICE_GAMMATURBO:
+            return BITAXE_GAMMATURBO_ASIC_COUNT;
+        default:
+    }
+    return ESP_OK;
+}
+
 uint8_t ASIC_get_asic_count(GlobalState * GLOBAL_STATE) {
     switch (GLOBAL_STATE->device_model) {
         case DEVICE_MAX:
@@ -259,5 +281,41 @@ esp_err_t ASIC_set_device_model(GlobalState * GLOBAL_STATE) {
         GLOBAL_STATE->valid_model = false;
         return ESP_FAIL;
     }
+    return ESP_OK;
+}
+
+esp_err_t ASIC_set_nonce_percent_and_timeout(GlobalState * GLOBAL_STATE) {
+
+    // default works for all chips
+    int asic_job_frequency_ms = 20; 
+    uint64_t frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+    int chain_chip_count = ASIC_get_chip_count(GLOBAL_STATE);
+    int versions_to_roll = GLOBAL_STATE->version_mask>>13;
+
+    float nonce_percent = GLOBAL_STATE->asic_nonce_percent;
+    float timeout_percent = GLOBAL_STATE->asic_timeout_percent;
+
+    switch (GLOBAL_STATE->asic_model) {
+        case ASIC_BM1366:
+            BM1366_set_nonce_percent(frequency,chain_chip_count,versions_to_roll,nonce_percent);
+            asic_job_frequency_ms = BM1366_get_timeout(frequency,chain_chip_count,versions_to_roll,nonce_percent,timeout_percent);
+            break;
+        case ASIC_BM1368:
+            BM1368_set_nonce_percent(frequency,chain_chip_count,versions_to_roll,nonce_percent);
+            asic_job_frequency_ms = BM1368_get_timeout(frequency,chain_chip_count,versions_to_roll,nonce_percent,timeout_percent);
+            break;
+        case ASIC_BM1370:
+            BM1370_set_nonce_percent(frequency,chain_chip_count,versions_to_roll,nonce_percent);
+            asic_job_frequency_ms = BM1370_get_timeout(frequency,chain_chip_count,versions_to_roll,nonce_percent,timeout_percent);
+            break;
+        case ASIC_BM1397:
+            BM1397_set_nonce_percent(frequency,chain_chip_count,versions_to_roll,nonce_percent);
+            asic_job_frequency_ms = BM1397_get_timeout(frequency,chain_chip_count,versions_to_roll,nonce_percent,timeout_percent);
+            break;
+        default:
+            ESP_LOGE(TAG, "UNknown ASIC");
+            return ESP_FAIL; 
+    }
+    GLOBAL_STATE->asic_job_frequency_ms = asic_job_frequency_ms;
     return ESP_OK;
 }

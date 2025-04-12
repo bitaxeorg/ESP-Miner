@@ -226,18 +226,27 @@ uint8_t BM1366_get_chip_address_interval(int chips) {
     return (uint8_t)(256/_largest_power_of_two(chips));
 }
 
-float BM1366_set_nonce_percent_and_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent, float timeout_percent) {
+void BM1366_set_nonce_percent(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent) {
     nonce_percent = limit_percent(nonce_percent,1.0);
 
     int address_interval = BM1366_get_chip_address_interval(chain_chip_count);
     int cno_interval = 0; //not used by bm1366
     int hcn = calculate_version_rolling_hcn(BM1366_CORE_COUNT,address_interval,cno_interval,frequency,nonce_percent);
     BM1366_set_hash_counting_number(hcn);
+    
+    ESP_LOGI(TAG, "Chip setting chips=%i freq=%i hcn=%i nonce_percent=%.3f",chain_chip_count,(int)frequency,hcn,nonce_percent);
+}
 
+float BM1366_get_timeout(uint64_t frequency, uint16_t chain_chip_count, int versions_to_roll, float nonce_percent, float timeout_percent) {
+    nonce_percent = limit_percent(nonce_percent,1.0);
+    
+    int address_interval = BM1366_get_chip_address_interval(chain_chip_count);
+    int cno_interval = 0; //not used by bm1366
+    int hcn = calculate_version_rolling_hcn(BM1366_CORE_COUNT,address_interval,cno_interval,frequency,nonce_percent);
     int versions_per_core = versions_to_roll/BM1366_MIDSTATE_ENGINES;
     float timeout_ms = calculate_timeout_ms(BM1366_CORE_COUNT,address_interval,(int)frequency,cno_interval,nonce_percent,timeout_percent,versions_per_core);
     
-    ESP_LOGI(TAG, "Chip setting chips=%i freq=%i hcn=%i nonce_percent=%.3f timeout_percent=%.3f timeout=%.4f",chain_chip_count,(int)frequency,hcn,nonce_percent,timeout_percent,timeout_ms);
+    ESP_LOGI(TAG, "Chip setting timeout_percent=%.3f timeout=%.4f",timeout_percent,timeout_ms);
 
     return timeout_ms;
 }
@@ -314,7 +323,7 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 
     do_frequency_ramp_up((float)frequency);
 
-    BM1366_set_nonce_percent_and_get_timeout(frequency,chip_counter,STRATUM_DEFAULT_VERSION_MASK>>13,1.0,1.0);
+    BM1366_set_nonce_percent(frequency,chip_counter,STRATUM_DEFAULT_VERSION_MASK>>13,1.0);
     BM1366_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
     return chip_counter;
