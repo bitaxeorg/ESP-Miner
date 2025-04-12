@@ -287,7 +287,11 @@ esp_err_t ASIC_set_device_model(GlobalState * GLOBAL_STATE) {
 esp_err_t ASIC_set_nonce_percent_and_timeout(GlobalState * GLOBAL_STATE) {
 
     // default works for all chips
-    int asic_job_frequency_ms = 20; 
+    int asic_job_frequency_ms = 20;
+
+    // use 1/128 for timeout be approximatly equivlent to Antminer SXX hcn setting 
+    GLOBAL_STATE -> asic_timeout_percent = 1/128; 
+
     uint64_t frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
     int chain_chip_count = ASIC_get_chip_count(GLOBAL_STATE);
     int versions_to_roll = GLOBAL_STATE->version_mask>>13;
@@ -316,6 +320,10 @@ esp_err_t ASIC_set_nonce_percent_and_timeout(GlobalState * GLOBAL_STATE) {
             ESP_LOGE(TAG, "UNknown ASIC");
             return ESP_FAIL; 
     }
+
+    // set minimum job frequency 
+    if (asic_job_frequency_ms < 20) asic_job_frequency_ms = 20;
+
     GLOBAL_STATE->asic_job_frequency_ms = asic_job_frequency_ms;
     return ESP_OK;
 }
