@@ -196,13 +196,6 @@ export class LayoutService {
     onConfigUpdate() {
         this._config = { ...this.config() };
         this.configUpdate.next(this.config());
-        // Save theme settings to NVS
-        this.themeService.saveThemeSettings({
-            colorScheme: this._config.colorScheme,
-        }).subscribe(
-            () => {},
-            error => console.error('Error saving theme settings:', error)
-        );
         // Apply theme changes immediately
         this.changeTheme();
     }
