@@ -1,18 +1,10 @@
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
-#include "esp_system.h"
-#include "esp_timer.h"
 #include "nvs_flash.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 #include "main.h"
 #include "influx_task.h"
-#include "thermal/thermal.h"
 #include "asic_result_task.h"
 #include "asic_task.h"
 #include "create_jobs_task.h"
