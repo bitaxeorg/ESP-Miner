@@ -70,24 +70,6 @@ bool influx_init(influx_client_t *client, const char *host, int port,
 bool influx_write(influx_client_t *client);
 
 /**
- * @brief Check if bucket exists
- *
- * @param client Pointer to the client structure
- * @return true if bucket exists
- * @return false if bucket doesn't exist
- */
-bool influx_bucket_exists(influx_client_t *client);
-
-/**
- * @brief Create bucket if it doesn't exist
- *
- * @param client Pointer to the client structure
- * @return true if creation successful
- * @return false if creation failed
- */
-bool influx_create_bucket(influx_client_t *client);
-
-/**
  * @brief Deinitialize and cleanup the InfluxDB client
  *
  * @param client Pointer to the client structure
