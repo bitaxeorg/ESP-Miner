@@ -119,52 +119,45 @@ endmenu
 menu "InfluxDB Configuration"
 
     config INFLUXDB_ENABLED
-        bool "Enable InfluxDB Integration"
-        default n
+        int "Enable InfluxDB Integration"
+        default 0
         help
-            Enable or disable InfluxDB metrics collection and reporting.
+            Enable or disable InfluxDB metrics collection.
 
     config INFLUXDB_HOST
         string "InfluxDB Host"
-        depends on INFLUXDB_ENABLED
-        default "192.168.1.1"
+        default "localhost"
         help
-            The InfluxDB server host address.
+            The hostname or IP address of your InfluxDB server.
 
     config INFLUXDB_PORT
         int "InfluxDB Port"
-        depends on INFLUXDB_ENABLED
-        range 0 65535
         default 8086
         help
-            The InfluxDB server port.
+            The port number of your InfluxDB server.
 
     config INFLUXDB_TOKEN
         string "InfluxDB Token"
-        depends on INFLUXDB_ENABLED
-        default "token"
+        default ""
         help
-            The authentication token for InfluxDB.
-
-    config INFLUXDB_BUCKET
-        string "InfluxDB Bucket"
-        depends on INFLUXDB_ENABLED
-        default "bucket"
-        help
-            The InfluxDB bucket name to write data to.
+            The authentication token for your InfluxDB server.
 
     config INFLUXDB_ORG
         string "InfluxDB Organization"
-        depends on INFLUXDB_ENABLED
-        default "org"
+        default "bitaxe"
         help
-            The InfluxDB organization name.
+            The organization name in InfluxDB.
+
+    config INFLUXDB_BUCKET
+        string "InfluxDB Bucket"
+        default "bitaxe"
+        help
+            The bucket name in InfluxDB where metrics will be stored.
 
     config INFLUXDB_MEASUREMENT
         string "InfluxDB Measurement"
-        depends on INFLUXDB_ENABLED
-        default "measurement"
+        default "mainnet_stats"
         help
-            The InfluxDB measurement name prefix.
+            The measurement name for the metrics in InfluxDB.
 
 endmenu
