@@ -1,10 +1,18 @@
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
+#include "esp_system.h"
+#include "esp_timer.h"
 #include "nvs_flash.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "main.h"
-
+#include "influx_task.h"
+#include "thermal/thermal.h"
 #include "asic_result_task.h"
 #include "asic_task.h"
 #include "create_jobs_task.h"
@@ -21,11 +29,12 @@
 #include "driver/gpio.h"
 
 static GlobalState GLOBAL_STATE = {
-    .extranonce_str = NULL, 
-    .extranonce_2_len = 0, 
-    .abandon_work = 0, 
+    .extranonce_str = NULL,
+    .extranonce_2_len = 0,
+    .abandon_work = 0,
     .version_mask = 0,
-    .ASIC_initalized = false
+    .ASIC_initalized = false,
+    .influx_client = NULL
 };
 
 static const char * TAG = "bitaxe";
@@ -99,6 +108,24 @@ void app_main(void)
     }
 
     ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);
+
+    // Initialize InfluxDB client if enabled
+    bool influx_enabled = nvs_config_get_u16(NVS_CONFIG_INFLUX_ENABLED, CONFIG_INFLUXDB_ENABLED);
+    if (influx_enabled) {
+        bool influx_success = influx_init_and_start(
+            &GLOBAL_STATE,
+            nvs_config_get_string(NVS_CONFIG_INFLUX_HOST, CONFIG_INFLUXDB_HOST),
+            nvs_config_get_u16(NVS_CONFIG_INFLUX_PORT, CONFIG_INFLUXDB_PORT),
+            nvs_config_get_string(NVS_CONFIG_INFLUX_TOKEN, CONFIG_INFLUXDB_TOKEN),
+            nvs_config_get_string(NVS_CONFIG_INFLUX_BUCKET, CONFIG_INFLUXDB_BUCKET),
+            nvs_config_get_string(NVS_CONFIG_INFLUX_ORG, CONFIG_INFLUXDB_ORG),
+            nvs_config_get_string(NVS_CONFIG_INFLUX_MEASUREMENT, CONFIG_INFLUXDB_MEASUREMENT)
+        );
+
+        if (!influx_success) {
+            ESP_LOGE(TAG, "Failed to initialize InfluxDB client");
+        }
+    }
 
     free(wifi_ssid);
     free(wifi_pass);

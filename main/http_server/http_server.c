@@ -37,6 +37,8 @@
 #include "TPS546.h"
 #include "theme_api.h"  // Add theme API include
 #include "http_server.h"
+#include "influx_task.h"  // Add InfluxDB task header
+#include "influx.h"       // Add InfluxDB header
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -482,6 +484,52 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
     }
 
+    // Handle InfluxDB configuration
+    if ((item = cJSON_GetObjectItem(root, "influxEnabled")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_INFLUX_ENABLED, item->valueint);
+        // If InfluxDB was enabled, try to initialize it
+        if (item->valueint && GLOBAL_STATE->influx_client == NULL) {
+            bool influx_success = influx_init_and_start(
+                GLOBAL_STATE,
+                nvs_config_get_string(NVS_CONFIG_INFLUX_HOST, CONFIG_INFLUXDB_HOST),
+                nvs_config_get_u16(NVS_CONFIG_INFLUX_PORT, CONFIG_INFLUXDB_PORT),
+                nvs_config_get_string(NVS_CONFIG_INFLUX_TOKEN, CONFIG_INFLUXDB_TOKEN),
+                nvs_config_get_string(NVS_CONFIG_INFLUX_BUCKET, CONFIG_INFLUXDB_BUCKET),
+                nvs_config_get_string(NVS_CONFIG_INFLUX_ORG, CONFIG_INFLUXDB_ORG),
+                nvs_config_get_string(NVS_CONFIG_INFLUX_MEASUREMENT, CONFIG_INFLUXDB_MEASUREMENT)
+            );
+            if (!influx_success) {
+                ESP_LOGE(TAG, "Failed to initialize InfluxDB client");
+            }
+        }
+        // If InfluxDB was disabled, clean up the client
+        else if (!item->valueint && GLOBAL_STATE->influx_client != NULL) {
+            // Cast the void pointer to the correct type
+            influx_client_t *client = (influx_client_t *)GLOBAL_STATE->influx_client;
+            influx_deinit(client);
+            free(client);
+            GLOBAL_STATE->influx_client = NULL;
+        }
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxHost"))) {
+        nvs_config_set_string(NVS_CONFIG_INFLUX_HOST, item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "influxPort")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_INFLUX_PORT, item->valueint);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxToken"))) {
+        nvs_config_set_string(NVS_CONFIG_INFLUX_TOKEN, item->valuestring);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxBucket"))) {
+        nvs_config_set_string(NVS_CONFIG_INFLUX_BUCKET, item->valuestring);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxOrg"))) {
+        nvs_config_set_string(NVS_CONFIG_INFLUX_ORG, item->valuestring);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxMeasurement"))) {
+        nvs_config_set_string(NVS_CONFIG_INFLUX_MEASUREMENT, item->valuestring);
+    }
+
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
@@ -614,7 +662,27 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
-    
+
+    // Add InfluxDB configuration
+    char *influx_host = nvs_config_get_string(NVS_CONFIG_INFLUX_HOST, CONFIG_INFLUXDB_HOST);
+    char *influx_token = nvs_config_get_string(NVS_CONFIG_INFLUX_TOKEN, CONFIG_INFLUXDB_TOKEN);
+    char *influx_bucket = nvs_config_get_string(NVS_CONFIG_INFLUX_BUCKET, CONFIG_INFLUXDB_BUCKET);
+    char *influx_org = nvs_config_get_string(NVS_CONFIG_INFLUX_ORG, CONFIG_INFLUXDB_ORG);
+    char *influx_measurement = nvs_config_get_string(NVS_CONFIG_INFLUX_MEASUREMENT, CONFIG_INFLUXDB_MEASUREMENT);
+
+    cJSON_AddBoolToObject(root, "influxEnabled", nvs_config_get_u16(NVS_CONFIG_INFLUX_ENABLED, CONFIG_INFLUXDB_ENABLED));
+    cJSON_AddStringToObject(root, "influxHost", influx_host);
+    cJSON_AddNumberToObject(root, "influxPort", nvs_config_get_u16(NVS_CONFIG_INFLUX_PORT, CONFIG_INFLUXDB_PORT));
+    cJSON_AddStringToObject(root, "influxBucket", influx_bucket);
+    cJSON_AddStringToObject(root, "influxOrg", influx_org);
+    cJSON_AddStringToObject(root, "influxMeasurement", influx_measurement);
+
+    free(influx_host);
+    free(influx_token);
+    free(influx_bucket);
+    free(influx_org);
+    free(influx_measurement);
+
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
     }
