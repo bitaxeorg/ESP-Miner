@@ -101,10 +101,14 @@
                                 <span class="text-500">
                                   {{ sharesRejectedReason.message }}
                                 </span>
-                                ({{ (sharesRejectedReason.count / (info.sharesAccepted + info.sharesRejected) * 100) | number: '1.2-2' }}%)
+                                ({{ 
+                                  (sharesRejectedReason.count / 
+                                   (info.sharesAccepted + info.sharesRejected) * 100) 
+                                  | number: '1.2-2' 
+                                }}%)
                               </span>
                             </div>
-                          </div>
+                        </div>
                     </div>
                 </div>
 
@@ -233,24 +237,24 @@
             <div class="card" *ngIf="info$ | async as info; else loading">
                 <h5>Pool Information ({{ activePoolLabel }})</h5>
                 <table>
-                  <tr>
-                    <td>URL:</td>
-                    <td style="word-break: break-all;">
-                      <a [href]="quickLink$ | async" target="_blank" style="text-decoration: underline;">
-                        {{ activePoolURL }}
-                      </a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Port:</td>
-                    <td>{{ activePoolPort }}</td>
-                  </tr>
-                  <tr>
-                    <td>User:</td>
-                    <td>{{ activePoolUser }}</td>
-                  </tr>
+                    <tr>
+                        <td>URL:</td>
+                        <td style="word-break: break-all;">
+                            <a [href]="quickLink$ | async" target="_blank" style="text-decoration: underline;">
+                            {{ activePoolURL }}
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Port:</td>
+                        <td>{{ activePoolPort }}</td>
+                    </tr>
+                    <tr>
+                        <td>User:</td>
+                        <td>{{ activePoolUser }}</td>
+                    </tr>
                 </table>
-              </div>              
+            </div>
         </div>
 
         <div class="col-12 lg:col-6">
