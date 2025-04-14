@@ -101,24 +101,6 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);
 
-    // Initialize InfluxDB client if enabled
-    bool influx_enabled = nvs_config_get_u16(NVS_CONFIG_INFLUX_ENABLED, CONFIG_INFLUXDB_ENABLED);
-    if (influx_enabled) {
-        bool influx_success = influx_init_and_start(
-            &GLOBAL_STATE,
-            nvs_config_get_string(NVS_CONFIG_INFLUX_HOST, CONFIG_INFLUXDB_HOST),
-            nvs_config_get_u16(NVS_CONFIG_INFLUX_PORT, CONFIG_INFLUXDB_PORT),
-            nvs_config_get_string(NVS_CONFIG_INFLUX_TOKEN, CONFIG_INFLUXDB_TOKEN),
-            nvs_config_get_string(NVS_CONFIG_INFLUX_BUCKET, CONFIG_INFLUXDB_BUCKET),
-            nvs_config_get_string(NVS_CONFIG_INFLUX_ORG, CONFIG_INFLUXDB_ORG),
-            nvs_config_get_string(NVS_CONFIG_INFLUX_MEASUREMENT, CONFIG_INFLUXDB_MEASUREMENT)
-        );
-
-        if (!influx_success) {
-            ESP_LOGE(TAG, "Failed to initialize InfluxDB client");
-        }
-    }
-
     free(wifi_ssid);
     free(wifi_pass);
     free(hostname);
@@ -147,4 +129,26 @@ void app_main(void)
     xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
+
+    // Initialize InfluxDB client if enabled and schedule the stats reporting task
+    bool influx_enabled = nvs_config_get_u16(NVS_CONFIG_INFLUX_ENABLED, CONFIG_INFLUXDB_ENABLED);
+
+    if (influx_enabled) {
+        bool influx_success = influx_init_and_start(
+            &GLOBAL_STATE,
+            nvs_config_get_string(NVS_CONFIG_INFLUX_HOST, CONFIG_INFLUXDB_HOST),
+            nvs_config_get_u16(NVS_CONFIG_INFLUX_PORT, CONFIG_INFLUXDB_PORT),
+            nvs_config_get_string(NVS_CONFIG_INFLUX_TOKEN, CONFIG_INFLUXDB_TOKEN),
+            nvs_config_get_string(NVS_CONFIG_INFLUX_BUCKET, CONFIG_INFLUXDB_BUCKET),
+            nvs_config_get_string(NVS_CONFIG_INFLUX_ORG, CONFIG_INFLUXDB_ORG),
+            nvs_config_get_string(NVS_CONFIG_INFLUX_MEASUREMENT, CONFIG_INFLUXDB_MEASUREMENT)
+        );
+
+        if (!influx_success) {
+            ESP_LOGE(TAG, "Failed to initialize InfluxDB client");
+        } else {
+            // Create the InfluxDB stats reporting task only if initialization was successful
+            xTaskCreate(influx_task, "influx task", 4096, (void *) &GLOBAL_STATE, 5, NULL);
+        }
+    }
 }

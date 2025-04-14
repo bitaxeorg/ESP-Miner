@@ -37,8 +37,8 @@
 #include "TPS546.h"
 #include "theme_api.h"  // Add theme API include
 #include "http_server.h"
-#include "influx_task.h"  // Add InfluxDB task header
-#include "influx.h"       // Add InfluxDB header
+#include "influx_task.h"
+#include "influx.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -47,10 +47,10 @@ static const char * CORS_TAG = "CORS";
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/json");
-    
+
     // Give some time for the connected flag to take effect
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    
+
     wifi_ap_record_simple_t ap_records[20];
     uint16_t ap_count = 0;
 
@@ -487,29 +487,6 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     // Handle InfluxDB configuration
     if ((item = cJSON_GetObjectItem(root, "influxEnabled")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_INFLUX_ENABLED, item->valueint);
-        // If InfluxDB was enabled, try to initialize it
-        if (item->valueint && GLOBAL_STATE->influx_client == NULL) {
-            bool influx_success = influx_init_and_start(
-                GLOBAL_STATE,
-                nvs_config_get_string(NVS_CONFIG_INFLUX_HOST, CONFIG_INFLUXDB_HOST),
-                nvs_config_get_u16(NVS_CONFIG_INFLUX_PORT, CONFIG_INFLUXDB_PORT),
-                nvs_config_get_string(NVS_CONFIG_INFLUX_TOKEN, CONFIG_INFLUXDB_TOKEN),
-                nvs_config_get_string(NVS_CONFIG_INFLUX_BUCKET, CONFIG_INFLUXDB_BUCKET),
-                nvs_config_get_string(NVS_CONFIG_INFLUX_ORG, CONFIG_INFLUXDB_ORG),
-                nvs_config_get_string(NVS_CONFIG_INFLUX_MEASUREMENT, CONFIG_INFLUXDB_MEASUREMENT)
-            );
-            if (!influx_success) {
-                ESP_LOGE(TAG, "Failed to initialize InfluxDB client");
-            }
-        }
-        // If InfluxDB was disabled, clean up the client
-        else if (!item->valueint && GLOBAL_STATE->influx_client != NULL) {
-            // Cast the void pointer to the correct type
-            influx_client_t *client = (influx_client_t *)GLOBAL_STATE->influx_client;
-            influx_deinit(client);
-            free(client);
-            GLOBAL_STATE->influx_client = NULL;
-        }
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxHost"))) {
         nvs_config_set_string(NVS_CONFIG_INFLUX_HOST, item->valuestring);
@@ -627,7 +604,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON *error_array = cJSON_CreateArray();
     cJSON_AddItemToObject(root, "sharesRejectedReasons", error_array);
-    
+
     for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
         cJSON *error_obj = cJSON_CreateObject();
         cJSON_AddStringToObject(error_obj, "message", GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].message);
@@ -788,7 +765,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
         return ESP_OK;
     }
-    
+
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "esp-miner.bin");
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");

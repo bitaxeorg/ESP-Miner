@@ -5,52 +5,13 @@
 #include <freertos/task.h>
 #include "influx.h"
 #include "global_state.h"
-#include "influx_task.h"
+#include "tasks/influx_task.h"
 #include "thermal/thermal.h"
 
 static const char *TAG = "influx_task";
 
-// Forward declarations
-static void stats_reporting_task(void *arg);
-
 void influx_task(void *pvParameters) {
-    stats_reporting_task(pvParameters);
-}
-
-bool influx_init_and_start(GlobalState *state, const char *host, int port, const char *token, const char *bucket, const char *org, const char *prefix) {
-    if (state == NULL) {
-        ESP_LOGE(TAG, "Global state is NULL");
-        return false;
-    }
-
-    ESP_LOGI(TAG, "Initializing InfluxDB client");
-
-    // Initialize InfluxDB client
-    influx_client_t *influx_client = malloc(sizeof(influx_client_t));
-    if (influx_client == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for InfluxDB client");
-        return false;
-    }
-
-    bool influx_success = influx_init(influx_client, host, port, token, bucket, org, prefix);
-    if (!influx_success) {
-        ESP_LOGE(TAG, "Failed to initialize InfluxDB client");
-        free(influx_client);
-        state->influx_client = NULL;
-        return false;
-    }
-
-    ESP_LOGI(TAG, "InfluxDB client initialized successfully");
-    state->influx_client = influx_client;
-
-    // Create the stats reporting task
-    xTaskCreate(influx_task, "influx_task", 4096, state, 5, NULL);
-
-    return true;
-}
-
-static void stats_reporting_task(void *arg) {
-    GlobalState *state = (GlobalState *)arg;
+    GlobalState *state = (GlobalState *)pvParameters;
     influx_client_t *client = (influx_client_t *)state->influx_client;
     TickType_t last_wake_time = xTaskGetTickCount();
     const TickType_t frequency = pdMS_TO_TICKS(30000); // 30 seconds
@@ -89,4 +50,32 @@ static void stats_reporting_task(void *arg) {
         // Wait for the next cycle using vTaskDelayUntil for precise timing
         vTaskDelayUntil(&last_wake_time, frequency);
     }
+}
+
+bool influx_init_and_start(GlobalState *state, const char *host, int port, const char *token, const char *bucket, const char *org, const char *prefix) {
+    if (state == NULL) {
+        ESP_LOGE(TAG, "Global state is NULL");
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Initializing InfluxDB client");
+
+    // Initialize InfluxDB client
+    influx_client_t *influx_client = malloc(sizeof(influx_client_t));
+    if (influx_client == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for InfluxDB client");
+        return false;
+    }
+
+    bool influx_success = influx_init(influx_client, host, port, token, bucket, org, prefix);
+    if (!influx_success) {
+        ESP_LOGE(TAG, "Failed to initialize InfluxDB client");
+        free(influx_client);
+        state->influx_client = NULL;
+        return false;
+    }
+
+    ESP_LOGI(TAG, "InfluxDB client initialized successfully");
+    state->influx_client = influx_client;
+    return true;
 }
