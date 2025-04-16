@@ -13,21 +13,21 @@ static i2c_master_dev_handle_t EMC2103_dev_handle;
  *
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
-esp_err_t EMC2103_init(bool invertPolarity) {
+esp_err_t EMC2103_init() {
 
     if (i2c_bitaxe_add_device(EMC2103_I2CADDR_DEFAULT, &EMC2103_dev_handle, TAG) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add device");
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "EMC2103 init with polarity %d", invertPolarity);
+    ESP_LOGI(TAG, "EMC2103 init");
 
     // Configure the fan setting
     ESP_ERROR_CHECK(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_CONFIGURATION1, 0));
 
-    if (invertPolarity) {
-        ESP_ERROR_CHECK(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_CONFIG, 0x01));
-    }
+    // //if (invertPolarity) {
+    ESP_ERROR_CHECK(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_CONFIG, 0x01));
+    // //}
 
     return ESP_OK;
 
