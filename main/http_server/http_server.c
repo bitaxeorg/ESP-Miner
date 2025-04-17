@@ -424,6 +424,18 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumURL"))) {
         nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, item->valuestring);
     }
+    if ((item = cJSON_GetObjectItem(root, "stratumTLS")) != NULL && item->valueint < 3) {
+        nvs_config_set_u16(NVS_CONFIG_STRATUM_TLS, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumTLS")) != NULL && item->valueint < 3) {
+        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS, item->valueint);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumCert"))) {
+        nvs_config_set_string(NVS_CONFIG_STRATUM_CERT, item->valuestring);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumCert"))) {
+        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_CERT, item->valuestring);
+    }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumUser"))) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_USER, item->valuestring);
     }
@@ -534,6 +546,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char formattedMac[18];
     char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
     char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
+    char * stratumCert = nvs_config_get_string(NVS_CONFIG_STRATUM_CERT, CONFIG_STRATUM_CERT);
+    char * fallbackStratumCert = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_CERT, CONFIG_FALLBACK_STRATUM_CERT);
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
     char * board_version = nvs_config_get_string(NVS_CONFIG_BOARD_VERSION, "unknown");
@@ -592,6 +606,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT));
     cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT));
+    cJSON_AddNumberToObject(root, "stratumTLS", nvs_config_get_u16(NVS_CONFIG_STRATUM_TLS, 0));
+    cJSON_AddNumberToObject(root, "fallbackStratumTLS", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS, 0));
+    cJSON_AddStringToObject(root, "stratumCert", stratumCert);
+    cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
     cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
 
@@ -619,6 +637,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(hostname);
     free(stratumURL);
     free(fallbackStratumURL);
+    free(stratumCert);
+    free(fallbackStratumCert);
     free(stratumUser);
     free(fallbackStratumUser);
     free(board_version);

@@ -63,6 +63,25 @@ p-chart>div {
     }
 }
 
+/* RadioButton Theme Override */
+.p-radiobutton {
+    .p-radiobutton-box {
+        &.p-highlight {
+            border-color: var(--radiobutton-border);
+            background: var(--radiobutton-bg);
+            &:not(.p-disabled):hover {
+                border-color: var(--radiobutton-hover-border);
+            }
+        }
+        &:not(.p-disabled):not(.p-highlight):hover {
+            border-color: var(--radiobutton-hover-border);
+        }
+        &:not(.p-disabled).p-focus {
+            box-shadow: var(--radiobutton-focus-shadow);
+        }
+    }
+}
+
 .p-button {
     background: var(--button-bg);
     border: 1px solid var(--button-bg);

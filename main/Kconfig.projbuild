@@ -69,6 +69,19 @@ menu "Stratum Configuration"
         default 21496
         help
             The stratum server port to connect to.
+    
+    config STRATUM_TLS
+        int "Stratum TLS"
+        range 0 1
+        default 0
+        help
+            Use TLS for the stratum connection.
+    
+    config STRATUM_CERT
+        string "Stratum Certificate"
+        default "x"
+        help
+            The certificate to use with the stratum connection.
 
     config FALLBACK_STRATUM_URL
         string "Fallback Stratum Address"
@@ -82,6 +95,19 @@ menu "Stratum Configuration"
         default 3333
         help
             The stratum server port to connect to if the primary fails.
+    
+    config FALLBACK_STRATUM_TLS
+        int "Fallback Stratum TLS"
+        range 0 1
+        default 0
+        help
+            Use TLS for the stratum connection if the primary fails.
+    
+    config FALLBACK_STRATUM_CERT
+        string "Fallback Stratum Certificate"
+        default "x"
+        help
+            The certificate to use with the stratum connection if the primary fails.
 
     config STRATUM_USER
         string "Stratum username"
