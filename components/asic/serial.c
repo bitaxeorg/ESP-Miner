@@ -18,10 +18,10 @@
 
 static const char *TAG = "serial";
 
-typedef int (*uart_read_bytes_fn)(uart_port_t, void*, uint16_t, TickType_t);
-static uart_read_bytes_fn_t _uart_read_bytes = uart_read_bytes;
+typedef int (*uart_read_bytes_fn_t)(uart_port_t, void*, uint32_t, TickType_t);
+static uart_read_bytes_fn_t *_uart_read_bytes = uart_read_bytes;
 
-void SERIAL_set_read_fn(uart_read_bytes_fn fn) {
+void SERIAL_set_read_fn(uart_read_bytes_fn_t *fn) {
     _uart_read_bytes = fn;
 }
 
