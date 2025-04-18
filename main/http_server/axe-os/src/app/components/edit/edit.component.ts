@@ -189,7 +189,6 @@ export class EditComponent implements OnInit, OnDestroy {
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
-          invertfanpolarity: [info.invertfanpolarity == 1, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
           temptarget: [info.temptarget, [Validators.required]],
           overheat_mode: [info.overheat_mode, [Validators.required]]
