@@ -111,8 +111,7 @@ int find_preamble_offset(uint8_t *buffer, int buffer_size)
 esp_err_t serial_alignment(uint8_t * buffer, int buffer_size, int preamble_offset) 
 {
     uint8_t reserve_buf[11] = {0}; // 11 is the largest result message from bm13xx chips
-    int reserve_timeout_ms = 10;
-    int reserve_received = SERIAL_rx(reserve_buf, preamble_offset, reserve_timeout_ms);
+    int reserve_received = SERIAL_rx(reserve_buf, preamble_offset, 10);
     bool reserve_buf_size_test_ok = reserve_received == preamble_offset;
 
     if (reserve_buf_size_test_ok) {
