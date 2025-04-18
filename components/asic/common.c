@@ -88,12 +88,14 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
     return chip_counter;
 }
 
-void shift_buffer_left(uint8_t *buffer, size_t len) {
+void shift_buffer_left(uint8_t *buffer, size_t len) 
+{
     if (len < 1) return;
     memmove(buffer, buffer + 1, len - 1);
 }
 
-int find_preamble_offset(uint8_t *buffer, int buffer_size) {
+int find_preamble_offset(uint8_t *buffer, int buffer_size) 
+{
     int preamble_offset  = -1;
     for (int i = 0; i < buffer_size; i++) {
         uint16_t received_preamble = (buffer[i] << 8) | buffer[i+1];
@@ -106,15 +108,19 @@ int find_preamble_offset(uint8_t *buffer, int buffer_size) {
     return preamble_offset; // -1 not found, >=0 location
 }
 
-esp_err_t serial_alignment(uint8_t * buffer, int buffer_size, int preamble_offset) {
-    shift_buffer_left(buffer,preamble_offset);
-    uint8_t reserve_buf[11] = {0};
-    int reserve_received = SERIAL_rx(reserve_buf, preamble_offset, 10);
+esp_err_t serial_alignment(uint8_t * buffer, int buffer_size, int preamble_offset) 
+{
+    uint8_t reserve_buf[11] = {0}; // 11 is the largest result message from bm13xx chips
+    int reserve_timeout_ms = 10;
+    int reserve_received = SERIAL_rx(reserve_buf, preamble_offset, reserve_timeout_ms);
     bool reserve_buf_size_test_ok = reserve_received == preamble_offset;
+
     if (reserve_buf_size_test_ok) {
+        shift_buffer_left(buffer, preamble_offset);
         for (int i=0; i < preamble_offset; i++) buffer[buffer_size-preamble_offset+i] = reserve_buf[i];
         return ESP_OK;
     }
+
     return ESP_FAIL;
 }
 
@@ -149,7 +155,7 @@ esp_err_t receive_work(uint8_t * buffer, int buffer_size)
 
     if (preamble_offset > 0) {
         ESP_LOGW(TAG, "Non zero preamble located at %i", preamble_offset);
-        if (serial_alignment(buffer, buffer_size, preamble_offset)==ESP_FAIL) {
+        if (serial_alignment(buffer, buffer_size, preamble_offset) == ESP_FAIL) {
             ESP_LOGE(TAG, "Serial alignment recovery failed");
             ESP_LOG_BUFFER_HEX(TAG, buffer, received);
             SERIAL_clear_buffer();
