@@ -613,7 +613,7 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                     ESP_LOGI("Serial BAP", "Received asic voltage");
                     ESP_LOGI("Serial BAP", "Voltage: %d", buf[4] * 256 + buf[5]);
                     uint16_t voltage = buf[4] * 256 + buf[5];
-                    if (voltage <= 1350 && voltage >= 900) {
+                    if (voltage <= 1500 && voltage >= 800) {
                         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, voltage);
                         ESP_LOGI("Serial BAP", "Setting ASIC voltage to %d", voltage);
                     }
@@ -626,7 +626,7 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                     ESP_LOGI("Serial BAP", "Received asic frequency");
                     ESP_LOGI("Serial BAP", "Frequency: %d", buf[4] * 256 + buf[5]);
                     uint16_t frequency = buf[4] * 256 + buf[5];
-                    if (frequency <= 800 && frequency >= 200) {
+                    if (frequency <= 1000 && frequency >= 200) {
                         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, frequency);
                         ESP_LOGI("Serial BAP", "Setting ASIC frequency to %d", frequency);
                     }
