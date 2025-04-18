@@ -214,6 +214,16 @@ void stratum_task(void * pvParameters)
             }
 
             GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
+            
+            // Reset share stats at failover
+            for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+                GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
+                GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].message[0] = '\0';
+            }
+            GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count = 0;
+            GLOBAL_STATE->SYSTEM_MODULE.shares_accepted = 0;
+            GLOBAL_STATE->SYSTEM_MODULE.shares_rejected = 0;
+
             ESP_LOGI(TAG, "Switching target due to too many failures (retries: %d)...", retry_attempts);
             retry_attempts = 0;
         }
