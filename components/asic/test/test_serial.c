@@ -22,10 +22,9 @@ int test_uart_read_bytes(uart_port_t port, void *buf, uint16_t size, TickType_t 
             _row = (_row + 1) % 2;
         }
     }
-    return size;  // simulate successful read of 'size' bytes
+    return size;
 }
 
-// Helper to reset pattern index between tests
 static void reset_test_pattern(void)
 {
     _row = 0;
@@ -34,20 +33,14 @@ static void reset_test_pattern(void)
 
 TEST_CASE("SERIAL_rx returns full test pattern", "[serial]")
 {
-    // Ensure serial is initialized once
     SERIAL_set_read_fn(test_uart_read_bytes);
-
-    // Reset stub indices
     reset_test_pattern();
 
-    // Buffer to receive 24 bytes (2 rows × 12 bytes)
     uint8_t buf[24] = {0};
     int16_t read = SERIAL_rx(buf, 11, 100 /*ms*/);
 
-    // Should read exactly 24 bytes
     TEST_ASSERT_EQUAL_INT16(24, read);
 
-    // Build expected sequence: row0 + row1
     uint8_t expected[24];
     memcpy(expected +    0, rx_test_pattern[0], 11);
     memcpy(expected + 12+1, rx_test_pattern[1], 11);
