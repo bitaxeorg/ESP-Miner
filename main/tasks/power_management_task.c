@@ -11,10 +11,11 @@
 #include "TPS546.h"
 #include "vcore.h"
 #include "thermal.h"
+#include "PID.h"
 #include "power.h"
 #include "asic.h"
 
-#define POLL_RATE 2000
+#define POLL_RATE 1800
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
@@ -28,45 +29,29 @@
 
 static const char * TAG = "power_management";
 
-// static float _fbound(float value, float lower_bound, float upper_bound)
-// {
-//     if (value < lower_bound)
-//         return lower_bound;
-//     if (value > upper_bound)
-//         return upper_bound;
+double pid_input = 0.0;
+double pid_output = 0.0;
+double pid_setPoint = 60.0;
+double pid_p = 4.0;
+double pid_i = 0.2;
+double pid_d = 3.0;
 
-//     return value;
-// }
-
-// Set the fan speed between 20% min and 100% max based on chip temperature as input.
-// The fan speed increases from 20% to 100% proportionally to the temperature increase from 50 and THROTTLE_TEMP
-static double automatic_fan_speed(float chip_temp, GlobalState * GLOBAL_STATE)
-{
-    double result = 0.0;
-    double min_temp = 45.0;
-    double min_fan_speed = 35.0;
-
-    if (chip_temp < min_temp) {
-        result = min_fan_speed;
-    } else if (chip_temp >= THROTTLE_TEMP) {
-        result = 100;
-    } else {
-        double temp_range = THROTTLE_TEMP - min_temp;
-        double fan_range = 100 - min_fan_speed;
-        result = ((chip_temp - min_temp) / temp_range) * fan_range + min_fan_speed;
-    }
-    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-    power_management->fan_perc = result;
-    Thermal_set_fan_percent(GLOBAL_STATE->device_model, result/100.0);
-
-	return result;
-}
+PIDController pid;
 
 void POWER_MANAGEMENT_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+    
+    // Initialize PID controller
+    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
+    pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, PID_P_ON_E, PID_DIRECT);
+    pid_set_sample_time(&pid, POLL_RATE - 1);
+    pid_set_output_limits(&pid, 15, 100);
+    pid_set_mode(&pid, AUTOMATIC);
+    pid_set_controller_direction(&pid, PID_REVERSE);
+    pid_initialize(&pid);
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -81,6 +66,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_asic_frequency = power_management->frequency_value;
     
     while (1) {
+
+        // Refresh PID setpoint from NVS in case it was changed via API
+        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
 
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);
@@ -112,10 +100,18 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
             exit(EXIT_FAILURE);
         }
-
+        //enable the PID auto control for the FAN if set
         if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
-
-            power_management->fan_perc = (float)automatic_fan_speed(power_management->chip_temp_avg, GLOBAL_STATE);
+            // Ignore invalid temperature readings (-1) during startup
+            if (power_management->chip_temp_avg >= 0) {
+                pid_input = power_management->chip_temp_avg;
+                pid_compute(&pid);
+                power_management->fan_perc = (uint16_t) pid_output;
+                Thermal_set_fan_percent(GLOBAL_STATE->device_model, pid_output / 100.0);
+                ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%%", pid_input, pid_setPoint, pid_output);
+            } else {
+                ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f°C", power_management->chip_temp_avg);
+            }
 
         } else {
             float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);

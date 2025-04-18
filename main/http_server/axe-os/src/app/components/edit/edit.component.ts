@@ -189,8 +189,8 @@ export class EditComponent implements OnInit, OnDestroy {
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
-          invertfanpolarity: [info.invertfanpolarity == 1, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
+          temptarget: [info.temptarget, [Validators.required]],
           overheat_mode: [info.overheat_mode, [Validators.required]]
         });
 
@@ -200,8 +200,10 @@ export class EditComponent implements OnInit, OnDestroy {
         ).subscribe(autofanspeed => {
           if (autofanspeed) {
             this.form.controls['fanspeed'].disable();
+            this.form.controls['temptarget'].enable();
           } else {
             this.form.controls['fanspeed'].enable();
+            this.form.controls['temptarget'].disable();
           }
         });
       });

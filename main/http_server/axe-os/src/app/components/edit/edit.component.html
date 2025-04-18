@@ -59,18 +59,18 @@
 
         <div class="col-12">
             <div class="field-checkbox">
-                <p-checkbox name="invertfanpolarity" formControlName="invertfanpolarity" inputId="invertfanpolarity"
-                    [binary]="true"></p-checkbox>
-                <label for="invertfanpolarity">Invert Fan Duty Cycle <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Inverting the polarity of the fan PWM signal"></i></label>
-            </div>
-        </div>
-        <div class="col-12">
-            <div class="field-checkbox">
                 <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed"
                     [binary]="true"></p-checkbox>
                 <label for="autofanspeed">Automatic Fan Control</label>
             </div>
         </div>
+
+        <div *ngIf="form.controls['autofanspeed'].value == true">
+          <div class="col-12" *ngIf="form.controls['autofanspeed'].value == true">
+              <label>Target Temperature {{form.controls['temptarget'].value}}°C</label>
+              <p-slider [min]="35" [max]="66" formControlName="temptarget"></p-slider>
+          </div>
+      </div>
 
         <div *ngIf="form.controls['autofanspeed'].value != true">
             <div class="col-12" *ngIf="form.controls['autofanspeed'].value != true">

@@ -70,10 +70,11 @@ typedef struct
     char best_session_diff_string[DIFF_STRING_SIZE];
     bool FOUND_BLOCK;
     char ssid[32];
-    char wifi_status[20];
+    char wifi_status[256];
     char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
     char ap_ssid[32];
     bool ap_enabled;
+    bool is_connected;
     char * pool_url;
     char * fallback_pool_url;
     uint16_t pool_port;

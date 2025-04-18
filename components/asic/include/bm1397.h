@@ -9,8 +9,8 @@
 
 #define BM1397_ASIC_DIFFICULTY 256
 
-#define BM1937_SERIALTX_DEBUG true
-#define BM1937_SERIALRX_DEBUG false
+#define BM1397_SERIALTX_DEBUG true
+#define BM1397_SERIALRX_DEBUG false
 #define BM1397_DEBUG_WORK false //causes insane amount of debug output
 #define BM1397_DEBUG_JOBS false //causes insane amount of debug output
 

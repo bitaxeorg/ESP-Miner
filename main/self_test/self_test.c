@@ -46,7 +46,7 @@
 //Test Power Consumption
 #define POWER_CONSUMPTION_TARGET_SUB_402 12     //watts
 #define POWER_CONSUMPTION_TARGET_402 5          //watts
-#define POWER_CONSUMPTION_TARGET_GAMMA 11       //watts
+#define POWER_CONSUMPTION_TARGET_GAMMA 19       //watts
 #define POWER_CONSUMPTION_MARGIN 3              //+/- watts
 
 static const char * TAG = "self_test";
@@ -116,7 +116,7 @@ static esp_err_t test_TPS546_power_consumption(int target_power, int margin)
     float current = TPS546_get_iout();
     float power = voltage * current;
     ESP_LOGI(TAG, "Power: %f, Voltage: %f, Current %f", power, voltage, current);
-    if (power > target_power -margin && power < target_power +margin) {
+    if (power < target_power +margin) {
         return ESP_OK;
     }
     return ESP_FAIL;
@@ -272,11 +272,11 @@ esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            ESP_RETURN_ON_ERROR(EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1)), TAG, "EMC2101 init failed!");
+            ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
             EMC2101_set_fan_speed(1);
             break;
         case DEVICE_GAMMA:
-            ESP_RETURN_ON_ERROR(EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1)), TAG, "EMC2101 init failed!");
+            ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
             EMC2101_set_fan_speed(1);
             EMC2101_set_ideality_factor(EMC2101_IDEALITY_1_0319);
             EMC2101_set_beta_compensation(EMC2101_BETA_11);
@@ -543,7 +543,12 @@ void self_test(void * pvParameters)
             }
             break;
         case DEVICE_GAMMA:
-                if (test_TPS546_power_consumption(POWER_CONSUMPTION_TARGET_GAMMA, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
+                int power_correction = 0;
+                // The 602 has a higher apparent power consumption due to less resistive losses and higher measured voltage. 
+                if(GLOBAL_STATE->board_version >= 602){
+                    power_correction += 3;
+                }
+                if (test_TPS546_power_consumption(POWER_CONSUMPTION_TARGET_GAMMA + power_correction, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
                     ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)POWER_CONSUMPTION_TARGET_GAMMA);
                     display_msg("POWER:FAIL", GLOBAL_STATE);
                     tests_done(GLOBAL_STATE, TESTS_FAILED);

@@ -17,6 +17,20 @@ servers:
 
 components:
   schemas:
+    SharesRejectedReason:
+      type: object
+      required:
+        - message
+        - count
+      properties:
+        message:
+          type: string
+          description: Rejection reason from pool
+          examples:
+            - "Job not found"
+        count:
+          type: integer
+          description: Shares rejected for this reason
     WifiNetwork:
       type: object
       required:
@@ -90,22 +104,26 @@ components:
         - fallbackStratumUser
         - fanrpm
         - fanspeed
+        - temptarget
         - flipscreen
         - freeHeap
         - frequency
         - hashRate
         - hostname
         - idfVersion
-        - invertfanpolarity
         - invertscreen
         - isPSRAMAvailable
         - isUsingFallbackStratum
         - macAddr
+        - maxPower
+        - nominalVoltage
         - overheat_mode
+        - overclockEnabled
         - power
         - runningPartition
         - sharesAccepted
         - sharesRejected
+        - sharesRejectedReasons
         - smallCoreCount
         - ssid
         - stratumDiff
@@ -118,6 +136,7 @@ components:
         - voltage
         - vrTemp
         - wifiStatus
+        - wifiRSSI
       properties:
         ASICModel:
           type: string
@@ -164,6 +183,9 @@ components:
         fanspeed:
           type: number
           description: Current fan speed percentage
+        temptarget:
+          type: number
+          description: Target Temperature for the PID Controller
         flipscreen:
           type: number
           description: Screen flip setting (0=normal, 1=flipped)
@@ -182,9 +204,6 @@ components:
         idfVersion:
           type: string
           description: ESP-IDF version
-        invertfanpolarity:
-          type: number
-          description: Fan polarity setting (0=normal, 1=inverted)
         invertscreen:
           type: number
           description: Screen invert setting (0=normal, 1=inverted)
@@ -197,12 +216,24 @@ components:
         macAddr:
           type: string
           description: Device MAC address
+        maxPower:
+          type: integer
+          description: Maxmium power draw of the board in watts
+        nominalVoltage:
+          type: integer
+          description: Nominal board voltage
         overheat_mode:
           type: number
           description: Overheat protection mode
+        overclockEnabled:
+          type: integer
+          description: Set custom voltage/frequency in AxeOS
         power:
           type: number
           description: Power consumption in watts
+        power_fault:
+          type: string
+          description: Voltage regulator fault reason, if any
         runningPartition:
           type: string
           description: Currently active OTA partition
@@ -212,6 +243,11 @@ components:
         sharesRejected:
           type: number
           description: Number of rejected shares
+        sharesRejectedReasons:
+          type: array
+          description: Reason(s) shares were rejected
+          items:
+            $ref: '#/components/schemas/SharesRejectedReason'
         smallCoreCount:
           type: number
           description: Number of small cores
@@ -248,6 +284,9 @@ components:
         wifiStatus:
           type: string
           description: WiFi connection status
+        wifiRSSI:
+          type: number
+          description: WiFi signal strength
 
     Settings:
       type: object
@@ -343,15 +382,15 @@ components:
           enum: [0]
           examples:
             - 0
+        overclockEnabled:
+          type: integer
+          description: Set custom voltage/frequency in AxeOS (0=disabled, 1=enabled)
+          enum: [0,1]
+          examples:
+            - 0
         invertscreen:
           type: integer
           description: Whether to invert screen colors (0=normal, 1=inverted)
-          enum: [0, 1]
-          examples:
-            - 0
-        invertfanpolarity:
-          type: integer
-          description: Whether to invert fan polarity (0=normal, 1=inverted)
           enum: [0, 1]
           examples:
             - 0
@@ -368,6 +407,13 @@ components:
           maximum: 100
           examples:
             - 80
+        temptarget:
+          type: integer
+          description: Manual Temperature Target in °C when autofanspeed is enabled
+          minimum: 0
+          maximum: 100
+          examples:
+            - 66
       additionalProperties: true
 
   responses:

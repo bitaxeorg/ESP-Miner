@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
+import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
@@ -33,7 +34,8 @@ export class HomeComponent {
 
   constructor(
     private systemService: SystemService,
-    private themeService: ThemeService
+    private themeService: ThemeService,
+    private quicklinkService: QuicklinkService
   ) {
     this.initializeChart();
 
@@ -235,11 +237,11 @@ export class HomeComponent {
     }))
 
     this.quickLink$ = this.info$.pipe(
-      map(info => this.getQuickLink(info.stratumURL, info.stratumUser))
+      map(info => this.quicklinkService.getQuickLink(info.stratumURL, info.stratumUser))
     );
 
     this.fallbackQuickLink$ = this.info$.pipe(
-      map(info => this.getQuickLink(info.fallbackStratumURL, info.fallbackStratumUser))
+      map(info => this.quicklinkService.getQuickLink(info.fallbackStratumURL, info.fallbackStratumUser))
     );
 
   }
@@ -248,29 +250,6 @@ export class HomeComponent {
     if (data.length === 0) return 0;
     const sum = data.reduce((sum, value) => sum + value, 0);
     return sum / data.length;
-  }
-
-  private getQuickLink(stratumURL: string, stratumUser: string): string | undefined {
-    const address = stratumUser.split('.')[0];
-
-    if (stratumURL.includes('public-pool.io')) {
-      return `https://web.public-pool.io/#/app/${address}`;
-    } else if (stratumURL.includes('ocean.xyz')) {
-      return `https://ocean.xyz/stats/${address}`;
-    } else if (stratumURL.includes('solo.d-central.tech')) {
-      return `https://solo.d-central.tech/#/app/${address}`;
-    } else if (/^eusolo[46]?.ckpool.org/.test(stratumURL)) {
-      return `https://eusolostats.ckpool.org/users/${address}`;
-    } else if (/^solo[46]?.ckpool.org/.test(stratumURL)) {
-      return `https://solostats.ckpool.org/users/${address}`;
-    } else if (stratumURL.includes('pool.noderunners.network')) {
-      return `https://noderunners.network/en/pool/user/${address}`;
-    } else if (stratumURL.includes('satoshiradio.nl')) {
-      return `https://pool.satoshiradio.nl/user/${address}`;
-    } else if (stratumURL.includes('solohash.co.uk')) {
-      return `https://solohash.co.uk/user/${address}`;
-    }
-    return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
   }
 
   public calculateEfficiencyAverage(hashrateData: number[], powerData: number[]): number {
