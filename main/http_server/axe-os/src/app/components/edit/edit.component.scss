@@ -1,5 +1,320 @@
-.pi {
-    right: 1rem;
+.built-in-badge {
+    background-color: #0ea5e9;
+}
+
+.current-settings-preview {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 0.375rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.preview-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.preview-item:last-child {
+    margin-bottom: 0;
+}
+
+.preview-item label {
+    font-weight: 600;
+    color: #f3f4f6;
+}
+
+.preview-item span {
+    color: #d1d5db;
+}
+
+.value-control-container {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.increment-buttons-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.increment-button, .decrement-button {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.75rem;
+    height: 1.75rem;
+    padding: 0;
+    text-align: center;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+    &:hover {
+        opacity: 1;
+    }
+}
+
+.range-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+@media (min-width: 768px) {
+    .value-control-container {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .increment-buttons-container {
+        flex: 2;
+    }
+
+    .value-input {
+        flex: 1;
+        margin: 0 0.5rem;
+    }
+}
+
+.delete-button {
+    font-size: 1rem;
+    padding: 0.5rem;
+}
+
+.delete-button .pi-trash {
+    font-size: 1.1rem;
+}
+
+.settings-wrapper {
+    position: relative;
+}
+
+/* Settings overlay styling */
+.settings-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+}
+
+.warning-icon {
+    font-size: 3rem;
+    color: #f59e0b;
+    margin-bottom: 1rem;
+}
+
+.overlay-content {
+    background-color: rgba(30, 41, 59, 0.95);
+    padding: 2rem;
+    border-radius: 0.5rem;
+    text-align: center;
+    max-width: 90%;
+    width: 500px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+
+    &h3 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: #f3f4f6;
+    }
+    &p {
+        color: #d1d5db;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+    }
+} 
+
+/* Custom warning message */
+.custom-warning-message {
+    display: flex;
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    gap: 1rem;
+    width: 100%;
+}
+
+.custom-warning-message .warning-icon {
     font-size: 1.5rem;
-    top: 1rem;
+    color: #ff9800;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 0.25rem;
+}
+
+.custom-warning-message .warning-content {
+    flex: 1;
+}
+
+.custom-warning-message .warning-text {
+    color: #856404;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+    font-size: 1.25rem;
+}
+
+/* Selected preset styling */
+.preset-item.selected {
+    background-color: rgba(6, 78, 59, 0.3);
+    border: 1px solid #374151;
+}
+
+.preset-item.selected:hover {
+    background-color: rgba(6, 78, 59, 0.4);
+    border-color: #6B7280;
+}
+
+.selected-badge {
+    background-color: #22c55e;
+}
+
+.preset-actions-container {
+    display: flex;
+    gap: 0.3rem;
+}
+
+
+.preset-item button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+    /* Preset styles */
+.preset-container {
+    border: 1px solid #374151;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background-color: rgba(17, 24, 39, 0.8);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.preset-actions {
+    margin-bottom: 1rem;
+    display: inline-block;
+}
+
+.preset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.preset-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    background-color: rgba(31, 41, 55, 0.5);
+    border: 1px solid #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-item:hover {
+    border-color: #6B7280;
+    background-color: rgba(55, 65, 81, 0.6);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Built-in preset styling */
+.preset-item.built-in {
+    background-color: rgba(30, 58, 138, 0.3);
+    border: 1px solid #374151;
+}
+
+.preset-item.built-in:hover {
+    border-color: #6B7280;
+    background-color: rgba(30, 58, 138, 0.4);
+}
+
+.preset-details {
+    flex: 1;
+}
+
+.preset-name {
+    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #f3f4f6;
+}
+
+.preset-values {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: #d1d5db;
+}
+
+.value-input {
+    font-weight: bold;
+    text-align: center;
+    font-size: 2rem;
+    transition: color 0.3s ease;
+    border: 1px solid #374151;
+    background-color: rgba(17, 24, 39, 0.8);
+    width: 100%;
+    min-width: 80px;
+}
+
+.range-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+/* Add styles for the actual frequency indicator */
+.actual-frequency-indicator {
+    color: #00e5ff; 
+    cursor:pointer;
+}
+
+.info-tooltip {
+  margin-left: 5px;
+  cursor: help;
+}
+
+/* Style for the frequency wrapper to display properly */
+.frequency-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.number-input-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+/* Style for increment/decrement button containers */
+.increment-buttons, .decrement-buttons {
+  display: flex;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+/* Ensure button styles are consistent */
+.btn-outline-secondary {
+  padding: 2px 8px;
+  font-size: 0.8em;
 }
