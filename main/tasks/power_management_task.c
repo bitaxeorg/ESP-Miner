@@ -64,7 +64,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
     uint16_t last_asic_frequency = power_management->frequency_value;
-    
+
     while (1) {
 
         // Refresh PID setpoint from NVS in case it was changed via API
@@ -72,7 +72,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);
-
+        power_management->current = Power_get_current(GLOBAL_STATE);
         power_management->fan_rpm = Thermal_get_fan_speed(GLOBAL_STATE->device_model);
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
 

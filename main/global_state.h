@@ -139,6 +139,10 @@ typedef struct
 
     bool ASIC_initalized;
     bool psram_is_available;
+
+    // InfluxDB client pointer (actual type is influx_client_t* from influx.h)
+    // Using void* here to avoid circular dependencies
+    void *influx_client;
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */

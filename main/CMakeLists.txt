@@ -20,6 +20,7 @@ SRCS
     "./tasks/asic_task.c"
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
+    "./tasks/influx_task.c"
     "./thermal/EMC2101.c"
     "./thermal/EMC2103.c"
     "./thermal/TMP1075.c"
@@ -40,8 +41,12 @@ INCLUDE_DIRS
     "../components/connect/include"
     "../components/dns_server/include"
     "../components/stratum/include"
+    "../components/influx/include"
     "thermal"
     "power"
+
+REQUIRES
+    "influx"
 
 PRIV_REQUIRES
     "app_update"
