@@ -7,7 +7,6 @@ import { catchError, shareReplay } from 'rxjs/operators';
 
 export interface ThemeSettings {
   colorScheme: string;
-  theme: string;
   accentColors?: {
     [key: string]: string;
   };
@@ -28,7 +27,6 @@ export class ThemeService {
 
   private readonly mockSettings: ThemeSettings = {
     colorScheme: 'dark',
-    theme: 'dark',
     accentColors: {
       '--primary-color': '#F80421',
       '--primary-color-text': '#ffffff',
