@@ -16,8 +16,6 @@
     </p-message>
 
     <div class="grid" *ngIf="info$ | async as info; else loading">
-        <div class="col-12">
-            <div class="grid">
                 <div class="col-12 md:col-6 xl:col-3">
                     <div class="card mb-0">
                         <div class="flex justify-content-between mb-3">
@@ -114,9 +112,7 @@
                     </div>
                 </div>
 
-            </div>
-        </div>
-        <div class="col-12 mb-4" *ngIf="!info.power_fault">
+        <div class="col-12" *ngIf="!info.power_fault">
             <div class="card">
                 <p-chart [data]="chartData" [options]="chartOptions"></p-chart>
             </div>

@@ -32,14 +32,15 @@ interface ThemeOption {
           </div>
         </div>
 
-        <div class="col-12">
+        <div class="col-12 mt-4">
           <h6>Theme Colors</h6>
           <div class="grid gap-2">
-            <div *ngFor="let theme of themes" class="col-2">
+            <div *ngFor="let theme of themes" class="col-2 theme-color">
               <button pButton [class]="'p-button-rounded p-button-text color-dot'"
                       [style.backgroundColor]="theme.primaryColor"
                       style="width: 2rem; height: 2rem; border: none;"
                       (click)="changeTheme(theme)">
+                <i *ngIf="theme.primaryColor === currentColor" class="pi pi-check selected-icon"></i>
               </button>
               <div class="text-sm mt-1">{{theme.name}}</div>
             </div>
@@ -47,10 +48,12 @@ interface ThemeOption {
         </div>
       </div>
     </div>
-  `
+  `,
+  styleUrls: ['./design-component.scss']
 })
 export class ThemeConfigComponent implements OnInit {
   selectedScheme: string;
+  currentColor: string = '';
   themes: ThemeOption[] = [
     {
       name: 'Orange',
@@ -227,6 +230,7 @@ export class ThemeConfigComponent implements OnInit {
       settings => {
         if (settings && settings.accentColors) {
           this.applyThemeColors(settings.accentColors);
+          this.currentColor = settings.accentColors['--primary-color'];
         }
       },
       error => console.error('Error loading theme settings:', error)
@@ -249,6 +253,7 @@ export class ThemeConfigComponent implements OnInit {
   changeTheme(theme: ThemeOption) {
     // Update CSS variables
     this.applyThemeColors(theme.accentColors);
+    this.currentColor = theme.primaryColor;
     // Save theme settings to NVS
     this.themeService.saveThemeSettings({
       colorScheme: this.selectedScheme,

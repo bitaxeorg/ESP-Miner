@@ -4,13 +4,13 @@
 </div>
 
 <div class="grid">
-    <div class="col-12 lg:col-6 xl:col-4">
+    <div class="col-12 xl:col-4">
         <div class="card" *ngIf="checkLatestRelease == false">
             <h5>Current Version: {{(info$ | async)?.version}}</h5>
             <h2>Latest Release: <p-button (onClick)="checkLatestRelease = true">Check</p-button></h2>
             <small>Clicking this button will connect to GitHub to check for recent updates</small>
         </div>
-        <div class="card" *ngIf="checkLatestRelease == true">
+        <div class="card h-full" *ngIf="checkLatestRelease == true">
             <ng-container *ngIf="latestRelease$ | async as latestRelease">
             <h5>Current Version: {{(info$ | async)?.version}}</h5>
             <h2>Latest Release
@@ -30,8 +30,8 @@
         </ng-container>
         </div>
     </div>
-    <div class="col-12 lg:col-12 xl:col-4">
-      <div class="card">
+    <div class="col-12 lg:col-6 xl:col-4">
+      <div class="card h-full">
           <h2>Update Website <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}}%</span></h2>
 
           <p-fileUpload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
@@ -41,7 +41,7 @@
       </div>
     </div>
     <div class="col-12 lg:col-6 xl:col-4">
-        <div class="card">
+        <div class="card h-full">
             <h2>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}}%</span></h2>
             <!-- <input type="file" id="file" (change)="otaUpdate($event)" accept=".bin"> -->
             <p-fileUpload #firmwareUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaUpdate($event)"
