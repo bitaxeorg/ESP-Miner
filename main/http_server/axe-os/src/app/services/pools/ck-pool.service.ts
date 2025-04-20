@@ -17,10 +17,10 @@ export class CkPoolService implements MiningPool {
     'Params not array': 'The parameters field was not formatted as a JSON array.',
     'Valid': 'This is not a rejection reason — it indicates a valid share.',
     'Invalid JobID': 'The job ID in the submission was not recognized or is no longer valid.',
-    'Stale': 'The share was received too late to be accepted.',
+    'Stale': 'While this share was being submitted, the network had already found a new block, making this share invalid.',
     'Ntime out of range': 'The provided ntime value was outside the allowed range.',
     'Duplicate': 'This share has already been submitted.',
-    'Above target': 'The share is above the target difficulty and not valid.',
+    'Above target': 'The submitted share does not meet the minimum required difficulty.',
     'Invalid version mask': 'The version mask provided was invalid for this job.',
   };
 

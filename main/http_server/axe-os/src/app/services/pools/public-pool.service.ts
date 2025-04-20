@@ -12,8 +12,8 @@ export class PublicPoolService implements MiningPool {
     'Authorization validation error': 'The credentials provided by the miner were incorrect or not authorized.',
     'Suggest difficulty validation error': 'An invalid difficulty value was suggested by the miner.',
     'Mining Submit validation error': 'The submitted mining work was invalid or improperly formatted.',
-    'Job not found': 'The mining job ID referenced in the submission was not found.',
-    'Duplicate share': 'The submitted share has already been accepted before (duplicate).',
+    'Job not found': 'While this share was being submitted, the network had already found a new block, making this share invalid.',
+    'Duplicate share': 'This share has already been submitted.',
     'Difficulty too low': 'The submitted share does not meet the minimum required difficulty.',
   };
 
