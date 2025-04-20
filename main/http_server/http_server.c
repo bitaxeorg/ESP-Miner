@@ -36,6 +36,7 @@
 #include "asic.h"
 #include "TPS546.h"
 #include "theme_api.h"  // Add theme API include
+#include "axe-os/api/system/asic_settings.h"
 #include "http_server.h"
 
 static const char * TAG = "http_server";
@@ -159,7 +160,7 @@ static uint32_t extract_origin_ip_addr(char *origin)
     return origin_ip_addr;
 }
 
-static esp_err_t is_network_allowed(httpd_req_t * req)
+esp_err_t is_network_allowed(httpd_req_t * req)
 {
     if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
         ESP_LOGI(CORS_TAG, "Device in AP mode. Allowing CORS.");
@@ -260,7 +261,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
     return httpd_resp_set_type(req, type);
 }
 
-static esp_err_t set_cors_headers(httpd_req_t * req)
+esp_err_t set_cors_headers(httpd_req_t * req)
 {
 
     esp_err_t err;
@@ -512,132 +513,6 @@ static esp_err_t POST_restart(httpd_req_t * req)
     return ESP_OK;
 }
 
-/* Handler for system asic endpoint */
-static esp_err_t GET_system_asic(httpd_req_t *req)
-{
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-    }
-
-    httpd_resp_set_type(req, "application/json");
-
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
-        return ESP_OK;
-    }
-
-    cJSON *root = cJSON_CreateObject();
-    
-    // Add ASIC model to the JSON object
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->asic_model_str);
-    
-    // Create arrays for frequency and voltage options based on ASIC model
-    cJSON *freqOptions = cJSON_CreateArray();
-    cJSON *voltageOptions = cJSON_CreateArray();
-    
-    // Set different frequency and voltage options based on ASIC model
-    if (strcmp(GLOBAL_STATE->asic_model_str, "BM1370") == 0) {
-        // BM1370 frequency options
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(400));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(490));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(525));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(550));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(600));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(625));
-        
-        // BM1370 voltage options
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1000));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1060));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1100));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1150));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1200));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1250));
-    }
-    else if (strcmp(GLOBAL_STATE->asic_model_str, "BM1368") == 0) {
-        // BM1368 frequency options
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(400));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(425));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(450));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(475));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(485));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(500));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(525));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(550));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(575));
-        
-        // BM1368 voltage options
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1100));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1150));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1200));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1250));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1300));
-    } 
-    else if (strcmp(GLOBAL_STATE->asic_model_str, "BM1366") == 0) {
-        // BM1366 frequency options
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(400));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(425));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(450));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(475));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(485));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(500));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(525));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(550));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(575));
-        
-        // BM1366 voltage options
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1100));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1150));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1200));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1250));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1300));
-    }
-    else if (strcmp(GLOBAL_STATE->asic_model_str, "BM1397") == 0) {
-        // BM1397 frequency options
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(400));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(425));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(450));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(475));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(485));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(500));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(525));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(550));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(575));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(600));
-        
-        // BM1397 voltage options
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1100));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1150));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1200));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1250));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1300));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1350));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1400));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1450));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1500));
-    }
-    else {
-        // Default options for other ASIC models
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(400));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(425));
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(450));
-        
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1200));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1250));
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(1300));
-    }
-    
-    // Add the arrays to the response
-    cJSON_AddItemToObject(root, "frequencyOptions", freqOptions);
-    cJSON_AddItemToObject(root, "voltageOptions", voltageOptions);
-    
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
-
-    free((void *)response);
-    cJSON_Delete(root);
-    return ESP_OK;
-}
 
 /* Simple handler for getting system handler */
 static esp_err_t GET_system_info(httpd_req_t * req)
@@ -1021,6 +896,9 @@ void websocket_log_handler()
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
+    
+    // Initialize the ASIC API with the global state
+    asic_api_init(GLOBAL_STATE);
     const char * base_path = "";
 
     bool enter_recovery = false;
