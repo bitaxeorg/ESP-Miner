@@ -117,6 +117,7 @@ components:
         - nominalVoltage
         - overheat_mode
         - overclockEnabled
+        - displayTimeout
         - power
         - runningPartition
         - sharesAccepted
@@ -207,6 +208,9 @@ components:
         idfVersion:
           type: string
           description: ESP-IDF version
+        invertfanpolarity:
+          type: number
+          description: Fan polarity setting (0=normal, 1=inverted)
         invertscreen:
           type: number
           description: Screen invert setting (0=normal, 1=inverted)
@@ -231,6 +235,9 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
+        displayTimeout:
+          type: number
+          description: Display timeout in seconds
         power:
           type: number
           description: Power consumption in watts
@@ -411,6 +418,12 @@ components:
         invertscreen:
           type: integer
           description: Whether to invert screen colors (0=normal, 1=inverted)
+          enum: [0, 1]
+          examples:
+            - 0
+        invertfanpolarity:
+          type: integer
+          description: Whether to invert fan polarity (0=normal, 1=inverted)
           enum: [0, 1]
           examples:
             - 0
