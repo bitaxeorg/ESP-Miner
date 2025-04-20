@@ -264,6 +264,10 @@ export class HomeComponent {
     return this.pool?.getRejectionExplanation(reason) ?? null;
   }
 
+  getSortedRejectedReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
+    return [...(info.sharesRejectedReasons ?? [])].sort((a, b) => b.count - a.count);
+  }
+
   public calculateAverage(data: number[]): number {
     if (data.length === 0) return 0;
     const sum = data.reduce((sum, value) => sum + value, 0);
@@ -280,5 +284,5 @@ export class HomeComponent {
     });
 
     return this.calculateAverage(efficiencies);
-  }
+  }  
 }
