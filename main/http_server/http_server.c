@@ -1344,7 +1344,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
-        .uri = "/api/system/info", 
+        .uri = "/api/v2/system/info", 
         .method = HTTP_GET, 
         .handler = GET_system_info, 
         .user_ctx = rest_context
@@ -1353,7 +1353,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for fetching system asic values */
     httpd_uri_t system_asic_get_uri = {
-        .uri = "/api/system/asic", 
+        .uri = "/api/v2/system/asic", 
         .method = HTTP_GET, 
         .handler = GET_system_asic, 
         .user_ctx = rest_context
@@ -1362,7 +1362,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for fetching system statistic values */
     httpd_uri_t system_statistics_get_uri = {
-        .uri = "/api/system/statistics", 
+        .uri = "/api/v2/system/statistics", 
         .method = HTTP_GET, 
         .handler = GET_system_statistics, 
         .user_ctx = rest_context
@@ -1371,7 +1371,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for WiFi scan */
     httpd_uri_t wifi_scan_get_uri = {
-        .uri = "/api/system/wifi/scan",
+        .uri = "/api/v2/system/wifi/scan",
         .method = HTTP_GET,
         .handler = GET_wifi_scan,
         .user_ctx = rest_context
@@ -1379,14 +1379,14 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &wifi_scan_get_uri);
 
     httpd_uri_t system_restart_uri = {
-        .uri = "/api/system/restart", .method = HTTP_POST, 
+        .uri = "/api/v2/system/restart", .method = HTTP_POST, 
         .handler = POST_restart, 
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_restart_uri);
 
     httpd_uri_t system_restart_options_uri = {
-        .uri = "/api/system/restart", 
+        .uri = "/api/v2/system/restart", 
         .method = HTTP_OPTIONS, 
         .handler = handle_options_request, 
         .user_ctx = NULL
@@ -1394,7 +1394,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &system_restart_options_uri);
 
     httpd_uri_t update_system_settings_uri = {
-        .uri = "/api/system", 
+        .uri = "/api/v2/system", 
         .method = HTTP_PATCH, 
         .handler = PATCH_update_settings, 
         .user_ctx = rest_context
@@ -1402,7 +1402,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &update_system_settings_uri);
 
     httpd_uri_t system_options_uri = {
-        .uri = "/api/system",
+        .uri = "/api/v2/system",
         .method = HTTP_OPTIONS,
         .handler = handle_options_request,
         .user_ctx = NULL,
@@ -1410,7 +1410,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &system_options_uri);
 
     httpd_uri_t update_post_ota_firmware = {
-        .uri = "/api/system/OTA", 
+        .uri = "/api/v2/system/OTA", 
         .method = HTTP_POST, 
         .handler = POST_OTA_update, 
         .user_ctx = NULL
@@ -1418,7 +1418,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &update_post_ota_firmware);
 
     httpd_uri_t update_post_ota_www = {
-        .uri = "/api/system/OTAWWW", 
+        .uri = "/api/v2/system/OTAWWW", 
         .method = HTTP_POST, 
         .handler = POST_WWW_update, 
         .user_ctx = NULL
@@ -1426,7 +1426,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &update_post_ota_www);
 
     httpd_uri_t ws = {
-        .uri = "/api/ws", 
+        .uri = "/api/v2/ws", 
         .method = HTTP_GET, 
         .handler = websocket_handler, 
         .user_ctx = NULL, 
