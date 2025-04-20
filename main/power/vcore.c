@@ -48,25 +48,19 @@ static TPS546_CONFIG TPS546_CONFIG_GAMMA = {
 static const char *TAG = "vcore.c";
 
 esp_err_t VCORE_init(GlobalState * GLOBAL_STATE) {
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-            if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
-                ESP_RETURN_ON_ERROR(TPS546_init(TPS546_CONFIG_GAMMA), TAG, "TPS546 init failed!"); //yes, it's a gamma as far as the TPS546 is concerned
-            } else {
-                ESP_RETURN_ON_ERROR(DS4432U_init(), TAG, "DS4432 init failed!");
-                ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
-            }
-            break;
-        case DEVICE_GAMMA:
-            ESP_RETURN_ON_ERROR(TPS546_init(TPS546_CONFIG_GAMMA), TAG, "TPS546 init failed!");
-            break;
-        case DEVICE_GAMMATURBO:
-            ESP_RETURN_ON_ERROR(TPS546_init(TPS546_CONFIG_GAMMATURBO), TAG, "TPS546 init failed!");
-            break;
-        // case DEVICE_HEX:
-        default:
+    if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {
+        ESP_RETURN_ON_ERROR(DS4432U_init(), TAG, "DS4432 init failed!");
+    }
+    if (GLOBAL_STATE->DEVICE_CONFIG.INA260) {
+        ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
+    }
+    if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
+        switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic_count) {
+            case 1: 
+                ESP_RETURN_ON_ERROR(TPS546_init(TPS546_CONFIG_GAMMA), TAG, "TPS546 init failed!");
+            case 2:
+                ESP_RETURN_ON_ERROR(TPS546_init(TPS546_CONFIG_GAMMATURBO), TAG, "TPS546 init failed!");
+        }
     }
 
     //configure plug sense, if present

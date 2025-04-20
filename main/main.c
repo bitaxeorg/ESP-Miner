@@ -19,6 +19,7 @@
 #include "self_test.h"
 #include "asic.h"
 #include "driver/gpio.h"
+#include "device_config.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -57,9 +58,8 @@ void app_main(void)
         return;
     }
 
-    //parse the NVS config into GLOBAL_STATE
-    if (NVSDevice_parse_config(&GLOBAL_STATE) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to parse NVS config");
+    if (device_config_init(&GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init device config");
         return;
     }
 

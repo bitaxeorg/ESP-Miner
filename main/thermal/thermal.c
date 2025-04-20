@@ -2,82 +2,69 @@
 
 #define INTERNAL_OFFSET 5 //degrees C
 
+esp_err_t Thermal_init(DeviceConfig device_config, bool polarity) 
+{
+    esp_err_t res = ESP_FAIL;
 
-esp_err_t Thermal_init(DeviceModel device_model, bool polarity) {
-        //init the EMC2101, if we have one
-    switch (device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-            EMC2101_init(polarity);
+    switch(device_config.thermal) {
+        case EMC2101_INTERNAL:
+        case EMC2101_EXTERNAL:
+            res = EMC2101_init(polarity);
+            if (device_config.emc2101_config != NULL) {
+                EMC2101_set_ideality_factor(device_config.emc2101_config.ideality_factory);
+                EMC2101_set_beta_compensation(device_config.emc2101_config.beta_compensation);
+            }
             break;
-        case DEVICE_GAMMA:
-            EMC2101_init(polarity);
-            EMC2101_set_ideality_factor(EMC2101_IDEALITY_1_0319);
-            EMC2101_set_beta_compensation(EMC2101_BETA_11);
+        case EMC2103:
+            res = EMC2103_init(polarity);
             break;
-        case DEVICE_GAMMATURBO:
-            EMC2103_init(polarity);
-            break;
-        default:
     }
-    return ESP_OK;
-    
+
+    return res;
 }
 
 //percent is a float between 0.0 and 1.0
-esp_err_t Thermal_set_fan_percent(DeviceModel device_model, float percent) {
-
-    switch (device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
+esp_err_t Thermal_set_fan_percent(DeviceConfig device_config, float percent)
+{
+    switch(device_config.thermal) {
+        case EMC2101_INTERNAL:
+        case EMC2101_EXTERNAL:
             EMC2101_set_fan_speed(percent);
             break;
-        case DEVICE_GAMMATURBO:
+        case EMC2103:
             EMC2103_set_fan_speed(percent);
             break;
-        default:
     }
     return ESP_OK;
 }
 
-uint16_t Thermal_get_fan_speed(DeviceModel device_model) {
-    switch (device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
+uint16_t Thermal_get_fan_speed(DeviceConfig device_config) 
+{
+    switch(device_config.thermal) {
+        case EMC2101_INTERNAL:
+        case EMC2101_EXTERNAL:
             return EMC2101_get_fan_speed();
-        case DEVICE_GAMMATURBO:
+        case EMC2103:
             return EMC2103_get_fan_speed();
         default:
+            return 0;
     }
-    return 0;
 }
 
-float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE) {
+float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE) 
+{
     if (!GLOBAL_STATE->ASIC_initalized) {
         return -1;
     }
 
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
+    switch(GLOBAL_STATE->DEVICE_CONFIG.thermal) {
+        case EMC2101_INTERNAL:
+            return EMC2101_get_internal_temp() + INTERNAL_OFFSET;
+        case EMC2101_EXTERNAL:
             return EMC2101_get_external_temp();
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-            if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
-                return EMC2101_get_external_temp();
-            } else {
-                return EMC2101_get_internal_temp() + INTERNAL_OFFSET;
-            }
-        case DEVICE_GAMMA:
-            return EMC2101_get_external_temp();
-        case DEVICE_GAMMATURBO:
+        case EMC2103:
             return EMC2103_get_external_temp();
         default:
+            return -1;
     }
-
-    return -1;
 }

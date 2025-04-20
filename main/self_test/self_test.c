@@ -23,12 +23,14 @@
 #include "TPS546.h"
 #include "esp_psram.h"
 #include "power.h"
+#include "thermal.h"
 
 #include "bm1397.h"
 #include "bm1366.h"
 #include "bm1368.h"
 #include "bm1370.h"
 #include "asic.h"
+#include "device_config.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
@@ -57,7 +59,7 @@ SemaphoreHandle_t BootSemaphore;
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
 bool should_test(GlobalState * GLOBAL_STATE) {
-    bool is_max = GLOBAL_STATE->asic_model == ASIC_BM1397;
+    bool is_max = GLOBAL_STATE->DEVICE_CONFIG.family.asic.model == BM1397;
     uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
     if (should_self_test == 1 && !is_max && best_diff < 1) {
@@ -79,16 +81,7 @@ static void display_msg(char * msg, GlobalState * GLOBAL_STATE)
 
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 {
-    uint16_t fan_speed = 0;
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
-            fan_speed = EMC2101_get_fan_speed();
-            break;
-        default:
-    }
+    uint16_t fan_speed = Thermal_get_fan_speed(GLOBAL_STATE->DEVICE_CONFIG);
     ESP_LOGI(TAG, "fanSpeed: %d", fan_speed);
     if (fan_speed > FAN_SPEED_TARGET_MIN) {
         return ESP_OK;
@@ -138,24 +131,17 @@ static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 
 esp_err_t test_display(GlobalState * GLOBAL_STATE) {
     // Display testing
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
-            if (display_init(GLOBAL_STATE) != ESP_OK) {
-                display_msg("DISPLAY:FAIL", GLOBAL_STATE);
-                return ESP_FAIL;
-            }
+    if (GLOBAL_STATE->DEVICE_CONFIG.display != NONE) {
+        if (display_init(GLOBAL_STATE) != ESP_OK) {
+            display_msg("DISPLAY:FAIL", GLOBAL_STATE);
+            return ESP_FAIL;
+        }
 
-            if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
-                ESP_LOGI(TAG, "DISPLAY init success!");
-            } else {
-                ESP_LOGW(TAG, "DISPLAY not found!");
-            }
-
-            break;
-        default:
+        if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
+            ESP_LOGI(TAG, "DISPLAY init success!");
+        } else {
+            ESP_LOGW(TAG, "DISPLAY not found!");
+        }
     }
 
     return ESP_OK;
@@ -163,40 +149,26 @@ esp_err_t test_display(GlobalState * GLOBAL_STATE) {
 
 esp_err_t test_input(GlobalState * GLOBAL_STATE) {
     // Input testing
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
-            if (input_init(NULL, reset_self_test) != ESP_OK) {
-                display_msg("INPUT:FAIL", GLOBAL_STATE);
-                return ESP_FAIL;
-            }
-            
-            ESP_LOGI(TAG, "INPUT init success!");
-            break;
-        default:
+    if (input_init(NULL, reset_self_test) != ESP_OK) {
+        display_msg("INPUT:FAIL", GLOBAL_STATE);
+        return ESP_FAIL;
     }
+            
+    ESP_LOGI(TAG, "INPUT init success!");
 
     return ESP_OK;
 }
 
 esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
     // Screen testing
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
-            if (screen_start(GLOBAL_STATE) != ESP_OK) {
-                display_msg("SCREEN:FAIL", GLOBAL_STATE);
-                return ESP_FAIL;
-            }
+    if (GLOBAL_STATE->DEVICE_CONFIG.display != NONE) {
 
-            ESP_LOGI(TAG, "SCREEN start success!");
-            
-            break;
-        default:
+        if (screen_start(GLOBAL_STATE) != ESP_OK) {
+            display_msg("SCREEN:FAIL", GLOBAL_STATE);
+            return ESP_FAIL;
+        }
+
+        ESP_LOGI(TAG, "SCREEN start success!");
     }
 
     return ESP_OK;
@@ -380,7 +352,7 @@ void self_test(void * pvParameters)
     }
 
     uint8_t chips_detected = ASIC_init(GLOBAL_STATE);
-    uint8_t chips_expected = ASIC_get_asic_count(GLOBAL_STATE);
+    uint8_t chips_expected = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, chips_expected);
 
     if (chips_detected != chips_expected) {
