@@ -9,14 +9,14 @@ esp_err_t Thermal_init(DeviceConfig device_config)
     switch(device_config.thermal) {
         case EMC2101_INTERNAL:
         case EMC2101_EXTERNAL:
-            res = EMC2101_init(polarity);
+            res = EMC2101_init();
             if (device_config.emc2101_config != NULL) {
                 EMC2101_set_ideality_factor(device_config.emc2101_config.ideality_factory);
                 EMC2101_set_beta_compensation(device_config.emc2101_config.beta_compensation);
             }
             break;
         case EMC2103:
-            res = EMC2103_init(polarity);
+            res = EMC2103_init();
             break;
     }
 
