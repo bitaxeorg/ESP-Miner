@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
-#include "TPS546.h"
 
 typedef enum
 {
@@ -42,29 +41,27 @@ typedef struct {
 
 typedef struct {
     const char * name;
-    Asic asic;
+    AsicConfig asic;
     uint8_t asic_count;
 } FamilyConfig;
-
-typedef struct {
-    uint16_t board_version;
-    Family family;
-    uint8_t boot_button_pin;
-    uint8_t plug_sense_pin;
-    uint8_t power_enable_pin;
-    Thermal thermal;
-    EMC2101Config emc2101_config;
-    Display display;
-    bool DS4432U : 1;
-    bool INA260  : 1;
-    bool TPS546  : 1;
-    TPS546_CONFIG tps546_config
-} DeviceConfig;
 
 typedef struct {
     uint8_t ideality_factory;
     uint8_t beta_compensation;
 } EMC2101Config;
+
+typedef struct {
+    uint16_t board_version;
+    FamilyConfig family;
+    Thermal thermal;
+    EMC2101Config emc2101_config;
+    Display display;
+    bool plug_sense;
+    bool asic_enable;
+    bool DS4432U : 1;
+    bool INA260  : 1;
+    bool TPS546  : 1;
+} DeviceConfig;
 
 static const EMC2101Config EMC2101_CONFIG_GAMMA = { .ideality_factory = 0x24, .beta_compensation = 0x00,};
 
@@ -81,14 +78,14 @@ static const FamilyConfig FAMILY_GAMMA       = { .name = "Gamma",      .asic = A
 static const FamilyConfig FAMILY_GAMMA_TURBO = { .name = "GammaTurbo", .asic = ASIC_BM1370, .asic_count = 2 };
 
 static const DeviceConfig default_configs[] = {
-    { .board_version = 102, .family = FAMILY_MAX,         .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, },
-    { .board_version = 201, .family = FAMILY_ULTRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, },
-    { .board_version = 202, .family = FAMILY_ULTRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, },
-    { .board_version = 203, .family = FAMILY_ULTRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, },
-    { .board_version = 204, .family = FAMILY_ULTRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, },
-    { .board_version = 205, .family = FAMILY_ULTRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, },
-    { .board_version = 400, .family = FAMILY_SUPRA,       .display = SSD1306, .thermal = EMC2101_INTERNAL,                                         .DS4432U = true, .INA260 = true, },
-    { .board_version = 401, .family = FAMILY_SUPRA,       .display = SSD1306, .thermal = EMC2101_INTERNAL,                                         .DS4432U = true, .INA260 = true, },
+    { .board_version = 102, .family = FAMILY_MAX,         .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, },
+    { .board_version = 201, .family = FAMILY_ULTRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, },
+    { .board_version = 202, .family = FAMILY_ULTRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, },
+    { .board_version = 203, .family = FAMILY_ULTRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, },
+    { .board_version = 204, .family = FAMILY_ULTRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, .plug_sense = true,                      },
+    { .board_version = 205, .family = FAMILY_ULTRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, },
+    { .board_version = 400, .family = FAMILY_SUPRA,       .display = SSD1306, .thermal = EMC2101_INTERNAL,                                         .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, },
+    { .board_version = 401, .family = FAMILY_SUPRA,       .display = SSD1306, .thermal = EMC2101_INTERNAL,                                         .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, },
     { .board_version = 402, .family = FAMILY_SUPRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .TPS546 = true, },
     { .board_version = 403, .family = FAMILY_SUPRA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL,                                         .TPS546 = true, },
     { .board_version = 601, .family = FAMILY_GAMMA,       .display = SSD1306, .thermal = EMC2101_EXTERNAL, .emc2101_config = EMC2101_CONFIG_GAMMA, .TPS546 = true, },

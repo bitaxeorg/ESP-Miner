@@ -183,7 +183,7 @@ static lv_obj_t * create_scr_connection(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_bitaxe_logo(char * version, int board_version) {
+static lv_obj_t * create_scr_bitaxe_logo(const char * name, int board_version) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_t *img = lv_img_create(scr);
@@ -191,11 +191,11 @@ static lv_obj_t * create_scr_bitaxe_logo(char * version, int board_version) {
     lv_obj_align(img, LV_ALIGN_BOTTOM_MID, 0, 0);
 
     lv_obj_t *label1 = lv_label_create(scr);
-    lv_label_set_text_fmt(label1, "GammaTurbo");
+    lv_label_set_text_fmt(label1, name);
     lv_obj_align(label1, LV_ALIGN_TOP_RIGHT, -6, 0);
 
     lv_obj_t *label2 = lv_label_create(scr);
-    lv_label_set_text_fmt(label2, "801");
+    lv_label_set_text_fmt(label2, "%d", board_version);
     lv_obj_align(label2, LV_ALIGN_TOP_RIGHT, -6, 8);
 
     return scr;
