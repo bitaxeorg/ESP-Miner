@@ -234,7 +234,7 @@ components:
           description: Set custom voltage/frequency in AxeOS
         displayTimeout:
           type: number
-          description: Display timeout in seconds
+          description: Display timeout in minutes
         power:
           type: number
           description: Power consumption in watts
