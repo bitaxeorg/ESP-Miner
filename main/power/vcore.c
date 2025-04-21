@@ -85,12 +85,11 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE) {
 
 esp_err_t VCORE_set_voltage(float core_voltage, GlobalState * global_state)
 {
+    ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
     if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {
-        ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
         ESP_RETURN_ON_ERROR(DS4432U_set_voltage(core_voltage), TAG, "DS4432U set voltage failed!");
 }
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
-        ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
         ESP_RETURN_ON_ERROR(TPS546_set_vout(core_voltage), TAG, "TPS546 set voltage failed!");
     }
 
