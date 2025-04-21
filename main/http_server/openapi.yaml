@@ -109,7 +109,6 @@ components:
         - hashRate
         - hostname
         - idfVersion
-        - invertfanpolarity
         - invertscreen
         - isPSRAMAvailable
         - isUsingFallbackStratum
@@ -203,9 +202,6 @@ components:
         idfVersion:
           type: string
           description: ESP-IDF version
-        invertfanpolarity:
-          type: number
-          description: Fan polarity setting (0=normal, 1=inverted)
         invertscreen:
           type: number
           description: Screen invert setting (0=normal, 1=inverted)
@@ -393,12 +389,6 @@ components:
         invertscreen:
           type: integer
           description: Whether to invert screen colors (0=normal, 1=inverted)
-          enum: [0, 1]
-          examples:
-            - 0
-        invertfanpolarity:
-          type: integer
-          description: Whether to invert fan polarity (0=normal, 1=inverted)
           enum: [0, 1]
           examples:
             - 0

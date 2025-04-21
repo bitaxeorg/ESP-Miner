@@ -15,7 +15,7 @@
 #include "power.h"
 #include "asic.h"
 
-#define POLL_RATE 2000
+#define POLL_RATE 1800
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
@@ -32,9 +32,9 @@ static const char * TAG = "power_management";
 double pid_input = 0.0;
 double pid_output = 0.0;
 double pid_setPoint = 60.0;
-double pid_p = 2.0;
-double pid_i = 0.1;
-double pid_d = 5.0;
+double pid_p = 4.0;
+double pid_i = 0.2;
+double pid_d = 3.0;
 
 PIDController pid;
 

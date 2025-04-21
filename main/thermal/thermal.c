@@ -2,7 +2,7 @@
 
 #define INTERNAL_OFFSET 5 //degrees C
 
-esp_err_t Thermal_init(DeviceConfig device_config, bool polarity) 
+esp_err_t Thermal_init(DeviceConfig device_config) 
 {
     esp_err_t res = ESP_FAIL;
 

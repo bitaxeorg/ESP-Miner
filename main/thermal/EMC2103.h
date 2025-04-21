@@ -65,7 +65,7 @@
 void EMC2103_set_fan_speed(float);
 // void EMC2103_read(void);
 uint16_t EMC2103_get_fan_speed(void);
-esp_err_t EMC2103_init(bool);
+esp_err_t EMC2103_init();
 float EMC2103_get_external_temp(void);
 float EMC2103_get_internal_temp(void);
 void EMC2103_set_ideality_factor(uint8_t);
