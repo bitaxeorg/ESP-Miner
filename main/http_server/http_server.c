@@ -1249,7 +1249,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &system_options_uri);
 
     httpd_uri_t update_post_ota_firmware = {
-        .uri = "/api/v2/system/OTA", 
+        .uri = "/api/v2/system/ota", 
         .method = HTTP_POST, 
         .handler = POST_OTA_update, 
         .user_ctx = NULL
@@ -1257,7 +1257,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &update_post_ota_firmware);
 
     httpd_uri_t update_post_ota_www = {
-        .uri = "/api/v2/system/OTAWWW", 
+        .uri = "/api/v2/system/otawww", 
         .method = HTTP_POST, 
         .handler = POST_WWW_update, 
         .user_ctx = NULL
