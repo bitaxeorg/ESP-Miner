@@ -52,7 +52,6 @@ describe('SwarmService', () => {
       hashRate: 120,
       hostname: 'bitaxe-1',
       idfVersion: 'v5.0',
-      invertfanpolarity: 0,
       invertscreen: 0,
       isPSRAMAvailable: 1,
       isUsingFallbackStratum: 0,
