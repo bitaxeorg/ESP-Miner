@@ -58,8 +58,10 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE) {
         switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic_count) {
             case 1:
                 ESP_RETURN_ON_ERROR(TPS546_init(TPS546_CONFIG_GAMMA), TAG, "TPS546 init failed!");
+                break;
             case 2:
                 ESP_RETURN_ON_ERROR(TPS546_init(TPS546_CONFIG_GAMMATURBO), TAG, "TPS546 init failed!");
+                break;
         }
     }
 
@@ -83,7 +85,7 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t VCORE_set_voltage(float core_voltage, GlobalState * global_state)
+esp_err_t VCORE_set_voltage(float core_voltage, GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
     if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {
@@ -96,21 +98,21 @@ esp_err_t VCORE_set_voltage(float core_voltage, GlobalState * global_state)
     return ESP_OK;
 }
 
-int16_t VCORE_get_voltage_mv(GlobalState * global_state) 
+int16_t VCORE_get_voltage_mv(GlobalState * GLOBAL_STATE) 
 {
     // TODO: What about hex?
     return ADC_get_vcore();
 }
 
-esp_err_t VCORE_check_fault(GlobalState * global_state) 
+esp_err_t VCORE_check_fault(GlobalState * GLOBAL_STATE) 
 {
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
-        ESP_RETURN_ON_ERROR(TPS546_check_status(global_state), TAG, "TPS546 check status failed!");
+        ESP_RETURN_ON_ERROR(TPS546_check_status(GLOBAL_STATE), TAG, "TPS546 check status failed!");
     }
     return ESP_OK;
 }
 
-const char* VCORE_get_fault_string(GlobalState * global_state) {
+const char* VCORE_get_fault_string(GlobalState * GLOBAL_STATE) {
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         return TPS546_get_error_message();
     }

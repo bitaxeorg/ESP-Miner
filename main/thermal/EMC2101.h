@@ -3,6 +3,8 @@
 
 #include "i2c_bitaxe.h"
 
+// TODO Make all these enums
+
 #define EMC2101_BETA_11         0x00
 #define EMC2101_BETA_18         0x01
 #define EMC2101_BETA_25         0x02

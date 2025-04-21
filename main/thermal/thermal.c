@@ -10,8 +10,9 @@ esp_err_t Thermal_init(DeviceConfig device_config)
         case EMC2101_INTERNAL:
         case EMC2101_EXTERNAL:
             res = EMC2101_init();
-            if (device_config.emc2101_config != NULL) {
-                EMC2101_set_ideality_factor(device_config.emc2101_config.ideality_factory);
+            // TODO: Improve this check.
+            if (device_config.emc2101_config.ideality_factor != 0x00) {
+                EMC2101_set_ideality_factor(device_config.emc2101_config.ideality_factor);
                 EMC2101_set_beta_compensation(device_config.emc2101_config.beta_compensation);
             }
             break;
