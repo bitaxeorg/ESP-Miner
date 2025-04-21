@@ -72,7 +72,7 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE) {
         int barrel_jack_plugged_in = gpio_get_level(GPIO_PLUG_SENSE);
 
         gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
-        if (barrel_jack_plugged_in == 1 || GLOBAL_STATE->DEVICE_CONFIG.power_enable) {
+        if (barrel_jack_plugged_in == 1 || GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
             gpio_set_level(GPIO_ASIC_ENABLE, 0);
         } else {
             // turn ASIC off
