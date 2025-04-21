@@ -1,75 +1,72 @@
 import { TestBed } from '@angular/core/testing';
-import { GenericPoolService } from './generic-pool.service';
+import { CkPoolService } from './ck-pool.service';
 
-describe('GenericPoolService', () => {
-  let service: GenericPoolService;
-  const stratumUser = 'bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq.bitaxe';
-  const address = 'bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq';
+describe('CkPoolService', () => {
+  let service: CkPoolService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      providers: [GenericPoolService],
-    });
-    service = TestBed.inject(GenericPoolService);
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(CkPoolService);
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
   });
 
   describe('canHandle', () => {
-    it('should always return true', () => {
-      expect(service.canHandle('any-url')).toBeTrue();
-      expect(service.canHandle('')).toBeTrue();
+    it('should return true for valid CKPool domains', () => {
+      const validUrls = [
+        'solo.ckpool.org',
+        'solo4.ckpool.org',
+        'solo6.ckpool.org',
+        'eusolo.ckpool.org',
+        'eusolo4.ckpool.org',
+        'eusolo6.ckpool.org'
+      ];
+
+      validUrls.forEach(url => {
+        expect(service.canHandle(url)).withContext(`URL: ${url}`).toBeTrue();
+      });
+    });
+
+    it('should return false for unrelated domains', () => {
+      const invalidUrls = [
+        'pool.solomining.de',
+        'public-pool.io',
+        'example.com',
+        'ckpool.org',
+        'notckpool.org'
+      ];
+
+      invalidUrls.forEach(url => {
+        expect(service.canHandle(url)).withContext(`URL: ${url}`).toBeFalse();
+      });
     });
   });
 
   describe('getRejectionExplanation', () => {
-    it('should always return null', () => {
-      expect(service.getRejectionExplanation('any')).toBeNull();
+    it('should return the correct explanation for known reasons', () => {
+      expect(service.getRejectionExplanation('Above target')).toContain('does not meet the minimum required difficulty');
+      expect(service.getRejectionExplanation('Stale')).toContain('the network had already found a new block');
+    });
+
+    it('should return null for unknown reasons', () => {
+      expect(service.getRejectionExplanation('Unknown reason')).toBeNull();
+      expect(service.getRejectionExplanation('')).toBeNull();
     });
   });
 
   describe('getQuickLink', () => {
-    it('should match ocean.xyz', () => {
-      const url = service.getQuickLink('ocean.xyz', stratumUser);
-      expect(url).toBe(`https://ocean.xyz/stats/${address}`);
+    it('should return a valid quick link for CKPool URLs', () => {
+      const user = '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa';
+      const url = 'eusolo6.ckpool.org';
+      const expected = `https://eusolo6.ckpool.org/users/${encodeURIComponent(user)}`;
+
+      expect(service.getQuickLink(url, user)).toEqual(expected);
     });
 
-    it('should match solo.d-central.tech', () => {
-      const url = service.getQuickLink('solo.d-central.tech', stratumUser);
-      expect(url).toBe(`https://solo.d-central.tech/#/app/${address}`);
-    });
-
-    it('should match noderunners.network', () => {
-      const url = service.getQuickLink('pool.noderunners.network', stratumUser);
-      expect(url).toBe(`https://noderunners.network/en/pool/user/${address}`);
-    });
-
-    it('should match satoshiradio.nl', () => {
-      const url = service.getQuickLink('satoshiradio.nl', stratumUser);
-      expect(url).toBe(`https://pool.satoshiradio.nl/user/${address}`);
-    });
-
-    it('should match solohash.co.uk', () => {
-      const url = service.getQuickLink('solohash.co.uk', stratumUser);
-      expect(url).toBe(`https://solohash.co.uk/user/${address}`);
-    });
-
-    it('should fall back to http:// for unknown pools', () => {
-      const url = service.getQuickLink('somepool.org', stratumUser);
-      expect(url).toBe(`http://somepool.org/${address}`);
-    });
-
-    it('should preserve https:// if present', () => {
-      const url = service.getQuickLink('https://example.com', stratumUser);
-      expect(url).toBe(`https://example.com/${address}`);
-    });
-
-    it('should trim trailing slashes', () => {
-      const url = service.getQuickLink('https://example.com/', stratumUser);
-      expect(url).toBe(`https://example.com/${address}`);
-    });
-
-    it('should encode special characters in fallback address', () => {
-      const result = service.getQuickLink('custompool.org', 'my@worker.name');
-      expect(result).toBe('http://custompool.org/my%40worker');
+    it('should return undefined for non-CKPool URLs', () => {
+      expect(service.getQuickLink('otherpool.org', 'someUser')).toBeUndefined();
     });
   });
 });

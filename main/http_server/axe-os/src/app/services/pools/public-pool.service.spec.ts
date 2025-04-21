@@ -31,7 +31,7 @@ describe('PublicPoolService', () => {
       );
 
       expect(service.getRejectionExplanation('Duplicate share')).toBe(
-        'The submitted share has already been accepted before (duplicate).'
+        'This share has already been submitted.'
       );
     });
 
