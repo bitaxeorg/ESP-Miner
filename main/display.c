@@ -26,10 +26,15 @@
 
 static const char * TAG = "display";
 
+static esp_lcd_panel_handle_t panel_handle = NULL;
+static bool display_state_on = false;
+
 static lv_theme_t theme;
 static lv_style_t scr_style;
 
 extern const lv_font_t lv_font_portfolio_6x8;
+
+esp_err_t display_on(bool display_on);
 
 static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
     if (lv_obj_get_parent(obj) == NULL) {
@@ -61,7 +66,6 @@ esp_err_t display_init(void * pvParameters)
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_i2c(i2c_master_bus_handle, &io_config, &io_handle), TAG, "Failed to initialise i2c panel bus");
 
     ESP_LOGI(TAG, "Install SSD1306 panel driver");
-    esp_lcd_panel_handle_t panel_handle = NULL;
     esp_lcd_panel_dev_config_t panel_config = {
         .bits_per_pixel = 1,
         .reset_gpio_num = -1,
@@ -123,11 +127,31 @@ esp_err_t display_init(void * pvParameters)
         }
 
         // Only turn on the screen when it has been cleared
-        ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, true), TAG, "Panel display on failed");   
+        esp_err_t esp_err = display_on(true);
+        if (ESP_OK != esp_err) {
+            return esp_err;
+        }
 
         GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = true;
     } else {
         ESP_LOGW(TAG, "No display found.");
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t display_on(bool display_on)
+{
+    if (NULL != panel_handle) {
+        if (display_on && !display_state_on) {
+            ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, true), TAG, "Panel display on failed");
+            display_state_on = true;
+        }
+        else if (!display_on && display_state_on)
+        {
+            ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, false), TAG, "Panel display off failed");
+            display_state_on = false;
+        }
     }
 
     return ESP_OK;
