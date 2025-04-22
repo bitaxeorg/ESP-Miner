@@ -62,8 +62,8 @@ export class HomeComponent {
     if (this.chartData && this.chartData.datasets) {
       this.chartData.datasets[0].backgroundColor = primaryColor + '30';
       this.chartData.datasets[0].borderColor = primaryColor;
-      this.chartData.datasets[1].backgroundColor = primaryColor + '30';
-      this.chartData.datasets[1].borderColor = primaryColor + '60';
+      this.chartData.datasets[1].backgroundColor = textColorSecondary;
+      this.chartData.datasets[1].borderColor = textColorSecondary;
     }
 
     // Update chart options

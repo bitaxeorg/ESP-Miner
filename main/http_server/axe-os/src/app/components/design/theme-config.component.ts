@@ -228,9 +228,15 @@ export class ThemeConfigComponent implements OnInit {
     // Load saved theme settings from NVS
     this.themeService.getThemeSettings().subscribe(
       settings => {
-        if (settings && settings.accentColors) {
-          this.applyThemeColors(settings.accentColors);
-          this.currentColor = settings.accentColors['--primary-color'];
+        if (settings) {
+          // Apply saved color scheme
+          if (settings.colorScheme) {
+            this.selectedScheme = settings.colorScheme;
+          }
+          // Apply accent colors if they exist
+          if (settings.accentColors) {
+            this.applyThemeColors(settings.accentColors);
+          }
         }
       },
       error => console.error('Error loading theme settings:', error)
@@ -248,6 +254,13 @@ export class ThemeConfigComponent implements OnInit {
     const config = { ...this.layoutService.config() };
     config.colorScheme = scheme;
     this.layoutService.config.set(config);
+    // Save color scheme to NVS
+    this.themeService.saveThemeSettings({ 
+      colorScheme: scheme 
+    }).subscribe(
+      () => { },
+      error => console.error('Error saving theme settings:', error)
+    );
   }
 
   changeTheme(theme: ThemeOption) {
@@ -257,10 +270,9 @@ export class ThemeConfigComponent implements OnInit {
     // Save theme settings to NVS
     this.themeService.saveThemeSettings({
       colorScheme: this.selectedScheme,
-      theme: this.layoutService.config().theme,
       accentColors: theme.accentColors
     }).subscribe(
-      () => {},
+      () => { },
       error => console.error('Error saving theme settings:', error)
     );
   }
