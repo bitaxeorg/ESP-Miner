@@ -23,6 +23,7 @@ esp_err_t device_config_init(void * pvParameters)
 
             ESP_LOGI(TAG, "Device Model: %s", GLOBAL_STATE->DEVICE_CONFIG.family.name);
             ESP_LOGI(TAG, "Board Version: %d", GLOBAL_STATE->DEVICE_CONFIG.board_version);
+            ESP_LOGI(TAG, "ASIC: %dx %s (%d cores)", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name, GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count);
 
             // TODO: Read overrides from NVS
 
