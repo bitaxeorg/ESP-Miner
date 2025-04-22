@@ -36,9 +36,10 @@ export class CkPoolService implements MiningPool {
 
   getQuickLink(stratumURL: string, stratumUser: string): string | undefined {
     const match = stratumURL.match(this.ckpoolRegex);
+    const address = stratumUser.split('.')[0];
     if (!match) return undefined;
 
     const region = match[1]; // e.g., 'eusolo4', 'solo6'
-    return `https://${region}.ckpool.org/users/${encodeURIComponent(stratumUser)}`;
+    return `https://${region}.ckpool.org/users/${encodeURIComponent(address)}`;
   }
 }
