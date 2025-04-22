@@ -493,7 +493,7 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool test_result)
 
     GLOBAL_STATE->SELF_TEST_MODULE.result = test_result;
     GLOBAL_STATE->SELF_TEST_MODULE.finished = true;
-    Power_disable(GLOBAL_STATE);
+    VCORE_set_voltage(0.0f, GLOBAL_STATE);
 
     if (test_result == TESTS_FAILED) {
         ESP_LOGI(TAG, "SELF TESTS FAIL -- Press RESET to continue");  

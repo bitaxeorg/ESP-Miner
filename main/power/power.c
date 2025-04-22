@@ -3,19 +3,8 @@
 #include "DS4432U.h"
 
 #include "power.h"
-#include "vcore.h"
-#include "driver/gpio.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
-
-esp_err_t Power_disable(GlobalState * GLOBAL_STATE)
-{
-    VCORE_set_voltage(0.0, GLOBAL_STATE);
-    if (GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
-        gpio_set_level(GPIO_ASIC_ENABLE, 1);
-    }
-    return ESP_OK;
-}
 
 float Power_get_current(GlobalState * GLOBAL_STATE)
 {

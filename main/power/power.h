@@ -4,9 +4,6 @@
 #include <esp_err.h>
 #include "global_state.h"
 
-
-esp_err_t Power_disable(GlobalState * GLOBAL_STATE);
-
 float Power_get_current(GlobalState * GLOBAL_STATE);
 float Power_get_power(GlobalState * GLOBAL_STATE);
 float Power_get_input_voltage(GlobalState * GLOBAL_STATE);
