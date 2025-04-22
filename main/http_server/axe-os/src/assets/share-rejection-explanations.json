@@ -1,0 +1,31 @@
+[
+    {
+    "Invalid nonce2 length": "The nonce2 value does not match the expected length for this mining job.",
+    "Worker mismatch": "The worker name sent does not match the expected or authenticated worker.",
+    "No nonce": "The share submission was missing a nonce value.",
+    "No ntime": "The submission was missing the network time (ntime).",
+    "No nonce2": "The submission did not include the nonce2 value.",
+    "No job_id": "The submission did not specify a job ID.",
+    "No username": "The submission was missing a username (worker name).",
+    "Invalid array size": "The JSON array parameters had an unexpected size.",
+    "Params not array": "The parameters field was not formatted as a JSON array.",
+    "Valid": "This is not a rejection reason — it indicates a valid share.",
+    "Invalid JobID": "The job ID in the submission was not recognized or is no longer valid.",
+    "Stale": "While this share was being submitted, the network had already found a new block, making this share invalid.",
+    "Ntime out of range": "The provided ntime value was outside the allowed range.",
+    "Duplicate": "This share has already been submitted.",
+    "Above target": "The submitted share does not meet the minimum required difficulty."
+  },
+  {
+    "Invalid version mask": "The version mask provided was invalid for this job.",    
+    "Subscription validation error": "The miner’s subscription request was invalid or malformed.",
+    "Configuration validation error": "Invalid mining configuration or settings sent by the miner.",
+    "Authorization validation error": "The credentials provided by the miner were incorrect or not authorized.",
+    "Suggest difficulty validation error": "An invalid difficulty value was suggested by the miner.",
+    "Mining Submit validation error": "The submitted mining work was invalid or improperly formatted.",
+    "Job not found": "While this share was being submitted, the network had already found a new block, making this share invalid.",
+    "Duplicate share": "This share has already been submitted.",
+    "Difficulty too low": "The submitted share does not meet the minimum required difficulty."
+  }
+]
+  

@@ -49,6 +49,16 @@
             </small>
         </div>
 
+        <div class="field grid p-fluid">
+            <label htmlFor="displayTimeout" class="col-12 mb-2 md:col-2 md:mb-0">Display Timeout</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="displayTimeout" formControlName="displayTimeout" required min="-1" max="71582" type="number" />
+                <div>
+                    <small>In minutes (-1=display always on, 0=display off).</small>
+                </div>
+            </div>
+        </div>
+
         <div class="col-12 md:col-4">
             <div class="field-checkbox">
                 <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
@@ -57,13 +67,6 @@
             </div>
         </div>
 
-        <div class="col-12">
-            <div class="field-checkbox">
-                <p-checkbox name="invertfanpolarity" formControlName="invertfanpolarity" inputId="invertfanpolarity"
-                    [binary]="true"></p-checkbox>
-                <label for="invertfanpolarity">Invert Fan Duty Cycle <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Inverting the polarity of the fan PWM signal"></i></label>
-            </div>
-        </div>
         <div class="col-12">
             <div class="field-checkbox">
                 <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed"
@@ -75,7 +78,7 @@
         <div *ngIf="form.controls['autofanspeed'].value == true">
           <div class="col-12" *ngIf="form.controls['autofanspeed'].value == true">
               <label>Target Temperature {{form.controls['temptarget'].value}}°C</label>
-              <p-slider formControlName="temptarget"></p-slider>
+              <p-slider [min]="35" [max]="66" formControlName="temptarget"></p-slider>
           </div>
       </div>
 

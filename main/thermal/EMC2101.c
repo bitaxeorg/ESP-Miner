@@ -13,7 +13,7 @@ static i2c_master_dev_handle_t emc2101_dev_handle;
  *
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
-esp_err_t EMC2101_init(bool invertPolarity) {
+esp_err_t EMC2101_init() {
 
     if (i2c_bitaxe_add_device(EMC2101_I2CADDR_DEFAULT, &emc2101_dev_handle, TAG) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add device");
@@ -23,9 +23,20 @@ esp_err_t EMC2101_init(bool invertPolarity) {
     // set the TACH input
     ESP_ERROR_CHECK(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_REG_CONFIG, 0x04));
 
-    if (invertPolarity) {
+
+    //! deprecated bit was never set successfully
+    // --- Configure Fan Settings (Register 0x4A) ---
+    // Start with a base configuration:
+    // Bit 7 (MASK) = 0: Tach Alert Enabled
+    // Bit 6 (EN)   = 1: *** FAN DRIVER ENABLED ***
+    // Bit 5 (LEVEL)= 1: Direct Setting Mode (use PWM Duty Cycle Reg 0x4C)
+    // Bit 4 (POL)  = 0: Normal Polarity (placeholder, set below)
+    // Bit 3:2(EDGES)=00: 2 Tach pulses per revolution (standard)
+    // Bit 1:0(RANGE)=00: PWM Frequency ~22.5 kHz (common setting)
+    // //if (invertPolarity) {
         ESP_ERROR_CHECK(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_FAN_CONFIG, 0b00100011));
-    }
+    // //}
+    
 
 
 
