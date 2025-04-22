@@ -1,10 +1,11 @@
 import { Component } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
-import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { SystemService } from 'src/app/generated/api/system.service';
 import { ThemeService } from 'src/app/generated/api/theme.service';
 import { SystemInfo } from 'src/app/generated';
+import { MiningPool } from 'src/app/services/pools/mining-pool.interface';
+import { PoolFactoryService } from 'src/app/services/pools/pool-factory.service';
 
 
 @Component({
@@ -19,7 +20,6 @@ export class HomeComponent {
   public fallbackQuickLink$!: Observable<string | undefined>;
   public expectedHashRate$!: Observable<number | undefined>;
 
-
   public chartOptions: any;
   public dataLabel: number[] = [];
   public hashrateData: number[] = [];
@@ -32,10 +32,18 @@ export class HomeComponent {
   public maxTemp: number = 75;
   public maxFrequency: number = 800;
 
+  public pool!: MiningPool;
+  public quickLink$!: Observable<string | undefined>;
+
+  public activePoolURL!: string;
+  public activePoolPort!: number;
+  public activePoolUser!: string;
+  public activePoolLabel!: 'Primary' | 'Fallback';
+
   constructor(
     private systemService: SystemService,
     private themeService: ThemeService,
-    private quicklinkService: QuicklinkService
+    private poolFactory: PoolFactoryService
   ) {
     this.initializeChart();
 
@@ -218,6 +226,14 @@ export class HomeComponent {
         this.maxTemp = Math.max(75, info.temp);
         this.maxFrequency = Math.max(800, info.frequency);
 
+        const isFallback = info.isUsingFallbackStratum;
+
+        this.activePoolLabel = isFallback ? 'Fallback' : 'Primary';
+        this.activePoolURL = isFallback ? info.fallbackStratumURL : info.stratumURL;
+        this.activePoolUser = isFallback ? info.fallbackStratumUser : info.stratumUser;
+        this.activePoolPort = isFallback ? info.fallbackStratumPort : info.stratumPort;
+        
+        this.pool = this.poolFactory.getPoolForUrl(this.activePoolURL);        
       }),
       map(info => {
         info.power = parseFloat(info.power.toFixed(1))
@@ -237,13 +253,21 @@ export class HomeComponent {
     }))
 
     this.quickLink$ = this.info$.pipe(
-      map(info => this.quicklinkService.getQuickLink(info.stratumURL, info.stratumUser))
+      map(info => {
+        const url = info.isUsingFallbackStratum ? info.fallbackStratumURL : info.stratumURL;
+        const user = info.isUsingFallbackStratum ? info.fallbackStratumUser : info.stratumUser;
+        const pool = this.poolFactory.getPoolForUrl(url);
+        return pool.getQuickLink(url, user);
+      })
     );
+  }
 
-    this.fallbackQuickLink$ = this.info$.pipe(
-      map(info => this.quicklinkService.getQuickLink(info.fallbackStratumURL, info.fallbackStratumUser))
-    );
+  getRejectionExplanation(reason: string): string | null {
+    return this.pool?.getRejectionExplanation(reason) ?? null;
+  }
 
+  getSortedRejectedReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
+    return [...(info.sharesRejectedReasons ?? [])].sort((a, b) => b.count - a.count);
   }
 
   public calculateAverage(data: number[]): number {
@@ -262,5 +286,5 @@ export class HomeComponent {
     });
 
     return this.calculateAverage(efficiencies);
-  }
+  }  
 }
