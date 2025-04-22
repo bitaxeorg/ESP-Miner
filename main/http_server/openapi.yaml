@@ -467,6 +467,25 @@ paths:
         '500':
           description: Internal server error
 
+    /api/system/asic:
+      get:
+        summary: Get asic information
+        description: Returns current asic model and corresponding frequency and voltage
+        operationId: getSystemInfo
+        tags:
+          - asic_api
+        responses:
+          '200':
+            description: Successful operation
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/SystemInfo'
+          '401':
+            description: Unauthorized - Client not in allowed network range
+          '500':
+            description: Internal server error
+
   /api/system/restart:
     post:
       summary: Restart the system
