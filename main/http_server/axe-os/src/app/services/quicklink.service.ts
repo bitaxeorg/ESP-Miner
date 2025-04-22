@@ -33,9 +33,9 @@ export class QuicklinkService {
         } else if (stratumURL.includes('solohash.co.uk')) {
             return `https://solohash.co.uk/user/${address}`;
         } else if (stratumURL.includes('nerdminer.de')) {
-            return `https://pool.nerdminer.de/user/${address}`;
+            return `https://pool.nerdminer.de/#/app/${address}`;
         } else if (stratumURL.includes('solomining.de')) {
-            return `https://pool.solomining.de/user/${address}`;
+            return `https://pool.solomining.de/#/app/${address}`;
         }
         return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
     }
