@@ -16,7 +16,7 @@
     </p-message>
 
     <p-message *ngIf="info.isUsingFallbackStratum" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Using fallback pool - Share stats resetted. Check Pool Settings and or / reboot Bitaxe">
+        text="Using fallback pool - Share stats reset. Check Pool Settings and or / reboot Bitaxe">
     </p-message>
 
     <div class="grid" *ngIf="info$ | async as info; else loading">
