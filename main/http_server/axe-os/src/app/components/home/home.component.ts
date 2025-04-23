@@ -266,7 +266,7 @@ export class HomeComponent {
   }
 
   trackByReason(_index: number, item: { message: string, count: number }) {
-    return item.message;
+    return `${item.message}-${item.count}`;
   }
 
   public calculateAverage(data: number[]): number {
