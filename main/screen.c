@@ -239,7 +239,7 @@ static lv_obj_t * create_scr_stats() {
 
 static void screen_show(screen_t screen)
 {
-    if (SCR_CAROUSEL_START > current_screen) {
+    if (SCR_CAROUSEL_START > screen) {
         lv_display_trigger_activity(NULL);
     }
 
@@ -259,6 +259,25 @@ static void screen_show(screen_t screen)
 
 static void screen_update_cb(lv_timer_t * timer)
 {
+    int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1);
+
+    if (0 > display_timeout_config) {
+        // display always on
+        display_on(true);
+    } else if (0 == display_timeout_config) {
+        // display off
+        display_on(false);
+    } else {
+        // display timeout
+        const uint32_t display_timeout = display_timeout_config * 60 * 1000;
+
+        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= current_screen)) {
+            display_on(false);
+        } else {
+            display_on(true);
+        }
+    }
+
     if (GLOBAL_STATE->SELF_TEST_MODULE.active) {
 
         screen_show(SCR_SELF_TEST);
@@ -370,25 +389,6 @@ static void screen_update_cb(lv_timer_t * timer)
     current_power = power_management->power;
     current_difficulty = module->best_session_nonce_diff;
     current_chip_temp = power_management->chip_temp_avg;
-
-    int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1);
-
-    if (0 > display_timeout_config) {
-        // display always on
-        display_on(true);
-    } else if (0 == display_timeout_config) {
-        // display off
-        display_on(false);
-    } else {
-        // display timeout
-        const uint32_t display_timeout = display_timeout_config * 60 * 1000;
-
-        if (lv_display_get_inactive_time(NULL) > display_timeout) {
-            display_on(false);
-        } else {
-            display_on(true);
-        }
-    }
 
     if (current_screen_time_ms <= current_screen_delay_ms || found_block) {
         return;
