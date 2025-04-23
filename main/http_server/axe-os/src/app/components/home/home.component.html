@@ -90,7 +90,7 @@
                             <span class="text-500">rejected</span>
                         </div>
                         <div *ngIf="info.sharesRejected > 0">
-                            <div *ngFor="let sharesRejectedReason of getSortedRejectedReasons(info)">
+                            <div *ngFor="let sharesRejectedReason of getSortedRejectionReasons(info); trackBy: trackByReason">
                               <span
                                 class="inline-block"
                                 pTooltip="{{ getRejectionExplanation(sharesRejectedReason.message) }}"

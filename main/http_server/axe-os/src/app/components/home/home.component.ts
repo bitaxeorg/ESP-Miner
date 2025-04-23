@@ -261,8 +261,12 @@ export class HomeComponent {
     return this.shareRejectReasonsService.getExplanation(reason);
   }
 
-  getSortedRejectedReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
+  getSortedRejectionReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
     return [...(info.sharesRejectedReasons ?? [])].sort((a, b) => b.count - a.count);
+  }
+
+  trackByReason(_index: number, item: { message: string, count: number }) {
+    return item.message;
   }
 
   public calculateAverage(data: number[]): number {
