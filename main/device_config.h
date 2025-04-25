@@ -37,6 +37,8 @@ typedef struct {
     uint16_t difficulty;
     uint16_t core_count;
     uint16_t small_core_count;
+    // test values
+    float hashrate_test_percentage_target;
 } AsicConfig;
 
 typedef struct {
@@ -70,10 +72,10 @@ typedef struct {
 
 static const EMC2101Config EMC2101_CONFIG_GAMMA = { .ideality_factor = 0x24, .beta_compensation = 0x00, };
 
-static const AsicConfig ASIC_BM1397 = { .model = BM1397, .name = "BM1397", .chip_id = 1397, .default_frequency_mhz = 425, .default_voltage_mv = 1400, .difficulty = 256, .core_count = 168, .small_core_count =  672 };
-static const AsicConfig ASIC_BM1366 = { .model = BM1366, .name = "BM1366", .chip_id = 1366, .default_frequency_mhz = 486, .default_voltage_mv = 1200, .difficulty = 256, .core_count = 112, .small_core_count =  894 };
-static const AsicConfig ASIC_BM1368 = { .model = BM1368, .name = "BM1368", .chip_id = 1368, .default_frequency_mhz = 490, .default_voltage_mv = 1166, .difficulty = 256, .core_count =  80, .small_core_count = 1276 };
-static const AsicConfig ASIC_BM1370 = { .model = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 525, .default_voltage_mv = 1150, .difficulty = 256, .core_count = 128, .small_core_count = 2040 };
+static const AsicConfig ASIC_BM1397 = { .model = BM1397, .name = "BM1397", .chip_id = 1397, .default_frequency_mhz = 425, .default_voltage_mv = 1400, .difficulty = 256, .core_count = 168, .small_core_count =  672, .hashrate_test_percentage_target = 0.85, };
+static const AsicConfig ASIC_BM1366 = { .model = BM1366, .name = "BM1366", .chip_id = 1366, .default_frequency_mhz = 486, .default_voltage_mv = 1200, .difficulty = 256, .core_count = 112, .small_core_count =  894, .hashrate_test_percentage_target = 0.85, };
+static const AsicConfig ASIC_BM1368 = { .model = BM1368, .name = "BM1368", .chip_id = 1368, .default_frequency_mhz = 490, .default_voltage_mv = 1166, .difficulty = 256, .core_count =  80, .small_core_count = 1276, .hashrate_test_percentage_target = 0.80, };
+static const AsicConfig ASIC_BM1370 = { .model = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 525, .default_voltage_mv = 1150, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hashrate_test_percentage_target = 0.85, };
 
 static const FamilyConfig FAMILY_MAX         = { .name = "Max",        .asic = ASIC_BM1397, .asic_count = 1, .max_power = 25, .power_offset = 5, .nominal_voltage = 5,  };
 static const FamilyConfig FAMILY_ULTRA       = { .name = "Ultra",      .asic = ASIC_BM1366, .asic_count = 1, .max_power = 25, .power_offset = 5, .nominal_voltage = 5,  };

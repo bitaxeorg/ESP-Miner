@@ -193,7 +193,7 @@ static void do_frequency_ramp_up(float target_frequency) {
     do_frequency_transition(target_frequency, BM1368_send_hash_frequency, 1368);
 }
 
-uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
+uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
 {
     ESP_LOGI(TAG, "Initializing BM1368");
 
@@ -251,7 +251,7 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count)
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 
-    BM1368_set_job_difficulty_mask(BM1368_ASIC_DIFFICULTY);
+    BM1368_set_job_difficulty_mask(difficulty);
 
     do_frequency_ramp_up((float)frequency);
 

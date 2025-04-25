@@ -18,13 +18,13 @@ static const char *TAG = "asic";
 uint8_t ASIC_init(GlobalState * GLOBAL_STATE) {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.model) {
         case BM1397:
-            return BM1397_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count);
+            return BM1397_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
         case BM1366:
-            return BM1366_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count);
+            return BM1366_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
         case BM1368:
-            return BM1368_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count);
+            return BM1368_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
         case BM1370:
-            return BM1370_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count);
+            return BM1370_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
         default:
     }
     return ESP_OK;
@@ -148,7 +148,7 @@ esp_err_t ASIC_set_device_model(GlobalState * GLOBAL_STATE) {
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.model) {
         case BM1397:
-            GLOBAL_STATE->asic_job_frequency_ms = (NONCE_SPACE / (double) (GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * BM1397_SMALL_CORE_COUNT * 1000)) / (double) GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; // no version-rolling so same Nonce Space is splitted between Small Cores
+            GLOBAL_STATE->asic_job_frequency_ms = (NONCE_SPACE / (double) (GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * 1000)) / (double) GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; // no version-rolling so same Nonce Space is splitted between Small Cores
             break;
         case BM1366:
             GLOBAL_STATE->asic_job_frequency_ms = 2000; //ms

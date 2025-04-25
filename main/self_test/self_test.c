@@ -428,29 +428,12 @@ void self_test(void * pvParameters)
 
     ESP_LOGI(TAG, "Hashrate: %f", hash_rate);
 
-    float hashrate_test_percentage_target = 0.85;
-    float expected_hashrate_mhs = (float)GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+    float expected_hashrate_mhs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value 
+                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count 
+                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
+                                / 1000.0f;
 
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.model) {
-        case BM1397:
-            expected_hashrate_mhs *= BM1397_CORE_COUNT * 4;
-            break;
-        case BM1366:
-            expected_hashrate_mhs *= BM1366_CORE_COUNT * 8;
-            break;
-        case BM1368:
-            expected_hashrate_mhs *= BM1368_CORE_COUNT * 8;
-            // lower target due to temp sensitivity
-            hashrate_test_percentage_target = 0.8; 
-            break;
-        case BM1370:
-            expected_hashrate_mhs *= BM1370_CORE_COUNT * 16;
-            hashrate_test_percentage_target = 0.85; 
-            break;
-        default:
-    }
-
-    if (hash_rate < hashrate_test_percentage_target * (expected_hashrate_mhs/1000.0) ){
+    if (hash_rate < expected_hashrate_mhs) {
         display_msg("HASHRATE:FAIL", GLOBAL_STATE);
         tests_done(GLOBAL_STATE, TESTS_FAILED);
     }
