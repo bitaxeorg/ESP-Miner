@@ -5,12 +5,6 @@
 #include "global_state.h"
 #include "common.h"
 
-#define BITAXE_MAX_ASIC_COUNT 1
-#define BITAXE_ULTRA_ASIC_COUNT 1
-#define BITAXE_SUPRA_ASIC_COUNT 1
-#define BITAXE_GAMMA_ASIC_COUNT 1
-#define BITAXE_GAMMATURBO_ASIC_COUNT 2
-
 uint8_t ASIC_init(GlobalState * GLOBAL_STATE);
 task_result * ASIC_process_work(GlobalState * GLOBAL_STATE);
 int ASIC_set_max_baud(GlobalState * GLOBAL_STATE);
