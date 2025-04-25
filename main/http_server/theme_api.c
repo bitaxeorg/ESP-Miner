@@ -30,7 +30,6 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     set_cors_headers(req);
 
     char *scheme = nvs_config_get_string(NVS_CONFIG_THEME_SCHEME, "dark");
-    char *name = nvs_config_get_string(NVS_CONFIG_THEME_NAME, "dark");
     char *colors = nvs_config_get_string(NVS_CONFIG_THEME_COLORS, 
         "{"
         "\"--primary-color\":\"#F80421\","
@@ -59,7 +58,6 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
 
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "colorScheme", scheme);
-    cJSON_AddStringToObject(root, "theme", name);
     
     // Parse stored colors JSON string
     cJSON *colors_json = cJSON_Parse(colors);
@@ -71,7 +69,6 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     httpd_resp_sendstr(req, response);
 
     free(scheme);
-    free(name);
     free(colors);
     free((char *)response);
     cJSON_Delete(root);
@@ -103,9 +100,6 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
     cJSON *item;
     if ((item = cJSON_GetObjectItem(root, "colorScheme")) != NULL) {
         nvs_config_set_string(NVS_CONFIG_THEME_SCHEME, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "theme")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_THEME_NAME, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "accentColors")) != NULL) {
         char *colors_str = cJSON_Print(item);

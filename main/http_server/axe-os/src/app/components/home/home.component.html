@@ -15,9 +15,11 @@
         text="{{info.power_fault}} Check your Power Supply.">
     </p-message>
 
+    <p-message *ngIf="info.isUsingFallbackStratum" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
+        text="Using fallback pool - Share stats reset. Check Pool Settings and or / reboot Bitaxe">
+    </p-message>
+
     <div class="grid" *ngIf="info$ | async as info; else loading">
-        <div class="col-12">
-            <div class="grid">
                 <div class="col-12 md:col-6 xl:col-3">
                     <div class="card mb-0">
                         <div class="flex justify-content-between mb-3">
@@ -88,12 +90,27 @@
                             <span class="text-500">rejected</span>
                         </div>
                         <div *ngIf="info.sharesRejected > 0">
-                            <div *ngFor="let sharesRejectedReason of info.sharesRejectedReasons">
-                                <span class="text-red-500 font-medium">{{sharesRejectedReason.count | number: '1.0-0'}} </span>
-                                <span class="text-500">{{sharesRejectedReason.message}}</span>
-                                ({{(sharesRejectedReason.count / (info.sharesAccepted + info.sharesRejected) * 100) | number: '1.2-2'}}%)
+                            <div *ngFor="let sharesRejectedReason of getSortedRejectionReasons(info); trackBy: trackByReason">
+                              <span
+                                class="inline-block"
+                                pTooltip="{{ getRejectionExplanation(sharesRejectedReason.message) }}"
+                                [tooltipDisabled]="!getRejectionExplanation(sharesRejectedReason.message)"
+                                tooltipPosition="bottom"
+                              >
+                                <span class="text-red-500 font-medium">
+                                  {{ sharesRejectedReason.count | number: '1.0-0' }}
+                                </span>
+                                <span class="text-500">
+                                  {{ sharesRejectedReason.message }}
+                                </span>
+                                ({{ 
+                                  (sharesRejectedReason.count / 
+                                   (info.sharesAccepted + info.sharesRejected) * 100) 
+                                  | number: '1.2-2' 
+                                }}%)
+                              </span>
                             </div>
-                        </div>
+                        </div>                          
                     </div>
                 </div>
 
@@ -114,9 +131,7 @@
                     </div>
                 </div>
 
-            </div>
-        </div>
-        <div class="col-12 mb-4" *ngIf="!info.power_fault">
+        <div class="col-12" *ngIf="!info.power_fault">
             <div class="card">
                 <p-chart [data]="chartData" [options]="chartOptions"></p-chart>
             </div>
@@ -218,48 +233,26 @@
             </div>
         </div>
 
-
-
-
         <div class="col-12 lg:col-6">
             <div class="card" *ngIf="info$ | async as info; else loading">
-                <h5>Pool Information ({{info.isUsingFallbackStratum ? 'Fallback' : 'Primary' }})</h5>
+                <h5>Pool Information ({{ activePoolLabel }})</h5>
                 <table>
-                    <ng-container *ngIf="!info.isUsingFallbackStratum">
-                        <tr>
-                            <td>URL:</td>
-                            <td style="word-break: break-all;">
-                                <a style="text-decoration: underline;" [href]="(quickLink$ | async)"
-                                    target="_blank">{{info.stratumURL}}</a>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Port:</td>
-                            <td style="word-break: break-all;">{{info.stratumPort}}</td>
-                        </tr>
-                        <tr>
-                            <td>User:</td>
-                            <td style="word-break: break-all;">{{info.stratumUser}}</td>
-                        </tr>
-                    </ng-container>
-                    <ng-container *ngIf="info.isUsingFallbackStratum">
-                        <tr>
-                            <td>URL:</td>
-                            <td style="word-break: break-all;">
-                                <a style="text-decoration: underline;"
-                                    [href]="(fallbackQuickLink$ | async) || info.fallbackStratumURL"
-                                    target="_blank">{{info.fallbackStratumURL}}</a>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Port:</td>
-                            <td style="word-break: break-all;">{{info.fallbackStratumPort}}</td>
-                        </tr>
-                        <tr>
-                            <td>User:</td>
-                            <td style="word-break: break-all;">{{info.fallbackStratumUser}}</td>
-                        </tr>
-                    </ng-container>
+                    <tr>
+                        <td>URL:</td>
+                        <td style="word-break: break-all;">
+                            <a [href]="quickLink$ | async" target="_blank" style="text-decoration: underline;">
+                            {{ activePoolURL }}
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Port:</td>
+                        <td>{{ activePoolPort }}</td>
+                    </tr>
+                    <tr>
+                        <td>User:</td>
+                        <td>{{ activePoolUser }}</td>
+                    </tr>
                 </table>
             </div>
         </div>
@@ -272,6 +265,4 @@
         </div>
 
     </div>
-
-
 </ng-container>
