@@ -220,17 +220,17 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
 
 esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
     
-    if (GLOBAL_STATE->DEVICE_CONFIG.thermal == EMC2101_INTERNAL || GLOBAL_STATE->DEVICE_CONFIG.thermal == EMC2101_EXTERNAL) {
+    if (GLOBAL_STATE->DEVICE_CONFIG.EMC2101) {
         ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
         EMC2101_set_fan_speed(1);
 
-        if (GLOBAL_STATE->DEVICE_CONFIG.emc2101_config.ideality_factor != 0x00) {
-            EMC2101_set_ideality_factor(GLOBAL_STATE->DEVICE_CONFIG.emc2101_config.ideality_factor);
-            EMC2101_set_beta_compensation(GLOBAL_STATE->DEVICE_CONFIG.emc2101_config.beta_compensation);
+        if (GLOBAL_STATE->DEVICE_CONFIG.emc_ideality_factor != 0x00) {
+            EMC2101_set_ideality_factor(GLOBAL_STATE->DEVICE_CONFIG.emc_ideality_factor);
+            EMC2101_set_beta_compensation(GLOBAL_STATE->DEVICE_CONFIG.emc_beta_compensation);
         }
     }
 
-    // TODO EMC2103
+    // TODO: EMC2103
 
     if (GLOBAL_STATE->DEVICE_CONFIG.INA260) {
         ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
@@ -452,7 +452,7 @@ void self_test(void * pvParameters)
             display_msg("POWER:FAIL", GLOBAL_STATE);
             tests_done(GLOBAL_STATE, TESTS_FAILED);
         }
-}
+    }
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         if (test_TPS546_power_consumption(GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
             ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
