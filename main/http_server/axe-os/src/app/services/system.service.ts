@@ -121,6 +121,27 @@ export class SystemService {
   }
 
 
+  public getAsicSettings(uri: string = ''): Observable<{
+    ASICModel: eASICModel;
+    frequencyOptions: number[];
+    voltageOptions: number[];
+  }> {
+    if (environment.production) {
+      return this.httpClient.get(`${uri}/api/system/asic`) as Observable<{
+        ASICModel: eASICModel;
+        frequencyOptions: number[];
+        voltageOptions: number[];
+      }>;
+    } else {
+      // Mock data for development
+      return of({
+        ASICModel: eASICModel.BM1366,
+        frequencyOptions: [400, 425, 450, 475, 485, 500, 525, 550, 575],
+        voltageOptions: [1100, 1150, 1200, 1250, 1300]
+      }).pipe(delay(1000));
+    }
+  }
+
   public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
     return this.httpClient.get(`${uri}/api/swarm/info`) as Observable<{ ip: string }[]>;
   }

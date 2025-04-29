@@ -467,6 +467,54 @@ paths:
         '500':
           description: Internal server error
 
+  /api/system/asic:
+    get:
+      summary: Get ASIC settings information
+      description: Returns current ASIC model and corresponding available frequency and voltage options
+      operationId: getAsicSettings
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ASICModel
+                  - frequencyOptions
+                  - voltageOptions
+                properties:
+                  ASICModel:
+                    type: string
+                    description: ASIC model identifier
+                    enum:
+                      - BM1366
+                      - BM1368
+                      - BM1370
+                      - BM1397
+                    examples:
+                      - "BM1366"
+                  frequencyOptions:
+                    type: array
+                    description: Available frequency options for the ASIC model in MHz
+                    items:
+                      type: number
+                    examples:
+                      - [400, 425, 450, 475, 485, 500, 525, 550, 575]
+                  voltageOptions:
+                    type: array
+                    description: Available voltage options for the ASIC model in millivolts
+                    items:
+                      type: number
+                    examples:
+                      - [1100, 1150, 1200, 1250, 1300]
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
   /api/system/restart:
     post:
       summary: Restart the system
