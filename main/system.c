@@ -86,6 +86,18 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     //Initialize power_fault fault mode
     module->power_fault = 0;
 
+    // Initialize thermal parameters
+    module->thermal_throttle_temp = nvs_config_get_u16("thermal_throttle", DEFAULT_THERMAL_THROTTLE_TEMP);
+    module->thermal_shutdown_temp = nvs_config_get_u16("thermal_shutdown", DEFAULT_THERMAL_SHUTDOWN_TEMP);
+    GLOBAL_STATE->thermal_throttle_temp = module->thermal_throttle_temp;
+    GLOBAL_STATE->thermal_shutdown_temp = module->thermal_shutdown_temp;
+    ESP_LOGI(TAG, "Thermal throttle: %.1f°C, shutdown: %.1f°C", 
+             module->thermal_throttle_temp, module->thermal_shutdown_temp);
+    
+    // Initialize power profile
+    module->power_profile = nvs_config_get_u16("power_profile", POWER_PROFILE_BALANCED);
+    ESP_LOGI(TAG, "Power profile: %d", module->power_profile);
+
     // set the best diff string
     _suffix_string(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     _suffix_string(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
@@ -103,9 +115,46 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
 
     // Initialize the core voltage regulator
     ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
+    
+    // Configure dynamic voltage based on power profile
+    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    power_management->dynamic_voltage = 
+        (GLOBAL_STATE->SYSTEM_MODULE.power_profile != POWER_PROFILE_PERFORMANCE);
+    
+    power_management->voltage_offset = 0.0f;
+    switch (GLOBAL_STATE->SYSTEM_MODULE.power_profile) {
+        case POWER_PROFILE_PERFORMANCE:
+            power_management->voltage_offset = 0.03f; // +30mV for stability
+            break;
+        case POWER_PROFILE_BALANCED:
+            power_management->voltage_offset = 0.01f; // +10mV
+            break;
+        case POWER_PROFILE_EFFICIENCY:
+            power_management->voltage_offset = -0.01f; // -10mV (slight undervolt)
+            break;
+        default:
+            power_management->voltage_offset = 0.0f;
+    }
+    
+    // Calculate optimal voltage for current frequency
+    float target_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0;
+    if (power_management->dynamic_voltage) {
+        float frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+        float optimal_voltage = Power_calculate_min_voltage(GLOBAL_STATE, frequency);
+        
+        // Only use calculated voltage if it's lower than configured (for safety)
+        if (optimal_voltage < target_voltage) {
+            target_voltage = optimal_voltage;
+            ESP_LOGI(TAG, "Using optimized voltage: %.3f V", target_voltage);
+        }
+    }
+    
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(target_voltage, GLOBAL_STATE), 
+                        TAG, "VCORE set voltage failed!");
 
-    ESP_RETURN_ON_ERROR(Thermal_init(GLOBAL_STATE->device_model, nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1)), TAG, "Thermal init failed!");
+    ESP_RETURN_ON_ERROR(Thermal_init(GLOBAL_STATE->device_model, 
+                                    nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1)), 
+                        TAG, "Thermal init failed!");
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
