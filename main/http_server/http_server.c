@@ -530,19 +530,19 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         return ESP_OK;
     }
 
-
     char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
     char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
-    uint8_t mac[6];
-    char formattedMac[18];
     char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
     char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
-    char * board_version = nvs_config_get_string(NVS_CONFIG_BOARD_VERSION, "unknown");
 
+    uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
-    snprintf(formattedMac, 18, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    char formattedMac[18];
+    snprintf(formattedMac, sizeof(formattedMac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    char board_version_str[6];
+    snprintf(board_version_str, sizeof(board_version_str), "%03d", GLOBAL_STATE->DEVICE_CONFIG.board_version);
 
     int8_t wifi_rssi = -90;
     get_wifi_current_rssi(&wifi_rssi);
@@ -600,7 +600,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
-    cJSON_AddStringToObject(root, "boardVersion", board_version);
+    cJSON_AddStringToObject(root, "boardVersion", board_version_str);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
     cJSON_AddNumberToObject(root, "flipscreen", nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1));
@@ -625,7 +625,6 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(fallbackStratumURL);
     free(stratumUser);
     free(fallbackStratumUser);
-    free(board_version);
 
     const char * sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
