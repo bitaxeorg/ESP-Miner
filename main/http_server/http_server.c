@@ -543,8 +543,6 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     esp_wifi_get_mac(WIFI_IF_STA, mac);
     char formattedMac[18];
     snprintf(formattedMac, sizeof(formattedMac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    char board_version_str[6];
-    snprintf(board_version_str, sizeof(board_version_str), "%03d", GLOBAL_STATE->DEVICE_CONFIG.board_version);
 
     int8_t wifi_rssi = -90;
     get_wifi_current_rssi(&wifi_rssi);
@@ -602,7 +600,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
-    cJSON_AddStringToObject(root, "boardVersion", board_version_str);
+    cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
     cJSON_AddNumberToObject(root, "flipscreen", nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1));
