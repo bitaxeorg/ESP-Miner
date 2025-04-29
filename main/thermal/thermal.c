@@ -13,7 +13,7 @@ esp_err_t Thermal_init(DeviceConfig device_config)
         }
         return res;
     }
-    if (device_config.EMC2101) {
+    if (device_config.EMC2103) {
         return EMC2103_init();
     }
 
