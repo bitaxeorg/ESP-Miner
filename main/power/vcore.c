@@ -7,6 +7,7 @@
 #include "DS4432U.h"
 #include "TPS546.h"
 #include "INA260.h"
+#include "driver/gpio.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_ASIC_RESET  CONFIG_GPIO_ASIC_RESET
@@ -33,7 +34,7 @@ static TPS546_CONFIG TPS546_CONFIG_GAMMA = {
     .TPS546_INIT_VIN_ON = 4.8,
     .TPS546_INIT_VIN_OFF = 4.5,
     .TPS546_INIT_VIN_UV_WARN_LIMIT = 0, //Set to 0 to ignore. TI Bug in this register
-    .TPS546_INIT_VIN_OV_FAULT_LIMIT = 5.5,
+    .TPS546_INIT_VIN_OV_FAULT_LIMIT = 6.5,
     /* vout voltage */
     .TPS546_INIT_SCALE_LOOP = 0.25,
     .TPS546_INIT_VOUT_MIN = 1,
@@ -52,10 +53,7 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE) {
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
             if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
-                if (TPS546_init(TPS546_CONFIG_GAMMA) != ESP_OK) {
-                    ESP_LOGE(TAG, "TPS546 init failed!");
-                    return ESP_FAIL;
-                }
+                ESP_RETURN_ON_ERROR(TPS546_init(TPS546_CONFIG_GAMMA), TAG, "TPS546 init failed!"); //yes, it's a gamma as far as the TPS546 is concerned
             } else {
                 ESP_RETURN_ON_ERROR(DS4432U_init(), TAG, "DS4432 init failed!");
                 ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
@@ -144,3 +142,43 @@ int16_t VCORE_get_voltage_mv(GlobalState * global_state) {
     }
     return -1;
 }
+
+esp_err_t VCORE_check_fault(GlobalState * global_state) {
+
+    switch (global_state->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (global_state->board_version >= 402 && global_state->board_version <= 499) {
+                ESP_RETURN_ON_ERROR(TPS546_check_status(global_state), TAG, "TPS546 check status failed!");
+            }
+            break;
+        case DEVICE_GAMMA:
+        case DEVICE_GAMMATURBO:
+        ESP_RETURN_ON_ERROR(TPS546_check_status(global_state), TAG, "TPS546 check status failed!");
+            break;
+        // case DEVICE_HEX:
+        default:
+    }
+    return ESP_OK;
+}
+
+const char* VCORE_get_fault_string(GlobalState * global_state) {
+    switch (global_state->device_model) {
+        case DEVICE_MAX:
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (global_state->board_version >= 402 && global_state->board_version <= 499) {
+                return TPS546_get_error_message();
+            }
+            break;
+        case DEVICE_GAMMA:
+        case DEVICE_GAMMATURBO:
+            return TPS546_get_error_message();
+            break;
+        // case DEVICE_HEX:
+        default:
+    }
+    return NULL;
+}
+

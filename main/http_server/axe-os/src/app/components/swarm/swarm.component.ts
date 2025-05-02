@@ -33,6 +33,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public refreshIntervalControl: FormControl;
 
+  public sortField: string = '';
+  public sortDirection: 'asc' | 'desc' = 'asc';
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -240,6 +243,35 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   private sortByIp(a: any, b: any): number {
     return this.ipToInt(a.IP) - this.ipToInt(b.IP);
+  }
+
+  sortBy(field: string) {
+    // If clicking the same field, toggle direction
+    if (this.sortField === field) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      // New field, set to ascending by default
+      this.sortField = field;
+      this.sortDirection = 'asc';
+    }
+
+    this.swarm.sort((a, b) => {
+      let comparison = 0;
+      if (field === 'IP') {
+        // Split IP into octets and compare numerically
+        const aOctets = a[field].split('.').map(Number);
+        const bOctets = b[field].split('.').map(Number);
+        for (let i = 0; i < 4; i++) {
+          if (aOctets[i] !== bOctets[i]) {
+            comparison = aOctets[i] - bOctets[i];
+            break;
+          }
+        }
+      } else {
+        comparison = a[field].localeCompare(b[field], undefined, { numeric: true });
+      }
+      return this.sortDirection === 'asc' ? comparison : -comparison;
+    });
   }
 
   private convertBestDiffToNumber(bestDiff: string): number {

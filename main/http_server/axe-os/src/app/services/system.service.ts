@@ -26,6 +26,8 @@ export class SystemService {
           current: 2237.5,
           temp: 60,
           vrTemp: 45,
+          maxPower: 25,
+          nominalVoltage: 5,
           hashRate: 475,
           bestDiff: "0",
           bestSessionDiff: "0",
@@ -40,6 +42,7 @@ export class SystemService {
           apEnabled: 0,
           sharesAccepted: 1,
           sharesRejected: 0,
+          sharesRejectedReasons: [],
           uptimeSeconds: 38,
           asicCount: 1,
           smallCoreCount: 672,
@@ -57,9 +60,10 @@ export class SystemService {
           boardVersion: "204",
           flipscreen: 1,
           invertscreen: 0,
-          invertfanpolarity: 1,
+          displayTimeout: 0,
           autofanspeed: 1,
           fanspeed: 100,
+          temptarget: 60,
           fanrpm: 0,
 
           boardtemp1: 30,
@@ -116,6 +120,27 @@ export class SystemService {
     return this.otaUpdate(file, `/api/system/OTAWWW`);
   }
 
+
+  public getAsicSettings(uri: string = ''): Observable<{
+    ASICModel: eASICModel;
+    frequencyOptions: number[];
+    voltageOptions: number[];
+  }> {
+    if (environment.production) {
+      return this.httpClient.get(`${uri}/api/system/asic`) as Observable<{
+        ASICModel: eASICModel;
+        frequencyOptions: number[];
+        voltageOptions: number[];
+      }>;
+    } else {
+      // Mock data for development
+      return of({
+        ASICModel: eASICModel.BM1366,
+        frequencyOptions: [400, 425, 450, 475, 485, 500, 525, 550, 575],
+        voltageOptions: [1100, 1150, 1200, 1250, 1300]
+      }).pipe(delay(1000));
+    }
+  }
 
   public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
     return this.httpClient.get(`${uri}/api/swarm/info`) as Observable<{ ip: string }[]>;

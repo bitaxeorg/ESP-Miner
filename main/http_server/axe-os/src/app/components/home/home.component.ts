@@ -1,10 +1,12 @@
 import { Component } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
+import { QuicklinkService } from 'src/app/services/quicklink.service';
+import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
 import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
-import { eASICModel } from 'src/models/enum/eASICModel';
 import { ISystemInfo } from 'src/models/ISystemInfo';
+
 
 @Component({
   selector: 'app-home',
@@ -14,10 +16,7 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 export class HomeComponent {
 
   public info$!: Observable<ISystemInfo>;
-  public quickLink$!: Observable<string | undefined>;
-  public fallbackQuickLink$!: Observable<string | undefined>;
   public expectedHashRate$!: Observable<number | undefined>;
-
 
   public chartOptions: any;
   public dataLabel: number[] = [];
@@ -26,13 +25,23 @@ export class HomeComponent {
   public powerData: number[] = [];
   public chartData?: any;
 
-  public maxPower: number = 50;
+  public maxPower: number = 0;
+  public nominalVoltage: number = 0;
   public maxTemp: number = 75;
   public maxFrequency: number = 800;
 
+  public quickLink$!: Observable<string | undefined>;
+
+  public activePoolURL!: string;
+  public activePoolPort!: number;
+  public activePoolUser!: string;
+  public activePoolLabel!: 'Primary' | 'Fallback';
+
   constructor(
     private systemService: SystemService,
-    private themeService: ThemeService
+    private themeService: ThemeService,
+    private quickLinkService: QuicklinkService,
+    private shareRejectReasonsService: ShareRejectionExplanationService
   ) {
     this.initializeChart();
 
@@ -53,10 +62,8 @@ export class HomeComponent {
     if (this.chartData && this.chartData.datasets) {
       this.chartData.datasets[0].backgroundColor = primaryColor + '30';
       this.chartData.datasets[0].borderColor = primaryColor;
-      this.chartData.datasets[1].backgroundColor = primaryColor + '30';
-      this.chartData.datasets[1].borderColor = primaryColor + '60';
-      this.chartData.datasets[2].backgroundColor = textColorSecondary;
-      this.chartData.datasets[2].borderColor = textColorSecondary;
+      this.chartData.datasets[1].backgroundColor = textColorSecondary;
+      this.chartData.datasets[1].borderColor = textColorSecondary;
     }
 
     // Update chart options
@@ -188,31 +195,41 @@ export class HomeComponent {
         return this.systemService.getInfo()
       }),
       tap(info => {
-        this.hashrateData.push(info.hashRate * 1000000000);
-        this.temperatureData.push(info.temp);
-        this.powerData.push(info.power);
+        // Only collect and update chart data if there's no power fault
+        if (!info.power_fault) {
+          this.hashrateData.push(info.hashRate * 1000000000);
+          this.temperatureData.push(info.temp);
+          this.powerData.push(info.power);
 
-        this.dataLabel.push(new Date().getTime());
+          this.dataLabel.push(new Date().getTime());
 
-        if (this.hashrateData.length >= 720) {
-          this.hashrateData.shift();
-          this.temperatureData.shift();
-          this.powerData.shift();
-          this.dataLabel.shift();
+          if (this.hashrateData.length >= 720) {
+            this.hashrateData.shift();
+            this.temperatureData.shift();
+            this.powerData.shift();
+            this.dataLabel.shift();
+          }
+
+          this.chartData.labels = this.dataLabel;
+          this.chartData.datasets[0].data = this.hashrateData;
+          this.chartData.datasets[1].data = this.temperatureData;
+
+          this.chartData = {
+            ...this.chartData
+          };
         }
 
-        this.chartData.labels = this.dataLabel;
-        this.chartData.datasets[0].data = this.hashrateData;
-        this.chartData.datasets[1].data = this.temperatureData;
-
-        this.chartData = {
-          ...this.chartData
-        };
-
-        this.maxPower = Math.max(50, info.power);
+        this.maxPower = Math.max(info.maxPower, info.power);
+        this.nominalVoltage = info.nominalVoltage;
         this.maxTemp = Math.max(75, info.temp);
         this.maxFrequency = Math.max(800, info.frequency);
 
+        const isFallback = info.isUsingFallbackStratum;
+
+        this.activePoolLabel = isFallback ? 'Fallback' : 'Primary';
+        this.activePoolURL = isFallback ? info.fallbackStratumURL : info.stratumURL;
+        this.activePoolUser = isFallback ? info.fallbackStratumUser : info.stratumUser;
+        this.activePoolPort = isFallback ? info.fallbackStratumPort : info.stratumPort;
       }),
       map(info => {
         info.power = parseFloat(info.power.toFixed(1))
@@ -232,13 +249,24 @@ export class HomeComponent {
     }))
 
     this.quickLink$ = this.info$.pipe(
-      map(info => this.getQuickLink(info.stratumURL, info.stratumUser))
+      map(info => {
+        const url = info.isUsingFallbackStratum ? info.fallbackStratumURL : info.stratumURL;
+        const user = info.isUsingFallbackStratum ? info.fallbackStratumUser : info.stratumUser;
+        return this.quickLinkService.getQuickLink(url, user);
+      })
     );
+  }
 
-    this.fallbackQuickLink$ = this.info$.pipe(
-      map(info => this.getQuickLink(info.fallbackStratumURL, info.fallbackStratumUser))
-    );
+  getRejectionExplanation(reason: string): string | null {
+    return this.shareRejectReasonsService.getExplanation(reason);
+  }
 
+  getSortedRejectionReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
+    return [...(info.sharesRejectedReasons ?? [])].sort((a, b) => b.count - a.count);
+  }
+
+  trackByReason(_index: number, item: { message: string, count: number }) {
+    return item.message; //Track only by message
   }
 
   public calculateAverage(data: number[]): number {
@@ -247,38 +275,15 @@ export class HomeComponent {
     return sum / data.length;
   }
 
-  private getQuickLink(stratumURL: string, stratumUser: string): string | undefined {
-    const address = stratumUser.split('.')[0];
-
-    if (stratumURL.includes('public-pool.io')) {
-      return `https://web.public-pool.io/#/app/${address}`;
-    } else if (stratumURL.includes('ocean.xyz')) {
-      return `https://ocean.xyz/stats/${address}`;
-    } else if (stratumURL.includes('solo.d-central.tech')) {
-      return `https://solo.d-central.tech/#/app/${address}`;
-    } else if (/^eusolo[46]?.ckpool.org/.test(stratumURL)) {
-      return `https://eusolostats.ckpool.org/users/${address}`;
-    } else if (/^solo[46]?.ckpool.org/.test(stratumURL)) {
-      return `https://solostats.ckpool.org/users/${address}`;
-    } else if (stratumURL.includes('pool.noderunners.network')) {
-      return `https://noderunners.network/en/pool/user/${address}`;
-    } else if (stratumURL.includes('satoshiradio.nl')) {
-      return `https://pool.satoshiradio.nl/user/${address}`;
-    } else if (stratumURL.includes('solohash.co.uk')) {
-      return `https://solohash.co.uk/user/${address}`;
-    }
-    return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
-  }
-
   public calculateEfficiencyAverage(hashrateData: number[], powerData: number[]): number {
     if (hashrateData.length === 0 || powerData.length === 0) return 0;
-    
+
     // Calculate efficiency for each data point and average them
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       return power / (hashrate/1000000000000); // Convert to J/TH
     });
-    
+
     return this.calculateAverage(efficiencies);
-  }
+  }  
 }

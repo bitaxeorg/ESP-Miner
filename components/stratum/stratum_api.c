@@ -137,12 +137,15 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         cJSON * error_json = cJSON_GetObjectItem(json, "error");
         cJSON * reject_reason_json = cJSON_GetObjectItem(json, "reject-reason");
 
-        //if the result is null, then it's a fail
+        // if the result is null, then it's a fail
         if (result_json == NULL) {
             message->response_success = false;
-
-        //if it's an error, then it's a fail
+            message->error_str = strdup("unknown");
+            
+        // if it's an error, then it's a fail
         } else if (!cJSON_IsNull(error_json)) {
+            message->response_success = false;
+            message->error_str = strdup("unknown");
             if (parsed_id < 5) {
                 result = STRATUM_RESULT_SETUP;
             } else {
@@ -157,9 +160,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                     }
                 }
             }
-            message->response_success = false;
 
-        //if the result is a boolean, then parse it
+        // if the result is a boolean, then parse it
         } else if (cJSON_IsBool(result_json)) {
             if (parsed_id < 5) {
                 result = STRATUM_RESULT_SETUP;
@@ -170,6 +172,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 message->response_success = true;
             } else {
                 message->response_success = false;
+                message->error_str = strdup("unknown");
                 if (cJSON_IsString(reject_reason_json)) {
                     message->error_str = strdup(cJSON_GetStringValue(reject_reason_json));
                 }                

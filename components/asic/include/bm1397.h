@@ -7,33 +7,15 @@
 
 #define ASIC_BM1397_JOB_FREQUENCY_MS 20 //not currently used
 
-#define CRC5_MASK 0x1F
 #define BM1397_ASIC_DIFFICULTY 256
 
-#define BM1937_SERIALTX_DEBUG false
-#define BM1937_SERIALRX_DEBUG false
+#define BM1397_SERIALTX_DEBUG true
+#define BM1397_SERIALRX_DEBUG false
 #define BM1397_DEBUG_WORK false //causes insane amount of debug output
 #define BM1397_DEBUG_JOBS false //causes insane amount of debug output
 
 static const uint64_t BM1397_CORE_COUNT = 168;
 static const uint64_t BM1397_SMALL_CORE_COUNT = 672;
-
-typedef struct
-{
-    float frequency;
-} bm1397Module;
-
-typedef enum
-{
-    JOB_PACKET = 0,
-    CMD_PACKET = 1,
-} packet_type_t;
-
-typedef enum
-{
-    JOB_RESP = 0,
-    CMD_RESP = 1,
-} response_type_t;
 
 typedef struct __attribute__((__packed__))
 {
@@ -56,6 +38,6 @@ void BM1397_set_version_mask(uint32_t version_mask);
 int BM1397_set_max_baud(void);
 int BM1397_set_default_baud(void);
 void BM1397_send_hash_frequency(float frequency);
-task_result * BM1397_proccess_work(void * GLOBAL_STATE);
+task_result * BM1397_process_work(void * GLOBAL_STATE);
 
 #endif /* BM1397_H_ */

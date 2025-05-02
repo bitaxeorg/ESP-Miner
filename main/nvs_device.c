@@ -9,7 +9,6 @@
 
 #include "connect.h"
 #include "global_state.h"
-#include "asic.h"
 
 static const char * TAG = "nvs_device";
 
@@ -24,9 +23,9 @@ esp_err_t NVSDevice_init(void) {
 
 esp_err_t NVSDevice_get_wifi_creds(GlobalState * GLOBAL_STATE, char ** wifi_ssid, char ** wifi_pass, char ** hostname) {
     // pull the wifi credentials and hostname out of NVS
-    *wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, WIFI_SSID);
-    *wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, WIFI_PASS);
-    *hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME, HOSTNAME);
+    *wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
+    *wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, CONFIG_ESP_WIFI_PASSWORD);
+    *hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
 
     // copy the wifi ssid to the global state
     strncpy(GLOBAL_STATE->SYSTEM_MODULE.ssid, *wifi_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid));
@@ -47,8 +46,6 @@ esp_err_t NVSDevice_parse_config(GlobalState * GLOBAL_STATE) {
     free(board_version);
     ESP_LOGI(TAG, "Found Device Model: %s", GLOBAL_STATE->device_model_str);
     ESP_LOGI(TAG, "Found Board Version: %d", GLOBAL_STATE->board_version);
-
-    ESP_RETURN_ON_ERROR(ASIC_set_device_model(GLOBAL_STATE), TAG, "Failed to get device model");
 
     return ESP_OK;
 }

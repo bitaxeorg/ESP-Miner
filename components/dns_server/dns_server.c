@@ -174,7 +174,7 @@ static int parse_dns_request(char * req, size_t req_len, char * dns_reply, size_
             uint8_t octet3 = (ip.addr >> 8) & 0xFF;
             uint8_t octet4 = ip.addr & 0xFF;
 
-            printf("IP address: %u.%u.%u.%u\n", octet1, octet2, octet3, octet4);
+            ESP_LOGI(TAG, "IP address: %u.%u.%u.%u\n", octet1, octet2, octet3, octet4);
 
             if (ip.addr == IPADDR_ANY) { // no rule applies, continue with another question
                 continue;
