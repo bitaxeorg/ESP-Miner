@@ -500,6 +500,52 @@ static esp_err_t handle_options_request(httpd_req_t * req)
     return ESP_OK;
 }
 
+bool check_json_type(int expected_type, const cJSON * const item)
+{
+    if (NULL == item) {
+        return false;
+    }
+
+    bool result = false;
+
+    if ((expected_type & cJSON_String) != 0) {
+        result = cJSON_IsString(item);
+    }
+    if (!result && (expected_type & cJSON_Number) != 0) {
+        result = cJSON_IsNumber(item);
+    }
+    if (!result && (expected_type & (cJSON_True | cJSON_False)) != 0) {
+        result = cJSON_IsBool(item);
+    }
+    if (!result && (expected_type & cJSON_True) != 0) {
+        result = cJSON_IsTrue(item);
+    }
+    if (!result && (expected_type & cJSON_False) != 0) {
+        result = cJSON_IsFalse(item);
+    }
+    if (!result && (expected_type & cJSON_Array) != 0) {
+        result = cJSON_IsArray(item);
+    }
+    if (!result && (expected_type & cJSON_Object) != 0) {
+        result = cJSON_IsObject(item);
+    }
+    if (!result && (expected_type & cJSON_Raw) != 0) {
+        result = cJSON_IsRaw(item);
+    }
+    if (!result && (expected_type & cJSON_Invalid) != 0) {
+        result = cJSON_IsInvalid(item);
+    }
+    if (!result && (expected_type & cJSON_NULL) != 0) {
+        result = cJSON_IsNull(item);
+    }
+
+    if (!result) {
+        ESP_LOGW(TAG, "Wrong API input type for setting '%s'", item->string);
+    }
+
+    return result;
+}
+
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -539,94 +585,98 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         return ESP_OK;
     }
 
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumURL"))) {
+    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "stratumURL"))) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_URL, item->valuestring);
     }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumURL"))) {
+    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "fallbackStratumURL"))) {
         nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "stratumExtranonceSubscribe")) != NULL) {
+    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "stratumExtranonceSubscribe"))) {
         nvs_config_set_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "stratumSuggestedDifficulty")) != NULL) {
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "stratumSuggestedDifficulty"))) {
         nvs_config_set_u16(NVS_CONFIG_STRATUM_DIFFICULTY, item->valueint);
     }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumUser"))) {
+    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "stratumUser"))) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_USER, item->valuestring);
     }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumPassword"))) {
+    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "stratumPassword"))) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "useFallbackStratum")) != NULL) {
+    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "useFallbackStratum"))) {
         nvs_config_set_u16(NVS_CONFIG_USE_FALLBACK_STRATUM, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumExtranonceSubscribe")) != NULL) {
+    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "fallbackStratumExtranonceSubscribe"))) {
         nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumSuggestedDifficulty")) != NULL) {
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "fallbackStratumSuggestedDifficulty"))) {
         nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, item->valueint);
     }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumUser"))) {
+    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "fallbackStratumUser"))) {
         nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, item->valuestring);
     }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumPassword"))) {
+    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "fallbackStratumPassword"))) {
         nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "stratumPort")) != NULL) {
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "stratumPort"))) {
         nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPort")) != NULL) {
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "fallbackStratumPort"))) {
         nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, item->valueint);
     }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "ssid"))) {
+    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "ssid"))) {
         nvs_config_set_string(NVS_CONFIG_WIFI_SSID, item->valuestring);
     }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "wifiPass"))) {
+    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "wifiPass"))) {
         nvs_config_set_string(NVS_CONFIG_WIFI_PASS, item->valuestring);
     }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "hostname"))) {
+    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "hostname"))) {
         nvs_config_set_string(NVS_CONFIG_HOSTNAME, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
-        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "coreVoltage"))) {
+        if (item->valueint > 0) {
+            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
+        }
     }
-    if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL && item->valuedouble > 0) {
-        float frequency = item->valuedouble;
-        nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
-        // also store as u16 for backwards compatibility
-        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, (int) frequency);
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "frequency"))) {
+        if (item->valuedouble > 0) {
+            float frequency = item->valuedouble;
+            nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
+            // also store as u16 for backwards compatibility
+            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, (int) frequency);
+        }
     }
     if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
     }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "display"))) {
+    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "display"))) {
         nvs_config_set_string(NVS_CONFIG_DISPLAY, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "rotation")) != NULL) {
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "rotation"))) {
         nvs_config_set_u16(NVS_CONFIG_ROTATION, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
+    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "invertscreen"))) {
         nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "displayTimeout")) != NULL) {
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "displayTimeout"))) {
         nvs_config_set_i32(NVS_CONFIG_DISPLAY_TIMEOUT, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "autofanspeed")) != NULL) {
+    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "autofanspeed"))) {
         nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "fanspeed"))) {
         nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "minFanSpeed")) != NULL) {
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "minFanSpeed"))) {
         nvs_config_set_u16(NVS_CONFIG_MIN_FAN_SPEED, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "temptarget")) != NULL) {
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "temptarget"))) {
         nvs_config_set_u16(NVS_CONFIG_TEMP_TARGET, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "statsFrequency")) != NULL) {
+    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "statsFrequency"))) {
         nvs_config_set_u16(NVS_CONFIG_STATISTICS_FREQUENCY, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "overclockEnabled")) != NULL) {
+    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "overclockEnabled"))) {
         nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
     }
 
