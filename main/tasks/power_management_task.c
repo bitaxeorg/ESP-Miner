@@ -72,7 +72,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     power_management->frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     ESP_LOGI(TAG, "ASIC Frequency: %.2fMHz", (float)power_management->frequency_value);
     uint16_t last_asic_frequency = power_management->frequency_value;
-    
+
+    power_management->chip_temp_max = 0.0;
+    power_management->vr_temp_max = 0.0;
+
     while (1) {
 
         // Refresh PID setpoint from NVS in case it was changed via API
@@ -83,8 +86,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
+        if (power_management->chip_temp_avg > power_management->chip_temp_max) {
+            power_management->chip_temp_max = power_management->chip_temp_avg;
+        }
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
+        if (power_management->vr_temp > power_management->vr_temp_max) {
+            power_management->vr_temp_max = power_management->vr_temp;
+        }
 
         // ASIC Thermal Diode will give bad readings if the ASIC is turned off
         // if(power_management->voltage < tps546_config.TPS546_INIT_VOUT_MIN){
