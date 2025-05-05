@@ -33,6 +33,8 @@
 #define NVS_CONFIG_OVERHEAT_MODE "overheat_mode"
 #define NVS_CONFIG_OVERCLOCK_ENABLED "oc_enabled"
 #define NVS_CONFIG_SWARM "swarmconfig"
+#define NVS_CONFIG_STATISTICS_LIMIT "statsLimit"
+#define NVS_CONFIG_STATISTICS_DURATION "statsDuration"
 
 // Theme configuration
 #define NVS_CONFIG_THEME_SCHEME "themescheme"
