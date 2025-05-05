@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { delay, Observable, of } from 'rxjs';
 import { eASICModel } from 'src/models/enum/eASICModel';
 import { ISystemInfo } from 'src/models/ISystemInfo';
+import { ISystemStatistics } from 'src/models/ISystemStatistics';
 
 import { environment } from '../../environments/environment';
 
@@ -66,6 +67,8 @@ export class SystemService {
           autofanspeed: 1,
           fanspeed: 100,
           temptarget: 60,
+          statsLimit: 360,
+          statsDuration: 2,
           fanrpm: 0,
 
           boardtemp1: 30,
@@ -73,6 +76,30 @@ export class SystemService {
           overheat_mode: 0
         }
       ).pipe(delay(1000));
+    }
+  }
+
+  public getStatistics(uri: string = ''): Observable<ISystemStatistics> {
+    if (environment.production) {
+      return this.httpClient.get(`${uri}/api/system/statistics`) as Observable<ISystemStatistics>;
+    } else {
+      // Mock data for development
+      return of({
+        maxTimeConfig: 3,
+        currentTimestamp: 61125,
+        statistics: [
+          {"hash":0,"temp":-1,"power":14.45068359375,"timestamp":13131},
+          {"hash":413.4903744405481,"temp":58.5,"power":14.86083984375,"timestamp":18126},
+          {"hash":410.7764830376959,"temp":59.625,"power":15.03173828125,"timestamp":23125},
+          {"hash":440.100549473198,"temp":60.125,"power":15.1171875,"timestamp":28125},
+          {"hash":430.5816012914026,"temp":60.75,"power":15.1171875,"timestamp":33125},
+          {"hash":452.5464981767163,"temp":61.5,"power":15.1513671875,"timestamp":38125},
+          {"hash":414.9564271189586,"temp":61.875,"power":15.185546875,"timestamp":43125},
+          {"hash":498.7294609150379,"temp":62.125,"power":15.27099609375,"timestamp":48125},
+          {"hash":411.1671601439723,"temp":62.5,"power":15.30517578125,"timestamp":53125},
+          {"hash":491.327834852684,"temp":63,"power":15.33935546875,"timestamp":58125}
+        ]
+      }).pipe(delay(1000));
     }
   }
 
