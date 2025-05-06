@@ -251,7 +251,15 @@
                     </tr>
                     <tr>
                         <td>User:</td>
-                        <td>{{ activePoolUser }}</td>
+                        <td>
+                            <span 
+                                pTooltip="{{ activePoolUser }}" 
+                                tooltipPosition="bottom">
+                                {{ activePoolUser.length > 20 ? 
+                                   activePoolUser.substring(0, 6) + '...' + activePoolUser.substring(activePoolUser.length - 14) : 
+                                   activePoolUser }}
+                            </span>
+                        </td>
                     </tr>
                 </table>
             </div>
