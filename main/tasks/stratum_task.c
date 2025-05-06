@@ -197,6 +197,11 @@ void stratum_task(void * pvParameters)
     xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL);
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
+    while(!GLOBAL_STATE->job_queue_initalized){
+        ESP_LOGI(TAG, "Waiting for jobs queres to init....");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        continue;
+    }
     while (1) {
         if (!is_wifi_connected()) {
             ESP_LOGI(TAG, "WiFi disconnected, attempting to reconnect...");
