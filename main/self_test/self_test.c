@@ -24,6 +24,10 @@
 #include "esp_psram.h"
 #include "power.h"
 
+#include "bm1397.h"
+#include "bm1366.h"
+#include "bm1368.h"
+#include "bm1370.h"
 #include "asic.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
@@ -268,11 +272,11 @@ esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            ESP_RETURN_ON_ERROR(EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1)), TAG, "EMC2101 init failed!");
+            ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
             EMC2101_set_fan_speed(1);
             break;
         case DEVICE_GAMMA:
-            ESP_RETURN_ON_ERROR(EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1)), TAG, "EMC2101 init failed!");
+            ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
             EMC2101_set_fan_speed(1);
             EMC2101_set_ideality_factor(EMC2101_IDEALITY_1_0319);
             EMC2101_set_beta_compensation(EMC2101_BETA_11);

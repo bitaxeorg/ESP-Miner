@@ -1,4 +1,4 @@
-
+#include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -10,10 +10,10 @@
 #include "lwip/lwip_napt.h"
 #include "lwip/sys.h"
 #include "nvs_flash.h"
-#include <string.h>
+#include "esp_wifi_types_generic.h"
 
 #include "connect.h"
-#include "main.h"
+#include "global_state.h"
 
 // Maximum number of access points to scan
 #define MAX_AP_COUNT 20
@@ -49,15 +49,15 @@
 #define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WAPI_PSK
 #endif
 
-/* FreeRTOS event group to signal when we are connected*/
-static EventGroupHandle_t s_wifi_event_group;
-
-static const char * TAG = "wifi_station";
+static const char * TAG = "connect";
 
 static bool is_scanning = false;
 static uint16_t ap_number = 0;
 static wifi_ap_record_t ap_info[MAX_AP_COUNT];
+static int s_retry_num = 0;
+static int clients_connected_to_ap = 0;
 
+static const char *get_wifi_reason_string(int reason);
 
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
@@ -132,12 +132,9 @@ esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
     return ESP_OK;
 }
 
-static int s_retry_num = 0;
-
-static char * _ip_addr_str;
-
 static void event_handler(void * arg, esp_event_base_t event_base, int32_t event_id, void * event_data)
 {
+    GlobalState *GLOBAL_STATE = (GlobalState *)arg;
     if (event_base == WIFI_EVENT)
     {
         if (event_id == WIFI_EVENT_SCAN_DONE) {
@@ -155,9 +152,17 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         }
 
         if (event_id == WIFI_EVENT_STA_START) {
+            ESP_LOGI(TAG, "Connecting...");
+            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connecting...");
             esp_wifi_connect();
-            MINER_set_wifi_status(WIFI_CONNECTING, 0, 0);
-        } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        }
+
+        if (event_id == WIFI_EVENT_STA_CONNECTED) {
+            ESP_LOGI(TAG, "Connected!");
+            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
+        }
+
+        if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
             wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
             if (event->reason == WIFI_REASON_ROAMING) {
                 ESP_LOGI(TAG, "We are roaming, nothing to do");
@@ -166,48 +171,66 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
             ESP_LOGI(TAG, "Could not connect to '%s' [rssi %d]: reason %d", event->ssid, event->rssi, event->reason);
 
+            if (clients_connected_to_ap > 0) {
+                ESP_LOGI(TAG, "Client(s) connected to AP, not retrying...");
+                sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Config AP connected!");
+                return;
+            }
+
+            sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
+            ESP_LOGI(TAG, "Wi-Fi status: %s", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
+
             // Wait a little
-            esp_wifi_connect();
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+
             s_retry_num++;
             ESP_LOGI(TAG, "Retrying Wi-Fi connection...");
-            MINER_set_wifi_status(WIFI_RETRYING, s_retry_num, event->reason);
-            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            esp_wifi_connect();
+        }
+        
+        if (event_id == WIFI_EVENT_AP_START) {
+            ESP_LOGI(TAG, "Configuration Access Point enabled");
+            GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = true;
+        }
+                
+        if (event_id == WIFI_EVENT_AP_STOP) {
+            ESP_LOGI(TAG, "Configuration Access Point disabled");
+            GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = false;
+        }
+
+        if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+            clients_connected_to_ap += 1;
+        }
+        
+        if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+            clients_connected_to_ap -= 1;
         }
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t * event = (ip_event_got_ip_t *) event_data;
-        snprintf(_ip_addr_str, IP4ADDR_STRLEN_MAX, IPSTR, IP2STR(&event->ip_info.ip));
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str, IP4ADDR_STRLEN_MAX, IPSTR, IP2STR(&event->ip_info.ip));
 
-        ESP_LOGI(TAG, "Bitaxe ip: %s", _ip_addr_str);
+        ESP_LOGI(TAG, "IP Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str);
         s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        MINER_set_wifi_status(WIFI_CONNECTED, 0, 0);
+
+        GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
     }
 }
 
-void generate_ssid(char * ssid)
-{
-    uint8_t mac[6];
-    esp_wifi_get_mac(ESP_IF_WIFI_AP, mac);
-    // Format the last 4 bytes of the MAC address as a hexadecimal string
-    snprintf(ssid, 32, "Bitaxe_%02X%02X", mac[4], mac[5]);
-}
-
-esp_netif_t * wifi_init_softap(void)
+esp_netif_t * wifi_init_softap(char * ap_ssid)
 {
     esp_netif_t * esp_netif_ap = esp_netif_create_default_wifi_ap();
 
-    // Define a buffer for the SSID
-    char ssid_with_mac[13]; // "Bitaxe" + 4 bytes from MAC address
-
-    // Generate the SSID
-    generate_ssid(ssid_with_mac);
+    uint8_t mac[6];
+    esp_wifi_get_mac(ESP_IF_WIFI_AP, mac);
+    // Format the last 4 bytes of the MAC address as a hexadecimal string
+    snprintf(ap_ssid, 32, "Bitaxe_%02X%02X", mac[4], mac[5]);
 
     wifi_config_t wifi_ap_config;
     memset(&wifi_ap_config, 0, sizeof(wifi_ap_config)); // Clear the structure
-    strncpy((char *) wifi_ap_config.ap.ssid, ssid_with_mac, sizeof(wifi_ap_config.ap.ssid));
-    wifi_ap_config.ap.ssid_len = strlen(ssid_with_mac);
+    strncpy((char *) wifi_ap_config.ap.ssid, ap_ssid, sizeof(wifi_ap_config.ap.ssid));
+    wifi_ap_config.ap.ssid_len = strlen(ap_ssid);
     wifi_ap_config.ap.channel = 1;
     wifi_ap_config.ap.max_connection = 10;
     wifi_ap_config.ap.authmode = WIFI_AUTH_OPEN;
@@ -232,16 +255,12 @@ void toggle_wifi_softap(void)
 
 void wifi_softap_off(void)
 {
-    ESP_LOGI(TAG, "ESP_WIFI Access Point Off");
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    MINER_set_ap_status(false);
 }
 
 void wifi_softap_on(void)
 {
-    ESP_LOGI(TAG, "ESP_WIFI Access Point On");
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-    MINER_set_ap_status(true);
 }
 
 /* Initialize wifi station */
@@ -297,19 +316,17 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
     return esp_netif_sta;
 }
 
-void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * hostname, char * ip_addr_str)
+void wifi_init(void * pvParameters, const char * wifi_ssid, const char * wifi_pass, const char * hostname)
 {
-    _ip_addr_str = ip_addr_str;
-
-    s_wifi_event_group = xEventGroupCreate();
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &instance_got_ip));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, GLOBAL_STATE, &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, GLOBAL_STATE, &instance_got_ip));
 
     /* Initialize Wi-Fi */
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -318,9 +335,7 @@ void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * host
     wifi_softap_on();
 
     /* Initialize AP */
-    ESP_LOGI(TAG, "ESP_WIFI Access Point On");
-    wifi_init_softap();
-
+    wifi_init_softap(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid);
 
     /* Skip connection if SSID is null */
     if (strlen(wifi_ssid) == 0) {
@@ -358,14 +373,80 @@ void wifi_init(const char * wifi_ssid, const char * wifi_pass, const char * host
     }
 }
 
-EventBits_t wifi_connect(void)
-{
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+typedef struct {
+    int reason;
+    const char *description;
+} wifi_reason_desc_t;
 
-    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
-     * happened. */
+static const wifi_reason_desc_t wifi_reasons[] = {
+    {WIFI_REASON_UNSPECIFIED,                        "Unspecified reason"},
+    {WIFI_REASON_AUTH_EXPIRE,                        "Authentication expired"},
+    {WIFI_REASON_AUTH_LEAVE,                         "Deauthentication due to leaving"},
+    {WIFI_REASON_DISASSOC_DUE_TO_INACTIVITY,         "Disassociated due to inactivity"},
+    {WIFI_REASON_ASSOC_TOOMANY,                      "Too many associated stations"},
+    {WIFI_REASON_CLASS2_FRAME_FROM_NONAUTH_STA,      "Class 2 frame from non-authenticated STA"},
+    {WIFI_REASON_CLASS3_FRAME_FROM_NONASSOC_STA,     "Class 3 frame from non-associated STA"},
+    {WIFI_REASON_ASSOC_LEAVE,                        "Deassociated due to leaving"},
+    {WIFI_REASON_ASSOC_NOT_AUTHED,                   "Association but not authenticated"},
+    {WIFI_REASON_DISASSOC_PWRCAP_BAD,                "Disassociated due to poor power capability"},
+    {WIFI_REASON_DISASSOC_SUPCHAN_BAD,               "Disassociated due to unsupported channel"},
+    {WIFI_REASON_BSS_TRANSITION_DISASSOC,            "Disassociated due to BSS transition"},
+    {WIFI_REASON_IE_INVALID,                         "Invalid Information Element"},
+    {WIFI_REASON_MIC_FAILURE,                        "MIC failure detected"},
+    {WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT,             "Incorrect password entered"}, // 4-way handshake timeout
+    {WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT,           "Group key update timeout"},
+    {WIFI_REASON_IE_IN_4WAY_DIFFERS,                 "IE differs in 4-way handshake"},
+    {WIFI_REASON_GROUP_CIPHER_INVALID,               "Invalid group cipher"},
+    {WIFI_REASON_PAIRWISE_CIPHER_INVALID,            "Invalid pairwise cipher"},
+    {WIFI_REASON_AKMP_INVALID,                       "Invalid AKMP"},
+    {WIFI_REASON_UNSUPP_RSN_IE_VERSION,              "Unsupported RSN IE version"},
+    {WIFI_REASON_INVALID_RSN_IE_CAP,                 "Invalid RSN IE capabilities"},
+    {WIFI_REASON_802_1X_AUTH_FAILED,                 "802.1X authentication failed"},
+    {WIFI_REASON_CIPHER_SUITE_REJECTED,              "Cipher suite rejected"},
+    {WIFI_REASON_TDLS_PEER_UNREACHABLE,              "TDLS peer unreachable"},
+    {WIFI_REASON_TDLS_UNSPECIFIED,                   "TDLS unspecified error"},
+    {WIFI_REASON_SSP_REQUESTED_DISASSOC,             "SSP requested disassociation"},
+    {WIFI_REASON_NO_SSP_ROAMING_AGREEMENT,           "No SSP roaming agreement"},
+    {WIFI_REASON_BAD_CIPHER_OR_AKM,                  "Bad cipher or AKM"},
+    {WIFI_REASON_NOT_AUTHORIZED_THIS_LOCATION,       "Not authorized in this location"},
+    {WIFI_REASON_SERVICE_CHANGE_PERCLUDES_TS,        "Service change precludes TS"},
+    {WIFI_REASON_UNSPECIFIED_QOS,                    "Unspecified QoS reason"},
+    {WIFI_REASON_NOT_ENOUGH_BANDWIDTH,               "Not enough bandwidth"},
+    {WIFI_REASON_MISSING_ACKS,                       "Missing ACKs"},
+    {WIFI_REASON_EXCEEDED_TXOP,                      "Exceeded TXOP"},
+    {WIFI_REASON_STA_LEAVING,                        "Station leaving"},
+    {WIFI_REASON_END_BA,                             "End of Block Ack"},
+    {WIFI_REASON_UNKNOWN_BA,                         "Unknown Block Ack"},
+    {WIFI_REASON_TIMEOUT,                            "Timeout occured"},
+    {WIFI_REASON_PEER_INITIATED,                     "Peer-initiated disassociation"},
+    {WIFI_REASON_AP_INITIATED,                       "Access Point-initiated disassociation"},
+    {WIFI_REASON_INVALID_FT_ACTION_FRAME_COUNT,      "Invalid FT action frame count"},
+    {WIFI_REASON_INVALID_PMKID,                      "Invalid PMKID"},
+    {WIFI_REASON_INVALID_MDE,                        "Invalid MDE"},
+    {WIFI_REASON_INVALID_FTE,                        "Invalid FTE"},
+    {WIFI_REASON_TRANSMISSION_LINK_ESTABLISH_FAILED, "Transmission link establishment failed"},
+    {WIFI_REASON_ALTERATIVE_CHANNEL_OCCUPIED,        "Alternative channel occupied"},
+    {WIFI_REASON_BEACON_TIMEOUT,                     "Beacon timeout"},
+    {WIFI_REASON_NO_AP_FOUND,                        "No access point found"},
+    {WIFI_REASON_AUTH_FAIL,                          "Authentication failed"},
+    {WIFI_REASON_ASSOC_FAIL,                         "Association failed"},
+    {WIFI_REASON_HANDSHAKE_TIMEOUT,                  "Handshake timeout"},
+    {WIFI_REASON_CONNECTION_FAIL,                    "Connection failed"},
+    {WIFI_REASON_AP_TSF_RESET,                       "Access point TSF reset"},
+    {WIFI_REASON_ROAMING,                            "Roaming in progress"},
+    {WIFI_REASON_ASSOC_COMEBACK_TIME_TOO_LONG,       "Association comeback time too long"},
+    {WIFI_REASON_SA_QUERY_TIMEOUT,                   "SA query timeout"},
+    {WIFI_REASON_NO_AP_FOUND_W_COMPATIBLE_SECURITY,  "No access point found with compatible security"},
+    {WIFI_REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD,  "No access point found in auth mode threshold"},
+    {WIFI_REASON_NO_AP_FOUND_IN_RSSI_THRESHOLD,      "No access point found in RSSI threshold"},
+    {0,                                               NULL},
+};
 
-    return bits;
+static const char *get_wifi_reason_string(int reason) {
+    for (int i = 0; wifi_reasons[i].reason != 0; i++) {
+        if (wifi_reasons[i].reason == reason) {
+            return wifi_reasons[i].description;
+        }
+    }
+    return "Unknown error";
 }

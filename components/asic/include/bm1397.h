@@ -9,25 +9,13 @@
 
 #define BM1397_ASIC_DIFFICULTY 256
 
-#define BM1937_SERIALTX_DEBUG true
-#define BM1937_SERIALRX_DEBUG false
+#define BM1397_SERIALTX_DEBUG true
+#define BM1397_SERIALRX_DEBUG false
 #define BM1397_DEBUG_WORK false //causes insane amount of debug output
 #define BM1397_DEBUG_JOBS false //causes insane amount of debug output
 
 static const uint64_t BM1397_CORE_COUNT = 168;
 static const uint64_t BM1397_SMALL_CORE_COUNT = 672;
-
-typedef enum
-{
-    JOB_PACKET = 0,
-    CMD_PACKET = 1,
-} packet_type_t;
-
-typedef enum
-{
-    JOB_RESP = 0,
-    CMD_RESP = 1,
-} response_type_t;
 
 typedef struct __attribute__((__packed__))
 {
