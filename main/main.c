@@ -8,6 +8,7 @@
 #include "asic_result_task.h"
 #include "asic_task.h"
 #include "create_jobs_task.h"
+#include "statistics_task.h"
 #include "system.h"
 #include "http_server.h"
 #include "nvs_config.h"
@@ -77,6 +78,7 @@ void app_main(void)
     }
 
     SYSTEM_init_system(&GLOBAL_STATE);
+    statistics_init(&GLOBAL_STATE);
 
     char * wifi_ssid;
     char * wifi_pass;
@@ -128,4 +130,5 @@ void app_main(void)
     xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
+    xTaskCreate(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL);
 }
