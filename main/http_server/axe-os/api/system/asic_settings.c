@@ -52,7 +52,7 @@ esp_err_t GET_system_asic(httpd_req_t *req)
 
     cJSON *voltageOptions = cJSON_CreateArray();
     count = 0;
-    while (GLOBAL_STATE->DEVICE_CONFIG.family.asic.frequency_options[count] != 0) {
+    while (GLOBAL_STATE->DEVICE_CONFIG.family.asic.voltage_options[count] != 0) {
         cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(GLOBAL_STATE->DEVICE_CONFIG.family.asic.voltage_options[count]));
         count++;
     }
