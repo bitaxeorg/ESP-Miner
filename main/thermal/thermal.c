@@ -4,41 +4,68 @@
 
 
 esp_err_t Thermal_init(DeviceModel device_model) {
-        //init the EMC2101, if we have one
+    esp_err_t err = ESP_OK;
+    
+    //init the EMC2101, if we have one
     switch (device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            EMC2101_init();
+            err = EMC2101_init();
+            if (err != ESP_OK) {
+                return err;
+            }
             break;
         case DEVICE_GAMMA:
-            EMC2101_init();
-            EMC2101_set_ideality_factor(EMC2101_IDEALITY_1_0319);
-            EMC2101_set_beta_compensation(EMC2101_BETA_11);
+            err = EMC2101_init();
+            if (err != ESP_OK) {
+                return err;
+            }
+            
+            err = EMC2101_set_ideality_factor(EMC2101_IDEALITY_1_0319);
+            if (err != ESP_OK) {
+                return err;
+            }
+            
+            err = EMC2101_set_beta_compensation(EMC2101_BETA_11);
+            if (err != ESP_OK) {
+                return err;
+            }
             break;
         case DEVICE_GAMMATURBO:
-            EMC2103_init();
+            err = EMC2103_init();
+            if (err != ESP_OK) {
+                return err;
+            }
             break;
         default:
+            break;
     }
     return ESP_OK;
-    
 }
 
 //percent is a float between 0.0 and 1.0
 esp_err_t Thermal_set_fan_percent(DeviceModel device_model, float percent) {
+    esp_err_t err = ESP_OK;
 
     switch (device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
         case DEVICE_GAMMA:
-            EMC2101_set_fan_speed(percent);
+            err = EMC2101_set_fan_speed(percent);
+            if (err != ESP_OK) {
+                return err;
+            }
             break;
         case DEVICE_GAMMATURBO:
-            EMC2103_set_fan_speed(percent);
+            err = EMC2103_set_fan_speed(percent);
+            if (err != ESP_OK) {
+                return err;
+            }
             break;
         default:
+            break;
     }
     return ESP_OK;
 }
