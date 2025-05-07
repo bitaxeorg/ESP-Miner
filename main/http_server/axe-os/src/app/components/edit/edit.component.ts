@@ -45,7 +45,7 @@ export class EditComponent implements OnInit, OnDestroy {
     [eASICModel.BM1366]: 1200,
     [eASICModel.BM1368]: 1166,
     [eASICModel.BM1370]: 1150,
-    [eASICModel.BM1397]: 1200
+    [eASICModel.BM1397]: 1400
   };
 
   private destroy$ = new Subject<void>();
