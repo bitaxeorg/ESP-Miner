@@ -8,6 +8,7 @@ import { NetworkComponent } from './components/network/network.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
 import { DesignComponent } from './components/design/design.component';
 import { PoolComponent } from './components/pool/pool.component';
+import { InfluxdbComponent } from './components/influxdb/influxdb.component';
 import { AppLayoutComponent } from './layout/app.layout.component';
 import { ApModeGuard } from './guards/ap-mode.guard';
 
@@ -54,6 +55,10 @@ const routes: Routes = [
       {
         path: 'pool',
         component: PoolComponent
+      },
+      {
+        path: 'influxdb',
+        component: InfluxdbComponent
       }
     ]
   },

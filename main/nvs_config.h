@@ -37,6 +37,15 @@
 #define NVS_CONFIG_THEME_SCHEME "themescheme"
 #define NVS_CONFIG_THEME_COLORS "themecolors"
 
+// InfluxDB configuration
+#define NVS_CONFIG_INFLUX_ENABLED "influxenabled"
+#define NVS_CONFIG_INFLUX_HOST "influxhost"
+#define NVS_CONFIG_INFLUX_PORT "influxport"
+#define NVS_CONFIG_INFLUX_TOKEN "influxtoken"
+#define NVS_CONFIG_INFLUX_BUCKET "influxbucket"
+#define NVS_CONFIG_INFLUX_ORG "influxorg"
+#define NVS_CONFIG_INFLUX_MEASUREMENT "influxmeasure"
+
 char * nvs_config_get_string(const char * key, const char * default_value);
 void nvs_config_set_string(const char * key, const char * default_value);
 uint16_t nvs_config_get_u16(const char * key, const uint16_t default_value);
