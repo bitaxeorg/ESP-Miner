@@ -114,7 +114,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled) {
                     ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%", power_management->chip_temp_avg);
                     power_management->fan_perc = 70;
-                    Thermal_set_fan_percent(GLOBAL_STATE->device_model, 0.7);
+                    Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, 0.7);
                 } else {
                     ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f°C", power_management->chip_temp_avg);
                 }
