@@ -57,6 +57,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     power_management->frequency_multiplier = 1;
+    power_management->chip_temp_highest = 0.0;
+    power_management->vr_temp_highest = 0.0;
 
     //int last_frequency_increase = 0;
     //uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
@@ -75,8 +77,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         power_management->fan_rpm = Thermal_get_fan_speed(GLOBAL_STATE->device_model);
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
+        if (power_management->chip_temp_avg > power_management->chip_temp_highest) {
+            power_management->chip_temp_highest = power_management->chip_temp_avg;
+        }
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
+        if (power_management->vr_temp > power_management->vr_temp_highest) {
+            power_management->vr_temp_highest = power_management->vr_temp;
+        }
 
 
         // ASIC Thermal Diode will give bad readings if the ASIC is turned off

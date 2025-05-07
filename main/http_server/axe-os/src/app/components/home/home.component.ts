@@ -238,6 +238,7 @@ export class HomeComponent {
         info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
         info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
+        info.tempHighest = parseFloat(info.tempHighest.toFixed(1));
 
         return info;
       }),

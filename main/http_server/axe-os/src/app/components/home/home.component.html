@@ -259,8 +259,20 @@
 
         <div class="col-12 lg:col-6">
             <div class="card" *ngIf="info$ | async as info; else loading">
-                <h5>Uptime</h5>
-                {{info.uptimeSeconds | dateAgo}}
+                <h5>Uptime Information</h5>
+                <table>
+                    <tr>
+                        <td>{{info.uptimeSeconds | dateAgo}}</td>
+                    </tr>
+                    <tr>
+                        <td>Highest ASIC Temperature:</td>
+                        <td>{{info.tempHighest}}&deg;C</td>
+                    </tr>
+                    <tr>
+                        <td>Highest VR Temperature:</td>
+                        <td>{{info.vrTempHighest}}&deg;C</td>
+                    </tr>
+                </table>
             </div>
         </div>
 
