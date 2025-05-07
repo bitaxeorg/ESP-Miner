@@ -1,59 +1,71 @@
-<div class="grid">
-    <div class="col-12 lg:col-6">
-        <div class="card">
-            <h2>Overview</h2>
-            <table *ngIf="info$ | async as info">
-                <tr>
-                    <td>Model:</td>
-                    <td>{{info.ASICModel}}</td>
-                </tr>
-                <tr>
-                    <td>Uptime:</td>
-                    <td>{{info.uptimeSeconds | dateAgo}}</td>
-                </tr>
-                <tr>
-                    <td>Wi-Fi Status:</td>
-                    <td>{{info.wifiStatus}}</td>
-                </tr>
-                <tr>
-                    <td>MAC Address:</td>
-                    <td>{{info.macAddr}}</td>
-                </tr>
-                <tr>
-                    <td>Free Heap Memory:</td>
-                    <td>{{info.freeHeap}}</td>
-                </tr>
-                <tr>
-                    <td>Version:</td>
-                    <td>{{info.version}}</td>
-                </tr>
-                <tr>
-                    <td>ESP-IDF Version:</td>
-                    <td>{{info.idfVersion}}</td>
-                </tr>
-                <tr>
-                    <td>Board Version:</td>
-                    <td>{{info.boardVersion}}</td>
-                </tr>
-            </table>
-        </div>
+<ng-container *ngIf="form != null">
+    <form [formGroup]="form">
 
-    </div>
+        <div class="grid">
+            <div class="col-12 lg:col-6">
+                <div class="card">
+                    <h2>Overview</h2>
+                    <table *ngIf="info$ | async as info">
+                        <tr>
+                            <td>Model:</td>
+                            <td>{{info.ASICModel}}</td>
+                        </tr>
+                        <tr>
+                            <td>Uptime:</td>
+                            <td>{{info.uptimeSeconds | dateAgo}}</td>
+                        </tr>
+                        <tr>
+                            <td>Wi-Fi Status:</td>
+                            <td>{{info.wifiStatus}}</td>
+                        </tr>
+                        <tr>
+                            <td>MAC Address:</td>
+                            <td>{{info.macAddr}}</td>
+                        </tr>
+                        <tr>
+                            <td>Free Heap Memory:</td>
+                            <td>{{info.freeHeap}}</td>
+                        </tr>
+                        <tr>
+                            <td>Version:</td>
+                            <td>{{info.version}}</td>
+                        </tr>
+                        <tr>
+                            <td>ESP-IDF Version:</td>
+                            <td>{{info.idfVersion}}</td>
+                        </tr>
+                        <tr>
+                            <td>Board Version:</td>
+                            <td>{{info.boardVersion}}</td>
+                        </tr>
+                    </table>
+                </div>
 
-    <div class="col-12">
-        <div class="card">
-            <h2>Realtime Logs <button pButton (click)="toggleLogs()" style="margin-left: 15px;"
-                    class="btn btn-secondary">{{showLogs
-                    ? 'Hide': 'Show'}}
-                    Logs</button>
+            </div>
 
-                <button pButton style="margin-left: 15px;" class="btn btn-secondary" (click)="stopScroll = !stopScroll"
-                    *ngIf="showLogs">{{stopScroll ? 'Start' : 'Stop'}} Scrolling</button>
-            </h2>
+            <div class="col-12">
+                <div class="card">
+                    <h2>Realtime Logs <button pButton (click)="toggleLogs()" style="margin-left: 15px;"
+                            class="btn btn-secondary">{{showLogs ? 'Hide': 'Show'}} Logs</button>
+                        
+                        <button pButton style="margin-left: 15px;" class="btn btn-secondary" (click)="stopScroll = !stopScroll"
+                            *ngIf="showLogs">{{stopScroll ? 'Start' : 'Stop'}} Scrolling</button>
+                        
+                        <button pButton style="margin-left: 15px;" class="btn btn-secondary" (click)="clearLogs()"
+                            *ngIf="showLogs">Clear Logs</button>
+                    </h2>
 
-            <div *ngIf="showLogs" id="logs" #scrollContainer>
-                <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
+                    <div *ngIf="showLogs" id="logs" #scrollContainer>
+                        <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
+                    </div>
+
+                    <div *ngIf="showLogs" >
+                        <input pInputText style="margin-top: 15px;" class="btn btn-secondary" type="text" autocomplete="off"
+                            *ngIf="showLogs" placeholder="Case-sensitive filter text" id="filter" formControlName="filter" />
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</div>
+
+    </form>
+</ng-container>
