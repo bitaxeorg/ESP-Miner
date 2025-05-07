@@ -43,6 +43,7 @@ typedef struct {
     uint16_t max_power;
     uint16_t power_offset;
     uint16_t nominal_voltage;
+    const char * swarm_color;
 } FamilyConfig;
 
 typedef struct {
@@ -78,12 +79,12 @@ static const AsicConfig ASIC_BM1366 = { .model = BM1366, .name = "BM1366", .chip
 static const AsicConfig ASIC_BM1368 = { .model = BM1368, .name = "BM1368", .chip_id = 1368, .default_frequency_mhz = 490, .frequency_options = BM1368_FREQUENCY_OPTIONS, .default_voltage_mv = 1166, .voltage_options = BM1368_VOLTAGE_OPTIONS, .difficulty = 256, .core_count =  80, .small_core_count = 1276, .hashrate_test_percentage_target = 0.80, };
 static const AsicConfig ASIC_BM1370 = { .model = BM1370, .name = "BM1370", .chip_id = 1370, .default_frequency_mhz = 525, .frequency_options = BM1370_FREQUENCY_OPTIONS, .default_voltage_mv = 1150, .voltage_options = BM1370_VOLTAGE_OPTIONS, .difficulty = 256, .core_count = 128, .small_core_count = 2040, .hashrate_test_percentage_target = 0.85, };
 
-static const FamilyConfig FAMILY_MAX         = { .name = "Max",        .asic = ASIC_BM1397, .asic_count = 1, .max_power = 25, .power_offset = 5,  .nominal_voltage = 5,  };
-static const FamilyConfig FAMILY_ULTRA       = { .name = "Ultra",      .asic = ASIC_BM1366, .asic_count = 1, .max_power = 25, .power_offset = 5,  .nominal_voltage = 5,  };
-static const FamilyConfig FAMILY_HEX         = { .name = "Hex",        .asic = ASIC_BM1366, .asic_count = 6, .max_power = 0,  .power_offset = 5,  .nominal_voltage = 5,  };
-static const FamilyConfig FAMILY_SUPRA       = { .name = "Supra",      .asic = ASIC_BM1368, .asic_count = 1, .max_power = 40, .power_offset = 5,  .nominal_voltage = 5,  };
-static const FamilyConfig FAMILY_GAMMA       = { .name = "Gamma",      .asic = ASIC_BM1370, .asic_count = 1, .max_power = 40, .power_offset = 5,  .nominal_voltage = 5,  };
-static const FamilyConfig FAMILY_GAMMA_TURBO = { .name = "GammaTurbo", .asic = ASIC_BM1370, .asic_count = 2, .max_power = 60, .power_offset = 10, .nominal_voltage = 12, };
+static const FamilyConfig FAMILY_MAX         = { .name = "Max",        .asic = ASIC_BM1397, .asic_count = 1, .max_power = 25, .power_offset = 5,  .nominal_voltage = 5,  .swarm_color = "red",    };
+static const FamilyConfig FAMILY_ULTRA       = { .name = "Ultra",      .asic = ASIC_BM1366, .asic_count = 1, .max_power = 25, .power_offset = 5,  .nominal_voltage = 5,  .swarm_color = "purple", };
+static const FamilyConfig FAMILY_HEX         = { .name = "Hex",        .asic = ASIC_BM1366, .asic_count = 6, .max_power = 0,  .power_offset = 5,  .nominal_voltage = 5,  .swarm_color = "orange", };
+static const FamilyConfig FAMILY_SUPRA       = { .name = "Supra",      .asic = ASIC_BM1368, .asic_count = 1, .max_power = 40, .power_offset = 5,  .nominal_voltage = 5,  .swarm_color = "blue",   };
+static const FamilyConfig FAMILY_GAMMA       = { .name = "Gamma",      .asic = ASIC_BM1370, .asic_count = 1, .max_power = 40, .power_offset = 5,  .nominal_voltage = 5,  .swarm_color = "green",  };
+static const FamilyConfig FAMILY_GAMMA_TURBO = { .name = "GammaTurbo", .asic = ASIC_BM1370, .asic_count = 2, .max_power = 60, .power_offset = 10, .nominal_voltage = 12, .swarm_color = "cyan",   };
 
 static const DeviceConfig default_configs[] = {
     { .board_version = "2.2",  .family = FAMILY_MAX,         .display = SSD1306, .EMC2101 = true,                                                             .DS4432U = true, .INA260 = true, .plug_sense = true, .asic_enable = true, .power_consumption_target = 12, },
