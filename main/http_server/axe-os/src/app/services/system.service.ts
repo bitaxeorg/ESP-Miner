@@ -81,23 +81,22 @@ export class SystemService {
 
   public getStatistics(uri: string = ''): Observable<ISystemStatistics> {
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/statistics`) as Observable<ISystemStatistics>;
+      return this.httpClient.get(`${uri}/api/system/statistics/dashboard`) as Observable<ISystemStatistics>;
     } else {
       // Mock data for development
       return of({
-        maxTimeConfig: 3,
         currentTimestamp: 61125,
         statistics: [
-          {"hash":0,"temp":-1,"power":14.45068359375,"timestamp":13131},
-          {"hash":413.4903744405481,"temp":58.5,"power":14.86083984375,"timestamp":18126},
-          {"hash":410.7764830376959,"temp":59.625,"power":15.03173828125,"timestamp":23125},
-          {"hash":440.100549473198,"temp":60.125,"power":15.1171875,"timestamp":28125},
-          {"hash":430.5816012914026,"temp":60.75,"power":15.1171875,"timestamp":33125},
-          {"hash":452.5464981767163,"temp":61.5,"power":15.1513671875,"timestamp":38125},
-          {"hash":414.9564271189586,"temp":61.875,"power":15.185546875,"timestamp":43125},
-          {"hash":498.7294609150379,"temp":62.125,"power":15.27099609375,"timestamp":48125},
-          {"hash":411.1671601439723,"temp":62.5,"power":15.30517578125,"timestamp":53125},
-          {"hash":491.327834852684,"temp":63,"power":15.33935546875,"timestamp":58125}
+          [0,-1,14.45068359375,13131],
+          [413.4903744405481,58.5,14.86083984375,18126],
+          [410.7764830376959,59.625,15.03173828125,23125],
+          [440.100549473198,60.125,15.1171875,28125],
+          [430.5816012914026,60.75,15.1171875,33125],
+          [452.5464981767163,61.5,15.1513671875,38125],
+          [414.9564271189586,61.875,15.185546875,43125],
+          [498.7294609150379,62.125,15.27099609375,48125],
+          [411.1671601439723,62.5,15.30517578125,53125],
+          [491.327834852684,63,15.33935546875,58125]
         ]
       }).pipe(delay(1000));
     }

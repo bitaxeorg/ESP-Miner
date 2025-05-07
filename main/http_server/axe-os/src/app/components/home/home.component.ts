@@ -198,10 +198,15 @@ export class HomeComponent {
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({refCount: true, bufferSize: 1}));
     this.stats$.subscribe(stats => {
       stats.statistics.forEach(element => {
-        this.previousHashrateData.push(element.hash * 1000000000);
-        this.previousTemperatureData.push(element.temp);
-        this.previousPowerData.push(element.power);
-        this.previousDataLabel.push(new Date().getTime() - stats.currentTimestamp + element.timestamp);
+        const idxHashrate = 0;
+        const idxTemperature = 1;
+        const idxPower = 2;
+        const idxTimestamp = 3;
+
+        this.previousHashrateData.push(element[idxHashrate] * 1000000000);
+        this.previousTemperatureData.push(element[idxTemperature]);
+        this.previousPowerData.push(element[idxPower]);
+        this.previousDataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
 
         if (this.previousHashrateData.length >= 720) {
           this.previousHashrateData.shift();

@@ -7,6 +7,9 @@
 #include "statistics_task.h"
 #include "global_state.h"
 #include "nvs_config.h"
+#include "power.h"
+#include "connect.h"
+#include "vcore.h"
 
 #define DEFAULT_POLL_RATE 5000
 
@@ -20,9 +23,9 @@ static uint16_t maxDataCount = 0;
 static uint16_t currentDataCount = 0;
 static uint16_t duration = 0;
 
-StatisticsNodePtr addStatisticData(double hashrate, float temperature, float power, int64_t timestamp)
+StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
 {
-    if (0 == maxDataCount) {
+    if ((NULL == data) || (0 == maxDataCount)) {
         return NULL;
     }
 
@@ -48,10 +51,7 @@ StatisticsNodePtr addStatisticData(double hashrate, float temperature, float pow
             }
         }
 
-        newData->hashrate = hashrate;
-        newData->temperature = temperature;
-        newData->power = power;
-        newData->timestamp = timestamp;
+        *newData = *data;
         newData->next = NULL;
 
         if ((NULL != statisticsDataEnd) && (newData != statisticsDataEnd)) {
@@ -65,9 +65,9 @@ StatisticsNodePtr addStatisticData(double hashrate, float temperature, float pow
     return newData;
 }
 
-StatisticsNextNodePtr statisticData(StatisticsNodePtr node, double * hashrate, float * temperature, float * power, int64_t * timestamp)
+StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr dataOut)
 {
-    if ((NULL == node) || (0 == maxDataCount)) {
+    if ((NULL == nodeIn) || (NULL == dataOut) || (0 == maxDataCount)) {
         return NULL;
     }
 
@@ -75,19 +75,8 @@ StatisticsNextNodePtr statisticData(StatisticsNodePtr node, double * hashrate, f
 
     pthread_mutex_lock(&statisticsDataLock);
 
-    if (NULL != hashrate) {
-        *hashrate = node->hashrate;
-    }
-    if (NULL != temperature) {
-        *temperature = node->temperature;
-    }
-    if (NULL != power) {
-        *power = node->power;
-    }
-    if (NULL != timestamp) {
-        *timestamp = node->timestamp;
-    }
-    nextNode = node->next;
+    *dataOut = *nodeIn;
+    nextNode = nodeIn->next;
 
     pthread_mutex_unlock(&statisticsDataLock);
 
@@ -124,14 +113,28 @@ void statistics_task(void * pvParameters)
     }
 
     const uint32_t pollRate = DEFAULT_POLL_RATE * duration;
+    struct StatisticsData statsData;
 
     ESP_LOGI(TAG, "Ready!");
 
     while (1) {
-        addStatisticData(sys_module->current_hashrate,
-                         power_management->chip_temp_avg,
-                         power_management->power,
-                         esp_timer_get_time() / 1000);
+        int8_t wifiRSSI = -90;
+        get_wifi_current_rssi(&wifiRSSI);
+
+        statsData.timestamp = esp_timer_get_time() / 1000;
+        statsData.hashrate = sys_module->current_hashrate;
+        statsData.chipTemperature = power_management->chip_temp_avg;
+        statsData.vrTemperature = power_management->vr_temp;
+        statsData.power = power_management->power;
+        statsData.voltage = power_management->voltage;
+        statsData.current = Power_get_current(GLOBAL_STATE);
+        statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
+        statsData.fanSpeed = power_management->fan_perc;
+        statsData.fanRPM = power_management->fan_rpm;
+        statsData.wifiRSSI = wifiRSSI;
+        statsData.freeHeap = esp_get_free_heap_size();
+
+        addStatisticData(&statsData);
 
         // looper:
         vTaskDelay(pollRate / portTICK_PERIOD_MS);

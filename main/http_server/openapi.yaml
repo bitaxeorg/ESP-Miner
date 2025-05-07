@@ -577,6 +577,46 @@ paths:
                 type: object
                 required:
                   - currentTimestamp
+                  - labels
+                  - statistics
+                properties:
+                  currentTimestamp:
+                    type: number
+                    description: Current timestamp as a reference
+                  labels:
+                    type: array
+                    description: Labels for statistics data value index
+                    items:
+                      type: string
+                  statistics:
+                    type: array
+                    description: Statistics data point(s)
+                    items:
+                      type: array
+                      description: Statistics data values(s)
+                      items:
+                        type: number
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/statistics/dashboard:
+    get:
+      summary: Get system statistics for dashboard
+      description: Returns system statistics for dashboard
+      operationId: getSystemStatisticsDashboard
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - currentTimestamp
                   - statistics
                 properties:
                   currentTimestamp:
@@ -586,25 +626,10 @@ paths:
                     type: array
                     description: Statistics data point(s)
                     items:
-                      type: object
-                      required:
-                        - hash
-                        - temp
-                        - power
-                        - timestamp
-                      properties:
-                        hash:
-                          type: number
-                          description: Hash rate
-                        temp:
-                          type: number
-                          description: Average chip temperature
-                        power:
-                          type: number
-                          description: Power consumption in watts
-                        timestamp:
-                          type: number
-                          description: Timestamp for data point
+                      type: array
+                      description: Statistics data values(s)
+                      items:
+                        type: number
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
