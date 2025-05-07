@@ -7,7 +7,8 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 @Component({
   selector: 'app-logs',
   templateUrl: './logs.component.html',
-  styleUrl: './logs.component.scss'
+  styleUrl: './logs.component.scss',
+  standalone: false
 })
 export class LogsComponent implements OnDestroy, AfterViewChecked {
 
@@ -57,7 +58,7 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
         next: (val) => {
           const matches = val.matchAll(/\[(\d+;\d+)m(.*?)(?=\[|\n|$)/g);
           let className = 'ansi-white'; // default color
-          
+
           for (const match of matches) {
             const colorCode = match[1].split(';')[1];
             switch (colorCode) {
@@ -70,9 +71,9 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
               case '37': className = 'ansi-white'; break;
             }
           }
-          
+
           this.logs.push({ className, text: val });
-          
+
           if (this.logs.length > 256) {
             this.logs.shift();
           }

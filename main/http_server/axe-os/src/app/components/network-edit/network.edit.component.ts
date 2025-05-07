@@ -16,7 +16,8 @@ interface WifiNetwork {
 @Component({
   selector: 'app-network-edit',
   templateUrl: './network.edit.component.html',
-  styleUrls: ['./network.edit.component.scss']
+  styleUrls: ['./network.edit.component.scss'],
+  standalone: false
 })
 export class NetworkEditComponent implements OnInit {
 

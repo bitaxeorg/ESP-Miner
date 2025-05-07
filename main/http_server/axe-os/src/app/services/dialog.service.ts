@@ -51,7 +51,8 @@ export class DialogService {
         styleClass="w-full text-left"
       ></p-button>
     </div>
-  `
+  `,
+   standalone: false
 })
 export class DialogListComponent {
   constructor(public config: DynamicDialogConfig) {}

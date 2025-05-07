@@ -10,7 +10,8 @@ const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 @Component({
   selector: 'app-swarm',
   templateUrl: './swarm.component.html',
-  styleUrls: ['./swarm.component.scss']
+  styleUrls: ['./swarm.component.scss'],
+  standalone: false
 })
 export class SwarmComponent implements OnInit, OnDestroy {
 
@@ -52,7 +53,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.refreshIntervalTime = storedRefreshTime;
     this.refreshTimeSet = storedRefreshTime;
     this.refreshIntervalControl = new FormControl(storedRefreshTime);
-    
+
     this.refreshIntervalControl.valueChanges.subscribe(value => {
       this.refreshIntervalTime = value;
       this.refreshTimeSet = value;
@@ -147,7 +148,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public add() {
     const newIp = this.form.value.manualAddIp;
-    
+
     // Check if IP already exists
     if (this.swarm.some(item => item.IP === newIp)) {
       this.toastr.warning('This IP address already exists in the swarm', 'Duplicate Entry');
@@ -192,7 +193,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     if (this.scanning) {
       return;
     }
-    
+
     this.refreshIntervalTime = this.refreshTimeSet;
     const ips = this.swarm.map(axeOs => axeOs.IP);
     this.isRefreshing = true;
