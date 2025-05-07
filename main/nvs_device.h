@@ -7,6 +7,5 @@
 
 esp_err_t NVSDevice_init(void);
 esp_err_t NVSDevice_parse_config(GlobalState *);
-esp_err_t NVSDevice_get_wifi_creds(GlobalState *, char **, char **, char **);
 
 #endif // MAIN_NVS_DEVICE_H
