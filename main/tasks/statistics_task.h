@@ -6,10 +6,18 @@ typedef struct StatisticsData * StatisticsNextNodePtr;
 
 struct StatisticsData
 {
-    double hashrate;
-    float temperature;
-    float power;
     int64_t timestamp;
+    double hashrate;
+    float chipTemperature;
+    float vrTemperature;
+    float power;
+    float voltage;
+    float current;
+    int16_t coreVoltageActual;
+    uint16_t fanSpeed;
+    uint16_t fanRPM;
+    int8_t wifiRSSI;
+    uint32_t freeHeap;
 
     StatisticsNextNodePtr next;
 };
@@ -19,8 +27,9 @@ typedef struct
     StatisticsNodePtr * statisticsList;
 } StatisticsModule;
 
-StatisticsNodePtr addStatisticData(double hashrate, float temperature, float power, int64_t timestamp);
-StatisticsNextNodePtr statisticData(StatisticsNodePtr node, double * hashrate, float * temperature, float * power, int64_t * timestamp);
+StatisticsNodePtr addStatisticData(StatisticsNodePtr data);
+
+StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr dataOut);
 
 void statistics_init(void * pvParameters);
 void statistics_task(void * pvParameters);
