@@ -6,6 +6,8 @@
 #include "esp_lvgl_port.h"
 #include "global_state.h"
 #include "screen.h"
+#include "nvs_config.h"
+#include "display.h"
 
 typedef enum {
     SCR_SELF_TEST,
@@ -237,6 +239,10 @@ static lv_obj_t * create_scr_stats() {
 
 static void screen_show(screen_t screen)
 {
+    if (SCR_CAROUSEL_START > screen) {
+        lv_display_trigger_activity(NULL);
+    }
+
     if (current_screen != screen) {
         lv_obj_t * scr = screens[screen];
 
@@ -253,6 +259,25 @@ static void screen_show(screen_t screen)
 
 static void screen_update_cb(lv_timer_t * timer)
 {
+    int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1);
+
+    if (0 > display_timeout_config) {
+        // display always on
+        display_on(true);
+    } else if (0 == display_timeout_config) {
+        // display off
+        display_on(false);
+    } else {
+        // display timeout
+        const uint32_t display_timeout = display_timeout_config * 60 * 1000;
+
+        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= current_screen)) {
+            display_on(false);
+        } else {
+            display_on(true);
+        }
+    }
+
     if (GLOBAL_STATE->SELF_TEST_MODULE.active) {
 
         screen_show(SCR_SELF_TEST);
@@ -349,6 +374,7 @@ static void screen_update_cb(lv_timer_t * timer)
         lv_label_set_text_fmt(difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", module->best_session_diff_string);
 
         screen_show(SCR_STATS);
+        lv_display_trigger_activity(NULL);
     } else {
         if (current_difficulty != module->best_session_nonce_diff) {
             lv_label_set_text_fmt(difficulty_label, "Best: %s/%s", module->best_session_diff_string, module->best_diff_string);

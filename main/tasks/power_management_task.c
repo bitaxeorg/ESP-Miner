@@ -48,7 +48,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
     pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, PID_P_ON_E, PID_DIRECT);
     pid_set_sample_time(&pid, POLL_RATE - 1);
-    pid_set_output_limits(&pid, 15, 100);
+    pid_set_output_limits(&pid, 25, 100);
     pid_set_mode(&pid, AUTOMATIC);
     pid_set_controller_direction(&pid, PID_REVERSE);
     pid_initialize(&pid);
@@ -110,9 +110,15 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 Thermal_set_fan_percent(GLOBAL_STATE->device_model, pid_output / 100.0);
                 ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%%", pid_input, pid_setPoint, pid_output);
             } else {
-                ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f°C", power_management->chip_temp_avg);
+                // Set fan to 70% in AP mode when temperature reading is invalid
+                if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled) {
+                    ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%", power_management->chip_temp_avg);
+                    power_management->fan_perc = 70;
+                    Thermal_set_fan_percent(GLOBAL_STATE->device_model, 0.7);
+                } else {
+                    ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f°C", power_management->chip_temp_avg);
+                }
             }
-
         } else {
             float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
             power_management->fan_perc = fs;
