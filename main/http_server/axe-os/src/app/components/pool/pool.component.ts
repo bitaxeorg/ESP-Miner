@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ValidatorFn, ValidationErrors, AbstractControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
@@ -41,6 +41,8 @@ export class PoolComponent implements OnInit {
             Validators.min(0),
             Validators.max(65535)
           ]],
+          stratumTLS: [info.stratumTLS || 0],
+          stratumCert: [info.stratumCert],
           fallbackStratumURL: [info.fallbackStratumURL, [
             Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
           ]],
@@ -50,11 +52,45 @@ export class PoolComponent implements OnInit {
             Validators.min(0),
             Validators.max(65535)
           ]],
+          fallbackStratumTLS: [info.fallbackStratumTLS || 0],
+          fallbackStratumCert: [info.fallbackStratumCert],
           stratumUser: [info.stratumUser, [Validators.required]],
           stratumPassword: ['*****', [Validators.required]],
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
           fallbackStratumPassword: ['password', [Validators.required]]
         });
+
+        // Add conditional validation for primary stratumCert
+        this.form.get('stratumTLS')?.valueChanges.subscribe(value => {
+          const certControl = this.form.get('stratumCert');
+          if (value === 2) { // Only validate certificate when "Custom CA" (value 2) is selected
+            certControl?.setValidators([
+              Validators.required,
+              this.pemCertificateValidator()
+            ]);
+          } else {
+            certControl?.clearValidators();
+          }
+          certControl?.updateValueAndValidity();
+        });
+
+        // Add conditional validation for fallback stratumCert
+        this.form.get('fallbackStratumTLS')?.valueChanges.subscribe(value => {
+          const certControl = this.form.get('fallbackStratumCert');
+          if (value === 2) { // Only validate certificate when "Custom CA" (value 2) is selected
+            certControl?.setValidators([
+              Validators.required,
+              this.pemCertificateValidator()
+            ]);
+          } else {
+            certControl?.clearValidators();
+          }
+          certControl?.updateValueAndValidity();
+        });
+
+        // Trigger initial validation
+        this.form.get('stratumTLS')?.updateValueAndValidity();
+        this.form.get('fallbackStratumTLS')?.updateValueAndValidity();
       });
   }
 
@@ -104,5 +140,47 @@ export class PoolComponent implements OnInit {
           this.toastr.error(errorMessage, 'Error');
         }
       });
+  }
+
+  /**
+   * Handles certificate file selection and reads the file content
+   * @param event File selection event
+   * @param formControlName Form control name ('stratumCert' or 'fallbackStratumCert')
+   */
+  onCertFileSelected(event: Event, formControlName: 'stratumCert' | 'fallbackStratumCert'): void {
+    const fileInput = event.target as HTMLInputElement;
+    
+    if (fileInput.files && fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+        const fileContent = reader.result as string;
+        // Update the corresponding certificate field in the form
+        this.form.get(formControlName)?.setValue(fileContent);
+        this.form.get(formControlName)?.markAsDirty();
+        
+        // Reset file input so the same file can be selected again
+        fileInput.value = '';
+      };
+      
+      reader.onerror = () => {
+        // Error handling when reading the certificate file
+        this.toastr.error('Failed to read certificate file', 'Error');
+        fileInput.value = '';
+      };
+      
+      // Read the file as text
+      reader.readAsText(file);
+    }
+  }
+
+  private pemCertificateValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      if (!control.value?.trim()) return null;
+      
+      const pemRegex = /^-----BEGIN CERTIFICATE-----\s*([\s\S]*?)\s*-----END CERTIFICATE-----$/;
+      return pemRegex.test(control.value?.trim()) ? null : { invalidCertificate: true };
+    };
   }
 }

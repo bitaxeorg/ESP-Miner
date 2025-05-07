@@ -53,7 +53,12 @@ export class ThemeService {
       '--togglebutton-border': '1px solid #F80421',
       '--togglebutton-hover-bg': '#e63c2e',
       '--togglebutton-hover-border': '1px solid #e63c2e',
-      '--togglebutton-text-color': '#ffffff'
+      '--togglebutton-text-color': '#ffffff',
+      // Radio Button
+      '--radiobutton-border': '#F80421',
+      '--radiobutton-bg': '#F80421',
+      '--radiobutton-hover-border': '#e63c2e',
+      '--radiobutton-focus-shadow': '0 0 0 1px #e63c2e',
     }
   };
 
