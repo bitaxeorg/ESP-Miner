@@ -66,7 +66,7 @@ static esp_err_t GET_wifi_scan(httpd_req_t *req)
         cJSON *network = cJSON_CreateObject();
         cJSON_AddStringToObject(network, "ssid", (char *)ap_records[i].ssid);
         cJSON_AddNumberToObject(network, "rssi", ap_records[i].rssi);
-        cJSON_AddNumberToObject(network, "authmode", ap_records[i].authmode);
+        cJSON_AddNumberToObject(network, "authMode", ap_records[i].authmode);
         cJSON_AddItemToArray(networks, network);
     }
 
@@ -458,25 +458,25 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL && item->valueint > 0) {
         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "flipscreen")) != NULL) {
+    if ((item = cJSON_GetObjectItem(root, "flipScreen")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_FLIP_SCREEN, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
+    if ((item = cJSON_GetObjectItem(root, "overheatMode")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
     }
-    if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
+    if ((item = cJSON_GetObjectItem(root, "invertScreen")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "displayTimeout")) != NULL) {
         nvs_config_set_i32(NVS_CONFIG_DISPLAY_TIMEOUT, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "autofanspeed")) != NULL) {
+    if ((item = cJSON_GetObjectItem(root, "autoFanSpeed")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
+    if ((item = cJSON_GetObjectItem(root, "fanSpeed")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "temptarget")) != NULL) {
+    if ((item = cJSON_GetObjectItem(root, "tempTarget")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_TEMP_TARGET, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "overclockEnabled")) != NULL) {
@@ -557,7 +557,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
     cJSON_AddNumberToObject(root, "maxPower", Power_get_max_settings(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "nominalVoltage", Power_get_nominal_voltage(GLOBAL_STATE));
-    cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
+    cJSON_AddNumberToObject(root, "hashrate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
     cJSON_AddStringToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_diff_string);
     cJSON_AddStringToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_diff_string);
     cJSON_AddNumberToObject(root, "stratumDiff", GLOBAL_STATE->stratum_difficulty);
@@ -592,7 +592,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000);
     cJSON_AddNumberToObject(root, "asicCount", ASIC_get_asic_count(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "smallCoreCount", ASIC_get_small_core_count(GLOBAL_STATE));
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->asic_model_str);
+    cJSON_AddStringToObject(root, "asicModel", GLOBAL_STATE->asic_model_str);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT));
@@ -605,20 +605,20 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "boardVersion", board_version);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
-    cJSON_AddNumberToObject(root, "flipscreen", nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1));
-    cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
+    cJSON_AddNumberToObject(root, "flipScreen", nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1));
+    cJSON_AddNumberToObject(root, "overheatMode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED, 0));
-    cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
+    cJSON_AddNumberToObject(root, "invertScreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
     cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1));
 
-    cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1));
+    cJSON_AddNumberToObject(root, "autoFanSpeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1));
 
-    cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
-    cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
-    cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
+    cJSON_AddNumberToObject(root, "fanSpeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
+    cJSON_AddNumberToObject(root, "tempTarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
+    cJSON_AddNumberToObject(root, "fanRPM", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
     
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
-        cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
+        cJSON_AddStringToObject(root, "powerFault", VCORE_get_fault_string(GLOBAL_STATE));
     }
 
     free(ssid);
@@ -941,7 +941,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
-        .uri = "/api/system/info", 
+        .uri = "/api/v2/system/info", 
         .method = HTTP_GET, 
         .handler = GET_system_info, 
         .user_ctx = rest_context
@@ -950,7 +950,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for fetching system asic values */
     httpd_uri_t system_asic_get_uri = {
-    .uri = "/api/system/asic", 
+    .uri = "/api/v2/system/asic", 
     .method = HTTP_GET, 
     .handler = GET_system_asic, 
     .user_ctx = rest_context
@@ -959,7 +959,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for WiFi scan */
     httpd_uri_t wifi_scan_get_uri = {
-        .uri = "/api/system/wifi/scan",
+        .uri = "/api/v2/system/wifi/scan",
         .method = HTTP_GET,
         .handler = GET_wifi_scan,
         .user_ctx = rest_context
@@ -967,7 +967,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &wifi_scan_get_uri);
 
     httpd_uri_t swarm_options_uri = {
-        .uri = "/api/swarm",
+        .uri = "/api/v2/swarm",
         .method = HTTP_OPTIONS,
         .handler = handle_options_request,
         .user_ctx = NULL,
@@ -975,14 +975,14 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &swarm_options_uri);
 
     httpd_uri_t system_restart_uri = {
-        .uri = "/api/system/restart", .method = HTTP_POST, 
+        .uri = "/api/v2/system/restart", .method = HTTP_POST, 
         .handler = POST_restart, 
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_restart_uri);
 
     httpd_uri_t system_restart_options_uri = {
-        .uri = "/api/system/restart", 
+        .uri = "/api/v2/system/restart", 
         .method = HTTP_OPTIONS, 
         .handler = handle_options_request, 
         .user_ctx = NULL
@@ -990,7 +990,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &system_restart_options_uri);
 
     httpd_uri_t update_system_settings_uri = {
-        .uri = "/api/system", 
+        .uri = "/api/v2/system", 
         .method = HTTP_PATCH, 
         .handler = PATCH_update_settings, 
         .user_ctx = rest_context
@@ -998,7 +998,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &update_system_settings_uri);
 
     httpd_uri_t system_options_uri = {
-        .uri = "/api/system",
+        .uri = "/api/v2/system",
         .method = HTTP_OPTIONS,
         .handler = handle_options_request,
         .user_ctx = NULL,
@@ -1006,7 +1006,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &system_options_uri);
 
     httpd_uri_t update_post_ota_firmware = {
-        .uri = "/api/system/OTA", 
+        .uri = "/api/v2/system/ota", 
         .method = HTTP_POST, 
         .handler = POST_OTA_update, 
         .user_ctx = NULL
@@ -1014,7 +1014,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &update_post_ota_firmware);
 
     httpd_uri_t update_post_ota_www = {
-        .uri = "/api/system/OTAWWW", 
+        .uri = "/api/v2/system/otawww", 
         .method = HTTP_POST, 
         .handler = POST_WWW_update, 
         .user_ctx = NULL
