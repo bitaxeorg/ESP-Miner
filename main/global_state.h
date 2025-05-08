@@ -9,41 +9,13 @@
 #include "serial.h"
 #include "stratum_api.h"
 #include "work_queue.h"
+#include "device_config.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
 
 #define HISTORY_LENGTH 100
 #define DIFF_STRING_SIZE 10
-
-typedef enum
-{
-    DEVICE_UNKNOWN = -1,
-    DEVICE_MAX,
-    DEVICE_ULTRA,
-    DEVICE_SUPRA,
-    DEVICE_GAMMA,
-    DEVICE_GAMMATURBO,
-} DeviceModel;
-
-typedef enum
-{
-    ASIC_UNKNOWN = -1,
-    ASIC_BM1397,
-    ASIC_BM1366,
-    ASIC_BM1368,
-    ASIC_BM1370,
-} AsicModel;
-
-// typedef struct
-// {
-//     uint8_t (*init_fn)(uint64_t, uint16_t);
-//     task_result * (*receive_result_fn)(void * GLOBAL_STATE);
-//     int (*set_max_baud_fn)(void);
-//     void (*set_difficulty_mask_fn)(int);
-//     void (*send_work_fn)(void * GLOBAL_STATE, bm_job * next_bm_job);
-//     void (*set_version_mask)(uint32_t);
-// } AsicFunctions;
 
 typedef struct {
     char message[64];
@@ -104,18 +76,11 @@ typedef struct
 
 typedef struct
 {
-    DeviceModel device_model;
-    char * device_model_str;
-    int board_version;
-    AsicModel asic_model;
-    char * asic_model_str;
-    double asic_job_frequency_ms;
-    uint32_t ASIC_difficulty;
-
     work_queue stratum_queue;
     work_queue ASIC_jobs_queue;
 
     SystemModule SYSTEM_MODULE;
+    DeviceConfig DEVICE_CONFIG;
     AsicTaskModule ASIC_TASK_MODULE;
     PowerManagementModule POWER_MANAGEMENT_MODULE;
     SelfTestModule SELF_TEST_MODULE;

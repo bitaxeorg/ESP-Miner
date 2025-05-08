@@ -227,7 +227,7 @@ void BM1397_send_hash_frequency(float frequency)
     ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
 }
 
-static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
+static uint8_t _send_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
 {
     // send the init command
     _send_read_address();
@@ -259,7 +259,7 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
     unsigned char init4[9] = {0x00, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x80, 0x74}; // init4 - init_4_?
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, BM1397_SERIALTX_DEBUG);
 
-    BM1397_set_job_difficulty_mask(BM1397_ASIC_DIFFICULTY);
+    BM1397_set_job_difficulty_mask(difficulty);
 
     unsigned char init5[9] = {0x00, PLL3_PARAMETER, 0xC0, 0x70, 0x01, 0x11}; // init5 - pll3_parameter
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5, 6, BM1397_SERIALTX_DEBUG);
@@ -289,7 +289,7 @@ static void _reset(void)
     vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
-uint8_t BM1397_init(uint64_t frequency, uint16_t asic_count)
+uint8_t BM1397_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
 {
     ESP_LOGI(TAG, "Initializing BM1397");
 
@@ -299,7 +299,7 @@ uint8_t BM1397_init(uint64_t frequency, uint16_t asic_count)
     // reset the bm1397
     _reset();
 
-    return _send_init(frequency, asic_count);
+    return _send_init(frequency, asic_count, difficulty);
 }
 
 // Baud formula = 25M/((denominator+1)*8)

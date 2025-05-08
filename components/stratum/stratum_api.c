@@ -311,7 +311,7 @@ int _parse_stratum_subscribe_result_message(const char * result_json_str, char *
     return 0;
 }
 
-int STRATUM_V1_subscribe(int socket, int send_uid, char * model)
+int STRATUM_V1_subscribe(int socket, int send_uid, const char * model)
 {
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];

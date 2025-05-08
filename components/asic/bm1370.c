@@ -217,7 +217,7 @@ bool BM1370_set_frequency(float target_freq) {
     return do_frequency_transition(target_freq, BM1370_send_hash_frequency, 1370);
 }
 
-static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
+static uint8_t _send_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
 {
     // set version mask
     for (int i = 0; i < 3; i++) {
@@ -270,7 +270,7 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count)
 
     //set ticket mask
     // unsigned char init11[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x14, 0x00, 0x00, 0x00, 0xFF, 0x08};
-    BM1370_set_job_difficulty_mask(BM1370_ASIC_DIFFICULTY);
+    BM1370_set_job_difficulty_mask(difficulty);
 
     //Analog Mux Control -- not sent on S21 Pro?
     // unsigned char init12[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x54, 0x00, 0x00, 0x00, 0x03, 0x1D};
@@ -349,7 +349,7 @@ static void _reset(void)
 //     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, BM1370_SERIALTX_DEBUG);
 // }
 
-uint8_t BM1370_init(uint64_t frequency, uint16_t asic_count)
+uint8_t BM1370_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
 {
     ESP_LOGI(TAG, "Initializing BM1370");
 
@@ -359,7 +359,7 @@ uint8_t BM1370_init(uint64_t frequency, uint16_t asic_count)
     // reset the bm1370
     _reset();
 
-    return _send_init(frequency, asic_count);
+    return _send_init(frequency, asic_count, difficulty);
 }
 
 // Baud formula = 25M/((denominator+1)*8)

@@ -14,6 +14,7 @@
 
 #include "connect.h"
 #include "global_state.h"
+#include "nvs_config.h"
 
 // Maximum number of access points to scan
 #define MAX_AP_COUNT 20
@@ -316,9 +317,16 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
     return esp_netif_sta;
 }
 
-void wifi_init(void * pvParameters, const char * wifi_ssid, const char * wifi_pass, const char * hostname)
+void wifi_init(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+
+    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
+    // copy the wifi ssid to the global state
+    strncpy(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid));
+    GLOBAL_STATE->SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid)-1] = 0;
+
+    free(wifi_ssid);
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -338,7 +346,7 @@ void wifi_init(void * pvParameters, const char * wifi_ssid, const char * wifi_pa
     wifi_init_softap(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid);
 
     /* Skip connection if SSID is null */
-    if (strlen(wifi_ssid) == 0) {
+    if (strlen(GLOBAL_STATE->SYSTEM_MODULE.ssid) == 0) {
         ESP_LOGI(TAG, "No WiFi SSID provided, skipping connection");
 
         /* Start WiFi */
@@ -349,15 +357,22 @@ void wifi_init(void * pvParameters, const char * wifi_ssid, const char * wifi_pa
 
         return;
     } else {
+
+        char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, CONFIG_ESP_WIFI_PASSWORD);
+
         /* Initialize STA */
         ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-        esp_netif_t * esp_netif_sta = wifi_init_sta(wifi_ssid, wifi_pass);
+        esp_netif_t * esp_netif_sta = wifi_init_sta(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_pass);
+
+        free(wifi_pass);
 
         /* Start Wi-Fi */
         ESP_ERROR_CHECK(esp_wifi_start());
 
         /* Disable power savings for best performance */
         ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+
+        char * hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
 
         /* Set Hostname */
         esp_err_t err = esp_netif_set_hostname(esp_netif_sta, hostname);
@@ -366,6 +381,8 @@ void wifi_init(void * pvParameters, const char * wifi_ssid, const char * wifi_pa
         } else {
             ESP_LOGI(TAG, "ESP_WIFI setting hostname to: %s", hostname);
         }
+
+        free(hostname);
 
         ESP_LOGI(TAG, "wifi_init_sta finished.");
 

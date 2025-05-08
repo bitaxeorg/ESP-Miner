@@ -185,11 +185,29 @@ static lv_obj_t * create_scr_connection(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_logo(const lv_img_dsc_t *logo) {
+static lv_obj_t * create_scr_bitaxe_logo(const char * name, const char * board_version) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_t *img = lv_img_create(scr);
-    lv_img_set_src(img, logo);
+    lv_img_set_src(img, &bitaxe_logo);
+    lv_obj_align(img, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    lv_obj_t *label1 = lv_label_create(scr);
+    lv_label_set_text(label1, name);
+    lv_obj_align(label1, LV_ALIGN_TOP_RIGHT, -6, 0);
+
+    lv_obj_t *label2 = lv_label_create(scr);
+    lv_label_set_text(label2, board_version);
+    lv_obj_align(label2, LV_ALIGN_TOP_RIGHT, -6, 8);
+
+    return scr;
+}
+
+static lv_obj_t * create_scr_osmu_logo() {
+    lv_obj_t * scr = lv_obj_create(NULL);
+
+    lv_obj_t *img = lv_img_create(scr);
+    lv_img_set_src(img, &osmu_logo);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
     return scr;
@@ -415,8 +433,8 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_CONFIGURE] = create_scr_configure(module);
         screens[SCR_FIRMWARE_UPDATE] = create_scr_ota(module);
         screens[SCR_CONNECTION] = create_scr_connection(module);
-        screens[SCR_BITAXE_LOGO] = create_scr_logo(&bitaxe_logo);
-        screens[SCR_OSMU_LOGO] = create_scr_logo(&osmu_logo);
+        screens[SCR_BITAXE_LOGO] = create_scr_bitaxe_logo(GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version);
+        screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
         screens[SCR_URLS] = create_scr_urls(module);
         screens[SCR_STATS] = create_scr_stats();
 
