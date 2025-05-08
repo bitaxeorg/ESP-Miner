@@ -274,32 +274,29 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
-  private convertBestDiffToNumber(bestDiff: string): number {
-    if (!bestDiff) return 0;
-    const value = parseFloat(bestDiff);
-    const unit = bestDiff.slice(-1).toUpperCase();
-    switch (unit) {
-      case 'T': return value * 1000000000000;
-      case 'G': return value * 1000000000;
-      case 'M': return value * 1000000;
-      case 'K': return value * 1000;
-      default: return value;
+  private compareBestDiff(a: string, b: string): string {
+    if (!a || a === '0') return b || '0';
+    if (!b || b === '0') return a;
+  
+    const units = 'kMGTPE';
+    const unitA = units.indexOf(a.slice(-1));
+    const unitB = units.indexOf(b.slice(-1));
+  
+    if (unitA !== unitB) {
+      return unitA > unitB ? a : b;
     }
-  }
-
-  private formatBestDiff(value: number): string {
-    if (value >= 1000000000000) return `${(value / 1000000000000).toFixed(2)}T`;
-    if (value >= 1000000000) return `${(value / 1000000000).toFixed(2)}G`;
-    if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`;
-    if (value >= 1000) return `${(value / 1000).toFixed(2)}K`;
-    return value.toFixed(2);
+  
+    const valueA = parseFloat(a.slice(0, unitA >= 0 ? -1 : 0));
+    const valueB = parseFloat(b.slice(0, unitB >= 0 ? -1 : 0));
+    return valueA >= valueB ? a : b;
   }
 
   private calculateTotals() {
     this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
     this.totals.power = this.swarm.reduce((sum, axe) => sum + (axe.power || 0), 0);
-    const maxDiff = Math.max(...this.swarm.map(axe => this.convertBestDiffToNumber(axe.bestDiff)));
-    this.totals.bestDiff = this.formatBestDiff(maxDiff);
+    this.totals.bestDiff = this.swarm
+      .map(axe => axe.bestDiff || '0')
+      .reduce((max, curr) => this.compareBestDiff(max, curr), '0');
   }
 
   hasModel(model: string): string {
