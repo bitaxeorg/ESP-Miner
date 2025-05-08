@@ -139,6 +139,7 @@ typedef struct
 
     bool ASIC_initalized;
     bool psram_is_available;
+    bool job_queue_initalized;
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */
