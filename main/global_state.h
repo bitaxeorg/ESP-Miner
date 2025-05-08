@@ -17,16 +17,6 @@
 #define HISTORY_LENGTH 100
 #define DIFF_STRING_SIZE 10
 
-// typedef struct
-// {
-//     uint8_t (*init_fn)(uint64_t, uint16_t);
-//     task_result * (*receive_result_fn)(void * GLOBAL_STATE);
-//     int (*set_max_baud_fn)(void);
-//     void (*set_difficulty_mask_fn)(int);
-//     void (*send_work_fn)(void * GLOBAL_STATE, bm_job * next_bm_job);
-//     void (*set_version_mask)(uint32_t);
-// } AsicFunctions;
-
 typedef struct {
     char message[64];
     uint32_t count;
@@ -86,8 +76,6 @@ typedef struct
 
 typedef struct
 {
-    double asic_job_frequency_ms;
-
     work_queue stratum_queue;
     work_queue ASIC_jobs_queue;
 

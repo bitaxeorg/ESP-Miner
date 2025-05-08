@@ -63,11 +63,6 @@ void app_main(void)
         return;
     }
 
-    if (ASIC_set_device_model(&GLOBAL_STATE) != ESP_OK) {
-        ESP_LOGE(TAG, "Error setting ASIC model");
-        return;
-    }
-
     // Optionally hold the boot button
     bool pressed = gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
     //should we run the self test?

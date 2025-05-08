@@ -12,6 +12,6 @@ void ASIC_set_job_difficulty_mask(GlobalState * GLOBAL_STATE, uint8_t mask);
 void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job);
 void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask);
 bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency);
-esp_err_t ASIC_set_device_model(GlobalState * GLOBAL_STATE);
+double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE);
 
 #endif // ASIC_H
