@@ -11,11 +11,12 @@
 #include "TPS546.h"
 #include "vcore.h"
 #include "thermal.h"
+#include "PID.h"
 #include "power.h"
 #include "asic.h"
 #include "esp_timer.h"
 
-#define POLL_RATE 2000
+#define POLL_RATE 1800
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
@@ -33,6 +34,7 @@
 #define VOLTAGE_STEP_SIZE 0.005  // 5mV steps for voltage optimization
 #define MIN_HASHRATE_THRESHOLD 0.5  // Minimum acceptable hashrate ratio
 
+ master
 static const char * TAG = "power_management";
 
 // Efficiency history for voltage optimization
@@ -75,6 +77,16 @@ static double automatic_fan_speed(float chip_temp, GlobalState * GLOBAL_STATE)
 
 	return result;
 }
+
+double pid_input = 0.0;
+double pid_output = 0.0;
+double pid_setPoint = 60.0;
+double pid_p = 4.0;
+double pid_i = 0.2;
+double pid_d = 3.0;
+
+PIDController pid;
+ master
 
 // Optimize voltage for efficiency
 static void optimize_voltage_for_efficiency(GlobalState * GLOBAL_STATE) {
@@ -162,6 +174,15 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     ESP_LOGI(TAG, "Starting");
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+    
+    // Initialize PID controller
+    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
+    pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, PID_P_ON_E, PID_DIRECT);
+    pid_set_sample_time(&pid, POLL_RATE - 1);
+    pid_set_output_limits(&pid, 25, 100);
+    pid_set_mode(&pid, AUTOMATIC);
+    pid_set_controller_direction(&pid, PID_REVERSE);
+    pid_initialize(&pid);
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -184,7 +205,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_asic_frequency = power_management->frequency_value;
     
     while (1) {
+ master
         // Update power measurements
+
+
+        // Refresh PID setpoint from NVS in case it was changed via API
+        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
+
+ master
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);
         power_management->current = Power_get_current(GLOBAL_STATE);
@@ -258,10 +286,32 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 power_management->throttle_count = 0;
             }
         }
+ master
 
         // Fan speed control
         if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
             power_management->fan_perc = (float)automatic_fan_speed(power_management->chip_temp_avg, GLOBAL_STATE);
+
+        //enable the PID auto control for the FAN if set
+        if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
+            // Ignore invalid temperature readings (-1) during startup
+            if (power_management->chip_temp_avg >= 0) {
+                pid_input = power_management->chip_temp_avg;
+                pid_compute(&pid);
+                power_management->fan_perc = (uint16_t) pid_output;
+                Thermal_set_fan_percent(GLOBAL_STATE->device_model, pid_output / 100.0);
+                ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%%", pid_input, pid_setPoint, pid_output);
+            } else {
+                // Set fan to 70% in AP mode when temperature reading is invalid
+                if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled) {
+                    ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%", power_management->chip_temp_avg);
+                    power_management->fan_perc = 70;
+                    Thermal_set_fan_percent(GLOBAL_STATE->device_model, 0.7);
+                } else {
+                    ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f°C", power_management->chip_temp_avg);
+                }
+            }
+ master
         } else {
             float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
             power_management->fan_perc = fs;

@@ -7,18 +7,18 @@ th {
     text-align: left;
     background-color: #1f2d40;
     padding: 0;
-    
+
     > div {
         height: 100%;
         padding: 0.5rem 1rem;
         gap: 0.75rem;
     }
-    
+
     .pi {
         opacity: 0.7;
         height: 1em;
         line-height: 1;
-        
+
         &.pi-sort-amount-up-alt,
         &.pi-sort-amount-down {
             opacity: 1;
@@ -36,7 +36,7 @@ td {
 }
 
 th > div {
-    min-width: 100px; 
+    min-width: 100px;
     padding-right: 0.5rem;
 }
 
@@ -56,14 +56,26 @@ a {
 
 .modal {
     position: fixed;
-    max-height: 70vh;
-    width: 50vw;
+    max-height: 80dvh;
+    width: 90dvw;
     z-index: 999;
-    top: 0;
-    left: 0;
-    margin: 12vh 25vw;
-    padding: 50px;
+    top: 10vh;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2rem;
     overflow-y: auto;
+}
+
+@media (min-width: 768px) {
+  .modal {
+    width: 70dvw;
+  }
+}
+
+@media (min-width: 1024px) {
+  .modal {
+    width: 50dvw;
+  }
 }
 
 .close {
@@ -77,11 +89,11 @@ a {
     width: 100%;
     overflow-x: auto;
     margin: 0;
-    
+
     table {
         min-width: 100%;
         white-space: nowrap;
-        
+
         th, td {
             padding: 0.75rem;
             text-align: left;
@@ -91,4 +103,18 @@ a {
             }
         }
     }
+}
+
+.refresh-button {
+  display: grid;
+  place-items: center;
+
+  > span:first-child {
+    visibility: hidden;
+    grid-area: 1 / 1;
+  }
+
+  > span:last-child {
+    grid-area: 1 / 1;
+  }
 }

@@ -102,13 +102,13 @@ components:
         - fallbackStratumUser
         - fanrpm
         - fanspeed
+        - temptarget
         - flipscreen
         - freeHeap
         - frequency
         - hashRate
         - hostname
         - idfVersion
-        - invertfanpolarity
         - invertscreen
         - isPSRAMAvailable
         - isUsingFallbackStratum
@@ -181,6 +181,9 @@ components:
         fanspeed:
           type: number
           description: Current fan speed percentage
+        temptarget:
+          type: number
+          description: Target Temperature for the PID Controller
         flipscreen:
           type: number
           description: Screen flip setting (0=normal, 1=flipped)
@@ -199,9 +202,6 @@ components:
         idfVersion:
           type: string
           description: ESP-IDF version
-        invertfanpolarity:
-          type: number
-          description: Fan polarity setting (0=normal, 1=inverted)
         invertscreen:
           type: number
           description: Screen invert setting (0=normal, 1=inverted)
@@ -392,12 +392,6 @@ components:
           enum: [0, 1]
           examples:
             - 0
-        invertfanpolarity:
-          type: integer
-          description: Whether to invert fan polarity (0=normal, 1=inverted)
-          enum: [0, 1]
-          examples:
-            - 0
         autofanspeed:
           type: integer
           description: Whether to enable automatic fan speed control (0=manual, 1=auto)
@@ -411,6 +405,13 @@ components:
           maximum: 100
           examples:
             - 80
+        temptarget:
+          type: integer
+          description: Manual Temperature Target in °C when autofanspeed is enabled
+          minimum: 0
+          maximum: 100
+          examples:
+            - 66
       additionalProperties: true
 
   responses:
@@ -461,6 +462,54 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SystemInfo'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/asic:
+    get:
+      summary: Get ASIC settings information
+      description: Returns current ASIC model and corresponding available frequency and voltage options
+      operationId: getAsicSettings
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ASICModel
+                  - frequencyOptions
+                  - voltageOptions
+                properties:
+                  ASICModel:
+                    type: string
+                    description: ASIC model identifier
+                    enum:
+                      - BM1366
+                      - BM1368
+                      - BM1370
+                      - BM1397
+                    examples:
+                      - "BM1366"
+                  frequencyOptions:
+                    type: array
+                    description: Available frequency options for the ASIC model in MHz
+                    items:
+                      type: number
+                    examples:
+                      - [400, 425, 450, 475, 485, 500, 525, 550, 575]
+                  voltageOptions:
+                    type: array
+                    description: Available voltage options for the ASIC model in millivolts
+                    items:
+                      type: number
+                    examples:
+                      - [1100, 1150, 1200, 1250, 1300]
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

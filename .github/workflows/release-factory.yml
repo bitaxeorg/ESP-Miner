@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.12.0'
+          node-version: '22.15.0'
       - name: Build web dist
         working-directory: ./main/http_server/axe-os
         run: |
@@ -34,14 +34,14 @@ jobs:
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.4
+          esp_idf_version: v5.4.1
           target: esp32s3
           command: GITHUB_ACTIONS="true" idf.py build
           path: '.'
       - name: "esp-idf build factory config for ${{ matrix.build_type }}"
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.4
+          esp_idf_version: v5.4.1
           target: esp32s3
           command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate config-${{ matrix.build_type }}.cvs config.bin 0x6000
           path: '.'

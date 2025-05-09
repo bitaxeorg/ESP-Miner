@@ -36,6 +36,7 @@
 #include "asic.h"
 #include "TPS546.h"
 #include "theme_api.h"  // Add theme API include
+#include "axe-os/api/system/asic_settings.h"
 #include "http_server.h"
 
 static const char * TAG = "http_server";
@@ -159,7 +160,7 @@ static uint32_t extract_origin_ip_addr(char *origin)
     return origin_ip_addr;
 }
 
-static esp_err_t is_network_allowed(httpd_req_t * req)
+esp_err_t is_network_allowed(httpd_req_t * req)
 {
     if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
         ESP_LOGI(CORS_TAG, "Device in AP mode. Allowing CORS.");
@@ -260,7 +261,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
     return httpd_resp_set_type(req, type);
 }
 
-static esp_err_t set_cors_headers(httpd_req_t * req)
+esp_err_t set_cors_headers(httpd_req_t * req)
 {
 
     esp_err_t err;
@@ -466,14 +467,17 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "invertfanpolarity")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_INVERT_FAN_POLARITY, item->valueint);
+    if ((item = cJSON_GetObjectItem(root, "displayTimeout")) != NULL) {
+        nvs_config_set_i32(NVS_CONFIG_DISPLAY_TIMEOUT, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "autofanspeed")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "temptarget")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_TEMP_TARGET, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "overclockEnabled")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
@@ -511,6 +515,7 @@ static esp_err_t POST_restart(httpd_req_t * req)
     // This return statement will never be reached, but it's good practice to include it
     return ESP_OK;
 }
+
 
 /* Simple handler for getting system handler */
 static esp_err_t GET_system_info(httpd_req_t * req)
@@ -604,11 +609,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED, 0));
     cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
+    cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1));
 
-    cJSON_AddNumberToObject(root, "invertfanpolarity", nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1));
     cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1));
 
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
+    cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
     
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
@@ -894,6 +900,9 @@ void websocket_log_handler()
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
+    
+    // Initialize the ASIC API with the global state
+    asic_api_init(GLOBAL_STATE);
     const char * base_path = "";
 
     bool enter_recovery = false;
@@ -938,6 +947,15 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_info_get_uri);
+
+    /* URI handler for fetching system asic values */
+    httpd_uri_t system_asic_get_uri = {
+    .uri = "/api/system/asic", 
+    .method = HTTP_GET, 
+    .handler = GET_system_asic, 
+    .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_asic_get_uri);
 
     /* URI handler for WiFi scan */
     httpd_uri_t wifi_scan_get_uri = {

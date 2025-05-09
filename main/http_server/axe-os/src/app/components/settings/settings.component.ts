@@ -57,6 +57,7 @@ export class SettingsComponent {
         this.form = this.fb.group({
           flipscreen: [info.flipscreen == 1],
           invertscreen: [info.invertscreen == 1],
+          displayTimeout: [info.displayTimeout, [Validators.required]],
           stratumURL: [info.stratumURL, [
             Validators.required,
             Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
@@ -66,14 +67,14 @@ export class SettingsComponent {
             Validators.required,
             Validators.pattern(/^[^:]*$/),
             Validators.min(0),
-            Validators.max(65353)
+            Validators.max(65535)
           ]],
           stratumUser: [info.stratumUser, [Validators.required]],
           stratumPassword: ['*****', [Validators.required]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
-          invertfanpolarity: [info.invertfanpolarity == 1, [Validators.required]],
+          temptarget: [info.temptarget, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
         });
 
@@ -82,8 +83,10 @@ export class SettingsComponent {
         ).subscribe(autofanspeed => {
           if (autofanspeed) {
             this.form.controls['fanspeed'].disable();
+            this.form.controls['temptarget'].enable();
           } else {
             this.form.controls['fanspeed'].enable();
+            this.form.controls['temptarget'].disable();
           }
         });
       });
@@ -99,7 +102,6 @@ export class SettingsComponent {
     // bools to ints
     form.flipscreen = form.flipscreen == true ? 1 : 0;
     form.invertscreen = form.invertscreen == true ? 1 : 0;
-    form.invertfanpolarity = form.invertfanpolarity == true ? 1 : 0;
     form.autofanspeed = form.autofanspeed == true ? 1 : 0;
 
     if (form.stratumPassword === '*****') {

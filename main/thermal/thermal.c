@@ -20,21 +20,26 @@ static float temp_history[TEMP_HISTORY_SIZE] = {0};
 static int temp_history_index = 0;
 static int64_t last_temp_time = 0;
 
+ master
 esp_err_t Thermal_init(DeviceModel device_model, bool polarity) {
     //init the EMC2101, if we have one
+
+esp_err_t Thermal_init(DeviceModel device_model) {
+        //init the EMC2101, if we have one
+ master
     switch (device_model) {
         case DEVICE_MAX:
         case DEVICE_ULTRA:
         case DEVICE_SUPRA:
-            EMC2101_init(polarity);
+            EMC2101_init();
             break;
         case DEVICE_GAMMA:
-            EMC2101_init(polarity);
+            EMC2101_init();
             EMC2101_set_ideality_factor(EMC2101_IDEALITY_1_0319);
             EMC2101_set_beta_compensation(EMC2101_BETA_11);
             break;
         case DEVICE_GAMMATURBO:
-            EMC2103_init(polarity);
+            EMC2103_init();
             break;
         default:
     }

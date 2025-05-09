@@ -8,6 +8,7 @@
 #include "EMC2103.h"
 #include "global_state.h"
 
+ master
 // Temperature trend enum
 typedef enum {
     TEMP_TREND_STABLE,
@@ -16,6 +17,9 @@ typedef enum {
 } TempTrend;
 
 esp_err_t Thermal_init(DeviceModel device_model, bool polarity);
+
+esp_err_t Thermal_init(DeviceModel device_model);
+ master
 esp_err_t Thermal_set_fan_percent(DeviceModel device_model, float percent);
 uint16_t Thermal_get_fan_speed(DeviceModel device_model);
 

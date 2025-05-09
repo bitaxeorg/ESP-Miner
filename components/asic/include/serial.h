@@ -3,6 +3,12 @@
 
 #include "esp_err.h"
 
+typedef enum
+{
+    JOB_PACKET = 0,
+    CMD_PACKET = 1,
+} packet_type_t;
+
 int SERIAL_send(uint8_t *, int, bool);
 esp_err_t SERIAL_init(void);
 void SERIAL_debug_rx(void);
