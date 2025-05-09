@@ -22,5 +22,6 @@ void queue_enqueue(work_queue *queue, void *new_work);
 void ASIC_jobs_queue_clear(work_queue *queue);
 void *queue_dequeue(work_queue *queue);
 void queue_clear(work_queue *queue);
+int queue_get_count(work_queue *queue); // Added to get count safely
 
 #endif // WORK_QUEUE_H

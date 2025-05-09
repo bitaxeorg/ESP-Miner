@@ -76,15 +76,13 @@ void stratum_reset_uid(GlobalState * GLOBAL_STATE)
 void stratum_close_connection(GlobalState * GLOBAL_STATE)
 {
     if (GLOBAL_STATE->sock < 0) {
-        ESP_LOGE(TAG, "Socket already shutdown, not shutting down again..");
         return;
     }
 
-    ESP_LOGE(TAG, "Shutting down socket and restarting...");
+    ESP_LOGI(TAG, "Shutting down stratum socket...");
     shutdown(GLOBAL_STATE->sock, SHUT_RDWR);
     close(GLOBAL_STATE->sock);
-    cleanQueue(GLOBAL_STATE);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    GLOBAL_STATE->sock = -1;
 }
 
 void stratum_primary_heartbeat(void * pvParameters)
@@ -104,6 +102,14 @@ void stratum_primary_heartbeat(void * pvParameters)
 
     while (1)
     {
+        // Check if mining is still enabled
+        if (!GLOBAL_STATE->mining_enabled) {
+            ESP_LOGI(TAG, "Mining disabled, stratum_primary_heartbeat task stopping.");
+            GLOBAL_STATE->stratum_primary_heartbeat_task_handle = NULL;
+            vTaskDelete(NULL);
+            return;
+        }
+
         if (GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback == false) {
             vTaskDelay(10000 / portTICK_PERIOD_MS);
             continue;
@@ -174,8 +180,11 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
 
-        vTaskDelay(60000 / portTICK_PERIOD_MS);
+        vTaskDelay(60000 / portTICK_PERIOD_MS); // Check mining_enabled flag every 60 seconds otherwise
     }
+    // Should not be reached if task self-terminates properly
+    GLOBAL_STATE->stratum_primary_heartbeat_task_handle = NULL;
+    vTaskDelete(NULL);
 }
 
 void stratum_task(void * pvParameters)
@@ -194,12 +203,33 @@ void stratum_task(void * pvParameters)
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
-    xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL);
+    // Store the handle for the heartbeat task
+    xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, &GLOBAL_STATE->stratum_primary_heartbeat_task_handle);
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
     while (1) {
+        // Check if mining is still enabled
+        if (!GLOBAL_STATE->mining_enabled) {
+            ESP_LOGI(TAG, "Mining disabled, stratum_task stopping (main loop start).");
+            if (GLOBAL_STATE->stratum_primary_heartbeat_task_handle != NULL) {
+                vTaskDelete(GLOBAL_STATE->stratum_primary_heartbeat_task_handle);
+                GLOBAL_STATE->stratum_primary_heartbeat_task_handle = NULL;
+            }
+            vTaskDelete(NULL); 
+            return; 
+        }
+
         if (!is_wifi_connected()) {
             ESP_LOGI(TAG, "WiFi disconnected, attempting to reconnect...");
+            if (!GLOBAL_STATE->mining_enabled) {
+                ESP_LOGI(TAG, "Mining disabled, stratum_task stopping (wifi check).");
+                if (GLOBAL_STATE->stratum_primary_heartbeat_task_handle != NULL) { 
+                    vTaskDelete(GLOBAL_STATE->stratum_primary_heartbeat_task_handle); 
+                    GLOBAL_STATE->stratum_primary_heartbeat_task_handle = NULL; 
+                }
+                vTaskDelete(NULL); 
+                return;
+            }
             vTaskDelay(10000 / portTICK_PERIOD_MS);
             continue;
         }
@@ -238,6 +268,16 @@ void stratum_task(void * pvParameters)
             continue;
         }
         inet_ntop(AF_INET, (void *)dns_addr->h_addr_list[0], host_ip, sizeof(host_ip));
+        
+        if (!GLOBAL_STATE->mining_enabled) {
+            ESP_LOGI(TAG, "Mining disabled, stratum_task stopping (pre-socket).");
+            if (GLOBAL_STATE->stratum_primary_heartbeat_task_handle != NULL) { 
+                vTaskDelete(GLOBAL_STATE->stratum_primary_heartbeat_task_handle); 
+                GLOBAL_STATE->stratum_primary_heartbeat_task_handle = NULL; 
+            }
+            vTaskDelete(NULL); 
+            return;
+        }
 
         ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)", stratum_url, port, host_ip);
 
@@ -249,8 +289,17 @@ void stratum_task(void * pvParameters)
         GLOBAL_STATE->sock = socket(addr_family, SOCK_STREAM, ip_protocol);
         if (GLOBAL_STATE->sock < 0) {
             ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+            if (!GLOBAL_STATE->mining_enabled) {
+                ESP_LOGI(TAG, "Mining disabled, stratum_task stopping (socket creation failed).");
+                if (GLOBAL_STATE->stratum_primary_heartbeat_task_handle != NULL) { 
+                    vTaskDelete(GLOBAL_STATE->stratum_primary_heartbeat_task_handle); 
+                    GLOBAL_STATE->stratum_primary_heartbeat_task_handle = NULL; 
+                }
+                vTaskDelete(NULL); 
+                return;
+            }
             if (++retry_critical_attempts > MAX_CRITICAL_RETRY_ATTEMPTS) {
-                ESP_LOGE(TAG, "Max retry attempts reached, restarting...");
+                ESP_LOGE(TAG, "Max critical retry attempts reached for stratum connection. System will not automatically restart. Consider manual restart or check connection.");
                 esp_restart();
             }
             vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -265,10 +314,22 @@ void stratum_task(void * pvParameters)
             retry_attempts++;
             ESP_LOGE(TAG, "Socket unable to connect to %s:%d (errno %d: %s)", stratum_url, port, errno, strerror(errno));
             // close the socket
-            shutdown(GLOBAL_STATE->sock, SHUT_RDWR);
-            close(GLOBAL_STATE->sock);
+            if(GLOBAL_STATE->sock >=0) { // Check if socket is valid before closing
+                shutdown(GLOBAL_STATE->sock, SHUT_RDWR);
+                close(GLOBAL_STATE->sock);
+                GLOBAL_STATE->sock = -1; // Mark as closed
+            }
+             if (!GLOBAL_STATE->mining_enabled) {
+                ESP_LOGI(TAG, "Mining disabled, stratum_task stopping (connect failed).");
+                if (GLOBAL_STATE->stratum_primary_heartbeat_task_handle != NULL) {
+                    vTaskDelete(GLOBAL_STATE->stratum_primary_heartbeat_task_handle); 
+                    GLOBAL_STATE->stratum_primary_heartbeat_task_handle = NULL; 
+                }
+                vTaskDelete(NULL); 
+                return;
+            }
             // instead of restarting, retry this every 5 seconds
-            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            vTaskDelay(5000 / portTICK_PERIOD_MS); // Consider checking mining_enabled after this delay too
             continue;
         }
 
@@ -308,6 +369,15 @@ void stratum_task(void * pvParameters)
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
                 retry_attempts++;
                 stratum_close_connection(GLOBAL_STATE);
+                if (!GLOBAL_STATE->mining_enabled) {
+                    ESP_LOGI(TAG, "Mining disabled, stratum_task stopping (recv failed).");
+                    if (GLOBAL_STATE->stratum_primary_heartbeat_task_handle != NULL) {
+                        vTaskDelete(GLOBAL_STATE->stratum_primary_heartbeat_task_handle); 
+                        GLOBAL_STATE->stratum_primary_heartbeat_task_handle = NULL; 
+                    }
+                    vTaskDelete(NULL); 
+                    return;
+                }
                 break;
             }
 
@@ -344,6 +414,15 @@ void stratum_task(void * pvParameters)
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
                 ESP_LOGE(TAG, "Pool requested client reconnect...");
                 stratum_close_connection(GLOBAL_STATE);
+                if (!GLOBAL_STATE->mining_enabled) {
+                    ESP_LOGI(TAG, "Mining disabled, stratum_task stopping (client reconnect).");
+                    if (GLOBAL_STATE->stratum_primary_heartbeat_task_handle != NULL) { 
+                        vTaskDelete(GLOBAL_STATE->stratum_primary_heartbeat_task_handle); 
+                        GLOBAL_STATE->stratum_primary_heartbeat_task_handle = NULL; 
+                    }
+                    vTaskDelete(NULL); 
+                    return;
+                }
                 break;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
                 if (stratum_api_v1_message.response_success) {

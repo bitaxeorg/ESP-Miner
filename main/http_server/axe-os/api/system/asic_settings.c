@@ -4,13 +4,10 @@
 #include "cJSON.h"
 #include "global_state.h"
 #include "asic.h"
+#include "http_server.h"
 
 // static const char *TAG = "asic_api";
 static GlobalState *GLOBAL_STATE = NULL;
-
-// Function declarations from http_server.c
-extern esp_err_t is_network_allowed(httpd_req_t *req);
-extern esp_err_t set_cors_headers(httpd_req_t *req);
 
 // Initialize the ASIC API with the global state
 void asic_api_init(GlobalState *global_state) {

@@ -2,6 +2,10 @@
     <h4>Loading...</h4>
 </ng-template>
 <ng-container *ngIf="info$ | async as info; else loading">
+    <p-message *ngIf="!info.miningEnabled" severity="info" styleClass="w-full mb-4 py-4 border-round-xl"
+        text="Mining manually stopped. Enable mining to start hashing again.">
+    </p-message>
+    
     <!-- Temp warning alert -->
     <p-message *ngIf="info.overheat_mode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
         text="Bitaxe has overheated - See settings">

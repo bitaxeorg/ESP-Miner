@@ -36,8 +36,17 @@ void ASIC_task(void *pvParameters)
 
     while (1)
     {
-        bm_job *next_bm_job = (bm_job *)queue_dequeue(&GLOBAL_STATE->ASIC_jobs_queue);
+        if (!GLOBAL_STATE->mining_enabled) {
+            ESP_LOGI(TAG, "Mining disabled, ASIC_task stopping.");
+            if (GLOBAL_STATE->asic_task_handle != NULL) {
+                GLOBAL_STATE->asic_task_handle = NULL; 
+            }
+            vTaskDelete(NULL); 
+            return; 
+        }
 
+        bm_job *next_bm_job = (bm_job *)queue_dequeue(&GLOBAL_STATE->ASIC_jobs_queue);
+        
         if (next_bm_job->pool_diff != GLOBAL_STATE->stratum_difficulty)
         {
             ESP_LOGI(TAG, "New pool difficulty %lu", next_bm_job->pool_diff);
