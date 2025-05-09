@@ -165,6 +165,38 @@ bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency) {
     ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
     bool success = false;
     
+    // Add thermal management to frequency adjustment
+    float chip_temp = Thermal_get_chip_temp(GLOBAL_STATE);
+    float current_power = Power_get_power(GLOBAL_STATE);
+    float max_power = Power_get_max_settings(GLOBAL_STATE);
+    
+    // Adjust target frequency based on thermal and power conditions
+    if (chip_temp > GLOBAL_STATE->thermal_throttle_temp && chip_temp < GLOBAL_STATE->thermal_shutdown_temp) {
+        float temp_factor = 1.0f - ((chip_temp - GLOBAL_STATE->thermal_throttle_temp) / 
+                                  (GLOBAL_STATE->thermal_shutdown_temp - GLOBAL_STATE->thermal_throttle_temp));
+        float adjusted_frequency = target_frequency * temp_factor;
+        
+        // Ensure we don't go below minimum safe frequency
+        float min_freq = target_frequency * 0.75f; // 75% of target as minimum
+        adjusted_frequency = (adjusted_frequency < min_freq) ? min_freq : adjusted_frequency;
+        
+        ESP_LOGW(TAG, "Thermal throttling: %.2f°C, reducing frequency to %.2f MHz", chip_temp, adjusted_frequency);
+        target_frequency = adjusted_frequency;
+    }
+    
+    // Add power-based frequency adjustment
+    if (current_power > max_power * 0.9f) {
+        float power_factor = 1.0f - ((current_power - (max_power * 0.9f)) / (max_power * 0.1f));
+        power_factor = (power_factor < 0.85f) ? 0.85f : power_factor;
+        
+        float power_adjusted_freq = target_frequency * power_factor;
+        if (power_adjusted_freq < target_frequency) {
+            ESP_LOGW(TAG, "Power throttling: %.2fW/%.2fW, reducing frequency to %.2f MHz", 
+                    current_power, max_power, power_adjusted_freq);
+            target_frequency = power_adjusted_freq;
+        }
+    }
+    
     switch (GLOBAL_STATE->asic_model) {
         case ASIC_BM1366:
             success = BM1366_set_frequency(target_frequency);
@@ -188,6 +220,8 @@ bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency) {
     
     if (success) {
         ESP_LOGI(TAG, "Successfully transitioned to new ASIC frequency: %.2f MHz", target_frequency);
+        // Store the actual set frequency for reference
+        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.current_frequency = target_frequency;
     } else {
         ESP_LOGE(TAG, "Failed to transition to new ASIC frequency: %.2f MHz", target_frequency);
     }
