@@ -66,6 +66,16 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_asic_frequency = power_management->frequency_value;
     
     while (1) {
+        if (!GLOBAL_STATE->mining_enabled) {
+            ESP_LOGI(TAG, "Mining disabled, POWER_MANAGEMENT_task stopping.");
+            
+            // Consider if PID needs specific deinitialization: pid_set_mode(&pid, MANUAL);
+            if (GLOBAL_STATE->power_management_task_handle != NULL) {
+                 GLOBAL_STATE->power_management_task_handle = NULL;
+            }
+            vTaskDelete(NULL);
+            return;
+        }
 
         // Refresh PID setpoint from NVS in case it was changed via API
         pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);

@@ -9,4 +9,18 @@
         <p-button (click)="restart()" id="restart" label="Restart" severity="primary"></p-button>
     </li>
 
+    <li id="start-mining-container" style="margin-top: 10px;">
+        <p-button (click)="callStartMining()" 
+                  label="Enable Mining" 
+                  icon="pi pi-play" 
+                  severity="success"></p-button>
+    </li>
+
+    <li id="stop-mining-container" style="margin-top: 10px;">
+        <p-button (click)="callStopMining()" 
+                  label="Disable Mining" 
+                  icon="pi pi-stop-circle" 
+                  severity="warning"></p-button>
+    </li>
+
 </ul>

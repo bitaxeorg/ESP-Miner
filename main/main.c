@@ -4,6 +4,7 @@
 #include "nvs_flash.h"
 
 #include "main.h"
+#include "mining_controller.h"
 
 #include "asic_result_task.h"
 #include "asic_task.h"
@@ -27,7 +28,14 @@ static GlobalState GLOBAL_STATE = {
     .extranonce_2_len = 0, 
     .abandon_work = 0, 
     .version_mask = 0,
-    .ASIC_initalized = false
+    .ASIC_initalized = false,
+    .mining_enabled = false,
+    .power_management_task_handle = NULL,
+    .stratum_task_handle = NULL,
+    .stratum_primary_heartbeat_task_handle = NULL,
+    .create_jobs_task_handle = NULL,
+    .asic_task_handle = NULL,
+    .asic_result_task_handle = NULL
 };
 
 static const char * TAG = "bitaxe";
@@ -99,25 +107,10 @@ void app_main(void)
 
     wifi_softap_off();
 
-    queue_init(&GLOBAL_STATE.stratum_queue);
-    queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
-
-    SERIAL_init();
-
-    if (ASIC_init(&GLOBAL_STATE) == 0) {
-        GLOBAL_STATE.SYSTEM_MODULE.asic_status = "Chip count 0";
-        ESP_LOGE(TAG, "Chip count 0");
-        return;
+    // Start mining operations using the mining_controller
+    if (start_mining(&GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start mining operations. System will not mine.");
     }
 
-    SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
-    SERIAL_clear_buffer();
-
-    GLOBAL_STATE.ASIC_initalized = true;
-
-    xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
-    xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
     xTaskCreate(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL);
 }
