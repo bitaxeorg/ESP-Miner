@@ -2,13 +2,14 @@ import { defineConfig } from "vite";
 import preact from "@preact/preset-vite";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import tailwindcss from "@tailwindcss/vite";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [preact()],
+  plugins: [preact(), tailwindcss()],
   build: {
     outDir: resolve(__dirname, "dist/axe-os"),
   },
@@ -16,7 +17,7 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to the ESP32 device
       "/api": {
-        target: "http://10.1.1.50",
+        target: "http://192.168.68.68",
         changeOrigin: true,
         secure: false,
         // Enable debug logging for proxy requests
