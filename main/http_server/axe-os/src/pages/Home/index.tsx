@@ -160,13 +160,7 @@ export function Home() {
     try {
       // Payload for system update
       const payload = {
-        stratumURL: "public-pool.io",
-        stratumPort: 21496,
-        fallbackStratumURL: "solo.ckpool.org",
-        fallbackStratumPort: 1234,
-        stratumUser: "bc1qa2500jc3cwjnklv4tdme4e6ascvvl5w8jezxlh.bitaxe",
-        fallbackStratumUser: "bc1qa2500jc3cwjnklv4tdme4e6ascvvl5w8jezxlh.bitaxe",
-        fallbackStratumPassword: "acs-test-password",
+        stratumURL: "solo.ckpool.org",
       };
 
       // Determine API URL based on connection method
@@ -386,13 +380,7 @@ export function Home() {
         <div class='code-preview'>
           <pre>
             {`{
-  "stratumURL": "public-pool.io",
-  "stratumPort": 21496,
-  "fallbackStratumURL": "solo.ckpool.org",
-  "fallbackStratumPort": 1234,
-  "stratumUser": "bc1qa2500jc3cwjnklv4tdme4e6ascvvl5w8jezxlh.bitaxe",
-  "fallbackStratumUser": "bc1qa2500jc3cwjnklv4tdme4e6ascvvl5w8jezxlh.bitaxe",
-  "fallbackStratumPassword": "acs-test-password"
+  "stratumURL": "solo.ckpool.org"
 }`}
           </pre>
         </div>
