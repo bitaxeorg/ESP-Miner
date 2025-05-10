@@ -1,27 +1,86 @@
-# AxeOS
+# ESP32 Preact API Client
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 16.1.3.
+This project is a Preact-based web client for interacting with ESP32 API endpoints. It demonstrates how to fetch data from an ESP32 device and display it in a web interface.
 
-## Development server
+## CORS and API Access Configuration
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+This project uses a development proxy to avoid CORS issues when accessing the ESP32 API. The proxy is configured in `vite.config.ts` and forwards requests from `/api/*` to the ESP32 device at `http://10.1.1.50/api/*`.
 
-## Code scaffolding
+### Options for handling CORS
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+1. **Development Proxy (Current Solution)**
 
-## Build
+   - The Vite development server proxies API requests to the ESP32
+   - No changes needed on the ESP32 device
+   - Only works during development
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+2. **Configure ESP32 CORS Headers (Recommended for Production)**
 
-## Running unit tests
+   - Modify the ESP32 HTTP server code to include CORS headers:
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+   ```c
+   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+   httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+   httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type, Accept");
+   ```
 
-## Running end-to-end tests
+   - This approach works for both development and production
+   - See HTTP server example code: https://github.com/espressif/esp-idf/tree/master/examples/protocols/http_server/simple
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+3. **Third-party CORS Proxy**
+   - Use a service like https://cors-anywhere.herokuapp.com/
+   - Example: `fetch('https://cors-anywhere.herokuapp.com/http://10.1.1.50/api/system/info')`
+   - Suitable for demonstrations but not recommended for production
 
-## Further help
+## Getting Started
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+### Prerequisites
+
+- Node.js (v14 or later)
+- npm or yarn
+- ESP32 device with API server running on your network
+
+### Installation
+
+1. Clone this repository
+2. Install dependencies
+
+   ```bash
+   npm install
+   ```
+
+3. Update the ESP32 IP address in `vite.config.ts` if needed
+
+   ```typescript
+   proxy: {
+     '/api': {
+       target: 'http://YOUR_ESP32_IP',
+       changeOrigin: true,
+       secure: false
+     }
+   }
+   ```
+
+4. Start the development server
+
+   ```bash
+   npm run dev
+   ```
+
+5. Open your browser to the URL shown in the terminal (typically http://localhost:5173)
+
+## Building for Production
+
+To build for production:
+
+```bash
+npm run build
+```
+
+The output files will be in the `dist` directory.
+
+**Note:** For production deployment, you should configure CORS headers on your ESP32 server or set up a production-ready proxy server.
+
+## License
+
+[MIT](https://choosealicense.com/licenses/mit/)
