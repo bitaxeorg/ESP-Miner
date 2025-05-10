@@ -47,8 +47,6 @@
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
 
-static GlobalState * GLOBAL_STATE;
-
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
@@ -87,6 +85,7 @@ static esp_err_t GET_wifi_scan(httpd_req_t *req)
     return ESP_OK;
 }
 
+static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
 QueueHandle_t log_queue = NULL;
 
@@ -166,7 +165,7 @@ static uint32_t extract_origin_ip_addr(char *origin)
     return origin_ip_addr;
 }
 
-esp_err_t is_network_allowed(httpd_req_t * req) 
+esp_err_t is_network_allowed(httpd_req_t * req)
 {
     if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
         ESP_LOGI(CORS_TAG, "Device in AP mode. Allowing CORS.");
@@ -267,7 +266,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
     return httpd_resp_set_type(req, type);
 }
 
-esp_err_t set_cors_headers(httpd_req_t * req) 
+esp_err_t set_cors_headers(httpd_req_t * req)
 {
 
     esp_err_t err;
