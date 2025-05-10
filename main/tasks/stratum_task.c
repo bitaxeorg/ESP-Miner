@@ -82,6 +82,7 @@ void stratum_close_connection(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "Shutting down stratum socket...");
     shutdown(GLOBAL_STATE->sock, SHUT_RDWR);
     close(GLOBAL_STATE->sock);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
     GLOBAL_STATE->sock = -1;
 }
 
@@ -180,8 +181,9 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
 
-        vTaskDelay(60000 / portTICK_PERIOD_MS); // Check mining_enabled flag every 60 seconds otherwise
+        vTaskDelay(60000 / portTICK_PERIOD_MS);
     }
+
     // Should not be reached if task self-terminates properly
     GLOBAL_STATE->stratum_primary_heartbeat_task_handle = NULL;
     vTaskDelete(NULL);
@@ -299,7 +301,7 @@ void stratum_task(void * pvParameters)
                 return;
             }
             if (++retry_critical_attempts > MAX_CRITICAL_RETRY_ATTEMPTS) {
-                ESP_LOGE(TAG, "Max critical retry attempts reached for stratum connection. System will not automatically restart. Consider manual restart or check connection.");
+                ESP_LOGE(TAG, "Max retry attempts reached, restarting...");
                 esp_restart();
             }
             vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -314,10 +316,10 @@ void stratum_task(void * pvParameters)
             retry_attempts++;
             ESP_LOGE(TAG, "Socket unable to connect to %s:%d (errno %d: %s)", stratum_url, port, errno, strerror(errno));
             // close the socket
-            if(GLOBAL_STATE->sock >=0) { // Check if socket is valid before closing
+            if(GLOBAL_STATE->sock >=0) {
                 shutdown(GLOBAL_STATE->sock, SHUT_RDWR);
                 close(GLOBAL_STATE->sock);
-                GLOBAL_STATE->sock = -1; // Mark as closed
+                GLOBAL_STATE->sock = -1;
             }
              if (!GLOBAL_STATE->mining_enabled) {
                 ESP_LOGI(TAG, "Mining disabled, stratum_task stopping (connect failed).");
@@ -329,7 +331,7 @@ void stratum_task(void * pvParameters)
                 return;
             }
             // instead of restarting, retry this every 5 seconds
-            vTaskDelay(5000 / portTICK_PERIOD_MS); // Consider checking mining_enabled after this delay too
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
             continue;
         }
 

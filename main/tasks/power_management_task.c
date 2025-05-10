@@ -66,33 +66,35 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     uint16_t last_asic_frequency = power_management->frequency_value;
     
     while (1) {
-        if (!GLOBAL_STATE->mining_enabled) {
-            ESP_LOGI(TAG, "Mining disabled, POWER_MANAGEMENT_task stopping.");
-            
-            // Consider if PID needs specific deinitialization: pid_set_mode(&pid, MANUAL);
-            if (GLOBAL_STATE->power_management_task_handle != NULL) {
-                 GLOBAL_STATE->power_management_task_handle = NULL;
-            }
-            vTaskDelete(NULL);
-            return;
-        }
-
-        // Refresh PID setpoint from NVS in case it was changed via API
-        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
-
+        // Common sensor readings, performed each cycle
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);
 
         power_management->fan_rpm = Thermal_get_fan_speed(GLOBAL_STATE->DEVICE_CONFIG);
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
-
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
 
+        if (!GLOBAL_STATE->mining_enabled) {
+            ESP_LOGI(TAG, "Mining disabled. Power management task active, fan at minimum.");
 
-        // ASIC Thermal Diode will give bad readings if the ASIC is turned off
-        // if(power_management->voltage < tps546_config.TPS546_INIT_VOUT_MIN){
-        //     goto looper;
-        // }
+            double min_fan_percent_when_disabled = 25.0; 
+            Thermal_set_fan_percent(GLOBAL_STATE->device_model, min_fan_percent_when_disabled / 100.0);
+            power_management->fan_perc = (uint16_t)min_fan_percent_when_disabled;
+            
+            // Reset last core voltage and frequency to ensure they are reapplied when mining restarts
+            last_core_voltage = 0; 
+            last_asic_frequency = 0;
+
+        } else {
+            ESP_LOGD(TAG, "Mining enabled. Running full power management logic."); 
+
+            // Refresh PID setpoint from NVS in case it was changed via API
+            pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
+
+            // ASIC Thermal Diode will give bad readings if the ASIC is turned off
+            // if(power_management->voltage < tps546_config.TPS546_INIT_VOUT_MIN){
+            //     goto looper; // This goto is problematic, consider refactoring if used
+            // }
 
         //overheat mode if the voltage regulator or ASIC is too hot
         if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
@@ -135,48 +137,49 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, (float) fs / 100.0);
         }
 
-        // Read the state of plug sense pin
-        // if (power_management->HAS_PLUG_SENSE) {
-        //     int gpio_plug_sense_state = gpio_get_level(GPIO_PLUG_SENSE);
-        //     if (gpio_plug_sense_state == 0) {
-        //         // turn ASIC off
-        //         gpio_set_level(GPIO_ASIC_ENABLE, 1);
-        //     }
-        // }
+            // Read the state of plug sense pin
+            // if (power_management->HAS_PLUG_SENSE) {
+            //     int gpio_plug_sense_state = gpio_get_level(GPIO_PLUG_SENSE);
+            //     if (gpio_plug_sense_state == 0) {
+            //         // turn ASIC off
+            //         gpio_set_level(GPIO_ASIC_ENABLE, 1);
+            //     }
+            // }
 
-        // New voltage and frequency adjustment code
-        uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-        uint16_t asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+            // New voltage and frequency adjustment code
+            uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
+            uint16_t asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
-        if (core_voltage != last_core_voltage) {
-            ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
-            VCORE_set_voltage((double) core_voltage / 1000.0, GLOBAL_STATE);
-            last_core_voltage = core_voltage;
-        }
-
-        if (asic_frequency != last_asic_frequency) {
-            ESP_LOGI(TAG, "New ASIC frequency requested: %uMHz (current: %uMHz)", asic_frequency, last_asic_frequency);
-            
-            bool success = ASIC_set_frequency(GLOBAL_STATE, (float)asic_frequency);
-            
-            if (success) {
-                power_management->frequency_value = (float)asic_frequency;
+            if (core_voltage != last_core_voltage) {
+                ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
+                VCORE_set_voltage((double) core_voltage / 1000.0, GLOBAL_STATE);
+                last_core_voltage = core_voltage;
             }
+
+            if (asic_frequency != last_asic_frequency) {
+                ESP_LOGI(TAG, "New ASIC frequency requested: %uMHz (current: %uMHz)", asic_frequency, last_asic_frequency);
+                
+                bool success = ASIC_set_frequency(GLOBAL_STATE, (float)asic_frequency);
+                
+                if (success) {
+                    power_management->frequency_value = (float)asic_frequency;
+                }
+                
+                last_asic_frequency = asic_frequency;
+            }
+
+            // Check for changing of overheat mode
+            uint16_t new_overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
             
-            last_asic_frequency = asic_frequency;
+            if (new_overheat_mode != sys_module->overheat_mode) {
+                sys_module->overheat_mode = new_overheat_mode;
+                ESP_LOGI(TAG, "Overheat mode updated to: %d", sys_module->overheat_mode);
+            }
+
+            VCORE_check_fault(GLOBAL_STATE);
         }
 
-        // Check for changing of overheat mode
-        uint16_t new_overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-        
-        if (new_overheat_mode != sys_module->overheat_mode) {
-            sys_module->overheat_mode = new_overheat_mode;
-            ESP_LOGI(TAG, "Overheat mode updated to: %d", sys_module->overheat_mode);
-        }
-
-        VCORE_check_fault(GLOBAL_STATE);
-
-        // looper:
+        // looper: // This label is unused if the goto above is not used.
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
     }
 }

@@ -31,14 +31,22 @@ esp_err_t start_mining(GlobalState * global_state)
     }
 
     BaseType_t task_created;
-    task_created = xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) global_state, 10,
-                               &global_state->power_management_task_handle);
-    if (task_created != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create POWER_MANAGEMENT_task");
-        global_state->ASIC_initalized = false;
-        return ESP_FAIL;
+    bool pm_task_created_in_this_call = false;
+
+    if (global_state->power_management_task_handle == NULL) {
+        ESP_LOGI(TAG, "POWER_MANAGEMENT_task not running. Creating new task...");
+        task_created = xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) global_state, 10,
+                                   &global_state->power_management_task_handle);
+        if (task_created != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create POWER_MANAGEMENT_task");
+            global_state->ASIC_initalized = false;
+            return ESP_FAIL;
+        }
+        pm_task_created_in_this_call = true;
+        ESP_LOGI(TAG, "POWER_MANAGEMENT_task created.");
+    } else {
+        ESP_LOGI(TAG, "POWER_MANAGEMENT_task is already running.");
     }
-    ESP_LOGI(TAG, "POWER_MANAGEMENT_task created.");
 
     global_state->mining_enabled = true;
     global_state->abandon_work = 0;
@@ -51,6 +59,8 @@ esp_err_t start_mining(GlobalState * global_state)
     }
 
     ESP_LOGI(TAG, "Initializing Queues...");
+    global_state->new_stratum_version_rolling_msg = false;
+
     queue_init(&global_state->stratum_queue);
     queue_init(&global_state->ASIC_jobs_queue);
 
@@ -71,18 +81,17 @@ esp_err_t start_mining(GlobalState * global_state)
 
     global_state->ASIC_initalized = true;
 
-    // 2. Reset flags
-    global_state->new_stratum_version_rolling_msg = false;
-
-    // 3. Create tasks and store handles
+    // 2. Create tasks and store handles
     ESP_LOGI(TAG, "Creating mining tasks...");
 
     task_created = xTaskCreate(stratum_task, "stratum admin", 8192, (void *) global_state, 5, &global_state->stratum_task_handle);
     if (task_created != pdPASS) {
         ESP_LOGE(TAG, "Failed to create stratum_task");
         // Rollback previous tasks
-        if (global_state->power_management_task_handle)
+        if (pm_task_created_in_this_call && global_state->power_management_task_handle) {
             vTaskDelete(global_state->power_management_task_handle);
+            global_state->power_management_task_handle = NULL;
+        }
         global_state->ASIC_initalized = false;
         return ESP_FAIL;
     }
@@ -93,10 +102,14 @@ esp_err_t start_mining(GlobalState * global_state)
     if (task_created != pdPASS) {
         ESP_LOGE(TAG, "Failed to create create_jobs_task");
         // Rollback previous tasks
-        if (global_state->stratum_task_handle)
+        if (global_state->stratum_task_handle) {
             vTaskDelete(global_state->stratum_task_handle);
-        if (global_state->power_management_task_handle)
+            global_state->stratum_task_handle = NULL;
+        }
+        if (pm_task_created_in_this_call && global_state->power_management_task_handle) {
             vTaskDelete(global_state->power_management_task_handle);
+            global_state->power_management_task_handle = NULL;
+        }
         global_state->ASIC_initalized = false;
         return ESP_FAIL;
     }
@@ -106,12 +119,18 @@ esp_err_t start_mining(GlobalState * global_state)
     if (task_created != pdPASS) {
         ESP_LOGE(TAG, "Failed to create ASIC_task");
         // Rollback previous tasks
-        if (global_state->create_jobs_task_handle)
+        if (global_state->create_jobs_task_handle) {
             vTaskDelete(global_state->create_jobs_task_handle);
-        if (global_state->stratum_task_handle)
+            global_state->create_jobs_task_handle = NULL;
+        }
+        if (global_state->stratum_task_handle) {
             vTaskDelete(global_state->stratum_task_handle);
-        if (global_state->power_management_task_handle)
+            global_state->stratum_task_handle = NULL;
+        }
+        if (pm_task_created_in_this_call && global_state->power_management_task_handle) {
             vTaskDelete(global_state->power_management_task_handle);
+            global_state->power_management_task_handle = NULL;
+        }
         global_state->ASIC_initalized = false;
         return ESP_FAIL;
     }
@@ -122,8 +141,10 @@ esp_err_t start_mining(GlobalState * global_state)
     if (task_created != pdPASS) {
         ESP_LOGE(TAG, "Failed to create ASIC_result_task");
         // Rollback previous tasks
-        if (global_state->asic_task_handle)
+        if (global_state->asic_task_handle) {
             vTaskDelete(global_state->asic_task_handle);
+            global_state->asic_task_handle = NULL;
+        }
         if (global_state->ASIC_TASK_MODULE.semaphore) {
             vSemaphoreDelete(global_state->ASIC_TASK_MODULE.semaphore);
             global_state->ASIC_TASK_MODULE.semaphore = NULL;
@@ -137,12 +158,18 @@ esp_err_t start_mining(GlobalState * global_state)
             global_state->valid_jobs = NULL;
         }
 
-        if (global_state->create_jobs_task_handle)
+        if (global_state->create_jobs_task_handle) {
             vTaskDelete(global_state->create_jobs_task_handle);
-        if (global_state->stratum_task_handle)
+            global_state->create_jobs_task_handle = NULL;
+        }
+        if (global_state->stratum_task_handle) {
             vTaskDelete(global_state->stratum_task_handle);
-        if (global_state->power_management_task_handle)
+            global_state->stratum_task_handle = NULL;
+        }
+        if (pm_task_created_in_this_call && global_state->power_management_task_handle) {
             vTaskDelete(global_state->power_management_task_handle);
+            global_state->power_management_task_handle = NULL;
+        }
         global_state->ASIC_initalized = false;
         return ESP_FAIL;
     }
