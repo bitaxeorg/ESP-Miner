@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./assets/theme.css";
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -13,6 +14,12 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
+}
+
+/* Update dark mode styling to use CSS variables */
+[data-color-scheme="dark"] {
+  color: #ccc;
+  background-color: #1a1a1a;
 }
 
 body {
@@ -64,9 +71,10 @@ main {
   }
 }
 
-@media (prefers-color-scheme: light) {
+/* Remove the media query since we're controlling dark mode via theme now */
+/* @media (prefers-color-scheme: light) {
   :root {
     color: #ccc;
     background-color: #1a1a1a;
   }
-}
+} */

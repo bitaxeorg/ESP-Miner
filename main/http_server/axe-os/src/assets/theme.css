@@ -1,0 +1,100 @@
+:root {
+  /* Default theme values that will be overridden by the ThemeProvider */
+  --primary-color: #3b82f6;
+  --primary-color-text: #ffffff;
+  --highlight-bg: #3b82f6;
+  --highlight-text-color: #ffffff;
+  --focus-ring: 0 0 0 0.2rem rgba(59, 130, 246, 0.2);
+
+  /* Button variables */
+  --button-bg: #3b82f6;
+  --button-hover-bg: #2563eb;
+  --button-focus-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #3b82f6;
+
+  /* Input and control variables */
+  --slider-bg: #dee2e6;
+  --slider-range-bg: #3b82f6;
+  --slider-handle-bg: #3b82f6;
+  --progressbar-bg: #dee2e6;
+  --progressbar-value-bg: #3b82f6;
+  --checkbox-border: #3b82f6;
+  --checkbox-bg: #3b82f6;
+  --checkbox-hover-bg: #2563eb;
+
+  /* Toggle button variables */
+  --togglebutton-bg: #3b82f6;
+  --togglebutton-border: 1px solid #3b82f6;
+  --togglebutton-hover-bg: #2563eb;
+  --togglebutton-hover-border: 1px solid #2563eb;
+  --togglebutton-text-color: #ffffff;
+
+  /* ShadCN-like tokens */
+  --background: #ffffff;
+  --foreground: #020817;
+  --card: #ffffff;
+  --card-foreground: #020817;
+  --popover: #ffffff;
+  --popover-foreground: #020817;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #ef4444;
+  --destructive-foreground: #f8fafc;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: var(--primary-color);
+
+  /* Typography */
+  --font-sans: "Inter, system-ui, sans-serif";
+  --font-heading: var(--font-sans);
+
+  /* Radius */
+  --radius: 0.5rem;
+}
+
+/* Update dark mode tokens */
+[data-color-scheme="dark"] {
+  color-scheme: dark;
+
+  --background: #020817;
+  --foreground: #f8fafc;
+  --card: #0f172a;
+  --card-foreground: #f8fafc;
+  --popover: #0f172a;
+  --popover-foreground: #f8fafc;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #1e293b;
+  --accent-foreground: #f8fafc;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #f8fafc;
+  --border: #1e293b;
+  --input: #1e293b;
+}
+
+/* Default theme classes to utilize CSS variables */
+.primary-color {
+  color: var(--primary-color);
+}
+
+.primary-bg {
+  background-color: var(--primary-color);
+}
+
+.primary-border {
+  border-color: var(--primary-color);
+}
+
+.primary-text {
+  color: var(--primary-color-text);
+}
+
+/* Apply different styles based on color scheme */
+[data-color-scheme="dark"] {
+  color-scheme: dark;
+}
+
+[data-color-scheme="light"] {
+  color-scheme: light;
+}
