@@ -1,4 +1,5 @@
 import { ComponentChildren } from "preact";
+import { useState } from "preact/hooks";
 
 interface SidebarProps {
   children?: ComponentChildren;
@@ -24,11 +25,18 @@ const navItems = [
 ];
 
 export function Sidebar({ children }: SidebarProps) {
+  const [logoLoaded, setLogoLoaded] = useState(true);
+
   return (
     <aside class='fixed left-0 top-0 z-40 h-screen w-64 transform bg-gray-900 transition-transform sm:translate-x-0'>
       <div class='flex h-full flex-col overflow-y-auto border-r border-gray-800 px-3 py-4'>
         <div class='mb-10 flex items-center px-2'>
-          <span class='text-xl font-semibold text-gray-100'>AxeOS</span>
+          <img
+            src='/acs-brandmark-white.png'
+            alt='ACS Logo'
+            class='h-10'
+            onLoad={() => setLogoLoaded(true)}
+          />
         </div>
 
         <nav class='flex-1 space-y-2'>
