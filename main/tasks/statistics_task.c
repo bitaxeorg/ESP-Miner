@@ -12,6 +12,9 @@
 #include "vcore.h"
 
 #define DEFAULT_POLL_RATE 5000
+#define MAX_DATA_COUNT 720
+#define MAX_DURATION 720
+#define MIN_DURATION 1
 
 static const char * TAG = "statistics_task";
 
@@ -98,45 +101,53 @@ void statistics_task(void * pvParameters)
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
     maxDataCount = nvs_config_get_u16(NVS_CONFIG_STATISTICS_LIMIT, 0);
-    if (720 < maxDataCount) {
-        maxDataCount = 720;
+    if (MAX_DATA_COUNT < maxDataCount) {
+        maxDataCount = MAX_DATA_COUNT;
         nvs_config_set_u16(NVS_CONFIG_STATISTICS_LIMIT, maxDataCount);
     }
     duration = nvs_config_get_u16(NVS_CONFIG_STATISTICS_DURATION, 1);
-    if (720 < duration) {
-        duration = 720;
+    if (MAX_DURATION < duration) {
+        duration = MAX_DURATION;
         nvs_config_set_u16(NVS_CONFIG_STATISTICS_DURATION, duration);
     }
-    if (1 > duration) {
-        duration = 1;
+    if (MIN_DURATION > duration) {
+        duration = MIN_DURATION;
         nvs_config_set_u16(NVS_CONFIG_STATISTICS_DURATION, duration);
     }
 
-    const uint32_t pollRate = DEFAULT_POLL_RATE * duration;
-    struct StatisticsData statsData;
+    if (0 != maxDataCount) {
+        const TickType_t pollRate = DEFAULT_POLL_RATE * duration * (MAX_DATA_COUNT / maxDataCount);
+        struct StatisticsData statsData;
 
-    ESP_LOGI(TAG, "Ready!");
+        ESP_LOGI(TAG, "Ready!");
 
-    while (1) {
-        int8_t wifiRSSI = -90;
-        get_wifi_current_rssi(&wifiRSSI);
+        TickType_t taskWakeTime = xTaskGetTickCount();
+        while (1) {
+            int8_t wifiRSSI = -90;
+            get_wifi_current_rssi(&wifiRSSI);
 
-        statsData.timestamp = esp_timer_get_time() / 1000;
-        statsData.hashrate = sys_module->current_hashrate;
-        statsData.chipTemperature = power_management->chip_temp_avg;
-        statsData.vrTemperature = power_management->vr_temp;
-        statsData.power = power_management->power;
-        statsData.voltage = power_management->voltage;
-        statsData.current = Power_get_current(GLOBAL_STATE);
-        statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
-        statsData.fanSpeed = power_management->fan_perc;
-        statsData.fanRPM = power_management->fan_rpm;
-        statsData.wifiRSSI = wifiRSSI;
-        statsData.freeHeap = esp_get_free_heap_size();
+            statsData.timestamp = esp_timer_get_time() / 1000;
+            statsData.hashrate = sys_module->current_hashrate;
+            statsData.chipTemperature = power_management->chip_temp_avg;
+            statsData.vrTemperature = power_management->vr_temp;
+            statsData.power = power_management->power;
+            statsData.voltage = power_management->voltage;
+            statsData.current = Power_get_current(GLOBAL_STATE);
+            statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
+            statsData.fanSpeed = power_management->fan_perc;
+            statsData.fanRPM = power_management->fan_rpm;
+            statsData.wifiRSSI = wifiRSSI;
+            statsData.freeHeap = esp_get_free_heap_size();
 
-        addStatisticData(&statsData);
+            addStatisticData(&statsData);
 
-        // looper:
-        vTaskDelay(pollRate / portTICK_PERIOD_MS);
+            // looper:
+            vTaskDelayUntil(&taskWakeTime, pollRate / portTICK_PERIOD_MS); // taskWakeTime is automatically updated
+        }
+    } else {
+        ESP_LOGI(TAG, "Disabled!");
+        while (1) {
+            vTaskDelay(DEFAULT_POLL_RATE / portTICK_PERIOD_MS);
+        }
     }
 }
