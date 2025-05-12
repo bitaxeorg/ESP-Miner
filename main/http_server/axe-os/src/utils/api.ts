@@ -64,6 +64,65 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 }
 
 /**
+ * Update pool information
+ * @param stratumURL - The stratum URL to set
+ * @param stratumPort - The stratum port to set
+ * @returns The response from the API
+ */
+export async function updatePoolInfo(stratumURL: string, stratumPort: number): Promise<any> {
+  try {
+    const response = await fetch("/api/system", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        stratumURL,
+        stratumPort,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Pool info update response:", result);
+    return result;
+  } catch (error) {
+    console.error("Failed to update pool info:", error);
+    throw error;
+  }
+}
+
+/**
+ * Restart the system
+ * @returns A message indicating the system will restart
+ */
+export async function restartSystem(): Promise<string> {
+  try {
+    const response = await fetch("/api/system/restart", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.text();
+    console.log("System restart response:", result);
+    return result;
+  } catch (error) {
+    console.error("Failed to restart system:", error);
+    throw error;
+  }
+}
+
+/**
  * Fetch miners data
  * Uses the actual system info API to get real miner data
  */
