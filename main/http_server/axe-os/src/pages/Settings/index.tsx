@@ -1,15 +1,16 @@
 import { useState, useEffect } from "preact/hooks";
 import { Button } from "../../components/Button";
 import { getSystemInfo, updatePoolInfo, restartSystem } from "../../utils/api";
+import { useToast } from "../../context/ToastContext";
 
 export function Settings() {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     stratumURL: "",
     stratumPort: "",
   });
   const [loading, setLoading] = useState(false);
   const [restartLoading, setRestartLoading] = useState(false);
-  const [message, setMessage] = useState({ text: "", type: "" });
 
   useEffect(() => {
     // Load current settings
@@ -22,12 +23,12 @@ export function Settings() {
         });
       } catch (error) {
         console.error("Failed to load settings:", error);
-        setMessage({ text: "Failed to load current settings", type: "error" });
+        showToast("Failed to load current settings", "error");
       }
     };
 
     loadSettings();
-  }, []);
+  }, [showToast]);
 
   const handleInputChange = (e: Event) => {
     const target = e.target as HTMLInputElement;
@@ -40,7 +41,6 @@ export function Settings() {
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     setLoading(true);
-    setMessage({ text: "", type: "" });
 
     try {
       const portNumber = parseInt(formData.stratumPort, 10);
@@ -50,16 +50,10 @@ export function Settings() {
       }
 
       await updatePoolInfo(formData.stratumURL, portNumber);
-      setMessage({
-        text: "Pool settings updated successfully. Please restart the device for changes to take effect.",
-        type: "success",
-      });
+      showToast("Pool settings updated successfully", "success");
     } catch (error) {
       console.error("Failed to update pool settings:", error);
-      setMessage({
-        text: error instanceof Error ? error.message : "Failed to update pool settings",
-        type: "error",
-      });
+      showToast(error instanceof Error ? error.message : "Failed to update pool settings", "error");
     } finally {
       setLoading(false);
     }
@@ -67,17 +61,13 @@ export function Settings() {
 
   const handleRestart = async () => {
     setRestartLoading(true);
-    setMessage({ text: "", type: "" });
 
     try {
-      const response = await restartSystem();
-      setMessage({ text: response, type: "success" });
+      await restartSystem();
+      showToast("System is restarting...", "info");
     } catch (error) {
       console.error("Failed to restart system:", error);
-      setMessage({
-        text: error instanceof Error ? error.message : "Failed to restart system",
-        type: "error",
-      });
+      showToast(error instanceof Error ? error.message : "Failed to restart system", "error");
     } finally {
       setRestartLoading(false);
     }
@@ -120,18 +110,6 @@ export function Settings() {
               required
             />
           </div>
-
-          {message.text && (
-            <div
-              className={`p-3 mb-4 rounded-md ${
-                message.type === "error"
-                  ? "bg-red-100 text-red-700 border border-red-200"
-                  : "bg-green-100 text-green-700 border border-green-200"
-              }`}
-            >
-              {message.text}
-            </div>
-          )}
 
           <div className='flex gap-4'>
             <Button type='submit' disabled={loading} className='flex-1'>

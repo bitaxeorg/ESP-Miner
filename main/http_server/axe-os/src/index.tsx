@@ -7,9 +7,13 @@ import { Theme } from "./pages/Theme/index";
 import { Miners } from "./pages/Miners/index";
 import { NotFound } from "./pages/_404.jsx";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ToastProvider, useToast } from "./context/ToastContext";
+import { ToastContainer } from "./components/Toast";
 import "./style.css";
 
-export function App() {
+function AppContent() {
+  const { toasts, hideToast } = useToast();
+
   return (
     <ThemeProvider>
       <LocationProvider>
@@ -22,8 +26,17 @@ export function App() {
             <Route default component={NotFound} />
           </Router>
         </Layout>
+        <ToastContainer toasts={toasts} onClose={hideToast} />
       </LocationProvider>
     </ThemeProvider>
+  );
+}
+
+export function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 }
 

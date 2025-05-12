@@ -48,6 +48,8 @@ export interface SystemInfo {
   ipAddress?: string;
 }
 
+// Hook for toast will be imported in components that use these functions
+
 export async function getSystemInfo(): Promise<SystemInfo> {
   try {
     const response = await fetch("/api/system/info");
