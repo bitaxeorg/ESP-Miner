@@ -67,7 +67,7 @@ export async function getSystemInfo(): Promise<SystemInfo> {
  * Update pool information
  * @param stratumURL - The stratum URL to set
  * @param stratumPort - The stratum port to set
- * @returns The response from the API
+ * @returns The response from the API or a success message
  */
 export async function updatePoolInfo(stratumURL: string, stratumPort: number): Promise<any> {
   try {
@@ -86,9 +86,23 @@ export async function updatePoolInfo(stratumURL: string, stratumPort: number): P
       throw new Error(`API error: ${response.status}`);
     }
 
-    const result = await response.json();
-    console.log("Pool info update response:", result);
-    return result;
+    const text = await response.text();
+
+    // If the response has content, try to parse it as JSON
+    if (text.trim()) {
+      try {
+        const result = JSON.parse(text);
+        console.log("Pool info update response:", result);
+        return result;
+      } catch (parseError) {
+        console.log("Response is not JSON:", text);
+        return { success: true, message: "Pool information updated successfully" };
+      }
+    }
+
+    // For empty responses with 200 status
+    console.log("Pool info update successful (empty response)");
+    return { success: true, message: "Pool information updated successfully" };
   } catch (error) {
     console.error("Failed to update pool info:", error);
     throw error;
