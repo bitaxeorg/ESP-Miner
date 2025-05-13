@@ -143,7 +143,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             message->error_str = strdup("unknown");
             
         // if it's an error, then it's a fail
-        } else if (!cJSON_IsNull(error_json)) {
+        } else if (error_json != NULL && !cJSON_IsNull(error_json)) {
             message->response_success = false;
             message->error_str = strdup("unknown");
             if (parsed_id < 5) {
