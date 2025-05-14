@@ -231,11 +231,18 @@ export class HomeComponent {
           this.powerData.push(info.power);
           this.dataLabel.push(new Date().getTime());
 
-          if (this.hashrateData.length >= 720) {
-            this.hashrateData.shift();
-            this.temperatureData.shift();
-            this.powerData.shift();
-            this.dataLabel.shift();
+          if ((this.previousHashrateData.length + this.hashrateData.length) >= 720) {
+            if (this.previousHashrateData.length > 0) {
+              this.previousHashrateData.shift();
+              this.previousTemperatureData.shift();
+              this.previousPowerData.shift();
+              this.previousDataLabel.shift();
+            } else {
+              this.hashrateData.shift();
+              this.temperatureData.shift();
+              this.powerData.shift();
+              this.dataLabel.shift();
+            }
           }
 
           this.chartData.labels = this.previousDataLabel.concat(this.dataLabel);
