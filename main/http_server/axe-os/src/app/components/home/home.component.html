@@ -30,7 +30,7 @@
                         <span class="block text-500 font-medium mb-3">Hashrate</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
                             <span *ngIf="!info.power_fault">
-                                {{info.hashRate * 1000000000 | hashSuffix}}
+                                {{info.hashRate | hashSuffix}}
                             </span>
                             <span *ngIf="info.power_fault" class="text-red-500">
                                 Not available - Power fault
@@ -58,7 +58,7 @@
                         <span class="block text-500 font-medium mb-3">Efficiency</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
                             <span *ngIf="!info.power_fault">
-                                {{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/Th</small>
+                                {{info.power / (info.hashRate / 1000000000000) | number: '1.2-2'}} <small>J/Th</small>
                             </span>
                             <span *ngIf="info.power_fault" class="text-red-500">
                                 Not available - Power fault

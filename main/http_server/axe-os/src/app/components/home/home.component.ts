@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewChild, OnDestroy } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap, first, Subject, takeUntil } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
+import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
 import { LoadingService } from 'src/app/services/loading.service';
@@ -10,6 +11,7 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
+import { eChartLabel } from 'src/models/enum/eChartLabel';
 
 @Component({
   selector: 'app-home',
@@ -24,8 +26,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   public chartOptions: any;
   public dataLabel: number[] = [];
   public hashrateData: number[] = [];
-  public temperatureData: number[] = [];
   public powerData: number[] = [];
+  public chartY1Data: number[] = [];
+  public chartY2Data: number[] = [];
   public chartData?: any;
 
   public maxPower: number = 0;
@@ -113,12 +116,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
 
     this.chartData = {
-      labels: [],
+      labels: [this.dataLabel],
       datasets: [
         {
           type: 'line',
-          label: 'Hashrate',
-          data: [this.hashrateData],
+          label: eChartLabel.hashrate,
+          data: [this.chartY1Data],
+          fill: true,
           backgroundColor: primaryColor + '30',
           borderColor: primaryColor,
           tension: 0,
@@ -126,12 +130,11 @@ export class HomeComponent implements OnInit, OnDestroy {
           pointHoverRadius: 5,
           borderWidth: 1,
           yAxisID: 'y',
-          fill: true,
         },
         {
           type: 'line',
-          label: 'ASIC Temp',
-          data: [this.temperatureData],
+          label: eChartLabel.asicTemp,
+          data: [this.chartY2Data],
           fill: false,
           backgroundColor: textColorSecondary,
           borderColor: textColorSecondary,
@@ -158,14 +161,10 @@ export class HomeComponent implements OnInit, OnDestroy {
             label: function (tooltipItem: any) {
               let label = tooltipItem.dataset.label || '';
               if (label) {
-                label += ': ';
-              }
-              if (tooltipItem.dataset.label === 'ASIC Temp') {
-                label += tooltipItem.raw + ' °C';
+                return label += ': ' + HomeComponent.cbFormatValue(tooltipItem.raw, label);
               } else {
-                label += HashSuffixPipe.transform(tooltipItem.raw);
+                return tooltipItem.raw;
               }
-              return label;
             }
           }
         },
@@ -186,14 +185,18 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
         },
         y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
           ticks: {
             color: primaryColor,
-            callback: (value: number) => HashSuffixPipe.transform(value)
+            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[0].label)
           },
           grid: {
             color: surfaceBorder,
             drawBorder: false
-          }
+          },
+          suggestedMax: 0
         },
         y2: {
           type: 'linear',
@@ -201,7 +204,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           position: 'right',
           ticks: {
             color: textColorSecondary,
-            callback: (value: number) => value + ' °C'
+            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[1].label)
           },
           grid: {
             drawOnChartArea: false,
@@ -213,8 +216,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     };
 
     this.chartData.labels = this.dataLabel;
-    this.chartData.datasets[0].data = this.hashrateData;
-    this.chartData.datasets[1].data = this.temperatureData;
+    this.chartData.datasets[0].data = this.chartY1Data;
+    this.chartData.datasets[1].data = this.chartY2Data;
 
     // load previous data
     this.stats$ = this.systemService.getStatistics()
@@ -223,22 +226,49 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.stats$
       .pipe(takeUntil(this.destroy$))
       .subscribe(stats => {
+        const idxTimestamp = 0;
+        const idxHashrate = 1;
+        const idxPower = 2;
+        let idxChartY1Data = 3;
+        let idxChartY2Data = 4;
+
+        if (stats.chartY1Data === eChartLabel.hashrate) {
+          idxChartY1Data = 1;
+        } else if (stats.chartY1Data === eChartLabel.power) {
+          idxChartY1Data = 2;
+        }
+
+        if (stats.chartY2Data === eChartLabel.hashrate) {
+          idxChartY2Data = 1;
+        } else if (stats.chartY2Data === eChartLabel.power) {
+          idxChartY2Data = 2;
+        } else if (idxChartY1Data < 3) { // no additional data for Y1
+          idxChartY2Data = 3;
+        }
+
         stats.statistics.forEach(element => {
-          const idxHashrate = 0;
-          const idxTemperature = 1;
-          const idxPower = 2;
-          const idxTimestamp = 3;
+          element[idxHashrate] = element[idxHashrate] * 1000000000; // convert to H/s
 
-          this.hashrateData.push(element[idxHashrate] * 1000000000);
-          this.temperatureData.push(element[idxTemperature]);
-          this.powerData.push(element[idxPower]);
           this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
+          this.hashrateData.push(element[idxHashrate]);
+          this.powerData.push(element[idxPower]);
+          if (idxChartY1Data < element.length) {
+            this.chartY1Data.push(element[idxChartY1Data]);
+          } else {
+            this.chartY1Data.push(0.0);
+          }
+          if (idxChartY2Data < element.length) {
+            this.chartY2Data.push(element[idxChartY2Data]);
+          } else {
+            this.chartY2Data.push(0.0);
+          }
 
-          if (this.hashrateData.length >= 720) {
-            this.hashrateData.shift();
-            this.temperatureData.shift();
-            this.powerData.shift();
+          if (this.dataLabel.length >= 720) {
             this.dataLabel.shift();
+            this.hashrateData.shift();
+            this.powerData.shift();
+            this.chartY1Data.shift();
+            this.chartY2Data.shift();
           }
         }),
         this.startGetLiveData();
@@ -253,20 +283,35 @@ export class HomeComponent implements OnInit, OnDestroy {
       switchMap(() => {
         return this.systemService.getInfo()
       }),
+      map(info => {
+        info.hashRate = info.hashRate * 1000000000; // convert to H/s
+        info.voltage = info.voltage / 1000;
+        info.current = info.current / 1000;
+        info.coreVoltageActual = info.coreVoltageActual / 1000;
+        info.coreVoltage = info.coreVoltage / 1000;
+        return info;
+      }),
       tap(info => {
         // Only collect and update chart data if there's no power fault
         if (!info.power_fault) {
-          this.hashrateData.push(info.hashRate * 1000000000);
-          this.temperatureData.push(info.temp);
-          this.powerData.push(info.power);
           this.dataLabel.push(new Date().getTime());
+          this.hashrateData.push(info.hashRate);
+          this.powerData.push(info.power);
+          this.chartY1Data.push(HomeComponent.getDataForLabel(info.chartY1Data, info));
+          this.chartY2Data.push(HomeComponent.getDataForLabel(info.chartY2Data, info));
 
-          if ((this.hashrateData.length) >= 720) {
-            this.hashrateData.shift();
-            this.temperatureData.shift();
-            this.powerData.shift();
+          if ((this.dataLabel.length) >= 720) {
             this.dataLabel.shift();
+            this.hashrateData.shift();
+            this.powerData.shift();
+            this.chartY1Data.shift();
+            this.chartY2Data.shift();
           }
+
+          this.chartData.datasets[0].label = info.chartY1Data;
+          this.chartData.datasets[1].label = info.chartY2Data;
+          this.chartOptions.scales.y.suggestedMax = HomeComponent.getSettingsForLabel(info.chartY1Data).suggestedMax;
+          this.chartOptions.scales.y2.suggestedMax = HomeComponent.getSettingsForLabel(info.chartY2Data).suggestedMax;
         }
 
         this.chart?.refresh();
@@ -285,10 +330,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       }),
       map(info => {
         info.power = parseFloat(info.power.toFixed(1))
-        info.voltage = parseFloat((info.voltage / 1000).toFixed(1));
-        info.current = parseFloat((info.current / 1000).toFixed(1));
-        info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
-        info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
+        info.voltage = parseFloat(info.voltage.toFixed(1));
+        info.current = parseFloat(info.current.toFixed(1));
+        info.coreVoltageActual = parseFloat(info.coreVoltageActual.toFixed(2));
+        info.coreVoltage = parseFloat(info.coreVoltage.toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
         info.temp2 = parseFloat(info.temp2.toFixed(1));
 
@@ -359,5 +404,49 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
 
     return this.calculateAverage(efficiencies);
+  }
+
+  static getDataForLabel(label: eChartLabel, info: ISystemInfo): number {
+    switch (label) {
+      case eChartLabel.hashrate:    return info.hashRate;
+      case eChartLabel.asicTemp:    return info.temp;
+      case eChartLabel.vrTemp:      return info.vrTemp;
+      case eChartLabel.asicVoltage: return info.coreVoltageActual;
+      case eChartLabel.voltage:     return info.voltage;
+      case eChartLabel.power:       return info.power;
+      case eChartLabel.current:     return info.current;
+      case eChartLabel.fanSpeed:    return info.fanspeed;
+      case eChartLabel.fanRpm:      return info.fanrpm;
+      case eChartLabel.wifiRssi:    return info.wifiRSSI;
+      case eChartLabel.freeHeap:    return info.freeHeap;
+      default: return 0.0;
+    }
+  }
+
+  static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number; suggestedMax: number} {
+    switch (label) {
+      case eChartLabel.hashrate:    return {suffix: ' H/s', precision: 0, suggestedMax: 0};
+      case eChartLabel.asicTemp:    return {suffix: ' °C', precision: 1, suggestedMax: 80};
+      case eChartLabel.vrTemp:      return {suffix: ' °C', precision: 1, suggestedMax: 110};
+      case eChartLabel.asicVoltage: return {suffix: ' V', precision: 2, suggestedMax: 1.5};
+      case eChartLabel.voltage:     return {suffix: ' V', precision: 1, suggestedMax: 5.2};
+      case eChartLabel.power:       return {suffix: ' W', precision: 1, suggestedMax: 40};
+      case eChartLabel.current:     return {suffix: ' A', precision: 1, suggestedMax: 20};
+      case eChartLabel.fanSpeed:    return {suffix: ' %', precision: 0, suggestedMax: 100};
+      case eChartLabel.fanRpm:      return {suffix: ' rpm', precision: 0, suggestedMax: 7000};
+      case eChartLabel.wifiRssi:    return {suffix: ' dBm', precision: 0, suggestedMax: 0};
+      case eChartLabel.freeHeap:    return {suffix: ' B', precision: 0, suggestedMax: 0};
+      default: return {suffix: '', precision: 0, suggestedMax: 0};
+    }
+  }
+
+  static cbFormatValue(value: number, datasetLabel: eChartLabel): string {
+    switch (datasetLabel) {
+      case eChartLabel.hashrate:    return HashSuffixPipe.transform(value);
+      case eChartLabel.freeHeap:    return ByteSuffixPipe.transform(value);
+      default:
+        const settings = HomeComponent.getSettingsForLabel(datasetLabel);
+        return value.toFixed(settings.precision) + settings.suffix;
+    }
   }
 }

@@ -166,6 +166,20 @@
                 <input type="hidden" formControlName="statsFrequency" />
             </div>
         </div>
+
+        <div class="field grid p-fluid">
+            <label htmlFor="chartY1Data" class="col-12 mb-2 md:col-2 md:mb-0">Chart Data Y-Axis (Left)</label>
+            <div class="col-12 md:col-10">
+                <p-dropdown [options]="getDataSourceLabels()" optionLabel="name" optionValue="value" formControlName="chartY1Data"></p-dropdown>
+            </div>
+        </div>
+
+        <div class="field grid p-fluid">
+            <label htmlFor="chartY2Data" class="col-12 mb-2 md:col-2 md:mb-0">Chart Data Y-Axis (Right)</label>
+            <div class="col-12 md:col-10">
+                <p-dropdown [options]="getDataSourceLabels()" optionLabel="name" optionValue="value" formControlName="chartY2Data"></p-dropdown>
+            </div>
+        </div>
     </div>
 
     <div class="flex mt-5 gap-3">

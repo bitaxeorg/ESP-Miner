@@ -5,6 +5,7 @@ import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
+import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { ActivatedRoute } from '@angular/router';
 
 type Dropdown = {
@@ -164,6 +165,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           ]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
+          chartY1Data: [info.chartY1Data, [Validators.required]],
+          chartY2Data: [info.chartY2Data, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
           minfanspeed: [info.minFanSpeed, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
@@ -350,4 +353,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     return !! Object.entries(this.form.controls)
       .filter(([field, control]) => control.dirty && !this.noRestartFields.includes(field)).length
   }
+  getDataSourceLabels() {
+    return Object.values(eChartLabel).map(label => ({name: label, value: label}));
+  }
+
 }

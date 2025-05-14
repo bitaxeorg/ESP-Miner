@@ -44,12 +44,24 @@
 #include "websocket.h"
 
 #define JSON_ALL_STATS_ELEMENT_SIZE 120
-#define JSON_DASHBOARD_STATS_ELEMENT_SIZE 60
+#define JSON_DASHBOARD_STATS_ELEMENT_SIZE 85
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
 
 static char axeOSVersion[32];
+static const char * STATS_LABEL_HASHRATE = "Hashrate";
+static const char * STATS_LABEL_ASIC_TEMP = "ASIC Temp";
+static const char * STATS_LABEL_VR_TEMP = "VR Temp";
+static const char * STATS_LABEL_ASIC_VOLTAGE = "ASIC Voltage";
+static const char * STATS_LABEL_VOLTAGE = "Voltage";
+static const char * STATS_LABEL_POWER = "Power";
+static const char * STATS_LABEL_CURRENT = "Current";
+static const char * STATS_LABEL_FAN_SPEED = "Fan Speed";
+static const char * STATS_LABEL_FAN_RPM = "Fan RPM";
+static const char * STATS_LABEL_WIFI_RSSI = "Wi-Fi Strength";
+static const char * STATS_LABEL_FREE_HEAP = "Free Heap";
+static const char * STATS_LABEL_TIMESTAMP = "Timestamp";
 
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
@@ -447,6 +459,41 @@ static esp_err_t handle_options_request(httpd_req_t * req)
     return ESP_OK;
 }
 
+float * mapChartLabelToValue(char * label, struct StatisticsData * statsData)
+{
+    float * value = NULL;
+
+    if ((NULL != label) && (NULL != statsData)) {
+        if (strcmp(label, STATS_LABEL_HASHRATE) == 0) {
+            value = &statsData->hashrate;
+        } else if (strcmp(label, STATS_LABEL_ASIC_TEMP) == 0) {
+            value = &statsData->chipTemperature;
+        } else if (strcmp(label, STATS_LABEL_VR_TEMP) == 0) {
+            value = &statsData->vrTemperature;
+        } else if (strcmp(label, STATS_LABEL_ASIC_VOLTAGE) == 0) {
+            value = &statsData->coreVoltageActual;
+        } else if (strcmp(label, STATS_LABEL_VOLTAGE) == 0) {
+            value = &statsData->voltage;
+        } else if (strcmp(label, STATS_LABEL_POWER) == 0) {
+            value = &statsData->power;
+        } else if (strcmp(label, STATS_LABEL_CURRENT) == 0) {
+            value = &statsData->current;
+        } else if (strcmp(label, STATS_LABEL_FAN_SPEED) == 0) {
+            value = &statsData->fanSpeed;
+        } else if (strcmp(label, STATS_LABEL_FAN_RPM) == 0) {
+            value = &statsData->fanRPM;
+        } else if (strcmp(label, STATS_LABEL_WIFI_RSSI) == 0) {
+            value = &statsData->wifiRSSI;
+        } else if (strcmp(label, STATS_LABEL_FREE_HEAP) == 0) {
+            value = &statsData->freeHeap;
+        } else {
+            value = NULL;
+        }
+    }
+
+    return value;
+}
+
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -570,6 +617,18 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "statsFrequency")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_STATISTICS_FREQUENCY, item->valueint);
     }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "chartY1Data"))) {
+        struct StatisticsData dummy;
+        if (NULL != mapChartLabelToValue(item->valuestring, &dummy)) {
+            nvs_config_set_string(NVS_CONFIG_CHART_Y1_DATA, item->valuestring);
+        }
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "chartY2Data"))) {
+        struct StatisticsData dummy;
+        if (NULL != mapChartLabelToValue(item->valuestring, &dummy)) {
+            nvs_config_set_string(NVS_CONFIG_CHART_Y2_DATA, item->valuestring);
+        }
+    }
     if ((item = cJSON_GetObjectItem(root, "overclockEnabled")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
     }
@@ -631,6 +690,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)");
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
     float expected_hashrate = frequency * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
+    char * chartY1Data = nvs_config_get_string(NVS_CONFIG_CHART_Y1_DATA, STATS_LABEL_HASHRATE);
+    char * chartY2Data = nvs_config_get_string(NVS_CONFIG_CHART_Y2_DATA, STATS_LABEL_ASIC_TEMP);
 
     uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
@@ -719,6 +780,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
 
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0));
+    cJSON_AddStringToObject(root, "chartY1Data", chartY1Data);
+    cJSON_AddStringToObject(root, "chartY2Data", chartY2Data);
 
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
@@ -731,6 +794,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(stratumUser);
     free(fallbackStratumUser);
     free(display);
+    free(chartY1Data);
+    free(chartY2Data);
 
     const char * sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
@@ -746,9 +811,10 @@ int create_json_statistics_all(cJSON * root)
     if (root) {
         // create array for all statistics
         const char *label[12] = {
-            "hashRate", "temp", "vrTemp", "power", "voltage",
-            "current", "coreVoltageActual", "fanspeed", "fanrpm",
-            "wifiRSSI", "freeHeap", "timestamp"
+            STATS_LABEL_HASHRATE, STATS_LABEL_ASIC_TEMP, STATS_LABEL_VR_TEMP,
+            STATS_LABEL_ASIC_VOLTAGE, STATS_LABEL_VOLTAGE, STATS_LABEL_POWER,
+            STATS_LABEL_CURRENT, STATS_LABEL_FAN_SPEED, STATS_LABEL_FAN_RPM,
+            STATS_LABEL_WIFI_RSSI, STATS_LABEL_FREE_HEAP, STATS_LABEL_TIMESTAMP
         };
 
         cJSON * statsLabelArray = cJSON_CreateStringArray(label, 12);
@@ -768,10 +834,10 @@ int create_json_statistics_all(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI));
@@ -793,25 +859,50 @@ int create_json_statistics_dashboard(cJSON * root)
 
     if (root) {
         // create array for dashboard statistics
+        char * chartY1Data = nvs_config_get_string(NVS_CONFIG_CHART_Y1_DATA, STATS_LABEL_HASHRATE);
+        char * chartY2Data = nvs_config_get_string(NVS_CONFIG_CHART_Y2_DATA, STATS_LABEL_ASIC_TEMP);
+
+        cJSON_AddStringToObject(root, "chartY1Data", chartY1Data);
+        cJSON_AddStringToObject(root, "chartY2Data", chartY2Data);
+        prebuffer++;
+
         cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
 
         if (NULL != GLOBAL_STATE->STATISTICS_MODULE.statisticsList) {
             StatisticsNodePtr node = *GLOBAL_STATE->STATISTICS_MODULE.statisticsList; // double pointer
             struct StatisticsData statsData;
+            float * chartY1Value = mapChartLabelToValue(chartY1Data, &statsData);
+            float * chartY2Value = mapChartLabelToValue(chartY2Data, &statsData);
+
+            // hashrate and power data are always available
+            if ((&statsData.hashrate == chartY1Value) || (&statsData.power == chartY1Value)) {
+                chartY1Value = NULL;
+            }
+            if ((&statsData.hashrate == chartY2Value) || (&statsData.power == chartY2Value)) {
+                chartY2Value = NULL;
+            }
 
             while (NULL != node) {
                 node = statisticData(node, &statsData);
 
                 cJSON *valueArray = cJSON_CreateArray();
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
+                if (NULL != chartY1Value) {
+                    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(*chartY1Value));
+                }
+                if (NULL != chartY2Value) {
+                    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(*chartY2Value));
+                }
 
                 cJSON_AddItemToArray(statsArray, valueArray);
                 prebuffer++;
             }
         }
+
+        free(chartY1Data);
+        free(chartY2Data);
     }
 
     return prebuffer;
