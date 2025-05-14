@@ -145,6 +145,8 @@ components:
         - wifiRSSI
         - displayTimeout
         - statsFrequency
+        - chartY1Data
+        - chartY2Data
       properties:
         ASICModel:
           type: string
@@ -319,6 +321,12 @@ components:
         statsFrequency:
           type: number
           description: Statistics frequency in seconds
+        chartY1Data:
+          type: string
+          description: Chart Y1 data source config
+        chartY2Data:
+          type: string
+          description: Chart Y2 data source config
 
     Settings:
       type: object
@@ -459,6 +467,40 @@ components:
           minimum: 0
           examples:
             - 120
+        chartY1Data:
+          type: string
+          description: Set chart Y1 data source
+          enum:
+            - hashrate
+            - asicTemp
+            - vrTemp
+            - asicVoltage
+            - voltage
+            - power
+            - current
+            - fanSpeed
+            - fanRpm
+            - wifiRssi
+            - freeHeap
+          examples:
+            - "Hashrate"
+        chartY2Data:
+          type: string
+          description: Set chart Y2 data source
+          enum:
+            - hashrate
+            - asicTemp
+            - vrTemp
+            - asicVoltage
+            - voltage
+            - power
+            - current
+            - fanSpeed
+            - fanRpm
+            - wifiRssi
+            - freeHeap
+          examples:
+            - "ASIC Temp"
       additionalProperties: true
 
   responses:
@@ -646,11 +688,47 @@ paths:
                 type: object
                 required:
                   - currentTimestamp
+                  - chartY1Data
+                  - chartY2Data
                   - statistics
                 properties:
                   currentTimestamp:
                     type: number
                     description: Current timestamp as a reference
+                  chartY1Data:
+                    type: string
+                    description: Chart Y1 data source config
+                    enum:
+                      - hashrate
+                      - asicTemp
+                      - vrTemp
+                      - asicVoltage
+                      - voltage
+                      - power
+                      - current
+                      - fanSpeed
+                      - fanRpm
+                      - wifiRssi
+                      - freeHeap
+                    examples:
+                      - "Hashrate"
+                  chartY2Data:
+                    type: string
+                    description: Chart Y2 data source config
+                    enum:
+                      - hashrate
+                      - asicTemp
+                      - vrTemp
+                      - asicVoltage
+                      - voltage
+                      - power
+                      - current
+                      - fanSpeed
+                      - fanRpm
+                      - wifiRssi
+                      - freeHeap
+                    examples:
+                      - "ASIC Temp"
                   statistics:
                     type: array
                     description: Statistics data point(s)
