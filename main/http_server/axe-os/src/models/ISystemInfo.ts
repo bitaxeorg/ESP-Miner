@@ -1,3 +1,5 @@
+import { eChartLabel } from './enum/eChartLabel';
+
 interface ISharesRejectedStat {
     message: string;
     count: number;
@@ -58,6 +60,8 @@ export interface ISystemInfo {
     temptarget: number,
     fanrpm: number,
     statsFrequency: number,
+    chartY1Data: eChartLabel,
+    chartY2Data: eChartLabel,
     coreVoltageActual: number,
 
     boardtemp1?: number,
