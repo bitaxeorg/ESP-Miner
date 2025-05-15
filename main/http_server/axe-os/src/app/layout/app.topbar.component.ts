@@ -5,14 +5,15 @@ import { LayoutService } from './service/app.layout.service';
 
 @Component({
     selector: 'app-topbar',
-    templateUrl: './app.topbar.component.html'
+    templateUrl: './app.topbar.component.html',
+    standalone: false
 })
 export class AppTopBarComponent {
 
     items!: MenuItem[];
 
     @Input() isAPMode: boolean = false;
-    
+
     @ViewChild('menubutton') menuButton!: ElementRef;
 
     @ViewChild('topbarmenubutton') topbarMenuButton!: ElementRef;

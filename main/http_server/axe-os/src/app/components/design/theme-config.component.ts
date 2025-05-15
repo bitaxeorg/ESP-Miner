@@ -49,7 +49,8 @@ interface ThemeOption {
       </div>
     </div>
   `,
-  styleUrls: ['./design-component.scss']
+  styleUrls: ['./design-component.scss'],
+  standalone: false
 })
 export class ThemeConfigComponent implements OnInit {
   selectedScheme: string;
@@ -255,8 +256,8 @@ export class ThemeConfigComponent implements OnInit {
     config.colorScheme = scheme;
     this.layoutService.config.set(config);
     // Save color scheme to NVS
-    this.themeService.saveThemeSettings({ 
-      colorScheme: scheme 
+    this.themeService.saveThemeSettings({
+      colorScheme: scheme
     }).subscribe(
       () => { },
       error => console.error('Error saving theme settings:', error)
