@@ -115,3 +115,49 @@ menu "Stratum Configuration"
             A starting difficulty to use with the pool.
 
 endmenu
+
+menu "InfluxDB Configuration"
+
+    config INFLUXDB_ENABLED
+        int "Enable InfluxDB Integration"
+        default 0
+        help
+            Enable or disable InfluxDB metrics collection.
+
+    config INFLUXDB_HOST
+        string "InfluxDB Host"
+        default "localhost"
+        help
+            The hostname or IP address of your InfluxDB server.
+
+    config INFLUXDB_PORT
+        int "InfluxDB Port"
+        default 8086
+        help
+            The port number of your InfluxDB server.
+
+    config INFLUXDB_TOKEN
+        string "InfluxDB Token"
+        default ""
+        help
+            The authentication token for your InfluxDB server.
+
+    config INFLUXDB_ORG
+        string "InfluxDB Organization"
+        default "bitaxe"
+        help
+            The organization name in InfluxDB.
+
+    config INFLUXDB_BUCKET
+        string "InfluxDB Bucket"
+        default "bitaxe"
+        help
+            The bucket name in InfluxDB where metrics will be stored.
+
+    config INFLUXDB_MEASUREMENT
+        string "InfluxDB Measurement"
+        default "mainnet_stats"
+        help
+            The measurement name for the metrics in InfluxDB.
+
+endmenu

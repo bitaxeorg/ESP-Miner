@@ -56,4 +56,9 @@ export interface ISystemInfo {
     overheat_mode: number,
     power_fault?: string
     overclockEnabled?: number
+    influxEnabled?: number
+    influxHost?: string
+    influxPort?: string
+    influxOrg?: string
+    influxBucket?: string
 }

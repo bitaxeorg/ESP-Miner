@@ -38,6 +38,8 @@
 #include "theme_api.h"  // Add theme API include
 #include "axe-os/api/system/asic_settings.h"
 #include "http_server.h"
+#include "influx_task.h"
+#include "influx.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -46,10 +48,10 @@ static const char * CORS_TAG = "CORS";
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/json");
-    
+
     // Give some time for the connected flag to take effect
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    
+
     wifi_ap_record_simple_t ap_records[20];
     uint16_t ap_count = 0;
 
@@ -483,6 +485,29 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
     }
 
+    // Handle InfluxDB configuration
+    if ((item = cJSON_GetObjectItem(root, "influxEnabled")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_INFLUX_ENABLED, item->valueint);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxHost"))) {
+        nvs_config_set_string(NVS_CONFIG_INFLUX_HOST, item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "influxPort")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_INFLUX_PORT, item->valueint);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxToken"))) {
+        nvs_config_set_string(NVS_CONFIG_INFLUX_TOKEN, item->valuestring);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxBucket"))) {
+        nvs_config_set_string(NVS_CONFIG_INFLUX_BUCKET, item->valuestring);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxOrg"))) {
+        nvs_config_set_string(NVS_CONFIG_INFLUX_ORG, item->valuestring);
+    }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "influxMeasurement"))) {
+        nvs_config_set_string(NVS_CONFIG_INFLUX_MEASUREMENT, item->valuestring);
+    }
+
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
@@ -584,7 +609,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON *error_array = cJSON_CreateArray();
     cJSON_AddItemToObject(root, "sharesRejectedReasons", error_array);
-    
+
     for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
         cJSON *error_obj = cJSON_CreateObject();
         cJSON_AddStringToObject(error_obj, "message", GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].message);
@@ -619,7 +644,27 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
-    
+
+    // Add InfluxDB configuration
+    char *influx_host = nvs_config_get_string(NVS_CONFIG_INFLUX_HOST, CONFIG_INFLUXDB_HOST);
+    char *influx_token = nvs_config_get_string(NVS_CONFIG_INFLUX_TOKEN, CONFIG_INFLUXDB_TOKEN);
+    char *influx_bucket = nvs_config_get_string(NVS_CONFIG_INFLUX_BUCKET, CONFIG_INFLUXDB_BUCKET);
+    char *influx_org = nvs_config_get_string(NVS_CONFIG_INFLUX_ORG, CONFIG_INFLUXDB_ORG);
+    char *influx_measurement = nvs_config_get_string(NVS_CONFIG_INFLUX_MEASUREMENT, CONFIG_INFLUXDB_MEASUREMENT);
+
+    cJSON_AddBoolToObject(root, "influxEnabled", nvs_config_get_u16(NVS_CONFIG_INFLUX_ENABLED, CONFIG_INFLUXDB_ENABLED));
+    cJSON_AddStringToObject(root, "influxHost", influx_host);
+    cJSON_AddNumberToObject(root, "influxPort", nvs_config_get_u16(NVS_CONFIG_INFLUX_PORT, CONFIG_INFLUXDB_PORT));
+    cJSON_AddStringToObject(root, "influxBucket", influx_bucket);
+    cJSON_AddStringToObject(root, "influxOrg", influx_org);
+    cJSON_AddStringToObject(root, "influxMeasurement", influx_measurement);
+
+    free(influx_host);
+    free(influx_token);
+    free(influx_bucket);
+    free(influx_org);
+    free(influx_measurement);
+
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
     }
@@ -725,7 +770,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
         return ESP_OK;
     }
-    
+
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "esp-miner.bin");
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");

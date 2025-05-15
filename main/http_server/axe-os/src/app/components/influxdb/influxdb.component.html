@@ -1,0 +1,101 @@
+<div class="card">
+  <h2>InfluxDB Configuration</h2>
+
+  <div class="grid">
+    <div class="col-12">
+      <div class="card">
+        <form *ngIf="form" [formGroup]="form" (ngSubmit)="updateSystem()">
+          <div class="field-checkbox mb-4">
+            <p-checkbox
+              [binary]="true"
+              inputId="influxEnabled"
+              formControlName="influxEnabled"
+            ></p-checkbox>
+            <label for="influxEnabled">Enable InfluxDB</label>
+          </div>
+
+          <div class="field mb-4">
+            <label for="influxHost" class="block mb-2">InfluxDB Host</label>
+            <input
+              id="influxHost"
+              type="text"
+              pInputText
+              class="w-full"
+              formControlName="influxHost"
+              placeholder="192.168.1.1"
+            />
+            <small
+              class="p-error block"
+              *ngIf="form?.get('influxHost')?.invalid && form?.get('influxHost')?.touched"
+            >Please enter a valid IP address</small>
+          </div>
+
+          <div class="field mb-4">
+            <label for="influxPort" class="block mb-2">InfluxDB Port</label>
+            <input
+              id="influxPort"
+              type="text"
+              pInputText
+              class="w-full"
+              formControlName="influxPort"
+              placeholder="8086"
+            />
+            <small
+              class="p-error block"
+              *ngIf="form?.get('influxPort')?.invalid && form?.get('influxPort')?.touched"
+            >Please enter a valid port number</small>
+          </div>
+
+          <div class="field mb-4">
+            <label for="influxToken" class="block mb-2">InfluxDB Token</label>
+            <input
+              id="influxToken"
+              type="password"
+              pInputText
+              class="w-full"
+              formControlName="influxToken"
+              placeholder="Your InfluxDB Token"
+            />
+            <small
+              class="p-error block"
+              *ngIf="form?.get('influxToken')?.invalid && form?.get('influxToken')?.touched"
+            >Token is required when InfluxDB is enabled</small>
+          </div>
+
+          <div class="field mb-4">
+            <label for="influxOrg" class="block mb-2">Organization</label>
+            <input
+              id="influxOrg"
+              type="text"
+              pInputText
+              class="w-full"
+              formControlName="influxOrg"
+              placeholder="Your Organization"
+            />
+          </div>
+
+          <div class="field mb-4">
+            <label for="influxBucket" class="block mb-2">Bucket</label>
+            <input
+              id="influxBucket"
+              type="text"
+              pInputText
+              class="w-full"
+              formControlName="influxBucket"
+              placeholder="Your Bucket"
+            />
+          </div>
+
+          <div class="mt-2">
+            <button pButton [disabled]="!form.valid" type="submit" class="btn btn-primary mr-2">Save</button>
+            <b style="line-height: 34px;">You must restart this device after saving for changes to take effect.</b>
+          </div>
+
+          <div class="mt-2">
+            <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
