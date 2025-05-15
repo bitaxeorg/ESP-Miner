@@ -483,7 +483,9 @@ paths:
                 type: object
                 required:
                   - ASICModel
+                  - defaultFrequency
                   - frequencyOptions
+                  - defaultVoltage
                   - voltageOptions
                 properties:
                   ASICModel:
@@ -496,6 +498,11 @@ paths:
                       - BM1397
                     examples:
                       - "BM1366"
+                  defaultFrequency:
+                    type: number
+                    description: Default frequency for the ASIC model in MHz
+                    examples:
+                      - 450
                   frequencyOptions:
                     type: array
                     description: Available frequency options for the ASIC model in MHz
@@ -503,6 +510,11 @@ paths:
                       type: number
                     examples:
                       - [400, 425, 450, 475, 485, 500, 525, 550, 575]
+                  defaultVoltage:
+                    type: number
+                    description: Default voltage for the ASIC model in millivolts
+                    examples:
+                      - 1100
                   voltageOptions:
                     type: array
                     description: Available voltage options for the ASIC model in millivolts
