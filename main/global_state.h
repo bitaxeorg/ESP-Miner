@@ -16,6 +16,14 @@
 #define HISTORY_LENGTH 100
 #define DIFF_STRING_SIZE 10
 
+// Thermal management constants
+#define DEFAULT_THERMAL_THROTTLE_TEMP 75.0f
+#define DEFAULT_THERMAL_SHUTDOWN_TEMP 85.0f
+
+// Power management constants
+#define POWER_EFFICIENCY_THRESHOLD 0.9f
+#define MIN_FREQUENCY_FACTOR 0.75f
+
 typedef enum
 {
     DEVICE_UNKNOWN = -1,
@@ -34,6 +42,14 @@ typedef enum
     ASIC_BM1368,
     ASIC_BM1370,
 } AsicModel;
+
+// Power management profiles
+typedef enum {
+    POWER_PROFILE_PERFORMANCE,   // Maximum performance, highest power usage
+    POWER_PROFILE_BALANCED,      // Balanced between performance and efficiency
+    POWER_PROFILE_EFFICIENCY,    // Optimized for power efficiency
+    POWER_PROFILE_DYNAMIC        // Dynamically adjusted based on conditions
+} PowerProfile;
 
 // typedef struct
 // {
@@ -92,6 +108,9 @@ typedef struct
     char firmware_update_filename[20];
     char firmware_update_status[20];
     char * asic_status;
+    float thermal_throttle_temp;
+    float thermal_shutdown_temp;
+    PowerProfile power_profile;
 } SystemModule;
 
 typedef struct
@@ -139,6 +158,8 @@ typedef struct
 
     bool ASIC_initalized;
     bool psram_is_available;
+    float thermal_throttle_temp;
+    float thermal_shutdown_temp;
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */
