@@ -15,12 +15,13 @@ static const char *TAG = "create_jobs_task";
 #define QUEUE_LOW_WATER_MARK 10 // Adjust based on your requirements
 
 static bool should_generate_more_work(GlobalState *GLOBAL_STATE);
-static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint32_t extranonce_2);
+static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint32_t extranonce_2, uint32_t difficulty);
 
 void create_jobs_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
+    uint32_t difficulty = GLOBAL_STATE->stratum_difficulty;
     while (1)
     {
         mining_notify *mining_notification = (mining_notify *)queue_dequeue(&GLOBAL_STATE->stratum_queue);
@@ -32,9 +33,15 @@ void create_jobs_task(void *pvParameters)
 
         ESP_LOGI(TAG, "New Work Dequeued %s", mining_notification->job_id);
 
+        if (GLOBAL_STATE->new_set_mining_difficulty_msg)
+        {
+            ESP_LOGI(TAG, "New pool difficulty %lu", GLOBAL_STATE->stratum_difficulty);
+            difficulty = GLOBAL_STATE->stratum_difficulty;
+            GLOBAL_STATE->new_set_mining_difficulty_msg = false;
+        }
+
         if (GLOBAL_STATE->new_stratum_version_rolling_msg) {
             ESP_LOGI(TAG, "Set chip version rolls %i", (int)(GLOBAL_STATE->version_mask >> 13));
-            //(GLOBAL_STATE->ASIC_functions.set_version_mask)(GLOBAL_STATE->version_mask);
             ASIC_set_version_mask(GLOBAL_STATE, GLOBAL_STATE->version_mask);
             GLOBAL_STATE->new_stratum_version_rolling_msg = false;
         }
@@ -44,7 +51,7 @@ void create_jobs_task(void *pvParameters)
         {
             if (should_generate_more_work(GLOBAL_STATE))
             {
-                generate_work(GLOBAL_STATE, mining_notification, extranonce_2);
+                generate_work(GLOBAL_STATE, mining_notification, extranonce_2, difficulty);
 
                 // Increase extranonce_2 for the next job.
                 extranonce_2++;
@@ -72,7 +79,7 @@ static bool should_generate_more_work(GlobalState *GLOBAL_STATE)
     return GLOBAL_STATE->ASIC_jobs_queue.count < QUEUE_LOW_WATER_MARK;
 }
 
-static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint32_t extranonce_2)
+static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint32_t extranonce_2, uint32_t difficulty)
 {
     char *extranonce_2_str = extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len);
     if (extranonce_2_str == NULL) {
@@ -95,7 +102,7 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
         return;
     }
 
-    bm_job next_job = construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask);
+    bm_job next_job = construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask, difficulty);
 
     bm_job *queued_next_job = malloc(sizeof(bm_job));
     if (queued_next_job == NULL) {
