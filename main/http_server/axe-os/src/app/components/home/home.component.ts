@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { ToastrService } from 'ngx-toastr';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
@@ -47,7 +48,8 @@ export class HomeComponent {
     private systemService: SystemService,
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
-    private shareRejectReasonsService: ShareRejectionExplanationService
+    private shareRejectReasonsService: ShareRejectionExplanationService,
+    private toastr: ToastrService
   ) {
     this.initializeChart();
 
@@ -302,6 +304,21 @@ export class HomeComponent {
 
   trackByReason(_index: number, item: { message: string, count: number }) {
     return item.message; //Track only by message
+  }
+
+  toggleMining(miningEnabled: boolean) {
+    this.toastr.info(`Toggling mining ${miningEnabled ? 'off' : 'on'}`, 'Requested');
+    const miningAction = miningEnabled ? this.systemService.stopMining() : this.systemService.startMining();
+
+    miningAction.subscribe({
+      next: () => {
+        this.toastr.success(`Mining ${miningEnabled ? 'disabled' : 'enabled'}`, 'Success')
+      },
+      error: (err) => {
+
+        this.toastr.error(`Failed to toggle mining: ${err}`, 'Error')
+      }
+    });
   }
 
   public calculateAverage(data: number[]): number {

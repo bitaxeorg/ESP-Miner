@@ -12,7 +12,6 @@
 #include "stratum_task.h"
 
 #include "asic.h"
-#include "power.h"
 #include "serial.h"
 #include "vcore.h"
 #include "work_queue.h"
@@ -35,6 +34,9 @@ esp_err_t start_mining(GlobalState * global_state)
 
     if (global_state->power_management_task_handle == NULL) {
         ESP_LOGI(TAG, "POWER_MANAGEMENT_task not running. Creating new task...");
+
+        global_state->POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+        ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)global_state->POWER_MANAGEMENT_MODULE.frequency_value);
         task_created = xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) global_state, 10,
                                    &global_state->power_management_task_handle);
         if (task_created != pdPASS) {
@@ -216,7 +218,7 @@ esp_err_t stop_mining(GlobalState * global_state)
     }
 
     ESP_LOGI(TAG, "Disabling power to ASIC...");
-    Power_disable(global_state);
+    VCORE_set_voltage(0.0, global_state);
 
     // Add a small delay after power disable for hardware to settle
     ESP_LOGI(TAG, "Delay after Power_disable (50ms)...");

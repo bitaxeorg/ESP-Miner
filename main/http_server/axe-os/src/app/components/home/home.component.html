@@ -3,7 +3,7 @@
 </ng-template>
 <ng-container *ngIf="info$ | async as info; else loading">
     <p-message *ngIf="!info.miningEnabled" severity="info" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Mining manually stopped. Enable mining to start hashing again.">
+        text="Mining manually disabled. Enable mining to start hashing again.">
     </p-message>
     
     <!-- Temp warning alert -->
@@ -280,6 +280,14 @@
             <div class="card" *ngIf="info$ | async as info; else loading">
                 <h5>Uptime</h5>
                 {{info.uptimeSeconds | dateAgo}}
+            </div>
+        </div>
+
+        <div class="col-12 lg:col-6">
+            <div class="card">
+                <h5>Mining Status</h5>
+                <p>Mining is currently {{ info.miningEnabled ? 'Enabled' : 'Disabled' }}.</p>
+                <button pButton type="button" icon="{{info.miningEnabled ? 'pi pi-stop-circle' : 'pi pi-play'}}" label="{{info.miningEnabled ? 'Disable Mining' : 'Enable Mining'}}" (click)="toggleMining(info.miningEnabled)"></button>
             </div>
         </div>
 
