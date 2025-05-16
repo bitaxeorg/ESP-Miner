@@ -123,6 +123,8 @@ export class EditComponent implements OnInit, OnDestroy {
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
           temptarget: [info.temptarget, [Validators.required]],
+          statsLimit: [info.statsLimit, [Validators.required]],
+          statsDuration: [info.statsDuration, [Validators.required]],
           overheat_mode: [info.overheat_mode, [Validators.required]]
         });
 

@@ -35,9 +35,13 @@
 #include "connect.h"
 #include "asic.h"
 #include "TPS546.h"
+#include "statistics_task.h"
 #include "theme_api.h"  // Add theme API include
 #include "axe-os/api/system/asic_settings.h"
 #include "http_server.h"
+
+#define JSON_ALL_STATS_ELEMENT_SIZE 120
+#define JSON_DASHBOARD_STATS_ELEMENT_SIZE 60
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -479,6 +483,12 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "temptarget")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_TEMP_TARGET, item->valueint);
     }
+    if ((item = cJSON_GetObjectItem(root, "statsLimit")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_STATISTICS_LIMIT, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "statsDuration")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_STATISTICS_DURATION, item->valueint);
+    }
     if ((item = cJSON_GetObjectItem(root, "overclockEnabled")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
     }
@@ -618,6 +628,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
     
+    cJSON_AddNumberToObject(root, "statsLimit", nvs_config_get_u16(NVS_CONFIG_STATISTICS_LIMIT, 0));
+    cJSON_AddNumberToObject(root, "statsDuration", nvs_config_get_u16(NVS_CONFIG_STATISTICS_DURATION, 1));
+
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
     }
@@ -633,6 +646,142 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     httpd_resp_sendstr(req, sys_info);
     free((char *)sys_info);
     cJSON_Delete(root);
+    return ESP_OK;
+}
+
+int create_json_statistics_all(cJSON * root)
+{
+    int prebuffer = 0;
+
+    if (root) {
+        // create array for all statistics
+        const char *label[12] = {
+            "hashRate", "temp", "vrTemp", "power", "voltage",
+            "current", "coreVoltageActual", "fanspeed", "fanrpm",
+            "wifiRSSI", "freeHeap", "timestamp"
+        };
+
+        cJSON * statsLabelArray = cJSON_CreateStringArray(label, 12);
+        cJSON_AddItemToObject(root, "labels", statsLabelArray);
+        prebuffer++;
+
+        cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
+
+        if (NULL != GLOBAL_STATE->STATISTICS_MODULE.statisticsList) {
+            StatisticsNodePtr node = *GLOBAL_STATE->STATISTICS_MODULE.statisticsList; // double pointer
+            struct StatisticsData statsData;
+
+            while (NULL != node) {
+                node = statisticData(node, &statsData);
+
+                cJSON *valueArray = cJSON_CreateArray();
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
+
+                cJSON_AddItemToArray(statsArray, valueArray);
+                prebuffer++;
+            }
+        }
+    }
+
+    return prebuffer;
+}
+
+int create_json_statistics_dashboard(cJSON * root)
+{
+    int prebuffer = 0;
+
+    if (root) {
+        // create array for dashboard statistics
+        cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
+
+        if (NULL != GLOBAL_STATE->STATISTICS_MODULE.statisticsList) {
+            StatisticsNodePtr node = *GLOBAL_STATE->STATISTICS_MODULE.statisticsList; // double pointer
+            struct StatisticsData statsData;
+
+            while (NULL != node) {
+                node = statisticData(node, &statsData);
+
+                cJSON *valueArray = cJSON_CreateArray();
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
+
+                cJSON_AddItemToArray(statsArray, valueArray);
+                prebuffer++;
+            }
+        }
+    }
+
+    return prebuffer;
+}
+
+static esp_err_t GET_system_statistics(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON * root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "currentTimestamp", (esp_timer_get_time() / 1000));
+    int prebuffer = 1;
+
+    prebuffer += create_json_statistics_all(root);
+
+    const char * response = cJSON_PrintBuffered(root, (JSON_ALL_STATS_ELEMENT_SIZE * prebuffer), 0); // unformatted
+    httpd_resp_sendstr(req, response);
+    free((void *)response);
+
+    cJSON_Delete(root);
+
+    return ESP_OK;
+}
+
+static esp_err_t GET_system_statistics_dashboard(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON * root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "currentTimestamp", (esp_timer_get_time() / 1000));
+    int prebuffer = 1;
+
+    prebuffer += create_json_statistics_dashboard(root);
+
+    const char * response = cJSON_PrintBuffered(root, (JSON_DASHBOARD_STATS_ELEMENT_SIZE * prebuffer), 0); // unformatted
+    httpd_resp_sendstr(req, response);
+    free((void *)response);
+
+    cJSON_Delete(root);
+
     return ESP_OK;
 }
 
@@ -950,12 +1099,30 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for fetching system asic values */
     httpd_uri_t system_asic_get_uri = {
-    .uri = "/api/system/asic", 
-    .method = HTTP_GET, 
-    .handler = GET_system_asic, 
-    .user_ctx = rest_context
+        .uri = "/api/system/asic", 
+        .method = HTTP_GET, 
+        .handler = GET_system_asic, 
+        .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_asic_get_uri);
+
+    /* URI handler for fetching system statistic values */
+    httpd_uri_t system_statistics_get_uri = {
+        .uri = "/api/system/statistics", 
+        .method = HTTP_GET, 
+        .handler = GET_system_statistics, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_statistics_get_uri);
+
+    /* URI handler for fetching system statistic values for dashboard */
+    httpd_uri_t system_statistics_dashboard_get_uri = {
+        .uri = "/api/system/statistics/dashboard", 
+        .method = HTTP_GET, 
+        .handler = GET_system_statistics_dashboard, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_statistics_dashboard_get_uri);
 
     /* URI handler for WiFi scan */
     httpd_uri_t wifi_scan_get_uri = {
