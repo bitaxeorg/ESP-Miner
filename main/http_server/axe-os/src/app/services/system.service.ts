@@ -62,6 +62,7 @@ export class SystemService {
           boardVersion: "204",
           flipscreen: 1,
           invertscreen: 0,
+          displayTimeout: 0,
           autofanspeed: 1,
           fanspeed: 100,
           temptarget: 60,
@@ -121,6 +122,33 @@ export class SystemService {
     return this.otaUpdate(file, `/api/system/OTAWWW`);
   }
 
+
+  public getAsicSettings(uri: string = ''): Observable<{
+    ASICModel: eASICModel;
+    defaultFrequency: number;
+    frequencyOptions: number[];
+    defaultVoltage: number;
+    voltageOptions: number[];
+  }> {
+    if (environment.production) {
+      return this.httpClient.get(`${uri}/api/system/asic`) as Observable<{
+        ASICModel: eASICModel;
+        defaultFrequency: number;
+        frequencyOptions: number[];
+        defaultVoltage: number;
+        voltageOptions: number[];
+      }>;
+    } else {
+      // Mock data for development
+      return of({
+        ASICModel: eASICModel.BM1366,
+        defaultFrequency: 485,
+        frequencyOptions: [400, 425, 450, 475, 485, 500, 525, 550, 575],
+        defaultVoltage: 1200,
+        voltageOptions: [1100, 1150, 1200, 1250, 1300]
+      }).pipe(delay(1000));
+    }
+  }
 
   public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
     return this.httpClient.get(`${uri}/api/swarm/info`) as Observable<{ ip: string }[]>;

@@ -152,7 +152,7 @@ void stratum_primary_heartbeat(void * pvParameters)
         }
 
         int send_uid = 1;
-        STRATUM_V1_subscribe(sock, send_uid++, GLOBAL_STATE->asic_model_str);
+        STRATUM_V1_subscribe(sock, send_uid++, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
         STRATUM_V1_authenticate(sock, send_uid++, GLOBAL_STATE->SYSTEM_MODULE.pool_user, GLOBAL_STATE->SYSTEM_MODULE.pool_pass);
 
         char recv_buffer[BUFFER_SIZE];
@@ -214,6 +214,16 @@ void stratum_task(void * pvParameters)
             }
 
             GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
+            
+            // Reset share stats at failover
+            for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+                GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
+                GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].message[0] = '\0';
+            }
+            GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count = 0;
+            GLOBAL_STATE->SYSTEM_MODULE.shares_accepted = 0;
+            GLOBAL_STATE->SYSTEM_MODULE.shares_rejected = 0;
+
             ESP_LOGI(TAG, "Switching target due to too many failures (retries: %d)...", retry_attempts);
             retry_attempts = 0;
         }
@@ -278,7 +288,7 @@ void stratum_task(void * pvParameters)
         STRATUM_V1_configure_version_rolling(GLOBAL_STATE->sock, GLOBAL_STATE->send_uid++, &GLOBAL_STATE->version_mask);
 
         // mining.subscribe - ID: 2
-        STRATUM_V1_subscribe(GLOBAL_STATE->sock, GLOBAL_STATE->send_uid++, GLOBAL_STATE->asic_model_str);
+        STRATUM_V1_subscribe(GLOBAL_STATE->sock, GLOBAL_STATE->send_uid++, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
 
         char * username = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
         char * password = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_pass : GLOBAL_STATE->SYSTEM_MODULE.pool_pass;
