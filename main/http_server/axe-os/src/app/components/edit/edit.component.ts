@@ -30,23 +30,10 @@ export class EditComponent implements OnInit, OnDestroy {
   @Input() uri = '';
 
   // Store frequency and voltage options from API
+  public defaultFrequency: number = 0;
   public frequencyOptions: number[] = [];
+  public defaultVoltage: number = 0;
   public voltageOptions: number[] = [];
-
-  // Default values for different ASIC models
-  private defaultFrequencies: Record<eASICModel, number> = {
-    [eASICModel.BM1366]: 485,
-    [eASICModel.BM1368]: 490,
-    [eASICModel.BM1370]: 525,
-    [eASICModel.BM1397]: 425
-  };
-
-  private defaultVoltages: Record<eASICModel, number> = {
-    [eASICModel.BM1366]: 1200,
-    [eASICModel.BM1368]: 1166,
-    [eASICModel.BM1370]: 1150,
-    [eASICModel.BM1397]: 1400
-  };
 
   private destroy$ = new Subject<void>();
 
@@ -108,7 +95,9 @@ export class EditComponent implements OnInit, OnDestroy {
       this.ASICModel = info.ASICModel;
 
       // Store the frequency and voltage options from the API
+      this.defaultFrequency = asicSettings.defaultFrequency;
       this.frequencyOptions = asicSettings.frequencyOptions;
+      this.defaultVoltage = asicSettings.defaultVoltage;
       this.voltageOptions = asicSettings.voltageOptions;
 
       // Check if overclock is enabled in NVS
@@ -228,7 +217,7 @@ export class EditComponent implements OnInit, OnDestroy {
     // Convert frequency options from API to dropdown format
     const options = this.frequencyOptions.map(freq => {
       // Check if this is a default frequency for the current ASIC model
-      const isDefault = this.defaultFrequencies[this.ASICModel] === freq;
+      const isDefault = this.defaultFrequency === freq;
       return {
         name: isDefault ? `${freq} (default)` : `${freq}`,
         value: freq
@@ -259,7 +248,7 @@ export class EditComponent implements OnInit, OnDestroy {
     // Convert voltage options from API to dropdown format
     const options = this.voltageOptions.map(voltage => {
       // Check if this is a default voltage for the current ASIC model
-      const isDefault = this.defaultVoltages[this.ASICModel] === voltage;
+      const isDefault = this.defaultVoltage === voltage;
       return {
         name: isDefault ? `${voltage} (default)` : `${voltage}`,
         value: voltage
