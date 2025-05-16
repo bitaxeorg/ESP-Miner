@@ -159,6 +159,7 @@ export class EditComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
+          this.toastr.warning('You must restart this device after saving for changes to take effect', 'Warning');
           this.toastr.success(successMessage, 'Success!');
           this.savedChanges = true;
         },
