@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
-
 import { SystemService } from '../services/system.service';
 import { LayoutService } from './service/app.layout.service';
 
@@ -39,32 +38,5 @@ export class AppMenuComponent implements OnInit {
         this.systemService.restart().subscribe(res => {
         });
         this.toastr.success('Success!', 'Bitaxe restarted');
-    }
-
-
-    callStartMining() {
-        this.toastr.info('Requesting to start mining...', 'Mining Start Requested');
-        this.systemService.startMining().subscribe({
-            next: () => {
-                this.toastr.success('Successfully started mining!', 'Mining Started');
-            },
-            error: (err) => {
-                this.toastr.error('Failed to start mining.', 'Error');
-                console.error('Error starting mining:', err);
-            }
-        });
-    }
-
-    callStopMining() {
-        this.toastr.info('Requesting to stop mining...', 'Mining Stop Requested');
-        this.systemService.stopMining().subscribe({
-            next: () => {
-                this.toastr.success('Successfully stopped mining!', 'Mining Stopped');
-            },
-            error: (err) => {
-                this.toastr.error('Failed to stop mining.', 'Error');
-                console.error('Error stopping mining:', err);
-            }
-        });
     }
 }

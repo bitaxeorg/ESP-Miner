@@ -78,7 +78,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             ESP_LOGI(TAG, "Mining disabled. Power management task active, fan at minimum.");
 
             double min_fan_percent_when_disabled = 25.0; 
-            Thermal_set_fan_percent(GLOBAL_STATE->device_model, min_fan_percent_when_disabled / 100.0);
+            Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, min_fan_percent_when_disabled / 100.0);
             power_management->fan_perc = (uint16_t)min_fan_percent_when_disabled;
             
             // Reset last core voltage and frequency to ensure they are reapplied when mining restarts
