@@ -19,6 +19,7 @@
 #include "self_test.h"
 #include "asic.h"
 #include "driver/gpio.h"
+#include "device_config.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -57,14 +58,8 @@ void app_main(void)
         return;
     }
 
-    //parse the NVS config into GLOBAL_STATE
-    if (NVSDevice_parse_config(&GLOBAL_STATE) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to parse NVS config");
-        return;
-    }
-
-    if (ASIC_set_device_model(&GLOBAL_STATE) != ESP_OK) {
-        ESP_LOGE(TAG, "Error setting ASIC model");
+    if (device_config_init(&GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init device config");
         return;
     }
 
@@ -78,16 +73,14 @@ void app_main(void)
 
     SYSTEM_init_system(&GLOBAL_STATE);
 
-    char * wifi_ssid;
-    char * wifi_pass;
-    char * hostname;
-
-    NVSDevice_get_wifi_creds(&GLOBAL_STATE, &wifi_ssid, &wifi_pass, &hostname);
-
     // init AP and connect to wifi
-    wifi_init(&GLOBAL_STATE, wifi_ssid, wifi_pass, hostname);
+    wifi_init(&GLOBAL_STATE);
 
     SYSTEM_init_peripherals(&GLOBAL_STATE);
+
+    // This needs to be done before the power management task starts
+    GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
 
     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL);
 
@@ -98,11 +91,7 @@ void app_main(void)
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
-    ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);
-
-    free(wifi_ssid);
-    free(wifi_pass);
-    free(hostname);
+    ESP_LOGI(TAG, "Connected to SSID: %s", GLOBAL_STATE.SYSTEM_MODULE.ssid);
 
     GLOBAL_STATE.new_stratum_version_rolling_msg = false;
 
