@@ -39,6 +39,7 @@ export class SystemService {
           ssid: "default",
           wifiPass: "password",
           wifiStatus: "Connected!",
+          wifiRSSI: -32,
           apEnabled: 0,
           sharesAccepted: 1,
           sharesRejected: 0,

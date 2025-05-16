@@ -16,6 +16,12 @@
                     <td>{{info.wifiStatus}}</td>
                 </tr>
                 <tr>
+                    <td>Wi-Fi RSSI:</td>
+                    <td [ngClass]="{'text-green-500': info.wifiRSSI > -70, 'text-orange-500': info.wifiRSSI <= -70, 'text-red-500': info.wifiRSSI < -80}">
+                        {{info.wifiRSSI}} dBm
+                    </td>
+                </tr>
+                <tr>
                     <td>MAC Address:</td>
                     <td>{{info.macAddr}}</td>
                 </tr>
