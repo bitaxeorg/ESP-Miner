@@ -267,18 +267,23 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
 }
 
 
-// POST /api/theme handler
+// Patch /api/theme handler
 static esp_err_t theme_patch_handler(httpd_req_t *req)
 {
     set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
 
-    // Get the theme name from the URL
+    // Get the theme name from the URL path
     char theme_name[32] = {0};
-    if (httpd_req_get_url_query_str(req, theme_name, sizeof(theme_name)) != ESP_OK) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing theme parameter");
+    const char *uri = req->uri;
+    const char *theme_start = strrchr(uri, '/');
+    if (theme_start == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid theme URL");
         return ESP_FAIL;
     }
+    theme_start++; // Skip the '/'
+    strncpy(theme_name, theme_start, sizeof(theme_name) - 1);
+    theme_name[sizeof(theme_name) - 1] = '\0';
 
     // Convert the theme name to a theme preset
     themePreset_t themePreset = themePresetFromString(theme_name);
