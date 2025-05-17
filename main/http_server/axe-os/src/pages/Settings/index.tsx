@@ -2,6 +2,7 @@ import { useState, useEffect } from "preact/hooks";
 import { Button } from "../../components/Button";
 import { getSystemInfo, updatePoolInfo, restartSystem } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
+import { Container } from "../../components/Container";
 
 export function Settings() {
   const { showToast } = useToast();
@@ -74,13 +75,13 @@ export function Settings() {
   };
 
   return (
-    <div className='p-6'>
+    <Container>
       <h1 className='text-2xl font-bold mb-6'>Pool Settings</h1>
 
-      <div className='max-w-md bg-[var(--card-bg)] p-6 rounded-lg shadow-md'>
+      <div className='max-w-md mx-auto bg-[var(--card-bg)] p-6 rounded-lg shadow-md'>
         <form onSubmit={handleSubmit}>
           <div className='mb-4'>
-            <label className='block text-sm font-medium mb-1' htmlFor='stratumURL'>
+            <label className='block text-sm font-medium mb-1 text-left' htmlFor='stratumURL'>
               Stratum URL
             </label>
             <input
@@ -96,7 +97,7 @@ export function Settings() {
           </div>
 
           <div className='mb-6'>
-            <label className='block text-sm font-medium mb-1' htmlFor='stratumPort'>
+            <label className='block text-sm font-medium mb-1 text-left' htmlFor='stratumPort'>
               Stratum Port
             </label>
             <input
@@ -128,6 +129,6 @@ export function Settings() {
           </div>
         </form>
       </div>
-    </div>
+    </Container>
   );
 }
