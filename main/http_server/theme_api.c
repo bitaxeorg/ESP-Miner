@@ -271,32 +271,23 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
 static esp_err_t theme_patch_handler(httpd_req_t *req)
 {
     set_cors_headers(req);
+    httpd_resp_set_type(req, "application/json");
 
-    // Read POST data
-    char content[1024];
-    int ret = httpd_req_recv(req, content, sizeof(content) - 1);
-    if (ret <= 0) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read request");
-        return ESP_FAIL;
-    }
-    content[ret] = '\0';
-
-    cJSON *root = cJSON_Parse(content);
-    if (!root) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    // Get the theme name from the URL
+    char theme_name[32] = {0};
+    if (httpd_req_get_url_query_str(req, theme_name, sizeof(theme_name)) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing theme parameter");
         return ESP_FAIL;
     }
 
-    // Update theme settings
-    cJSON *item;
-    if ((item = cJSON_GetObjectItem(root, "themeName")) != NULL) {
-        themePreset_t themePreset = themePresetFromString(item->valuestring);
-        nvs_config_set_u16(NVS_CONFIG_THEME_NAME, themePreset);
-        initializeTheme(themePreset);
-    }
+    // Convert the theme name to a theme preset
+    themePreset_t themePreset = themePresetFromString(theme_name);
+    
+    // Update the theme in NVS and initialize it
+    nvs_config_set_u16(NVS_CONFIG_THEME_NAME, themePreset);
+    initializeTheme(themePreset);
 
-    cJSON_Delete(root);
-      // Get the current theme after update
+    // Get the current theme after update
     uiTheme_t* theme = getCurrentTheme();
 
     // Create response JSON
@@ -359,8 +350,8 @@ esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
         .user_ctx = ctx
     };
 
-    httpd_uri_t theme_post = {
-        .uri = "/api/theme",
+    httpd_uri_t theme_patch = {
+        .uri = "/api/theme/*",
         .method = HTTP_PATCH,
         .handler = theme_patch_handler,
         .user_ctx = ctx
@@ -381,8 +372,9 @@ esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
     };
 
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_get));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_post));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_patch));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_options));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_active_themes));
 
     return ESP_OK;
 }
