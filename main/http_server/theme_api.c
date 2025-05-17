@@ -8,7 +8,30 @@
 static const char *TAG = "theme_api";
 uiTheme_t currentTheme;
 
-uiTheme_t* getCurrnetThem(void) {
+// Helper function to convert theme preset to string
+static const char* themePresetToString(themePreset_t preset) {
+    switch (preset) {
+        case THEME_BITAXE_RED:
+            return "THEME_BITAXE_RED";
+        case THEME_BLOCKSTREAM_JADE:
+            return "THEME_BLOCKSTREAM_JADE";
+        case THEME_BLOCKSTREAM_BLUE:
+            return "THEME_BLOCKSTREAM_BLUE";
+        case THEME_SOLO_SATOSHI:
+            return "THEME_SOLO_SATOSHI";
+        case THEME_SOLO_MINING_CO:
+            return "THEME_SOLO_MINING_CO";
+        case THEME_BTCMAGAZINE:
+            return "THEME_BTCMAGAZINE";
+        case THEME_VOSKCOIN:
+            return "THEME_VOSKCOIN";
+        default:
+            return "THEME_ACS_DEFAULT";
+    }
+}
+
+
+uiTheme_t* getCurrnetTheme(void) {
     return &currentTheme;
 }
 
@@ -188,55 +211,30 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     set_cors_headers(req);
 
-    char *scheme = nvs_config_get_string(NVS_CONFIG_THEME_SCHEME, "dark");
-    char *name = nvs_config_get_string(NVS_CONFIG_THEME_NAME, "dark");
-    char *colors = nvs_config_get_string(NVS_CONFIG_THEME_COLORS, 
-        "{"
-        "\"--primary-color\":\"#F80421\","
-        "\"--primary-color-text\":\"#ffffff\","
-        "\"--highlight-bg\":\"#F80421\","
-        "\"--highlight-text-color\":\"#ffffff\","
-        "\"--focus-ring\":\"0 0 0 0.2rem rgba(248,4,33,0.2)\","
-        "\"--slider-bg\":\"#dee2e6\","
-        "\"--slider-range-bg\":\"#F80421\","
-        "\"--slider-handle-bg\":\"#F80421\","
-        "\"--progressbar-bg\":\"#dee2e6\","
-        "\"--progressbar-value-bg\":\"#F80421\","
-        "\"--checkbox-border\":\"#F80421\","
-        "\"--checkbox-bg\":\"#F80421\","
-        "\"--checkbox-hover-bg\":\"#df031d\","
-        "\"--button-bg\":\"#F80421\","
-        "\"--button-hover-bg\":\"#df031d\","
-        "\"--button-focus-shadow\":\"0 0 0 2px #ffffff, 0 0 0 4px #F80421\","
-        "\"--togglebutton-bg\":\"#F80421\","
-        "\"--togglebutton-border\":\"1px solid #F80421\","
-        "\"--togglebutton-hover-bg\":\"#df031d\","
-        "\"--togglebutton-hover-border\":\"1px solid #df031d\","
-        "\"--togglebutton-text-color\":\"#ffffff\""
-        "}"
-    );
+    initializeTheme(THEME_BITAXE_RED);
+    uiTheme_t* theme = getCurrnetTheme();
 
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "colorScheme", scheme);
-    cJSON_AddStringToObject(root, "theme", name);
     
-    // Parse stored colors JSON string
-    cJSON *colors_json = cJSON_Parse(colors);
-    if (colors_json) {
-        cJSON_AddItemToObject(root, "accentColors", colors_json);
-    }
+    // Add theme preset
+    cJSON_AddStringToObject(root, "theme", themePresetToString(theme->themePreset));
+    
+    // Add all color values
+    cJSON_AddStringToObject(root, "primaryColor", theme->primaryColor);
+    cJSON_AddStringToObject(root, "secondaryColor", theme->secondaryColor);
+    cJSON_AddStringToObject(root, "backgroundColor", theme->backgroundColor);
+    cJSON_AddStringToObject(root, "textColor", theme->textColor);
+    cJSON_AddStringToObject(root, "borderColor", theme->borderColor);
 
     const char *response = cJSON_Print(root);
     httpd_resp_sendstr(req, response);
 
-    free(scheme);
-    free(name);
-    free(colors);
     free((char *)response);
     cJSON_Delete(root);
 
     return ESP_OK;
 }
+
 
 // POST /api/theme handler
 static esp_err_t theme_post_handler(httpd_req_t *req)
