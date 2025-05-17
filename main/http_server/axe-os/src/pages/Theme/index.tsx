@@ -1,52 +1,48 @@
 import { useEffect, useState } from "preact/hooks";
 import { useTheme } from "../../context/ThemeContext";
 import { Button } from "../../components/Button";
-import { Theme as ThemeType } from "../../utils/api";
+import { ThemeSelector } from "../../components/ThemeSelector";
 
 export function Theme() {
   const { themeData, loading, error, fetchTheme } = useTheme();
-  const [availableThemes, setAvailableThemes] = useState([]);
-  const [loadingThemes, setLoadingThemes] = useState(false);
-
-  // Fetch themes on mount
-  useEffect(() => {
-    async function loadThemes() {
-      try {
-        setLoadingThemes(true);
-        const response = await fetch("/api/themes");
-        if (response.ok) {
-          const themes = await response.json();
-          setAvailableThemes(themes);
-        }
-      } catch (err) {
-        console.error("Failed to load themes:", err);
-      } finally {
-        setLoadingThemes(false);
-      }
-    }
-
-    loadThemes();
-  }, []);
 
   return (
     <div class='space-y-6'>
       <div class='rounded-lg bg-gray-900 p-6'>
         <h2 class='mb-4 text-xl font-semibold text-gray-100'>Theme Configuration</h2>
 
-        <div class='mb-6'>
-          <Button onClick={fetchTheme} disabled={loading} variant='default' size='default'>
-            {loading ? "Loading..." : "Refresh Theme Data"}
-          </Button>
+        <div class='grid gap-6 sm:grid-cols-2 mb-6'>
+          <div>
+            <ThemeSelector />
 
-          <div class='mt-4'>
-            <p class='text-gray-300'>
-              Current theme: <span class='font-semibold'>{themeData?.theme || "Not loaded"}</span>
-            </p>
-            <p class='text-gray-300'>
-              Color scheme:{" "}
-              <span class='font-semibold'>{themeData?.colorScheme || "Not loaded"}</span>
-            </p>
+            <div class='mt-6'>
+              <Button onClick={fetchTheme} disabled={loading} variant='default' size='default'>
+                {loading ? "Loading..." : "Refresh Theme Data"}
+              </Button>
+            </div>
+
+            <div class='mt-4'>
+              <p class='text-gray-300'>
+                Current theme:{" "}
+                <span class='font-semibold'>{themeData?.themeName || "Not loaded"}</span>
+              </p>
+              <p class='text-gray-300'>
+                Primary color:{" "}
+                <span class='font-semibold' style={{ color: themeData?.primaryColor }}>
+                  {themeData?.primaryColor || "Not loaded"}
+                </span>
+              </p>
+            </div>
           </div>
+
+          {themeData && (
+            <div class='rounded-md bg-gray-800 p-4'>
+              <h3 class='mb-2 text-sm font-medium text-gray-400'>Current Theme Data</h3>
+              <pre class='mt-2 max-h-64 overflow-auto rounded-md bg-gray-700 p-3 text-xs text-gray-300'>
+                {JSON.stringify(themeData, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
 
         {error && (
@@ -110,10 +106,6 @@ export function Theme() {
                 <h3 class='mb-2 text-sm font-medium text-gray-400'>Theme Data</h3>
                 <pre class='mt-2 max-h-64 overflow-auto rounded-md bg-gray-700 p-3 text-xs text-gray-300'>
                   {JSON.stringify(themeData, null, 2)}
-                </pre>
-                <h3 class='mb-2 text-sm font-medium text-gray-400'>Available Themes</h3>
-                <pre class='mt-2 max-h-64 overflow-auto rounded-md bg-gray-700 p-3 text-xs text-gray-300'>
-                  {loadingThemes ? "Loading themes..." : JSON.stringify(availableThemes, null, 2)}
                 </pre>
               </div>
             </div>

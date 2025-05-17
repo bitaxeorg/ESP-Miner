@@ -28,7 +28,7 @@ export function Button({
   // Apply variant styling
   const variantStyles = {
     default:
-      "bg-[var(--button-bg)] text-[var(--primary-color-text)] hover:bg-[var(--button-hover-bg)] shadow focus-visible:ring-[var(--primary-color)]",
+      "bg-[var(--primary-color)] text-[var(--primary-color-text)] hover:bg-[color-mix(in_srgb,var(--primary-color),black_10%)] shadow focus-visible:ring-[var(--primary-color)]",
     outline:
       "border border-[var(--primary-color)] bg-transparent text-[var(--primary-color)] hover:bg-[var(--primary-color)] hover:text-[var(--primary-color-text)]",
     ghost:
