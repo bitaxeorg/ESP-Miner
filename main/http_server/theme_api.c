@@ -33,6 +33,12 @@ static const char* themePresetToString(themePreset_t preset) {
             return "THEME_BTCMAGAZINE";
         case THEME_VOSKCOIN:
             return "THEME_VOSKCOIN";
+        case THEME_AMERICANBTC:
+            return "THEME_AMERICANBTC";
+        case THEME_HUT8:
+            return "THEME_HUT8";
+        case THEME_LUXOR:
+            return "THEME_LUXOR";
         default:
             return "THEME_ACS_DEFAULT";
     }
@@ -54,6 +60,12 @@ static themePreset_t themePresetFromString(const char* preset_str) {
         return THEME_BTCMAGAZINE;
     } else if (strcmp(preset_str, "THEME_VOSKCOIN") == 0) {
         return THEME_VOSKCOIN;
+    } else if (strcmp(preset_str, "THEME_AMERICANBTC") == 0) {
+        return THEME_AMERICANBTC;
+    } else if (strcmp(preset_str, "THEME_HUT8") == 0) {
+        return THEME_HUT8;
+    } else if (strcmp(preset_str, "THEME_LUXOR") == 0) {
+        return THEME_LUXOR;
     } else {
         return THEME_ACS_DEFAULT;
     }
@@ -198,6 +210,61 @@ void initializeTheme(themePreset_t preset) {
             
             currentTheme.themePreset = THEME_VOSKCOIN;
             break;
+        case THEME_AMERICANBTC:
+            strncpy(currentTheme.primaryColor, "#334CF5", sizeof(currentTheme.primaryColor) - 1);
+            currentTheme.primaryColor[sizeof(currentTheme.primaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.secondaryColor, "#6779F7", sizeof(currentTheme.secondaryColor) - 1);
+            currentTheme.secondaryColor[sizeof(currentTheme.secondaryColor) - 1] = '\0';
+
+            strncpy(currentTheme.backgroundColor, "#111316", sizeof(currentTheme.backgroundColor) - 1);
+            currentTheme.backgroundColor[sizeof(currentTheme.backgroundColor) - 1] = '\0';
+            
+            strncpy(currentTheme.textColor, "#FFFFFF", sizeof(currentTheme.textColor) - 1);
+            currentTheme.textColor[sizeof(currentTheme.textColor) - 1] = '\0';
+            
+            strncpy(currentTheme.borderColor, "#EB443C", sizeof(currentTheme.borderColor) - 1);
+            currentTheme.borderColor[sizeof(currentTheme.borderColor) - 1] = '\0';
+            
+            currentTheme.themePreset = THEME_AMERICANBTC;
+            break;
+        case THEME_HUT8:
+            strncpy(currentTheme.primaryColor, "#168080", sizeof(currentTheme.primaryColor) - 1);
+            currentTheme.primaryColor[sizeof(currentTheme.primaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.secondaryColor, "#168080", sizeof(currentTheme.secondaryColor) - 1);
+            currentTheme.secondaryColor[sizeof(currentTheme.secondaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.backgroundColor, "#111316", sizeof(currentTheme.backgroundColor) - 1);
+            currentTheme.backgroundColor[sizeof(currentTheme.backgroundColor) - 1] = '\0';
+
+            strncpy(currentTheme.textColor, "#FFFFFF", sizeof(currentTheme.textColor) - 1);
+            currentTheme.textColor[sizeof(currentTheme.textColor) - 1] = '\0';
+            
+            strncpy(currentTheme.borderColor, "#168080", sizeof(currentTheme.borderColor) - 1);
+            currentTheme.borderColor[sizeof(currentTheme.borderColor) - 1] = '\0';
+            
+            currentTheme.themePreset = THEME_HUT8;
+            break;
+        case THEME_LUXOR:
+            strncpy(currentTheme.primaryColor, "#F2C85C", sizeof(currentTheme.primaryColor) - 1);
+            currentTheme.primaryColor[sizeof(currentTheme.primaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.secondaryColor, "#866C29", sizeof(currentTheme.secondaryColor) - 1);
+            currentTheme.secondaryColor[sizeof(currentTheme.secondaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.backgroundColor, "#111316", sizeof(currentTheme.backgroundColor) - 1);
+            currentTheme.backgroundColor[sizeof(currentTheme.backgroundColor) - 1] = '\0';
+            
+            strncpy(currentTheme.textColor, "#FFFFFF", sizeof(currentTheme.textColor) - 1);
+            currentTheme.textColor[sizeof(currentTheme.textColor) - 1] = '\0';
+            
+            strncpy(currentTheme.borderColor, "#866C29", sizeof(currentTheme.borderColor) - 1);
+            currentTheme.borderColor[sizeof(currentTheme.borderColor) - 1] = '\0';
+            
+            currentTheme.themePreset = THEME_LUXOR;
+            break;
+            
         default:
             strncpy(currentTheme.primaryColor, "#A7F3D0", sizeof(currentTheme.primaryColor) - 1);
             currentTheme.primaryColor[sizeof(currentTheme.primaryColor) - 1] = '\0';
@@ -326,9 +393,8 @@ static esp_err_t theme_active_themes_handler(httpd_req_t *req)
     cJSON *themes = cJSON_CreateArray();
 
     // Iterate through all theme presets
-    for (themePreset_t theme = THEME_ACS_DEFAULT; theme <= THEME_VOSKCOIN; theme++) {
+    for (themePreset_t theme = THEME_ACS_DEFAULT; theme <= THEME_LUXOR; theme++) {
         // Skip any gaps in the enum values
-        if (theme == 6) continue; // Skip the gap between THEME_SOLO_MINING_CO and THEME_BTCMAGAZINE
         
         const char* themeName = themePresetToString(theme);
         if (themeName) {
@@ -349,28 +415,28 @@ static esp_err_t theme_active_themes_handler(httpd_req_t *req)
 esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
 {
     httpd_uri_t theme_get = {
-        .uri = "/api/theme",
+        .uri = "/api/themes/current",
         .method = HTTP_GET,
         .handler = theme_get_handler,
         .user_ctx = ctx
     };
 
     httpd_uri_t theme_patch = {
-        .uri = "/api/theme/*",
+        .uri = "/api/themes/*",
         .method = HTTP_PATCH,
         .handler = theme_patch_handler,
         .user_ctx = ctx
     };
 
     httpd_uri_t theme_options = {
-        .uri = "/api/theme",
+        .uri = "/api/themes",
         .method = HTTP_OPTIONS,
         .handler = theme_options_handler,
         .user_ctx = ctx
     };
 
     httpd_uri_t theme_active_themes = {
-        .uri = "/api/activeThemes",
+        .uri = "/api/themes",
         .method = HTTP_GET,
         .handler = theme_active_themes_handler,
         .user_ctx = ctx

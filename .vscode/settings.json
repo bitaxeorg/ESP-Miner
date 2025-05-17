@@ -67,6 +67,6 @@
     "cSpell.words": [
         "ssid"
     ],
-    "idf.port": "/dev/ttyACM0",
+    "idf.port": "/dev/tty.usbmodem11101",
     "C_Cpp.intelliSenseEngine": "Tag Parser"
 }
