@@ -21,6 +21,7 @@
 #include "self_test.h"
 #include "lvglDisplayBAP.h"
 #include "serial.h"
+#include "theme_api.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -68,6 +69,9 @@ void app_main(void)
 
     SYSTEM_init_system(&GLOBAL_STATE);
 
+    initializeTheme(loadThemefromNVS());
+    ESP_LOGI(TAG, "Theme initialized");
+
     // pull the wifi credentials and hostname out of NVS
     char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, WIFI_SSID);
     char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, WIFI_PASS);
@@ -83,6 +87,8 @@ void app_main(void)
     generate_ssid(GLOBAL_STATE.SYSTEM_MODULE.ap_ssid);
 
     SYSTEM_init_peripherals(&GLOBAL_STATE);
+
+   
     
     xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void *) &GLOBAL_STATE, 3, NULL);
     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL);

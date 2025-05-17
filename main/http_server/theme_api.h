@@ -6,6 +6,7 @@
 // Register theme API endpoints
 esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx);
 
+
 typedef enum {
     THEME_ACS_DEFAULT = 0, 
     THEME_BITAXE_RED = 1,
@@ -28,6 +29,12 @@ typedef struct {
     themePreset_t themePreset;
 
 } uiTheme_t;
+
+extern uiTheme_t* getCurrnetTheme(void);
+extern themePreset_t getCurrentThemePreset(void);
+extern void initializeTheme(themePreset_t preset);
+extern themePreset_t loadThemefromNVS(void);
+
 
 #endif // THEME_API_H
 

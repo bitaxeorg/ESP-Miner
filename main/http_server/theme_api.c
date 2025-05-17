@@ -11,8 +11,9 @@ uiTheme_t currentTheme;
 themePreset_t loadThemefromNVS(void) {
     // Get the theme preset as an integer from NVS, defaulting to THEME_ACS_DEFAULT (0)
     uint16_t themeValue = nvs_config_get_u16(NVS_CONFIG_THEME_NAME, THEME_ACS_DEFAULT);
-    return (themePreset_t)themeValue;
     ESP_LOGI(TAG, "Loaded theme from NVS: %d", themeValue);
+    return (themePreset_t)themeValue;
+    
 }
 
 // Helper function to convert theme preset to string
