@@ -7,6 +7,8 @@ import { LocalStorageService } from 'src/app/local-storage.service';
 import { SystemService } from 'src/app/services/system.service';
 const SWARM_DATA = 'SWARM_DATA'
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
+const SWARM_SORTING = 'SWARM_SORTING'
+
 @Component({
   selector: 'app-swarm',
   templateUrl: './swarm.component.html',
@@ -52,13 +54,19 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.refreshIntervalTime = storedRefreshTime;
     this.refreshTimeSet = storedRefreshTime;
     this.refreshIntervalControl = new FormControl(storedRefreshTime);
-    
+
     this.refreshIntervalControl.valueChanges.subscribe(value => {
       this.refreshIntervalTime = value;
       this.refreshTimeSet = value;
       this.localStorageService.setNumber(SWARM_REFRESH_TIME, value);
     });
 
+    const storedSorting = this.localStorageService.getObject(SWARM_SORTING) ?? {
+      sortField: 'IP',
+      sortDirection: 'asc'
+    };
+    this.sortField = storedSorting.sortField;
+    this.sortDirection = storedSorting.sortDirection;
   }
 
   ngOnInit(): void {
@@ -135,7 +143,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
         // Merge new results with existing swarm entries
         const existingIps = new Set(this.swarm.map(item => item.IP));
         const newItems = validResults.filter(item => !existingIps.has(item.IP));
-        this.swarm = [...this.swarm, ...newItems].sort(this.sortByIp.bind(this));
+        this.swarm = [...this.swarm, ...newItems];
+        this.sortSwarm();
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
         this.calculateTotals();
       },
@@ -147,7 +156,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public add() {
     const newIp = this.form.value.manualAddIp;
-    
+
     // Check if IP already exists
     if (this.swarm.some(item => item.IP === newIp)) {
       this.toastr.warning('This IP address already exists in the swarm', 'Duplicate Entry');
@@ -157,7 +166,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.systemService.getInfo(`http://${newIp}`).subscribe((res) => {
       if (res.ASICModel) {
         this.swarm.push({ IP: newIp, ...res });
-        this.swarm = this.swarm.sort(this.sortByIp.bind(this));
+        this.sortSwarm();
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
         this.calculateTotals();
       }
@@ -192,7 +201,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     if (this.scanning) {
       return;
     }
-    
+
     this.refreshIntervalTime = this.refreshTimeSet;
     const ips = this.swarm.map(axeOs => axeOs.IP);
     this.isRefreshing = true;
@@ -230,7 +239,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
       toArray() // Collect all results into a single array
     ).pipe(take(1)).subscribe({
       next: (result) => {
-        this.swarm = result.sort(this.sortByIp.bind(this));
+        this.swarm = result;
+        this.sortSwarm();
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
         this.calculateTotals();
         this.isRefreshing = false;
@@ -255,12 +265,21 @@ export class SwarmComponent implements OnInit, OnDestroy {
       this.sortDirection = 'asc';
     }
 
+    this.localStorageService.setObject(SWARM_SORTING, {
+      sortField: this.sortField,
+      sortDirection: this.sortDirection
+    });
+
+    this.sortSwarm();
+  }
+
+  private sortSwarm() {
     this.swarm.sort((a, b) => {
       let comparison = 0;
-      if (field === 'IP') {
+      if (this.sortField === 'IP') {
         // Split IP into octets and compare numerically
-        const aOctets = a[field].split('.').map(Number);
-        const bOctets = b[field].split('.').map(Number);
+        const aOctets = a[this.sortField].split('.').map(Number);
+        const bOctets = b[this.sortField].split('.').map(Number);
         for (let i = 0; i < 4; i++) {
           if (aOctets[i] !== bOctets[i]) {
             comparison = aOctets[i] - bOctets[i];
@@ -268,7 +287,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
           }
         }
       } else {
-        comparison = a[field].localeCompare(b[field], undefined, { numeric: true });
+        comparison = a[this.sortField].localeCompare(b[this.sortField], undefined, { numeric: true });
       }
       return this.sortDirection === 'asc' ? comparison : -comparison;
     });
@@ -277,15 +296,15 @@ export class SwarmComponent implements OnInit, OnDestroy {
   private compareBestDiff(a: string, b: string): string {
     if (!a || a === '0') return b || '0';
     if (!b || b === '0') return a;
-  
+
     const units = 'kMGTPE';
     const unitA = units.indexOf(a.slice(-1));
     const unitB = units.indexOf(b.slice(-1));
-  
+
     if (unitA !== unitB) {
       return unitA > unitB ? a : b;
     }
-  
+
     const valueA = parseFloat(a.slice(0, unitA >= 0 ? -1 : 0));
     const valueB = parseFloat(b.slice(0, unitB >= 0 ? -1 : 0));
     return valueA >= valueB ? a : b;
