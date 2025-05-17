@@ -217,7 +217,7 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     cJSON *root = cJSON_CreateObject();
     
     // Add theme preset
-    cJSON_AddStringToObject(root, "theme", themePresetToString(theme->themePreset));
+    cJSON_AddStringToObject(root, "themeName", themePresetToString(theme->themePreset));
     
     // Add all color values
     cJSON_AddStringToObject(root, "primaryColor", theme->primaryColor);
