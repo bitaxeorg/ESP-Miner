@@ -257,6 +257,8 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
         type = "text/xml";
     } else if (CHECK_FILE_EXTENSION(filepath, ".pdf")) {
         type = "application/pdf";
+    } else if (CHECK_FILE_EXTENSION(filepath, ".woff2")) {
+        type = "font/woff2";
     }
     return httpd_resp_set_type(req, type);
 }

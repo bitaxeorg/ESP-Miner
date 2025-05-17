@@ -1,6 +1,8 @@
 @font-face {
     font-family: 'Angel Wish';
-    src: url(./assets/fonts/AngelWish.ttf) format('truetype');
+    src: url(./assets/fonts/AngelWish.woff2) format('woff2'),
+         url(./assets/fonts/AngelWish.woff) format('woff'),
+         url(./assets/fonts/AngelWish.ttf) format('truetype');
 }
 
 @font-face {
