@@ -37,6 +37,27 @@ static const char* themePresetToString(themePreset_t preset) {
     }
 }
 
+// Helper function to convert string to theme preset
+static themePreset_t themePresetFromString(const char* preset_str) {
+    if (strcmp(preset_str, "THEME_BITAXE_RED") == 0) {
+        return THEME_BITAXE_RED;
+    } else if (strcmp(preset_str, "THEME_BLOCKSTREAM_JADE") == 0) {
+        return THEME_BLOCKSTREAM_JADE;
+    } else if (strcmp(preset_str, "THEME_BLOCKSTREAM_BLUE") == 0) {
+        return THEME_BLOCKSTREAM_BLUE;
+    } else if (strcmp(preset_str, "THEME_SOLO_SATOSHI") == 0) {
+        return THEME_SOLO_SATOSHI;
+    } else if (strcmp(preset_str, "THEME_SOLO_MINING_CO") == 0) {
+        return THEME_SOLO_MINING_CO;
+    } else if (strcmp(preset_str, "THEME_BTCMAGAZINE") == 0) {
+        return THEME_BTCMAGAZINE;
+    } else if (strcmp(preset_str, "THEME_VOSKCOIN") == 0) {
+        return THEME_VOSKCOIN;
+    } else {
+        return THEME_ACS_DEFAULT;
+    }
+}
+
 
 uiTheme_t* getCurrnetTheme(void) {
     return &currentTheme;
@@ -267,16 +288,10 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
 
     // Update theme settings
     cJSON *item;
-    if ((item = cJSON_GetObjectItem(root, "colorScheme")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_THEME_SCHEME, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "theme")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_THEME_NAME, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "accentColors")) != NULL) {
-        char *colors_str = cJSON_Print(item);
-        nvs_config_set_string(NVS_CONFIG_THEME_COLORS, colors_str);
-        free(colors_str);
+    if ((item = cJSON_GetObjectItem(root, "themeName")) != NULL) {
+        themePreset_t themePreset = themePresetFromString(item->valuestring);
+        nvs_config_set_u16(NVS_CONFIG_THEME_NAME, themePreset);
+        initializeTheme(themePreset);
     }
 
     cJSON_Delete(root);
