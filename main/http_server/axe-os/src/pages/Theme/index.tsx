@@ -1,8 +1,32 @@
+import { useEffect, useState } from "preact/hooks";
 import { useTheme } from "../../context/ThemeContext";
-import { Button } from "../../components/button";
+import { Button } from "../../components/Button";
+import { Theme as ThemeType } from "../../utils/api";
 
 export function Theme() {
   const { themeData, loading, error, fetchTheme } = useTheme();
+  const [availableThemes, setAvailableThemes] = useState([]);
+  const [loadingThemes, setLoadingThemes] = useState(false);
+
+  // Fetch themes on mount
+  useEffect(() => {
+    async function loadThemes() {
+      try {
+        setLoadingThemes(true);
+        const response = await fetch("/api/themes");
+        if (response.ok) {
+          const themes = await response.json();
+          setAvailableThemes(themes);
+        }
+      } catch (err) {
+        console.error("Failed to load themes:", err);
+      } finally {
+        setLoadingThemes(false);
+      }
+    }
+
+    loadThemes();
+  }, []);
 
   return (
     <div class='space-y-6'>
@@ -86,6 +110,10 @@ export function Theme() {
                 <h3 class='mb-2 text-sm font-medium text-gray-400'>Theme Data</h3>
                 <pre class='mt-2 max-h-64 overflow-auto rounded-md bg-gray-700 p-3 text-xs text-gray-300'>
                   {JSON.stringify(themeData, null, 2)}
+                </pre>
+                <h3 class='mb-2 text-sm font-medium text-gray-400'>Available Themes</h3>
+                <pre class='mt-2 max-h-64 overflow-auto rounded-md bg-gray-700 p-3 text-xs text-gray-300'>
+                  {loadingThemes ? "Loading themes..." : JSON.stringify(availableThemes, null, 2)}
                 </pre>
               </div>
             </div>
