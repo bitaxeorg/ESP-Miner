@@ -60,7 +60,7 @@ static themePreset_t themePresetFromString(const char* preset_str) {
 }
 
 
-uiTheme_t* getCurrnetTheme(void) {
+uiTheme_t* getCurrentTheme(void) {
     return &currentTheme;
     ESP_LOGI(TAG, "Current theme: %s", themePresetToString(currentTheme.themePreset));
 }
@@ -243,7 +243,7 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     set_cors_headers(req);
 
     initializeTheme(THEME_BITAXE_RED);
-    uiTheme_t* theme = getCurrnetTheme();
+    uiTheme_t* theme = getCurrentTheme();
 
     cJSON *root = cJSON_CreateObject();
     
@@ -296,7 +296,28 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
     }
 
     cJSON_Delete(root);
-    httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
+      // Get the current theme after update
+    uiTheme_t* theme = getCurrentTheme();
+
+    // Create response JSON
+    cJSON *response_root = cJSON_CreateObject();
+    
+    // Add theme preset
+    cJSON_AddStringToObject(response_root, "themeName", themePresetToString(theme->themePreset));
+    
+    // Add all color values
+    cJSON_AddStringToObject(response_root, "primaryColor", theme->primaryColor);
+    cJSON_AddStringToObject(response_root, "secondaryColor", theme->secondaryColor);
+    cJSON_AddStringToObject(response_root, "backgroundColor", theme->backgroundColor);
+    cJSON_AddStringToObject(response_root, "textColor", theme->textColor);
+    cJSON_AddStringToObject(response_root, "borderColor", theme->borderColor);
+
+    const char *response = cJSON_Print(response_root);
+    httpd_resp_sendstr(req, response);
+
+    free((char *)response);
+    cJSON_Delete(response_root);
+
     return ESP_OK;
 }
 

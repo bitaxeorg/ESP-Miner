@@ -30,7 +30,7 @@ typedef struct {
 
 } uiTheme_t;
 
-extern uiTheme_t* getCurrnetTheme(void);
+extern uiTheme_t* getCurrentTheme(void);
 extern themePreset_t getCurrentThemePreset(void);
 extern void initializeTheme(themePreset_t preset);
 extern themePreset_t loadThemefromNVS(void);
