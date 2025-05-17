@@ -7,8 +7,8 @@ interface ISharesRejectedStat {
 
 export interface ISystemInfo {
 
-    flipscreen: number;
-    invertscreen: number;
+    flipScreen: number;
+    invertScreen: number;
     displayTimeout: number;
     power: number,
     voltage: number,
@@ -17,7 +17,7 @@ export interface ISystemInfo {
     vrTemp: number,
     maxPower: number,
     nominalVoltage: number,
-    hashRate: number,
+    hashrate: number,
     bestDiff: string,
     bestSessionDiff: string,
     freeHeap: number,
@@ -33,7 +33,7 @@ export interface ISystemInfo {
     uptimeSeconds: number,
     asicCount: number,
     smallCoreCount: number,
-    ASICModel: eASICModel,
+    asicModel: eASICModel,
     stratumURL: string,
     stratumPort: number,
     fallbackStratumURL: string,
@@ -45,15 +45,15 @@ export interface ISystemInfo {
     version: string,
     idfVersion: string,
     boardVersion: string,
-    autofanspeed: number,
-    fanspeed: number,
-    temptarget: number,
-    fanrpm: number,
+    autoFanSpeed: number,
+    fanSpeed: number,
+    tempTarget: number,
+    fanRPM: number,
     coreVoltageActual: number,
 
     boardtemp1?: number,
     boardtemp2?: number,
-    overheat_mode: number,
-    power_fault?: string
+    overheatMode: number,
+    powerFault?: string
     overclockEnabled?: number
 }
