@@ -6,4 +6,28 @@
 // Register theme API endpoints
 esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx);
 
+typedef enum {
+    THEME_ACS_DEFAULT = 0, 
+    THEME_BITAXE_RED = 1,
+    THEME_BLOCKSTREAM_JADE = 2,
+    THEME_BLOCKSTREAM_BLUE = 3,
+    THEME_SOLO_SATOSHI = 4,
+    THEME_SOLO_MINING_CO = 5,
+    THEME_BTCMAGAZINE = 7,
+    THEME_VOSKCOIN = 8,
+
+
+} themePreset_t;
+
+typedef struct {
+    char primaryColor[8];      // Main brand color (e.g. "#FF0000")
+    char secondaryColor[8];    // Secondary brand color
+    char backgroundColor[8];   // Background color
+    char textColor[8];         // Text color
+    char borderColor[8];       // Border color
+    themePreset_t themePreset;
+
+} uiTheme_t;
+
 #endif // THEME_API_H
+

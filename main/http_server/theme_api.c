@@ -5,6 +5,84 @@
 #include "cJSON.h"
 
 static const char *TAG = "theme_api";
+uiTheme_t currentTheme;
+
+uiTheme_t* getCurrnetThem(void) {
+    return &currentTheme;
+}
+
+themePreset_t getCurrentThemePreset(void) {
+    return currentTheme.themePreset;
+}
+
+void initializeTheme(themePreset_t preset) {
+    switch (preset) {
+        case THEME_BITAXE_RED:
+            currentTheme.primaryColor = "#F80421";
+            currentTheme.secondaryColor = "#FC4D62";
+            currentTheme.backgroundColor = "#070D17";
+            currentTheme.textColor = "#F80421";
+            currentTheme.borderColor = "#FC4D62";
+            currentTheme.themePreset = THEME_BITAXE_RED;
+            break;
+        case THEME_BLOCKSTREAM_JADE:
+            currentTheme.primaryColor = "#00FF00";
+            currentTheme.secondaryColor = "#00FF00";
+            currentTheme.backgroundColor = "#000000";
+            currentTheme.textColor = "#00FF00";
+            currentTheme.borderColor = "#00FF00";
+            currentTheme.themePreset = THEME_BLOCKSTREAM_JADE;
+            break;
+        case THEME_BLOCKSTREAM_BLUE:
+            currentTheme.primaryColor = "#0000FF";
+            currentTheme.secondaryColor = "#0000FF";
+            currentTheme.backgroundColor = "#000000";
+            currentTheme.textColor = "#0000FF";
+            currentTheme.borderColor = "#0000FF";
+            currentTheme.themePreset = THEME_BLOCKSTREAM_BLUE;
+            break;
+        case THEME_SOLO_SATOSHI:
+            currentTheme.primaryColor = "#0000FF";
+            currentTheme.secondaryColor = "#0000FF";
+            currentTheme.backgroundColor = "#000000";
+            currentTheme.textColor = "#0000FF";
+            currentTheme.borderColor = "#0000FF";
+            currentTheme.themePreset = THEME_SOLO_SATOSHI;
+            break;
+        case THEME_SOLO_MINING_CO:
+            currentTheme.primaryColor = "#0000FF";
+            currentTheme.secondaryColor = "#0000FF";
+            currentTheme.backgroundColor = "#000000";   
+            currentTheme.textColor = "#0000FF";
+            currentTheme.borderColor = "#0000FF";
+            currentTheme.themePreset = THEME_SOLO_MINING_CO;
+            break;
+        case THEME_BTCMAGAZINE:
+            currentTheme.primaryColor = "#0000FF";
+            currentTheme.secondaryColor = "#0000FF";
+            currentTheme.backgroundColor = "#000000";
+            currentTheme.textColor = "#0000FF";
+            currentTheme.borderColor = "#0000FF";
+            currentTheme.themePreset = THEME_BTCMAGAZINE;
+            break;
+        case THEME_VOSKCOIN:
+            currentTheme.primaryColor = "#0000FF";  
+            currentTheme.secondaryColor = "#0000FF";
+            currentTheme.backgroundColor = "#000000";
+            currentTheme.textColor = "#0000FF";
+            currentTheme.borderColor = "#0000FF";
+            currentTheme.themePreset = THEME_VOSKCOIN;
+            break;
+        default:
+            currentTheme.primaryColor = "#A7F3D0";
+            currentTheme.secondaryColor = "#A7F3D0";
+            currentTheme.backgroundColor = "#161f1b";
+            currentTheme.textColor = "#A7F3D0";
+            currentTheme.borderColor = "#A7F3D0";
+            currentTheme.themePreset = THEME_ACS_DEFAULT;
+            break;
+    }
+}
 
 // Helper function to set CORS headers
 static esp_err_t set_cors_headers(httpd_req_t *req)
@@ -147,3 +225,4 @@ esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
 
     return ESP_OK;
 }
+
