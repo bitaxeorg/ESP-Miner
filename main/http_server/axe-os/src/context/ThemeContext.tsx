@@ -15,6 +15,7 @@ interface ThemeContextType {
   loading: boolean;
   error: string | null;
   fetchTheme: () => Promise<void>;
+  fetchThemes: () => Promise<void>;
 }
 
 const defaultThemeContext: ThemeContextType = {
@@ -22,6 +23,7 @@ const defaultThemeContext: ThemeContextType = {
   loading: false,
   error: null,
   fetchTheme: async () => {},
+  fetchThemes: async () => {},
 };
 
 export const ThemeContext = createContext<ThemeContextType>(defaultThemeContext);
@@ -63,13 +65,30 @@ export function ThemeProvider({ children }: { children: ComponentChildren }) {
     }
   };
 
+  const fetchThemes = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch("/api/themes");
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      // Just fetch themes - no need to return them
+      await response.json();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch themes data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch theme on mount
   useEffect(() => {
     fetchTheme();
   }, []);
 
   return (
-    <ThemeContext.Provider value={{ themeData, loading, error, fetchTheme }}>
+    <ThemeContext.Provider value={{ themeData, loading, error, fetchTheme, fetchThemes }}>
       {children}
     </ThemeContext.Provider>
   );
