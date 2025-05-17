@@ -42,17 +42,24 @@
 
     <div class="col-12">
         <div class="card">
-            <h2>Realtime Logs <button pButton (click)="toggleLogs()" style="margin-left: 15px;"
-                    class="btn btn-secondary">{{showLogs
-                    ? 'Hide': 'Show'}}
-                    Logs</button>
+            <h2 class="flex flex-wrap gap-3">
+                Realtime Logs
+                <button pButton (click)="toggleLogs()" class="btn btn-secondary">
+                    {{showLogs ? 'Hide': 'Show'}} Logs
+                </button>
 
-                <button pButton style="margin-left: 15px;" class="btn btn-secondary" (click)="stopScroll = !stopScroll"
-                    *ngIf="showLogs">{{stopScroll ? 'Start' : 'Stop'}} Scrolling</button>
+                <button pButton (click)="isExpanded = !isExpanded" class="btn btn-secondary" *ngIf="showLogs">
+                    Expand Logs
+                </button>
+
+                <button pButton class="btn btn-secondary" (click)="stopScroll = !stopScroll" *ngIf="showLogs">
+                    {{stopScroll ? 'Start' : 'Stop'}} Scrolling
+                </button>
             </h2>
 
-            <div *ngIf="showLogs" id="logs" #scrollContainer>
+            <div *ngIf="showLogs" id="logs" #scrollContainer [ngClass]="{'is-expanded': isExpanded}">
                 <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
+                <button pButton (click)="isExpanded = !isExpanded" class="close-button">Close</button>
             </div>
         </div>
     </div>

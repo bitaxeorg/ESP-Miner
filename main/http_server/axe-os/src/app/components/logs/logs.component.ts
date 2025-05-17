@@ -22,6 +22,8 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
 
   public stopScroll: boolean = false;
 
+  public isExpanded: boolean = false;
+
   constructor(
     private websocketService: WebsocketService,
     private systemService: SystemService
@@ -57,7 +59,7 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
         next: (val) => {
           const matches = val.matchAll(/\[(\d+;\d+)m(.*?)(?=\[|\n|$)/g);
           let className = 'ansi-white'; // default color
-          
+
           for (const match of matches) {
             const colorCode = match[1].split(';')[1];
             switch (colorCode) {
@@ -70,9 +72,9 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
               case '37': className = 'ansi-white'; break;
             }
           }
-          
+
           this.logs.push({ className, text: val });
-          
+
           if (this.logs.length > 256) {
             this.logs.shift();
           }
