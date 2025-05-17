@@ -22,6 +22,7 @@
 #include "system.h"
 #include "vcore.h"
 #include "mempoolAPI.h"
+#include "theme_api.h"
 
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 2500
@@ -650,6 +651,14 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
                     uint16_t auto_fan_enabled = 0x0000 + buf[5];  // Convert to bool (0 or 1)
                     ESP_LOGI("Serial BAP", "Auto fan enabled: %d", auto_fan_enabled);
                     nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, auto_fan_enabled ? 1 : 0);
+                    break;
+                case LVGL_REG_SPECIAL_THEME:
+                    ESP_LOGI("Serial BAP", "Received theme");
+                    ESP_LOGI("Serial BAP", "RAW HEX: %02X", buf[4]);
+                    uint16_t theme = 0x0000 + buf[4];
+                    ESP_LOGI("Serial BAP", "Theme: %d", theme);
+                    nvs_config_set_u16(NVS_CONFIG_THEME_NAME, theme);
+                    initializeTheme(theme);
                     break;
                 case LVGL_REG_SPECIAL_RESTART:
                     ESP_LOGI("Serial BAP", "Received restart command");

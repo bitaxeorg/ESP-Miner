@@ -84,6 +84,7 @@
 #define LVGL_REG_SETTINGS_AUTO_FAN_SPEED 0x9E // 2 bytes
 
 // Special registers (0xF0 - 0xFF)
+#define LVGL_REG_SPECIAL_THEME 0xF0
 #define LVGL_REG_SPECIAL_RESTART 0xFE
 
 // Flags (0xE0 - 0xEF)
