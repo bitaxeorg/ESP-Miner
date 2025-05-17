@@ -12,7 +12,8 @@ const __dirname = dirname(__filename);
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current directory
   const env = loadEnv(mode, process.cwd());
-  const ESP32_IP = env.VITE_ESP32_IP || "localhost";
+  const isProd = mode === "production";
+  const API_TARGET = isProd ? undefined : env.VITE_API_URL || "http://10.1.1.168";
 
   return {
     plugins: [preact(), tailwindcss()],
@@ -20,28 +21,31 @@ export default defineConfig(({ mode }) => {
       outDir: resolve(__dirname, "dist/axe-os"),
     },
     server: {
-      proxy: {
-        // Proxy API requests to the ESP32 device
-        "/api": {
-          target: `http://${ESP32_IP}`,
-          changeOrigin: true,
-          secure: false,
-          // Enable debug logging for proxy requests
-          configure: (proxy, _options) => {
-            proxy.on("error", (err, _req, _res) => {
-              console.log("proxy error", err);
-            });
-            proxy.on("proxyReq", (proxyReq, req, _res) => {
-              console.log("Sending Request to Target:", req.method, req.url);
-              console.log("Request Headers:", proxyReq.getHeaders());
-            });
-            proxy.on("proxyRes", (proxyRes, req, _res) => {
-              console.log("Received Response from Target:", proxyRes.statusCode, req.url);
-              console.log("Response Headers:", proxyRes.headers);
-            });
-          },
-        },
-      },
+      proxy:
+        !isProd && API_TARGET
+          ? {
+              // Proxy API requests to the target device
+              "/api": {
+                target: API_TARGET,
+                changeOrigin: true,
+                secure: false,
+                // Enable debug logging for proxy requests
+                configure: (proxy, _options) => {
+                  proxy.on("error", (err, _req, _res) => {
+                    console.log("proxy error", err);
+                  });
+                  proxy.on("proxyReq", (proxyReq, req, _res) => {
+                    console.log("Sending Request to Target:", req.method, req.url);
+                    console.log("Request Headers:", proxyReq.getHeaders());
+                  });
+                  proxy.on("proxyRes", (proxyRes, req, _res) => {
+                    console.log("Received Response from Target:", proxyRes.statusCode, req.url);
+                    console.log("Response Headers:", proxyRes.headers);
+                  });
+                },
+              },
+            }
+          : {},
     },
   };
 });
