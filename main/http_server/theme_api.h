@@ -14,8 +14,8 @@ typedef enum {
     THEME_BLOCKSTREAM_BLUE = 3,
     THEME_SOLO_SATOSHI = 4,
     THEME_SOLO_MINING_CO = 5,
-    THEME_BTCMAGAZINE = 7,
-    THEME_VOSKCOIN = 8,
+    THEME_BTCMAGAZINE = 6,
+    THEME_VOSKCOIN = 7,
 
 
 } themePreset_t;

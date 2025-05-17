@@ -268,7 +268,7 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
 
 
 // POST /api/theme handler
-static esp_err_t theme_post_handler(httpd_req_t *req)
+static esp_err_t theme_patch_handler(httpd_req_t *req)
 {
     set_cors_headers(req);
 
@@ -321,6 +321,35 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t theme_active_themes_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    set_cors_headers(req);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *themes = cJSON_CreateArray();
+
+    // Iterate through all theme presets
+    for (themePreset_t theme = THEME_ACS_DEFAULT; theme <= THEME_VOSKCOIN; theme++) {
+        // Skip any gaps in the enum values
+        if (theme == 6) continue; // Skip the gap between THEME_SOLO_MINING_CO and THEME_BTCMAGAZINE
+        
+        const char* themeName = themePresetToString(theme);
+        if (themeName) {
+            cJSON_AddItemToArray(themes, cJSON_CreateString(themeName));
+        }
+    }
+
+    cJSON_AddItemToObject(root, "themes", themes);
+
+    const char *response = cJSON_Print(root);
+    httpd_resp_sendstr(req, response);
+
+    free((char *)response);
+    cJSON_Delete(root);
+
+    return ESP_OK;
+}
 esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
 {
     httpd_uri_t theme_get = {
@@ -332,8 +361,8 @@ esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
 
     httpd_uri_t theme_post = {
         .uri = "/api/theme",
-        .method = HTTP_POST,
-        .handler = theme_post_handler,
+        .method = HTTP_PATCH,
+        .handler = theme_patch_handler,
         .user_ctx = ctx
     };
 
@@ -341,6 +370,13 @@ esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
         .uri = "/api/theme",
         .method = HTTP_OPTIONS,
         .handler = theme_options_handler,
+        .user_ctx = ctx
+    };
+
+    httpd_uri_t theme_active_themes = {
+        .uri = "/api/activeThemes",
+        .method = HTTP_GET,
+        .handler = theme_active_themes_handler,
         .user_ctx = ctx
     };
 
