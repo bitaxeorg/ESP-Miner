@@ -70,6 +70,7 @@ static float current_power;
 static uint64_t current_difficulty;
 static float current_chip_temp;
 static bool found_block;
+static bool self_test_finished;
 
 static lv_obj_t * create_scr_self_test() {
     lv_obj_t * scr = lv_obj_create(NULL);
@@ -336,7 +337,9 @@ static void screen_update_cb(lv_timer_t * timer)
 
         lv_label_set_text(self_test_message_label, self_test->message);
 
-        if (self_test->finished) {
+        if (self_test->finished && !self_test_finished) {
+            self_test_finished = true;
+
             if (self_test->result) {
                 lv_label_set_text(self_test_result_label, "TESTS PASS!");
                 lv_label_set_text(self_test_finished_label, "Press RESET button to start Bitaxe.");
