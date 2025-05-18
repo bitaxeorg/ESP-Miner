@@ -35,6 +35,10 @@ double pid_setPoint = 60.0;
 double pid_p = 4.0;
 double pid_i = 0.2;
 double pid_d = 3.0;
+double pid_d_startup = 20.0;  // Higher D value for startup
+bool pid_startup_phase = true;
+int pid_startup_counter = 0;
+#define PID_STARTUP_DURATION 20  // Number of cycles to consider as "startup phase"
 
 PIDController pid;
 
@@ -46,7 +50,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     
     // Initialize PID controller
     pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
-    pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, PID_P_ON_E, PID_DIRECT);
+    // Initialize with higher D value for startup
+    pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d_startup, PID_P_ON_E, PID_DIRECT);
     pid_set_sample_time(&pid, POLL_RATE - 1);
     pid_set_output_limits(&pid, 25, 100);
     pid_set_mode(&pid, AUTOMATIC);
@@ -105,6 +110,23 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             // Ignore invalid temperature readings (-1) during startup
             if (power_management->chip_temp_avg >= 0) {
                 pid_input = power_management->chip_temp_avg;
+                
+                // Gradually transition from startup D value to normal D value
+                if (pid_startup_phase) {
+                    pid_startup_counter++;
+                    if (pid_startup_counter >= PID_STARTUP_DURATION) {
+                        // Transition complete, switch to normal D value
+                        pid_set_tunings(&pid, pid_p, pid_i, pid_d);
+                        pid_startup_phase = false;
+                        ESP_LOGI(TAG, "PID startup phase complete, switching to normal D value: %.1f", pid_d);
+                    } else {
+                        // Calculate intermediate D value during transition
+                        double current_d = pid_d_startup - ((pid_d_startup - pid_d) * pid_startup_counter / PID_STARTUP_DURATION);
+                        pid_set_tunings(&pid, pid_p, pid_i, current_d);
+                        ESP_LOGI(TAG, "PID startup phase: %d/%d, current D: %.1f", pid_startup_counter, PID_STARTUP_DURATION, current_d);
+                    }
+                }
+                
                 pid_compute(&pid);
                 power_management->fan_perc = (uint16_t) pid_output;
                 Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, pid_output / 100.0);
