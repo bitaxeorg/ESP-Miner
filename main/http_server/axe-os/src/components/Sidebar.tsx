@@ -1,7 +1,8 @@
 import { ComponentChildren } from "preact";
-import { useState } from "preact/hooks";
+import { useState, useContext } from "preact/hooks";
 import { useTheme } from "../context/ThemeContext";
 import { Activity, Layers, Users, Palette, Settings, Home, PanelLeft } from "lucide-preact";
+import { SidebarContext } from "./Layout";
 
 interface SidebarProps {
   children?: ComponentChildren;
@@ -68,7 +69,7 @@ function cn(...classes: string[]) {
 }
 
 export function Sidebar({ children }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, setCollapsed } = useContext(SidebarContext);
   const [logoLoaded, setLogoLoaded] = useState(true);
   const { getThemeLogo } = useTheme();
 
