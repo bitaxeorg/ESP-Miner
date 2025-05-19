@@ -4,8 +4,23 @@ import { getSystemInfo, SystemInfo } from "../../utils/api";
 import { formatUptime } from "../../utils/formatters";
 import { DataSection } from "../../components/DataSection";
 import { Tabs } from "../../components/Tabs";
-
-export function Home() {
+import {
+  Activity,
+  Battery,
+  ChevronDown,
+  CpuIcon,
+  Flag,
+  Gauge,
+  Home,
+  Layers,
+  Network,
+  PanelLeft,
+  Settings,
+  Thermometer,
+  Users,
+  Zap,
+} from "lucide-preact";
+export function HomePage() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -250,87 +265,99 @@ export function Home() {
       {activeTab === "overview" && (
         <>
           <DataSection
-            title='⚡ Performance Metrics'
+            title='Performance Metrics'
             cards={performanceCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={Gauge}
           />
 
           <DataSection
-            title='🔋 Power & Thermal'
+            title='Power & Thermal'
             cards={powerThermalCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={Thermometer}
           />
 
           <DataSection
-            title='🔌 Core Operation'
+            title='Core Operation'
             cards={coreOperationCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={CpuIcon}
           />
 
           <DataSection
-            title='📶 Network Info'
+            title='Network Info'
             cards={networkInfoCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={Network}
           />
 
           <DataSection
-            title='🌐 Stratum Settings'
+            title='Stratum Settings'
             cards={stratumSettingsCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={Settings}
           />
 
           <DataSection
-            title='🧊 Fallback Stratum'
+            title='Fallback Stratum'
             cards={fallbackStratumCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={Settings}
           />
 
           <DataSection
-            title='🧠 System Info'
+            title='System Info'
             cards={systemInfoCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={Layers}
           />
 
           <DataSection
-            title='💻 Runtime & Memory'
+            title='Runtime & Memory'
             cards={runtimeMemoryCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={CpuIcon}
           />
 
           <DataSection
-            title='🧾 Versioning'
+            title='Versioning'
             cards={versioningCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={CpuIcon}
           />
 
           <DataSection
-            title='🌡️ VR & Fan'
+            title='VR & Fan'
             cards={vrFanCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={Thermometer}
           />
 
           <DataSection
-            title='🧩 Misc Flags'
+            title='Misc Flags'
             cards={miscFlagsCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={Flag}
           />
 
           <DataSection
-            title='🧪 Other Settings'
+            title='Other Settings'
             cards={otherSettingsCards}
             loading={loading && !systemInfo}
             error={error}
+            icon={Settings}
           />
         </>
       )}

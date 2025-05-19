@@ -1,7 +1,7 @@
 import { render } from "preact";
 import { LocationProvider, Router, Route } from "preact-iso";
 import { Layout } from "./components/Layout";
-import { Home } from "./pages/Home/index.jsx";
+import { HomePage } from "./pages/Home/index.jsx";
 import { Settings } from "./pages/Settings/index.jsx";
 import { Theme } from "./pages/Theme/index";
 import { Miners } from "./pages/Miners/index";
@@ -19,7 +19,7 @@ function AppContent() {
       <LocationProvider>
         <Layout>
           <Router>
-            <Route path='/' component={Home} />
+            <Route path='/' component={HomePage} />
             <Route path='/settings' component={Settings} />
             <Route path='/theme' component={Theme} />
             <Route path='/miners' component={Miners} />

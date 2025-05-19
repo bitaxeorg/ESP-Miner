@@ -80,13 +80,22 @@ export function Sidebar({ children }: SidebarProps) {
       )}
     >
       <div className='flex h-full flex-col overflow-y-auto border-r border-slate-800'>
-        <div className='p-4 border-b border-slate-800 flex items-center'>
-          {!collapsed && (
+        <div className='h-16 border-b border-slate-800 flex items-center justify-center px-3'>
+          {collapsed ? (
+            <div className='flex justify-center w-full'>
+              <img
+                src='/american-btc-small.png'
+                alt='Favicon'
+                className='h-8 w-8'
+                onLoad={() => setLogoLoaded(true)}
+              />
+            </div>
+          ) : (
             <div className='flex items-center gap-2'>
               <img
                 src={getThemeLogo()}
                 alt='Logo'
-                className='h-10'
+                className='h-8'
                 onLoad={() => setLogoLoaded(true)}
               />
             </div>
