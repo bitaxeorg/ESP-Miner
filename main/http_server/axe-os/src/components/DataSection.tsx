@@ -17,7 +17,7 @@ interface DataSectionProps {
 
 export function DataSection({ title, cards, loading, error, className = "" }: DataSectionProps) {
   return (
-    <div class={`rounded-lg bg-gray-900 p-6 ${className}`}>
+    <div class={`rounded-lg bg-blue-600 p-6 ${className}`}>
       <h2 class='mb-4 text-xl font-semibold text-gray-100'>{title}</h2>
       {loading ? (
         <div class='text-gray-400'>Loading {title.toLowerCase()} data...</div>
