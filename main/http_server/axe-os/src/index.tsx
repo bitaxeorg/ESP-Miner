@@ -10,6 +10,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider, useToast } from "./context/ToastContext";
 import { ToastContainer } from "./components/Toast";
 import "./style.css";
+import { LogsPage } from "./pages/Logs";
 
 function AppContent() {
   const { toasts, hideToast } = useToast();
@@ -20,6 +21,7 @@ function AppContent() {
         <Layout>
           <Router>
             <Route path='/' component={HomePage} />
+            <Route path='/logs' component={LogsPage} />
             <Route path='/settings' component={Settings} />
             <Route path='/theme' component={Theme} />
             <Route path='/miners' component={Miners} />

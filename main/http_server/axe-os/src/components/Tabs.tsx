@@ -18,11 +18,11 @@ export function Tabs({ tabs, activeTab, onTabChange }: TabsProps) {
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             class={`
-              px-6 py-2.5 text-sm font-medium rounded-md transition-all cursor-pointer
+              px-6 py-2.5 text-sm font-semibold rounded-md transition-all cursor-pointer
               ${
                 activeTab === tab.id
-                  ? "bg-blue-900 text-white"
-                  : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                  ? "bg-blue-900/50 text-blue-400"
+                  : "text-slate-400 hover:bg-blue-900/50 hover:text-blue-400"
               }
             `}
           >

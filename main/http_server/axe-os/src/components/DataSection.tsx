@@ -1,5 +1,6 @@
 import { Gauge, LucideIcon } from "lucide-preact";
 import { DataCard } from "./DataCard";
+import { ComponentType } from "preact";
 
 interface CardData {
   title: string;
@@ -7,6 +8,7 @@ interface CardData {
   subtitle?: string;
   percentageChange?: number;
   className?: string;
+  icon?: LucideIcon;
 }
 
 interface DataSectionProps {
@@ -34,13 +36,13 @@ export function DataSection({
         <div className='text-[#FF2C47]'>{error}</div>
       ) : (
         <>
-          <div className='flex items-center gap-2'>
+          <div className='flex items-center gap-2 pt-6'>
             {Icon && <Icon className='h-5 w-5 text-blue-500' />}
-            <h2 className='text-lg font-semibold text-white'>{title}</h2>
+            <h2 className='text-lg font-bold text-white'>{title}</h2>
           </div>
           <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
             {cards.map((card, index) => (
-              <DataCard key={index} {...card} icon={Icon} />
+              <DataCard key={index} {...card} />
             ))}
           </div>
         </>

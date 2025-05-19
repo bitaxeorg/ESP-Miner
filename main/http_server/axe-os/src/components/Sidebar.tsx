@@ -1,5 +1,5 @@
 import { ComponentChildren } from "preact";
-import { useState, useContext } from "preact/hooks";
+import { useState, useContext, useEffect } from "preact/hooks";
 import { useTheme } from "../context/ThemeContext";
 import { Activity, Layers, Users, Palette, Settings, Home, PanelLeft } from "lucide-preact";
 import { SidebarContext } from "./Layout";
@@ -14,6 +14,7 @@ interface NavItemProps {
   href?: string;
   active?: boolean;
   collapsed: boolean;
+  onClick?: () => void;
 }
 
 const navItems = [
@@ -21,7 +22,6 @@ const navItems = [
     label: "Dashboard",
     href: "/",
     icon: Home,
-    active: true,
   },
   {
     label: "Miners",
@@ -34,8 +34,8 @@ const navItems = [
     icon: Users,
   },
   {
-    label: "Analytics",
-    href: "/analytics",
+    label: "Logs",
+    href: "/logs",
     icon: Activity,
   },
   {
@@ -50,12 +50,17 @@ const navItems = [
   },
 ];
 
-function NavItem({ icon: Icon, label, href = "#", active, collapsed }: NavItemProps) {
+function NavItem({ icon: Icon, label, href = "#", active, collapsed, onClick }: NavItemProps) {
   return (
     <a
       href={href}
-      className={`flex items-center rounded-lg px-4 py-2 ${
-        active ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"
+      onClick={(e) => {
+        if (onClick) onClick();
+      }}
+      className={`flex items-center font-semibold rounded-lg px-4 py-2 ${
+        active
+          ? "bg-blue-900/50 text-blue-400 font-medium"
+          : "text-slate-400 hover:text-white hover:bg-blue-900/50"
       } ${collapsed ? "justify-center" : ""}`}
     >
       <Icon className='h-5 w-5' />
@@ -72,6 +77,41 @@ export function Sidebar({ children }: SidebarProps) {
   const { collapsed, setCollapsed } = useContext(SidebarContext);
   const [logoLoaded, setLogoLoaded] = useState(true);
   const { getThemeLogo } = useTheme();
+  const [activeItem, setActiveItem] = useState(() => {
+    // Initialize based on current path
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      // Find the matching nav item or default to dashboard
+      const match = navItems.find(
+        (item) => item.href === path || (item.href !== "/" && path.startsWith(item.href))
+      );
+      return match?.href || "/";
+    }
+    return "/";
+  });
+
+  useEffect(() => {
+    // Update active item when URL changes
+    const handleLocationChange = () => {
+      const path = window.location.pathname;
+      const match = navItems.find(
+        (item) => item.href === path || (item.href !== "/" && path.startsWith(item.href))
+      );
+      if (match) {
+        setActiveItem(match.href);
+      }
+    };
+
+    // Call once on mount
+    handleLocationChange();
+
+    // Listen for navigation events
+    window.addEventListener("popstate", handleLocationChange);
+
+    return () => {
+      window.removeEventListener("popstate", handleLocationChange);
+    };
+  }, []);
 
   return (
     <aside
@@ -111,8 +151,9 @@ export function Sidebar({ children }: SidebarProps) {
                 icon={item.icon}
                 label={item.label}
                 href={item.href}
-                active={item.active}
+                active={activeItem === item.href}
                 collapsed={collapsed}
+                onClick={() => setActiveItem(item.href)}
               />
             ))}
           </nav>
