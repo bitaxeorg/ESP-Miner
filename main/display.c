@@ -20,7 +20,7 @@
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-#define SSD1306_I2C_ADDRESS    0x3C
+#define DISPLAY_I2C_ADDRESS    0x3C
 
 #define DEFAULT_DISPLAY        "SSD1306 (128x32)"
 
@@ -70,6 +70,10 @@ esp_err_t display_init(void * pvParameters)
 
     ESP_RETURN_ON_ERROR(read_display_config(GLOBAL_STATE), TAG, "Failed to read display config");
 
+    if (GLOBAL_STATE->DISPLAY_CONFIG.display == NONE) {
+        return ESP_OK;
+    }
+
     uint8_t flip_screen = nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1);
     uint8_t invert_screen = nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0);
 
@@ -80,12 +84,22 @@ esp_err_t display_init(void * pvParameters)
     esp_lcd_panel_io_handle_t io_handle = NULL;
     esp_lcd_panel_io_i2c_config_t io_config = {
         .scl_speed_hz = I2C_BUS_SPEED_HZ,
-        .dev_addr = SSD1306_I2C_ADDRESS,
+        .dev_addr = DISPLAY_I2C_ADDRESS,
         .control_phase_bytes = 1,
         .lcd_cmd_bits = LCD_CMD_BITS,
         .lcd_param_bits = LCD_PARAM_BITS,
-        .dc_bit_offset = 6                     
     };
+
+    switch (GLOBAL_STATE->DISPLAY_CONFIG.display) {
+        case SSD1306:
+        case SSD1309:
+            io_config.dc_bit_offset = 6;
+            break;
+        case SH1107:
+            io_config.dc_bit_offset = 0;
+            io_config.flags.disable_control_phase = 1;
+            break;
+    }
     
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_i2c(i2c_master_bus_handle, &io_config, &io_handle), TAG, "Failed to initialise i2c panel bus");
 
@@ -100,7 +114,17 @@ esp_err_t display_init(void * pvParameters)
     };
     panel_config.vendor_config = &ssd1306_config;
 
-    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle), TAG, "No display found");
+
+    switch (GLOBAL_STATE->DISPLAY_CONFIG.display) {
+        case SSD1306:
+        case SSD1309:
+            ESP_RETURN_ON_ERROR(esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle), TAG, "No display found");
+            break;
+        case SH1107:
+            ESP_RETURN_ON_ERROR(esp_lcd_new_panel_sh1107(io_handle, &panel_config, &panel_handle), TAG, "No display found");
+            break;
+    }
+
     ESP_RETURN_ON_ERROR(esp_lcd_panel_reset(panel_handle), TAG, "Panel reset failed");
     esp_err_t esp_lcd_panel_init_err = esp_lcd_panel_init(panel_handle);
     if (esp_lcd_panel_init_err != ESP_OK) {
@@ -123,7 +147,7 @@ esp_err_t display_init(void * pvParameters)
         .hres = GLOBAL_STATE->DISPLAY_CONFIG.h_res,
         .vres = GLOBAL_STATE->DISPLAY_CONFIG.v_res,
         .monochrome = true,
-        .color_format = LV_COLOR_FORMAT_RGB565,
+        .color_format = LV_COLOR_FORMAT_I1,
         .rotation = {
             .swap_xy = false,
             .mirror_x = !flip_screen, // The screen is not flipped, this is for backwards compatibility
