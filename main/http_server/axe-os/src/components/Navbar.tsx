@@ -6,17 +6,11 @@ export function Navbar({ title = "Dashboard" }: NavbarProps) {
   return (
     <nav class='fixed left-0 right-0 top-0 z-30 h-16 border-b border-gray-800 bg-gray-900 pl-64'>
       <div class='flex h-full items-center justify-between px-4'>
-        <h1 class='text-xl font-semibold text-gray-100'>{title}</h1>
+        {/* <h1 class='text-xl font-semibold text-gray-100'>{title}</h1> */}
 
         <div class='flex items-center gap-4'>
-          {/* Status indicator */}
-          <div class='flex items-center gap-2'>
-            <div class='h-2 w-2 rounded-full bg-green-500'></div>
-            <span class='text-sm text-gray-300'>Connected</span>
-          </div>
-
           {/* Settings button */}
-          <button
+          {/* <button
             class='rounded-lg p-2 text-gray-300 hover:bg-gray-800'
             onClick={() => (window.location.href = "/settings")}
           >
@@ -34,7 +28,7 @@ export function Navbar({ title = "Dashboard" }: NavbarProps) {
                 d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
               ></path>
             </svg>
-          </button>
+          </button> */}
         </div>
       </div>
     </nav>

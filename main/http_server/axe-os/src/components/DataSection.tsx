@@ -17,12 +17,12 @@ interface DataSectionProps {
 
 export function DataSection({ title, cards, loading, error, className = "" }: DataSectionProps) {
   return (
-    <div class={`rounded-lg bg-blue-600 p-6 ${className}`}>
-      <h2 class='mb-4 text-xl font-semibold text-gray-100'>{title}</h2>
+    <div class={`bg-[#1E2C7B] rounded-2xl shadow-lg p-6 text-white ${className}`}>
+      <h2 class='mb-4 text-xl text-left font-semibold text-white'>{title}</h2>
       {loading ? (
-        <div class='text-gray-400'>Loading {title.toLowerCase()} data...</div>
+        <div class='text-slate-400'>Loading {title.toLowerCase()} data...</div>
       ) : error ? (
-        <div class='text-red-400'>{error}</div>
+        <div class='text-[#FF2C47]'>{error}</div>
       ) : (
         <div class='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
           {cards.map((card, index) => (

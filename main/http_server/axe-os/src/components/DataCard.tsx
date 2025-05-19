@@ -8,11 +8,9 @@ interface DataCardProps {
 
 export function DataCard({ title, value, className = "" }: DataCardProps) {
   return (
-    <div class={`rounded-lg bg-gray-800 p-4 ${className}`}>
-      <h3 class='text-sm font-medium text-gray-400'>{title}</h3>
-      <p class='mt-2 text-2xl font-semibold text-gray-100'>
-        {value !== null && value !== undefined ? value : "--"}
-      </p>
+    <div class={`rounded-xl bg-[#0B1C3F] p-4 shadow-inner ${className}`}>
+      <h3 class='text-sm text-white'>{title}</h3>
+      <p class='mt-2 text-2xl font-bold'>{value !== null && value !== undefined ? value : "--"}</p>
     </div>
   );
 }
