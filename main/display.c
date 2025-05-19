@@ -17,6 +17,7 @@
 #include "driver/i2c_master.h"
 #include "driver/i2c_types.h"
 #include "esp_lcd_panel_ssd1306.h"
+#include "esp_lcd_sh1107.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -99,11 +100,13 @@ esp_err_t display_init(void * pvParameters)
             io_config.dc_bit_offset = 0;
             io_config.flags.disable_control_phase = 1;
             break;
+        default:
+            return ESP_FAIL;
     }
     
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_i2c(i2c_master_bus_handle, &io_config, &io_handle), TAG, "Failed to initialise i2c panel bus");
 
-    ESP_LOGI(TAG, "Install SSD1306 panel driver");
+    ESP_LOGI(TAG, "Install panel driver");
     esp_lcd_panel_dev_config_t panel_config = {
         .bits_per_pixel = 1,
         .reset_gpio_num = -1,
@@ -114,7 +117,6 @@ esp_err_t display_init(void * pvParameters)
     };
     panel_config.vendor_config = &ssd1306_config;
 
-
     switch (GLOBAL_STATE->DISPLAY_CONFIG.display) {
         case SSD1306:
         case SSD1309:
@@ -123,6 +125,8 @@ esp_err_t display_init(void * pvParameters)
         case SH1107:
             ESP_RETURN_ON_ERROR(esp_lcd_new_panel_sh1107(io_handle, &panel_config, &panel_handle), TAG, "No display found");
             break;
+        default:
+            return ESP_FAIL;
     }
 
     ESP_RETURN_ON_ERROR(esp_lcd_panel_reset(panel_handle), TAG, "Panel reset failed");
