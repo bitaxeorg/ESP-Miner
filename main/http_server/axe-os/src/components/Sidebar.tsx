@@ -1,61 +1,131 @@
 import { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { useTheme } from "../context/ThemeContext";
+import { Activity, Layers, Users, Palette, Settings, Home, PanelLeft } from "lucide-preact";
 
 interface SidebarProps {
   children?: ComponentChildren;
+}
+
+interface NavItemProps {
+  icon: any;
+  label: string;
+  href?: string;
+  active?: boolean;
+  collapsed: boolean;
 }
 
 const navItems = [
   {
     label: "Dashboard",
     href: "/",
+    icon: Home,
+    active: true,
   },
   {
     label: "Miners",
     href: "/miners",
+    icon: Layers,
+  },
+  {
+    label: "Pool",
+    href: "/pool",
+    icon: Users,
+  },
+  {
+    label: "Analytics",
+    href: "/analytics",
+    icon: Activity,
   },
   {
     label: "Theme",
     href: "/theme",
+    icon: Palette,
   },
   {
     label: "Settings",
     href: "/settings",
+    icon: Settings,
   },
 ];
 
+function NavItem({ icon: Icon, label, href = "#", active, collapsed }: NavItemProps) {
+  return (
+    <a
+      href={href}
+      className={`flex items-center rounded-lg px-4 py-2 ${
+        active ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"
+      } ${collapsed ? "justify-center" : ""}`}
+    >
+      <Icon className='h-5 w-5' />
+      {!collapsed && <span className='ml-3'>{label}</span>}
+    </a>
+  );
+}
+
+function cn(...classes: string[]) {
+  return classes.filter(Boolean).join(" ");
+}
+
 export function Sidebar({ children }: SidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(true);
   const { getThemeLogo } = useTheme();
 
-  // Get the logo URL for the current theme
-  const logoUrl = getThemeLogo();
-
   return (
-    <aside class='fixed left-0 top-0 z-40 h-screen w-64 transform bg-gray-900 transition-transform sm:translate-x-0'>
-      <div class='flex h-full flex-col overflow-y-auto border-r border-gray-800 px-3 py-4'>
-        <div class='mb-10 flex items-center px-2'>
-          <img src={logoUrl} alt='Logo' class='h-10' onLoad={() => setLogoLoaded(true)} />
+    <aside
+      className={cn(
+        "fixed left-0 top-0 z-40 h-screen transform bg-slate-900 text-slate-200 transition-all duration-300 sm:translate-x-0",
+        collapsed ? "w-[70px]" : "w-[240px]"
+      )}
+    >
+      <div className='flex h-full flex-col overflow-y-auto border-r border-slate-800'>
+        <div className='p-4 border-b border-slate-800 flex items-center'>
+          {!collapsed && (
+            <div className='flex items-center gap-2'>
+              <img
+                src={getThemeLogo()}
+                alt='Logo'
+                className='h-10'
+                onLoad={() => setLogoLoaded(true)}
+              />
+            </div>
+          )}
         </div>
 
-        <nav class='flex-1 space-y-2'>
-          {navItems.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              class='flex items-center rounded-lg px-4 py-2 text-gray-300 hover:bg-gray-800'
-            >
-              <span>{item.label}</span>
-            </a>
-          ))}
-        </nav>
+        <div className='flex-1 py-4'>
+          <nav className='space-y-1 px-2'>
+            {navItems.map((item) => (
+              <NavItem
+                key={item.href}
+                icon={item.icon}
+                label={item.label}
+                href={item.href}
+                active={item.active}
+                collapsed={collapsed}
+              />
+            ))}
+          </nav>
+        </div>
 
-        {/* Status indicator */}
-        <div class='mt-auto pt-4 border-t border-gray-800'>
-          <div class='flex items-center gap-2 px-4 py-2'>
-            <div class='h-2 w-2 rounded-full bg-green-500'></div>
-            <span class='text-sm text-gray-300'>Connected</span>
+        {/* Status indicator and collapse button */}
+        <div className='p-4 border-t border-slate-800'>
+          <div
+            className={cn(
+              "flex items-center gap-3 text-sm text-slate-400",
+              collapsed ? "justify-center" : "justify-between"
+            )}
+          >
+            <div className='flex items-center gap-3'>
+              <div className='h-2 w-2 rounded-full bg-emerald-500'></div>
+              {!collapsed && <span>Connected</span>}
+            </div>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className='h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-800 rounded flex items-center justify-center'
+            >
+              <PanelLeft className='h-4 w-4' />
+            </button>
           </div>
         </div>
       </div>

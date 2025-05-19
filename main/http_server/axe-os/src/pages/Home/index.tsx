@@ -3,11 +3,18 @@ import { useState, useEffect } from "preact/hooks";
 import { getSystemInfo, SystemInfo } from "../../utils/api";
 import { formatUptime } from "../../utils/formatters";
 import { DataSection } from "../../components/DataSection";
+import { Tabs } from "../../components/Tabs";
 
 export function Home() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "btc", label: "BTC" },
+  ];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -239,89 +246,98 @@ export function Home() {
 
   return (
     <div class='space-y-6'>
-      <DataSection
-        title='⚡ Performance Metrics'
-        cards={performanceCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      {activeTab === "overview" && (
+        <>
+          <DataSection
+            title='⚡ Performance Metrics'
+            cards={performanceCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='🔋 Power & Thermal'
-        cards={powerThermalCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='🔋 Power & Thermal'
+            cards={powerThermalCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='🔌 Core Operation'
-        cards={coreOperationCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='🔌 Core Operation'
+            cards={coreOperationCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='📶 Network Info'
-        cards={networkInfoCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='📶 Network Info'
+            cards={networkInfoCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='🌐 Stratum Settings'
-        cards={stratumSettingsCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='🌐 Stratum Settings'
+            cards={stratumSettingsCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='🧊 Fallback Stratum'
-        cards={fallbackStratumCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='🧊 Fallback Stratum'
+            cards={fallbackStratumCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='🧠 System Info'
-        cards={systemInfoCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='🧠 System Info'
+            cards={systemInfoCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='💻 Runtime & Memory'
-        cards={runtimeMemoryCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='💻 Runtime & Memory'
+            cards={runtimeMemoryCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='🧾 Versioning'
-        cards={versioningCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='🧾 Versioning'
+            cards={versioningCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='🌡️ VR & Fan'
-        cards={vrFanCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='🌡️ VR & Fan'
+            cards={vrFanCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='🧩 Misc Flags'
-        cards={miscFlagsCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='🧩 Misc Flags'
+            cards={miscFlagsCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
 
-      <DataSection
-        title='🧪 Other Settings'
-        cards={otherSettingsCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='🧪 Other Settings'
+            cards={otherSettingsCards}
+            loading={loading && !systemInfo}
+            error={error}
+          />
+        </>
+      )}
+      {activeTab === "btc" && (
+        <div class='text-slate-400 text-center py-8'>BTC information coming soon...</div>
+      )}
+      Tab
     </div>
   );
 }
