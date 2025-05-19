@@ -161,6 +161,11 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         if (event_id == WIFI_EVENT_STA_CONNECTED) {
             ESP_LOGI(TAG, "Connected!");
             strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
+            int8_t rssi_value;
+            esp_err_t result = get_wifi_current_rssi(&rssi_value);
+            if (result == ESP_OK) {
+                GLOBAL_STATE->SYSTEM_MODULE.wifi_rssi = rssi_value;
+            }
         }
 
         if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
