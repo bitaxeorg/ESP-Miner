@@ -436,44 +436,18 @@ static void screen_update_cb(lv_timer_t * timer)
         lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", power_management->chip_temp_avg);
     }
 
-    if (wifi_rssi_value_label) {
-        char rssi_buf[25];
+    
+    char rssi_buf[25];
         
-        if (module->wifi_rssi < 0 && module->wifi_rssi >= -127) { // Typical RSSI range
-            snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: %d dBm", module->wifi_rssi);
-        } else {
-            snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: -- dBm");
+    if (module->wifi_rssi < 0 && module->wifi_rssi >= -127) { // Typical RSSI range
+        snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: %d dBm", module->wifi_rssi);
+    } else {
+        snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: -- dBm");
         }
-        if (strcmp(lv_label_get_text(wifi_rssi_value_label), rssi_buf) != 0) {
-            lv_label_set_text(wifi_rssi_value_label, rssi_buf);
-        }
+    if (strcmp(lv_label_get_text(wifi_rssi_value_label), rssi_buf) != 0) {
+        lv_label_set_text(wifi_rssi_value_label, rssi_buf);
     }
-
-    if (esp_uptime_label) {
-        char uptime[50];
-        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
-        
-        uint32_t days = uptime_seconds / (24 * 3600);
-        uptime_seconds %= (24 * 3600);
-        uint32_t hours = uptime_seconds / 3600;
-        uptime_seconds %= 3600;
-        uint32_t minutes = uptime_seconds / 60;
-        uptime_seconds %= 60;
-        
-        if (days > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
-        } else if (hours > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
-        } else if (minutes > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
-        } else {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
-        }
-        
-        if (strcmp(lv_label_get_text(esp_uptime_label), uptime) != 0) {
-            lv_label_set_text(esp_uptime_label, uptime);
-        }
-    }
+    
 
     current_hashrate = module->current_hashrate;
     current_power = power_management->power;
@@ -504,6 +478,35 @@ void screen_next()
     screen_show(next_scr);
 }
 
+static void uptime_update_cb(lv_timer_t * timer)
+{
+    if (esp_uptime_label) {
+        char uptime[50];
+        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
+        
+        uint32_t days = uptime_seconds / (24 * 3600);
+        uptime_seconds %= (24 * 3600);
+        uint32_t hours = uptime_seconds / 3600;
+        uptime_seconds %= 3600;
+        uint32_t minutes = uptime_seconds / 60;
+        uptime_seconds %= 60;
+        
+        if (days > 0) {
+            snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
+        } else if (hours > 0) {
+            snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
+        } else if (minutes > 0) {
+            snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
+        } else {
+            snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
+        }
+        
+        if (strcmp(lv_label_get_text(esp_uptime_label), uptime) != 0) {
+            lv_label_set_text(esp_uptime_label, uptime);
+        }
+    }
+}
+
 esp_err_t screen_start(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -524,6 +527,9 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_WIFI_RSSI] = create_scr_wifi_rssi();
 
         lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);
+        
+        // Create uptime update timer (runs every 1 second)
+        lv_timer_create(uptime_update_cb, 1000, NULL);
     }
 
     return ESP_OK;
