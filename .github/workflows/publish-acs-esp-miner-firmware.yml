@@ -1,0 +1,40 @@
+name: Publish Latest Firmware to S3
+
+on:
+  workflow_dispatch:
+    inputs:
+      asset_name:
+        description: 'Name of the asset to upload (e.g. firmware.bin)'
+        required: true
+        default: esp-miner.bin
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    env:
+      REPO: Advanced-Crypto-Services/acs-esp-miner
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download latest release asset
+        run: |
+          curl -L \
+            -o ${{ github.event.inputs.asset_name }} \
+            https://github.com/${{ env.REPO }}/releases/latest/download/${{ github.event.inputs.asset_name }}
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp \
+            ${{ github.event.inputs.asset_name }} \
+            s3://${{ env.S3_BUCKET }}/esp32/latest/${{ github.event.inputs.asset_name }} \
+            --acl public-read
