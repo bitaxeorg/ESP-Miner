@@ -9,6 +9,7 @@
 #include "nvs_config.h"
 #include "display.h"
 #include "connect.h"
+#include "esp_timer.h"
 
 
 typedef enum {
@@ -62,6 +63,7 @@ static lv_obj_t *self_test_result_label;
 static lv_obj_t *self_test_finished_label;
 
 static lv_obj_t *wifi_rssi_value_label;
+static lv_obj_t *esp_uptime_label;
 
 static double current_hashrate;
 static float current_power;
@@ -272,6 +274,9 @@ static lv_obj_t * create_scr_wifi_rssi() {
     wifi_rssi_value_label = lv_label_create(scr);
     lv_label_set_text(wifi_rssi_value_label, "RSSI: -- dBm");
 
+    esp_uptime_label = lv_label_create(scr);
+    lv_label_set_text(esp_uptime_label, "Uptime: --");
+
     return scr;
 }
 
@@ -441,6 +446,32 @@ static void screen_update_cb(lv_timer_t * timer)
         }
         if (strcmp(lv_label_get_text(wifi_rssi_value_label), rssi_buf) != 0) {
             lv_label_set_text(wifi_rssi_value_label, rssi_buf);
+        }
+    }
+
+    if (esp_uptime_label) {
+        char uptime[50];
+        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
+        
+        uint32_t days = uptime_seconds / (24 * 3600);
+        uptime_seconds %= (24 * 3600);
+        uint32_t hours = uptime_seconds / 3600;
+        uptime_seconds %= 3600;
+        uint32_t minutes = uptime_seconds / 60;
+        uptime_seconds %= 60;
+        
+        if (days > 0) {
+            snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
+        } else if (hours > 0) {
+            snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
+        } else if (minutes > 0) {
+            snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
+        } else {
+            snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
+        }
+        
+        if (strcmp(lv_label_get_text(esp_uptime_label), uptime) != 0) {
+            lv_label_set_text(esp_uptime_label, uptime);
         }
     }
 
