@@ -8,6 +8,7 @@
 #include "screen.h"
 #include "nvs_config.h"
 #include "display.h"
+#include "connect.h"
 
 
 typedef enum {
@@ -312,6 +313,14 @@ static void screen_update_cb(lv_timer_t * timer)
             display_on(false);
         } else {
             display_on(true);
+        }
+    }
+    
+    // Update WiFi RSSI periodically
+    if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
+        int8_t rssi_value;
+        if (get_wifi_current_rssi(&rssi_value) == ESP_OK) {
+            GLOBAL_STATE->SYSTEM_MODULE.wifi_rssi = rssi_value;
         }
     }
 
