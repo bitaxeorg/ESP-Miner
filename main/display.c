@@ -79,8 +79,6 @@ esp_err_t display_init(void * pvParameters)
         return ESP_OK;
     }
 
-    esp_err_t esp_lcd_panel_init_err = ESP_FAIL;
-
     i2c_master_bus_handle_t i2c_master_bus_handle;
     ESP_RETURN_ON_ERROR(i2c_bitaxe_get_master_bus_handle(&i2c_master_bus_handle), TAG, "Failed to get i2c master bus handle");
 
@@ -133,7 +131,7 @@ esp_err_t display_init(void * pvParameters)
     }
 
     ESP_RETURN_ON_ERROR(esp_lcd_panel_reset(panel_handle), TAG, "Panel reset failed");
-    esp_lcd_panel_init_err = esp_lcd_panel_init(panel_handle);
+    esp_err_t esp_lcd_panel_init_err = esp_lcd_panel_init(panel_handle);
     if (esp_lcd_panel_init_err != ESP_OK) {
         ESP_LOGE(TAG, "Panel init failed, no display connected?");
     }  else {
