@@ -457,7 +457,7 @@ void screen_next()
         if (next_scr > SCR_CAROUSEL_END) { // If past the end of carousel
             next_scr = SCR_CAROUSEL_START; // Wrap around to the start of carousel
         }
-        // If the candidate screen is SCR_WIFI_RSSI AND this is NOT an SSD1309 display,
+        // If the candidate screen is SCR_WIFI_RSSI AND this is NOT a bigger display,
         // then this screen should be skipped, and the loop will continue to find the next one.
     } while (next_scr == SCR_WIFI_RSSI && GLOBAL_STATE->DISPLAY_CONFIG.v_res / 8 != 8);
 
