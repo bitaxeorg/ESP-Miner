@@ -273,6 +273,6 @@ export class EditComponent implements OnInit, OnDestroy {
   }
 
   getDisplays() {
-    return ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (128x64)", "SH1107 (128x128)"];
+    return ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
   }
 }

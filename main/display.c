@@ -113,14 +113,13 @@ esp_err_t display_init(void * pvParameters)
         .reset_gpio_num = -1,
     };
 
-    esp_lcd_panel_ssd1306_config_t ssd1306_config = {
-        .height = GLOBAL_STATE->DISPLAY_CONFIG.v_res,
-    };
-    panel_config.vendor_config = &ssd1306_config;
-
     switch (GLOBAL_STATE->DISPLAY_CONFIG.display) {
         case SSD1306:
         case SSD1309:
+            esp_lcd_panel_ssd1306_config_t ssd1306_config = {
+                .height = GLOBAL_STATE->DISPLAY_CONFIG.h_res,
+            };
+            panel_config.vendor_config = &ssd1306_config;
             ESP_RETURN_ON_ERROR(esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle), TAG, "No display found");
             break;
         case SH1107:
@@ -153,7 +152,7 @@ esp_err_t display_init(void * pvParameters)
         .hres = GLOBAL_STATE->DISPLAY_CONFIG.h_res,
         .vres = GLOBAL_STATE->DISPLAY_CONFIG.v_res,
         .monochrome = true,
-        .color_format = LV_COLOR_FORMAT_I1,
+        .color_format = LV_COLOR_FORMAT_RGB565,
         .rotation = {
             .swap_xy = false,
             .mirror_x = !flip_screen, // The screen is not flipped, this is for backwards compatibility
@@ -169,6 +168,9 @@ esp_err_t display_init(void * pvParameters)
 
     if (esp_lcd_panel_init_err == ESP_OK) {
         if (lvgl_port_lock(0)) {
+
+            // lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);
+
             lv_style_init(&scr_style);
             lv_style_set_text_font(&scr_style, &lv_font_portfolio_6x8);
             lv_style_set_bg_opa(&scr_style, LV_OPA_COVER);
