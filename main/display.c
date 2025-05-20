@@ -60,7 +60,7 @@ static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
             return ESP_OK;
         }
     }
-    ESP_LOGW(TAG, "Display configuration '%s' not found. Using default or no display.", display_config);
+
     free(display_config);
     return ESP_FAIL;
 }
@@ -102,7 +102,6 @@ esp_err_t display_init(void * pvParameters)
             io_config.flags.disable_control_phase = 1;
             break;
         default:
-            ESP_LOGE(TAG, "Unsupported display type for IO config: %d", GLOBAL_STATE->DISPLAY_CONFIG.display);
             return ESP_FAIL;
     }
     
@@ -129,7 +128,6 @@ esp_err_t display_init(void * pvParameters)
             ESP_RETURN_ON_ERROR(esp_lcd_new_panel_sh1107(io_handle, &panel_config, &panel_handle), TAG, "No display found");
             break;
         default:
-             ESP_LOGE(TAG, "Unsupported display type for panel driver: %d", GLOBAL_STATE->DISPLAY_CONFIG.display);
             return ESP_FAIL;
     }
 

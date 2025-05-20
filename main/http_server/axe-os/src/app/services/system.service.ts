@@ -29,6 +29,7 @@ export class SystemService {
           maxPower: 25,
           nominalVoltage: 5,
           hashRate: 475,
+          expectedHashrate: 420,
           bestDiff: "0",
           bestSessionDiff: "0",
           freeHeap: 200504,

@@ -107,6 +107,7 @@ components:
         - freeHeap
         - frequency
         - hashRate
+        - expectedHashrate
         - hostname
         - idfVersion
         - invertscreen
