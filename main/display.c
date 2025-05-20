@@ -36,7 +36,6 @@ static bool display_state_on = false;
 static lv_theme_t theme;
 static lv_style_t scr_style;
 
-static bool g_is_ssd1309 = false;
 
 extern const lv_font_t lv_font_portfolio_6x8;
 
@@ -75,10 +74,6 @@ esp_err_t display_init(void * pvParameters)
 
     if (GLOBAL_STATE->DISPLAY_CONFIG.display == NONE) {
         return ESP_OK;
-    }
-    if (GLOBAL_STATE->DISPLAY_CONFIG.display == SSD1309) {
-        g_is_ssd1309 = true;
-        ESP_LOGI(TAG, "Display type confirmed as SSD1309.");
     }
 
     uint8_t flip_screen = nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1);
@@ -226,8 +221,4 @@ esp_err_t display_on(bool display_on)
     }
 
     return ESP_OK;
-}
-
-bool display_is_ssd1309(void) {
-    return g_is_ssd1309;
 }

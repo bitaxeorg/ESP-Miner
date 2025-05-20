@@ -9,7 +9,6 @@
 #include "nvs_config.h"
 #include "display.h"
 
-extern bool display_is_ssd1309(void);
 
 typedef enum {
     SCR_SELF_TEST,
@@ -460,7 +459,7 @@ void screen_next()
         }
         // If the candidate screen is SCR_WIFI_RSSI AND this is NOT an SSD1309 display,
         // then this screen should be skipped, and the loop will continue to find the next one.
-    } while (next_scr == SCR_WIFI_RSSI && !display_is_ssd1309());
+    } while (next_scr == SCR_WIFI_RSSI && GLOBAL_STATE->DISPLAY_CONFIG.v_res / 8 != 8);
 
     screen_show(next_scr);
 }
