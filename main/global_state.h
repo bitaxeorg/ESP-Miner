@@ -44,7 +44,6 @@ typedef struct
     bool FOUND_BLOCK;
     char ssid[32];
     char wifi_status[256];
-    int8_t wifi_rssi;
     char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
     char ap_ssid[32];
     bool ap_enabled;

@@ -320,14 +320,13 @@ static void screen_update_cb(lv_timer_t * timer)
             display_on(true);
         }
     }
-    
     // Update WiFi RSSI periodically
+    int8_t rssi_value = -128; // Invalid value by default
     if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
-        int8_t rssi_value;
-        if (get_wifi_current_rssi(&rssi_value) == ESP_OK) {
-            GLOBAL_STATE->SYSTEM_MODULE.wifi_rssi = rssi_value;
-        }
+        get_wifi_current_rssi(&rssi_value);
     }
+    
+    
 
     if (GLOBAL_STATE->SELF_TEST_MODULE.active) {
 
@@ -439,8 +438,8 @@ static void screen_update_cb(lv_timer_t * timer)
     
     char rssi_buf[25];
         
-    if (module->wifi_rssi < 0 && module->wifi_rssi >= -127) { // Typical RSSI range
-        snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: %d dBm", module->wifi_rssi);
+    if (rssi_value < 0 && rssi_value >= -127) { // Typical RSSI range
+        snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: %d dBm", rssi_value);
     } else {
         snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: -- dBm");
         }
