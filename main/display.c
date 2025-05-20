@@ -55,14 +55,13 @@ static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
         if (strcmp(display_configs[i].name, display_config) == 0) {
             GLOBAL_STATE->DISPLAY_CONFIG = display_configs[i];
 
-            ESP_LOGI(TAG, "Display: %s", GLOBAL_STATE->DISPLAY_CONFIG.name);
+            ESP_LOGI(TAG, "%s", GLOBAL_STATE->DISPLAY_CONFIG.name);
             free(display_config);
             return ESP_OK;
         }
     }
     ESP_LOGW(TAG, "Display configuration '%s' not found. Using default or no display.", display_config);
     free(display_config);
-
     return ESP_FAIL;
 }
 
@@ -72,18 +71,19 @@ esp_err_t display_init(void * pvParameters)
 
     ESP_RETURN_ON_ERROR(read_display_config(GLOBAL_STATE), TAG, "Failed to read display config");
 
+    const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+
     if (GLOBAL_STATE->DISPLAY_CONFIG.display == NONE) {
+        ESP_LOGI(TAG, "Initialize LVGL");
+        ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL init failed");
+        lv_display_create(1, 1);
         return ESP_OK;
     }
-
-    uint8_t flip_screen = nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1);
-    uint8_t invert_screen = nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0);
 
     i2c_master_bus_handle_t i2c_master_bus_handle;
     ESP_RETURN_ON_ERROR(i2c_bitaxe_get_master_bus_handle(&i2c_master_bus_handle), TAG, "Failed to get i2c master bus handle");
 
     ESP_LOGI(TAG, "Install panel IO");
-    esp_lcd_panel_io_handle_t io_handle = NULL;
     esp_lcd_panel_io_i2c_config_t io_config = {
         .scl_speed_hz = I2C_BUS_SPEED_HZ,
         .dev_addr = DISPLAY_I2C_ADDRESS,
@@ -106,6 +106,7 @@ esp_err_t display_init(void * pvParameters)
             return ESP_FAIL;
     }
     
+    esp_lcd_panel_io_handle_t io_handle = NULL;
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_i2c(i2c_master_bus_handle, &io_config, &io_handle), TAG, "Failed to initialise i2c panel bus");
 
     ESP_LOGI(TAG, "Install panel driver");
@@ -137,15 +138,16 @@ esp_err_t display_init(void * pvParameters)
     if (esp_lcd_panel_init_err != ESP_OK) {
         ESP_LOGE(TAG, "Panel init failed, no display connected?");
     }  else {
+        uint8_t invert_screen = nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0);
         ESP_RETURN_ON_ERROR(esp_lcd_panel_invert_color(panel_handle, invert_screen), TAG, "Panel invert failed");
         // ESP_RETURN_ON_ERROR(esp_lcd_panel_mirror(panel_handle, false, false), TAG, "Panel mirror failed");
     }
-    
+
     ESP_LOGI(TAG, "Initialize LVGL");
 
-    const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL init failed");
 
+    uint8_t flip_screen = nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1);
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,
         .panel_handle = panel_handle,
@@ -177,7 +179,6 @@ esp_err_t display_init(void * pvParameters)
 
 
     if (esp_lcd_panel_init_err == ESP_OK) {
-
         if (lvgl_port_lock(0)) {
             lv_style_init(&scr_style);
             lv_style_set_text_font(&scr_style, &lv_font_portfolio_6x8);
@@ -190,10 +191,7 @@ esp_err_t display_init(void * pvParameters)
         }
 
         // Only turn on the screen when it has been cleared
-        esp_err_t esp_err = display_on(true);
-        if (ESP_OK != esp_err) {
-            return esp_err;
-        }
+        ESP_RETURN_ON_ERROR(display_on(true), TAG, "Display on failed");
 
         GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = true;
     } else {
@@ -202,7 +200,7 @@ esp_err_t display_init(void * pvParameters)
     }
 
     ESP_LOGI(TAG, "Display init success!");
-    
+
     return ESP_OK;
 }
 
