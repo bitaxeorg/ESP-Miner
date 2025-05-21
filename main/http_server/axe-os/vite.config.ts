@@ -20,7 +20,9 @@ export default defineConfig(({ mode }) => {
     plugins: [preact(), tailwindcss()],
     build: {
       outDir: resolve(__dirname, "dist/axe-os"),
+      assetsInlineLimit: 0, // Disable inlining assets
     },
+    publicDir: resolve(__dirname, "public"), // Ensure public directory is explicitly set
     server: {
       proxy:
         !isProd && API_TARGET
