@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # this is just your owner/repo string, not a secret
+      ACTIONS_STEP_DEBUG: true 
       REPO: Advanced-Crypto-Services/acs-esp-miner
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
