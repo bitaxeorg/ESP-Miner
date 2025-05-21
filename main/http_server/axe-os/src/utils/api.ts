@@ -53,6 +53,8 @@ export interface SystemInfo {
 // Constants for firmware and webapp URLs
 export const FIRMWARE_LATEST_URL =
   "https://acs-bitaxe-touch.s3.us-east-2.amazonaws.com/firmware/acs-esp-miner/latest/esp-miner.bin";
+export const WEBAPP_LATEST_URL =
+  "https://acs-bitaxe-touch.s3.us-east-2.amazonaws.com/web-app/acs-esp-miner/latest/www.bin";
 
 export async function getSystemInfo(): Promise<SystemInfo> {
   try {
@@ -175,12 +177,22 @@ export async function updatePoolInfo(
  */
 export async function updateFirmware(): Promise<{ success: boolean; message: string }> {
   try {
+    // First, download the firmware from the URL
+    const firmwareResponse = await fetch(FIRMWARE_LATEST_URL);
+    if (!firmwareResponse.ok) {
+      throw new Error(`Failed to download firmware: ${firmwareResponse.status}`);
+    }
+    const firmwareBlob = await firmwareResponse.blob();
+
+    console.log("Firmware blob:", firmwareBlob);
+
+    // Then, send the firmware blob to the OTA endpoint
     const response = await fetch("/api/system/OTA", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/octet-stream",
       },
-      body: JSON.stringify({ firmwareUrl: FIRMWARE_LATEST_URL }),
+      body: firmwareBlob,
     });
 
     if (!response.ok) {
@@ -206,12 +218,13 @@ export async function updateFirmware(): Promise<{ success: boolean; message: str
  */
 export async function uploadFirmware(file: File): Promise<{ success: boolean; message: string }> {
   try {
-    const formData = new FormData();
-    formData.append("firmware", file);
-
-    const response = await fetch("/api/system/upload-firmware", {
+    // Send the firmware blob directly to the OTA endpoint
+    const response = await fetch("/api/system/OTA", {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": "application/octet-stream",
+      },
+      body: file,
     });
 
     if (!response.ok) {
@@ -270,7 +283,7 @@ export async function fetchMiners(): Promise<SystemInfo[]> {
     const enhancedMinerInfo: SystemInfo = {
       ...minerInfo,
       ipAddress:
-        window.location.hostname !== "localhost" ? window.location.hostname : "192.168.4.1",
+        window.location.hostname !== "localhost" ? window.location.hostname : "localhost:5173",
       status: "online", // Assume online since we're able to get data
     };
 
@@ -281,5 +294,37 @@ export async function fetchMiners(): Promise<SystemInfo[]> {
     console.error("Failed to fetch miners:", error);
     // Return an empty array on error
     return [];
+  }
+}
+
+/**
+ * Upload web app file
+ * @param file - The web app file to upload
+ * @returns A message indicating the web app update status
+ */
+export async function uploadWebApp(file: File): Promise<{ success: boolean; message: string }> {
+  try {
+    // Send the web app blob directly
+    const response = await fetch("/api/system/upload-webapp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+      },
+      body: file,
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Web app upload response:", result);
+    return { success: true, message: result.message || "Web app uploaded successfully" };
+  } catch (error) {
+    console.error("Failed to upload web app:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
   }
 }

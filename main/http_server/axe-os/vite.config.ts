@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
   const isProd = mode === "production";
   const API_TARGET = isProd ? undefined : env.VITE_API_URL || "http://10.1.1.168";
+  const NGROK_HOST = "59569bf4f1ea.ngrok.app";
 
   return {
     plugins: [preact(), tailwindcss()],

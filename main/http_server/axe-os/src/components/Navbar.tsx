@@ -1,12 +1,16 @@
 import { useContext } from "preact/hooks";
 import { SidebarContext } from "./Layout";
+import { useTheme } from "../context/ThemeContext";
 
 interface NavbarProps {
   title?: string;
 }
 
 export function Navbar({ title = "Dashboard" }: NavbarProps) {
-  const { collapsed } = useContext(SidebarContext);
+  const { collapsed, setCollapsed } = useContext(SidebarContext);
+  const { getThemeLogo } = useTheme();
+
+  const logoSrc = getThemeLogo();
 
   return (
     <nav
@@ -15,7 +19,18 @@ export function Navbar({ title = "Dashboard" }: NavbarProps) {
       }`}
     >
       <div class='flex h-full items-center px-6 py-4'>
-        <h1 class='text-xl font-semibold text-gray-100'>{title}</h1>
+        {/* <h1 class='hidden md:block text-xl font-semibold text-gray-100'>{title}</h1> */}
+        <img
+          src={logoSrc}
+          alt='Logo'
+          class='md:hidden h-8 w-auto cursor-pointer hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-400 rounded'
+          tabIndex={0}
+          aria-label='Toggle sidebar'
+          onClick={() => setCollapsed(!collapsed)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") setCollapsed(!collapsed);
+          }}
+        />
       </div>
     </nav>
   );

@@ -211,7 +211,7 @@ export function PoolsPage() {
         <h1 className='text-2xl font-bold'>Pool Settings</h1>
       </div>
 
-      <div className='bg-[var(--card-bg)] p-6 rounded-lg shadow-md max-w-3xl mx-auto'>
+      <div className='bg-[var(--card-bg)] p-4 md:p-6 rounded-lg shadow-md max-w-full md:max-w-3xl'>
         <form onSubmit={handleSubmitAndRestart}>
           <div className='flex justify-between items-center mb-6'>
             <h2 className='text-xl font-medium'>Stratum URLs</h2>
@@ -456,7 +456,7 @@ export function PoolsPage() {
             </div>
           </div>
 
-          <Button type='submit' disabled={loading} className='w-full bg-red-600 hover:bg-red-700'>
+          <Button type='submit' disabled={loading} className='bg-red-600 hover:bg-red-700'>
             {loading ? "Processing..." : "Save & Restart Device"}
           </Button>
         </form>

@@ -1,4 +1,5 @@
 import { ComponentChildren } from "preact";
+import { JSX } from "preact/jsx-runtime";
 
 interface ButtonProps {
   children: ComponentChildren;
@@ -8,6 +9,9 @@ interface ButtonProps {
   onClick?: (event: MouseEvent) => void;
   type?: "button" | "submit" | "reset";
   className?: string;
+  as?: string | keyof JSX.IntrinsicElements;
+  href?: string;
+  download?: string;
   [key: string]: any;
 }
 
@@ -19,6 +23,9 @@ export function Button({
   onClick,
   type = "button",
   className = "",
+  as,
+  href,
+  download,
   ...props
 }: ButtonProps) {
   // Base styles
@@ -47,8 +54,19 @@ export function Button({
   // Combine all styles
   const buttonStyles = `${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`;
 
+  // Determine which element to render
+  const Component = as || "button";
+
+  if (Component === "a") {
+    return (
+      <a href={href} download={download} className={buttonStyles} onClick={onClick} {...props}>
+        {children}
+      </a>
+    );
+  }
+
   return (
-    <button type={type} disabled={disabled} onClick={onClick} class={buttonStyles} {...props}>
+    <button type={type} disabled={disabled} onClick={onClick} className={buttonStyles} {...props}>
       {children}
     </button>
   );

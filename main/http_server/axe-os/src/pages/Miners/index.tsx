@@ -64,7 +64,7 @@ export function Miners() {
         </div>
       )}
 
-      <div className='rounded-md border border-border text-gray-400'>
+      <div className='rounded-md border border-border text-slate-200'>
         <Table>
           <TableHeader>
             <TableRow>

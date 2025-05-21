@@ -59,7 +59,7 @@ export function DataCard({
 
   return (
     <div
-      className={`w-56 rounded-xl bg-[#0B1C3F]/80 border border-[#1C2F52] p-6 backdrop-blur-sm ${className}`}
+      className={`w-full rounded-xl bg-[#0B1C3F]/80 border border-[#1C2F52] p-4 md:p-6 backdrop-blur-sm ${className}`}
     >
       <div className='flex justify-between gap-6'>
         <div className='flex-1 min-w-0 space-y-2'>

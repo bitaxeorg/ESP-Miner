@@ -14,6 +14,8 @@ interface NavItemProps {
   href?: string;
   active?: boolean;
   collapsed: boolean;
+  isMobile: boolean;
+  setCollapsed: (collapsed: boolean) => void;
   onClick?: () => void;
 }
 
@@ -33,11 +35,11 @@ const navItems = [
     href: "/pools",
     icon: Users,
   },
-  {
-    label: "Logs",
-    href: "/logs",
-    icon: Activity,
-  },
+  // {
+  //   label: "Logs",
+  //   href: "/logs",
+  //   icon: Activity,
+  // },
   {
     label: "Theme",
     href: "/theme",
@@ -50,11 +52,24 @@ const navItems = [
   },
 ];
 
-function NavItem({ icon: Icon, label, href = "#", active, collapsed, onClick }: NavItemProps) {
+function NavItem({
+  icon: Icon,
+  label,
+  href = "#",
+  active,
+  collapsed,
+  isMobile,
+  setCollapsed,
+  onClick,
+}: NavItemProps) {
   return (
     <a
       href={href}
       onClick={(e) => {
+        // On mobile, collapse the sidebar when a link is clicked
+        if (isMobile) {
+          setCollapsed(true);
+        }
         if (onClick) onClick();
       }}
       className={`flex items-center font-semibold rounded-lg px-4 py-2 ${
@@ -89,6 +104,17 @@ export function Sidebar({ children }: SidebarProps) {
     }
     return "/";
   });
+  // Track if we're on mobile
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     // Update active item when URL changes
@@ -122,13 +148,19 @@ export function Sidebar({ children }: SidebarProps) {
     >
       <div className='flex h-full flex-col overflow-y-auto border-r border-slate-800'>
         <div className='h-16 border-b border-slate-800 flex items-center justify-center px-3'>
-          {collapsed ? (
+          {/* On mobile and sidebar open, show only favicon. Otherwise, show logo or favicon as before. Only favicon is clickable to toggle. */}
+          {collapsed || (isMobile && !collapsed) ? (
             <div className='flex justify-center w-full'>
               <img
                 src='/american-btc-small.png'
                 alt='Favicon'
-                className='h-8 w-8'
-                onLoad={() => setLogoLoaded(true)}
+                className='h-8 w-8 cursor-pointer hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-400 rounded'
+                tabIndex={0}
+                aria-label='Toggle sidebar'
+                onClick={() => setCollapsed(!collapsed)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") setCollapsed(!collapsed);
+                }}
               />
             </div>
           ) : (
@@ -153,6 +185,8 @@ export function Sidebar({ children }: SidebarProps) {
                 href={item.href}
                 active={activeItem === item.href}
                 collapsed={collapsed}
+                isMobile={isMobile}
+                setCollapsed={setCollapsed}
                 onClick={() => setActiveItem(item.href)}
               />
             ))}
