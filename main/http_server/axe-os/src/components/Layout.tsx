@@ -42,7 +42,7 @@ export function Layout({ children, title }: LayoutProps) {
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [collapsed]);
+  }, []);
 
   return (
     <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
