@@ -11,7 +11,7 @@ import { ToastProvider, useToast } from "./context/ToastContext";
 import { ToastContainer } from "./components/Toast";
 import "./style.css";
 import { LogsPage } from "./pages/Logs";
-
+import { PoolsPage } from "./pages/Pool";
 function AppContent() {
   const { toasts, hideToast } = useToast();
 
@@ -25,6 +25,7 @@ function AppContent() {
             <Route path='/settings' component={Settings} />
             <Route path='/theme' component={Theme} />
             <Route path='/miners' component={Miners} />
+            <Route path='/pools' component={PoolsPage} />
             <Route default component={NotFound} />
           </Router>
         </Layout>

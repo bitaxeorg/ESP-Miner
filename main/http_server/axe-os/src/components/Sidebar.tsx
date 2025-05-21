@@ -30,7 +30,7 @@ const navItems = [
   },
   {
     label: "Pool",
-    href: "/pool",
+    href: "/pools",
     icon: Users,
   },
   {
