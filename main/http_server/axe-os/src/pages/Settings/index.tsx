@@ -1,23 +1,18 @@
-import { useState, useEffect } from "preact/hooks";
+import { useState, useEffect, useRef } from "preact/hooks";
 import { Button } from "../../components/Button";
-import {
-  fetchMiners,
-  updateFirmware,
-  uploadFirmware,
-  FIRMWARE_LATEST_URL,
-  SystemInfo,
-} from "../../utils/api";
+import { fetchMiners, uploadFirmware, FIRMWARE_LATEST_URL, SystemInfo } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
 
 interface ActionCardProps {
   title: string;
   description: string;
-  buttonText: string;
-  onAction: () => void;
+  buttonText?: string;
+  onAction?: () => void;
   secondaryButtonText?: string;
   onSecondaryAction?: () => void;
   link?: string;
+  children?: preact.ComponentChildren;
 }
 
 function ActionCard({
@@ -28,32 +23,28 @@ function ActionCard({
   secondaryButtonText,
   onSecondaryAction,
   link,
+  children,
 }: ActionCardProps) {
   return (
     <div className='bg-[var(--card-bg)] rounded-xl border border-[#1C2F52] p-6 shadow-md'>
       <h3 className='text-lg font-medium text-white mb-2'>{title}</h3>
-      <p className='text-[#8B96A5] mb-4'>
-        {description}
-        {link && (
-          <a
-            href={link}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='text-blue-400 hover:underline ml-1'
-          >
-            here
-          </a>
-        )}
-        .
-      </p>
-      <div className='flex flex-wrap gap-3'>
-        <Button onClick={onAction}>{buttonText}</Button>
-        {secondaryButtonText && onSecondaryAction && (
-          <Button variant='outline' onClick={onSecondaryAction}>
-            {secondaryButtonText}
-          </Button>
-        )}
-      </div>
+      <p className='text-[#8B96A5] mb-4'>{description}</p>
+
+      {children || (
+        <div className='flex flex-wrap gap-3'>
+          {buttonText && onAction && <Button onClick={onAction}>{buttonText}</Button>}
+          {link && (
+            <Button as='a' href={link} download='esp-miner.bin'>
+              Download Firmware
+            </Button>
+          )}
+          {secondaryButtonText && onSecondaryAction && (
+            <Button variant='outline' onClick={onSecondaryAction}>
+              {secondaryButtonText}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -63,6 +54,8 @@ export function Settings() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [minerInfo, setMinerInfo] = useState<SystemInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [firmwareFile, setFirmwareFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSystemInfo = async () => {
     try {
@@ -84,14 +77,20 @@ export function Settings() {
     fetchSystemInfo();
   }, [showToast]);
 
-  const handleFirmwareUpdate = async () => {
+  const handleFirmwareUpload = async () => {
+    if (!firmwareFile) {
+      showToast("Please select a firmware file first", "error");
+      return;
+    }
+
     setIsUpdating(true);
-    showToast("Downloading and installing latest firmware...", "info");
+    showToast("Uploading and installing firmware...", "info");
 
     try {
-      const result = await updateFirmware();
+      const result = await uploadFirmware(firmwareFile);
       if (result.success) {
         showToast(result.message, "success");
+        setFirmwareFile(null);
         // Refresh system info to get the updated firmware version
         await fetchSystemInfo();
       } else {
@@ -102,6 +101,18 @@ export function Settings() {
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleFirmwareFileChange = (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (file) {
+      setFirmwareFile(file);
+      showToast(`Selected firmware file: ${file.name}`, "info");
+    }
+  };
+
+  const handleFirmwareFileClick = () => {
+    fileInputRef.current?.click();
   };
 
   const handleWebAppUpdate = () => {
@@ -123,10 +134,8 @@ export function Settings() {
 
   const getFirmwareDescription = () => {
     if (isLoading) return "Loading current firmware information...";
-    if (minerInfo?.version) {
-      return `Current version: ${minerInfo.version}. Automatically download and install the latest firmware version available`;
-    }
-    return "Automatically download and install the latest firmware version available";
+    let baseText = minerInfo?.version ? `Current version: ${minerInfo.version}. ` : "";
+    return `${baseText}Download the latest firmware and then upload it to update your device.`;
   };
 
   return (
@@ -136,10 +145,66 @@ export function Settings() {
         <ActionCard
           title='Update Device Firmware'
           description={getFirmwareDescription()}
-          buttonText={isUpdating ? "Updating..." : "Update to Latest Firmware"}
-          onAction={handleFirmwareUpdate}
-          // link={FIRMWARE_LATEST_URL}
-        />
+          link={FIRMWARE_LATEST_URL}
+        >
+          <div className='space-y-4'>
+            <div className='flex flex-wrap gap-3'>
+              <Button as='a' href={FIRMWARE_LATEST_URL} download='esp-miner.bin'>
+                1. Download Latest Firmware
+              </Button>
+            </div>
+
+            <div className='mt-2 text-sm text-[#8B96A5]'>
+              <p>
+                If the button doesn't work,{" "}
+                <a
+                  href={FIRMWARE_LATEST_URL}
+                  download='esp-miner.bin'
+                  className='text-blue-400 underline'
+                >
+                  click here
+                </a>{" "}
+                to download directly.
+              </p>
+            </div>
+
+            <div className='mt-4'>
+              <label className='block text-sm text-[#8B96A5] mb-2'>
+                2. Upload downloaded firmware:
+              </label>
+              <div className='flex items-center gap-3'>
+                <div className='flex-1'>
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      variant='outline'
+                      type='button'
+                      size='sm'
+                      onClick={handleFirmwareFileClick}
+                    >
+                      Choose File
+                    </Button>
+                    <span className='text-sm text-[#8B96A5]'>
+                      {firmwareFile ? firmwareFile.name : "No file selected"}
+                    </span>
+                    <input
+                      ref={fileInputRef}
+                      type='file'
+                      accept='.bin'
+                      onChange={handleFirmwareFileChange}
+                      className='sr-only' // Hidden but accessible
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleFirmwareUpload} disabled={isUpdating}>
+                  {isUpdating ? "Updating..." : "Install"}
+                </Button>
+              </div>
+              {firmwareFile && (
+                <p className='text-sm text-green-500 mt-2'>✓ File selected: {firmwareFile.name}</p>
+              )}
+            </div>
+          </div>
+        </ActionCard>
         <ActionCard
           title='Update Web App'
           description='Upload the latest web app version available'

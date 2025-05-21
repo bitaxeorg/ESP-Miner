@@ -175,12 +175,22 @@ export async function updatePoolInfo(
  */
 export async function updateFirmware(): Promise<{ success: boolean; message: string }> {
   try {
+    // First, download the firmware from the URL
+    const firmwareResponse = await fetch(FIRMWARE_LATEST_URL);
+    if (!firmwareResponse.ok) {
+      throw new Error(`Failed to download firmware: ${firmwareResponse.status}`);
+    }
+    const firmwareBlob = await firmwareResponse.blob();
+
+    console.log("Firmware blob:", firmwareBlob);
+
+    // Then, send the firmware blob to the OTA endpoint
     const response = await fetch("/api/system/OTA", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/octet-stream",
       },
-      body: JSON.stringify({ firmwareUrl: FIRMWARE_LATEST_URL }),
+      body: firmwareBlob,
     });
 
     if (!response.ok) {
@@ -206,12 +216,13 @@ export async function updateFirmware(): Promise<{ success: boolean; message: str
  */
 export async function uploadFirmware(file: File): Promise<{ success: boolean; message: string }> {
   try {
-    const formData = new FormData();
-    formData.append("firmware", file);
-
-    const response = await fetch("/api/system/upload-firmware", {
+    // Send the firmware blob directly to the OTA endpoint
+    const response = await fetch("/api/system/OTA", {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": "application/octet-stream",
+      },
+      body: file,
     });
 
     if (!response.ok) {
