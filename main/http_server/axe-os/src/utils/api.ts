@@ -283,7 +283,7 @@ export async function fetchMiners(): Promise<SystemInfo[]> {
     const enhancedMinerInfo: SystemInfo = {
       ...minerInfo,
       ipAddress:
-        window.location.hostname !== "localhost" ? window.location.hostname : "192.168.4.1",
+        window.location.hostname !== "localhost" ? window.location.hostname : "localhost:5173",
       status: "online", // Assume online since we're able to get data
     };
 

@@ -29,18 +29,18 @@ export function DataSection({
   className = "",
 }: DataSectionProps) {
   return (
-    <section className='space-y-4'>
+    <section className={`space-y-4 px-1 ${className}`}>
       {loading ? (
         <div className='text-slate-400'>Loading {title.toLowerCase()} data...</div>
       ) : error ? (
         <div className='text-[#FF2C47]'>{error}</div>
       ) : (
         <>
-          <div className='flex items-center gap-2 pt-6'>
+          <div className='flex items-center gap-2 pt-6 pl-0.5'>
             {Icon && <Icon className='h-5 w-5 text-blue-500' />}
             <h2 className='text-lg font-bold text-white'>{title}</h2>
           </div>
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 pr-1 justify-items-start'>
             {cards.map((card, index) => (
               <DataCard key={index} {...card} />
             ))}
