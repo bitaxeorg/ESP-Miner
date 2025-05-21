@@ -1,11 +1,11 @@
-import fs from 'fs';
-import path from 'path';
-import zlib from 'zlib';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import zlib from "zlib";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const sourceDirectory = path.join(__dirname, 'dist/axe-os');
+const sourceDirectory = path.join(__dirname, "dist/axe-os");
 
 // Function to gzip a file
 function gzipFile(filePath) {
@@ -35,7 +35,12 @@ function processDirectory(dirPath) {
     if (stats.isDirectory()) {
       // Recursively process subdirectories
       processDirectory(itemPath);
-    } else if (!itemPath.endsWith('.gz')) {
+    } else if (!itemPath.endsWith(".gz")) {
+      // Add this before gzipping files
+      if (itemPath.endsWith(".svg")) {
+        console.log(`Skipping SVG: ${itemPath}`);
+        continue;
+      }
       // Gzip files that are not already gzipped
       gzipFile(itemPath);
     }
@@ -45,4 +50,4 @@ function processDirectory(dirPath) {
 // Main execution
 console.log(`Processing directory: ${sourceDirectory}`);
 processDirectory(sourceDirectory);
-console.log('All files have been gzipped successfully.');
+console.log("All files have been gzipped successfully.");
