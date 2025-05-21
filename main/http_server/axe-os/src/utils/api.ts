@@ -1,5 +1,3 @@
-// import { Miner } from "./types";
-
 export interface SystemInfo {
   power: number;
   voltage: number;
@@ -51,8 +49,6 @@ export interface SystemInfo {
   status?: "online" | "offline" | "warning";
   ipAddress?: string;
 }
-
-// Hook for toast will be imported in components that use these functions
 
 // Constants for firmware and webapp URLs
 export const FIRMWARE_LATEST_URL =
@@ -179,7 +175,7 @@ export async function updatePoolInfo(
  */
 export async function updateFirmware(): Promise<{ success: boolean; message: string }> {
   try {
-    const response = await fetch("/api/system/update-firmware", {
+    const response = await fetch("/api/system/OTA", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

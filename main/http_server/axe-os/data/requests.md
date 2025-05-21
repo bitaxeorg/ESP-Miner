@@ -53,7 +53,7 @@ autofanspeed: true
 
 ## Firmware Updates
 
-`/OTA`
+`/api/system/OTA`
 Expects .bin file upload
 Restrict based on file name on containers acs-esp-miner
 
