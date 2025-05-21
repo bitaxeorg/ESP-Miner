@@ -12,38 +12,58 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     env:
+      ACTIONS_STEP_DEBUG: true           # full debug output
       REPO: Advanced-Crypto-Services/acs-esp-miner
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
+      ROLE_ARN: arn:aws:iam::603187095057:role/GitHubActionsFirmwareUploadRole
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Debug environment variables
+      - name: Debug environment
         run: |
           echo "REPO=$REPO"
           echo "S3_BUCKET=$S3_BUCKET"
           echo "AWS_REGION=$AWS_REGION"
+          echo "ROLE_ARN=$ROLE_ARN"
+
+      - name: Show OIDC token path
+        run: |
+          echo "Web identity token:"  
+          echo "$AWS_WEB_IDENTITY_TOKEN_FILE"
 
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: arn:aws:iam::603187095057:role/GitHubActionsFirmwareUploadRole
+          role-to-assume: ${{ env.ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # Fallback/validation step for credentials
-      - name: Validate AWS credentials
+      - name: Explicit assume-role-with-web-identity test
         run: |
-          if ! aws sts get-caller-identity > /dev/null 2>&1; then
-            echo "ERROR: AWS credentials are not properly configured. Check that your repository secrets and IAM role are set up correctly."
-            exit 1
-          fi
+          aws sts assume-role-with-web-identity \
+            --role-arn $ROLE_ARN \
+            --role-session-name gha-debug \
+            --web-identity-token file://$AWS_WEB_IDENTITY_TOKEN_FILE \
+            --region $AWS_REGION \
+            && echo "OIDC assume-role succeeded" \
+            || (echo "OIDC assume-role failed" && exit 1)
+
+      - name: Confirm AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Test S3 list (permissions check)
+        run: |
+          echo "Listing S3 path:"
+          aws s3 ls s3://$S3_BUCKET/esp32/latest/ --region $AWS_REGION \
+            && echo "S3 list OK" \
+            || (echo "S3 list failed, check your bucket policy" && exit 1)
 
       - name: Download latest release asset (head request)
         run: |
-          echo "Fetching URL:"
-          echo "https://github.com/${REPO}/releases/latest/download/${{ github.event.inputs.asset_name }}"
-          curl -I https://github.com/${REPO}/releases/latest/download/${{ github.event.inputs.asset_name }}
+          URL="https://github.com/${REPO}/releases/latest/download/${{ github.event.inputs.asset_name }}"
+          echo "HEAD $URL"
+          curl -I $URL
 
       - name: Download latest release asset (full)
         run: |
@@ -55,5 +75,5 @@ jobs:
         run: |
           aws s3 cp \
             ${{ github.event.inputs.asset_name }} \
-            s3://${{ env.S3_BUCKET }}/esp32/latest/${{ github.event.inputs.asset_name }} \
-            --acl public-read
+            s3://$S3_BUCKET/esp32/latest/${{ github.event.inputs.asset_name }} \
+            --acl public-read --region $AWS_REGION
