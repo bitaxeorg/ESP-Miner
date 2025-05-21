@@ -1,6 +1,6 @@
 {
     "idf.flashType": "UART",
-    "idf.portWin": "COM9",
+    "idf.portWin": "COM25",
     "idf.adapterTargetName": "esp32s3",
     "idf.openOcdConfigs": [
         "board/esp32s3-builtin.cfg"
@@ -68,5 +68,8 @@
         "ssid"
     ],
     "idf.port": "/dev/tty.usbmodem11101",
-    "C_Cpp.intelliSenseEngine": "Tag Parser"
+    "C_Cpp.intelliSenseEngine": "Tag Parser",
+    "idf.espIdfPathWin": "C:\\Users\\benPC\\esp\\v5.4\\esp-idf",
+    "idf.toolsPathWin": "C:\\Users\\benPC\\.espressif",
+    "idf.pythonInstallPath": "C:\\Users\\benPC\\.espressif\\tools\\idf-python\\3.11.2\\python.exe"
 }
