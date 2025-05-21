@@ -100,7 +100,7 @@ export const themeAssetsMap: Record<string, ThemeAssets> = {
     },
   },
   THEME_AMERICANBTC: {
-    logo: "/am-btc-logo.svg",
+    logo: "/am-btc-logo-v2.png",
     favicon: "/favicon.png",
     colors: {
       primary: "blue-600",

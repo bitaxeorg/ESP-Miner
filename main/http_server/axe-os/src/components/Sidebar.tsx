@@ -154,7 +154,7 @@ export function Sidebar({ children }: SidebarProps) {
               <img
                 src='/american-btc-small.png'
                 alt='Favicon'
-                className='h-8 w-8 cursor-pointer hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-400 rounded'
+                className='h-4 w-4 cursor-pointer hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-400'
                 tabIndex={0}
                 aria-label='Toggle sidebar'
                 onClick={() => setCollapsed(!collapsed)}
