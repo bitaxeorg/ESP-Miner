@@ -33,11 +33,11 @@ const navItems = [
     href: "/pools",
     icon: Users,
   },
-  {
-    label: "Logs",
-    href: "/logs",
-    icon: Activity,
-  },
+  // {
+  //   label: "Logs",
+  //   href: "/logs",
+  //   icon: Activity,
+  // },
   {
     label: "Theme",
     href: "/theme",

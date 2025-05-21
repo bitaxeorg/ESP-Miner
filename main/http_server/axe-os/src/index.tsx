@@ -21,7 +21,7 @@ function AppContent() {
         <Layout>
           <Router>
             <Route path='/' component={HomePage} />
-            <Route path='/logs' component={LogsPage} />
+            {/* <Route path='/logs' component={LogsPage} /> */}
             <Route path='/settings' component={Settings} />
             <Route path='/theme' component={Theme} />
             <Route path='/miners' component={Miners} />

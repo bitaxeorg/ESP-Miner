@@ -53,6 +53,8 @@ export interface SystemInfo {
 // Constants for firmware and webapp URLs
 export const FIRMWARE_LATEST_URL =
   "https://acs-bitaxe-touch.s3.us-east-2.amazonaws.com/firmware/acs-esp-miner/latest/esp-miner.bin";
+export const WEBAPP_LATEST_URL =
+  "https://acs-bitaxe-touch.s3.us-east-2.amazonaws.com/web-app/acs-esp-miner/latest/www.bin";
 
 export async function getSystemInfo(): Promise<SystemInfo> {
   try {
@@ -292,5 +294,37 @@ export async function fetchMiners(): Promise<SystemInfo[]> {
     console.error("Failed to fetch miners:", error);
     // Return an empty array on error
     return [];
+  }
+}
+
+/**
+ * Upload web app file
+ * @param file - The web app file to upload
+ * @returns A message indicating the web app update status
+ */
+export async function uploadWebApp(file: File): Promise<{ success: boolean; message: string }> {
+  try {
+    // Send the web app blob directly
+    const response = await fetch("/api/system/upload-webapp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+      },
+      body: file,
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Web app upload response:", result);
+    return { success: true, message: result.message || "Web app uploaded successfully" };
+  } catch (error) {
+    console.error("Failed to upload web app:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
   }
 }

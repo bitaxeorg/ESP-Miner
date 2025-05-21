@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef } from "preact/hooks";
 import { Button } from "../../components/Button";
-import { fetchMiners, uploadFirmware, FIRMWARE_LATEST_URL, SystemInfo } from "../../utils/api";
+import {
+  fetchMiners,
+  uploadFirmware,
+  uploadWebApp,
+  FIRMWARE_LATEST_URL,
+  WEBAPP_LATEST_URL,
+  SystemInfo,
+} from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
 
@@ -52,10 +59,13 @@ function ActionCard({
 export function Settings() {
   const { showToast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isWebAppUpdating, setIsWebAppUpdating] = useState(false);
   const [minerInfo, setMinerInfo] = useState<SystemInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [firmwareFile, setFirmwareFile] = useState<File | null>(null);
+  const [webAppFile, setWebAppFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const webAppFileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSystemInfo = async () => {
     try {
@@ -115,21 +125,42 @@ export function Settings() {
     fileInputRef.current?.click();
   };
 
-  const handleWebAppUpdate = () => {
-    // Create a hidden file input
-    const fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = ".zip";
+  const handleWebAppFileClick = () => {
+    webAppFileInputRef.current?.click();
+  };
 
-    fileInput.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        showToast(`Selected web app file: ${file.name}`, "info");
-        // TODO: Implement web app update API call
+  const handleWebAppFileChange = (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (file) {
+      setWebAppFile(file);
+      showToast(`Selected web app file: ${file.name}`, "info");
+    }
+  };
+
+  const handleWebAppUpload = async () => {
+    if (!webAppFile) {
+      showToast("Please select a web app file first", "error");
+      return;
+    }
+
+    setIsWebAppUpdating(true);
+    showToast("Uploading and installing web app...", "info");
+
+    try {
+      const result = await uploadWebApp(webAppFile);
+      if (result.success) {
+        showToast(result.message, "success");
+        setWebAppFile(null);
+        // Refresh system info if needed
+        await fetchSystemInfo();
+      } else {
+        showToast(`Failed to update web app: ${result.message}`, "error");
       }
-    };
-
-    fileInput.click();
+    } catch (error) {
+      showToast(`Error: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+    } finally {
+      setIsWebAppUpdating(false);
+    }
   };
 
   const getFirmwareDescription = () => {
@@ -207,10 +238,63 @@ export function Settings() {
         </ActionCard>
         <ActionCard
           title='Update Web App'
-          description='Upload the latest web app version available'
-          buttonText='Choose Web App File'
-          onAction={handleWebAppUpdate}
-        />
+          description='Download the latest web app and then upload it to update your device.'
+          link={WEBAPP_LATEST_URL}
+        >
+          <div className='space-y-4'>
+            <div className='flex flex-wrap gap-3'>
+              <Button as='a' href={WEBAPP_LATEST_URL} download='www.bin'>
+                1. Download Latest Web App
+              </Button>
+            </div>
+
+            <div className='mt-2 text-sm text-[#8B96A5]'>
+              <p>
+                If the button doesn't work,{" "}
+                <a href={WEBAPP_LATEST_URL} download='www.bin' className='text-blue-400 underline'>
+                  click here
+                </a>{" "}
+                to download directly.
+              </p>
+            </div>
+
+            <div className='mt-4'>
+              <label className='block text-sm text-[#8B96A5] mb-2'>
+                2. Upload downloaded web app:
+              </label>
+              <div className='flex items-center gap-3'>
+                <div className='flex-1'>
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      variant='outline'
+                      type='button'
+                      size='sm'
+                      onClick={handleWebAppFileClick}
+                    >
+                      Choose File
+                    </Button>
+                    <span className='text-sm text-[#8B96A5]'>
+                      {webAppFile ? webAppFile.name : "No file selected"}
+                    </span>
+                    <input
+                      ref={webAppFileInputRef}
+                      type='file'
+                      accept='.bin'
+                      onChange={handleWebAppFileChange}
+                      className='sr-only' // Hidden but accessible
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleWebAppUpload} disabled={isWebAppUpdating}>
+                  {isWebAppUpdating ? "Updating..." : "Install"}
+                </Button>
+              </div>
+              {webAppFile && (
+                <p className='text-sm text-green-500 mt-2'>✓ File selected: {webAppFile.name}</p>
+              )}
+            </div>
+          </div>
+        </ActionCard>
       </div>
     </Container>
   );
