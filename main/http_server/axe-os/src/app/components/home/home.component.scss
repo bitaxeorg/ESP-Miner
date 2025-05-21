@@ -6,3 +6,32 @@
 .card {
     min-height: 100%;
 }
+
+.col-fixed-width {
+    min-width: 50px;
+}
+.break-all {
+    word-break: break-all;
+}
+
+.ellipsis-magic {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    white-space: nowrap;
+    user-select: none;
+
+    .start {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex-shrink: 1;
+    }
+    .end {
+        white-space: nowrap;
+        flex-basis: content;
+        flex-grow: 0;
+        flex-shrink: 0;
+    }
+}

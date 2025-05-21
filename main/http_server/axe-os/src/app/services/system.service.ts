@@ -29,6 +29,7 @@ export class SystemService {
           maxPower: 25,
           nominalVoltage: 5,
           hashRate: 475,
+          expectedHashrate: 420,
           bestDiff: "0",
           bestSessionDiff: "0",
           freeHeap: 200504,
@@ -58,6 +59,7 @@ export class SystemService {
           version: "2.0",
           idfVersion: "v5.1.2",
           boardVersion: "204",
+          display: "SSD1306 (128x32)",
           flipscreen: 1,
           invertscreen: 0,
           displayTimeout: 0,
@@ -123,20 +125,26 @@ export class SystemService {
 
   public getAsicSettings(uri: string = ''): Observable<{
     ASICModel: eASICModel;
+    defaultFrequency: number;
     frequencyOptions: number[];
+    defaultVoltage: number;
     voltageOptions: number[];
   }> {
     if (environment.production) {
       return this.httpClient.get(`${uri}/api/system/asic`) as Observable<{
         ASICModel: eASICModel;
+        defaultFrequency: number;
         frequencyOptions: number[];
+        defaultVoltage: number;
         voltageOptions: number[];
       }>;
     } else {
       // Mock data for development
       return of({
         ASICModel: eASICModel.BM1366,
+        defaultFrequency: 485,
         frequencyOptions: [400, 425, 450, 475, 485, 500, 525, 550, 575],
+        defaultVoltage: 1200,
         voltageOptions: [1100, 1150, 1200, 1250, 1300]
       }).pipe(delay(1000));
     }
