@@ -1,4 +1,3 @@
-
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -69,8 +68,9 @@ void app_main(void)
 
     SYSTEM_init_system(&GLOBAL_STATE);
 
-    initializeTheme(loadThemefromNVS());
+    initializeTheme(THEME_AMERICANBTC);
     ESP_LOGI(TAG, "Theme initialized");
+    ESP_LOGI(TAG, "Current theme preset: %d", getCurrentThemePreset());
 
     // pull the wifi credentials and hostname out of NVS
     char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, WIFI_SSID);

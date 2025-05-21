@@ -309,7 +309,6 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     set_cors_headers(req);
 
-    initializeTheme(THEME_BITAXE_RED);
     uiTheme_t* theme = getCurrentTheme();
 
     cJSON *root = cJSON_CreateObject();
