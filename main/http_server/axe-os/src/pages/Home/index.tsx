@@ -1,4 +1,3 @@
-import preactLogo from "../../assets/preact.svg";
 import { useState, useEffect } from "preact/hooks";
 import { getSystemInfo, SystemInfo } from "../../utils/api";
 import { formatUptime } from "../../utils/formatters";
@@ -333,29 +332,4 @@ export function HomePage() {
       )}
     </div>
   );
-}
-
-/**
- * Truncates a long address string (e.g., wallet addresses)
- */
-function truncateAddress(address: string): string {
-  if (!address) return "";
-
-  const parts = address.split(".");
-  if (parts.length > 1) {
-    // Handle "address.identifier" format
-    const addr = parts[0];
-    const identifier = parts[1];
-    if (addr.length > 8) {
-      return `${addr.substring(0, 5)}...${identifier}`;
-    }
-    return address;
-  }
-
-  // Regular address
-  if (address.length > 12) {
-    return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
-  }
-
-  return address;
 }

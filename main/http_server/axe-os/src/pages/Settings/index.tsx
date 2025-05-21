@@ -181,7 +181,8 @@ export function Settings() {
           <div className='space-y-4'>
             <div className='flex flex-wrap gap-3'>
               <Button as='a' href={FIRMWARE_LATEST_URL} download='esp-miner.bin'>
-                1. Download Latest Firmware
+                <span className='sm:hidden'>Download Firmware</span>
+                <span className='hidden sm:inline'>1. Download Latest Firmware</span>
               </Button>
             </div>
 
@@ -244,7 +245,8 @@ export function Settings() {
           <div className='space-y-4'>
             <div className='flex flex-wrap gap-3'>
               <Button as='a' href={WEBAPP_LATEST_URL} download='www.bin'>
-                1. Download Latest Web App
+                <span className='sm:hidden'>Download www.bin</span>
+                <span className='hidden sm:inline'>1. Download Latest Web App</span>
               </Button>
             </div>
 

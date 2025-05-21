@@ -56,7 +56,7 @@ export function Layout({ children, title }: LayoutProps) {
             collapsed ? "pl-[50px] md:pl-[70px]" : "pl-[50px] md:pl-[240px]"
           } bg-gray-950 min-w-full`}
         >
-          <div class='px-3 py-3 md:px-6 md:py-4'>{children}</div>
+          <div class='px-3 py-3 md:px-6 md:py-4 max-w-xs md:max-w-full'>{children}</div>
         </main>
       </div>
     </SidebarContext.Provider>
