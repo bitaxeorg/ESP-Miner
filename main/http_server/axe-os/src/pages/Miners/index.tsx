@@ -9,6 +9,7 @@ import {
   TableHead,
   TableCell,
 } from "../../components/Table";
+import { Container } from "../../components/Container";
 
 export function Miners() {
   const [miners, setMiners] = useState<SystemInfo[]>([]);
@@ -54,7 +55,7 @@ export function Miners() {
   }
 
   return (
-    <div className='container mx-auto py-6'>
+    <Container>
       <h1 className='text-2xl font-bold mb-6'>Miners</h1>
 
       {error && (
@@ -63,7 +64,7 @@ export function Miners() {
         </div>
       )}
 
-      <div className='rounded-md border border-border'>
+      <div className='rounded-md border border-border text-gray-400'>
         <Table>
           <TableHeader>
             <TableRow>
@@ -123,6 +124,6 @@ export function Miners() {
           Last updated: {new Date().toLocaleTimeString()}
         </div>
       )}
-    </div>
+    </Container>
   );
 }

@@ -1,6 +1,7 @@
 import { createContext } from "preact";
 import { useState, useEffect, useContext } from "preact/hooks";
 import { ComponentChildren } from "preact";
+import { themeAssetsMap, defaultAssets } from "../utils/themeConfig";
 
 interface ThemeData {
   themeName: string;
@@ -18,6 +19,8 @@ interface ThemeContextType {
   fetchTheme: () => Promise<void>;
   fetchThemes: () => Promise<void>;
   applyTheme: (themeName: string) => Promise<void>;
+  getThemeLogo: () => string;
+  getThemeFavicon: () => string;
 }
 
 const defaultThemeContext: ThemeContextType = {
@@ -27,6 +30,8 @@ const defaultThemeContext: ThemeContextType = {
   fetchTheme: async () => {},
   fetchThemes: async () => {},
   applyTheme: async () => {},
+  getThemeLogo: () => defaultAssets.logo,
+  getThemeFavicon: () => defaultAssets.favicon,
 };
 
 export const ThemeContext = createContext<ThemeContextType>(defaultThemeContext);
@@ -59,6 +64,9 @@ export function ThemeProvider({ children }: { children: ComponentChildren }) {
         document.documentElement.style.setProperty("--text-color", data.textColor);
         document.documentElement.style.setProperty("--border-color", data.borderColor);
         document.documentElement.style.setProperty("--primary-color-text", "#ffffff");
+
+        // Update favicon
+        updateFavicon(data.themeName);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch theme data");
@@ -107,9 +115,35 @@ export function ThemeProvider({ children }: { children: ComponentChildren }) {
         document.documentElement.style.setProperty("--text-color", data.textColor);
         document.documentElement.style.setProperty("--border-color", data.borderColor);
         document.documentElement.style.setProperty("--primary-color-text", "#ffffff");
+
+        // Update favicon
+        updateFavicon(data.themeName);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to apply theme");
+    }
+  };
+
+  // Get the appropriate logo for the current theme
+  const getThemeLogo = () => {
+    if (!themeData || !themeData.themeName) return defaultAssets.logo;
+    return themeAssetsMap[themeData.themeName]?.logo || defaultAssets.logo;
+  };
+
+  // Get the appropriate favicon for the current theme
+  const getThemeFavicon = () => {
+    if (!themeData || !themeData.themeName) return defaultAssets.favicon;
+    return themeAssetsMap[themeData.themeName]?.favicon || defaultAssets.favicon;
+  };
+
+  // Update the favicon in the document
+  const updateFavicon = (themeName: string) => {
+    const faviconLink = document.querySelector("link[rel='icon']") as HTMLLinkElement;
+    if (faviconLink) {
+      const faviconPath = themeName
+        ? themeAssetsMap[themeName]?.favicon || defaultAssets.favicon
+        : defaultAssets.favicon;
+      faviconLink.href = faviconPath;
     }
   };
 
@@ -120,7 +154,16 @@ export function ThemeProvider({ children }: { children: ComponentChildren }) {
 
   return (
     <ThemeContext.Provider
-      value={{ themeData, loading, error, fetchTheme, fetchThemes, applyTheme }}
+      value={{
+        themeData,
+        loading,
+        error,
+        fetchTheme,
+        fetchThemes,
+        applyTheme,
+        getThemeLogo,
+        getThemeFavicon,
+      }}
     >
       {children}
     </ThemeContext.Provider>

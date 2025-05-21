@@ -33,6 +33,10 @@ export interface SystemInfo {
   fallbackStratumPort: number;
   stratumUser: string;
   fallbackStratumUser: string;
+  stratumPassword?: string;
+  fallbackStratumPassword?: string;
+  stratumWorkerName?: string;
+  fallbackStratumWorkerName?: string;
   version: string;
   idfVersion: string;
   boardVersion: string;
@@ -49,6 +53,10 @@ export interface SystemInfo {
 }
 
 // Hook for toast will be imported in components that use these functions
+
+// Constants for firmware and webapp URLs
+export const FIRMWARE_LATEST_URL =
+  "https://acs-bitaxe-touch.s3.us-east-2.amazonaws.com/firmware/acs-esp-miner/latest/esp-miner.bin";
 
 export async function getSystemInfo(): Promise<SystemInfo> {
   try {
@@ -67,21 +75,75 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 
 /**
  * Update pool information
- * @param stratumURL - The stratum URL to set
- * @param stratumPort - The stratum port to set
+ * @param stratumURL - The primary stratum URL
+ * @param stratumPort - The primary stratum port
+ * @param stratumPassword - Optional password for primary pool
+ * @param stratumUser - Optional BTC address for primary pool
+ * @param fallbackStratumURL - Optional fallback stratum URL
+ * @param fallbackStratumPort - Optional fallback stratum port
+ * @param fallbackStratumPassword - Optional password for fallback pool
+ * @param fallbackStratumUser - Optional BTC address for fallback pool
+ * @param stratumWorkerName - Optional worker name for primary pool
+ * @param fallbackStratumWorkerName - Optional worker name for fallback pool
  * @returns The response from the API or a success message
  */
-export async function updatePoolInfo(stratumURL: string, stratumPort: number): Promise<any> {
+export async function updatePoolInfo(
+  stratumURL: string,
+  stratumPort: number,
+  stratumPassword?: string,
+  stratumUser?: string,
+  fallbackStratumURL?: string,
+  fallbackStratumPort?: number | null,
+  fallbackStratumPassword?: string,
+  fallbackStratumUser?: string,
+  stratumWorkerName?: string,
+  fallbackStratumWorkerName?: string
+): Promise<any> {
   try {
+    const payload: any = {
+      stratumURL,
+      stratumPort,
+    };
+
+    // Add optional fields if provided
+    if (stratumPassword) {
+      payload.stratumPassword = stratumPassword;
+    }
+
+    if (stratumUser) {
+      payload.stratumUser = stratumUser;
+    }
+
+    if (fallbackStratumURL) {
+      payload.fallbackStratumURL = fallbackStratumURL;
+    }
+
+    if (fallbackStratumPort) {
+      payload.fallbackStratumPort = fallbackStratumPort;
+    }
+
+    if (fallbackStratumPassword) {
+      payload.fallbackStratumPassword = fallbackStratumPassword;
+    }
+
+    if (fallbackStratumUser) {
+      payload.fallbackStratumUser = fallbackStratumUser;
+    }
+
+    if (stratumWorkerName) {
+      payload.stratumWorkerName = stratumWorkerName;
+    }
+
+    if (fallbackStratumWorkerName) {
+      payload.fallbackStratumWorkerName = fallbackStratumWorkerName;
+    }
+
     const response = await fetch("/api/system", {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        stratumURL,
-        stratumPort,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -108,6 +170,67 @@ export async function updatePoolInfo(stratumURL: string, stratumPort: number): P
   } catch (error) {
     console.error("Failed to update pool info:", error);
     throw error;
+  }
+}
+
+/**
+ * Update firmware with the latest version
+ * @returns A message indicating the firmware update status
+ */
+export async function updateFirmware(): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch("/api/system/update-firmware", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ firmwareUrl: FIRMWARE_LATEST_URL }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Firmware update response:", result);
+    return { success: true, message: result.message || "Firmware update initiated successfully" };
+  } catch (error) {
+    console.error("Failed to update firmware:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+/**
+ * Upload custom firmware file
+ * @param file - The firmware file to upload
+ * @returns A message indicating the firmware update status
+ */
+export async function uploadFirmware(file: File): Promise<{ success: boolean; message: string }> {
+  try {
+    const formData = new FormData();
+    formData.append("firmware", file);
+
+    const response = await fetch("/api/system/upload-firmware", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Firmware upload response:", result);
+    return { success: true, message: result.message || "Firmware uploaded successfully" };
+  } catch (error) {
+    console.error("Failed to upload firmware:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
   }
 }
 

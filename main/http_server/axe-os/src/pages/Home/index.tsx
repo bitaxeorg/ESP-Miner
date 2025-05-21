@@ -3,11 +3,39 @@ import { useState, useEffect } from "preact/hooks";
 import { getSystemInfo, SystemInfo } from "../../utils/api";
 import { formatUptime } from "../../utils/formatters";
 import { DataSection } from "../../components/DataSection";
+import { Tabs } from "../../components/Tabs";
+import {
+  Activity,
+  AudioLines,
+  Battery,
+  ChevronDown,
+  CpuIcon,
+  Flag,
+  Gauge,
+  Home,
+  Layers,
+  PanelLeft,
+  Pickaxe,
+  Settings,
+  Thermometer,
+  ThumbsDown,
+  ThumbsUp,
+  Users,
+  Zap,
+} from "lucide-preact";
 
-export function Home() {
+export function HomePage() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "power", label: "Power" },
+    { id: "thermals", label: "Thermals" },
+    { id: "system", label: "System" },
+  ];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,31 +70,39 @@ export function Home() {
   const performanceCards = [
     {
       title: "Hashrate",
-      value: systemInfo?.hashRate ? `${(systemInfo.hashRate / 1000).toFixed(2)} GH/s` : null,
+      value: systemInfo?.hashRate ? `${(systemInfo.hashRate / 1000).toFixed(2)} TH/s` : null,
+      icon: Activity,
     },
     {
       title: "Shares Accepted",
       value: systemInfo?.sharesAccepted?.toLocaleString() || "0",
+      icon: ThumbsUp,
+      color: "green",
     },
     {
       title: "Shares Rejected",
       value: systemInfo?.sharesRejected?.toLocaleString() || "0",
+      icon: ThumbsDown,
+      color: "red",
     },
   ];
 
   // Power & Thermal
   const powerThermalCards = [
     {
-      title: "Power",
-      value: systemInfo?.power ? `${systemInfo.power.toFixed(2)}W` : null,
+      title: "Frequency",
+      value: systemInfo?.frequency ? `${systemInfo.frequency} MHz` : null,
+      icon: AudioLines,
     },
     {
       title: "Voltage",
       value: systemInfo?.voltage ? `${(systemInfo.voltage / 1000).toFixed(2)}V` : null,
+      icon: Zap,
     },
     {
-      title: "Temperature",
-      value: systemInfo?.temp ? `${systemInfo.temp.toFixed(1)}°C` : null,
+      title: "Power",
+      value: systemInfo?.power ? `${systemInfo.power.toFixed(2)}W` : null,
+      icon: Battery,
     },
   ];
 
@@ -75,67 +111,12 @@ export function Home() {
     {
       title: "Core Voltage Set",
       value: systemInfo?.coreVoltage ? `${systemInfo.coreVoltage} mV` : null,
+      icon: AudioLines,
     },
     {
       title: "Core Voltage Actual",
       value: systemInfo?.coreVoltageActual ? `${systemInfo.coreVoltageActual} mV` : null,
-    },
-    {
-      title: "Frequency",
-      value: systemInfo?.frequency ? `${systemInfo.frequency} MHz` : null,
-    },
-  ];
-
-  // Network Info
-  const networkInfoCards = [
-    {
-      title: "SSID",
-      value: systemInfo?.ssid || null,
-    },
-    {
-      title: "MAC Address",
-      value: systemInfo?.macAddr || null,
-      className: "text-xl",
-    },
-    {
-      title: "WiFi Status",
-      value: systemInfo?.wifiStatus || null,
-    },
-  ];
-
-  // Stratum Settings
-  const stratumSettingsCards = [
-    {
-      title: "Stratum URL",
-      value: systemInfo?.stratumURL || null,
-    },
-    {
-      title: "Stratum Port",
-      value: systemInfo?.stratumPort || null,
-    },
-    {
-      title: "Stratum User",
-      value: systemInfo?.stratumUser ? truncateAddress(systemInfo.stratumUser) : null,
-      className: "text-lg",
-    },
-  ];
-
-  // Fallback Stratum
-  const fallbackStratumCards = [
-    {
-      title: "Fallback URL",
-      value: systemInfo?.fallbackStratumURL || null,
-    },
-    {
-      title: "Fallback Port",
-      value: systemInfo?.fallbackStratumPort || null,
-    },
-    {
-      title: "Fallback User",
-      value: systemInfo?.fallbackStratumUser
-        ? truncateAddress(systemInfo.fallbackStratumUser)
-        : null,
-      className: "text-lg",
+      icon: Battery,
     },
   ];
 
@@ -144,14 +125,17 @@ export function Home() {
     {
       title: "ASIC Model",
       value: systemInfo?.ASICModel || null,
+      icon: CpuIcon,
     },
     {
       title: "ASIC Count",
       value: systemInfo?.asicCount || null,
+      icon: Layers,
     },
     {
       title: "Small Core Count",
       value: systemInfo?.smallCoreCount?.toLocaleString() || null,
+      icon: CpuIcon,
     },
   ];
 
@@ -160,14 +144,17 @@ export function Home() {
     {
       title: "Uptime",
       value: systemInfo?.uptimeSeconds ? formatUptime(systemInfo.uptimeSeconds) : null,
+      icon: Activity,
     },
     {
       title: "Free Heap",
       value: systemInfo?.freeHeap ? `${(systemInfo.freeHeap / 1024 / 1024).toFixed(2)} MB` : null,
+      icon: Layers,
     },
     {
       title: "PSRAM Available",
       value: systemInfo?.isPSRAMAvailable ? "Yes" : "No",
+      icon: CpuIcon,
     },
   ];
 
@@ -177,31 +164,42 @@ export function Home() {
       title: "Firmware Version",
       value: systemInfo?.version || null,
       className: "text-base",
+      icon: Settings,
     },
     {
       title: "IDF Version",
       value: systemInfo?.idfVersion || null,
       className: "text-base",
+      icon: Settings,
     },
     {
       title: "Board Version",
       value: systemInfo?.boardVersion || null,
+      icon: Settings,
     },
   ];
 
   // VR & Fan
   const vrFanCards = [
     {
+      title: "Temperature",
+      value: systemInfo?.temp ? `${systemInfo.temp.toFixed(1)}°C` : null,
+      icon: Thermometer,
+    },
+    {
       title: "VR Temp",
       value: systemInfo?.vrTemp ? `${systemInfo.vrTemp}°C` : null,
+      icon: Thermometer,
     },
     {
       title: "Fan Speed",
       value: systemInfo?.fanspeed ? `${systemInfo.fanspeed}%` : null,
+      icon: Activity,
     },
     {
       title: "Fan RPM",
       value: systemInfo?.fanrpm?.toLocaleString() || null,
+      icon: Activity,
     },
   ];
 
@@ -210,14 +208,17 @@ export function Home() {
     {
       title: "Flip Screen",
       value: systemInfo?.flipscreen ? "Yes" : "No",
+      icon: PanelLeft,
     },
     {
       title: "Invert Screen",
       value: systemInfo?.invertscreen ? "Yes" : "No",
+      icon: PanelLeft,
     },
     {
       title: "Overheat Mode",
       value: systemInfo?.overheat_mode ? "On" : "Off",
+      icon: Thermometer,
     },
   ];
 
@@ -226,102 +227,110 @@ export function Home() {
     {
       title: "Stratum Diff",
       value: systemInfo?.stratumDiff?.toLocaleString() || null,
+      icon: Pickaxe,
     },
     {
       title: "Best Diff",
       value: systemInfo?.bestDiff || null,
+      icon: Pickaxe,
     },
     {
       title: "Session Best Diff",
       value: systemInfo?.bestSessionDiff || null,
+      icon: Pickaxe,
     },
   ];
 
   return (
     <div class='space-y-6'>
-      <DataSection
-        title='⚡ Performance Metrics'
-        cards={performanceCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      {activeTab === "overview" && (
+        <>
+          <DataSection
+            title='Performance Metrics'
+            cards={performanceCards}
+            loading={loading && !systemInfo}
+            error={error}
+            icon={Gauge}
+          />
 
-      <DataSection
-        title='🔋 Power & Thermal'
-        cards={powerThermalCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='Difficulty Metrics'
+            cards={otherSettingsCards}
+            loading={loading && !systemInfo}
+            error={error}
+            icon={Pickaxe}
+          />
+        </>
+      )}
+      {activeTab === "power" && (
+        <>
+          <DataSection
+            title='Power'
+            cards={powerThermalCards}
+            loading={loading && !systemInfo}
+            error={error}
+            icon={Zap}
+          />
 
-      <DataSection
-        title='🔌 Core Operation'
-        cards={coreOperationCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='Core Operation'
+            cards={coreOperationCards}
+            loading={loading && !systemInfo}
+            error={error}
+            icon={CpuIcon}
+          />
+        </>
+      )}
+      {activeTab === "thermals" && (
+        <>
+          <DataSection
+            title='VR & Fan'
+            cards={vrFanCards}
+            loading={loading && !systemInfo}
+            error={error}
+            icon={Thermometer}
+          />
+        </>
+      )}
+      {activeTab === "system" && (
+        <>
+          <DataSection
+            title='System Info'
+            cards={systemInfoCards}
+            loading={loading && !systemInfo}
+            error={error}
+            icon={Layers}
+          />
 
-      <DataSection
-        title='📶 Network Info'
-        cards={networkInfoCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='Runtime & Memory'
+            cards={runtimeMemoryCards}
+            loading={loading && !systemInfo}
+            error={error}
+            icon={CpuIcon}
+          />
 
-      <DataSection
-        title='🌐 Stratum Settings'
-        cards={stratumSettingsCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='Versioning'
+            cards={versioningCards}
+            loading={loading && !systemInfo}
+            error={error}
+            icon={CpuIcon}
+          />
 
-      <DataSection
-        title='🧊 Fallback Stratum'
-        cards={fallbackStratumCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
-
-      <DataSection
-        title='🧠 System Info'
-        cards={systemInfoCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
-
-      <DataSection
-        title='💻 Runtime & Memory'
-        cards={runtimeMemoryCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
-
-      <DataSection
-        title='🧾 Versioning'
-        cards={versioningCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
-
-      <DataSection
-        title='🌡️ VR & Fan'
-        cards={vrFanCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
-
-      <DataSection
-        title='🧩 Misc Flags'
-        cards={miscFlagsCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
-
-      <DataSection
-        title='🧪 Other Settings'
-        cards={otherSettingsCards}
-        loading={loading && !systemInfo}
-        error={error}
-      />
+          <DataSection
+            title='Misc Flags'
+            cards={miscFlagsCards}
+            loading={loading && !systemInfo}
+            error={error}
+            icon={Flag}
+          />
+        </>
+      )}
+      {activeTab === "btc" && (
+        <div class='text-slate-400 text-center py-8'>BTC information coming soon...</div>
+      )}
     </div>
   );
 }

@@ -1,133 +1,153 @@
-import { useState, useEffect } from "preact/hooks";
+import { useState } from "preact/hooks";
 import { Button } from "../../components/Button";
-import { getSystemInfo, updatePoolInfo, restartSystem } from "../../utils/api";
+import {
+  getSystemInfo,
+  updatePoolInfo,
+  restartSystem,
+  updateFirmware,
+  uploadFirmware,
+  FIRMWARE_LATEST_URL,
+} from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
+import { Container } from "../../components/Container";
+
+interface ActionCardProps {
+  title: string;
+  description: string;
+  buttonText: string;
+  onAction: () => void;
+  secondaryButtonText?: string;
+  onSecondaryAction?: () => void;
+  link?: string;
+}
+
+function ActionCard({
+  title,
+  description,
+  buttonText,
+  onAction,
+  secondaryButtonText,
+  onSecondaryAction,
+  link,
+}: ActionCardProps) {
+  return (
+    <div className='bg-[var(--card-bg)] rounded-xl border border-[#1C2F52] p-6 shadow-md'>
+      <h3 className='text-lg font-medium text-white mb-2'>{title}</h3>
+      <p className='text-[#8B96A5] mb-4'>
+        {description}
+        {link && (
+          <a
+            href={link}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='text-blue-400 hover:underline ml-1'
+          >
+            here
+          </a>
+        )}
+        .
+      </p>
+      <div className='flex flex-wrap gap-3'>
+        <Button onClick={onAction}>{buttonText}</Button>
+        {secondaryButtonText && onSecondaryAction && (
+          <Button variant='outline' onClick={onSecondaryAction}>
+            {secondaryButtonText}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function Settings() {
   const { showToast } = useToast();
-  const [formData, setFormData] = useState({
-    stratumURL: "",
-    stratumPort: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [restartLoading, setRestartLoading] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  useEffect(() => {
-    // Load current settings
-    const loadSettings = async () => {
-      try {
-        const systemInfo = await getSystemInfo();
-        setFormData({
-          stratumURL: systemInfo.stratumURL || "",
-          stratumPort: systemInfo.stratumPort?.toString() || "",
-        });
-      } catch (error) {
-        console.error("Failed to load settings:", error);
-        showToast("Failed to load current settings", "error");
+  const handleFirmwareUpdate = async () => {
+    setIsUpdating(true);
+    showToast("Downloading and installing latest firmware...", "info");
+
+    try {
+      const result = await updateFirmware();
+      if (result.success) {
+        showToast(result.message, "success");
+      } else {
+        showToast(`Failed to update firmware: ${result.message}`, "error");
+      }
+    } catch (error) {
+      showToast(`Error: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleManualFirmwareUpload = () => {
+    // Create a hidden file input
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".bin";
+
+    fileInput.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        setIsUpdating(true);
+        showToast(`Uploading firmware file: ${file.name}`, "info");
+
+        try {
+          const result = await uploadFirmware(file);
+          if (result.success) {
+            showToast(result.message, "success");
+          } else {
+            showToast(`Failed to upload firmware: ${result.message}`, "error");
+          }
+        } catch (error) {
+          showToast(`Error: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+        } finally {
+          setIsUpdating(false);
+        }
       }
     };
 
-    loadSettings();
-  }, [showToast]);
-
-  const handleInputChange = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    setFormData({
-      ...formData,
-      [target.name]: target.value,
-    });
+    fileInput.click();
   };
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleWebAppUpdate = () => {
+    // Create a hidden file input
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".zip";
 
-    try {
-      const portNumber = parseInt(formData.stratumPort, 10);
-
-      if (isNaN(portNumber)) {
-        throw new Error("Port must be a valid number");
+    fileInput.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        showToast(`Selected web app file: ${file.name}`, "info");
+        // TODO: Implement web app update API call
       }
+    };
 
-      await updatePoolInfo(formData.stratumURL, portNumber);
-      showToast("Pool settings updated successfully", "success");
-    } catch (error) {
-      console.error("Failed to update pool settings:", error);
-      showToast(error instanceof Error ? error.message : "Failed to update pool settings", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRestart = async () => {
-    setRestartLoading(true);
-
-    try {
-      await restartSystem();
-      showToast("System is restarting...", "info");
-    } catch (error) {
-      console.error("Failed to restart system:", error);
-      showToast(error instanceof Error ? error.message : "Failed to restart system", "error");
-    } finally {
-      setRestartLoading(false);
-    }
+    fileInput.click();
   };
 
   return (
-    <div className='p-6'>
-      <h1 className='text-2xl font-bold mb-6'>Pool Settings</h1>
-
-      <div className='max-w-md bg-[var(--card-bg)] p-6 rounded-lg shadow-md'>
-        <form onSubmit={handleSubmit}>
-          <div className='mb-4'>
-            <label className='block text-sm font-medium mb-1' htmlFor='stratumURL'>
-              Stratum URL
-            </label>
-            <input
-              type='text'
-              id='stratumURL'
-              name='stratumURL'
-              value={formData.stratumURL}
-              onChange={handleInputChange}
-              className='w-full p-2 border border-[var(--border-color)] rounded-md bg-[var(--input-bg)] text-[var(--text-color)]'
-              placeholder='e.g., solo.ckpool.org'
-              required
-            />
-          </div>
-
-          <div className='mb-6'>
-            <label className='block text-sm font-medium mb-1' htmlFor='stratumPort'>
-              Stratum Port
-            </label>
-            <input
-              type='text'
-              id='stratumPort'
-              name='stratumPort'
-              value={formData.stratumPort}
-              onChange={handleInputChange}
-              className='w-full p-2 border border-[var(--border-color)] rounded-md bg-[var(--input-bg)] text-[var(--text-color)]'
-              placeholder='e.g., 3333'
-              required
-            />
-          </div>
-
-          <div className='flex gap-4'>
-            <Button type='submit' disabled={loading} className='flex-1'>
-              {loading ? "Saving..." : "Save Settings"}
-            </Button>
-
-            <Button
-              type='button'
-              variant='outline'
-              disabled={restartLoading}
-              onClick={handleRestart}
-              className='flex-1'
-            >
-              {restartLoading ? "Restarting..." : "Restart Device"}
-            </Button>
-          </div>
-        </form>
+    <Container>
+      <h2 className='text-xl font-bold text-white mb-6'>System Settings</h2>
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+        <ActionCard
+          title='Update Device Firmware'
+          description='Automatically download and install the latest firmware version available'
+          buttonText={isUpdating ? "Updating..." : "Update to Latest Firmware"}
+          onAction={handleFirmwareUpdate}
+          secondaryButtonText='Upload Custom Firmware'
+          onSecondaryAction={handleManualFirmwareUpload}
+          link={FIRMWARE_LATEST_URL}
+        />
+        <ActionCard
+          title='Update Web App'
+          description='Upload the latest web app version available'
+          buttonText='Choose Web App File'
+          onAction={handleWebAppUpdate}
+        />
       </div>
-    </div>
+    </Container>
   );
 }

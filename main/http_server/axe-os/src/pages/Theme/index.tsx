@@ -1,13 +1,14 @@
 import { useTheme } from "../../context/ThemeContext";
 import { ThemeSelector } from "../../components/ThemeSelector";
+import { Container } from "../../components/Container";
 
 export function Theme() {
   const { themeData } = useTheme();
 
   return (
-    <div class='space-y-6'>
-      <div class='rounded-lg bg-gray-900 p-6'>
-        <h2 class='mb-4 text-xl font-semibold text-gray-100'>Available Themes</h2>
+    <Container>
+      <div class='rounded-lg bg-gray-900 p-6 text-gray-100'>
+        <h1 class='text-2xl font-bold mb-6'>Available Themes</h1>
         <div class='rounded-md bg-gray-800 p-4'>
           <ThemeSelector />
         </div>
@@ -45,6 +46,6 @@ export function Theme() {
           </div>
         )}
       </div>
-    </div>
+    </Container>
   );
 }
