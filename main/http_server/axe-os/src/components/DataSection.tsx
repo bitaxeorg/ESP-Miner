@@ -40,7 +40,7 @@ export function DataSection({
             {Icon && <Icon className='h-5 w-5 text-blue-500' />}
             <h2 className='text-lg font-bold text-white'>{title}</h2>
           </div>
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 pr-1 justify-items-start'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 pr-1 w-full'>
             {cards.map((card, index) => (
               <DataCard key={index} {...card} />
             ))}
