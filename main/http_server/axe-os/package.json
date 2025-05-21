@@ -1,28 +1,28 @@
 {
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev": "vite",
-		"build:old": "vite build",
-		"build": "vite build && node gzip-preact.js",
-		"preview": "vite preview"
-	},
-	"dependencies": {
-		"@tailwindcss/vite": "^4.1.6",
-		"lucide-preact": "^0.511.0",
-		"preact": "^10.25.3",
-		"preact-iso": "^2.9.1",
-		"tailwindcss": "^4.1.6"
-	},
-	"devDependencies": {
-		"@preact/preset-vite": "^2.9.3",
-		"@types/node": "^22.15.17",
-		"eslint": "^8.57.1",
-		"eslint-config-preact": "^1.5.0",
-		"typescript": "^5.8.3",
-		"vite": "^6.0.4"
-	},
-	"eslintConfig": {
-		"extends": "preact"
-	}
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build:old": "vite build",
+    "build": "vite build && node gzip-preact.js",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.6",
+    "lucide-preact": "^0.511.0",
+    "preact": "^10.25.3",
+    "preact-iso": "^2.9.1",
+    "tailwindcss": "^4.1.6"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.9.3",
+    "@types/node": "^22.15.17",
+    "eslint": "^8.57.1",
+    "eslint-config-preact": "^1.5.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.0.4"
+  },
+  "eslintConfig": {
+    "extends": "preact"
+  }
 }
