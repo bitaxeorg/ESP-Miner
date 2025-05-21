@@ -35,7 +35,7 @@ jobs:
       - name: Test S3 list (permissions check)
         run: |
           echo "Listing S3 path:"
-          aws s3 ls s3://$S3_BUCKET/firmware/acs-esp-miner/latest/ --region $AWS_REGION \
+          aws s3 ls s3://$S3_BUCKET --region $AWS_REGION \
             && echo "S3 list OK" \
             || (echo "S3 list failed, check your bucket policy" && exit 1)
 
