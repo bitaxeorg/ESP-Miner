@@ -111,7 +111,6 @@ typedef struct
     bool ASIC_initalized;
     bool psram_is_available;
 
-    // New fields for mining state and task handles
     bool mining_enabled;
     TaskHandle_t power_management_task_handle;
     TaskHandle_t stratum_task_handle;

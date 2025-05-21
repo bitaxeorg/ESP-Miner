@@ -33,7 +33,7 @@ SRCS
     "./power/INA260.c"
     "./power/power.c"
     "./power/vcore.c"
-    "mining_controller.c" # Added mining controller
+    "mining_controller.c"
 
 INCLUDE_DIRS
     "."

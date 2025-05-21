@@ -72,14 +72,12 @@ export class SystemService {
         statsLimit: 360,
         statsDuration: 2,
         fanrpm: 0,
-
-          boardtemp1: 30,
-          boardtemp2: 40,
-          overheat_mode: 0,
-          miningEnabled: true
-        }
-      ).pipe(delay(1000));
-    }
+        boardtemp1: 30,
+        boardtemp2: 40,
+        overheat_mode: 0,
+        miningEnabled: true
+      }
+    ).pipe(delay(1000));
   }
 
   public getStatistics(uri: string = ''): Observable<ISystemStatistics> {
