@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       asset_name:
-        description: 'Name of the asset to upload (e.g. firmware.bin)'
+        description: 'Name of the asset to upload (e.g. esp-miner.bin)'
         required: true
         default: esp-miner.bin
 
@@ -19,11 +19,10 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::603187095057:role/GitHubActionsFirmwareUploadRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Download latest release asset
