@@ -1,12 +1,11 @@
-import { useState } from "preact/hooks";
+import { useState, useEffect } from "preact/hooks";
 import { Button } from "../../components/Button";
 import {
-  getSystemInfo,
-  updatePoolInfo,
-  restartSystem,
+  fetchMiners,
   updateFirmware,
   uploadFirmware,
   FIRMWARE_LATEST_URL,
+  SystemInfo,
 } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
@@ -62,6 +61,28 @@ function ActionCard({
 export function Settings() {
   const { showToast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [minerInfo, setMinerInfo] = useState<SystemInfo | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchSystemInfo = async () => {
+    try {
+      setIsLoading(true);
+      const miners = await fetchMiners();
+      // Use the first miner (current implementation only returns one)
+      setMinerInfo(miners.length > 0 ? miners[0] : null);
+    } catch (error) {
+      showToast(
+        `Error fetching system info: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "error"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSystemInfo();
+  }, [showToast]);
 
   const handleFirmwareUpdate = async () => {
     setIsUpdating(true);
@@ -71,6 +92,8 @@ export function Settings() {
       const result = await updateFirmware();
       if (result.success) {
         showToast(result.message, "success");
+        // Refresh system info to get the updated firmware version
+        await fetchSystemInfo();
       } else {
         showToast(`Failed to update firmware: ${result.message}`, "error");
       }
@@ -79,36 +102,6 @@ export function Settings() {
     } finally {
       setIsUpdating(false);
     }
-  };
-
-  const handleManualFirmwareUpload = () => {
-    // Create a hidden file input
-    const fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = ".bin";
-
-    fileInput.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        setIsUpdating(true);
-        showToast(`Uploading firmware file: ${file.name}`, "info");
-
-        try {
-          const result = await uploadFirmware(file);
-          if (result.success) {
-            showToast(result.message, "success");
-          } else {
-            showToast(`Failed to upload firmware: ${result.message}`, "error");
-          }
-        } catch (error) {
-          showToast(`Error: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
-        } finally {
-          setIsUpdating(false);
-        }
-      }
-    };
-
-    fileInput.click();
   };
 
   const handleWebAppUpdate = () => {
@@ -128,18 +121,24 @@ export function Settings() {
     fileInput.click();
   };
 
+  const getFirmwareDescription = () => {
+    if (isLoading) return "Loading current firmware information...";
+    if (minerInfo?.version) {
+      return `Current version: ${minerInfo.version}. Automatically download and install the latest firmware version available`;
+    }
+    return "Automatically download and install the latest firmware version available";
+  };
+
   return (
     <Container>
       <h2 className='text-xl font-bold text-white mb-6'>System Settings</h2>
       <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
         <ActionCard
           title='Update Device Firmware'
-          description='Automatically download and install the latest firmware version available'
+          description={getFirmwareDescription()}
           buttonText={isUpdating ? "Updating..." : "Update to Latest Firmware"}
           onAction={handleFirmwareUpdate}
-          secondaryButtonText='Upload Custom Firmware'
-          onSecondaryAction={handleManualFirmwareUpload}
-          link={FIRMWARE_LATEST_URL}
+          // link={FIRMWARE_LATEST_URL}
         />
         <ActionCard
           title='Update Web App'
