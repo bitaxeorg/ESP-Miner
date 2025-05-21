@@ -12,8 +12,6 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     env:
-      # this is just your owner/repo string, not a secret
-      ACTIONS_STEP_DEBUG: true 
       REPO: Advanced-Crypto-Services/acs-esp-miner
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -33,8 +31,13 @@ jobs:
           role-to-assume: arn:aws:iam::603187095057:role/GitHubActionsFirmwareUploadRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Confirm AWS identity
-        run: aws sts get-caller-identity
+      # Fallback/validation step for credentials
+      - name: Validate AWS credentials
+        run: |
+          if ! aws sts get-caller-identity > /dev/null 2>&1; then
+            echo "ERROR: AWS credentials are not properly configured. Check that your repository secrets and IAM role are set up correctly."
+            exit 1
+          fi
 
       - name: Download latest release asset (head request)
         run: |
