@@ -12,6 +12,7 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     env:
+      # this is just your owner/repo string, not a secret
       REPO: Advanced-Crypto-Services/acs-esp-miner
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -19,17 +20,32 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Debug environment variables
+        run: |
+          echo "REPO=$REPO"
+          echo "S3_BUCKET=$S3_BUCKET"
+          echo "AWS_REGION=$AWS_REGION"
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::603187095057:role/GitHubActionsFirmwareUploadRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Download latest release asset
+      - name: Confirm AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Download latest release asset (head request)
+        run: |
+          echo "Fetching URL:"
+          echo "https://github.com/${REPO}/releases/latest/download/${{ github.event.inputs.asset_name }}"
+          curl -I https://github.com/${REPO}/releases/latest/download/${{ github.event.inputs.asset_name }}
+
+      - name: Download latest release asset (full)
         run: |
           curl -L \
             -o ${{ github.event.inputs.asset_name }} \
-            https://github.com/${{ env.REPO }}/releases/latest/download/${{ github.event.inputs.asset_name }}
+            https://github.com/${REPO}/releases/latest/download/${{ github.event.inputs.asset_name }}
 
       - name: Upload to S3
         run: |
