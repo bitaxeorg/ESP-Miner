@@ -70,6 +70,7 @@ export class PoolComponent implements OnInit {
       .subscribe({
         next: () => {
           const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
+          this.toastr.warning('You must restart this device after saving for changes to take effect', 'Warning');
           this.toastr.success(successMessage, 'Success!');
           this.savedChanges = true;
         },

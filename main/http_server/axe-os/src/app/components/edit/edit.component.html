@@ -49,24 +49,6 @@
             </small>
         </div>
 
-        <div class="field grid p-fluid">
-            <label htmlFor="displayTimeout" class="col-12 mb-2 md:col-2 md:mb-0">Display Timeout</label>
-            <div class="col-12 md:col-10">
-                <input pInputText id="displayTimeout" formControlName="displayTimeout" required min="-1" max="71582" type="number" />
-                <div>
-                    <small>In minutes (-1=display always on, 0=display off).</small>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 md:col-4">
-            <div class="field-checkbox">
-                <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
-                    [binary]="true"></p-checkbox>
-                <label for="flipscreen">Flip Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Rotates the LCD screen by 180 degrees"></i></label>
-            </div>
-        </div>
-
         <div class="col-12">
             <div class="field-checkbox">
                 <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed"
@@ -93,21 +75,65 @@
             </div>
         </div>
 
-        <div class="mt-2">
-            <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-                class="btn btn-primary mr-2">Save</button>
-            <b style="line-height: 34px;">You must restart this device after saving for changes to take effect.</b>
+        <br/>
+
+        <h3>Display</h3>
+
+        <div class="field grid p-fluid">
+            <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="display">Display</label>
+            <div class="col-12 md:col-10">
+                <p-dropdown [options]="getDisplays()" formControlName="display"></p-dropdown>
+            </div>
         </div>
 
-        <div class="mt-2">
+        <div class="col-12 md:col-4">
+            <div class="field-checkbox">
+                <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
+                    [binary]="true"></p-checkbox>
+                <label for="flipscreen">Flip Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Rotates the LCD screen by 180 degrees"></i></label>
+            </div>
+        </div>
+
+        <div class="col-12 md:col-4">
+            <div class="field-checkbox">
+                <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen"
+                    [binary]="true"></p-checkbox>
+                <label for="invertscreen">Invert Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Inverts the colors"></i></label>
+            </div>
+        </div>
+
+        <div class="field grid p-fluid">
+            <label htmlFor="displayTimeout" class="col-12 mb-2 md:col-2 md:mb-0">Display Timeout</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="displayTimeout" formControlName="displayTimeout" required min="-1" max="71582" type="number" />
+                <div>
+                    <small>In minutes (-1=display always on, 0=display off).</small>
+                </div>
+            </div>
+        </div>
+
+        <br/>
+
+        <div class="col-12">
+              <label>Statistics Limit: {{form.controls['statsLimit'].value}} previous data points
+                  <b *ngIf="form.controls['statsLimit'].value == 0"> (live data points only)</b></label>
+              <p-slider [min]="0" [max]="720" [step]="60" formControlName="statsLimit"></p-slider>
+        </div>
+
+        <div class="col-12">
+              <label>Statistics Duration: {{form.controls['statsDuration'].value}} hour(s)</label>
+              <p-slider [min]="1" [max]="720" formControlName="statsDuration"></p-slider>
+        </div>
+
+        <div class="flex mt-5 gap-3">
+            <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
+                class="btn btn-primary">Save</button>
+
             <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
 
             <button *ngIf="settingsUnlocked" pButton pButton="p-button-danger" (click)="toggleOverclockMode(false)"
-                    class="p-button-danger" pTooltip="Return to safe preset values only">
-                Disable Overclock Mode
-            </button>
+                class="p-button-danger" pTooltip="Return to safe preset values only">Disable Overclock Mode</button>
         </div>
-
 
     </form>
 </ng-container>

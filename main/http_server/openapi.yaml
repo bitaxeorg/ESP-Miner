@@ -107,6 +107,7 @@ components:
         - freeHeap
         - frequency
         - hashRate
+        - expectedHashrate
         - hostname
         - idfVersion
         - invertscreen
@@ -135,6 +136,9 @@ components:
         - vrTemp
         - wifiStatus
         - wifiRSSI
+        - displayTimeout
+        - statisticsLimit
+        - statisticsDuration
       properties:
         ASICModel:
           type: string
@@ -285,6 +289,15 @@ components:
         wifiRSSI:
           type: number
           description: WiFi signal strength
+        displayTimeout:
+          type: number
+          description: Turn off display after timeout
+        statsLimit:
+          type: number
+          description: Max limit data points for statistics
+        statsDuration:
+          type: number
+          description: Statistics duration in hours
 
     Settings:
       type: object
@@ -412,6 +425,27 @@ components:
           maximum: 100
           examples:
             - 66
+        displayTimeout:
+          type: integer
+          description: Set display timeout time in minutes (-1=display on, 0=display off)
+          minimum: -1
+          maximum: 71582
+          examples:
+            - 10
+        statsLimit:
+          type: integer
+          description: Set max limit data points for statistics (0=live data points only)
+          minimum: 0
+          maximum: 720
+          examples:
+            - 0
+        statsDuration:
+          type: integer
+          description: Set statistics duration in hours
+          minimum: 1
+          maximum: 720
+          examples:
+            - 1
       additionalProperties: true
 
   responses:
@@ -522,6 +556,80 @@ paths:
                       type: number
                     examples:
                       - [1100, 1150, 1200, 1250, 1300]
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/statistics:
+    get:
+      summary: Get system statistics
+      description: Returns system statistics
+      operationId: getSystemStatistics
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - currentTimestamp
+                  - labels
+                  - statistics
+                properties:
+                  currentTimestamp:
+                    type: number
+                    description: Current timestamp as a reference
+                  labels:
+                    type: array
+                    description: Labels for statistics data value index
+                    items:
+                      type: string
+                  statistics:
+                    type: array
+                    description: Statistics data point(s)
+                    items:
+                      type: array
+                      description: Statistics data values(s)
+                      items:
+                        type: number
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/statistics/dashboard:
+    get:
+      summary: Get system statistics for dashboard
+      description: Returns system statistics for dashboard
+      operationId: getSystemStatisticsDashboard
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - currentTimestamp
+                  - statistics
+                properties:
+                  currentTimestamp:
+                    type: number
+                    description: Current timestamp as a reference
+                  statistics:
+                    type: array
+                    description: Statistics data point(s)
+                    items:
+                      type: array
+                      description: Statistics data values(s)
+                      items:
+                        type: number
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

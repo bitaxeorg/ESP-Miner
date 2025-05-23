@@ -6,10 +6,12 @@
 #include "asic_task.h"
 #include "common.h"
 #include "power_management_task.h"
+#include "statistics_task.h"
 #include "serial.h"
 #include "stratum_api.h"
 #include "work_queue.h"
 #include "device_config.h"
+#include "display.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
@@ -81,9 +83,11 @@ typedef struct
 
     SystemModule SYSTEM_MODULE;
     DeviceConfig DEVICE_CONFIG;
+    DisplayConfig DISPLAY_CONFIG;
     AsicTaskModule ASIC_TASK_MODULE;
     PowerManagementModule POWER_MANAGEMENT_MODULE;
     SelfTestModule SELF_TEST_MODULE;
+    StatisticsModule STATISTICS_MODULE;
 
     char * extranonce_str;
     int extranonce_2_len;

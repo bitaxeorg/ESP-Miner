@@ -8,6 +8,9 @@
 #include "screen.h"
 #include "nvs_config.h"
 #include "display.h"
+#include "connect.h"
+#include "esp_timer.h"
+
 
 typedef enum {
     SCR_SELF_TEST,
@@ -20,19 +23,20 @@ typedef enum {
     SCR_OSMU_LOGO,
     SCR_URLS,
     SCR_STATS,
+    SCR_WIFI_RSSI,
     MAX_SCREENS,
 } screen_t;
 
 #define SCREEN_UPDATE_MS 500
 
 #define SCR_CAROUSEL_START SCR_URLS
-#define SCR_CAROUSEL_END SCR_STATS
+#define SCR_CAROUSEL_END SCR_WIFI_RSSI
 
 extern const lv_img_dsc_t bitaxe_logo;
 extern const lv_img_dsc_t osmu_logo;
 
 static lv_obj_t * screens[MAX_SCREENS];
-static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000};
+static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000, 5000};
 
 static screen_t current_screen = -1;
 static int current_screen_time_ms;
@@ -58,11 +62,15 @@ static lv_obj_t *self_test_message_label;
 static lv_obj_t *self_test_result_label;
 static lv_obj_t *self_test_finished_label;
 
+static lv_obj_t *wifi_rssi_value_label;
+static lv_obj_t *esp_uptime_label;
+
 static double current_hashrate;
 static float current_power;
 static uint64_t current_difficulty;
 static float current_chip_temp;
 static bool found_block;
+static bool self_test_finished;
 
 static lv_obj_t * create_scr_self_test() {
     lv_obj_t * scr = lv_obj_create(NULL);
@@ -255,6 +263,24 @@ static lv_obj_t * create_scr_stats() {
     return scr;
 }
 
+static lv_obj_t * create_scr_wifi_rssi() {
+    lv_obj_t * scr = lv_obj_create(NULL);
+
+    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+
+    lv_obj_t *title_label = lv_label_create(scr);
+    lv_label_set_text(title_label, "Wi-Fi Signal");
+
+    wifi_rssi_value_label = lv_label_create(scr);
+    lv_label_set_text(wifi_rssi_value_label, "RSSI: -- dBm");
+
+    esp_uptime_label = lv_label_create(scr);
+    lv_label_set_text(esp_uptime_label, "Uptime: --");
+
+    return scr;
+}
+
 static void screen_show(screen_t screen)
 {
     if (SCR_CAROUSEL_START > screen) {
@@ -295,6 +321,13 @@ static void screen_update_cb(lv_timer_t * timer)
             display_on(true);
         }
     }
+    // Update WiFi RSSI periodically
+    int8_t rssi_value = -128; // Invalid value by default
+    if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
+        get_wifi_current_rssi(&rssi_value);
+    }
+    
+    
 
     if (GLOBAL_STATE->SELF_TEST_MODULE.active) {
 
@@ -304,7 +337,9 @@ static void screen_update_cb(lv_timer_t * timer)
 
         lv_label_set_text(self_test_message_label, self_test->message);
 
-        if (self_test->finished) {
+        if (self_test->finished && !self_test_finished) {
+            self_test_finished = true;
+
             if (self_test->result) {
                 lv_label_set_text(self_test_result_label, "TESTS PASS!");
                 lv_label_set_text(self_test_finished_label, "Press RESET button to start Bitaxe.");
@@ -403,6 +438,19 @@ static void screen_update_cb(lv_timer_t * timer)
         lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", power_management->chip_temp_avg);
     }
 
+    
+    char rssi_buf[25];
+        
+    if (rssi_value < 0 && rssi_value >= -127) { // Typical RSSI range
+        snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: %d dBm", rssi_value);
+    } else {
+        snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: -- dBm");
+        }
+    if (strcmp(lv_label_get_text(wifi_rssi_value_label), rssi_buf) != 0) {
+        lv_label_set_text(wifi_rssi_value_label, rssi_buf);
+    }
+    
+
     current_hashrate = module->current_hashrate;
     current_power = power_management->power;
     current_difficulty = module->best_session_nonce_diff;
@@ -417,7 +465,48 @@ static void screen_update_cb(lv_timer_t * timer)
 
 void screen_next()
 {
-    screen_show(current_screen == SCR_CAROUSEL_END ? SCR_CAROUSEL_START : current_screen + 1);
+    screen_t next_scr = current_screen;
+
+    // Loop to find the next screen that should be displayed
+    do {
+        next_scr++; // Advance to the next screen candidate
+        if (next_scr > SCR_CAROUSEL_END) { // If past the end of carousel
+            next_scr = SCR_CAROUSEL_START; // Wrap around to the start of carousel
+        }
+        // If the candidate screen is SCR_WIFI_RSSI AND this is NOT a bigger display,
+        // then this screen should be skipped, and the loop will continue to find the next one.
+    } while (next_scr == SCR_WIFI_RSSI && GLOBAL_STATE->DISPLAY_CONFIG.v_res / 8 != 8);
+
+    screen_show(next_scr);
+}
+
+static void uptime_update_cb(lv_timer_t * timer)
+{
+    if (esp_uptime_label) {
+        char uptime[50];
+        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
+        
+        uint32_t days = uptime_seconds / (24 * 3600);
+        uptime_seconds %= (24 * 3600);
+        uint32_t hours = uptime_seconds / 3600;
+        uptime_seconds %= 3600;
+        uint32_t minutes = uptime_seconds / 60;
+        uptime_seconds %= 60;
+        
+        if (days > 0) {
+            snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
+        } else if (hours > 0) {
+            snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
+        } else if (minutes > 0) {
+            snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
+        } else {
+            snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
+        }
+        
+        if (strcmp(lv_label_get_text(esp_uptime_label), uptime) != 0) {
+            lv_label_set_text(esp_uptime_label, uptime);
+        }
+    }
 }
 
 esp_err_t screen_start(void * pvParameters)
@@ -437,8 +526,12 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
         screens[SCR_URLS] = create_scr_urls(module);
         screens[SCR_STATS] = create_scr_stats();
+        screens[SCR_WIFI_RSSI] = create_scr_wifi_rssi();
 
         lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);
+        
+        // Create uptime update timer (runs every 1 second)
+        lv_timer_create(uptime_update_cb, 1000, NULL);
     }
 
     return ESP_OK;

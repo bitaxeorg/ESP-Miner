@@ -55,6 +55,7 @@ export class SettingsComponent {
       .subscribe(info => {
         this.ASICModel = info.ASICModel;
         this.form = this.fb.group({
+          display: [info.display, [Validators.required]],
           flipscreen: [info.flipscreen == 1],
           invertscreen: [info.invertscreen == 1],
           displayTimeout: [info.displayTimeout, [Validators.required]],

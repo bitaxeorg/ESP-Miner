@@ -1,6 +1,9 @@
 import { Injectable, effect, signal } from '@angular/core';
 import { Subject } from 'rxjs';
 import { ThemeService } from '../../services/theme.service';
+import { LocalStorageService } from '../../local-storage.service';
+
+const STATIC_MENU_DESKTOP_INACTIVE = 'STATIC_MENU_DESKTOP_INACTIVE'
 
 export interface AppConfig {
     inputStyle: string;
@@ -81,7 +84,10 @@ export class LayoutService {
     private overlayOpen = new Subject<any>();
     overlayOpen$ = this.overlayOpen.asObservable();
 
-    constructor(private themeService: ThemeService) {
+    constructor(
+      private themeService: ThemeService,
+      private localStorageService: LocalStorageService
+    ) {
         // Load saved theme settings from NVS
         this.themeService.getThemeSettings().subscribe(
             settings => {
@@ -142,6 +148,7 @@ export class LayoutService {
             const config = this.config();
             this.changeTheme();
             this.changeScale(config.scale);
+            this.handleStaticMenuDesktopInactivity();
         });
     }
 
@@ -156,6 +163,8 @@ export class LayoutService {
         if (this.isDesktop()) {
             this.state.staticMenuDesktopInactive =
                 !this.state.staticMenuDesktopInactive;
+
+            this.localStorageService.setBool(STATIC_MENU_DESKTOP_INACTIVE, this.state.staticMenuDesktopInactive);
         } else {
             this.state.staticMenuMobileActive =
                 !this.state.staticMenuMobileActive;
@@ -213,5 +222,13 @@ export class LayoutService {
 
     changeScale(value: number) {
         document.documentElement.style.fontSize = `${value}px`;
+    }
+
+    handleStaticMenuDesktopInactivity() {
+        if (!this.isDesktop()) {
+            return;
+        }
+
+        this.state.staticMenuDesktopInactive = this.localStorageService.getBool(STATIC_MENU_DESKTOP_INACTIVE);
     }
 }

@@ -21,6 +21,7 @@
 #define NVS_CONFIG_ASIC_MODEL "asicmodel"
 #define NVS_CONFIG_DEVICE_MODEL "devicemodel"
 #define NVS_CONFIG_BOARD_VERSION "boardversion"
+#define NVS_CONFIG_DISPLAY "display"
 #define NVS_CONFIG_FLIP_SCREEN "flipscreen"
 #define NVS_CONFIG_INVERT_SCREEN "invertscreen"
 #define NVS_CONFIG_DISPLAY_TIMEOUT "displayTimeout"
@@ -32,6 +33,8 @@
 #define NVS_CONFIG_OVERHEAT_MODE "overheat_mode"
 #define NVS_CONFIG_OVERCLOCK_ENABLED "oc_enabled"
 #define NVS_CONFIG_SWARM "swarmconfig"
+#define NVS_CONFIG_STATISTICS_LIMIT "statsLimit"
+#define NVS_CONFIG_STATISTICS_DURATION "statsDuration"
 
 // Theme configuration
 #define NVS_CONFIG_THEME_SCHEME "themescheme"

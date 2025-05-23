@@ -128,7 +128,7 @@ static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 
 esp_err_t test_display(GlobalState * GLOBAL_STATE) {
     // Display testing
-    if (GLOBAL_STATE->DEVICE_CONFIG.display != NONE) {
+    if (GLOBAL_STATE->DISPLAY_CONFIG.display != NONE) {
         if (display_init(GLOBAL_STATE) != ESP_OK) {
             display_msg("DISPLAY:FAIL", GLOBAL_STATE);
             return ESP_FAIL;
@@ -158,8 +158,7 @@ esp_err_t test_input(GlobalState * GLOBAL_STATE) {
 
 esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
     // Screen testing
-    if (GLOBAL_STATE->DEVICE_CONFIG.display != NONE) {
-
+    if (GLOBAL_STATE->DISPLAY_CONFIG.display != NONE) {
         if (screen_start(GLOBAL_STATE) != ESP_OK) {
             display_msg("SCREEN:FAIL", GLOBAL_STATE);
             return ESP_FAIL;
