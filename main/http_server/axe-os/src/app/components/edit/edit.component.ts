@@ -1,12 +1,15 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit, OnDestroy } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormControl, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { forkJoin, startWith, Subject, takeUntil } from 'rxjs';
+import { forkJoin, startWith, Subject, takeUntil, pairwise } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
 import { ActivatedRoute } from '@angular/router';
+
+const DISPLAY_TIMEOUT_MIN = 0;
+const DISPLAY_TIMEOUT_MAX = 31;
 
 @Component({
   selector: 'app-edit',
@@ -37,6 +40,8 @@ export class EditComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
+  public displayTimeoutControl: FormControl;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -66,6 +71,18 @@ export class EditComponent implements OnInit, OnDestroy {
           'to the current URL'
         );
       }
+    });
+
+    this.displayTimeoutControl = new FormControl();
+    this.displayTimeoutControl.valueChanges.pipe(pairwise()).subscribe(([prev, next]) => {
+      if (prev === next) {
+        return;
+      }
+
+      this.form.patchValue({
+        displayTimeout: next === DISPLAY_TIMEOUT_MAX ? -1 : next
+      });
+      this.form.markAsDirty();
     });
   }
 
@@ -117,7 +134,7 @@ export class EditComponent implements OnInit, OnDestroy {
             Validators.required,
             Validators.pattern(/^[^:]*$/),
             Validators.min(-1),
-            Validators.max(71582)
+            Validators.max(DISPLAY_TIMEOUT_MAX)
           ]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
@@ -141,6 +158,10 @@ export class EditComponent implements OnInit, OnDestroy {
           this.form.controls['temptarget'].disable();
         }
       });
+
+      this.displayTimeoutControl.setValue(
+        info.displayTimeout === -1 ? DISPLAY_TIMEOUT_MAX : info.displayTimeout
+      );
     });
   }
 
@@ -277,5 +298,25 @@ export class EditComponent implements OnInit, OnDestroy {
 
   getDisplays() {
     return ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
+  }
+
+  getDisplayTimeoutMax(): number {
+    return DISPLAY_TIMEOUT_MAX;
+  }
+  getDisplayTimeoutMin(): number {
+    return DISPLAY_TIMEOUT_MIN;
+  }
+
+  getDisplayTimeoutFormated(): string {
+    const {value} = this.form.controls['displayTimeout'];
+
+    switch(value) {
+      case 0:
+        return 'Display always off';
+      case -1:
+        return 'Display always on';
+      default:
+        return `Display timeout: ${value} Minute${value > 1 ? 's': ''}`;
+    }
   }
 }
