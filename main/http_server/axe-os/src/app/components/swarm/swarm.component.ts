@@ -286,6 +286,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
             break;
           }
         }
+      } else if (typeof a[this.sortField] === 'number') {
+        comparison = a[this.sortField] - b[this.sortField];
       } else {
         comparison = a[this.sortField].localeCompare(b[this.sortField], undefined, { numeric: true });
       }
