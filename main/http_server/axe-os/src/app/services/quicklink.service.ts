@@ -36,6 +36,8 @@ export class QuicklinkService {
             return `https://pool.nerdminer.de/#/app/${address}`;
         } else if (stratumURL.includes('solomining.de')) {
             return `https://pool.solomining.de/#/app/${address}`;
+        } else if (stratumURL.includes('solo.stratum.braiins.com')) {
+          return `https://solo.braiins.com/stats/${address}`;
         }
         return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
     }
