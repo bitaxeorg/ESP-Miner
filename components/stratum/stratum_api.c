@@ -332,7 +332,7 @@ int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty)
     return write(socket, difficulty_msg, strlen(difficulty_msg));
 }
 
-int STRATUM_V1_authenticate(int socket, int send_uid, const char * username, const char * pass)
+int STRATUM_V1_authorize(int socket, int send_uid, const char * username, const char * pass)
 {
     char authorize_msg[BUFFER_SIZE];
     sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"%s\"]}\n", send_uid, username,
