@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component,ViewChild } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
@@ -7,6 +7,7 @@ import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
+import { UIChart } from 'primeng/chart';
 
 
 @Component({
@@ -41,6 +42,8 @@ export class HomeComponent {
   public activePoolPort!: number;
   public activePoolUser!: string;
   public activePoolLabel!: 'Primary' | 'Fallback';
+  @ViewChild('chart')
+  private chart?: UIChart
 
   constructor(
     private systemService: SystemService,
@@ -99,7 +102,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'Hashrate',
-          data: [],
+          data: [this.hashrateData],
           backgroundColor: primaryColor + '30',
           borderColor: primaryColor,
           tension: 0,
@@ -112,7 +115,7 @@ export class HomeComponent {
         {
           type: 'line',
           label: 'ASIC Temp',
-          data: [],
+          data: [this.temperatureData],
           fill: false,
           backgroundColor: textColorSecondary,
           borderColor: textColorSecondary,
@@ -193,6 +196,14 @@ export class HomeComponent {
       }
     };
 
+    this.chartData.labels = this.dataLabel;
+    this.chartData.datasets[0].data = this.hashrateData;
+    this.chartData.datasets[1].data = this.temperatureData;
+
+    this.chartData = {
+      ...this.chartData
+    };
+
     // load previous data
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({refCount: true, bufferSize: 1}));
     this.stats$.subscribe(stats => {
@@ -243,14 +254,8 @@ export class HomeComponent {
               this.dataLabel.shift();
             }
           }
-
-          this.chartData.labels = this.previousDataLabel.concat(this.dataLabel);
-          this.chartData.datasets[0].data = this.previousHashrateData.concat(this.hashrateData);
-          this.chartData.datasets[1].data = this.previousTemperatureData.concat(this.temperatureData);
-
-          this.chartData = {
-            ...this.chartData
-          };
+          this.chart?.refresh();
+          
         }
 
         this.maxPower = Math.max(info.maxPower, info.power);
