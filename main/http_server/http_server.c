@@ -38,6 +38,7 @@
 #include "statistics_task.h"
 #include "theme_api.h"  // Add theme API include
 #include "axe-os/api/system/asic_settings.h"
+#include "mining_controller.h"
 #include "http_server.h"
 
 #define JSON_ALL_STATS_ELEMENT_SIZE 120
@@ -620,6 +621,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
+    cJSON_AddBoolToObject(root, "miningEnabled", GLOBAL_STATE->mining_enabled);
 
     cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED, 0));
@@ -935,6 +937,66 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     return ESP_OK;
 }
 
+static esp_err_t PATCH_mining_stop_handler(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "API call to stop mining.");
+    esp_err_t err = stop_mining(GLOBAL_STATE);
+
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    if (err == ESP_OK) {
+        cJSON_AddStringToObject(root, "status", "ok");
+        cJSON_AddStringToObject(root, "message", "Mining stop requested successfully.");
+    } else {
+        cJSON_AddStringToObject(root, "status", "error");
+        cJSON_AddStringToObject(root, "message", "Failed to request mining stop.");
+        httpd_resp_set_status(req, HTTPD_500_INTERNAL_SERVER_ERROR);
+    }
+    const char *response = cJSON_Print(root);
+    httpd_resp_sendstr(req, response);
+    free((void *)response);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+static esp_err_t PATCH_mining_start_handler(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "API call to start mining.");
+    esp_err_t err = start_mining(GLOBAL_STATE);
+
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    if (err == ESP_OK) {
+        cJSON_AddStringToObject(root, "status", "ok");
+        cJSON_AddStringToObject(root, "message", "Mining start requested successfully.");
+    } else {
+        cJSON_AddStringToObject(root, "status", "error");
+        cJSON_AddStringToObject(root, "message", "Failed to request mining start.");
+        httpd_resp_set_status(req, HTTPD_500_INTERNAL_SERVER_ERROR);
+    }
+    const char *response = cJSON_Print(root);
+    httpd_resp_sendstr(req, response);
+    free((void *)response);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 int log_to_queue(const char * format, va_list args)
 {
     va_list args_copy;
@@ -1202,6 +1264,38 @@ esp_err_t start_rest_server(void * pvParameters)
         .is_websocket = true
     };
     httpd_register_uri_handler(server, &ws);
+
+    httpd_uri_t mining_stop_uri = {
+        .uri = "/api/mining/stop",
+        .method = HTTP_PATCH,
+        .handler = PATCH_mining_stop_handler,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &mining_stop_uri);
+
+    httpd_uri_t mining_stop_options_uri = {
+        .uri = "/api/mining/stop",
+        .method = HTTP_OPTIONS,
+        .handler = handle_options_request,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &mining_stop_options_uri);
+
+    httpd_uri_t mining_start_uri = {
+        .uri = "/api/mining/start",
+        .method = HTTP_PATCH,
+        .handler = PATCH_mining_start_handler,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &mining_start_uri);
+
+    httpd_uri_t mining_start_options_uri = {
+        .uri = "/api/mining/start",
+        .method = HTTP_OPTIONS,
+        .handler = handle_options_request,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &mining_start_options_uri);
 
     if (enter_recovery) {
         /* Make default route serve Recovery */

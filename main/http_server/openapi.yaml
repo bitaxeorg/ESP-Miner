@@ -139,6 +139,7 @@ components:
         - displayTimeout
         - statisticsLimit
         - statisticsDuration
+        - miningEnabled
       properties:
         ASICModel:
           type: string
@@ -298,6 +299,9 @@ components:
         statsDuration:
           type: number
           description: Statistics duration in hours
+        miningEnabled:
+          type: boolean
+          description: Whether mining is currently enabled (true) or stopped (false)
 
     Settings:
       type: object
@@ -454,8 +458,68 @@ components:
 
     InternalError:
       description: Internal server error
+    MiningActionResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+          description: Result status of the action.
+        message:
+          type: string
+          description: A message describing the result of the action.
+      required:
+        - status
+        - message
 
 paths:
+  /api/mining/start:
+    patch:
+      summary: Start mining operations
+      description: Initiates or restarts the mining process.
+      operationId: startMining
+      tags:
+        - mining
+      responses:
+        '200':
+          description: Mining start successfully requested.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiningActionResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiningActionResponse'
+
+
+  /api/mining/stop:
+    patch:
+      summary: Stop mining operations
+      description: Halts the current mining process.
+      operationId: stopMining
+      tags:
+        - mining
+      responses:
+        '200':
+          description: Mining stop successfully requested.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiningActionResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiningActionResponse'
+
   /api/system/wifi/scan:
     get:
       summary: Scan for available WiFi networks

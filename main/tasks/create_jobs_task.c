@@ -23,6 +23,15 @@ void create_jobs_task(void *pvParameters)
 
     while (1)
     {
+        if (!GLOBAL_STATE->mining_enabled && GLOBAL_STATE->abandon_work) {
+            ESP_LOGI(TAG, "Mining disabled and abandon work set, create_jobs_task stopping.");
+            if (GLOBAL_STATE->create_jobs_task_handle != NULL) {
+                GLOBAL_STATE->create_jobs_task_handle = NULL;
+            }
+            vTaskDelete(NULL);
+            return;
+        }
+
         mining_notify *mining_notification = (mining_notify *)queue_dequeue(&GLOBAL_STATE->stratum_queue);
         if (mining_notification == NULL) {
             ESP_LOGE(TAG, "Failed to dequeue mining notification");
@@ -60,7 +69,9 @@ void create_jobs_task(void *pvParameters)
         {
             GLOBAL_STATE->abandon_work = 0;
             ASIC_jobs_queue_clear(&GLOBAL_STATE->ASIC_jobs_queue);
-            xSemaphoreGive(GLOBAL_STATE->ASIC_TASK_MODULE.semaphore);
+            if (GLOBAL_STATE->ASIC_TASK_MODULE.semaphore != NULL) {
+                 xSemaphoreGive(GLOBAL_STATE->ASIC_TASK_MODULE.semaphore);
+            }
         }
 
         STRATUM_V1_free_mining_notify(mining_notification);
