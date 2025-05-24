@@ -133,7 +133,7 @@
 
         <div class="col-12" *ngIf="!info.power_fault">
             <div class="card">
-                <p-chart [data]="chartData" [options]="chartOptions"></p-chart>
+                <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
             </div>
         </div>
         <div class="col-12 lg:col-6 xl:col-6">
