@@ -163,7 +163,7 @@ export class HomeComponent {
         },
         y: {
           ticks: {
-            color: textColorSecondary,
+            color: primaryColor,
             callback: (value: number) => HashSuffixPipe.transform(value)
           },
           grid: {
