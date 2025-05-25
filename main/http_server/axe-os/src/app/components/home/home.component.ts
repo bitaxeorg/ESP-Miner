@@ -1,4 +1,4 @@
-import { Component,ViewChild } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
@@ -205,7 +205,7 @@ export class HomeComponent {
     };
 
     // load previous data
-    this.stats$ = this.systemService.getStatistics().pipe(shareReplay({refCount: true, bufferSize: 1}));
+    this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
     this.stats$.subscribe(stats => {
       stats.statistics.forEach(element => {
         const idxHashrate = 0;
@@ -255,7 +255,6 @@ export class HomeComponent {
             }
           }
           this.chart?.refresh();
-          
         }
 
         this.maxPower = Math.max(info.maxPower, info.power);
@@ -317,7 +316,7 @@ export class HomeComponent {
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       if (hashrate > 0) {
-        return power / (hashrate/1000000000000); // Convert to J/TH
+        return power / (hashrate / 1000000000000); // Convert to J/TH
       } else {
         return power; // in this case better than infinity or NaN
       }
