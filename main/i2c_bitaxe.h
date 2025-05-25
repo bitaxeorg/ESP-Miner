@@ -3,7 +3,7 @@
 
 #include "driver/i2c_master.h"
 
-#define I2C_BUS_SPEED_HZ 100000   /*!< I2C master clock frequency */
+#define I2C_BUS_SPEED_HZ 400000   /*!< I2C master clock frequency */
 
 esp_err_t i2c_bitaxe_init(void);
 esp_err_t i2c_bitaxe_add_device(uint8_t device_address, i2c_master_dev_handle_t * dev_handle, const char *device_tag);

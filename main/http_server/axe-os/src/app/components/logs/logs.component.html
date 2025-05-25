@@ -16,6 +16,21 @@
                     <td>{{info.wifiStatus}}</td>
                 </tr>
                 <tr>
+                    <td>Wi-Fi RSSI:</td>
+                    <td class="inline" [ngClass]="{
+                        'text-green-500': info.wifiRSSI > -50,
+                        'text-blue-500': info.wifiRSSI <= -50 && info.wifiRSSI > -60,
+                        'text-orange-500': info.wifiRSSI <= -60 && info.wifiRSSI > -70,
+                        'text-red-500': info.wifiRSSI <= -70
+                    }" pTooltip="{{
+                        info.wifiRSSI > -50 ? 'Excellent' :
+                        (info.wifiRSSI <= -50 && info.wifiRSSI > -60 ? 'Good' :
+                        (info.wifiRSSI <= -60 && info.wifiRSSI > -70 ? 'Fair' : 'Weak'))
+                    }}" tooltipPosition="bottom">
+                        {{info.wifiRSSI}} dBm
+                    </td>
+                </tr>
+                <tr>
                     <td>MAC Address:</td>
                     <td>{{info.macAddr}}</td>
                 </tr>
@@ -42,17 +57,38 @@
 
     <div class="col-12">
         <div class="card">
-            <h2>Realtime Logs <button pButton (click)="toggleLogs()" style="margin-left: 15px;"
-                    class="btn btn-secondary">{{showLogs
-                    ? 'Hide': 'Show'}}
-                    Logs</button>
+            <div class="flex flex-wrap gap-3 align-items-center">
+                <h2 class="mb-0" [ngClass]="{'w-full sm:w-auto': showLogs}">
+                    Realtime Logs
+                </h2>
 
-                <button pButton style="margin-left: 15px;" class="btn btn-secondary" (click)="stopScroll = !stopScroll"
-                    *ngIf="showLogs">{{stopScroll ? 'Start' : 'Stop'}} Scrolling</button>
-            </h2>
+                <button pButton (click)="toggleLogs()" class="btn btn-secondary" [ngClass]="{'ml-auto sm:ml-0': !showLogs}">
+                    {{showLogs ? 'Hide': 'Show'}} Logs
+                </button>
 
-            <div *ngIf="showLogs" id="logs" #scrollContainer>
+                <button pButton class="btn btn-secondary" (click)="stopScroll = !stopScroll" *ngIf="showLogs">
+                    {{stopScroll ? 'Start' : 'Stop'}} Scrolling
+                </button>
+
+                <button pButton class="btn btn--icon ml-auto"
+                    (click)="isExpanded = !isExpanded"
+                    pTooltip="Maximize Logs"
+                    tooltipPosition="left"
+                    *ngIf="showLogs"
+                >
+                    <i class="pi pi-window-maximize"></i>
+                </button>
+            </div>
+
+            <div *ngIf="showLogs" id="logs" #scrollContainer [ngClass]="{'is-expanded': isExpanded, 'mt-4': !isExpanded}">
                 <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
+                <button pButton class="btn btn--icon absolute top-0 right-0"
+                    (click)="isExpanded = !isExpanded"
+                    pTooltip="Minimize Logs"
+                    tooltipPosition="left"
+                >
+                    <i class="pi pi-window-minimize"></i>
+                </button>
             </div>
         </div>
     </div>

@@ -71,7 +71,8 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.success('Success!', 'Saved.');
+          this.toastr.warning('You must restart this device after saving for changes to take effect', 'Warning');
+          this.toastr.success('Success!', 'Saved network settings');
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
