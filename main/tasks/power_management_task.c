@@ -9,6 +9,7 @@
 #include "math.h"
 #include "mining.h"
 #include "nvs_config.h"
+#include "nvs_device.h"
 #include "serial.h"
 #include "TPS546.h"
 #include "vcore.h"
@@ -46,6 +47,33 @@ static const char * TAG = "power_management";
 
 // Set the fan speed between 20% min and 100% max based on chip temperature as input.
 // The fan speed increases from 20% to 100% proportionally to the temperature increase from 50 and THROTTLE_TEMP
+
+static void triggerOverheatMode(GlobalState * GLOBAL_STATE, PowerManagementModule * power_management) {
+
+    //overheat mode if the voltage regulator or ASIC is too hot
+                if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) &&
+                    (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+                    ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg );
+
+                    EMC2101_set_fan_speed(1);
+
+                    // increment the overheat count
+                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_COUNT, nvs_config_get_u16(NVS_CONFIG_OVERHEAT_COUNT, 0) + 1);
+
+                    // check and update the highest values
+                    NVSDevice_CompareandUpdateHighestValues(GLOBAL_STATE);
+
+                    // Turn off core voltage
+                    VCORE_set_voltage(0.0, GLOBAL_STATE);
+
+                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
+                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
+                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
+                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+                    exit(EXIT_FAILURE);
+}
+}
 static double automatic_fan_speed(float chip_temp, GlobalState * GLOBAL_STATE)
 {
     double result = 0.0;
@@ -163,21 +191,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             case DEVICE_MAX:
                 power_management->chip_temp_avg = GLOBAL_STATE->ASIC_initalized ? EMC2101_get_external_temp() : -1;
 
-                if ((power_management->chip_temp_avg > THROTTLE_TEMP) &&
-                    (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                    ESP_LOGE(TAG, "OVERHEAT ASIC %fC", power_management->chip_temp_avg );
-
-                    EMC2101_set_fan_speed(1);
-                    if (power_management->HAS_POWER_EN) {
-                        gpio_set_level(GPIO_ASIC_ENABLE, 1);
-                    }
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
-                    exit(EXIT_FAILURE);
-                }
+                triggerOverheatMode(GLOBAL_STATE, power_management);
                 break;
             case DEVICE_ULTRA:
             case DEVICE_SUPRA:
@@ -195,25 +209,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     break;
                 }
 
-                //overheat mode if the voltage regulator or ASIC is too hot
-                if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) &&
-                    (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                    ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg );
-
-                    EMC2101_set_fan_speed(1);
-                    if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
-                        // Turn off core voltage
-                        VCORE_set_voltage(0.0, GLOBAL_STATE);
-                    } else if (power_management->HAS_POWER_EN) {
-                        gpio_set_level(GPIO_ASIC_ENABLE, 1);
-                    }
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
-                    exit(EXIT_FAILURE);
-                }
+                triggerOverheatMode(GLOBAL_STATE, power_management);
 
                 break;
             case DEVICE_GAMMA:
@@ -226,24 +222,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 }
 
                 //overheat mode if the voltage regulator or ASIC is too hot
-                if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) &&
-                    (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                    ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg );
-
-                    EMC2101_set_fan_speed(1);
-
-                    // Turn off core voltage
-                    VCORE_set_voltage(0.0, GLOBAL_STATE);
-
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
-                    exit(EXIT_FAILURE);
-                }
+                triggerOverheatMode(GLOBAL_STATE, power_management);
                 break;
             default:
+                break;
         }
 
 
@@ -309,3 +291,4 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
     }
 }
+
