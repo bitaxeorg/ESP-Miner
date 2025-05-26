@@ -153,6 +153,8 @@ esp_err_t NVSDevice_CompareandUpdateHighestValues(GlobalState * GLOBAL_STATE) {
     uint16_t current_frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
     uint16_t domain_voltage = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage * GLOBAL_STATE->voltage_domain;
     uint16_t current_temp = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg;
+    float currentVIN = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage;
+    float currentPower = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power;
 
 
     // compare the current values with the highest values and update the highest values if the current values are higher
@@ -165,5 +167,12 @@ esp_err_t NVSDevice_CompareandUpdateHighestValues(GlobalState * GLOBAL_STATE) {
     if (current_temp > nvs_config_get_u16(NVS_CONFIG_HIGHEST_TEMPERATURE, 0)) {
         nvs_config_set_u16(NVS_CONFIG_HIGHEST_TEMPERATURE, current_temp);
     }
+    if (currentVIN > 5600) {
+        nvs_config_set_u16(NVS_CONFIG_OVERVOLT_COUNT, nvs_config_get_u16(NVS_CONFIG_OVERVOLT_COUNT, 0) + 1);
+    }
+    if (currentPower > 28000) {
+        nvs_config_set_u16(NVS_CONFIG_OVERPOWER_COUNT, nvs_config_get_u16(NVS_CONFIG_OVERPOWER_COUNT, 0) + 1);
+    }
+
     return ESP_OK;
 }
