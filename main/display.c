@@ -118,7 +118,7 @@ esp_err_t display_init(void * pvParameters)
         case SSD1306:
         case SSD1309:
             esp_lcd_panel_ssd1306_config_t ssd1306_config = {
-                .height = GLOBAL_STATE->DISPLAY_CONFIG.h_res,
+                .height = GLOBAL_STATE->DISPLAY_CONFIG.v_res,
             };
             panel_config.vendor_config = &ssd1306_config;
             ESP_RETURN_ON_ERROR(esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle), TAG, "No display found");
