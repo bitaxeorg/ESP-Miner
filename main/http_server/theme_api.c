@@ -354,6 +354,13 @@ static esp_err_t theme_patch_handler(httpd_req_t *req)
     // Convert the theme name to a theme preset
     themePreset_t themePreset = themePresetFromString(theme_name);
     
+    // Check if the theme exists
+    if (themePreset == THEME_ACS_DEFAULT && strcmp(theme_name, "THEME_ACS_DEFAULT") != 0) {
+        ESP_LOGE(TAG, "Invalid theme name: %s", theme_name);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid theme name");
+        return ESP_FAIL;
+    }
+    
     // Update the theme in NVS and initialize it
     nvs_config_set_u16(NVS_CONFIG_THEME_NAME, themePreset);
     initializeTheme(themePreset);
