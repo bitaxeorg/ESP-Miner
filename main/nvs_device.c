@@ -151,7 +151,7 @@ esp_err_t NVSDevice_CompareandUpdateHighestValues(GlobalState * GLOBAL_STATE) {
 
     // get the current values
     uint16_t current_frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
-    uint16_t current_domainVoltage = VCORE_get_voltage_mv(GLOBAL_STATE);
+    uint16_t domain_voltage = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage * GLOBAL_STATE->voltage_domain;
     uint16_t current_temp = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg;
 
 
@@ -159,8 +159,8 @@ esp_err_t NVSDevice_CompareandUpdateHighestValues(GlobalState * GLOBAL_STATE) {
     if (current_frequency > nvs_config_get_u16(NVS_CONFIG_HIGHEST_FREQUENCY, 0)) {
         nvs_config_set_u16(NVS_CONFIG_HIGHEST_FREQUENCY, current_frequency);
     }
-    if (current_domainVoltage > nvs_config_get_u16(NVS_CONFIG_HIGHEST_DOMAIN_VOLTAGE, 0)) {
-        nvs_config_set_u16(NVS_CONFIG_HIGHEST_DOMAIN_VOLTAGE, current_domainVoltage);
+    if (domain_voltage > nvs_config_get_u16(NVS_CONFIG_HIGHEST_DOMAIN_VOLTAGE, 0)) {
+        nvs_config_set_u16(NVS_CONFIG_HIGHEST_DOMAIN_VOLTAGE, domain_voltage);
     }
     if (current_temp > nvs_config_get_u16(NVS_CONFIG_HIGHEST_TEMPERATURE, 0)) {
         nvs_config_set_u16(NVS_CONFIG_HIGHEST_TEMPERATURE, current_temp);

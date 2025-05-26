@@ -42,7 +42,6 @@
 #define NVS_CONFIG_HIGHEST_TEMPERATURE "hightemp"
 #define NVS_CONFIG_OVERHEAT_COUNT "overheat"
 #define NVS_CONFIG_OVERVOLT_COUNT "overvolt"
-#define NVS_CONFIG_UNDERVOLT_COUNT "undervolt"
 #define NVS_CONFIG_OVERPOWER_COUNT "overpower"
 
 
