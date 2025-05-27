@@ -254,9 +254,12 @@ export class HomeComponent {
               this.dataLabel.shift();
             }
           }
-          this.chart?.refresh();
-        }
 
+        }
+        this.chartData.labels = this.previousDataLabel.concat(this.dataLabel);
+        this.chartData.datasets[0].data = this.previousHashrateData.concat(this.hashrateData);
+        this.chartData.datasets[1].data = this.previousTemperatureData.concat(this.temperatureData);
+        this.chart?.refresh();
         this.maxPower = Math.max(info.maxPower, info.power);
         this.nominalVoltage = info.nominalVoltage;
         this.maxTemp = Math.max(75, info.temp);
