@@ -128,17 +128,15 @@ static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 
 esp_err_t test_display(GlobalState * GLOBAL_STATE) {
     // Display testing
-    if (GLOBAL_STATE->DISPLAY_CONFIG.display != NONE) {
-        if (display_init(GLOBAL_STATE) != ESP_OK) {
-            display_msg("DISPLAY:FAIL", GLOBAL_STATE);
-            return ESP_FAIL;
-        }
+    if (display_init(GLOBAL_STATE) != ESP_OK) {
+        display_msg("DISPLAY:FAIL", GLOBAL_STATE);
+        return ESP_FAIL;
+    }
 
-        if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
-            ESP_LOGI(TAG, "DISPLAY init success!");
-        } else {
-            ESP_LOGW(TAG, "DISPLAY not found!");
-        }
+    if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
+        ESP_LOGI(TAG, "DISPLAY init success!");
+    } else {
+        ESP_LOGW(TAG, "DISPLAY not found!");
     }
 
     return ESP_OK;
@@ -158,14 +156,12 @@ esp_err_t test_input(GlobalState * GLOBAL_STATE) {
 
 esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
     // Screen testing
-    if (GLOBAL_STATE->DISPLAY_CONFIG.display != NONE) {
-        if (screen_start(GLOBAL_STATE) != ESP_OK) {
-            display_msg("SCREEN:FAIL", GLOBAL_STATE);
-            return ESP_FAIL;
-        }
-
-        ESP_LOGI(TAG, "SCREEN start success!");
+    if (screen_start(GLOBAL_STATE) != ESP_OK) {
+        display_msg("SCREEN:FAIL", GLOBAL_STATE);
+        return ESP_FAIL;
     }
+
+    ESP_LOGI(TAG, "SCREEN start success!");
 
     return ESP_OK;
 }
@@ -315,6 +311,9 @@ void self_test(void * pvParameters)
         ESP_LOGE(TAG, "SERIAL init failed!");
         tests_done(GLOBAL_STATE, TESTS_FAILED);
     }
+
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
 
     uint8_t chips_detected = ASIC_init(GLOBAL_STATE);
     uint8_t chips_expected = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
@@ -472,7 +471,6 @@ void self_test(void * pvParameters)
 
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result) 
 {
-
     GLOBAL_STATE->SELF_TEST_MODULE.result = test_result;
     GLOBAL_STATE->SELF_TEST_MODULE.finished = true;
     VCORE_set_voltage(0.0f, GLOBAL_STATE);
