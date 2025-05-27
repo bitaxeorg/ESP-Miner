@@ -49,13 +49,13 @@ float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE)
 
     if (GLOBAL_STATE->DEVICE_CONFIG.EMC2101) {
         if (GLOBAL_STATE->DEVICE_CONFIG.emc_internal_temp) {
-            return EMC2101_get_internal_temp() + GLOBAL_STATE->DEVICE_CONFIG.internal_temp_offset;
+            return EMC2101_get_internal_temp() + GLOBAL_STATE->DEVICE_CONFIG.temp_offset;
         } else {
-            return EMC2101_get_external_temp() + GLOBAL_STATE->DEVICE_CONFIG.external_temp_offset;
+            return EMC2101_get_external_temp() + GLOBAL_STATE->DEVICE_CONFIG.temp_offset;
         }
     }
     if (GLOBAL_STATE->DEVICE_CONFIG.EMC2103) {
-        return EMC2103_get_external_temp() + GLOBAL_STATE->DEVICE_CONFIG.external_temp_offset;
+        return EMC2103_get_external_temp() + GLOBAL_STATE->DEVICE_CONFIG.temp_offset;
     }
     return -1;
 }
