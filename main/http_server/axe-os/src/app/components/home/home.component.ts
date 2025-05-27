@@ -85,6 +85,65 @@ export class HomeComponent {
     this.chartData = { ...this.chartData };
   }
 
+  private startGetLiveData()
+  {
+     // live data
+    this.info$ = interval(5000).pipe(
+      startWith(() => this.systemService.getInfo()),
+      switchMap(() => {
+        return this.systemService.getInfo()
+      }),
+      tap(info => {
+        // Only collect and update chart data if there's no power fault
+        if (!info.power_fault) {
+          this.hashrateData.push(info.hashRate * 1000000000);
+          this.temperatureData.push(info.temp);
+          this.powerData.push(info.power);
+          this.dataLabel.push(new Date().getTime());
+
+          if ((this.hashrateData.length) >= 720) {
+            this.hashrateData.shift();
+            this.temperatureData.shift();
+            this.powerData.shift();
+            this.dataLabel.shift();
+          }
+        }
+
+        this.chart?.refresh();
+        this.maxPower = Math.max(info.maxPower, info.power);
+        this.nominalVoltage = info.nominalVoltage;
+        this.maxTemp = Math.max(75, info.temp);
+        this.maxFrequency = Math.max(800, info.frequency);
+
+        const isFallback = info.isUsingFallbackStratum;
+
+        this.activePoolLabel = isFallback ? 'Fallback' : 'Primary';
+        this.activePoolURL = isFallback ? info.fallbackStratumURL : info.stratumURL;
+        this.activePoolUser = isFallback ? info.fallbackStratumUser : info.stratumUser;
+        this.activePoolPort = isFallback ? info.fallbackStratumPort : info.stratumPort;
+      }),
+      map(info => {
+        info.power = parseFloat(info.power.toFixed(1))
+        info.voltage = parseFloat((info.voltage / 1000).toFixed(1));
+        info.current = parseFloat((info.current / 1000).toFixed(1));
+        info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
+        info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
+        info.temp = parseFloat(info.temp.toFixed(1));
+
+        return info;
+      }),
+      shareReplay({ refCount: true, bufferSize: 1 })
+    );
+
+    this.quickLink$ = this.info$.pipe(
+      map(info => {
+        const url = info.isUsingFallbackStratum ? info.fallbackStratumURL : info.stratumURL;
+        const user = info.isUsingFallbackStratum ? info.fallbackStratumUser : info.stratumUser;
+        return this.quickLinkService.getQuickLink(url, user);
+      })
+    );
+  }
+
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
     const textColor = documentStyle.getPropertyValue('--text-color');
@@ -216,64 +275,11 @@ export class HomeComponent {
           this.powerData.shift();
           this.dataLabel.shift();
         }
-      });
+      }),
+      this.startGetLiveData();
     });
 
-    // live data
-    this.info$ = interval(5000).pipe(
-      startWith(() => this.systemService.getInfo()),
-      switchMap(() => {
-        return this.systemService.getInfo()
-      }),
-      tap(info => {
-        // Only collect and update chart data if there's no power fault
-        if (!info.power_fault) {
-          this.hashrateData.push(info.hashRate * 1000000000);
-          this.temperatureData.push(info.temp);
-          this.powerData.push(info.power);
-          this.dataLabel.push(new Date().getTime());
-
-          if ((this.hashrateData.length) >= 720) {
-            this.hashrateData.shift();
-            this.temperatureData.shift();
-            this.powerData.shift();
-            this.dataLabel.shift();
-          }
-        }
-
-        this.chart?.refresh();
-        this.maxPower = Math.max(info.maxPower, info.power);
-        this.nominalVoltage = info.nominalVoltage;
-        this.maxTemp = Math.max(75, info.temp);
-        this.maxFrequency = Math.max(800, info.frequency);
-
-        const isFallback = info.isUsingFallbackStratum;
-
-        this.activePoolLabel = isFallback ? 'Fallback' : 'Primary';
-        this.activePoolURL = isFallback ? info.fallbackStratumURL : info.stratumURL;
-        this.activePoolUser = isFallback ? info.fallbackStratumUser : info.stratumUser;
-        this.activePoolPort = isFallback ? info.fallbackStratumPort : info.stratumPort;
-      }),
-      map(info => {
-        info.power = parseFloat(info.power.toFixed(1))
-        info.voltage = parseFloat((info.voltage / 1000).toFixed(1));
-        info.current = parseFloat((info.current / 1000).toFixed(1));
-        info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
-        info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
-        info.temp = parseFloat(info.temp.toFixed(1));
-
-        return info;
-      }),
-      shareReplay({ refCount: true, bufferSize: 1 })
-    );
-
-    this.quickLink$ = this.info$.pipe(
-      map(info => {
-        const url = info.isUsingFallbackStratum ? info.fallbackStratumURL : info.stratumURL;
-        const user = info.isUsingFallbackStratum ? info.fallbackStratumUser : info.stratumUser;
-        return this.quickLinkService.getQuickLink(url, user);
-      })
-    );
+   
   }
 
   getRejectionExplanation(reason: string): string | null {
