@@ -51,7 +51,7 @@ float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE)
         if (GLOBAL_STATE->DEVICE_CONFIG.emc_internal_temp) {
             return EMC2101_get_internal_temp() + GLOBAL_STATE->DEVICE_CONFIG.temp_offset;
         } else {
-            return EMC2101_get_external_temp() + GLOBAL_STATE->DEVICE_CONFIG.temp_offset;
+            return EMC2101_get_external_temp();
         }
     }
     if (GLOBAL_STATE->DEVICE_CONFIG.EMC2103) {
