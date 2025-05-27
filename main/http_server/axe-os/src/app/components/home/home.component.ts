@@ -25,10 +25,6 @@ export class HomeComponent {
   public hashrateData: number[] = [];
   public temperatureData: number[] = [];
   public powerData: number[] = [];
-  public previousDataLabel: number[] = [];
-  public previousHashrateData: number[] = [];
-  public previousTemperatureData: number[] = [];
-  public previousPowerData: number[] = [];
   public chartData?: any;
 
   public maxPower: number = 0;
