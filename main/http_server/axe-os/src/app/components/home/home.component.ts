@@ -200,10 +200,6 @@ export class HomeComponent {
     this.chartData.datasets[0].data = this.hashrateData;
     this.chartData.datasets[1].data = this.temperatureData;
 
-    this.chartData = {
-      ...this.chartData
-    };
-
     // load previous data
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
     this.stats$.subscribe(stats => {
@@ -213,16 +209,16 @@ export class HomeComponent {
         const idxPower = 2;
         const idxTimestamp = 3;
 
-        this.previousHashrateData.push(element[idxHashrate] * 1000000000);
-        this.previousTemperatureData.push(element[idxTemperature]);
-        this.previousPowerData.push(element[idxPower]);
-        this.previousDataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
+        this.hashrateData.push(element[idxHashrate] * 1000000000);
+        this.temperatureData.push(element[idxTemperature]);
+        this.powerData.push(element[idxPower]);
+        this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
 
-        if (this.previousHashrateData.length >= 720) {
-          this.previousHashrateData.shift();
-          this.previousTemperatureData.shift();
-          this.previousPowerData.shift();
-          this.previousDataLabel.shift();
+        if (this.hashrateData.length >= 720) {
+          this.hashrateData.shift();
+          this.temperatureData.shift();
+          this.powerData.shift();
+          this.dataLabel.shift();
         }
       });
     });
@@ -241,24 +237,14 @@ export class HomeComponent {
           this.powerData.push(info.power);
           this.dataLabel.push(new Date().getTime());
 
-          if ((this.previousHashrateData.length + this.hashrateData.length) >= 720) {
-            if (this.previousHashrateData.length > 0) {
-              this.previousHashrateData.shift();
-              this.previousTemperatureData.shift();
-              this.previousPowerData.shift();
-              this.previousDataLabel.shift();
-            } else {
-              this.hashrateData.shift();
-              this.temperatureData.shift();
-              this.powerData.shift();
-              this.dataLabel.shift();
-            }
+          if ((this.hashrateData.length) >= 720) {
+            this.hashrateData.shift();
+            this.temperatureData.shift();
+            this.powerData.shift();
+            this.dataLabel.shift();
           }
-
         }
-        this.chartData.labels = this.previousDataLabel.concat(this.dataLabel);
-        this.chartData.datasets[0].data = this.previousHashrateData.concat(this.hashrateData);
-        this.chartData.datasets[1].data = this.previousTemperatureData.concat(this.temperatureData);
+
         this.chart?.refresh();
         this.maxPower = Math.max(info.maxPower, info.power);
         this.nominalVoltage = info.nominalVoltage;
