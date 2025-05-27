@@ -1,6 +1,7 @@
 #include "thermal.h"
 
 #define INTERNAL_OFFSET 5 //degrees C
+#define INTERNAL_OFFSET_GT 10 //degrees C
 
 esp_err_t Thermal_init(DeviceConfig device_config) 
 {
@@ -57,7 +58,7 @@ float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE)
         }
     }
     if (GLOBAL_STATE->DEVICE_CONFIG.EMC2103) {
-        return EMC2103_get_external_temp();
+        return EMC2103_get_external_temp() - INTERNAL_OFFSET_GT;
     }
     return -1;
 }
