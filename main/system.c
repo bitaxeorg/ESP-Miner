@@ -304,7 +304,7 @@ static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigit
 
     if (!sigdigits) {
         if (decimal)
-            snprintf(buf, bufsiz, "%.3f%s", dval, suffix);
+            snprintf(buf, bufsiz, "%.2f%s", dval, suffix);
         else
             snprintf(buf, bufsiz, "%d%s", (unsigned int) dval, suffix);
     } else {

@@ -31,10 +31,19 @@ static const char * TAG = "power_management";
 
 double pid_input = 0.0;
 double pid_output = 0.0;
-double pid_setPoint = 60.0;
-double pid_p = 4.0;
+double pid_setPoint = 60.0; // Default, will be overwritten by NVS
+double pid_p = 15.0;        
 double pid_i = 0.2;
 double pid_d = 3.0;
+double pid_d_startup = 20.0;  // Higher D value for startup
+
+bool pid_startup_phase = true;
+int pid_startup_counter = 0;
+
+// Hold and Ramp startup D-term
+#define PID_STARTUP_HOLD_DURATION 3  // Number of cycles to HOLD pid_d_startup
+#define PID_STARTUP_RAMP_DURATION 17 // Number of cycles to RAMP DOWN D (Total startup duration PID_STARTUP_HOLD_DURATION + PID_STARTUP_RAMP_DURATION)
+
 
 PIDController pid;
 
@@ -44,22 +53,18 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     
-    // Initialize PID controller
     pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
-    pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d, PID_P_ON_E, PID_DIRECT);
-    pid_set_sample_time(&pid, POLL_RATE - 1);
-    pid_set_output_limits(&pid, 25, 100);
-    pid_set_mode(&pid, AUTOMATIC);
-    pid_set_controller_direction(&pid, PID_REVERSE);
-    pid_initialize(&pid);
+
+    // Initialize PID controller with pid_d_startup and PID_REVERSE directly
+    pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d_startup, PID_P_ON_E, PID_REVERSE);
+    pid_set_sample_time(&pid, POLL_RATE - 1); // Sample time in ms
+    pid_set_output_limits(&pid, 25, 100); // Output limits 25% to 100%
+    pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     power_management->frequency_multiplier = 1;
-
-    //int last_frequency_increase = 0;
-    //uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
@@ -102,15 +107,45 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
         //enable the PID auto control for the FAN if set
         if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
-            // Ignore invalid temperature readings (-1) during startup
-            if (power_management->chip_temp_avg >= 0) {
+            if (power_management->chip_temp_avg >= 0) { // Ignore invalid temperature readings (-1)
                 pid_input = power_management->chip_temp_avg;
+                
+                // Hold and Ramp logic for startup D value
+                if (pid_startup_phase) {
+                    pid_startup_counter++; // Increment counter at the start of each startup phase cycle
+                    
+                    if (pid_startup_counter >= (PID_STARTUP_HOLD_DURATION + PID_STARTUP_RAMP_DURATION)) {
+                        // Transition complete, switch to normal D value
+                        pid_set_tunings(&pid, pid_p, pid_i, pid_d); // Use normal pid_d
+                        pid_startup_phase = false;
+                        ESP_LOGI(TAG, "PID startup phase complete, switching to normal D value: %.1f", pid_d);
+                    } else if (pid_startup_counter > PID_STARTUP_HOLD_DURATION) {
+                        // In RAMP DOWN phase
+                        int ramp_counter = pid_startup_counter - PID_STARTUP_HOLD_DURATION;
+                        double current_d = pid_d_startup - ((pid_d_startup - pid_d) * (double)ramp_counter / PID_STARTUP_RAMP_DURATION);
+                        pid_set_tunings(&pid, pid_p, pid_i, current_d);
+                        ESP_LOGI(TAG, "PID startup ramp phase: %d/%d (Total cycle: %d), current D: %.1f", 
+                                 ramp_counter, PID_STARTUP_RAMP_DURATION, pid_startup_counter, current_d);
+                    } else {
+                        // In HOLD phase, ensure pid_d_startup is used.
+                        // pid_init already set it with pid_d_startup. If pid_p or pid_i changed dynamically,
+                        // this call ensures pid_d_startup is maintained.
+                        pid_set_tunings(&pid, pid_p, pid_i, pid_d_startup);
+                        ESP_LOGI(TAG, "PID startup hold phase: %d/%d, holding D at: %.1f", 
+                                 pid_startup_counter, PID_STARTUP_HOLD_DURATION, pid_d_startup);
+                    }
+                }
+                // If not in startup_phase, PID tunings remain as set (either normal or last startup value if just exited)
+                
                 pid_compute(&pid);
+                // Uncomment for debugging PID output directly after compute
+                // ESP_LOGD(TAG, "DEBUG: PID raw output: %.2f%%, Input: %.1f, SetPoint: %.1f", pid_output, pid_input, pid_setPoint);
+
                 power_management->fan_perc = (uint16_t) pid_output;
                 Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, pid_output / 100.0);
-                ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%%", pid_input, pid_setPoint, pid_output);
+                ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
+                         pid_input, pid_setPoint, pid_output, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
             } else {
-                // Set fan to 70% in AP mode when temperature reading is invalid
                 if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled) {
                     ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f°C - Setting fan to 70%%", power_management->chip_temp_avg);
                     power_management->fan_perc = 70;
@@ -119,22 +154,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f°C", power_management->chip_temp_avg);
                 }
             }
-        } else {
+        } else { // Manual fan speed
             float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
             power_management->fan_perc = fs;
             Thermal_set_fan_percent(GLOBAL_STATE->DEVICE_CONFIG, (float) fs / 100.0);
         }
 
-        // Read the state of plug sense pin
-        // if (power_management->HAS_PLUG_SENSE) {
-        //     int gpio_plug_sense_state = gpio_get_level(GPIO_PLUG_SENSE);
-        //     if (gpio_plug_sense_state == 0) {
-        //         // turn ASIC off
-        //         gpio_set_level(GPIO_ASIC_ENABLE, 1);
-        //     }
-        // }
-
-        // New voltage and frequency adjustment code
         uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
         uint16_t asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
