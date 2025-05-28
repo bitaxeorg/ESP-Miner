@@ -281,3 +281,32 @@ export async function uploadWebApp(file: File): Promise<{ success: boolean; mess
     };
   }
 }
+
+export async function setSSID(
+  ssid: string,
+  wifiPass: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch("/api/system", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ssid, wifiPass }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("SSID set response:", result);
+    return { success: true, message: result.message || "SSID set successfully" };
+  } catch (error) {
+    console.error("Failed to set SSID:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}

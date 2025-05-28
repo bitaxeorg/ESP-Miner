@@ -10,6 +10,8 @@ import {
   Home,
   PanelLeft,
   ChartBar,
+  Download,
+  Wifi,
 } from "lucide-preact";
 import { SidebarContext } from "./Layout";
 
@@ -60,9 +62,19 @@ const navItems = [
   //   icon: Palette,
   // },
   {
+    label: "Wifi",
+    href: "/wifi",
+    icon: Wifi,
+  },
+  {
     label: "Settings",
     href: "/settings",
     icon: Settings,
+  },
+  {
+    label: "Updates",
+    href: "/updates",
+    icon: Download,
   },
 ];
 

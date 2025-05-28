@@ -12,7 +12,9 @@ import { ToastContainer } from "./components/Toast";
 import "./style.css";
 import { LogsPage } from "./pages/Logs";
 import { PoolsPage } from "./pages/Pool";
+import { WifiPage } from "./pages/Wifi";
 import ChartPage from "./pages/Chart";
+import UpdatesPage from "./pages/Updates";
 function AppContent() {
   const { toasts, hideToast } = useToast();
 
@@ -27,7 +29,9 @@ function AppContent() {
             <Route path='/theme' component={Theme} />
             <Route path='/miners' component={Miners} />
             <Route path='/pools' component={PoolsPage} />
+            <Route path='/wifi' component={WifiPage} />
             <Route path='/chart' component={ChartPage} />
+            <Route path='/updates' component={UpdatesPage} />
             <Route default component={NotFound} />
           </Router>
         </Layout>
