@@ -1,7 +1,18 @@
 import { ComponentChildren } from "preact";
 import { useState, useContext, useEffect } from "preact/hooks";
 import { useTheme } from "../context/ThemeContext";
-import { Activity, Layers, Users, Palette, Settings, Home, PanelLeft } from "lucide-preact";
+import {
+  Activity,
+  Layers,
+  Users,
+  Palette,
+  Settings,
+  Home,
+  PanelLeft,
+  ChartBar,
+  Download,
+  Wifi,
+} from "lucide-preact";
 import { SidebarContext } from "./Layout";
 
 interface SidebarProps {
@@ -35,6 +46,11 @@ const navItems = [
     href: "/pools",
     icon: Users,
   },
+  {
+    label: "Chart",
+    href: "/chart",
+    icon: ChartBar,
+  },
   // {
   //   label: "Logs",
   //   href: "/logs",
@@ -46,9 +62,19 @@ const navItems = [
   //   icon: Palette,
   // },
   {
+    label: "Wifi",
+    href: "/wifi",
+    icon: Wifi,
+  },
+  {
     label: "Settings",
     href: "/settings",
     icon: Settings,
+  },
+  {
+    label: "Updates",
+    href: "/updates",
+    icon: Download,
   },
 ];
 

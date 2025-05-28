@@ -1,54 +1,7 @@
-export interface SystemInfo {
-  power: number;
-  voltage: number;
-  current: number;
-  temp: number;
-  vrTemp: number;
-  hashRate: number;
-  bestDiff: string;
-  bestSessionDiff: string;
-  stratumDiff: number;
-  isUsingFallbackStratum: number;
-  isPSRAMAvailable: number;
-  freeHeap: number;
-  coreVoltage: number;
-  coreVoltageActual: number;
-  frequency: number;
-  ssid: string;
-  macAddr: string;
-  hostname: string;
-  wifiStatus: string;
-  apEnabled: number;
-  sharesAccepted: number;
-  sharesRejected: number;
-  uptimeSeconds: number;
-  asicCount: number;
-  smallCoreCount: number;
-  ASICModel: string;
-  stratumURL: string;
-  fallbackStratumURL: string;
-  stratumPort: number;
-  fallbackStratumPort: number;
-  stratumUser: string;
-  fallbackStratumUser: string;
-  stratumPassword?: string;
-  fallbackStratumPassword?: string;
-  stratumWorkerName?: string;
-  fallbackStratumWorkerName?: string;
-  version: string;
-  idfVersion: string;
-  boardVersion: string;
-  runningPartition: string;
-  flipscreen: number;
-  overheat_mode: number;
-  invertscreen: number;
-  invertfanpolarity: number;
-  autofanspeed: number;
-  fanspeed: number;
-  fanrpm: number;
-  status?: "online" | "offline" | "warning";
-  ipAddress?: string;
-}
+import { SystemInfo } from "./types/systemInfo";
+
+// Re-export SystemInfo type for convenience
+export type { SystemInfo };
 
 // Constants for firmware and webapp URLs
 export const FIRMWARE_LATEST_URL =
@@ -322,6 +275,35 @@ export async function uploadWebApp(file: File): Promise<{ success: boolean; mess
     return { success: true, message: result.message || "Web app uploaded successfully" };
   } catch (error) {
     console.error("Failed to upload web app:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+export async function setSSID(
+  ssid: string,
+  wifiPass: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch("/api/system", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ssid, wifiPass }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("SSID set response:", result);
+    return { success: true, message: result.message || "SSID set successfully" };
+  } catch (error) {
+    console.error("Failed to set SSID:", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred",

@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.6",
+    "lightweight-charts": "^5.0.7",
     "lucide-preact": "^0.511.0",
     "preact": "^10.25.3",
     "preact-iso": "^2.9.1",
