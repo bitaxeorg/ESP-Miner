@@ -1,4 +1,5 @@
 import { ChartDataPoint } from "../components/Chart/config";
+import { Time } from "lightweight-charts";
 
 export class MockDataGenerator {
   private currentValue: number;
@@ -45,9 +46,9 @@ export class MockDataGenerator {
     return data;
   }
 
-  private formatTime(date: Date): number {
-    // Return Unix timestamp in seconds as a number for real-time data
-    return Math.floor(date.getTime() / 1000);
+  private formatTime(date: Date): Time {
+    // Return Unix timestamp in seconds as Time for real-time data
+    return Math.floor(date.getTime() / 1000) as Time;
   }
 
   setVolatility(volatility: number): void {

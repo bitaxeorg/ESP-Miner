@@ -1,5 +1,8 @@
 import { SystemInfo } from "./types/systemInfo";
 
+// Re-export SystemInfo type for convenience
+export type { SystemInfo };
+
 // Constants for firmware and webapp URLs
 export const FIRMWARE_LATEST_URL =
   "https://acs-bitaxe-touch.s3.us-east-2.amazonaws.com/firmware/acs-esp-miner/latest/esp-miner.bin";
