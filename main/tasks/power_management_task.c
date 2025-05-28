@@ -184,7 +184,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 break;
             default:
         }
-        idf
 
         power_management->fan_rpm = EMC2101_get_fan_speed();
 
@@ -260,7 +259,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         // check and update the highest values or if power/voltage is over limit
-        NVSDevice_CompareandUpdateHighes tValues(GLOBAL_STATE);
+        NVSDevice_CompareandUpdateHighestValues(GLOBAL_STATE);
 
         // New voltage and frequency adjustment code
         uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
