@@ -66,7 +66,7 @@ export class SystemService {
         display: "SSD1306 (128x32)",
         flipscreen: 1,
         invertscreen: 0,
-        displayTimeout: 0,
+        displayTimeout: -1,
         autofanspeed: 1,
         fanspeed: 100,
         temptarget: 60,
@@ -109,7 +109,11 @@ export class SystemService {
   }
 
   public updateSystem(uri: string = '', update: any) {
-    return this.httpClient.patch(`${uri}/api/system`, update);
+    if (environment.production) {
+      return this.httpClient.patch(`${uri}/api/system`, update);
+    } else {
+      return of(true);
+    }
   }
 
 

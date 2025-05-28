@@ -1,12 +1,19 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit, OnDestroy } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormControl, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { forkJoin, startWith, Subject, takeUntil } from 'rxjs';
+import { forkJoin, startWith, Subject, takeUntil, pairwise } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
 import { ActivatedRoute } from '@angular/router';
+
+type Dropdown = {
+  name: string;
+  value: number;
+}[]
+
+const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
 
 @Component({
   selector: 'app-edit',
@@ -37,6 +44,8 @@ export class EditComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
+  public displayTimeoutControl: FormControl;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -66,6 +75,16 @@ export class EditComponent implements OnInit, OnDestroy {
           'to the current URL'
         );
       }
+    });
+
+    this.displayTimeoutControl = new FormControl();
+    this.displayTimeoutControl.valueChanges.pipe(pairwise()).subscribe(([prev, next]) => {
+      if (prev === next) {
+        return;
+      }
+
+      this.form.patchValue({ displayTimeout: DISPLAY_TIMEOUT_STEPS[next] });
+      this.form.markAsDirty();
     });
   }
 
@@ -117,7 +136,7 @@ export class EditComponent implements OnInit, OnDestroy {
             Validators.required,
             Validators.pattern(/^[^:]*$/),
             Validators.min(-1),
-            Validators.max(71582)
+            Validators.max(this.displayTimeoutMaxValue)
           ]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
@@ -141,6 +160,17 @@ export class EditComponent implements OnInit, OnDestroy {
           this.form.controls['temptarget'].disable();
         }
       });
+
+      // Add custom value to predefined steps
+      if (DISPLAY_TIMEOUT_STEPS.filter(x => x === info.displayTimeout).length === 0) {
+        DISPLAY_TIMEOUT_STEPS.push(info.displayTimeout);
+        DISPLAY_TIMEOUT_STEPS.sort((a, b) => a - b);
+        DISPLAY_TIMEOUT_STEPS.push(DISPLAY_TIMEOUT_STEPS.shift() as number);
+      }
+
+      this.displayTimeoutControl.setValue(
+        DISPLAY_TIMEOUT_STEPS.findIndex(x => x === info.displayTimeout)
+      );
     });
   }
 
@@ -150,7 +180,6 @@ export class EditComponent implements OnInit, OnDestroy {
   }
 
   public updateSystem() {
-
     const form = this.form.getRawValue();
 
     if (form.stratumPassword === '*****') {
@@ -162,7 +191,9 @@ export class EditComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
-          this.toastr.warning('You must restart this device after saving for changes to take effect', 'Warning');
+          if (this.isRestartRequired) {
+            this.toastr.warning('You must restart this device after saving for changes to take effect', 'Warning');
+          }
           this.toastr.success(successMessage, 'Success!');
           this.savedChanges = true;
         },
@@ -172,11 +203,6 @@ export class EditComponent implements OnInit, OnDestroy {
           this.savedChanges = false;
         }
       });
-  }
-
-  showWifiPassword: boolean = false;
-  toggleWifiPasswordVisibility() {
-    this.showWifiPassword = !this.showWifiPassword;
   }
 
   disableOverheatMode() {
@@ -213,69 +239,71 @@ export class EditComponent implements OnInit, OnDestroy {
       });
   }
 
-  getDropdownFrequency() {
-    if (!this.frequencyOptions.length) {
-      return [];
-    }
-
-    // Convert frequency options from API to dropdown format
-    const options = this.frequencyOptions.map(freq => {
-      // Check if this is a default frequency for the current ASIC model
-      const isDefault = this.defaultFrequency === freq;
-      return {
-        name: isDefault ? `${freq} (default)` : `${freq}`,
-        value: freq
-      };
-    });
-
-    // Get current frequency value from form
-    const currentFreq = this.form?.get('frequency')?.value;
-
-    // If current frequency exists and isn't in the options
-    if (currentFreq && !options.some(opt => opt.value === currentFreq)) {
-      options.push({
-        name: `${currentFreq} (Custom)`,
-        value: currentFreq
-      });
-      // Sort options by frequency value
-      options.sort((a, b) => a.value - b.value);
-    }
-
-    return options;
+  get dropdownFrequency(): Dropdown {
+    return this.buildDropdown('frequency', this.frequencyOptions, this.defaultFrequency);
   }
 
-  getCoreVoltage() {
-    if (!this.voltageOptions.length) {
-      return [];
-    }
-
-    // Convert voltage options from API to dropdown format
-    const options = this.voltageOptions.map(voltage => {
-      // Check if this is a default voltage for the current ASIC model
-      const isDefault = this.defaultVoltage === voltage;
-      return {
-        name: isDefault ? `${voltage} (default)` : `${voltage}`,
-        value: voltage
-      };
-    });
-
-    // Get current voltage value from form
-    const currentVoltage = this.form?.get('coreVoltage')?.value;
-
-    // If current voltage exists and isn't in the options
-    if (currentVoltage && !options.some(opt => opt.value === currentVoltage)) {
-      options.push({
-        name: `${currentVoltage} (Custom)`,
-        value: currentVoltage
-      });
-      // Sort options by voltage value
-      options.sort((a, b) => a.value - b.value);
-    }
-
-    return options;
+  get dropdownVoltage(): Dropdown {
+    return this.buildDropdown('coreVoltage', this.voltageOptions, this.defaultVoltage);
   }
 
   getDisplays() {
     return ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
+  }
+
+  get displayTimeoutMaxSteps(): number {
+    return DISPLAY_TIMEOUT_STEPS.length - 1;
+  }
+
+  get displayTimeoutMaxValue(): number {
+    return DISPLAY_TIMEOUT_STEPS[this.displayTimeoutMaxSteps - 1];
+  }
+
+  buildDropdown(formField: string, apiOptions: number[], defaultValue: number): Dropdown {
+    if (!apiOptions.length) {
+      return [];
+    }
+
+    // Convert options from API to dropdown format
+    const options = apiOptions.map(option => {
+      return {
+        name: defaultValue === option ? `${option} (Default)` : `${option}`,
+        value: option
+      };
+    });
+
+    // Get current field value from form
+    const currentValue = this.form?.get(formField)?.value;
+
+    // If current field value exists and isn't in the options
+    if (currentValue && !options.some(opt => opt.value === currentValue)) {
+      options.push({
+        name: `${currentValue} (Custom)`,
+        value: currentValue
+      });
+      // Sort options by value
+      options.sort((a, b) => a.value - b.value);
+    }
+
+    return options;
+  }
+
+  get noRestartFields(): string[] {
+    return [
+      'displayTimeout',
+      'coreVoltage',
+      'frequency',
+      'autofanspeed',
+      'fanspeed',
+      'temptarget',
+      'overheat_mode',
+      'statsLimit',
+      'statsDuration'
+    ];
+  }
+
+  get isRestartRequired(): boolean {
+    return !! Object.entries(this.form.controls)
+      .filter(([field, control]) => control.dirty && !this.noRestartFields.includes(field)).length
   }
 }

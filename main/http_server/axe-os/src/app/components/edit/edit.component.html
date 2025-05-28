@@ -9,14 +9,14 @@
             <div class="field grid p-fluid">
                 <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
                 <div class="col-12 md:col-10">
-                    <p-dropdown [options]="getDropdownFrequency()" optionLabel="name" optionValue="value"
+                    <p-dropdown [options]="dropdownFrequency" optionLabel="name" optionValue="value"
                         formControlName="frequency"></p-dropdown>
                 </div>
             </div>
 
             <div class="field grid p-fluid">
                 <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="coreVoltage">Core Voltage</label>
-                <p-dropdown class="col-12 md:col-10" [options]="getCoreVoltage()" optionLabel="name"
+                <p-dropdown class="col-12 md:col-10" [options]="dropdownVoltage" optionLabel="name"
                     optionValue="value" formControlName="coreVoltage"></p-dropdown>
             </div>
         </ng-container>
@@ -86,6 +86,27 @@
             </div>
         </div>
 
+        <div class="field grid p-fluid">
+            <label htmlFor="displayTimeoutControl" class="col-12 md:col-2 hidden md:flex mb-2 md:mb-0 relative" style="top: -5px;">
+                Display Sleep
+            </label>
+            <div class="col-12 md:col-10">
+                <label class="block mb-2">
+                    <ng-container *ngIf="this.form.controls['displayTimeout'].value == 0">
+                        Display always off
+                    </ng-container>
+                    <ng-container *ngIf="this.form.controls['displayTimeout'].value > 0">
+                        Display timeout: {{this.form.controls['displayTimeout'].value * 60 | dateAgo}}
+                    </ng-container>
+                    <ng-container *ngIf="this.form.controls['displayTimeout'].value == -1">
+                        Display always on
+                    </ng-container>
+                </label>
+                <p-slider [min]="0" [max]="displayTimeoutMaxSteps" [step]="1" [formControl]="displayTimeoutControl"></p-slider>
+                <input type="hidden" formControlName="displayTimeout" />
+            </div>
+        </div>
+
         <div class="col-12 md:col-4">
             <div class="field-checkbox">
                 <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
@@ -99,16 +120,6 @@
                 <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen"
                     [binary]="true"></p-checkbox>
                 <label for="invertscreen">Invert Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Inverts the colors"></i></label>
-            </div>
-        </div>
-
-        <div class="field grid p-fluid">
-            <label htmlFor="displayTimeout" class="col-12 mb-2 md:col-2 md:mb-0">Display Timeout</label>
-            <div class="col-12 md:col-10">
-                <input pInputText id="displayTimeout" formControlName="displayTimeout" required min="-1" max="71582" type="number" />
-                <div>
-                    <small>In minutes (-1=display always on, 0=display off).</small>
-                </div>
             </div>
         </div>
 
