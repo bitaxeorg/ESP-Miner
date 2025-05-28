@@ -12,6 +12,7 @@ import { ToastContainer } from "./components/Toast";
 import "./style.css";
 import { LogsPage } from "./pages/Logs";
 import { PoolsPage } from "./pages/Pool";
+import ChartPage from "./pages/Chart";
 function AppContent() {
   const { toasts, hideToast } = useToast();
 
@@ -26,6 +27,7 @@ function AppContent() {
             <Route path='/theme' component={Theme} />
             <Route path='/miners' component={Miners} />
             <Route path='/pools' component={PoolsPage} />
+            <Route path='/chart' component={ChartPage} />
             <Route default component={NotFound} />
           </Router>
         </Layout>
