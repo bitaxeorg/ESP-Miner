@@ -8,6 +8,11 @@ import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
 import { ActivatedRoute } from '@angular/router';
 
+type Dropdown = {
+  name: string;
+  value: number;
+}[]
+
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
 
 @Component({
@@ -234,11 +239,11 @@ export class EditComponent implements OnInit, OnDestroy {
       });
   }
 
-  getDropdownFrequency() {
+  get dropdownFrequency(): Dropdown {
     return this.buildDropdown('frequency', this.frequencyOptions, this.defaultFrequency);
   }
 
-  getCoreVoltage() {
+  get dropdownVoltage(): Dropdown {
     return this.buildDropdown('coreVoltage', this.voltageOptions, this.defaultVoltage);
   }
 
@@ -254,7 +259,7 @@ export class EditComponent implements OnInit, OnDestroy {
     return DISPLAY_TIMEOUT_STEPS[this.displayTimeoutMaxSteps - 1];
   }
 
-  buildDropdown(formField: string, apiOptions: number[], defaultValue: number): {name: string; value: number;}[] {
+  buildDropdown(formField: string, apiOptions: number[], defaultValue: number): Dropdown {
     if (!apiOptions.length) {
       return [];
     }

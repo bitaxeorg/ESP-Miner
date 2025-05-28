@@ -9,14 +9,14 @@
             <div class="field grid p-fluid">
                 <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
                 <div class="col-12 md:col-10">
-                    <p-dropdown [options]="getDropdownFrequency()" optionLabel="name" optionValue="value"
+                    <p-dropdown [options]="dropdownFrequency" optionLabel="name" optionValue="value"
                         formControlName="frequency"></p-dropdown>
                 </div>
             </div>
 
             <div class="field grid p-fluid">
                 <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="coreVoltage">Core Voltage</label>
-                <p-dropdown class="col-12 md:col-10" [options]="getCoreVoltage()" optionLabel="name"
+                <p-dropdown class="col-12 md:col-10" [options]="dropdownVoltage" optionLabel="name"
                     optionValue="value" formControlName="coreVoltage"></p-dropdown>
             </div>
         </ng-container>
