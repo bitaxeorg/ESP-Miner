@@ -208,7 +208,7 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
     ESP_LOGI("LVGL", "Sending reg 0x%02X, len %d, CRC: 0x%04X", reg, dataLen, crc);
     SERIAL_send_BAP(displayBufferBAP, dataLen + 6, false);
     // Wait for CRC feedback
-    if (!SERIAL_rx_BAP_CRC(crc, 500))
+    if (!SERIAL_rx_BAP_CRC(crc, 5000))
     {
         ESP_LOGE("BAPTX", "CRC Feedback mismatch");
         return ESP_FAIL;
