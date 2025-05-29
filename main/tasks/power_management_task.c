@@ -52,7 +52,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     ESP_LOGI(TAG, "Starting");
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-    
+
+    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
+
     pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
 
     // Initialize PID controller with pid_d_startup and PID_REVERSE directly
@@ -61,13 +64,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     pid_set_output_limits(&pid, 25, 100); // Output limits 25% to 100%
     pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
 
-    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-    SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    power_management->frequency_multiplier = 1;
-
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
+
+    power_management->frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    ESP_LOGI(TAG, "ASIC Frequency: %.2fMHz", (float)power_management->frequency_value);
     uint16_t last_asic_frequency = power_management->frequency_value;
     
     while (1) {
@@ -82,7 +83,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
-
 
         // ASIC Thermal Diode will give bad readings if the ASIC is turned off
         // if(power_management->voltage < tps546_config.TPS546_INIT_VOUT_MIN){
