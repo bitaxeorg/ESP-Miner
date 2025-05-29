@@ -111,7 +111,6 @@ static uint32_t lastClockSync = 0;
 static char lastBoardInfo[128] = {0};
 
 // Static buffers for all display data
-
 static float tempBuffer[8];  // For temperature data
 static float powerBuffer[4]; // For power stats
 static uint16_t infoBuffer[2]; // For ASIC info
@@ -121,6 +120,42 @@ static uint32_t lastPrice = 0;
 static double lastNetworkHashrate = 0.0;
 static double lastNetworkDifficulty = 0.0;
 static uint32_t lastBlockHeight = 0;
+
+// static crc buffer
+static uint8_t crcBufferRX[2];
+static uint8_t crcBufferTX[2];
+
+/// @brief waits for a serial response to Match CRC
+/// @param expectedCRC the expected crc 
+/// @param size size of the buffer
+/// @param timeout_ms number of ms to wait before timing out
+/// @return true if CRC matches, false otherwise
+static bool SERIAL_rx_BAP_CRC(uint16_t expectedCRC, uint16_t size, uint16_t timeout_ms) {
+    memset(crcBufferRX, 0, size);
+    int16_t CRCBytesRead = uart_read_bytes(UART_NUM_2, crcBufferRX, size, timeout_ms / portTICK_PERIOD_MS);
+
+    if (CRCBytesRead != 2) {
+        ESP_LOGE("LVGL", "Failed to read CRC from device");
+        return false;
+    }
+    
+    uint16_t receivedCRC = (crcBufferRX[0] << 8) | crcBufferRX[1];
+    
+    if (receivedCRC == expectedCRC) {
+        return true;
+    }
+    
+    else if (crcBufferRX[0] != expectedCRC) {
+        ESP_LOGE("LVGL", "CRC mismatch: expected 0x%04X, received 0x%04X", expectedCRC, crcBufferRX[0]);
+        return false;
+    }
+    
+    else
+    {
+        ESP_LOGE("LVGL", "Unknown error");
+        return false;
+    }
+}
 
 static uint16_t calculate_crc16(const uint8_t* data, size_t length) {
     uint16_t crc = 0xFFFF;  // Initial value
@@ -166,7 +201,15 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
     
     // Send data with CRC
     ESP_LOGI("LVGL", "Sending reg 0x%02X, len %d, CRC: 0x%04X", reg, dataLen, crc);
-    return SERIAL_send_BAP(displayBufferBAP, dataLen + 4, false);
+    SERIAL_send_BAP(displayBufferBAP, dataLen + 4, false);
+    // Wait for CRC feedback
+    if (!SERIAL_rx_BAP_CRC(crc, 2, 500))
+    {
+        ESP_LOGE("BAPTX", "CRC Feedback mismatch");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
 }
 
 esp_err_t lvglDisplay_initBAP(void) 
@@ -590,10 +633,15 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms) {
             // Calculate CRC16 of received message (excluding CRC bytes)
             uint16_t received_crc = (buf[bytes_read - 2] << 8) | buf[bytes_read - 1];
             uint16_t calculated_crc = calculate_crc16(buf, bytes_read - 2);
+            crcBufferTX[0] = (calculated_crc >> 8) & 0xFF;
+            crcBufferTX[1] = calculated_crc & 0xFF;
+
+            
             
             if (received_crc != calculated_crc) {
                 ESP_LOGE("Serial BAP", "CRC mismatch: received 0x%04X, calculated 0x%04X", 
                          received_crc, calculated_crc);
+                SERIAL_send_BAP(crcBufferTX, 2, false);
                 return -1;
             }
             
@@ -729,7 +777,7 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms) {
             }
         }
     }
-
+    SERIAL_send_BAP(crcBufferTX, 2, false);
     return bytes_read;
 }
 
