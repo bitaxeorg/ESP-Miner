@@ -55,7 +55,13 @@ SemaphoreHandle_t BootSemaphore;
 //local function prototypes
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
-bool should_test(GlobalState * GLOBAL_STATE) {
+static bool should_test(GlobalState * GLOBAL_STATE) 
+{
+    // Optionally hold the boot button
+    if (gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0) { // LOW when pressed
+        return true;
+    }
+
     bool is_max = GLOBAL_STATE->DEVICE_CONFIG.family.asic.model == BM1397;
     uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
@@ -255,6 +261,9 @@ esp_err_t test_psram(GlobalState * GLOBAL_STATE){
 void self_test(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+
+    // Should we run the self test?
+    if (!should_test(GLOBAL_STATE)) return;
 
     ESP_LOGI(TAG, "Running Self Tests");
 
@@ -466,7 +475,7 @@ void self_test(void * pvParameters)
 
     tests_done(GLOBAL_STATE, TESTS_PASSED);
 
-    return;  
+    return;
 }
 
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result) 
