@@ -11,7 +11,6 @@
 #include "statistics_task.h"
 #include "system.h"
 #include "http_server.h"
-#include "nvs_config.h"
 #include "serial.h"
 #include "stratum_task.h"
 #include "i2c_bitaxe.h"
@@ -79,10 +78,6 @@ void app_main(void)
     wifi_init(&GLOBAL_STATE);
 
     SYSTEM_init_peripherals(&GLOBAL_STATE);
-
-    // This needs to be done before the power management task starts
-    GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value);
 
     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL);
 
