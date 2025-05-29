@@ -70,25 +70,25 @@
                     {{stopScroll ? 'Start' : 'Stop'}} Scrolling
                 </button>
 
-                <button pButton class="btn btn--icon ml-auto"
+                <p-button
+                    icon="pi pi-window-maximize"
+                    pp-button
                     (click)="isExpanded = !isExpanded"
+                    class="ml-auto"
                     pTooltip="Maximize Logs"
                     tooltipPosition="left"
-                    *ngIf="showLogs"
-                >
-                    <i class="pi pi-window-maximize"></i>
-                </button>
+                    *ngIf="showLogs"></p-button>
             </div>
 
             <div *ngIf="showLogs" id="logs" #scrollContainer [ngClass]="{'is-expanded': isExpanded, 'mt-4': !isExpanded}">
                 <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
-                <button pButton class="btn btn--icon absolute top-0 right-0"
+                <p-button
+                    icon="pi pi-window-minimize"
+                    pp-button
                     (click)="isExpanded = !isExpanded"
+                    class="absolute top-0 right-0"
                     pTooltip="Minimize Logs"
-                    tooltipPosition="left"
-                >
-                    <i class="pi pi-window-minimize"></i>
-                </button>
+                    tooltipPosition="left"></p-button>
             </div>
         </div>
     </div>

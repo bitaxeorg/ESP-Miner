@@ -11,7 +11,13 @@
             <label htmlFor="ssid" class="col-12 mb-2 md:col-2 md:mb-0">Wi-Fi SSID:</label>
             <div class="col-12 md:col-10 p-inputgroup">
                 <input pInputText id="ssid" type="text" formControlName="ssid" />
-                <button pButton type="button" icon="pi pi-search" (click)="scanWifi()" [loading]="scanning"></button>
+                <p-button
+                    icon="pi pi-search"
+                    pp-button
+                    (click)="scanWifi()"
+                    [loading]="scanning"
+                    pTooltip="Scan Wi-Fi"
+                    tooltipPosition="left"></p-button>
             </div>
         </div>
         <div class="field grid p-fluid">
