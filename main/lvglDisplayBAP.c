@@ -127,12 +127,11 @@ static uint8_t crcBufferTX[2];
 
 /// @brief waits for a serial response to Match CRC
 /// @param expectedCRC the expected crc 
-/// @param size size of the buffer
 /// @param timeout_ms number of ms to wait before timing out
 /// @return true if CRC matches, false otherwise
-static bool SERIAL_rx_BAP_CRC(uint16_t expectedCRC, uint16_t size, uint16_t timeout_ms) {
-    memset(crcBufferRX, 0, size);
-    int16_t CRCBytesRead = uart_read_bytes(UART_NUM_2, crcBufferRX, size, timeout_ms / portTICK_PERIOD_MS);
+static bool SERIAL_rx_BAP_CRC(uint16_t expectedCRC, uint16_t timeout_ms) {
+    memset(crcBufferRX, 0, 2);
+    int16_t CRCBytesRead = uart_read_bytes(UART_NUM_2, crcBufferRX, 2, timeout_ms / portTICK_PERIOD_MS);
 
     if (CRCBytesRead != 2) {
         ESP_LOGE("LVGL", "Failed to read CRC from device");
@@ -156,7 +155,10 @@ static bool SERIAL_rx_BAP_CRC(uint16_t expectedCRC, uint16_t size, uint16_t time
         return false;
     }
 }
-
+/// @brief Calculates the CRC16 of a given data
+/// @param data The data to calculate the CRC16 of
+/// @param length The length of the data
+/// @return The CRC16 of the data
 static uint16_t calculate_crc16(const uint8_t* data, size_t length) {
     uint16_t crc = 0xFFFF;  // Initial value
     
@@ -192,8 +194,8 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
         memcpy(&displayBufferBAP[2], data, dataLen);
     }
     
-    // Calculate CRC16 for the entire message (reg + len + data)
-    uint16_t crc = calculate_crc16(displayBufferBAP, dataLen + 2);
+    // Calculate CRC16 for the entire message (preamble + reg + len + data)
+    uint16_t crc = calculate_crc16(displayBufferBAP, dataLen + 4);  // +4 for preamble (2) + reg (1) + len (1)
     
     // Append CRC to the message
     displayBufferBAP[dataLen + 2] = (crc >> 8) & 0xFF;    // High byte
@@ -203,7 +205,7 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
     ESP_LOGI("LVGL", "Sending reg 0x%02X, len %d, CRC: 0x%04X", reg, dataLen, crc);
     SERIAL_send_BAP(displayBufferBAP, dataLen + 4, false);
     // Wait for CRC feedback
-    if (!SERIAL_rx_BAP_CRC(crc, 2, 500))
+    if (!SERIAL_rx_BAP_CRC(crc, 500))
     {
         ESP_LOGE("BAPTX", "CRC Feedback mismatch");
         return ESP_FAIL;
