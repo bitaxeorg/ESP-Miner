@@ -65,6 +65,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     power_management->frequency_multiplier = 1;
+    power_management->chip_temp_max = 0.0;
+    power_management->vr_temp_max = 0.0;
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
@@ -80,8 +82,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         power_management->fan_rpm = Thermal_get_fan_speed(GLOBAL_STATE->DEVICE_CONFIG);
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
+        if (power_management->chip_temp_avg > power_management->chip_temp_max) {
+            power_management->chip_temp_max = power_management->chip_temp_avg;
+        }
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
+        if (power_management->vr_temp > power_management->vr_temp_max) {
+            power_management->vr_temp_max = power_management->vr_temp;
+        }
 
 
         // ASIC Thermal Diode will give bad readings if the ASIC is turned off
