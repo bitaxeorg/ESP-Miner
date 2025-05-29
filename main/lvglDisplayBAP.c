@@ -188,22 +188,25 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
     //memset(displayBufferBAP, 0, dataLen + 2);
     
     // Prepare data
-    displayBufferBAP[0] = reg;
-    displayBufferBAP[1] = (uint8_t)dataLen; // Explicitly cast size to uint8_t
+    memset(displayBufferBAP, 0, MAX_BUFFER_SIZE_BAP);
+    displayBufferBAP[0] = 0xFF;
+    displayBufferBAP[1] = 0xAA;
+    displayBufferBAP[2] = reg;
+    displayBufferBAP[3] = (uint8_t)dataLen; // Explicitly cast size to uint8_t
     if (data != NULL && dataLen > 0) {
-        memcpy(&displayBufferBAP[2], data, dataLen);
+        memcpy(&displayBufferBAP[4], data, dataLen);
     }
     
     // Calculate CRC16 for the entire message (preamble + reg + len + data)
     uint16_t crc = calculate_crc16(displayBufferBAP, dataLen + 4);  // +4 for preamble (2) + reg (1) + len (1)
     
     // Append CRC to the message
-    displayBufferBAP[dataLen + 2] = (crc >> 8) & 0xFF;    // High byte
-    displayBufferBAP[dataLen + 3] = crc & 0xFF;           // Low byte
+    displayBufferBAP[dataLen + 4] = (crc >> 8) & 0xFF;    // High byte
+    displayBufferBAP[dataLen + 5] = crc & 0xFF;           // Low byte
     
     // Send data with CRC
     ESP_LOGI("LVGL", "Sending reg 0x%02X, len %d, CRC: 0x%04X", reg, dataLen, crc);
-    SERIAL_send_BAP(displayBufferBAP, dataLen + 4, false);
+    SERIAL_send_BAP(displayBufferBAP, dataLen + 6, false);
     // Wait for CRC feedback
     if (!SERIAL_rx_BAP_CRC(crc, 500))
     {
@@ -772,6 +775,7 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms) {
                         ESP_LOGI("Serial BAP", "RAW HEX: %02X", buf[3]);
                         break;
                 }
+                SERIAL_send_BAP(crcBufferTX, 2, false);
             }
             else {
                 ESP_LOGI("Serial BAP", "Received invalid length");
@@ -779,7 +783,7 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms) {
             }
         }
     }
-    SERIAL_send_BAP(crcBufferTX, 2, false);
+    
     return bytes_read;
 }
 
