@@ -62,33 +62,53 @@
 <div class="table-container">
     <table cellspacing="0" cellpadding="0" class="text-sm md:text-base">
         <tr>
-            <th>
-                <div class="flex align-items-center cursor-pointer select-none h-full" (click)="sortBy('IP')">
-                    <span class="flex-1">IP</span>
+            <th *ngFor="let field of [
+                {
+                    name: 'IP',
+                    label: 'IP'
+                },
+                {
+                    name: 'hostname',
+                    label: 'Hostname'
+                },
+                {
+                    name: 'hashRate',
+                    label: 'Hash Rate'
+                },
+                {
+                    name: 'sharesAccepted',
+                    label: 'Shares'
+                },
+                {
+                    name: 'bestDiff',
+                    label: 'Best Diff'
+                },
+                {
+                    name: 'uptimeSeconds',
+                    label: 'Uptime'
+                },
+                {
+                    name: 'power',
+                    label: 'Power'
+                },
+                {
+                    name: 'temp',
+                    label: 'Temp'
+                },
+                {
+                    name: 'version',
+                    label: 'Version'
+                },
+            ]">
+                <div class="flex align-items-center cursor-pointer select-none h-full" (click)="sortBy(field.name)">
+                    <span class="flex-1">{{field.label}}</span>
                     <i class="pi text-xs flex items-center" [ngClass]="{
-                        'pi-sort-alt': sortField !== 'IP',
-                        'pi-sort-amount-up-alt': sortField === 'IP' && sortDirection === 'asc',
-                        'pi-sort-amount-down': sortField === 'IP' && sortDirection === 'desc'
+                        'pi-sort-alt': sortField !== field.name,
+                        'pi-sort-amount-up-alt': sortField === field.name && sortDirection === 'asc',
+                        'pi-sort-amount-down': sortField === field.name && sortDirection === 'desc'
                     }"></i>
                 </div>
             </th>
-            <th>
-                <div class="flex align-items-center cursor-pointer select-none h-full" (click)="sortBy('hostname')">
-                    <span class="flex-1">Hostname</span>
-                    <i class="pi text-xs flex items-center" [ngClass]="{
-                        'pi-sort-alt': sortField !== 'hostname',
-                        'pi-sort-amount-up-alt': sortField === 'hostname' && sortDirection === 'asc',
-                        'pi-sort-amount-down': sortField === 'hostname' && sortDirection === 'desc'
-                    }"></i>
-                </div>
-            </th>
-            <th>Hash Rate</th>
-            <th>Uptime</th>
-            <th>Shares</th>
-            <th>Power</th>
-            <th>Temp</th>
-            <th>Best Diff</th>
-            <th>Version</th>
             <th>Edit</th>
             <th>Restart</th>
             <th>Remove</th>
@@ -112,7 +132,6 @@
                 </td>
                 <td>{{axe.hostname}}</td>
                 <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
-                <td>{{axe.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
                 <td>
                     <div class="w-min cursor-pointer"
                          pTooltip="Shares Accepted"
@@ -125,9 +144,25 @@
                         {{axe.sharesRejected | number: '1.0-0'}}
                     </div>
                 </td>
+                <td>
+                    <div class="w-min cursor-pointer"
+                         pTooltip="Best Diff"
+                         tooltipPosition="top">
+                        {{axe.bestDiff}}
+                    </div>
+                    <div class="text-sm w-min cursor-pointer"
+                         pTooltip="Best Session Diff"
+                         tooltipPosition="top">
+                        {{axe.bestSessionDiff}}
+                    </div>
+                </td>
+                <td>{{axe.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
                 <td>{{axe.power | number: '1.1-1'}} <small>W</small> </td>
                 <td>
-                    <div [ngClass]="{'text-orange-500': axe.temp > 68}">
+                    <div
+                         [ngClass]="{'text-orange-500': axe.temp > 68}"
+                         pTooltip="ASIC Temperature"
+                         tooltipPosition="top">
                         {{axe.temp | number: '1.0-1'}}°<small>C</small>
                     </div>
                     <div class="text-sm w-min cursor-pointer"
@@ -136,14 +171,6 @@
                          pTooltip="Voltage Regulator Temperature"
                          tooltipPosition="top">
                         {{axe.vrTemp | number: '1.0-1'}}°<small>C</small>
-                    </div>
-                </td>
-                <td>
-                    <div>{{axe.bestDiff}}</div>
-                    <div class="text-sm w-min cursor-pointer"
-                         pTooltip="Best Session Diff"
-                         tooltipPosition="top">
-                        {{axe.bestSessionDiff}}
                     </div>
                 </td>
                 <td>{{axe.version}}</td>
