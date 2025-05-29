@@ -59,6 +59,8 @@ static int s_retry_num = 0;
 static int clients_connected_to_ap = 0;
 
 static const char *get_wifi_reason_string(int reason);
+static void wifi_softap_on(void);
+static void wifi_softap_off(void);
 
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
@@ -216,6 +218,10 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         s_retry_num = 0;
 
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
+
+        ESP_LOGI(TAG, "Connected to SSID: %s", GLOBAL_STATE->SYSTEM_MODULE.ssid);
+
+        wifi_softap_off();
     }
 }
 
@@ -254,12 +260,12 @@ void toggle_wifi_softap(void)
     }
 }
 
-void wifi_softap_off(void)
+static void wifi_softap_off(void)
 {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 }
 
-void wifi_softap_on(void)
+static void wifi_softap_on(void)
 {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
 }
