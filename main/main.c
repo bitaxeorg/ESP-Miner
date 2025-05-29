@@ -56,8 +56,7 @@ void app_main(void)
         return;
     }
 
-    self_test(&GLOBAL_STATE);
-    if (GLOBAL_STATE->SELF_TEST_MODULE.active = true) return;
+    if (self_test(&GLOBAL_STATE)) return;
 
     SYSTEM_init_system(&GLOBAL_STATE);
     statistics_init(&GLOBAL_STATE);
