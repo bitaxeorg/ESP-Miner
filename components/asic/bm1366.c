@@ -66,7 +66,7 @@ typedef struct __attribute__((__packed__))
 
 static float current_frequency = 56.25;
 
-static const char * TAG = "bm1366Module";
+static const char * TAG = "bm1366";
 
 static task_result result;
 

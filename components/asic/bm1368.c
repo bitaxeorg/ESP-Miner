@@ -64,7 +64,7 @@ typedef struct __attribute__((__packed__))
     uint8_t crc;
 } bm1368_asic_result_t;
 
-static const char * TAG = "bm1368Module";
+static const char * TAG = "bm1368";
 
 static task_result result;
 

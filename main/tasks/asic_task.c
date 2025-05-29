@@ -9,7 +9,7 @@
 
 #include "asic.h"
 
-static const char *TAG = "ASIC_task";
+static const char *TAG = "asic_task";
 
 // static bm_job ** active_jobs; is required to keep track of the active jobs since the
 
