@@ -5,7 +5,8 @@ import { LoadingService } from 'src/app/services/loading.service';
 @Component({
   selector: 'app-loading',
   templateUrl: './loading.component.html',
-  styleUrls: ['./loading.component.scss']
+  styleUrls: ['./loading.component.scss'],
+  standalone: false
 })
 export class LoadingComponent {
 

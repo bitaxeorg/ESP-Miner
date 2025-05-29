@@ -12,7 +12,8 @@ const SWARM_SORTING = 'SWARM_SORTING'
 @Component({
   selector: 'app-swarm',
   templateUrl: './swarm.component.html',
-  styleUrls: ['./swarm.component.scss']
+  styleUrls: ['./swarm.component.scss'],
+  standalone: false
 })
 export class SwarmComponent implements OnInit, OnDestroy {
 

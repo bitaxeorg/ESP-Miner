@@ -7,7 +7,8 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 @Component({
   selector: 'app-logs',
   templateUrl: './logs.component.html',
-  styleUrl: './logs.component.scss'
+  styleUrl: './logs.component.scss',
+  standalone: false
 })
 export class LogsComponent implements OnDestroy, AfterViewChecked {
 

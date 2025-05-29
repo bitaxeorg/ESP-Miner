@@ -12,7 +12,8 @@ import { eASICModel } from 'src/models/enum/eASICModel';
 @Component({
   selector: 'app-settings',
   templateUrl: './settings.component.html',
-  styleUrls: ['./settings.component.scss']
+  styleUrls: ['./settings.component.scss'],
+  standalone: false
 })
 export class SettingsComponent {
 
