@@ -122,10 +122,27 @@ static double lastNetworkHashrate = 0.0;
 static double lastNetworkDifficulty = 0.0;
 static uint32_t lastBlockHeight = 0;
 
+static uint16_t calculate_crc16(const uint8_t* data, size_t length) {
+    uint16_t crc = 0xFFFF;  // Initial value
+    
+    for (size_t i = 0; i < length; i++) {
+        crc ^= (uint16_t)data[i] << 8;
+        for (int j = 0; j < 8; j++) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc = crc << 1;
+            }
+        }
+    }
+    
+    return crc;
+}
+
 static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataLen) 
 {
     // Check total size including register byte and length byte
-    if (dataLen + 2 > MAX_BUFFER_SIZE_BAP) {
+    if (dataLen + 4 > MAX_BUFFER_SIZE_BAP) {
         ESP_LOGE("LVGL", "Buffer overflow prevented: reg 0x%02X, size %d", reg, dataLen);
         return ESP_ERR_NO_MEM;
     }        
@@ -140,11 +157,16 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
         memcpy(&displayBufferBAP[2], data, dataLen);
     }
     
-    // Add debug logging
-    ESP_LOGI("LVGL", "Sending reg 0x%02X, len %d", reg, dataLen);
-    SERIAL_send_BAP(displayBufferBAP, dataLen + 2, false);
-    // Send data with exact length
-    return ESP_OK;
+    // Calculate CRC16 for the entire message (reg + len + data)
+    uint16_t crc = calculate_crc16(displayBufferBAP, dataLen + 2);
+    
+    // Append CRC to the message
+    displayBufferBAP[dataLen + 2] = (crc >> 8) & 0xFF;    // High byte
+    displayBufferBAP[dataLen + 3] = crc & 0xFF;           // Low byte
+    
+    // Send data with CRC
+    ESP_LOGI("LVGL", "Sending reg 0x%02X, len %d, CRC: 0x%04X", reg, dataLen, crc);
+    return SERIAL_send_BAP(displayBufferBAP, dataLen + 4, false);
 }
 
 esp_err_t lvglDisplay_initBAP(void) 
@@ -537,23 +559,46 @@ esp_err_t lvglUpdateDisplayAPIBAP(void)
 
 /// @brief waits for a serial response from the device
 /// @param buf buffer to read data into
-/// @param buf number of ms to wait before timing out
+/// @param size size of the buffer
+/// @param timeout_ms number of ms to wait before timing out
 /// @return number of bytes read, or -1 on error
-int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
-{
+int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms) {
     memset(buf, 0, size);
     int16_t bytes_read = uart_read_bytes(UART_NUM_2, buf, size, timeout_ms / portTICK_PERIOD_MS);
 
-    if (bytes_read > 0) 
-    {
+    if (bytes_read > 0) {
         ESP_LOGI("Serial BAP", "rx: ");
         prettyHex((unsigned char*) buf, bytes_read);
         ESP_LOGI("Serial BAP", " [%d]\n", bytes_read);
 
-        if (buf[0] == 0xFF && buf[1] == 0xAA) {
-            ESP_LOGI("Serial BAP", "Received Preamble");
+        // Minimum message size: preamble (2) + reg (1) + len (1) + data (1) + CRC (2) = 7 bytes
+        if (bytes_read < 7) {
+            ESP_LOGE("Serial BAP", "Message too short");
+            return -1;
+        }
 
-            if (buf[2] == bytes_read - 4) {
+        if (buf[0] == 0xFF && buf[1] == 0xAA) {
+            uint8_t reg = buf[2];
+            uint8_t data_len = buf[3];
+            
+            // Verify total message length
+            if (bytes_read != data_len + 6) { // preamble + reg + len + data + CRC
+                ESP_LOGE("Serial BAP", "Invalid message length");
+                return -1;
+            }
+            
+            // Calculate CRC16 of received message (excluding CRC bytes)
+            uint16_t received_crc = (buf[bytes_read - 2] << 8) | buf[bytes_read - 1];
+            uint16_t calculated_crc = calculate_crc16(buf, bytes_read - 2);
+            
+            if (received_crc != calculated_crc) {
+                ESP_LOGE("Serial BAP", "CRC mismatch: received 0x%04X, calculated 0x%04X", 
+                         received_crc, calculated_crc);
+                return -1;
+            }
+            
+            // Process the message based on register
+            if (data_len == bytes_read - 6) {
                 switch (buf[3]) {
                     case LVGL_REG_SETTINGS_HOSTNAME:
                     ESP_LOGI("Serial BAP", "Received hostname");
