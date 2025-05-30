@@ -91,6 +91,20 @@ typedef struct
 
 typedef struct
 {
+    int16_t offsetPower;          // Power offset in watts
+    uint16_t offsetDomainVoltage; // Voltage offset in mV
+    uint16_t offsetFrequency;     // Frequency offset in MHz
+    uint8_t offsetFanSpeed;       // Fan speed offset in percentage
+    int16_t targetPower;          // Target power in watts
+    uint16_t targetDomainVoltage; // Target voltage in mV
+    uint16_t targetFrequency;     // Target frequency in MHz
+    uint8_t targetFanSpeed;       // Target fan speed in percentage
+    uint8_t targetTemperature;    // Target temperature in °C
+    float targetHashrate;         // Target hashrate in GH/s
+} AutotuneModule;
+
+typedef struct
+{
     DeviceModel device_model;
     char * device_model_str;
     int board_version;
@@ -110,6 +124,7 @@ typedef struct
     AsicTaskModule ASIC_TASK_MODULE;
     PowerManagementModule POWER_MANAGEMENT_MODULE;
     SelfTestModule SELF_TEST_MODULE;
+    AutotuneModule AUTOTUNE_MODULE;
 
     char * extranonce_str;
     int extranonce_2_len;
