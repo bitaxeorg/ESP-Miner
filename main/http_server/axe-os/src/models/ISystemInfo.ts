@@ -7,6 +7,7 @@ interface ISharesRejectedStat {
 
 export interface ISystemInfo {
 
+    display: string;
     flipscreen: number;
     invertscreen: number;
     displayTimeout: number;
@@ -18,6 +19,7 @@ export interface ISystemInfo {
     maxPower: number,
     nominalVoltage: number,
     hashRate: number,
+    expectedHashrate: number,
     bestDiff: string,
     bestSessionDiff: string,
     freeHeap: number,
@@ -26,6 +28,7 @@ export interface ISystemInfo {
     macAddr: string,
     ssid: string,
     wifiStatus: string,
+    wifiRSSI: number,
     apEnabled: number,
     sharesAccepted: number,
     sharesRejected: number,
@@ -49,6 +52,8 @@ export interface ISystemInfo {
     fanspeed: number,
     temptarget: number,
     fanrpm: number,
+    statsLimit: number,
+    statsDuration: number,
     coreVoltageActual: number,
 
     boardtemp1?: number,

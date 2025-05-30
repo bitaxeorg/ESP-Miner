@@ -35,14 +35,27 @@
 </div>
 
 <div class="flex flex-column sm:flex-row w-full gap-2 xl:gap-4 mt-4 mb-4">
-    <div class="card mb-0 w-full text-center p-4">
-        Total Hash Rate: <span class="text-primary">{{totals.hashRate * 1000000000 | hashSuffix}}</span>
-    </div>
-    <div class="card mb-0 w-full text-center p-4">
-        Total Power: <span class="text-primary">{{totals.power | number: '1.1-1'}} <small>W</small></span>
-    </div>
-    <div class="card mb-0 w-full text-center p-4">
-        Best Diff: <span class="text-primary">{{totals.bestDiff}}</span>
+    <div class="card mb-0 w-full text-center p-4 min-w-max flex sm:flex-column xl:flex-row justify-content-center gap-1"
+        *ngFor="let metric of [
+            {
+                label: 'Total Devices',
+                value: swarm.length
+            },
+            {
+                label: 'Total Hash Rate',
+                value: totals.hashRate * 1000000000 | hashSuffix
+            },
+            {
+                label: 'Total Power',
+                value: (totals.power | number: '1.1-1')  + ' W'
+            },
+            {
+                label: 'Best Diff',
+                value: totals.bestDiff
+            }
+        ]"
+    >
+        {{metric.label}}: <span class="text-primary">{{metric.value}}</span>
     </div>
 </div>
 

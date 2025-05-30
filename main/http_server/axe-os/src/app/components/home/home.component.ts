@@ -6,6 +6,7 @@ import { ShareRejectionExplanationService } from 'src/app/services/share-rejecti
 import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
+import { ISystemStatistics } from 'src/models/ISystemStatistics';
 
 
 @Component({
@@ -16,13 +17,17 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 export class HomeComponent {
 
   public info$!: Observable<ISystemInfo>;
-  public expectedHashRate$!: Observable<number | undefined>;
+  public stats$!: Observable<ISystemStatistics>;
 
   public chartOptions: any;
   public dataLabel: number[] = [];
   public hashrateData: number[] = [];
   public temperatureData: number[] = [];
   public powerData: number[] = [];
+  public previousDataLabel: number[] = [];
+  public previousHashrateData: number[] = [];
+  public previousTemperatureData: number[] = [];
+  public previousPowerData: number[] = [];
   public chartData?: any;
 
   public maxPower: number = 0;
@@ -71,7 +76,7 @@ export class HomeComponent {
       this.chartOptions.plugins.legend.labels.color = textColor;
       this.chartOptions.scales.x.ticks.color = textColorSecondary;
       this.chartOptions.scales.x.grid.color = surfaceBorder;
-      this.chartOptions.scales.y.ticks.color = textColorSecondary;
+      this.chartOptions.scales.y.ticks.color = primaryColor;
       this.chartOptions.scales.y.grid.color = surfaceBorder;
       this.chartOptions.scales.y2.ticks.color = textColorSecondary;
       this.chartOptions.scales.y2.grid.color = surfaceBorder;
@@ -163,7 +168,7 @@ export class HomeComponent {
         },
         y: {
           ticks: {
-            color: textColorSecondary,
+            color: primaryColor,
             callback: (value: number) => HashSuffixPipe.transform(value)
           },
           grid: {
@@ -188,7 +193,30 @@ export class HomeComponent {
       }
     };
 
+    // load previous data
+    this.stats$ = this.systemService.getStatistics().pipe(shareReplay({refCount: true, bufferSize: 1}));
+    this.stats$.subscribe(stats => {
+      stats.statistics.forEach(element => {
+        const idxHashrate = 0;
+        const idxTemperature = 1;
+        const idxPower = 2;
+        const idxTimestamp = 3;
 
+        this.previousHashrateData.push(element[idxHashrate] * 1000000000);
+        this.previousTemperatureData.push(element[idxTemperature]);
+        this.previousPowerData.push(element[idxPower]);
+        this.previousDataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
+
+        if (this.previousHashrateData.length >= 720) {
+          this.previousHashrateData.shift();
+          this.previousTemperatureData.shift();
+          this.previousPowerData.shift();
+          this.previousDataLabel.shift();
+        }
+      });
+    });
+
+    // live data
     this.info$ = interval(5000).pipe(
       startWith(() => this.systemService.getInfo()),
       switchMap(() => {
@@ -200,19 +228,25 @@ export class HomeComponent {
           this.hashrateData.push(info.hashRate * 1000000000);
           this.temperatureData.push(info.temp);
           this.powerData.push(info.power);
-
           this.dataLabel.push(new Date().getTime());
 
-          if (this.hashrateData.length >= 720) {
-            this.hashrateData.shift();
-            this.temperatureData.shift();
-            this.powerData.shift();
-            this.dataLabel.shift();
+          if ((this.previousHashrateData.length + this.hashrateData.length) >= 720) {
+            if (this.previousHashrateData.length > 0) {
+              this.previousHashrateData.shift();
+              this.previousTemperatureData.shift();
+              this.previousPowerData.shift();
+              this.previousDataLabel.shift();
+            } else {
+              this.hashrateData.shift();
+              this.temperatureData.shift();
+              this.powerData.shift();
+              this.dataLabel.shift();
+            }
           }
 
-          this.chartData.labels = this.dataLabel;
-          this.chartData.datasets[0].data = this.hashrateData;
-          this.chartData.datasets[1].data = this.temperatureData;
+          this.chartData.labels = this.previousDataLabel.concat(this.dataLabel);
+          this.chartData.datasets[0].data = this.previousHashrateData.concat(this.hashrateData);
+          this.chartData.datasets[1].data = this.previousTemperatureData.concat(this.temperatureData);
 
           this.chartData = {
             ...this.chartData
@@ -243,10 +277,6 @@ export class HomeComponent {
       }),
       shareReplay({ refCount: true, bufferSize: 1 })
     );
-
-    this.expectedHashRate$ = this.info$.pipe(map(info => {
-      return Math.floor(info.frequency * ((info.smallCoreCount * info.asicCount) / 1000))
-    }))
 
     this.quickLink$ = this.info$.pipe(
       map(info => {
@@ -281,9 +311,13 @@ export class HomeComponent {
     // Calculate efficiency for each data point and average them
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
-      return power / (hashrate/1000000000000); // Convert to J/TH
+      if (hashrate > 0) {
+        return power / (hashrate/1000000000000); // Convert to J/TH
+      } else {
+        return power; // in this case better than infinity or NaN
+      }
     });
 
     return this.calculateAverage(efficiencies);
-  }  
+  }
 }
