@@ -2,7 +2,6 @@
 #define BM1397_H_
 
 #include "common.h"
-#include "driver/gpio.h"
 #include "mining.h"
 
 #define BM1397_SERIALTX_DEBUG true

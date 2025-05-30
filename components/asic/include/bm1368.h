@@ -2,7 +2,6 @@
 #define BM1368_H_
 
 #include "common.h"
-#include "driver/gpio.h"
 #include "mining.h"
 
 #define BM1368_SERIALTX_DEBUG false
