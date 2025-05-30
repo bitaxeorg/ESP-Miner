@@ -5,7 +5,7 @@
 #include "global_state.h"
 #include "asic.h"
 
-// static const char *TAG = "asic_api";
+// static const char *TAG = "asic_settings";
 static GlobalState *GLOBAL_STATE = NULL;
 
 // Function declarations from http_server.c
