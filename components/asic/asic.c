@@ -10,6 +10,7 @@
 #include "asic.h"
 #include "device_config.h"
 #include "driver/gpio.h"
+#include "sdkconfig.h"
 
 #define GPIO_ASIC_RESET CONFIG_GPIO_ASIC_RESET
 
