@@ -31,6 +31,7 @@
 #include "bm1370.h"
 #include "asic.h"
 #include "device_config.h"
+#include "asic_reset.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
@@ -304,6 +305,12 @@ void self_test(void * pvParameters)
     if (test_voltage_regulator(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Voltage Regulator test failed!");
         tests_done(GLOBAL_STATE, TESTS_FAILED);
+    }
+
+    if (asic_reset() != ESP_OK) {
+        ESP_LOGE(TAG, "ASIC reset failed!");
+        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        return;
     }
 
     //test for number of ASICs
