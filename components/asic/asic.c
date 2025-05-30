@@ -9,6 +9,9 @@
 
 #include "asic.h"
 #include "device_config.h"
+#include "driver/gpio.h"
+
+#define GPIO_ASIC_RESET CONFIG_GPIO_ASIC_RESET
 
 static const double NONCE_SPACE = 4294967296.0; //  2^32
 
@@ -16,6 +19,15 @@ static const char *TAG = "asic";
 
 uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
 {
+    ESP_LOGI(TAG, "Initializing %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+
+    esp_rom_gpio_pad_select_gpio(GPIO_ASIC_RESET);
+    gpio_set_direction(GPIO_ASIC_RESET, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_ASIC_RESET, 0);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    gpio_set_level(GPIO_ASIC_RESET, 1);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.model) {
         case BM1397:
             return BM1397_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
