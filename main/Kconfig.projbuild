@@ -12,19 +12,19 @@ menu "Bitaxe Configuration"
             int "ASIC reset GPIO pin"
             default 1
             help
-                GPIO pin connected to the NRSTI signal of the ASIC.
+                GPIO pin for ASIC_RESET (RST_N), reset input to ASIC.
 
         config GPIO_ASIC_ENABLE
             int "ASIC enable GPIO pin"
             default 10
             help
-                GPIO pin for POWER_EN ASIC power enable.
+                GPIO pin for ASIC_ENABLE (POWER_EN), enable for core power supply.
 
         config GPIO_PLUG_SENSE
             int "Barrel plug sense GPIO pin"
             default 12
             help
-                GPIO pin for DC barrel PLUG_SENSE Bitaxe ultra 204.
+                GPIO pin for DC barrel (PLUG_SENSE), sense pin of DC power jack socket.
 
         config GPIO_I2C_SDA
             int "I2C SDA Pin"
