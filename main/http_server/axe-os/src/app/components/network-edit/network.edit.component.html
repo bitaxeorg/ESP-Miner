@@ -26,13 +26,9 @@
             </div>
         </div>
 
-        <div class="mt-2">
+        <div class="flex mt-5 gap-3">
             <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-                class="btn btn-primary mr-2">Save</button>
-            <b style="line-height: 34px;">You must restart this device after saving for changes to take effect.</b>
-        </div>
-
-        <div class="mt-2">
+                class="btn btn-primary">Save</button>
             <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
         </div>
     </form>

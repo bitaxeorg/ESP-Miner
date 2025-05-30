@@ -3,6 +3,8 @@
 
 #include "i2c_bitaxe.h"
 
+// TODO Make all these enums
+
 #define EMC2101_BETA_11         0x00
 #define EMC2101_BETA_18         0x01
 #define EMC2101_BETA_25         0x02
@@ -160,12 +162,12 @@ typedef enum
     EMC2101_RATE_32_HZ,   ///< 32_HZ
 } emc2101_rate_t;
 
-void EMC2101_set_fan_speed(float);
+esp_err_t EMC2101_set_fan_speed(float);
 // void EMC2101_read(void);
 uint16_t EMC2101_get_fan_speed(void);
 esp_err_t EMC2101_init();
 float EMC2101_get_external_temp(void);
 uint8_t EMC2101_get_internal_temp(void);
-void EMC2101_set_ideality_factor(uint8_t);
-void EMC2101_set_beta_compensation(uint8_t);
+esp_err_t EMC2101_set_ideality_factor(uint8_t);
+esp_err_t EMC2101_set_beta_compensation(uint8_t);
 #endif /* EMC2101_H_ */

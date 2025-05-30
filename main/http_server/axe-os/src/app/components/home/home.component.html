@@ -20,116 +20,116 @@
     </p-message>
 
     <div class="grid" *ngIf="info$ | async as info; else loading">
-                <div class="col-12 md:col-6 xl:col-3">
-                    <div class="card mb-0">
-                        <div class="flex justify-content-between mb-3">
-                            <div>
-                                <span class="block text-500 font-medium mb-3">Hash Rate</span>
-                                <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
-                                    <span *ngIf="!info.power_fault">
-                                        {{info.hashRate * 1000000000 | hashSuffix}}
-                                    </span>
-                                    <span *ngIf="info.power_fault" class="text-red-500">
-                                        Not available - Power fault
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <ng-container *ngIf="!info.power_fault">
-                            Average:
-                            <span class="text-green-500 font-medium">
-                                {{calculateAverage(hashrateData) | hashSuffix}}
+        <div class="col-12 md:col-6 xl:col-3">
+            <div class="card mb-0">
+                <div class="flex justify-content-between mb-3">
+                    <div>
+                        <span class="block text-500 font-medium mb-3">Hash Rate</span>
+                        <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
+                            <span *ngIf="!info.power_fault">
+                                {{info.hashRate * 1000000000 | hashSuffix}}
                             </span>
-                        </ng-container>
-
-                        <div class="text-500 text-xs" *ngIf="!info.power_fault && (expectedHashRate$ | async) as expectedHashRate">
-                            Expected: {{expectedHashRate * 1000000000 | hashSuffix}}
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 md:col-6 xl:col-3">
-                    <div class="card mb-0">
-                        <div class="flex justify-content-between mb-3">
-                            <div>
-                                <span class="block text-500 font-medium mb-3">Efficiency</span>
-                                <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
-                                    <span *ngIf="!info.power_fault">
-                                        {{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/TH</small>
-                                    </span>
-                                    <span *ngIf="info.power_fault" class="text-red-500">
-                                        Not available - Power fault
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <ng-container *ngIf="!info.power_fault">
-                            Average:
-                            <span class="text-green-500 font-medium">
-                                {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} <small>J/TH</small>
+                            <span *ngIf="info.power_fault" class="text-red-500">
+                                Not available - Power fault
                             </span>
-                        </ng-container>
-
-                        <div class="text-500 text-xs" *ngIf="!info.power_fault && (expectedHashRate$ | async) as expectedHashRate">
-                            Expected: {{info.power / (expectedHashRate/1000) | number: '1.2-2'}} J/TH
                         </div>
-                    </div>
-                </div>
-                <div class="col-12 md:col-6 xl:col-3">
-                    <div class="card mb-0">
-                        <div class="flex justify-content-between mb-3">
-                            <div>
-                                <span class="block text-500 font-medium mb-3">Shares</span>
-                                <div class="text-900 font-medium text-2xl">{{info.sharesAccepted | number: '1.0-0'}}
-                                </div>
-                            </div>
-                        </div>
-                        <div *ngIf="info.sharesRejected === 0">
-                            <span class="text-red-500 font-medium">0 </span>
-                            <span class="text-500">rejected</span>
-                        </div>
-                        <div *ngIf="info.sharesRejected > 0">
-                            <div *ngFor="let sharesRejectedReason of getSortedRejectionReasons(info); trackBy: trackByReason">
-                              <span
-                                class="inline-block"
-                                pTooltip="{{ getRejectionExplanation(sharesRejectedReason.message) }}"
-                                [tooltipDisabled]="!getRejectionExplanation(sharesRejectedReason.message)"
-                                tooltipPosition="bottom"
-                              >
-                                <span class="text-red-500 font-medium">
-                                  {{ sharesRejectedReason.count | number: '1.0-0' }}
-                                </span>
-                                <span class="text-500">
-                                  {{ sharesRejectedReason.message }}
-                                </span>
-                                ({{ 
-                                  (sharesRejectedReason.count / 
-                                   (info.sharesAccepted + info.sharesRejected) * 100) 
-                                  | number: '1.2-2' 
-                                }}%)
-                              </span>
-                            </div>
-                        </div>                          
                     </div>
                 </div>
 
-                <div class="col-12 md:col-6 xl:col-3">
-                    <div class="card mb-0">
-                        <div class="flex justify-content-between mb-3">
-                            <div>
-                                <span class="block text-500 font-medium mb-3">Best Difficulty</span>
-                                <div class="text-900 font-medium text-2xl">{{info.bestDiff}}
-                                    <span class="text-500 text-lg">all-time best</span>
-                                </div>
-                            </div>
+                <ng-container *ngIf="!info.power_fault">
+                    Average:
+                    <span class="text-green-500 font-medium">
+                        {{calculateAverage(previousHashrateData.concat(hashrateData)) | hashSuffix}}
+                    </span>
+                </ng-container>
+
+                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
+                    Expected: {{info.expectedHashrate * 1000000000 | hashSuffix}}
+                </div>
+            </div>
+        </div>
+        <div class="col-12 md:col-6 xl:col-3">
+            <div class="card mb-0">
+                <div class="flex justify-content-between mb-3">
+                    <div>
+                        <span class="block text-500 font-medium mb-3">Efficiency</span>
+                        <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
+                            <span *ngIf="!info.power_fault">
+                                {{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/TH</small>
+                            </span>
+                            <span *ngIf="info.power_fault" class="text-red-500">
+                                Not available - Power fault
+                            </span>
                         </div>
-                        <span class="text-900 font-medium">{{info.bestSessionDiff}} </span>
-                        <span class="text-500">since system boot</span>
-                        <!-- <span class="text-green-500 font-medium">520 </span>
-                        <span class="text-500">newly registered</span> -->
                     </div>
                 </div>
+
+                <ng-container *ngIf="!info.power_fault">
+                    Average:
+                    <span class="text-green-500 font-medium">
+                        {{calculateEfficiencyAverage(previousHashrateData.concat(hashrateData), previousPowerData.concat(powerData)) | number: '1.2-2'}} <small>J/TH</small>
+                    </span>
+                </ng-container>
+
+                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
+                    Expected: {{info.power / (info.expectedHashrate/1000) | number: '1.2-2'}} J/TH
+                </div>
+            </div>
+        </div>
+        <div class="col-12 md:col-6 xl:col-3">
+            <div class="card mb-0">
+                <div class="flex justify-content-between mb-3">
+                    <div>
+                        <span class="block text-500 font-medium mb-3">Shares</span>
+                        <div class="text-900 font-medium text-2xl">{{info.sharesAccepted | number: '1.0-0'}}
+                        </div>
+                    </div>
+                </div>
+                <div *ngIf="info.sharesRejected === 0">
+                    <span class="text-red-500 font-medium">0 </span>
+                    <span class="text-500">rejected</span>
+                </div>
+                <div *ngIf="info.sharesRejected > 0">
+                    <div *ngFor="let sharesRejectedReason of getSortedRejectionReasons(info); trackBy: trackByReason">
+                        <span
+                        class="inline-block"
+                        pTooltip="{{ getRejectionExplanation(sharesRejectedReason.message) }}"
+                        [tooltipDisabled]="!getRejectionExplanation(sharesRejectedReason.message)"
+                        tooltipPosition="bottom"
+                        >
+                        <span class="text-red-500 font-medium">
+                            {{ sharesRejectedReason.count | number: '1.0-0' }}
+                        </span>
+                        <span class="text-500">
+                            {{ sharesRejectedReason.message }}
+                        </span>
+                        ({{
+                            (sharesRejectedReason.count /
+                            (info.sharesAccepted + info.sharesRejected) * 100)
+                            | number: '1.2-2'
+                        }}%)
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 md:col-6 xl:col-3">
+            <div class="card mb-0">
+                <div class="flex justify-content-between mb-3">
+                    <div>
+                        <span class="block text-500 font-medium mb-3">Best Difficulty</span>
+                        <div class="text-900 font-medium text-2xl">{{info.bestDiff}}
+                            <span class="text-500 text-lg">all-time best</span>
+                        </div>
+                    </div>
+                </div>
+                <span class="text-900 font-medium">{{info.bestSessionDiff}} </span>
+                <span class="text-500">since system boot</span>
+                <!-- <span class="text-green-500 font-medium">520 </span>
+                <span class="text-500">newly registered</span> -->
+            </div>
+        </div>
 
         <div class="col-12" *ngIf="!info.power_fault">
             <div class="card">
@@ -233,31 +233,46 @@
             </div>
         </div>
 
-        <div class="col-12 lg:col-6">
+        <div class="col-12 md:col-6">
             <div class="card" *ngIf="info$ | async as info; else loading">
-                <h5>Pool Information ({{ activePoolLabel }})</h5>
-                <table>
-                    <tr>
-                        <td>URL:</td>
-                        <td style="word-break: break-all;">
-                            <a [href]="quickLink$ | async" target="_blank" style="text-decoration: underline;">
+                <h5>Pool ({{ activePoolLabel }})</h5>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width">
+                        <span>URL:</span>
+                    </div>
+                    <div>
+                        <a [href]="quickLink$ | async" target="_blank" class="underline break-all">
                             {{ activePoolURL }}
-                            </a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Port:</td>
-                        <td>{{ activePoolPort }}</td>
-                    </tr>
-                    <tr>
-                        <td>User:</td>
-                        <td>{{ activePoolUser }}</td>
-                    </tr>
-                </table>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width">
+                        <span>Port:</span>
+                    </div>
+                    <div>
+                        {{ activePoolPort }}
+                    </div>
+                </div>
+
+                <div class="flex flex-nowrap ellipsis-magic" pTooltip="{{activePoolUser}}" tooltipPosition="top">
+                    <div class="col-fixed-width">
+                        <span>User:</span>
+                    </div>
+
+                    <span class="start">
+                        {{ activePoolUser.substring(0, activePoolUser.length - 20) }}
+                    </span>
+                    <span class="end">
+                        {{ activePoolUser.substring(activePoolUser.length - 20) }}
+                    </span>
+                </div>
             </div>
         </div>
 
-        <div class="col-12 lg:col-6">
+        <div class="col-12 md:col-6">
             <div class="card" *ngIf="info$ | async as info; else loading">
                 <h5>Uptime</h5>
                 {{info.uptimeSeconds | dateAgo}}
