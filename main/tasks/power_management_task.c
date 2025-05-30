@@ -58,6 +58,12 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     uint8_t targetTemperature = autotune->targetTemperature;            // Target temperature in °C
     float targetHashrate = autotune->targetHashrate;                    // Target hashrate in GH/s
     
+    // Get current offset values from autotune module
+    int16_t offsetPower = autotune->offsetPower;                        // Power offset in watts
+    uint16_t offsetDomainVoltage = autotune->offsetDomainVoltage;       // Voltage offset in mV
+    uint16_t offsetFrequency = autotune->offsetFrequency;               // Frequency offset in MHz
+    uint8_t offsetFanSpeed = autotune->offsetFanSpeed;                  // Fan speed offset in percentage
+    
     // Log current values
     ESP_LOGI(TAG, "Autotune - Current Values:");
     ESP_LOGI(TAG, "  Domain Voltage: %u mV", currentDomainVoltage);
@@ -75,6 +81,13 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "  Target Fan Speed: %u %%", targetFanSpeed);
     ESP_LOGI(TAG, "  Target Temperature: %u °C", targetTemperature);
     ESP_LOGI(TAG, "  Target Hashrate: %.2f GH/s", targetHashrate);
+    
+    // Log current offset values
+    ESP_LOGI(TAG, "Autotune - Current Offset Values:");
+    ESP_LOGI(TAG, "  Power Offset: %d W", offsetPower);
+    ESP_LOGI(TAG, "  Domain Voltage Offset: %u mV", offsetDomainVoltage);
+    ESP_LOGI(TAG, "  Frequency Offset: %u MHz", offsetFrequency);
+    ESP_LOGI(TAG, "  Fan Speed Offset: %u %%", offsetFanSpeed);
     
     // TODO: Implement your autotune algorithm here
     // You can modify the offset values based on the difference between current and target values
