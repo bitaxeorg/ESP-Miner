@@ -135,8 +135,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          // console.log('Chart source saved.');
           // Clear previous data
+          this.initializeChart();
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error('Error.', `Could not save chart source. ${err.message}`);
@@ -149,6 +149,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
+
+    this.clearDataPoints();
 
     this.chartData = {
       labels: [this.dataLabel],
@@ -444,6 +446,14 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
 
     return this.calculateAverage(efficiencies);
+  }
+
+  public clearDataPoints() {
+    this.dataLabel = [];
+    this.hashrateData = [];
+    this.powerData = [];
+    this.chartY1Data = [];
+    this.chartY2Data = [];
   }
 
   public getSuggestedMaxForLabel(label: eChartLabel, info: ISystemInfo): number {
