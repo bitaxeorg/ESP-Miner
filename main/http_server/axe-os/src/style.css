@@ -78,3 +78,23 @@ main {
     background-color: #1a1a1a;
   }
 } */
+
+/* Global button cursor styling */
+button,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+.cursor-pointer,
+[onclick] {
+  cursor: pointer !important;
+}
+
+/* Ensure disabled buttons don't show pointer cursor */
+button:disabled,
+[role="button"]:disabled,
+[type="button"]:disabled,
+[type="submit"]:disabled,
+[type="reset"]:disabled {
+  cursor: not-allowed !important;
+}

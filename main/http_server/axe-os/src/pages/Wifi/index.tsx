@@ -33,7 +33,7 @@ export function WifiPage() {
       return;
     }
 
-    if (!formData.password.trim()) {
+    if (!formData.wifiPass.trim()) {
       showToast("Password is required", "error");
       return;
     }
@@ -41,12 +41,12 @@ export function WifiPage() {
     setLoading(true);
 
     try {
-      const result = await setSSID(formData.ssid.trim(), formData.password);
+      const result = await setSSID(formData.ssid.trim(), formData.wifiPass);
 
       if (result.success) {
         showToast(result.message, "success");
         // Reset form on success
-        setFormData({ ssid: "", password: "" });
+        setFormData({ ssid: "", wifiPass: "" });
       } else {
         showToast(result.message, "error");
       }
@@ -97,8 +97,8 @@ export function WifiPage() {
                   type='password'
                   id='password'
                   name='password'
-                  value={formData.password}
-                  onChange={handleInputChange("password")}
+                  value={formData.wifiPass}
+                  onChange={handleInputChange("wifiPass")}
                   className='w-full p-2 border border-slate-700 rounded-md bg-[var(--input-bg)]'
                   placeholder='Enter Wi-Fi password'
                   required
@@ -108,7 +108,7 @@ export function WifiPage() {
             </div>
           </div>
 
-          <Button type='submit' disabled={loading}>
+          <Button type='submit' disabled={loading} className='bg-blue-600 hover:bg-blue-700'>
             {loading ? "Configuring..." : "Connect to Network"}
           </Button>
         </form>

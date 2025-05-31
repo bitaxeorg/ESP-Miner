@@ -180,7 +180,12 @@ export default function UpdatesPage() {
         >
           <div className='space-y-4'>
             <div className='flex flex-wrap gap-3'>
-              <Button as='a' href={FIRMWARE_LATEST_URL} download='esp-miner.bin'>
+              <Button
+                as='a'
+                href={FIRMWARE_LATEST_URL}
+                download='esp-miner.bin'
+                className='bg-blue-600 hover:bg-blue-700'
+              >
                 <span className='sm:hidden'>Download Firmware</span>
                 <span className='hidden sm:inline'>1. Download Latest Firmware</span>
               </Button>
@@ -227,7 +232,11 @@ export default function UpdatesPage() {
                     />
                   </div>
                 </div>
-                <Button onClick={handleFirmwareUpload} disabled={isUpdating}>
+                <Button
+                  onClick={handleFirmwareUpload}
+                  disabled={isUpdating}
+                  className='bg-blue-600 hover:bg-blue-700'
+                >
                   {isUpdating ? "Updating..." : "Install"}
                 </Button>
               </div>
@@ -244,7 +253,12 @@ export default function UpdatesPage() {
         >
           <div className='space-y-4'>
             <div className='flex flex-wrap gap-3'>
-              <Button as='a' href={WEBAPP_LATEST_URL} download='www.bin'>
+              <Button
+                as='a'
+                href={WEBAPP_LATEST_URL}
+                download='www.bin'
+                className='bg-blue-600 hover:bg-blue-700'
+              >
                 <span className='sm:hidden'>Download www.bin</span>
                 <span className='hidden sm:inline'>1. Download Latest Web App</span>
               </Button>
@@ -287,7 +301,11 @@ export default function UpdatesPage() {
                     />
                   </div>
                 </div>
-                <Button onClick={handleWebAppUpload} disabled={isWebAppUpdating}>
+                <Button
+                  onClick={handleWebAppUpload}
+                  disabled={isWebAppUpdating}
+                  className='bg-blue-600 hover:bg-blue-700'
+                >
                   {isWebAppUpdating ? "Updating..." : "Install"}
                 </Button>
               </div>

@@ -25,6 +25,33 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 }
 
 /**
+ * Fetch miners data
+ * Uses the actual system info API to get real miner data
+ */
+export async function fetchMiners(): Promise<SystemInfo[]> {
+  try {
+    // Get the system info from the actual miner
+    const minerInfo = await getSystemInfo();
+
+    // Add IP address and status fields
+    const enhancedMinerInfo: SystemInfo = {
+      ...minerInfo,
+      ipAddress:
+        window.location.hostname !== "localhost" ? window.location.hostname : "localhost:5173",
+      status: "online", // Assume online since we're able to get data
+    };
+
+    // Return as an array with the single miner
+    // In a multi-miner setup, this would be expanded to query multiple miners
+    return [enhancedMinerInfo];
+  } catch (error) {
+    console.error("Failed to fetch miners:", error);
+    // Return an empty array on error
+    return [];
+  }
+}
+
+/**
  * Update pool information
  * @param stratumURL - The primary stratum URL
  * @param stratumPort - The primary stratum port
@@ -224,33 +251,6 @@ export async function restartSystem(): Promise<string> {
 }
 
 /**
- * Fetch miners data
- * Uses the actual system info API to get real miner data
- */
-export async function fetchMiners(): Promise<SystemInfo[]> {
-  try {
-    // Get the system info from the actual miner
-    const minerInfo = await getSystemInfo();
-
-    // Add IP address and status fields
-    const enhancedMinerInfo: SystemInfo = {
-      ...minerInfo,
-      ipAddress:
-        window.location.hostname !== "localhost" ? window.location.hostname : "localhost:5173",
-      status: "online", // Assume online since we're able to get data
-    };
-
-    // Return as an array with the single miner
-    // In a multi-miner setup, this would be expanded to query multiple miners
-    return [enhancedMinerInfo];
-  } catch (error) {
-    console.error("Failed to fetch miners:", error);
-    // Return an empty array on error
-    return [];
-  }
-}
-
-/**
  * Upload web app file
  * @param file - The web app file to upload
  * @returns A message indicating the web app update status
@@ -304,6 +304,169 @@ export async function setSSID(
     return { success: true, message: result.message || "SSID set successfully" };
   } catch (error) {
     console.error("Failed to set SSID:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+/**
+ * Update fan settings
+ * @param autofanspeed - Whether automatic fan control is enabled (1) or disabled (0)
+ * @param fanspeed - Fan speed percentage (only used when autofanspeed is 0)
+ * @returns A message indicating the fan settings update status
+ */
+export async function updateFanSettings(
+  autofanspeed: number,
+  fanspeed?: number
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload: any = {
+      autofanspeed,
+    };
+
+    // Only include fanspeed if autofanspeed is disabled (0)
+    if (autofanspeed === 0 && fanspeed !== undefined) {
+      payload.fanspeed = fanspeed;
+    }
+
+    const response = await fetch("/api/system", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const text = await response.text();
+
+    // If the response has content, try to parse it as JSON
+    if (text.trim()) {
+      try {
+        const result = JSON.parse(text);
+        console.log("Fan settings update response:", result);
+        return result;
+      } catch (parseError) {
+        console.log("Response is not JSON:", text);
+        return { success: true, message: "Fan settings updated successfully" };
+      }
+    }
+
+    // For empty responses with 200 status
+    console.log("Fan settings update successful (empty response)");
+    return { success: true, message: "Fan settings updated successfully" };
+  } catch (error) {
+    console.error("Failed to update fan settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+/**
+ * Update ASIC settings
+ * @param coreVoltage - Core voltage in mV
+ * @param frequency - Frequency in MHz
+ * @returns A message indicating the ASIC settings update status
+ */
+export async function updateASICSettings(
+  coreVoltage: number,
+  frequency: number
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload = {
+      coreVoltage,
+      frequency,
+    };
+
+    const response = await fetch("/api/system", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const text = await response.text();
+
+    // If the response has content, try to parse it as JSON
+    if (text.trim()) {
+      try {
+        const result = JSON.parse(text);
+        console.log("ASIC settings update response:", result);
+        return result;
+      } catch (parseError) {
+        console.log("Response is not JSON:", text);
+        return { success: true, message: "ASIC settings updated successfully" };
+      }
+    }
+
+    // For empty responses with 200 status
+    console.log("ASIC settings update successful (empty response)");
+    return { success: true, message: "ASIC settings updated successfully" };
+  } catch (error) {
+    console.error("Failed to update ASIC settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+/**
+ * Update preset settings
+ * @param presetName - The preset name: "quiet", "balanced", or "turbo"
+ * @returns A message indicating the preset update status
+ */
+export async function updatePresetSettings(
+  presetName: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload = {
+      presetName,
+    };
+
+    const response = await fetch("/api/system", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const text = await response.text();
+
+    // If the response has content, try to parse it as JSON
+    if (text.trim()) {
+      try {
+        const result = JSON.parse(text);
+        console.log("Preset settings update response:", result);
+        return result;
+      } catch (parseError) {
+        console.log("Response is not JSON:", text);
+        return { success: true, message: `${presetName} mode applied successfully` };
+      }
+    }
+
+    // For empty responses with 200 status
+    console.log("Preset settings update successful (empty response)");
+    return { success: true, message: `${presetName} mode applied successfully` };
+  } catch (error) {
+    console.error("Failed to update preset settings:", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred",
