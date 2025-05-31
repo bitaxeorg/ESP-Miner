@@ -861,6 +861,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .handler = GET_system_info, 
         .user_ctx = rest_context
     };
+    /*
     httpd_register_uri_handler(server, &system_info_get_uri);
 
     httpd_uri_t swarm_options_uri = {
@@ -877,7 +878,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_restart_uri);
-
+*/
     httpd_uri_t system_restart_options_uri = {
         .uri = "/api/system/restart", 
         .method = HTTP_OPTIONS, 
