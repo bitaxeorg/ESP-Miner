@@ -97,7 +97,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     
     // Check if we need to wait for initial warmup (15 minutes)
     if (uptimeSeconds < 900 && currentAsicTemp < targetAsicTemp) { // 15 minutes = 900 seconds
-        ESP_LOGI(TAG, "Autotune - Waiting for initial warmup period (%u seconds remaining)", 900 - uptimeSeconds);
+        ESP_LOGI(TAG, "Autotune - Waiting for initial warmup period (%lu seconds remaining)", 900 - uptimeSeconds);
         return;
     }
     
@@ -111,7 +111,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     
     // Check if enough time has passed since last autotune
     if ((currentTime - lastAutotuneTime) < pdMS_TO_TICKS(intervalMs)) {
-        ESP_LOGI(TAG, "Autotune - Waiting for next adjustment interval (%u ms remaining)", 
+        ESP_LOGI(TAG, "Autotune - Waiting for next adjustment interval (%lu ms remaining)", 
                  intervalMs - ((currentTime - lastAutotuneTime) * portTICK_PERIOD_MS));
         return;
     }
