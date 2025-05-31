@@ -29,6 +29,7 @@
 #include "screen.h"
 #include "vcore.h"
 #include "thermal.h"
+#include "accepted_led.h"
 
 static const char * TAG = "SystemModule";
 
@@ -108,6 +109,8 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     ESP_RETURN_ON_ERROR(input_init(screen_next, toggle_wifi_softap), TAG, "Input init failed!");
 
     ESP_RETURN_ON_ERROR(screen_start(GLOBAL_STATE), TAG, "Screen start failed!");
+
+    ESP_RETURN_ON_ERROR(accepted_led_init(), TAG, "Accepted LED start failed");
 
     return ESP_OK;
 }

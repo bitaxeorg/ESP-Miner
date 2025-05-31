@@ -1,5 +1,6 @@
 idf_component_register(
 SRCS
+    "accepted_led.c"
     "adc.c"
     "i2c_bitaxe.c"
     "main.c"

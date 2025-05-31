@@ -10,6 +10,7 @@
 #include "esp_wifi.h"
 #include <esp_sntp.h>
 #include <time.h>
+#include "accepted_led.h"
 
 #define PORT CONFIG_STRATUM_PORT
 #define STRATUM_URL CONFIG_STRATUM_URL
@@ -348,6 +349,7 @@ void stratum_task(void * pvParameters)
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "message result accepted");
+                    accepted_led_trigger();
                     SYSTEM_notify_accepted_share(GLOBAL_STATE);
                 } else {
                     ESP_LOGW(TAG, "message result rejected: %s", stratum_api_v1_message.error_str);
