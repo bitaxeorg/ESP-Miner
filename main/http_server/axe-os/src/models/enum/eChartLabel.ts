@@ -9,5 +9,6 @@ export enum eChartLabel {
     fanSpeed = 'Fan Speed',
     fanRpm = 'Fan RPM',
     wifiRssi = 'Wi-Fi Strength',
-    freeHeap = 'Free Heap'
+    freeHeap = 'Free Heap',
+    none = 'None'
 }

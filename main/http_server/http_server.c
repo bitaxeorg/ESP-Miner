@@ -59,6 +59,8 @@ static const char * STATS_LABEL_WIFI_RSSI = "Wi-Fi Strength";
 static const char * STATS_LABEL_FREE_HEAP = "Free Heap";
 static const char * STATS_LABEL_TIMESTAMP = "Timestamp";
 
+static const char * STATS_LABEL_NONE = "None";
+
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
@@ -544,13 +546,13 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "chartY1Data"))) {
         struct StatisticsData dummy;
-        if (NULL != mapChartLabelToValue(item->valuestring, &dummy)) {
+        if (NULL != mapChartLabelToValue(item->valuestring, &dummy) || (0 == strcmp(item->valuestring, STATS_LABEL_NONE))) {
             nvs_config_set_string(NVS_CONFIG_CHART_Y1_DATA, item->valuestring);
         }
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "chartY2Data"))) {
         struct StatisticsData dummy;
-        if (NULL != mapChartLabelToValue(item->valuestring, &dummy)) {
+        if (NULL != mapChartLabelToValue(item->valuestring, &dummy) || (0 == strcmp(item->valuestring, STATS_LABEL_NONE))) {
             nvs_config_set_string(NVS_CONFIG_CHART_Y2_DATA, item->valuestring);
         }
     }
