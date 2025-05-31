@@ -428,6 +428,13 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
     }
+    if ((item = cJSON_GetObjectItem(root, "autotune")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_AUTOTUNE_FLAG, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "autotune_preset")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_AUTOTUNE_PRESET, item->valueint);
+    }
+
 
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
@@ -558,6 +565,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
+    cJSON_AddNumberToObject(root, "autotune", nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1));
+    cJSON_AddNumberToObject(root, "autotune_preset", nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_PRESET, 0));
 
     free(ssid);
     free(hostname);

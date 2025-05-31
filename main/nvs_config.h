@@ -34,6 +34,10 @@
 // Theme configuration
 #define NVS_CONFIG_THEME_NAME "themename"
 
+// Autotune configuration
+#define NVS_CONFIG_AUTOTUNE_FLAG "autotune"
+#define NVS_CONFIG_AUTOTUNE_PRESET "preset"
+
 // Warranty Checks
 #define NVS_CONFIG_SERIAL_NUMBER "serialnumber"
 #define NVS_CONFIG_BUILD_DATE "builddate"
