@@ -26,12 +26,12 @@
 #include "sdkconfig.h"
 #include "driver/gpio.h"
 
-//#define accepted_led_duration uint64_t 200000 //200mS 200000uS
-
-#define GPIO_ACCEPTED_LED CONFIG_GPIO_ACCEPTED_LED
+#define accepted_led_duration 200000ULL //200mS 200000uS
 
 #ifndef CONFIG_GPIO_ACCEPTED_LED
 #define GPIO_ACCEPTED_LED 39
+#else
+#define GPIO_ACCEPTED_LED CONFIG_GPIO_ACCEPTED_LED
 #endif
 
 static const char * TAG = "Accepted_LED";
@@ -84,13 +84,13 @@ esp_err_t accepted_led_trigger(void){
 
 	if (esp_timer_is_active(accepted_led_oneshot_timer)){
 	//if the timer is already running then restart it
-	esp_timer_restart(accepted_led_oneshot_timer, 200000);
+	esp_timer_restart(accepted_led_oneshot_timer, accepted_led_duration);
 
 	}
 	else
 	{
 	//otherwise start it for the first time
-	esp_timer_start_once(accepted_led_oneshot_timer, 200000);
+	esp_timer_start_once(accepted_led_oneshot_timer, accepted_led_duration);
 	}
 
 	return ESP_OK;
