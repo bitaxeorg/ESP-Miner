@@ -310,3 +310,115 @@ export async function setSSID(
     };
   }
 }
+
+/**
+ * Update fan settings
+ * @param autofanspeed - Whether automatic fan control is enabled (1) or disabled (0)
+ * @param fanspeed - Fan speed percentage (only used when autofanspeed is 0)
+ * @returns A message indicating the fan settings update status
+ */
+export async function updateFanSettings(
+  autofanspeed: number,
+  fanspeed?: number
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload: any = {
+      autofanspeed,
+    };
+
+    // Only include fanspeed if autofanspeed is disabled (0)
+    if (autofanspeed === 0 && fanspeed !== undefined) {
+      payload.fanspeed = fanspeed;
+    }
+
+    const response = await fetch("/api/system", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const text = await response.text();
+
+    // If the response has content, try to parse it as JSON
+    if (text.trim()) {
+      try {
+        const result = JSON.parse(text);
+        console.log("Fan settings update response:", result);
+        return result;
+      } catch (parseError) {
+        console.log("Response is not JSON:", text);
+        return { success: true, message: "Fan settings updated successfully" };
+      }
+    }
+
+    // For empty responses with 200 status
+    console.log("Fan settings update successful (empty response)");
+    return { success: true, message: "Fan settings updated successfully" };
+  } catch (error) {
+    console.error("Failed to update fan settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+/**
+ * Update ASIC settings
+ * @param coreVoltage - Core voltage in mV
+ * @param frequency - Frequency in MHz
+ * @returns A message indicating the ASIC settings update status
+ */
+export async function updateASICSettings(
+  coreVoltage: number,
+  frequency: number
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload = {
+      coreVoltage,
+      frequency,
+    };
+
+    const response = await fetch("/api/system", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const text = await response.text();
+
+    // If the response has content, try to parse it as JSON
+    if (text.trim()) {
+      try {
+        const result = JSON.parse(text);
+        console.log("ASIC settings update response:", result);
+        return result;
+      } catch (parseError) {
+        console.log("Response is not JSON:", text);
+        return { success: true, message: "ASIC settings updated successfully" };
+      }
+    }
+
+    // For empty responses with 200 status
+    console.log("ASIC settings update successful (empty response)");
+    return { success: true, message: "ASIC settings updated successfully" };
+  } catch (error) {
+    console.error("Failed to update ASIC settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}

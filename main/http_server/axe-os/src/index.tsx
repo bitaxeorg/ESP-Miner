@@ -2,7 +2,7 @@ import { render } from "preact";
 import { LocationProvider, Router, Route } from "preact-iso";
 import { Layout } from "./components/Layout";
 import { HomePage } from "./pages/Home/index.jsx";
-import { Settings } from "./pages/Settings/index.jsx";
+import { Settings } from "./pages/Settings/index.js";
 import { Theme } from "./pages/Theme/index";
 import { Miners } from "./pages/Miners/index";
 import { NotFound } from "./pages/_404.jsx";
