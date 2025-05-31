@@ -155,6 +155,8 @@ button.color-dot {
         background: var(--surface-overlay) !important;
 
         .p-dropdown-items {
+            padding: 0;
+
             .p-dropdown-item {
                 &:hover {
                     background: var(--highlight-bg) !important;
@@ -166,6 +168,18 @@ button.color-dot {
                     color: var(--highlight-text-color) !important;
                 }
             }
+        }
+    }
+
+    .p-overlay {
+        left: -1px !important;
+        right: -1px !important;
+    }
+
+    &--small {
+        .p-dropdown-label,
+        .p-dropdown-item {
+            font-size: small;
         }
     }
 }

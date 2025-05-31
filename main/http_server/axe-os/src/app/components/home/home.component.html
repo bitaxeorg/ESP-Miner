@@ -136,7 +136,26 @@
 
         <div class="col-12" *ngIf="!info.power_fault">
             <div class="card">
-                <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
+                <form [formGroup]="form">
+                    <div class="flex flex-nowrap justify-content-between mb-3">
+                        <p-dropdown
+                            [options]="dataSourceLabels"
+                            optionLabel="name"
+                            optionValue="value"
+                            formControlName="chartY1Data"
+                            styleClass="border-primary-500 p-dropdown--small">
+                        </p-dropdown>
+                        <p-dropdown
+                            [options]="dataSourceLabels"
+                            optionLabel="name"
+                            optionValue="value"
+                            formControlName="chartY2Data"
+                            styleClass="border-500 p-dropdown--small">
+                        </p-dropdown>
+                    </div>
+
+                    <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
+                </form>
             </div>
         </div>
 

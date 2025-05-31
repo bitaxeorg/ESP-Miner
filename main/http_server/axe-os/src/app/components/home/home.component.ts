@@ -1,5 +1,8 @@
-import { Component, OnInit, ViewChild, OnDestroy } from '@angular/core';
+import { Component, OnInit, ViewChild, Input, OnDestroy } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap, first, Subject, takeUntil } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ToastrService } from 'ngx-toastr';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
@@ -12,6 +15,7 @@ import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
+import { LoadingService } from 'src/app/services/loading.service';
 
 @Component({
   selector: 'app-home',
@@ -49,13 +53,18 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private pageDefaultTitle: string = '';
   private destroy$ = new Subject<void>();
+  public form!: FormGroup;
+
+  @Input() uri = '';
 
   constructor(
+    private fb: FormBuilder,
     private systemService: SystemService,
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
     private titleService: Title,
     private loadingService: LoadingService,
+    private toastr: ToastrService,
     private shareRejectReasonsService: ShareRejectionExplanationService
   ) {
     this.initializeChart();
@@ -68,9 +77,21 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
   }
 
-  ngOnInit() {
+  ngOnInit(): void {
     this.pageDefaultTitle = this.titleService.getTitle();
     this.loadingService.loading$.next(true);
+
+    this.systemService.getInfo(this.uri)
+      .subscribe(info => {
+        this.form = this.fb.group({
+          chartY1Data: [info.chartY1Data, [Validators.required]],
+          chartY2Data: [info.chartY2Data, [Validators.required]],
+        });
+
+        this.form.valueChanges.subscribe(() => {
+          this.updateSystem();
+        })
+      });
   }
 
   ngOnDestroy() {
@@ -95,7 +116,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     // Update chart options
     if (this.chartOptions) {
-      this.chartOptions.plugins.legend.labels.color = textColor;
       this.chartOptions.scales.x.ticks.color = textColorSecondary;
       this.chartOptions.scales.x.grid.color = surfaceBorder;
       this.chartOptions.scales.y.ticks.color = primaryColor;
@@ -108,9 +128,24 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.chartData = { ...this.chartData };
   }
 
+  public updateSystem() {
+    const form = this.form.getRawValue();
+
+    this.systemService.updateSystem(this.uri, form)
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => {
+          // console.log('Chart source saved.');
+          // Clear previous data
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error('Error.', `Could not save chart source. ${err.message}`);
+        }
+      });
+  }
+
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColor = documentStyle.getPropertyValue('--text-color');
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
@@ -153,7 +188,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       plugins: {
         legend: {
           labels: {
-            color: textColor
+            display: false,
           }
         },
         tooltip: {
@@ -292,13 +327,16 @@ export class HomeComponent implements OnInit, OnDestroy {
         return info;
       }),
       tap(info => {
+        const chartY1DataValue = this.form.get('chartY1Data')?.value;
+        const chartY2DataValue = this.form.get('chartY2Data')?.value;
+
         // Only collect and update chart data if there's no power fault
         if (!info.power_fault) {
           this.dataLabel.push(new Date().getTime());
           this.hashrateData.push(info.hashRate);
           this.powerData.push(info.power);
-          this.chartY1Data.push(HomeComponent.getDataForLabel(info.chartY1Data, info));
-          this.chartY2Data.push(HomeComponent.getDataForLabel(info.chartY2Data, info));
+          this.chartY1Data.push(HomeComponent.getDataForLabel(chartY1DataValue, info));
+          this.chartY2Data.push(HomeComponent.getDataForLabel(chartY2DataValue, info));
 
           if ((this.dataLabel.length) >= 720) {
             this.dataLabel.shift();
@@ -308,8 +346,8 @@ export class HomeComponent implements OnInit, OnDestroy {
             this.chartY2Data.shift();
           }
 
-          this.chartData.datasets[0].label = info.chartY1Data;
-          this.chartData.datasets[1].label = info.chartY2Data;
+          this.chartData.datasets[0].label = chartY1DataValue;
+          this.chartData.datasets[1].label = chartY2DataValue;
           this.chartOptions.scales.y.suggestedMax = HomeComponent.getSettingsForLabel(info.chartY1Data).suggestedMax;
           this.chartOptions.scales.y2.suggestedMax = HomeComponent.getSettingsForLabel(info.chartY2Data).suggestedMax;
         }
@@ -448,5 +486,9 @@ export class HomeComponent implements OnInit, OnDestroy {
         const settings = HomeComponent.getSettingsForLabel(datasetLabel);
         return value.toFixed(settings.precision) + settings.suffix;
     }
+  }
+
+  get dataSourceLabels() {
+    return Object.values(eChartLabel).map(label => ({name: label, value: label}));
   }
 }
