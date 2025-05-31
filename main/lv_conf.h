@@ -13,7 +13,7 @@
 #define LV_DRAW_SW_SUPPORT_AL88     0
 #define LV_DRAW_SW_SUPPORT_A8       0
 
-#define LV_DRAW_SW_COMPLEX 0
+#define LV_DRAW_SW_COMPLEX 1
 
 #define LV_USE_FLOAT 1
 

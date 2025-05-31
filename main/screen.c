@@ -65,12 +65,15 @@ static lv_obj_t *self_test_finished_label;
 static lv_obj_t *wifi_rssi_value_label;
 static lv_obj_t *esp_uptime_label;
 
+static lv_obj_t *notification_dot;
+
 static double current_hashrate;
 static float current_power;
 static uint64_t current_difficulty;
 static float current_chip_temp;
 static bool found_block;
 static bool self_test_finished;
+static uint64_t current_shares;
 
 static lv_obj_t * create_scr_self_test() {
     lv_obj_t * scr = lv_obj_create(NULL);
@@ -321,16 +324,14 @@ static void screen_update_cb(lv_timer_t * timer)
             display_on(true);
         }
     }
+
     // Update WiFi RSSI periodically
     int8_t rssi_value = -128; // Invalid value by default
     if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
         get_wifi_current_rssi(&rssi_value);
     }
-    
-    
 
     if (GLOBAL_STATE->SELF_TEST_MODULE.active) {
-
         screen_show(SCR_SELF_TEST);
 
         SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
@@ -438,9 +439,7 @@ static void screen_update_cb(lv_timer_t * timer)
         lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", power_management->chip_temp_avg);
     }
 
-    
     char rssi_buf[25];
-        
     if (rssi_value < 0 && rssi_value >= -127) { // Typical RSSI range
         snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: %d dBm", rssi_value);
     } else {
@@ -449,7 +448,15 @@ static void screen_update_cb(lv_timer_t * timer)
     if (strcmp(lv_label_get_text(wifi_rssi_value_label), rssi_buf) != 0) {
         lv_label_set_text(wifi_rssi_value_label, rssi_buf);
     }
-    
+
+    if (current_shares != module->shares_accepted) {
+        lv_obj_remove_flag(notification_dot, LV_OBJ_FLAG_HIDDEN);
+        current_shares = module->shares_accepted;
+    } else {
+        if (!lv_obj_has_flag(notification_dot, LV_OBJ_FLAG_HIDDEN)) {
+            lv_obj_add_flag(notification_dot, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
 
     current_hashrate = module->current_hashrate;
     current_power = power_management->power;
@@ -485,14 +492,14 @@ static void uptime_update_cb(lv_timer_t * timer)
     if (esp_uptime_label) {
         char uptime[50];
         uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
-        
+
         uint32_t days = uptime_seconds / (24 * 3600);
         uptime_seconds %= (24 * 3600);
         uint32_t hours = uptime_seconds / 3600;
         uptime_seconds %= 3600;
         uint32_t minutes = uptime_seconds / 60;
         uptime_seconds %= 60;
-        
+
         if (days > 0) {
             snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
         } else if (hours > 0) {
@@ -502,7 +509,7 @@ static void uptime_update_cb(lv_timer_t * timer)
         } else {
             snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
         }
-        
+
         if (strcmp(lv_label_get_text(esp_uptime_label), uptime) != 0) {
             lv_label_set_text(esp_uptime_label, uptime);
         }
@@ -528,8 +535,16 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_STATS] = create_scr_stats();
         screens[SCR_WIFI_RSSI] = create_scr_wifi_rssi();
 
+        notification_dot = lv_obj_create(lv_layer_top());
+        lv_obj_align(notification_dot, LV_ALIGN_TOP_RIGHT, 0, 0);
+        lv_obj_set_size(notification_dot, 8, 8);
+        lv_obj_set_style_radius(notification_dot, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(notification_dot, lv_color_black(), LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(notification_dot, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_add_flag(notification_dot, LV_OBJ_FLAG_HIDDEN);
+
         lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);
-        
+
         // Create uptime update timer (runs every 1 second)
         lv_timer_create(uptime_update_cb, 1000, NULL);
     }
