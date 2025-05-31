@@ -167,6 +167,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           pointHoverRadius: 5,
           borderWidth: 1,
           yAxisID: 'y',
+          hidden: false
         },
         {
           type: 'line',
@@ -180,6 +181,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           pointHoverRadius: 5,
           borderWidth: 1,
           yAxisID: 'y2',
+          hidden: false
         }
       ]
     };
@@ -189,9 +191,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          labels: {
-            display: false,
-          }
+          display: false
         },
         tooltip: {
           callbacks: {
@@ -273,12 +273,16 @@ export class HomeComponent implements OnInit, OnDestroy {
           idxChartY1Data = 1;
         } else if (stats.chartY1Data === eChartLabel.power) {
           idxChartY1Data = 2;
+        } else if (stats.chartY1Data === eChartLabel.none) {
+          idxChartY1Data = -1;
         }
 
         if (stats.chartY2Data === eChartLabel.hashrate) {
           idxChartY2Data = 1;
         } else if (stats.chartY2Data === eChartLabel.power) {
           idxChartY2Data = 2;
+        } else if (stats.chartY2Data === eChartLabel.none) {
+          idxChartY2Data = -1;
         } else if (idxChartY1Data < 3) { // no additional data for Y1
           idxChartY2Data = 3;
         }
@@ -289,12 +293,12 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
           this.hashrateData.push(element[idxHashrate]);
           this.powerData.push(element[idxPower]);
-          if (idxChartY1Data < element.length) {
+          if ((-1 != idxChartY1Data) && (idxChartY1Data < element.length)) {
             this.chartY1Data.push(element[idxChartY1Data]);
           } else {
             this.chartY1Data.push(0.0);
           }
-          if (idxChartY2Data < element.length) {
+          if ((-1 != idxChartY2Data) && (idxChartY2Data < element.length)) {
             this.chartY2Data.push(element[idxChartY2Data]);
           } else {
             this.chartY2Data.push(0.0);
@@ -356,8 +360,15 @@ export class HomeComponent implements OnInit, OnDestroy {
 
           this.chartData.datasets[0].label = chartY1DataValue;
           this.chartData.datasets[1].label = chartY2DataValue;
+
+          this.chartData.datasets[0].hidden = (chartY1DataValue === eChartLabel.none);
+          this.chartData.datasets[1].hidden = (chartY2DataValue === eChartLabel.none);
+
           this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartY1DataValue, info);
           this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartY2DataValue, info);
+
+          this.chartOptions.scales.y.display = (chartY1DataValue != eChartLabel.none);
+          this.chartOptions.scales.y2.display = (chartY2DataValue != eChartLabel.none);
         }
 
         this.chart?.refresh();
