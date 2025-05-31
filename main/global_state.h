@@ -89,19 +89,7 @@ typedef struct
     bool finished;
 } SelfTestModule;
 
-typedef struct
-{
-    int16_t offsetPower;          // Power offset in watts
-    uint16_t offsetDomainVoltage; // Voltage offset in mV
-    uint16_t offsetFrequency;     // Frequency offset in MHz
-    uint8_t offsetFanSpeed;       // Fan speed offset in percentage
-    int16_t targetPower;          // Target power in watts
-    uint16_t targetDomainVoltage; // Target voltage in mV
-    uint16_t targetFrequency;     // Target frequency in MHz
-    uint8_t targetFanSpeed;       // Target fan speed in percentage
-    uint8_t targetTemperature;    // Target temperature in °C
-    float targetHashrate;         // Target hashrate in GH/s
-} AutotuneModule;
+
 
 typedef struct
 {
@@ -111,6 +99,7 @@ typedef struct
     AsicModel asic_model;
     char * asic_model_str;
     uint16_t asic_count;
+    uint16_t small_core_count;
     uint16_t voltage_domain;
     AsicFunctions ASIC_functions;
     double asic_job_frequency_ms;

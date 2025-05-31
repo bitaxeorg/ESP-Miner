@@ -35,6 +35,91 @@
 
 static const char * TAG = "power_management";
 
+
+// Define preset arrays for each device model
+// DEVICE_MAX presets
+static const DevicePreset DEVICE_MAX_PRESETS[] = {
+    {"quiet", 1100, 450, 50},       // Quiet: Low power, conservative
+    {"balanced", 1200, 550, 65},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1400, 750, 100},      // Turbo: Maximum performance
+};
+
+// DEVICE_ULTRA presets
+static const DevicePreset DEVICE_ULTRA_PRESETS[] = {
+    {"quiet", 1050, 400, 45},       // Quiet: Low power, conservative
+    {"balanced", 1150, 500, 60},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1350, 700, 95},       // Turbo: Maximum performance
+};
+
+// DEVICE_SUPRA presets
+static const DevicePreset DEVICE_SUPRA_PRESETS[] = {
+    {"quiet", 1000, 350, 40},       // Quiet: Low power, conservative
+    {"balanced", 1100, 450, 55},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1300, 650, 90},       // Turbo: Maximum performance
+};
+
+// DEVICE_GAMMA presets
+static const DevicePreset DEVICE_GAMMA_PRESETS[] = {
+    {"quiet", 950, 300, 35},        // Quiet: Low power, conservative
+    {"balanced", 1050, 400, 50},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1250, 600, 85},       // Turbo: Maximum performance
+};
+
+// Simple function to apply a preset by name
+bool apply_preset(DeviceModel device_model, const char* preset_name) {
+    const DevicePreset* presets = NULL;
+    uint8_t preset_count = 0;
+    
+    // Get the correct preset array for the device
+    switch (device_model) {
+        case DEVICE_MAX:
+            presets = DEVICE_MAX_PRESETS;
+            preset_count = sizeof(DEVICE_MAX_PRESETS) / sizeof(DevicePreset);
+            break;
+        case DEVICE_ULTRA:
+            presets = DEVICE_ULTRA_PRESETS;
+            preset_count = sizeof(DEVICE_ULTRA_PRESETS) / sizeof(DevicePreset);
+            break;
+        case DEVICE_SUPRA:
+            presets = DEVICE_SUPRA_PRESETS;
+            preset_count = sizeof(DEVICE_SUPRA_PRESETS) / sizeof(DevicePreset);
+            break;
+        case DEVICE_GAMMA:
+            presets = DEVICE_GAMMA_PRESETS;
+            preset_count = sizeof(DEVICE_GAMMA_PRESETS) / sizeof(DevicePreset);
+            break;
+        default:
+            ESP_LOGI(TAG, "Unknown device model: %d", device_model);
+            return false;
+    }
+    
+    // Find the preset by name
+    const DevicePreset* selected_preset = NULL;
+    for (uint8_t i = 0; i < preset_count; i++) {
+        if (strcmp(presets[i].name, preset_name) == 0) {
+            selected_preset = &presets[i];
+            break;
+        }
+    }
+    
+    if (selected_preset == NULL) {
+        ESP_LOGI(TAG, "Invalid preset name '%s' for device model %d", preset_name, device_model);
+        return false;
+    }
+    
+    ESP_LOGI(TAG, "Applying preset \"%s\": %umV, %uMHz, %u%% fan", 
+             selected_preset->name, selected_preset->domain_voltage_mv, 
+             selected_preset->frequency_mhz, selected_preset->fan_speed_percent);
+    
+    // Set the values directly to NVS
+    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, selected_preset->domain_voltage_mv);
+    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, selected_preset->frequency_mhz);
+    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, selected_preset->fan_speed_percent);
+    nvs_config_set_string(NVS_CONFIG_AUTOTUNE_PRESET, preset_name);
+    
+    return true;
+}
+
 // autotune function
 static void autotuneOffset(GlobalState * GLOBAL_STATE)
 {
@@ -49,7 +134,9 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
         ESP_LOGI(autotuneTAG, "Autotune is disabled");
         return;
     }
+
     
+
     // Get current global variables for autotune calculations
     uint16_t currentDomainVoltage = VCORE_get_voltage_mv(GLOBAL_STATE);  // Domain Voltage in mV
     uint16_t currentFrequency = (uint16_t)power->frequency_value;        // Frequency in MHz
@@ -57,6 +144,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     uint8_t currentFanSpeed = (uint8_t)(power->fan_perc * 100);         // Fan Speed in percentage
     float currentHashrate = system->current_hashrate;                   // Hashrate in GH/s
     int16_t currentPower = (int16_t)power->power;                       // Power in watts
+    float expected_hashrate = currentFrequency * ((GLOBAL_STATE->small_core_count * GLOBAL_STATE->asic_count) / 1000.0);
     
     // Get target values from autotune module
     int16_t targetPower = autotune->targetPower;                        // Target power in watts
@@ -65,13 +153,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     uint8_t targetFanSpeed = autotune->targetFanSpeed;                  // Target fan speed in percentage
     uint8_t targetAsicTemp = autotune->targetTemperature;            // Target temperature in °C
     float targetHashrate = autotune->targetHashrate;                    // Target hashrate in GH/s
-    
-    // Get current offset values from autotune module
-    int16_t offsetPower = autotune->offsetPower;                        // Power offset in watts
-    uint16_t offsetDomainVoltage = autotune->offsetDomainVoltage;       // Voltage offset in mV
-    uint16_t offsetFrequency = autotune->offsetFrequency;               // Frequency offset in MHz
-    uint8_t offsetFanSpeed = autotune->offsetFanSpeed;                  // Fan speed offset in percentage
-    
+
     // Log current values
     ESP_LOGI(autotuneTAG, "Autotune - Current Values:");
     ESP_LOGI(autotuneTAG, "  Domain Voltage: %u mV", currentDomainVoltage);
@@ -89,13 +171,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     ESP_LOGI(autotuneTAG, "  Target Fan Speed: %u %%", targetFanSpeed);
     ESP_LOGI(autotuneTAG, "  Target Temperature: %u °C", targetAsicTemp);
     ESP_LOGI(autotuneTAG, "  Target Hashrate: %.2f GH/s", targetHashrate);
-    
-    // Log current offset values
-    ESP_LOGI(autotuneTAG, "Autotune - Current Offset Values:");
-    ESP_LOGI(autotuneTAG, "  Power Offset: %d W", offsetPower);
-    ESP_LOGI(autotuneTAG, "  Domain Voltage Offset: %u mV", offsetDomainVoltage);
-    ESP_LOGI(autotuneTAG, "  Frequency Offset: %u MHz", offsetFrequency);
-    ESP_LOGI(autotuneTAG, "  Fan Speed Offset: %u %%", offsetFanSpeed);
+
     
     // Timing mechanism for normal operation
     static TickType_t lastAutotuneTime = 0;

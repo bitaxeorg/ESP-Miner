@@ -16,6 +16,7 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "vcore.h"
+#include "power_management_task.h"  // Add this for preset support
 #include <fcntl.h>
 #include <string.h>
 #include <sys/param.h>
@@ -35,6 +36,8 @@
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
+
+extern bool apply_preset(DeviceModel device_model, const char* preset_name);
 
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
@@ -431,10 +434,14 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "autotune")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_AUTOTUNE_FLAG, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "autotune_preset")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_AUTOTUNE_PRESET, item->valueint);
+    // Apply preset immediately if "presetName" field is present
+    if ((item = cJSON_GetObjectItem(root, "presetName")) != NULL && item->valuestring != NULL) {
+        if (apply_preset(GLOBAL_STATE->device_model, item->valuestring)) {
+            ESP_LOGI(TAG, "Preset '%s' applied successfully", item->valuestring);
+        } else {
+            ESP_LOGE(TAG, "Failed to apply preset '%s'", item->valuestring);
+        }
     }
-
 
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
