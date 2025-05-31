@@ -25,6 +25,33 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 }
 
 /**
+ * Fetch miners data
+ * Uses the actual system info API to get real miner data
+ */
+export async function fetchMiners(): Promise<SystemInfo[]> {
+  try {
+    // Get the system info from the actual miner
+    const minerInfo = await getSystemInfo();
+
+    // Add IP address and status fields
+    const enhancedMinerInfo: SystemInfo = {
+      ...minerInfo,
+      ipAddress:
+        window.location.hostname !== "localhost" ? window.location.hostname : "localhost:5173",
+      status: "online", // Assume online since we're able to get data
+    };
+
+    // Return as an array with the single miner
+    // In a multi-miner setup, this would be expanded to query multiple miners
+    return [enhancedMinerInfo];
+  } catch (error) {
+    console.error("Failed to fetch miners:", error);
+    // Return an empty array on error
+    return [];
+  }
+}
+
+/**
  * Update pool information
  * @param stratumURL - The primary stratum URL
  * @param stratumPort - The primary stratum port
@@ -220,33 +247,6 @@ export async function restartSystem(): Promise<string> {
   } catch (error) {
     console.error("Failed to restart system:", error);
     throw error;
-  }
-}
-
-/**
- * Fetch miners data
- * Uses the actual system info API to get real miner data
- */
-export async function fetchMiners(): Promise<SystemInfo[]> {
-  try {
-    // Get the system info from the actual miner
-    const minerInfo = await getSystemInfo();
-
-    // Add IP address and status fields
-    const enhancedMinerInfo: SystemInfo = {
-      ...minerInfo,
-      ipAddress:
-        window.location.hostname !== "localhost" ? window.location.hostname : "localhost:5173",
-      status: "online", // Assume online since we're able to get data
-    };
-
-    // Return as an array with the single miner
-    // In a multi-miner setup, this would be expanded to query multiple miners
-    return [enhancedMinerInfo];
-  } catch (error) {
-    console.error("Failed to fetch miners:", error);
-    // Return an empty array on error
-    return [];
   }
 }
 

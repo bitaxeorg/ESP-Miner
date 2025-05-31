@@ -74,7 +74,7 @@ export function Settings() {
     }
   };
 
-  const [isEnabled, setIsEnabled] = useState(true);
+  const [isEnabled, setIsEnabled] = useState(false);
   const [fanSpeed, setFanSpeed] = useState(0);
   const [frequency, setFrequency] = useState(0);
   const [voltage, setVoltage] = useState(0);
@@ -86,6 +86,16 @@ export function Settings() {
   useEffect(() => {
     fetchSystemInfo();
   }, [showToast]);
+
+  // Update states when minerInfo changes
+  useEffect(() => {
+    if (minerInfo) {
+      setIsEnabled(minerInfo.autofanspeed === 1);
+      setFanSpeed(minerInfo.fanspeed || 0);
+      setFrequency(minerInfo.frequency || 0);
+      setVoltage(minerInfo.coreVoltage || 0);
+    }
+  }, [minerInfo]);
 
   return (
     <>
@@ -112,15 +122,30 @@ export function Settings() {
               </div>
             </div>
           </ActionCard>
-          <ActionCard
-            title='Fan Speed Control'
-            description={
-              isEnabled
-                ? "Disabled when automatic fan control is enabled"
-                : "Set the fan speed in percentage"
-            }
-            link={""}
-          >
+          <div className='bg-[var(--card-bg)] rounded-xl border border-[#1C2F52] p-6 shadow-md'>
+            <div className='flex items-start gap-4 mb-4'>
+              <div className='min-w-0'>
+                <h3 className='text-lg font-medium text-white mb-2'>Fan Speed Control</h3>
+                <p className='text-[#8B96A5]'>
+                  {isEnabled
+                    ? "Disabled when automatic fan control is enabled"
+                    : "Set the fan speed in percentage"}
+                </p>
+              </div>
+              {!isEnabled && fanSpeed < 18 && (
+                <div
+                  className='bg-[#2A2D3A] border-l-4 border-yellow-500 text-white p-3 flex-1 self-stretch flex items-start gap-3 min-w-0'
+                  role='alert'
+                >
+                  <div className='text-yellow-500 text-xl'>⚠</div>
+                  <div className='flex-1'>
+                    <p className='font-semibold text-yellow-400 mb-1'>Danger</p>
+                    <p className='text-[#8B96A5] '>Could cause overheating</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className='space-y-4'>
               <div className='flex flex-wrap gap-3'>
                 <Slider
@@ -141,7 +166,7 @@ export function Settings() {
                 </div>
               </div>
             </div>
-          </ActionCard>
+          </div>
         </div>
       </Container>
       <Container className='mt-10'>
