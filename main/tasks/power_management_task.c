@@ -12,6 +12,7 @@
 #include "serial.h"
 #include "TPS546.h"
 #include "vcore.h"
+#include "esp_timer.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_ASIC_RESET  CONFIG_GPIO_ASIC_RESET
@@ -55,7 +56,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     uint16_t targetDomainVoltage = autotune->targetDomainVoltage;       // Target voltage in mV
     uint16_t targetFrequency = autotune->targetFrequency;               // Target frequency in MHz
     uint8_t targetFanSpeed = autotune->targetFanSpeed;                  // Target fan speed in percentage
-    uint8_t targetTemperature = autotune->targetTemperature;            // Target temperature in °C
+    uint8_t targetAsicTemp = autotune->targetTemperature;            // Target temperature in °C
     float targetHashrate = autotune->targetHashrate;                    // Target hashrate in GH/s
     
     // Get current offset values from autotune module
@@ -79,7 +80,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "  Target Domain Voltage: %u mV", targetDomainVoltage);
     ESP_LOGI(TAG, "  Target Frequency: %u MHz", targetFrequency);
     ESP_LOGI(TAG, "  Target Fan Speed: %u %%", targetFanSpeed);
-    ESP_LOGI(TAG, "  Target Temperature: %u °C", targetTemperature);
+    ESP_LOGI(TAG, "  Target Temperature: %u °C", targetAsicTemp);
     ESP_LOGI(TAG, "  Target Hashrate: %.2f GH/s", targetHashrate);
     
     // Log current offset values
@@ -89,12 +90,94 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "  Frequency Offset: %u MHz", offsetFrequency);
     ESP_LOGI(TAG, "  Fan Speed Offset: %u %%", offsetFanSpeed);
     
-    // TODO: Implement your autotune algorithm here
-    // You can modify the offset values based on the difference between current and target values
-    // autotune->offsetPower = ...
-    // autotune->offsetDomainVoltage = ...
-    // autotune->offsetFrequency = ...
-    // autotune->offsetFanSpeed = ...
+    // Timing mechanism for normal operation
+    static TickType_t lastAutotuneTime = 0;
+    TickType_t currentTime = xTaskGetTickCount();
+    uint32_t uptimeSeconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
+    
+    // Check if we need to wait for initial warmup (15 minutes)
+    if (uptimeSeconds < 900 && currentAsicTemp < targetAsicTemp) { // 15 minutes = 900 seconds
+        ESP_LOGI(TAG, "Autotune - Waiting for initial warmup period (%u seconds remaining)", 900 - uptimeSeconds);
+        return;
+    }
+    
+    // Determine timing interval based on temperature
+    uint32_t intervalMs;
+    if (currentAsicTemp > 40 || currentAsicTemp < 68) {
+        intervalMs = 300000; // 5 minutes for normal operation
+    } else {
+        intervalMs = 10000;  // 10 seconds for higher temperatures
+    }
+    
+    // Check if enough time has passed since last autotune
+    if ((currentTime - lastAutotuneTime) < pdMS_TO_TICKS(intervalMs)) {
+        ESP_LOGI(TAG, "Autotune - Waiting for next adjustment interval (%u ms remaining)", 
+                 intervalMs - ((currentTime - lastAutotuneTime) * portTICK_PERIOD_MS));
+        return;
+    }
+    
+    // Update last autotune time
+    lastAutotuneTime = currentTime;
+    
+    // First, ensure fan speed is at target
+    if (currentFanSpeed != targetFanSpeed) {
+        ESP_LOGI(TAG, "Autotune - Adjusting fan speed from %u%% to %u%%", currentFanSpeed, targetFanSpeed);
+        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, targetFanSpeed);
+        return; // Exit after fan adjustment to let it take effect
+    }
+    
+    // Temperature-based adjustments
+    int8_t tempDiff = currentAsicTemp - targetAsicTemp;
+    
+    // If temperature is within 2 degrees of target
+    if (tempDiff >= -2 && tempDiff <= 2) {
+        // Check hashrate
+        float hashrateDiffPercent = ((currentHashrate - targetHashrate) / targetHashrate) * 100.0;
+        
+        if (hashrateDiffPercent >= -5.0 && hashrateDiffPercent <= 5.0) {
+            ESP_LOGI(TAG, "Autotune - Hashrate within 5%% of target, no adjustments needed");
+            return;
+        } else if (hashrateDiffPercent < -5.0) {
+            // Increase voltage by 10mV
+            uint16_t newVoltage = targetDomainVoltage + 10;
+            ESP_LOGI(TAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
+            return;
+        } else {
+            ESP_LOGI(TAG, "Autotune - Hashrate above target, no adjustments needed");
+            return;
+        }
+    }
+    // If temperature is under target
+    else if (tempDiff < -2) {
+        // Increase frequency by 2%
+        uint16_t newFrequency = targetFrequency + (uint16_t)(targetFrequency * 0.02);
+        // Increase voltage by 0.2%
+        uint16_t newVoltage = targetDomainVoltage + (uint16_t)(targetDomainVoltage * 0.002);
+        
+        ESP_LOGI(TAG, "Autotune - Temperature under target, increasing frequency from %u MHz to %u MHz", 
+                 targetFrequency, newFrequency);
+        ESP_LOGI(TAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+        
+        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
+        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
+        return;
+    }
+    // If temperature is over target
+    else {
+        // Decrease frequency by 2%
+        uint16_t newFrequency = currentFrequency - (uint16_t)(currentFrequency * 0.02);
+        // Decrease voltage by 0.2%
+        uint16_t newVoltage = currentDomainVoltage - (uint16_t)(currentDomainVoltage * 0.002);
+        
+        ESP_LOGI(TAG, "Autotune - Temperature over target, decreasing frequency from %u MHz to %u MHz", 
+                 currentFrequency, newFrequency);
+        ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", currentDomainVoltage, newVoltage);
+        
+        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
+        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
+        return;
+    }
 }
 
 // static float _fbound(float value, float lower_bound, float upper_bound)
