@@ -75,9 +75,7 @@
             </div>
         </div>
 
-        <br/>
-
-        <h3>Display</h3>
+        <h3 class="mt-5">Display</h3>
 
         <div class="field grid p-fluid">
             <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="display">Display</label>
@@ -123,17 +121,24 @@
             </div>
         </div>
 
-        <br/>
+        <h3 class="mt-5">Statistics</h3>
 
-        <div class="col-12">
-              <label>Statistics Limit: {{form.controls['statsLimit'].value}} previous data points
-                  <b *ngIf="form.controls['statsLimit'].value == 0"> (live data points only)</b></label>
-              <p-slider [min]="0" [max]="720" [step]="60" formControlName="statsLimit"></p-slider>
-        </div>
+        <div class="flex flex-column mb-5 gap-3">
+            <div>
+                <label class="block mb-2">
+                    Statistics Limit: {{form.controls['statsLimit'].value}} previous data points
+                    <b *ngIf="form.controls['statsLimit'].value == 0"> (live data points only)</b>
+                </label>
+                <p-slider [min]="0" [max]="720" [step]="60" formControlName="statsLimit"></p-slider>
+            </div>
 
-        <div class="col-12">
-              <label>Statistics Duration: {{form.controls['statsDuration'].value}} hour(s)</label>
-              <p-slider [min]="1" [max]="720" formControlName="statsDuration"></p-slider>
+            <div>
+                <label class="block mb-2">
+                    Statistics Duration:
+                    {{form.controls['statsDuration'].value}} hour{{form.controls['statsDuration'].value > 1 ? 's': ''}}
+                </label>
+                <p-slider [min]="1" [max]="720" formControlName="statsDuration"></p-slider>
+            </div>
         </div>
 
         <div class="flex mt-5 gap-3">
