@@ -6,7 +6,6 @@ import { forkJoin, startWith, Subject, takeUntil, pairwise } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { eASICModel } from 'src/models/enum/eASICModel';
-import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { ActivatedRoute } from '@angular/router';
 
 type Dropdown = {
@@ -152,8 +151,6 @@ export class EditComponent implements OnInit, OnDestroy {
           ]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
-          chartY1Data: [info.chartY1Data, [Validators.required]],
-          chartY2Data: [info.chartY2Data, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
           temptarget: [info.temptarget, [Validators.required]],
@@ -340,8 +337,4 @@ export class EditComponent implements OnInit, OnDestroy {
     return !! Object.entries(this.form.controls)
       .filter(([field, control]) => control.dirty && !this.noRestartFields.includes(field)).length
   }
-  getDataSourceLabels() {
-    return Object.values(eChartLabel).map(label => ({name: label, value: label}));
-  }
-
 }
