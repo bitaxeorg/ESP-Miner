@@ -492,14 +492,14 @@ static void uptime_update_cb(lv_timer_t * timer)
     if (esp_uptime_label) {
         char uptime[50];
         uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
-        
+
         uint32_t days = uptime_seconds / (24 * 3600);
         uptime_seconds %= (24 * 3600);
         uint32_t hours = uptime_seconds / 3600;
         uptime_seconds %= 3600;
         uint32_t minutes = uptime_seconds / 60;
         uptime_seconds %= 60;
-        
+
         if (days > 0) {
             snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
         } else if (hours > 0) {
@@ -509,7 +509,7 @@ static void uptime_update_cb(lv_timer_t * timer)
         } else {
             snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
         }
-        
+
         if (strcmp(lv_label_get_text(esp_uptime_label), uptime) != 0) {
             lv_label_set_text(esp_uptime_label, uptime);
         }
@@ -536,7 +536,7 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_WIFI_RSSI] = create_scr_wifi_rssi();
 
         notification_dot = lv_obj_create(lv_layer_top());
-        lv_obj_align(notification_dot, LV_ALIGN_TOP_RIGHT, 0, 0);        
+        lv_obj_align(notification_dot, LV_ALIGN_TOP_RIGHT, 0, 0);
         lv_obj_set_size(notification_dot, 8, 8);
         lv_obj_set_style_radius(notification_dot, LV_RADIUS_CIRCLE, LV_PART_MAIN);
         lv_obj_set_style_bg_color(notification_dot, lv_color_black(), LV_PART_MAIN);
@@ -544,7 +544,7 @@ esp_err_t screen_start(void * pvParameters)
         lv_obj_add_flag(notification_dot, LV_OBJ_FLAG_HIDDEN);
 
         lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);
-        
+
         // Create uptime update timer (runs every 1 second)
         lv_timer_create(uptime_update_cb, 1000, NULL);
     }
