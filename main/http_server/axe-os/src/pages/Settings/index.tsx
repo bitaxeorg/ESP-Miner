@@ -2,14 +2,7 @@ import { useState, useEffect, useRef } from "preact/hooks";
 import { Button } from "../../components/Button";
 import { Switch } from "../../components/Switch";
 import { Slider } from "../../components/Slider";
-import {
-  fetchMiners,
-  uploadFirmware,
-  uploadWebApp,
-  FIRMWARE_LATEST_URL,
-  WEBAPP_LATEST_URL,
-  SystemInfo,
-} from "../../utils/api";
+import { fetchMiners, SystemInfo } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
 
@@ -81,8 +74,10 @@ export function Settings() {
     }
   };
 
-  const [isEnabled, setIsEnabled] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(true);
   const [fanSpeed, setFanSpeed] = useState(0);
+  const [frequency, setFrequency] = useState(0);
+  const [voltage, setVoltage] = useState(0);
 
   const onCheckedChange = (checked: boolean) => {
     setIsEnabled(checked);
@@ -93,52 +88,105 @@ export function Settings() {
   }, [showToast]);
 
   return (
-    <Container>
-      <h2 className='text-xl font-bold text-white mb-6'>Fan Settings</h2>
-      <div className='grid grid-cols-1 gap-6 max-w-4xl mx-auto'>
-        <ActionCard
-          title='Automatic Fan Control'
-          description={"Enable or disable automatic fan control"}
-          link={""}
-        >
-          <div className='space-y-4'>
-            <div className='flex flex-wrap gap-3'>
-              <Switch
-                checked={isEnabled}
-                onCheckedChange={onCheckedChange}
-                aria-label='Enable automatic fan control'
-              />
-            </div>
-            <div className='mt-4'>
-              <div className='flex items-center gap-3'>
-                <div className='flex-1'></div>
+    <>
+      <Container>
+        <h2 className='text-xl font-bold text-white mb-6'>Fan Settings</h2>
+        <div className='grid grid-cols-1 gap-6 max-w-4xl mx-auto'>
+          <ActionCard
+            title='Automatic Fan Control'
+            description={"Enable or disable automatic fan control"}
+            link={""}
+          >
+            <div className='space-y-4'>
+              <div className='flex flex-wrap gap-3'>
+                <Switch
+                  checked={isEnabled}
+                  onCheckedChange={onCheckedChange}
+                  aria-label='Enable automatic fan control'
+                />
+              </div>
+              <div className='mt-4'>
+                <div className='flex items-center gap-3'>
+                  <div className='flex-1'></div>
+                </div>
               </div>
             </div>
-          </div>
-        </ActionCard>
-        <ActionCard
-          title='Fan Speed Control'
-          description={"Set the fan speed in percentage"}
-          link={""}
-        >
-          <div className='space-y-4'>
-            <div className='flex flex-wrap gap-3'>
-              <Slider
-                min={0}
-                max={100}
-                step={5}
-                value={[fanSpeed]}
-                onValueChange={(value) => setFanSpeed(value[0])}
-              />
-            </div>
-            <div className='mt-4'>
-              <div className='flex items-center gap-3'>
-                <div className='flex-1'></div>
+          </ActionCard>
+          <ActionCard
+            title='Fan Speed Control'
+            description={
+              isEnabled
+                ? "Disabled when automatic fan control is enabled"
+                : "Set the fan speed in percentage"
+            }
+            link={""}
+          >
+            <div className='space-y-4'>
+              <div className='flex flex-wrap gap-3'>
+                <Slider
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={[fanSpeed]}
+                  onValueChange={(value) => setFanSpeed(value[0])}
+                  disabled={isEnabled}
+                />
+              </div>
+              <div className={`text-sm font-medium ${isEnabled ? "text-[#8B96A5]" : "text-white"}`}>
+                {fanSpeed}%
+              </div>
+              <div className='mt-4'>
+                <div className='flex items-center gap-3'>
+                  <div className='flex-1'></div>
+                </div>
               </div>
             </div>
-          </div>
-        </ActionCard>
-      </div>
-    </Container>
+          </ActionCard>
+        </div>
+      </Container>
+      <Container className='mt-10'>
+        <h2 className='text-xl font-bold text-white mb-6'>ASIC Settings</h2>
+        <div className='grid grid-cols-1 gap-6 max-w-4xl mx-auto'>
+          <ActionCard title='Frequency' description={"Set the frequency of the ASIC"} link={""}>
+            <div className='space-y-4'>
+              <div className='flex flex-wrap gap-3'>
+                <Slider
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={[frequency]}
+                  onValueChange={(value) => setFrequency(value[0])}
+                />
+              </div>
+              <div className='text-white text-sm font-medium'>{frequency}%</div>
+              <div className='mt-4'>
+                <div className='flex items-center gap-3'>
+                  <div className='flex-1'></div>
+                </div>
+              </div>
+            </div>
+          </ActionCard>
+          <ActionCard title='Voltage' description={"Set the voltage of the ASIC"} link={""}>
+            <div className='space-y-4'>
+              <div className='flex flex-wrap gap-3'>
+                <Slider
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={[voltage]}
+                  onValueChange={(value) => setVoltage(value[0])}
+                />
+              </div>
+              <div className='text-white text-sm font-medium'>{voltage}%</div>
+              <div className='mt-4'>
+                <div className='flex items-center gap-3'>
+                  <div className='flex-1'></div>
+                </div>
+              </div>
+            </div>
+          </ActionCard>
+        </div>
+      </Container>
+    </>
   );
 }
