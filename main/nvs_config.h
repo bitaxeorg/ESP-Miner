@@ -35,6 +35,8 @@
 #define NVS_CONFIG_SWARM "swarmconfig"
 #define NVS_CONFIG_STATISTICS_LIMIT "statsLimit"
 #define NVS_CONFIG_STATISTICS_DURATION "statsDuration"
+#define NVS_CONFIG_CHART_Y1_DATA "chartY1Data"
+#define NVS_CONFIG_CHART_Y2_DATA "chartY2Data"
 
 // Theme configuration
 #define NVS_CONFIG_THEME_SCHEME "themescheme"
