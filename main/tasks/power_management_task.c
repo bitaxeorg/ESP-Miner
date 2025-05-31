@@ -144,15 +144,15 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     uint8_t currentFanSpeed = (uint8_t)(power->fan_perc * 100);         // Fan Speed in percentage
     float currentHashrate = system->current_hashrate;                   // Hashrate in GH/s
     int16_t currentPower = (int16_t)power->power;                       // Power in watts
-    float expected_hashrate = currentFrequency * ((GLOBAL_STATE->small_core_count * GLOBAL_STATE->asic_count) / 1000.0);
+    
     
     // Get target values from autotune module
-    int16_t targetPower = autotune->targetPower;                        // Target power in watts
-    uint16_t targetDomainVoltage = autotune->targetDomainVoltage;       // Target voltage in mV
-    uint16_t targetFrequency = autotune->targetFrequency;               // Target frequency in MHz
-    uint8_t targetFanSpeed = autotune->targetFanSpeed;                  // Target fan speed in percentage
-    uint8_t targetAsicTemp = autotune->targetTemperature;            // Target temperature in °C
-    float targetHashrate = autotune->targetHashrate;                    // Target hashrate in GH/s
+    //int16_t targetPower = autotune->targetPower;                        // Target power in watts
+    uint16_t targetDomainVoltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);     // Target voltage in mV
+    //uint16_t targetFrequency = autotune->targetFrequency;               // Target frequency in MHz
+    //uint8_t targetFanSpeed = autotune->targetFanSpeed;                  // Target fan speed in percentage
+    uint8_t targetAsicTemp = 60;            // Target temperature in °C
+    float targetHashrate = currentFrequency * ((GLOBAL_STATE->small_core_count * GLOBAL_STATE->asic_count) / 1000.0);
 
     // Log current values
     ESP_LOGI(autotuneTAG, "Autotune - Current Values:");
@@ -165,10 +165,10 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     
     // Log target values
     ESP_LOGI(autotuneTAG, "Autotune - Target Values:");
-    ESP_LOGI(autotuneTAG, "  Target Power: %d W", targetPower);
+    //ESP_LOGI(autotuneTAG, "  Target Power: %d W", targetPower);
     ESP_LOGI(autotuneTAG, "  Target Domain Voltage: %u mV", targetDomainVoltage);
-    ESP_LOGI(autotuneTAG, "  Target Frequency: %u MHz", targetFrequency);
-    ESP_LOGI(autotuneTAG, "  Target Fan Speed: %u %%", targetFanSpeed);
+    //ESP_LOGI(autotuneTAG, "  Target Frequency: %u MHz", targetFrequency);
+    //ESP_LOGI(autotuneTAG, "  Target Fan Speed: %u %%", targetFanSpeed);
     ESP_LOGI(autotuneTAG, "  Target Temperature: %u °C", targetAsicTemp);
     ESP_LOGI(autotuneTAG, "  Target Hashrate: %.2f GH/s", targetHashrate);
 
@@ -189,7 +189,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     if (currentAsicTemp > 40 || currentAsicTemp < 68) {
         intervalMs = 300000; // 5 minutes for normal operation
     } else {
-        intervalMs = 10000;  // 10 seconds for higher temperatures
+        intervalMs = 15000;  // 15 seconds for higher temperatures
     }
     
     // Check if enough time has passed since last autotune
@@ -202,13 +202,6 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     // Update last autotune time
     lastAutotuneTime = currentTime;
     
-    // First, ensure fan speed is at target
-    if (currentFanSpeed != targetFanSpeed) {
-        ESP_LOGI(autotuneTAG, "Autotune - Adjusting fan speed from %u%% to %u%%", currentFanSpeed, targetFanSpeed);
-        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, targetFanSpeed);
-        return; // Exit after fan adjustment to let it take effect
-    }
-    
     // Temperature-based adjustments
     int8_t tempDiff = currentAsicTemp - targetAsicTemp;
     
@@ -217,10 +210,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
         // Check hashrate
         float hashrateDiffPercent = ((currentHashrate - targetHashrate) / targetHashrate) * 100.0;
         
-        if (hashrateDiffPercent >= -5.0 && hashrateDiffPercent <= 5.0) {
-            ESP_LOGI(autotuneTAG, "Autotune - Hashrate within 5%% of target, no adjustments needed");
-            return;
-        } else if (hashrateDiffPercent < -5.0) {
+        if (hashrateDiffPercent < -20.0) { // Hashrate is below target by 20%
             // Increase voltage by 10mV
             uint16_t newVoltage = targetDomainVoltage + 10;
             ESP_LOGI(autotuneTAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
@@ -234,12 +224,12 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     // If temperature is under target
     else if (tempDiff < -2) {
         // Increase frequency by 2%
-        uint16_t newFrequency = targetFrequency + (uint16_t)(targetFrequency * 0.02);
+        uint16_t newFrequency = currentFrequency * 1.02;
         // Increase voltage by 0.2%
-        uint16_t newVoltage = targetDomainVoltage + (uint16_t)(targetDomainVoltage * 0.002);
+        uint16_t newVoltage = targetDomainVoltage * 1.002;
         
         ESP_LOGI(TAG, "Autotune - Temperature under target, increasing frequency from %u MHz to %u MHz", 
-                 targetFrequency, newFrequency);
+                 currentFrequency, newFrequency);
         ESP_LOGI(TAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
         
         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
@@ -249,13 +239,13 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     // If temperature is over target
     else {
         // Decrease frequency by 2%
-        uint16_t newFrequency = currentFrequency - (uint16_t)(currentFrequency * 0.02);
+        uint16_t newFrequency = currentFrequency * 0.98;
         // Decrease voltage by 0.2%
-        uint16_t newVoltage = currentDomainVoltage - (uint16_t)(currentDomainVoltage * 0.002);
+        uint16_t newVoltage = targetDomainVoltage * 0.998;
         
         ESP_LOGI(TAG, "Autotune - Temperature over target, decreasing frequency from %u MHz to %u MHz", 
                  currentFrequency, newFrequency);
-        ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", currentDomainVoltage, newVoltage);
+        ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
         
         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
