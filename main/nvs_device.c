@@ -47,24 +47,36 @@ esp_err_t NVSDevice_parse_config(GlobalState * GLOBAL_STATE) {
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
         GLOBAL_STATE->small_core_count = BM1397_SMALL_CORE_COUNT;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1800;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 1000;
     } else if (strcmp(GLOBAL_STATE->device_model_str, "ultra") == 0) {
         ESP_LOGI(TAG, "DEVICE: Ultra");
         GLOBAL_STATE->device_model = DEVICE_ULTRA;
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
         GLOBAL_STATE->small_core_count = BM1366_SMALL_CORE_COUNT;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1400;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 900;
     } else if (strcmp(GLOBAL_STATE->device_model_str, "supra") == 0) {
         ESP_LOGI(TAG, "DEVICE: Supra");
         GLOBAL_STATE->device_model = DEVICE_SUPRA;
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
         GLOBAL_STATE->small_core_count = BM1368_SMALL_CORE_COUNT;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1450;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 1000;
     } else if (strcmp(GLOBAL_STATE->device_model_str, "gamma") == 0) {
         ESP_LOGI(TAG, "DEVICE: Gamma");
         GLOBAL_STATE->device_model = DEVICE_GAMMA;
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
         GLOBAL_STATE->small_core_count = BM1370_SMALL_CORE_COUNT;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1300;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 1000;
     } else {
         ESP_LOGE(TAG, "Invalid DEVICE model");
         // maybe should return here to now execute anything with a faulty device parameter !

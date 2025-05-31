@@ -62,7 +62,7 @@ static const DevicePreset DEVICE_SUPRA_PRESETS[] = {
 static const DevicePreset DEVICE_GAMMA_PRESETS[] = {
     {"quiet", 950, 300, 35},        // Quiet: Low power, conservative
     {"balanced", 1050, 400, 50},    // Balanced: Good performance/efficiency balance
-    {"turbo", 1250, 600, 85},       // Turbo: Maximum performance
+    {"turbo", 1150, 525, 100},       // Turbo: Maximum performance
 };
 
 // Simple function to apply a preset by name
@@ -141,7 +141,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     uint16_t currentDomainVoltage = VCORE_get_voltage_mv(GLOBAL_STATE);  // Domain Voltage in mV
     uint16_t currentFrequency = (uint16_t)power->frequency_value;        // Frequency in MHz
     uint8_t currentAsicTemp = (uint8_t)power->chip_temp_avg;            // ASIC Temperature in °C
-    uint8_t currentFanSpeed = (uint8_t)(power->fan_perc * 100);         // Fan Speed in percentage
+    uint8_t currentFanSpeed = (uint8_t)(power->fan_perc);         // Fan Speed in percentage
     float currentHashrate = system->current_hashrate;                   // Hashrate in GH/s
     int16_t currentPower = (int16_t)power->power;                       // Power in watts
     
@@ -154,6 +154,8 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     uint8_t targetAsicTemp = 60;            // Target temperature in °C
     float targetHashrate = currentFrequency * ((GLOBAL_STATE->small_core_count * GLOBAL_STATE->asic_count) / 1000.0);
 
+
+
     // Log current values
     ESP_LOGI(autotuneTAG, "Autotune - Current Values:");
     ESP_LOGI(autotuneTAG, "  Domain Voltage: %u mV", currentDomainVoltage);
@@ -162,7 +164,10 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     ESP_LOGI(autotuneTAG, "  Fan Speed: %u %%", currentFanSpeed);
     ESP_LOGI(autotuneTAG, "  Hashrate: %.2f GH/s", currentHashrate);
     ESP_LOGI(autotuneTAG, "  Power: %d W", currentPower);
-    
+    ESP_LOGI(autotuneTAG, "  Max Power: %d W", GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
+    ESP_LOGI(autotuneTAG, "  Max Domain Voltage: %u mV", GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage);
+    ESP_LOGI(autotuneTAG, "  Max Frequency: %u MHz", GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency);
+
     // Log target values
     ESP_LOGI(autotuneTAG, "Autotune - Target Values:");
     //ESP_LOGI(autotuneTAG, "  Target Power: %d W", targetPower);
@@ -223,10 +228,28 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     }
     // If temperature is under target
     else if (tempDiff < -2) {
+        static uint16_t newFrequency = 0;
+        static uint16_t newVoltage = 0;
         // Increase frequency by 2%
-        uint16_t newFrequency = currentFrequency * 1.02;
+        if (currentFrequency < GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency && GLOBAL_STATE->AUTOTUNE_MODULE.maxPower > currentPower) {
+           newFrequency = currentFrequency * 1.02;
+        }
+        else {
+            ESP_LOGI(TAG, "freq or power limit reached, no adjustments possible");
+            ESP_LOGI(TAG, "Autotune - Frequency: %u MHz, Power: %d W, Max Frequency: %u MHz, Max Power: %d W", 
+                     currentFrequency, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
+            return;
+        }
         // Increase voltage by 0.2%
-        uint16_t newVoltage = targetDomainVoltage * 1.002;
+        if (targetDomainVoltage < GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage && GLOBAL_STATE->AUTOTUNE_MODULE.maxPower > currentPower) {
+            newVoltage = targetDomainVoltage * 1.002;
+        }
+        else {
+            ESP_LOGI(TAG, "voltage or power limit reached, no adjustments possible");
+            ESP_LOGI(TAG, "Autotune - Voltage: %u mV, Power: %d W, Max Voltage: %u mV, Max Power: %d W", 
+                     targetDomainVoltage, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
+            return;
+        }
         
         ESP_LOGI(TAG, "Autotune - Temperature under target, increasing frequency from %u MHz to %u MHz", 
                  currentFrequency, newFrequency);
@@ -524,7 +547,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             module->overheat_mode = new_overheat_mode;
             ESP_LOGI(TAG, "Overheat mode updated to: %d", module->overheat_mode);
         }
-
+        autotuneOffset(GLOBAL_STATE);
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
     }
 }

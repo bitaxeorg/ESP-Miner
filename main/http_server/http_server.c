@@ -573,7 +573,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
     cJSON_AddNumberToObject(root, "autotune", nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1));
-    cJSON_AddNumberToObject(root, "autotune_preset", nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_PRESET, 0));
+    cJSON_AddStringToObject(root, "autotune_preset", nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, ""));
 
     free(ssid);
     free(hostname);
@@ -868,9 +868,9 @@ esp_err_t start_rest_server(void * pvParameters)
         .handler = GET_system_info, 
         .user_ctx = rest_context
     };
-    /*
+    
     httpd_register_uri_handler(server, &system_info_get_uri);
-
+/*
     httpd_uri_t swarm_options_uri = {
         .uri = "/api/swarm",
         .method = HTTP_OPTIONS,

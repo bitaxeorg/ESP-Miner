@@ -30,6 +30,11 @@ typedef struct
     uint8_t targetFanSpeed;       // Target fan speed in percentage
     uint8_t targetTemperature;    // Target temperature in °C
     float targetHashrate;         // Target hashrate in GH/s
+    uint16_t maxPower;            // Maximum power in watts
+    uint16_t maxDomainVoltage;    // Maximum domain voltage in mV
+    uint16_t maxFrequency;        // Maximum frequency in MHz
+
+
 } AutotuneModule;
 
 // Preset data structure for device-specific safe values
