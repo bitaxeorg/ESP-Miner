@@ -28,9 +28,18 @@ export function ActionCard({
 
       {children || (
         <div className='flex flex-wrap gap-3'>
-          {buttonText && onAction && <Button onClick={onAction}>{buttonText}</Button>}
+          {buttonText && onAction && (
+            <Button onClick={onAction} className='bg-blue-600 hover:bg-blue-700'>
+              {buttonText}
+            </Button>
+          )}
           {link && (
-            <Button as='a' href={link} download='esp-miner.bin'>
+            <Button
+              as='a'
+              href={link}
+              download='esp-miner.bin'
+              className='bg-blue-600 hover:bg-blue-700'
+            >
               Download Firmware
             </Button>
           )}

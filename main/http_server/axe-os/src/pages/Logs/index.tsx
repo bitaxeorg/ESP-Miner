@@ -126,6 +126,7 @@ export function LogsPage() {
             variant={isConnected ? "outline" : "default"}
             onClick={handleConnect}
             disabled={isConnecting}
+            className={isConnected ? "" : "bg-blue-600 hover:bg-blue-700"}
           >
             {isConnecting ? "Connecting..." : isConnected ? "Disconnect" : "Fetch Logs"}
           </Button>

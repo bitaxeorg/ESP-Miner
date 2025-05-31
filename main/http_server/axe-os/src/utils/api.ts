@@ -422,3 +422,54 @@ export async function updateASICSettings(
     };
   }
 }
+
+/**
+ * Update preset settings
+ * @param presetName - The preset name: "quiet", "balanced", or "turbo"
+ * @returns A message indicating the preset update status
+ */
+export async function updatePresetSettings(
+  presetName: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload = {
+      presetName,
+    };
+
+    const response = await fetch("/api/system", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const text = await response.text();
+
+    // If the response has content, try to parse it as JSON
+    if (text.trim()) {
+      try {
+        const result = JSON.parse(text);
+        console.log("Preset settings update response:", result);
+        return result;
+      } catch (parseError) {
+        console.log("Response is not JSON:", text);
+        return { success: true, message: `${presetName} mode applied successfully` };
+      }
+    }
+
+    // For empty responses with 200 status
+    console.log("Preset settings update successful (empty response)");
+    return { success: true, message: `${presetName} mode applied successfully` };
+  } catch (error) {
+    console.error("Failed to update preset settings:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}

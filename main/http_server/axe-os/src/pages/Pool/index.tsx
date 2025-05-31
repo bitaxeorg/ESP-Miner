@@ -456,7 +456,7 @@ export function PoolsPage() {
             </div>
           </div>
 
-          <Button type='submit' disabled={loading} className='bg-red-600 hover:bg-red-700'>
+          <Button type='submit' disabled={loading} className='bg-blue-600 hover:bg-blue-700'>
             {loading ? "Processing..." : "Save & Restart Device"}
           </Button>
         </form>

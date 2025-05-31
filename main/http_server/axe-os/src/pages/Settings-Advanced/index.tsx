@@ -150,7 +150,11 @@ export function SettingsAdvanced() {
       <Container>
         <div className='flex items-center justify-between mb-6'>
           <h2 className='text-xl font-bold text-white'>Fan Settings</h2>
-          <Button onClick={handleSaveFanSettings} disabled={!hasChanges || isUpdating}>
+          <Button
+            onClick={handleSaveFanSettings}
+            disabled={!hasChanges || isUpdating}
+            className='bg-blue-600 hover:bg-blue-700'
+          >
             {isUpdating ? "Saving..." : "Save"}
           </Button>
         </div>
@@ -225,7 +229,11 @@ export function SettingsAdvanced() {
       <Container className='mt-10'>
         <div className='flex items-center justify-between mb-6'>
           <h2 className='text-xl font-bold text-white'>ASIC Settings</h2>
-          <Button onClick={handleSaveASICSettings} disabled={!hasASICChanges || isUpdatingASIC}>
+          <Button
+            onClick={handleSaveASICSettings}
+            disabled={!hasASICChanges || isUpdatingASIC}
+            className='bg-blue-600 hover:bg-blue-700'
+          >
             {isUpdatingASIC ? "Saving..." : "Save"}
           </Button>
         </div>
