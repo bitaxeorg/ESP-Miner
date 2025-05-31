@@ -320,6 +320,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       }),
       map(info => {
         info.hashRate = info.hashRate * 1000000000; // convert to H/s
+        info.expectedHashrate = info.expectedHashrate * 1000000000; // convert to H/s
         info.voltage = info.voltage / 1000;
         info.current = info.current / 1000;
         info.coreVoltageActual = info.coreVoltageActual / 1000;
@@ -329,6 +330,11 @@ export class HomeComponent implements OnInit, OnDestroy {
       tap(info => {
         const chartY1DataValue = this.form.get('chartY1Data')?.value;
         const chartY2DataValue = this.form.get('chartY2Data')?.value;
+
+        this.maxPower = Math.max(info.maxPower, info.power);
+        this.nominalVoltage = info.nominalVoltage;
+        this.maxTemp = Math.max(75, info.temp);
+        this.maxFrequency = Math.max(800, info.frequency);
 
         // Only collect and update chart data if there's no power fault
         if (!info.power_fault) {
@@ -348,15 +354,11 @@ export class HomeComponent implements OnInit, OnDestroy {
 
           this.chartData.datasets[0].label = chartY1DataValue;
           this.chartData.datasets[1].label = chartY2DataValue;
-          this.chartOptions.scales.y.suggestedMax = HomeComponent.getSettingsForLabel(info.chartY1Data).suggestedMax;
-          this.chartOptions.scales.y2.suggestedMax = HomeComponent.getSettingsForLabel(info.chartY2Data).suggestedMax;
+          this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartY1DataValue, info);
+          this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartY2DataValue, info);
         }
 
         this.chart?.refresh();
-        this.maxPower = Math.max(info.maxPower, info.power);
-        this.nominalVoltage = info.nominalVoltage;
-        this.maxTemp = Math.max(75, info.temp);
-        this.maxFrequency = Math.max(800, info.frequency);
 
         const isFallback = info.isUsingFallbackStratum;
 
@@ -444,6 +446,23 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.calculateAverage(efficiencies);
   }
 
+  public getSuggestedMaxForLabel(label: eChartLabel, info: ISystemInfo): number {
+    switch (label) {
+      case eChartLabel.hashrate:    return info.expectedHashrate;
+      case eChartLabel.asicTemp:    return this.maxTemp;
+      case eChartLabel.vrTemp:      return this.maxTemp + 25;
+      case eChartLabel.asicVoltage: return info.coreVoltage;
+      case eChartLabel.voltage:     return (info.nominalVoltage + .5);
+      case eChartLabel.power:       return this.maxPower;
+      case eChartLabel.current:     return (this.maxPower / info.coreVoltage);
+      case eChartLabel.fanSpeed:    return 100;
+      case eChartLabel.fanRpm:      return 7000;
+      case eChartLabel.wifiRssi:    return 0;
+      case eChartLabel.freeHeap:    return 0;
+      default: return 0;
+    }
+  }
+
   static getDataForLabel(label: eChartLabel, info: ISystemInfo): number {
     switch (label) {
       case eChartLabel.hashrate:    return info.hashRate;
@@ -461,20 +480,20 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number; suggestedMax: number} {
+  static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number} {
     switch (label) {
-      case eChartLabel.hashrate:    return {suffix: ' H/s', precision: 0, suggestedMax: 0};
-      case eChartLabel.asicTemp:    return {suffix: ' °C', precision: 1, suggestedMax: 80};
-      case eChartLabel.vrTemp:      return {suffix: ' °C', precision: 1, suggestedMax: 110};
-      case eChartLabel.asicVoltage: return {suffix: ' V', precision: 2, suggestedMax: 1.5};
-      case eChartLabel.voltage:     return {suffix: ' V', precision: 1, suggestedMax: 5.2};
-      case eChartLabel.power:       return {suffix: ' W', precision: 1, suggestedMax: 40};
-      case eChartLabel.current:     return {suffix: ' A', precision: 1, suggestedMax: 20};
-      case eChartLabel.fanSpeed:    return {suffix: ' %', precision: 0, suggestedMax: 100};
-      case eChartLabel.fanRpm:      return {suffix: ' rpm', precision: 0, suggestedMax: 7000};
-      case eChartLabel.wifiRssi:    return {suffix: ' dBm', precision: 0, suggestedMax: 0};
-      case eChartLabel.freeHeap:    return {suffix: ' B', precision: 0, suggestedMax: 0};
-      default: return {suffix: '', precision: 0, suggestedMax: 0};
+      case eChartLabel.hashrate:    return {suffix: ' H/s', precision: 0};
+      case eChartLabel.asicTemp:    return {suffix: ' °C', precision: 1};
+      case eChartLabel.vrTemp:      return {suffix: ' °C', precision: 1};
+      case eChartLabel.asicVoltage: return {suffix: ' V', precision: 3};
+      case eChartLabel.voltage:     return {suffix: ' V', precision: 1};
+      case eChartLabel.power:       return {suffix: ' W', precision: 1};
+      case eChartLabel.current:     return {suffix: ' A', precision: 1};
+      case eChartLabel.fanSpeed:    return {suffix: ' %', precision: 0};
+      case eChartLabel.fanRpm:      return {suffix: ' rpm', precision: 0};
+      case eChartLabel.wifiRssi:    return {suffix: ' dBm', precision: 0};
+      case eChartLabel.freeHeap:    return {suffix: ' B', precision: 0};
+      default: return {suffix: '', precision: 0};
     }
   }
 

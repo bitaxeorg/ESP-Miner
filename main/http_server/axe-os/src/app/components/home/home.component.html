@@ -47,7 +47,7 @@
                 </ng-container>
 
                 <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
-                    Expected: {{info.expectedHashrate * 1000000000 | hashSuffix}}
+                    Expected: {{info.expectedHashrate | hashSuffix}}
                 </div>
             </div>
         </div>
@@ -75,7 +75,7 @@
                 </ng-container>
 
                 <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
-                    Expected: {{info.power / (info.expectedHashrate/1000) | number: '1.2-2'}} J/Th
+                    Expected: {{info.power / (info.expectedHashrate / 1000000000000) | number: '1.2-2'}} J/Th
                 </div>
             </div>
         </div>
