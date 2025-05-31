@@ -42,6 +42,13 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     AutotuneModule *autotune = &GLOBAL_STATE->AUTOTUNE_MODULE;
     PowerManagementModule *power = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     SystemModule *system = &GLOBAL_STATE->SYSTEM_MODULE;
+    static const char *autotuneTAG = "autotune";
+
+    // Check if autotune is enabled
+    if (nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1) == 0) {
+        ESP_LOGI(autotuneTAG, "Autotune is disabled");
+        return;
+    }
     
     // Get current global variables for autotune calculations
     uint16_t currentDomainVoltage = VCORE_get_voltage_mv(GLOBAL_STATE);  // Domain Voltage in mV
@@ -66,29 +73,29 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     uint8_t offsetFanSpeed = autotune->offsetFanSpeed;                  // Fan speed offset in percentage
     
     // Log current values
-    ESP_LOGI(TAG, "Autotune - Current Values:");
-    ESP_LOGI(TAG, "  Domain Voltage: %u mV", currentDomainVoltage);
-    ESP_LOGI(TAG, "  Frequency: %u MHz", currentFrequency);
-    ESP_LOGI(TAG, "  ASIC Temp: %u °C", currentAsicTemp);
-    ESP_LOGI(TAG, "  Fan Speed: %u %%", currentFanSpeed);
-    ESP_LOGI(TAG, "  Hashrate: %.2f GH/s", currentHashrate);
-    ESP_LOGI(TAG, "  Power: %d W", currentPower);
+    ESP_LOGI(autotuneTAG, "Autotune - Current Values:");
+    ESP_LOGI(autotuneTAG, "  Domain Voltage: %u mV", currentDomainVoltage);
+    ESP_LOGI(autotuneTAG, "  Frequency: %u MHz", currentFrequency);
+    ESP_LOGI(autotuneTAG, "  ASIC Temp: %u °C", currentAsicTemp);
+    ESP_LOGI(autotuneTAG, "  Fan Speed: %u %%", currentFanSpeed);
+    ESP_LOGI(autotuneTAG, "  Hashrate: %.2f GH/s", currentHashrate);
+    ESP_LOGI(autotuneTAG, "  Power: %d W", currentPower);
     
     // Log target values
-    ESP_LOGI(TAG, "Autotune - Target Values:");
-    ESP_LOGI(TAG, "  Target Power: %d W", targetPower);
-    ESP_LOGI(TAG, "  Target Domain Voltage: %u mV", targetDomainVoltage);
-    ESP_LOGI(TAG, "  Target Frequency: %u MHz", targetFrequency);
-    ESP_LOGI(TAG, "  Target Fan Speed: %u %%", targetFanSpeed);
-    ESP_LOGI(TAG, "  Target Temperature: %u °C", targetAsicTemp);
-    ESP_LOGI(TAG, "  Target Hashrate: %.2f GH/s", targetHashrate);
+    ESP_LOGI(autotuneTAG, "Autotune - Target Values:");
+    ESP_LOGI(autotuneTAG, "  Target Power: %d W", targetPower);
+    ESP_LOGI(autotuneTAG, "  Target Domain Voltage: %u mV", targetDomainVoltage);
+    ESP_LOGI(autotuneTAG, "  Target Frequency: %u MHz", targetFrequency);
+    ESP_LOGI(autotuneTAG, "  Target Fan Speed: %u %%", targetFanSpeed);
+    ESP_LOGI(autotuneTAG, "  Target Temperature: %u °C", targetAsicTemp);
+    ESP_LOGI(autotuneTAG, "  Target Hashrate: %.2f GH/s", targetHashrate);
     
     // Log current offset values
-    ESP_LOGI(TAG, "Autotune - Current Offset Values:");
-    ESP_LOGI(TAG, "  Power Offset: %d W", offsetPower);
-    ESP_LOGI(TAG, "  Domain Voltage Offset: %u mV", offsetDomainVoltage);
-    ESP_LOGI(TAG, "  Frequency Offset: %u MHz", offsetFrequency);
-    ESP_LOGI(TAG, "  Fan Speed Offset: %u %%", offsetFanSpeed);
+    ESP_LOGI(autotuneTAG, "Autotune - Current Offset Values:");
+    ESP_LOGI(autotuneTAG, "  Power Offset: %d W", offsetPower);
+    ESP_LOGI(autotuneTAG, "  Domain Voltage Offset: %u mV", offsetDomainVoltage);
+    ESP_LOGI(autotuneTAG, "  Frequency Offset: %u MHz", offsetFrequency);
+    ESP_LOGI(autotuneTAG, "  Fan Speed Offset: %u %%", offsetFanSpeed);
     
     // Timing mechanism for normal operation
     static TickType_t lastAutotuneTime = 0;
@@ -97,7 +104,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     
     // Check if we need to wait for initial warmup (15 minutes)
     if (uptimeSeconds < 900 && currentAsicTemp < targetAsicTemp) { // 15 minutes = 900 seconds
-        ESP_LOGI(TAG, "Autotune - Waiting for initial warmup period (%lu seconds remaining)", 900 - uptimeSeconds);
+        ESP_LOGI(autotuneTAG, "Autotune - Waiting for initial warmup period (%lu seconds remaining)", 900 - uptimeSeconds);
         return;
     }
     
@@ -111,7 +118,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     
     // Check if enough time has passed since last autotune
     if ((currentTime - lastAutotuneTime) < pdMS_TO_TICKS(intervalMs)) {
-        ESP_LOGI(TAG, "Autotune - Waiting for next adjustment interval (%lu ms remaining)", 
+        ESP_LOGI(autotuneTAG, "Autotune - Waiting for next adjustment interval (%lu ms remaining)", 
                  intervalMs - ((currentTime - lastAutotuneTime) * portTICK_PERIOD_MS));
         return;
     }
@@ -121,7 +128,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     
     // First, ensure fan speed is at target
     if (currentFanSpeed != targetFanSpeed) {
-        ESP_LOGI(TAG, "Autotune - Adjusting fan speed from %u%% to %u%%", currentFanSpeed, targetFanSpeed);
+        ESP_LOGI(autotuneTAG, "Autotune - Adjusting fan speed from %u%% to %u%%", currentFanSpeed, targetFanSpeed);
         nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, targetFanSpeed);
         return; // Exit after fan adjustment to let it take effect
     }
@@ -135,12 +142,12 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
         float hashrateDiffPercent = ((currentHashrate - targetHashrate) / targetHashrate) * 100.0;
         
         if (hashrateDiffPercent >= -5.0 && hashrateDiffPercent <= 5.0) {
-            ESP_LOGI(TAG, "Autotune - Hashrate within 5%% of target, no adjustments needed");
+            ESP_LOGI(autotuneTAG, "Autotune - Hashrate within 5%% of target, no adjustments needed");
             return;
         } else if (hashrateDiffPercent < -5.0) {
             // Increase voltage by 10mV
             uint16_t newVoltage = targetDomainVoltage + 10;
-            ESP_LOGI(TAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+            ESP_LOGI(autotuneTAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
             return;
         } else {
