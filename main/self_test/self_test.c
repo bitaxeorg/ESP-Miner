@@ -56,7 +56,7 @@ SemaphoreHandle_t BootSemaphore;
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
 bool should_test(GlobalState * GLOBAL_STATE) {
-    bool is_max = GLOBAL_STATE->DEVICE_CONFIG.family.asic.model == BM1397;
+    bool is_max = GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BM1397;
     uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
     if (should_self_test == 1 && !is_max && best_diff < 1) {
