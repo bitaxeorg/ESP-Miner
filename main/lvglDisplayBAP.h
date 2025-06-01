@@ -108,4 +108,6 @@ esp_err_t lvglGetSettingsBAP(void);
 
 esp_err_t lvglSendPresetBAP();
 esp_err_t lvglSendThemeBAP(char themeName[32]);
+
+int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, uint16_t timeout_ms);
 #endif

@@ -23,11 +23,17 @@
 #include "vcore.h"
 #include "mempoolAPI.h"
 #include "theme_api.h"
+#include "power_management_task.h"
+#include "global_state.h"
+
+extern GlobalState *GLOBAL_STATE;
 
 #define lvglDisplayI2CAddr 0x50
 #define DISPLAY_UPDATE_INTERVAL_MS 2500
 #define MAX_BUFFER_SIZE_BAP 1024  //Placeholder Buffer Size
 
+
+extern bool apply_preset(DeviceModel device_model, const char* preset_name);
 
 /*  sent to the display
 Network:
@@ -600,7 +606,8 @@ esp_err_t lvglUpdateDisplayAPIBAP(void)
 /// @param size size of the buffer
 /// @param timeout_ms number of ms to wait before timing out
 /// @return number of bytes read, or -1 on error
-int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms) {
+int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, uint16_t timeout_ms) {
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     memset(buf, 0, size);
     int16_t bytes_read = uart_read_bytes(UART_NUM_2, buf, size, timeout_ms / portTICK_PERIOD_MS);
 
@@ -747,6 +754,20 @@ int16_t SERIAL_rx_BAP(uint8_t *buf, uint16_t size, uint16_t timeout_ms) {
                     ESP_LOGI("Serial BAP", "Theme: %d", theme);
                     nvs_config_set_u16(NVS_CONFIG_THEME_NAME, theme);
                     initializeTheme(theme);
+                    break;
+                case LVGL_REG_SPECIAL_PRESET:
+                    
+                    ESP_LOGI("Serial BAP", "Received preset");
+                    ESP_LOGI("Serial BAP", "RAW HEX: %02X", buf[4]);
+                    char preset[32] = {0};  // Initialize buffer for preset string
+                    snprintf(preset, sizeof(preset), "%d", buf[4]);  // Convert number to string
+                    ESP_LOGI("Serial BAP", "Preset: %s", preset);
+                    if (apply_preset(GLOBAL_STATE->device_model, preset)) {
+                        ESP_LOGI("Serial BAP", "Preset applied successfully");
+                    } else {
+                        ESP_LOGE("Serial BAP", "Failed to apply preset");
+                    }
+
                     break;
                 case LVGL_REG_SPECIAL_RESTART:
                     ESP_LOGI("Serial BAP", "Received restart command");

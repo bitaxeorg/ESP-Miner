@@ -35,6 +35,8 @@
 
 
 
+
+
 static const char * TAG = "SystemModule";
 
 static void _suffix_string(uint64_t, char *, size_t, int);
@@ -190,7 +192,7 @@ void SYSTEM_task(void * pvParameters)
     while (!module->startup_done) {
         // Check for BAP messages
         #if LVGL_MODE_BAP == 1
-        SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 50);
+        SERIAL_rx_BAP(GLOBAL_STATE, displayBufferBAP, sizeof(displayBufferBAP), 50);
         lvglStartupLoopBAP(GLOBAL_STATE);
         #elif LVGL_MODE_I2C == 1
         // TODO: Implement I2C startup loop
@@ -202,7 +204,7 @@ void SYSTEM_task(void * pvParameters)
     while (1) {
         // Check for overheat mode
         #if LVGL_MODE_BAP == 1
-            SERIAL_rx_BAP(displayBufferBAP, sizeof(displayBufferBAP), 15);
+            SERIAL_rx_BAP(GLOBAL_STATE, displayBufferBAP, sizeof(displayBufferBAP), 15);
         #elif LVGL_MODE_I2C == 1
             // TODO: 
         #endif
