@@ -204,7 +204,7 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
     }
     
     // Calculate CRC16 for the entire message (preamble + reg + len + data)
-    uint16_t crc = calculate_crc16(displayBufferBAP, dataLen + 4);  // +4 for preamble (2) + reg (1) + len (1)
+    uint16_t crc = calculate_crc16(&displayBufferBAP[2], dataLen + 2);  // +4 for preamble (2) + reg (1) + len (1)
     
     // Append CRC to the message
     displayBufferBAP[dataLen + 4] = (crc >> 8) & 0xFF;    // High byte
