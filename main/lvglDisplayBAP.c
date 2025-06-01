@@ -633,23 +633,22 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
             }
             
             // Calculate CRC16 of received message (excluding CRC bytes)
-            uint16_t received_crc = (buf[bytes_read - 2] << 8) | buf[bytes_read - 1];
-            uint16_t calculated_crc = calculate_crc16(buf, bytes_read - 2);
+            uint16_t calculated_crc = calculate_crc16(&buf[2], bytes_read - 4);  // Start after preamble, exclude CRC bytes
             crcBufferTX[0] = (calculated_crc >> 8) & 0xFF;
             crcBufferTX[1] = calculated_crc & 0xFF;
 
             
             
-            if (received_crc != calculated_crc) {
+            if (calculated_crc != ((buf[bytes_read - 2] << 8) | (buf[bytes_read - 1]))) {
                 ESP_LOGE("Serial BAP", "CRC mismatch: received 0x%04X, calculated 0x%04X", 
-                         received_crc, calculated_crc);
+                         (buf[bytes_read - 2] << 8) | (buf[bytes_read - 1]), calculated_crc);
                 SERIAL_send_BAP(crcBufferTX, 2, false);
                 return -1;
             }
             
             // Process the message based on register
             if (data_len == bytes_read - 6) {
-                switch (buf[3]) {
+                switch (buf[2]) {
                     case LVGL_REG_SETTINGS_HOSTNAME:
                     ESP_LOGI("Serial BAP", "Received hostname");
                     ESP_LOGI("Serial BAP", "Hostname: %s", buf + 4);
@@ -783,14 +782,14 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
                     break;
                 default:
                         ESP_LOGI("Serial BAP", "Received unknown register");
-                        ESP_LOGI("Serial BAP", "RAW HEX: %02X", buf[3]);
+                        ESP_LOGI("Serial BAP", "RAW HEX: %02X", buf[2]);
                         break;
                 }
                 SERIAL_send_BAP(crcBufferTX, 2, false);
             }
             else {
                 ESP_LOGI("Serial BAP", "Received invalid length");
-                ESP_LOGI("Serial BAP", "Expected: %d, Received: %d", buf[2], bytes_read - 4);
+                ESP_LOGI("Serial BAP", "Expected: %d, Received: %d", buf[3], bytes_read - 4);
             }
         }
     }
