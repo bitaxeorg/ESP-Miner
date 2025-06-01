@@ -13,7 +13,7 @@
 #include "TPS546.h"
 #include "vcore.h"
 #include "esp_timer.h"
-
+#include "lvglDisplayBAP.h"
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_ASIC_RESET  CONFIG_GPIO_ASIC_RESET
 #define GPIO_PLUG_SENSE  CONFIG_GPIO_PLUG_SENSE
@@ -116,6 +116,9 @@ bool apply_preset(DeviceModel device_model, const char* preset_name) {
     nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, selected_preset->frequency_mhz);
     nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, selected_preset->fan_speed_percent);
     nvs_config_set_string(NVS_CONFIG_AUTOTUNE_PRESET, preset_name);
+
+    // send through BAP
+    lvglSendPresetBAP();
     
     return true;
 }

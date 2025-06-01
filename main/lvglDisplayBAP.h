@@ -38,7 +38,7 @@
 #define LVGL_REG_POWER_STATS    0x43
 #define LVGL_REG_ASIC_INFO      0x44
 #define LVGL_REG_UPTIME         0x45
-#define LVGL_REG_TARGET_VOLTAGE 0x46 // (uint16_t )
+#define LVGL_REG_VREG_TEMP   0x46
 
 // Device status registers (on change only)
 #define LVGL_REG_FLAGS          0x50
@@ -85,6 +85,7 @@
 
 // Special registers (0xF0 - 0xFF)
 #define LVGL_REG_SPECIAL_THEME 0xF0
+#define LVGL_REG_SPECIAL_PRESET 0xF1
 #define LVGL_REG_SPECIAL_RESTART 0xFE
 
 // Flags (0xE0 - 0xEF)
@@ -105,4 +106,6 @@ esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayAPIBAP(void);
 esp_err_t lvglGetSettingsBAP(void);
 
+esp_err_t lvglSendPresetBAP();
+esp_err_t lvglSendThemeBAP(char themeName[32]);
 #endif

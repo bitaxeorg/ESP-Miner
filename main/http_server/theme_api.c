@@ -5,6 +5,8 @@
 #include "cJSON.h"
 #include <string.h>
 
+extern esp_err_t lvglSendThemeBAP(char themeName[32]);
+
 static const char *TAG = "theme_api";
 uiTheme_t currentTheme;
 
@@ -364,6 +366,9 @@ static esp_err_t theme_patch_handler(httpd_req_t *req)
     // Update the theme in NVS and initialize it
     nvs_config_set_u16(NVS_CONFIG_THEME_NAME, themePreset);
     initializeTheme(themePreset);
+
+    // send theme to BAP
+    lvglSendThemeBAP(themePresetToString(themePreset));
 
     // Get the current theme after update
     uiTheme_t* theme = getCurrentTheme();

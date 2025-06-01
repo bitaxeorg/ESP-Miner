@@ -442,15 +442,10 @@ esp_err_t lvglUpdateDisplayMonitoringBAP(GlobalState *GLOBAL_STATE)
     ret = sendRegisterDataBAP(LVGL_REG_UPTIME, &uptimeSeconds, sizeof(uint32_t));
     if (ret != ESP_OK) return ret;
 
-    // LVGL_REG_TARGET_VOLTAGE 0x46
-    uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-    ret = sendRegisterDataBAP(LVGL_REG_TARGET_VOLTAGE, &core_voltage, sizeof(uint16_t));
-    if (ret != ESP_OK) 
-    {
-    return ret;
-    }
-    // startup done flag
-    sendRegisterDataBAP(LVGL_FLAG_STARTUP_DONE, &module->startup_done, sizeof(uint8_t));
+    // LVGL_REG_VREG_TEMP   0x46
+    float vreg_temp = power->vr_temp;
+    ret = sendRegisterDataBAP(LVGL_REG_VREG_TEMP, &vreg_temp, sizeof(float));
+    if (ret != ESP_OK) return ret;
 
     return ESP_OK;
 }
@@ -823,3 +818,20 @@ esp_err_t lvglOverheatLoopBAP(GlobalState *GLOBAL_STATE) {
 
     return ESP_OK;
 }
+
+// send theme to BAP
+esp_err_t lvglSendThemeBAP(char themeName[32]) {
+    sendRegisterDataBAP(LVGL_REG_SPECIAL_THEME, themeName, strlen(themeName));
+    ESP_LOGI("LVGL", "Sent theme: %s", themeName);
+    return ESP_OK;
+}
+
+// send preset to BAP
+esp_err_t lvglSendPresetBAP() {
+    char preset[32] = {0};
+    strncpy(preset, nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, ""), sizeof(preset) - 1);
+    sendRegisterDataBAP(LVGL_REG_SPECIAL_PRESET, preset, strlen(preset));
+    ESP_LOGI("LVGL", "Sent preset: %s", preset);
+    return ESP_OK;
+}
+
