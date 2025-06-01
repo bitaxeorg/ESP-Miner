@@ -19,4 +19,6 @@ fanspeed,data,u16,100
 selftest,data,u16,1
 overheat_mode,data,u16,0
 serialnumber,data,string,ACSBAT_BM1368_11232
-builddate,data,string,05,26,2025
+builddate,data,string,05262025
+autotune,data,u16,1
+preset,data,string,balanced
