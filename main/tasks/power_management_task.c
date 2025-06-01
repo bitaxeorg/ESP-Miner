@@ -46,23 +46,23 @@ static const DevicePreset DEVICE_MAX_PRESETS[] = {
 
 // DEVICE_ULTRA presets
 static const DevicePreset DEVICE_ULTRA_PRESETS[] = {
-    {"quiet", 1050, 400, 45},       // Quiet: Low power, conservative
-    {"balanced", 1150, 500, 60},    // Balanced: Good performance/efficiency balance
-    {"turbo", 1350, 700, 95},       // Turbo: Maximum performance
+    {"quiet", 1130, 420, 25},       // Quiet: Low power, conservative
+    {"balanced", 1190, 490,35},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1250, 625, 95},       // Turbo: Maximum performance
 };
 
 // DEVICE_SUPRA presets
 static const DevicePreset DEVICE_SUPRA_PRESETS[] = {
-    {"quiet", 1000, 350, 40},       // Quiet: Low power, conservative
-    {"balanced", 1100, 450, 55},    // Balanced: Good performance/efficiency balance
-    {"turbo", 1300, 650, 90},       // Turbo: Maximum performance
+    {"quiet", 1100, 425, 25},       // Quiet: Low power, conservative
+    {"balanced", 1200, 575, 35},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1350, 750, 95},       // Turbo: Maximum performance
 };
 
 // DEVICE_GAMMA presets
 static const DevicePreset DEVICE_GAMMA_PRESETS[] = {
-    {"quiet", 950, 300, 35},        // Quiet: Low power, conservative
-    {"balanced", 1050, 400, 50},    // Balanced: Good performance/efficiency balance
-    {"turbo", 1150, 525, 100},       // Turbo: Maximum performance
+    {"quiet", 1000, 400, 25},        // Quiet: Low power, conservative
+    {"balanced", 1090, 490, 35},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1150, 525, 95},       // Turbo: Maximum performance
 };
 
 // Simple function to apply a preset by name
@@ -191,10 +191,10 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     
     // Determine timing interval based on temperature
     uint32_t intervalMs;
-    if (currentAsicTemp > 40 || currentAsicTemp < 68) {
+    if (currentAsicTemp <= 68) {
         intervalMs = 300000; // 5 minutes for normal operation
     } else {
-        intervalMs = 15000;  // 15 seconds for higher temperatures
+        intervalMs = 500;  // 5 seconds for higher temperatures
     }
     
     // Check if enough time has passed since last autotune
