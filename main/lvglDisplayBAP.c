@@ -828,18 +828,17 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
                     initializeTheme(theme);
                     break;
                 case LVGL_REG_SPECIAL_PRESET:
-                    
                     ESP_LOGI("Serial BAP", "Received preset");
                     ESP_LOGI("Serial BAP", "RAW HEX: %02X", buf[4]);
                     char preset[32] = {0};  // Initialize buffer for preset string
-                    snprintf(preset, sizeof(preset), "%d", buf[4]);  // Convert number to string
+                    strncpy(preset, (const char *)(buf + 4), data_len);  // Copy the string data
+                    preset[data_len] = '\0';  // Ensure null termination
                     ESP_LOGI("Serial BAP", "Preset: %s", preset);
                     if (apply_preset(GLOBAL_STATE->device_model, preset)) {
                         ESP_LOGI("Serial BAP", "Preset applied successfully");
                     } else {
                         ESP_LOGE("Serial BAP", "Failed to apply preset");
                     }
-
                     break;
                 case LVGL_REG_SPECIAL_RESTART:
                     ESP_LOGI("Serial BAP", "Received restart command");
