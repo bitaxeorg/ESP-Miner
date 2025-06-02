@@ -843,6 +843,8 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
                     break;
                 case LVGL_REG_SPECIAL_RESTART:
                     ESP_LOGI("Serial BAP", "Received restart command");
+                    // send crc before restart
+                    SERIAL_send_BAP(crcBufferTX, 2, false);
                     vTaskDelay(pdMS_TO_TICKS(2000));
                     esp_restart();
                     break;
