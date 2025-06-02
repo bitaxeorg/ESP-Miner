@@ -131,6 +131,9 @@ static uint32_t lastBlockHeight = 0;
 static uint8_t crcBufferRX[2];
 static uint8_t crcBufferTX[2];
 
+// Add at the top with other static variables
+static bool is_receiving_data = false;
+
 /// @brief waits for a serial response to Match CRC
 /// @param expectedCRC the expected crc 
 /// @param timeout_ms number of ms to wait before timing out
@@ -184,6 +187,12 @@ static uint16_t calculate_crc16(const uint8_t* data, size_t length) {
 
 static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataLen) 
 {
+    // Don't send if we're receiving data
+    if (is_receiving_data) {
+        ESP_LOGI("LVGL", "Skipping send during data reception");
+        return ESP_OK;
+    }
+
     // Check total size including register byte and length byte
     if (dataLen + 4 > MAX_BUFFER_SIZE_BAP) {
         ESP_LOGE("LVGL", "Buffer overflow prevented: reg 0x%02X, size %d", reg, dataLen);
@@ -609,6 +618,10 @@ esp_err_t lvglUpdateDisplayAPIBAP(void)
 int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, uint16_t timeout_ms) {
     SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
     memset(buf, 0, size);
+    
+    // Set receiving flag
+    is_receiving_data = true;
+    
     int16_t bytes_read = uart_read_bytes(UART_NUM_2, buf, size, timeout_ms / portTICK_PERIOD_MS);
 
     if (bytes_read > 0) {
@@ -619,6 +632,7 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
         // Minimum message size: preamble (2) + reg (1) + len (1) + data (1) + CRC (2) = 7 bytes
         if (bytes_read < 7) {
             ESP_LOGE("Serial BAP", "Message too short");
+            is_receiving_data = false;  // Clear flag before returning
             return -1;
         }
 
@@ -629,6 +643,7 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
             // Verify total message length
             if (bytes_read != data_len + 6) { // preamble + reg + len + data + CRC
                 ESP_LOGE("Serial BAP", "Invalid message length");
+                is_receiving_data = false;  // Clear flag before returning
                 return -1;
             }
             
@@ -643,6 +658,7 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
                 ESP_LOGE("Serial BAP", "CRC mismatch: received 0x%04X, calculated 0x%04X", 
                          (buf[bytes_read - 2] << 8) | (buf[bytes_read - 1]), calculated_crc);
                 SERIAL_send_BAP(crcBufferTX, 2, false);
+                is_receiving_data = false;  // Clear flag before returning
                 return -1;
             }
             
@@ -650,60 +666,105 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
             if (data_len == bytes_read - 6) {
                 switch (buf[2]) {
                     case LVGL_REG_SETTINGS_HOSTNAME:
-                    ESP_LOGI("Serial BAP", "Received hostname");
-                    ESP_LOGI("Serial BAP", "Hostname: %s", buf + 4);
-                    nvs_config_set_string(NVS_CONFIG_HOSTNAME, (const char *)(buf + 4));
-                    break;
+                    {
+                        ESP_LOGI("Serial BAP", "Received hostname");
+                        char hostname[64] = {0};  // Create temporary buffer
+                        strncpy(hostname, (const char *)(buf + 4), data_len);
+                        hostname[data_len] = '\0';  // Ensure null termination
+                        ESP_LOGI("Serial BAP", "Hostname: %s", hostname);
+                        nvs_config_set_string(NVS_CONFIG_HOSTNAME, hostname);
+                        break;
+                    }
                 case LVGL_REG_SETTINGS_WIFI_SSID:
-                    ESP_LOGI("Serial BAP", "Received wifi ssid");
-                    ESP_LOGI("Serial BAP", "SSID: %s", buf + 4);
-                    nvs_config_set_string(NVS_CONFIG_WIFI_SSID, (const char *)(buf + 4));
-                    break;
+                    {
+                        ESP_LOGI("Serial BAP", "Received wifi ssid");
+                        char ssid[64] = {0};  // Create temporary buffer
+                        strncpy(ssid, (const char *)(buf + 4), data_len);
+                        ssid[data_len] = '\0';  // Ensure null termination
+                        ESP_LOGI("Serial BAP", "SSID: %s", ssid);
+                        nvs_config_set_string(NVS_CONFIG_WIFI_SSID, ssid);
+                        break;
+                    }
                 case LVGL_REG_SETTINGS_WIFI_PASSWORD:
-                    ESP_LOGI("Serial BAP", "Received wifi password");
-                    ESP_LOGI("Serial BAP", "Password: %s", buf + 4);
-                    nvs_config_set_string(NVS_CONFIG_WIFI_PASS, (const char *)(buf + 4));
-                    break;
+                    {
+                        ESP_LOGI("Serial BAP", "Received wifi password");
+                        char password[64] = {0};  // Create temporary buffer
+                        strncpy(password, (const char *)(buf + 4), data_len);
+                        password[data_len] = '\0';  // Ensure null termination
+                        ESP_LOGI("Serial BAP", "Password: %s", password);
+                        nvs_config_set_string(NVS_CONFIG_WIFI_PASS, password);
+                        break;
+                    }
                 case LVGL_REG_SETTINGS_STRATUM_URL_MAIN:
-                    ESP_LOGI("Serial BAP", "Received stratum url main");
-                    ESP_LOGI("Serial BAP", "URL: %s", buf + 4);
-                    nvs_config_set_string(NVS_CONFIG_STRATUM_URL, (const char *)(buf + 4));
-                    break;
+                    {
+                        ESP_LOGI("Serial BAP", "Received stratum url main");
+                        char url[128] = {0};  // Create temporary buffer
+                        strncpy(url, (const char *)(buf + 4), data_len);
+                        url[data_len] = '\0';  // Ensure null termination
+                        ESP_LOGI("Serial BAP", "URL: %s", url);
+                        nvs_config_set_string(NVS_CONFIG_STRATUM_URL, url);
+                        break;
+                    }
                 case LVGL_REG_SETTINGS_STRATUM_PORT_MAIN:
                     ESP_LOGI("Serial BAP", "Received stratum port main");
                     ESP_LOGI("Serial BAP", "Port: %d", buf[4] * 256 + buf[5]);
                     nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, buf[4] * 256 + buf[5]);
                     break;
                 case LVGL_REG_SETTINGS_STRATUM_USER_MAIN:
-                    ESP_LOGI("Serial BAP", "Received stratum user main");
-                    ESP_LOGI("Serial BAP", "User: %s", buf + 4);
-                    nvs_config_set_string(NVS_CONFIG_STRATUM_USER, (const char *)(buf + 4));
-                    break;
+                    {
+                        ESP_LOGI("Serial BAP", "Received stratum user main");
+                        char user[64] = {0};  // Create temporary buffer
+                        strncpy(user, (const char *)(buf + 4), data_len);
+                        user[data_len] = '\0';  // Ensure null termination
+                        ESP_LOGI("Serial BAP", "User: %s", user);
+                        nvs_config_set_string(NVS_CONFIG_STRATUM_USER, user);
+                        break;
+                    }
                 case LVGL_REG_SETTINGS_STRATUM_PASSWORD_MAIN:
-                    ESP_LOGI("Serial BAP", "Received stratum password main");
-                    ESP_LOGI("Serial BAP", "Password: %s", buf + 4);
-                    nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, (const char *)(buf + 4));
-                    break;
+                    {
+                        ESP_LOGI("Serial BAP", "Received stratum password main");
+                        char password[64] = {0};  // Create temporary buffer
+                        strncpy(password, (const char *)(buf + 4), data_len);
+                        password[data_len] = '\0';  // Ensure null termination
+                        ESP_LOGI("Serial BAP", "Password: %s", password);
+                        nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, password);
+                        break;
+                    }
                 case LVGL_REG_SETTINGS_STRATUM_URL_FALLBACK:
-                    ESP_LOGI("Serial BAP", "Received stratum url fallback");
-                    ESP_LOGI("Serial BAP", "URL: %s", buf + 4);
-                    nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, (const char *)(buf + 4));
-                    break;
+                    {
+                        ESP_LOGI("Serial BAP", "Received stratum url fallback");
+                        char url[128] = {0};  // Create temporary buffer
+                        strncpy(url, (const char *)(buf + 4), data_len);
+                        url[data_len] = '\0';  // Ensure null termination
+                        ESP_LOGI("Serial BAP", "URL: %s", url);
+                        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, url);
+                        break;
+                    }
                 case LVGL_REG_SETTINGS_STRATUM_PORT_FALLBACK:
                     ESP_LOGI("Serial BAP", "Received stratum port fallback");
                     ESP_LOGI("Serial BAP", "Port: %d", buf[4] * 256 + buf[5]);
                     nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, buf[4] * 256 + buf[5]);
                     break;
                 case LVGL_REG_SETTINGS_STRATUM_USER_FALLBACK:
-                    ESP_LOGI("Serial BAP", "Received stratum user fallback");
-                    ESP_LOGI("Serial BAP", "User: %s", buf + 4);
-                    nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, (const char *)(buf + 4));
-                    break;
+                    {
+                        ESP_LOGI("Serial BAP", "Received stratum user fallback");
+                        char user[64] = {0};  // Create temporary buffer
+                        strncpy(user, (const char *)(buf + 4), data_len);
+                        user[data_len] = '\0';  // Ensure null termination
+                        ESP_LOGI("Serial BAP", "User: %s", user);
+                        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, user);
+                        break;
+                    }
                 case LVGL_REG_SETTINGS_STRATUM_PASSWORD_FALLBACK:
-                    ESP_LOGI("Serial BAP", "Received stratum password fallback");
-                    ESP_LOGI("Serial BAP", "Password: %s", buf + 4);
-                    nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, (const char *)(buf + 4));
-                    break;
+                    {
+                        ESP_LOGI("Serial BAP", "Received stratum password fallback");
+                        char password[64] = {0};  // Create temporary buffer
+                        strncpy(password, (const char *)(buf + 4), data_len);
+                        password[data_len] = '\0';  // Ensure null termination
+                        ESP_LOGI("Serial BAP", "Password: %s", password);
+                        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, password);
+                        break;
+                    }
                 case LVGL_REG_SETTINGS_ASIC_VOLTAGE:
                     ESP_LOGI("Serial BAP", "Received asic voltage");
                     ESP_LOGI("Serial BAP", "Voltage: %d", buf[4] * 256 + buf[5]);
@@ -788,12 +849,14 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
                 SERIAL_send_BAP(crcBufferTX, 2, false);
             }
             else {
-                ESP_LOGI("Serial BAP", "Received invalid length");
+                ESP_LOGI("Serial BAP", "Received invalid length");           
                 ESP_LOGI("Serial BAP", "Expected: %d, Received: %d", buf[3], bytes_read - 4);
             }
         }
     }
     
+    // Clear receiving flag
+    is_receiving_data = false;
     return bytes_read;
 }
 
