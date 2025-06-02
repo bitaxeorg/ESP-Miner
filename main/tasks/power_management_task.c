@@ -138,17 +138,25 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
         return;
     }
 
-    
-
     // Get current global variables for autotune calculations
     uint16_t currentDomainVoltage = VCORE_get_voltage_mv(GLOBAL_STATE);  // Domain Voltage in mV
     uint16_t currentFrequency = (uint16_t)power->frequency_value;        // Frequency in MHz
     uint8_t currentAsicTemp = (uint8_t)power->chip_temp_avg;            // ASIC Temperature in °C
-    uint8_t currentFanSpeed = (uint8_t)(power->fan_perc);         // Fan Speed in percentage
+    uint8_t currentFanSpeed = (uint8_t)(power->fan_perc);               // Fan Speed in percentage
     float currentHashrate = system->current_hashrate;                   // Hashrate in GH/s
     int16_t currentPower = (int16_t)power->power;                       // Power in watts
-    
-    
+
+    // Early return if temperature is invalid or hashrate is 0
+    if (currentAsicTemp == 255) {
+        ESP_LOGI(autotuneTAG, "Skipping autotune - Temperature sensor not initialized");
+        return;
+    }
+
+    if (currentHashrate <= 0) {
+        ESP_LOGI(autotuneTAG, "Skipping autotune - Hashrate is 0");
+        return;
+    }
+
     // Get target values from autotune module
     //int16_t targetPower = autotune->targetPower;                        // Target power in watts
     uint16_t targetDomainVoltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);     // Target voltage in mV
