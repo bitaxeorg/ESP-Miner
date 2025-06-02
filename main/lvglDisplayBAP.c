@@ -133,6 +133,8 @@ static uint8_t crcBufferTX[2];
 
 // Add at the top with other static variables
 static bool is_receiving_data = false;
+static TickType_t last_receive_time = 0;
+#define SEND_DELAY_AFTER_RECEIVE_MS 1000  // 1 second delay
 
 /// @brief waits for a serial response to Match CRC
 /// @param expectedCRC the expected crc 
@@ -190,6 +192,13 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
     // Don't send if we're receiving data
     if (is_receiving_data) {
         ESP_LOGI("LVGL", "Skipping send during data reception");
+        return ESP_OK;
+    }
+
+    // Check if we're within the delay period after receiving data
+    TickType_t current_time = xTaskGetTickCount();
+    if ((current_time - last_receive_time) < pdMS_TO_TICKS(SEND_DELAY_AFTER_RECEIVE_MS)) {
+        ESP_LOGI("LVGL", "Skipping send during delay period after receive");
         return ESP_OK;
     }
 
@@ -625,6 +634,9 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
     int16_t bytes_read = uart_read_bytes(UART_NUM_2, buf, size, timeout_ms / portTICK_PERIOD_MS);
 
     if (bytes_read > 0) {
+        // Update last receive time
+        last_receive_time = xTaskGetTickCount();
+        
         ESP_LOGI("Serial BAP", "rx: ");
         prettyHex((unsigned char*) buf, bytes_read);
         ESP_LOGI("Serial BAP", " [%d]\n", bytes_read);
