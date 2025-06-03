@@ -925,9 +925,26 @@ esp_err_t lvglSendThemeBAP(char themeName[32]) {
 // send preset to BAP
 esp_err_t lvglSendPresetBAP() {
     char preset[32] = {0};
-    strncpy(preset, nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, ""), sizeof(preset) - 1);
-    sendRegisterDataBAP(LVGL_REG_SPECIAL_PRESET, preset, strlen(preset));
-    ESP_LOGI("LVGL", "Sent preset: %s", preset);
+    const char* preset_str = nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, "");
+    ESP_LOGI("LVGL", "Getting preset from NVS: %s", preset_str);
+    
+    strncpy(preset, preset_str, sizeof(preset) - 1);
+    preset[sizeof(preset) - 1] = '\0';  // Ensure null termination
+    
+    size_t preset_len = strlen(preset);
+    ESP_LOGI("LVGL", "Sending preset length: %d", preset_len);
+    ESP_LOGI("LVGL", "Sending preset: %s", preset);
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // clear receiving flag due to bug TODO: Why is this happening when the same sendRegisterDataBAP is used for other registers with no issues?
+    is_receiving_data = false;
+    esp_err_t ret = sendRegisterDataBAP(LVGL_REG_SPECIAL_PRESET, preset, preset_len);
+    if (ret != ESP_OK) {
+        ESP_LOGE("LVGL", "Failed to send preset");
+        return ret;
+    }
+    
     return ESP_OK;
 }
 
