@@ -33,6 +33,7 @@
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
 #include <pthread.h>
+#include "lvglDisplayBAP.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -438,6 +439,7 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "presetName")) != NULL && item->valuestring != NULL) {
         if (apply_preset(GLOBAL_STATE->device_model, item->valuestring)) {
             ESP_LOGI(TAG, "Preset '%s' applied successfully", item->valuestring);
+            lvglSendPresetBAP();
         } else {
             ESP_LOGE(TAG, "Failed to apply preset '%s'", item->valuestring);
         }

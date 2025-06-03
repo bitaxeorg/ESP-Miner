@@ -112,13 +112,15 @@ bool apply_preset(DeviceModel device_model, const char* preset_name) {
              selected_preset->frequency_mhz, selected_preset->fan_speed_percent);
     
     // Set the values directly to NVS
+    // set fan speed high for safety
+    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
     nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, selected_preset->domain_voltage_mv);
     nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, selected_preset->frequency_mhz);
     nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, selected_preset->fan_speed_percent);
     nvs_config_set_string(NVS_CONFIG_AUTOTUNE_PRESET, preset_name);
 
     // send through BAP
-    lvglSendPresetBAP();
+    //lvglSendPresetBAP();
     
     return true;
 }
