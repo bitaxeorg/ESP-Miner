@@ -14,6 +14,10 @@ interface RealTimeApiChartProps {
   defaultSmoothingFactor?: number;
   defaultUseAreaChart?: boolean;
   defaultDataAggregation?: number;
+  // Chart configuration props
+  chartConfigs?: Record<string, any>;
+  selectedConfigKey?: string;
+  onConfigChange?: (configKey: string) => void;
 }
 
 const RealTimeApiChart = ({
@@ -24,23 +28,34 @@ const RealTimeApiChart = ({
   color = "#10b981", // Updated to match the new chart color
   unit = "",
   defaultSmoothingFactor = 5, // Increased from 3 to 5 for less noise
-  defaultUseAreaChart = false,
+  defaultUseAreaChart = true, // Changed to true for better visual appeal
   defaultDataAggregation = 5, // Increased from 2 to 5 for better aggregation
+  chartConfigs,
+  selectedConfigKey,
+  onConfigChange,
 }: RealTimeApiChartProps) => {
   const [data, setData] = useState<ChartDataPoint[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showMovingAverage, setShowMovingAverage] = useState(false);
-  const [movingAveragePeriod, setMovingAveragePeriod] = useState(10);
 
   // New state for noise reduction features
   const [smoothingFactor, setSmoothingFactor] = useState(defaultSmoothingFactor);
   const [useAreaChart, setUseAreaChart] = useState(defaultUseAreaChart);
   const [dataAggregationSeconds, setDataAggregationSeconds] = useState(defaultDataAggregation);
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
+  const [isConfigChanging, setIsConfigChanging] = useState(false);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsContentRef = useRef<HTMLDivElement>(null);
+  const [controlsHeight, setControlsHeight] = useState(0);
+
+  // Measure controls content height when it mounts
+  useEffect(() => {
+    if (controlsContentRef.current) {
+      setControlsHeight(controlsContentRef.current.scrollHeight);
+    }
+  }, [showAdvancedControls]);
 
   // Initialize with historical data from API
   useEffect(() => {
@@ -118,6 +133,62 @@ const RealTimeApiChart = ({
 
   const currentValue = data.length > 0 ? data[data.length - 1].value : 0;
 
+  // Handle configuration changes with loading state
+  const handleConfigChange = async (configKey: string) => {
+    if (!onConfigChange) return;
+
+    setIsConfigChanging(true);
+
+    // Stop real-time updates during config change
+    const wasRunning = isRunning;
+    if (isRunning) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      setIsRunning(false);
+    }
+
+    try {
+      // Trigger the config change
+      onConfigChange(configKey);
+
+      // Wait a bit for the parent component to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Reload data with new configuration
+      const newData = await dataFetcher.generateInitialData(maxDataPoints);
+      setData(newData);
+
+      // Restart real-time updates if they were running
+      if (wasRunning) {
+        setTimeout(() => {
+          setIsRunning(true);
+          intervalRef.current = setInterval(async () => {
+            try {
+              const newPoint = await dataFetcher.fetchNextPoint();
+              if (newPoint) {
+                setData((prevData) => {
+                  const newData = [...prevData, newPoint];
+                  return newData.slice(-maxDataPoints);
+                });
+                setError(null);
+              }
+            } catch (err) {
+              console.error("Failed to fetch new data point:", err);
+              setError("Failed to fetch data");
+            }
+          }, updateInterval);
+        }, 200);
+      }
+    } catch (err) {
+      console.error("Failed to change configuration:", err);
+      setError("Failed to update configuration");
+    } finally {
+      setIsConfigChanging(false);
+    }
+  };
+
   if (isLoading && data.length === 0) {
     return (
       <div className='bg-white rounded-lg shadow-lg p-6'>
@@ -139,34 +210,11 @@ const RealTimeApiChart = ({
         </div>
         <div className='flex flex-col gap-2'>
           {/* Primary Controls Row */}
-          <div className='flex gap-2 items-center'>
-            <div className='flex items-center gap-2 mr-4'>
-              <label className='flex items-center gap-2 text-sm'>
-                <input
-                  type="checkbox"
-                  checked={showMovingAverage}
-                  onChange={(e) => setShowMovingAverage((e.target as HTMLInputElement).checked)}
-                  className='rounded'
-                />
-                Moving Average
-              </label>
-              {showMovingAverage && (
-                <select
-                  value={movingAveragePeriod}
-                  onChange={(e) => setMovingAveragePeriod(Number((e.target as HTMLSelectElement).value))}
-                  className='px-2 py-1 border border-gray-300 rounded text-sm'
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              )}
-            </div>
+          <div className='flex gap-2 items-center justify-end'>
             <button
               onClick={toggleRealTime}
-              disabled={isLoading}
-              className={`px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50 ${
+              disabled={isLoading || isConfigChanging}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50 ${
                 isRunning
                   ? "bg-red-500 hover:bg-red-600 text-white"
                   : "bg-green-500 hover:bg-green-600 text-white"
@@ -176,26 +224,82 @@ const RealTimeApiChart = ({
             </button>
             <button
               onClick={resetData}
-              disabled={isLoading}
-              className='px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md font-medium transition-colors disabled:opacity-50'
+              disabled={isLoading || isConfigChanging}
+              className='px-3 py-1.5 border border-blue-500 text-blue-500 hover:bg-blue-50 rounded text-sm font-medium transition-colors disabled:opacity-50'
             >
               Reset Data
             </button>
           </div>
 
+          {/* Chart Duration Selector */}
+          {chartConfigs && selectedConfigKey && onConfigChange && (
+            <div className='flex justify-end'>
+              <div className='flex items-center gap-2 text-sm'>
+                <label className='text-gray-600 whitespace-nowrap'>Duration:</label>
+                <div className='relative'>
+                  <select
+                    value={selectedConfigKey}
+                    onChange={(e) => handleConfigChange((e.target as HTMLSelectElement).value)}
+                    disabled={isConfigChanging}
+                    className={`px-2 py-1 border border-gray-300 rounded text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent ${
+                      isConfigChanging ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <option value="SHORT">30 minutes</option>
+                    <option value="MEDIUM">1 hour</option>
+                    <option value="LONG">2 hours</option>
+                    <option value="EXTENDED">4 hours</option>
+                    <option value="FULL_DAY">6 hours</option>
+                  </select>
+                  {isConfigChanging && (
+                    <div className='absolute right-2 top-1/2 transform -translate-y-1/2'>
+                      <div className='w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin'></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Advanced Controls Toggle */}
           <div className='flex justify-end'>
             <button
               onClick={() => setShowAdvancedControls(!showAdvancedControls)}
-              className='text-sm text-gray-500 hover:text-gray-700 underline'
+              className='text-sm text-gray-500 hover:text-gray-700 underline transition-colors flex items-center gap-1'
+              aria-expanded={showAdvancedControls}
+              aria-controls="noise-reduction-controls"
             >
-              {showAdvancedControls ? 'Hide' : 'Show'} Noise Reduction Controls
+              <span>{showAdvancedControls ? 'Hide' : 'Show'} Noise Reduction Controls</span>
+              <svg
+                className={`w-3 h-3 transition-transform duration-200 ${
+                  showAdvancedControls ? 'rotate-180' : 'rotate-0'
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
           </div>
 
-          {/* Advanced Controls Panel */}
-          {showAdvancedControls && (
-            <div className='flex flex-wrap gap-3 p-3 bg-gray-50 rounded-lg text-sm'>
+          {/* Advanced Controls Panel with smooth transition */}
+          <div
+            id="noise-reduction-controls"
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              showAdvancedControls
+                ? 'opacity-100'
+                : 'opacity-0'
+            }`}
+            style={{
+              height: showAdvancedControls ? `${controlsHeight}px` : '0px'
+            }}
+            aria-hidden={!showAdvancedControls}
+          >
+            <div
+              ref={controlsContentRef}
+              className='flex flex-wrap gap-3 p-3 bg-gray-50 rounded-lg text-sm'
+            >
               <div className='flex items-center gap-2'>
                 <label className='flex items-center gap-1'>
                   <input
@@ -236,19 +340,27 @@ const RealTimeApiChart = ({
                 </select>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
       <div className='mb-4'>
         <span
           className={`inline-block w-3 h-3 rounded-full mr-2 ${
-            isRunning ? "bg-green-500 animate-pulse" : "bg-gray-400"
+            isConfigChanging
+              ? "bg-orange-500 animate-pulse"
+              : isRunning
+              ? "bg-green-500 animate-pulse"
+              : "bg-gray-400"
           }`}
         ></span>
         <span className='text-sm text-gray-600'>
-          {isRunning ? "Live" : "Paused"} • {data.length} data points
-          {showMovingAverage && <span className='text-slate-500 ml-2'>• MA({movingAveragePeriod})</span>}
+          {isConfigChanging
+            ? "Updating configuration..."
+            : isRunning
+            ? "Live"
+            : "Paused"} • {data.length} data points
+          {useAreaChart && <span className='text-green-500 ml-2'>• Area Chart</span>}
           {smoothingFactor > 1 && <span className='text-blue-500 ml-2'>• Smoothed({smoothingFactor})</span>}
           {dataAggregationSeconds > 1 && <span className='text-purple-500 ml-2'>• Aggregated({dataAggregationSeconds}s)</span>}
           {error && <span className='text-red-500 ml-2'>• {error}</span>}
@@ -256,11 +368,17 @@ const RealTimeApiChart = ({
       </div>
 
       <div className='relative'>
+        {isConfigChanging && (
+          <div className='absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg'>
+            <div className='flex items-center gap-3 text-gray-600'>
+              <div className='w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin'></div>
+              <span className='text-sm font-medium'>Updating chart configuration...</span>
+            </div>
+          </div>
+        )}
         <Chart
           data={data}
           seriesOptions={{ color }}
-          showMovingAverage={showMovingAverage}
-          movingAveragePeriod={movingAveragePeriod}
           smoothingFactor={smoothingFactor}
           useAreaChart={useAreaChart}
           dataAggregationSeconds={dataAggregationSeconds}

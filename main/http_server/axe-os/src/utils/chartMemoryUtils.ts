@@ -55,7 +55,7 @@ export const CHART_CONFIGS: Record<string, ChartTimeConfig> = {
     dataPoints: 4320,     // 6 hours (practical limit)
     hours: 6,
     intervalSeconds: 5,
-    description: "6 hours of data (recommended max)"
+    description: "6 hours of data"
   }
 };
 
