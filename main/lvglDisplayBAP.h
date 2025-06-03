@@ -62,6 +62,17 @@
 #define LVGL_REG_API_ECONOMY_FEE 0x6B
 #define LVGL_REG_API_MINIMUM_FEE 0x6C
 
+// device info registers
+// define max lengths for serial number, model, and firmware version
+#define MAX_SERIAL_LENGTH 32
+#define MAX_MODEL_LENGTH 32
+#define MAX_FIRMWARE_VERSION_LENGTH 32
+#define MAX_THEME_LENGTH 128
+#define LVGL_REG_DEVICE_SERIAL 0x70 // MAX_SERIAL_LENGTH bytes
+#define LVGL_REG_BOARD_MODEL 0x71 // MAX_MODEL_LENGTH bytes
+#define LVGL_REG_BOARD_FIRMWARE_VERSION 0x72 // MAX_FIRMWARE_VERSION_LENGTH bytes
+#define LVGL_REG_THEME_CURRENT 0x73 // 128 bytes
+#define LVGL_REG_THEMES_AVAILABLE 0x74 // 128 bytes
 // Settings registers 
 // Network settings
 #define LVGL_REG_SETTINGS_HOSTNAME 0x90 // 32 bytes

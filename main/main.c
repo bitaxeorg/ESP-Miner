@@ -68,7 +68,7 @@ void app_main(void)
 
     SYSTEM_init_system(&GLOBAL_STATE);
 
-    initializeTheme(THEME_AMERICANBTC);
+    initializeTheme(THEME_ACS_DEFAULT);
     ESP_LOGI(TAG, "Theme initialized");
     ESP_LOGI(TAG, "Current theme preset: %d", getCurrentThemePreset());
 

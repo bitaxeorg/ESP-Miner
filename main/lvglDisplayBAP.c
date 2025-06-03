@@ -12,6 +12,7 @@
 #include "serial.h"
 #include "utils.h"
 #include "driver/uart.h"
+#include "esp_system.h"
 
 #include "nvs_config.h"
 #include "i2c_bitaxe.h"
@@ -25,6 +26,8 @@
 #include "theme_api.h"
 #include "power_management_task.h"
 #include "global_state.h"
+#include "theme_api.h"
+#include "esp_ota_ops.h"
 
 extern GlobalState *GLOBAL_STATE;
 
@@ -489,25 +492,38 @@ esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE)
     esp_err_t ret;
     bool hasChanges = false;
 
-    // LVGL_REG_FLAGS (0x50) (No Longer used. See serperated flags)
+    // LVGL_REG_DEVICE_SERIAL 0x70
+    static char serialNumber[MAX_SERIAL_LENGTH] = {0};
+    strncpy(serialNumber, nvs_config_get_string(NVS_CONFIG_SERIAL_NUMBER, ""), MAX_SERIAL_LENGTH);
+    ret = sendRegisterDataBAP(LVGL_REG_DEVICE_SERIAL, serialNumber, strlen(serialNumber));
+    if (ret != ESP_OK) return ret;
 
+    // LVGL_REG_BOARD_MODEL 0x71
+    static char boardModel[MAX_MODEL_LENGTH] = {0};
+    strncpy(boardModel, GLOBAL_STATE->asic_model_str, MAX_MODEL_LENGTH);
+    ret = sendRegisterDataBAP(LVGL_REG_BOARD_MODEL, boardModel, strlen(boardModel));
+    if (ret != ESP_OK) return ret;
 
-    // LVGL_REG_DEVICE_INFO (0x52)
+    // LVGL_REG_BOARD_FIRMWARE_VERSION 0x72
+    static char firmwareVersion[MAX_FIRMWARE_VERSION_LENGTH] = {0};
+    strncpy(firmwareVersion, esp_app_get_description()->version, MAX_FIRMWARE_VERSION_LENGTH);
+    ret = sendRegisterDataBAP(LVGL_REG_BOARD_FIRMWARE_VERSION, firmwareVersion, strlen(firmwareVersion));
+    if (ret != ESP_OK) return ret;
 
+    // LVGL_REG_THEME_CURRENT 0x73
+    static char themeCurrent[MAX_THEME_LENGTH] = {0};
+    themePreset_t currentTheme = getCurrentThemePreset();
+    strncpy(themeCurrent, themePresetToString(currentTheme), MAX_THEME_LENGTH);
+    ret = sendRegisterDataBAP(LVGL_REG_THEME_CURRENT, themeCurrent, strlen(themeCurrent));
+    if (ret != ESP_OK) return ret;
 
-    // LVGL_REG_BOARD_INFO (0x53)
-    if (strcmp(lastBoardInfo, GLOBAL_STATE->device_model_str) != 0) 
-    {
-        size_t totalLen = snprintf(boardInfo, sizeof(boardInfo), "%s|%s", 
-            GLOBAL_STATE->device_model_str, 
-            GLOBAL_STATE->asic_model_str);
-
-        ret = sendRegisterDataBAP(LVGL_REG_BOARD_INFO, boardInfo, totalLen);
-        if (ret != ESP_OK) return ret;
-
-        strncpy(lastBoardInfo, GLOBAL_STATE->device_model_str, sizeof(lastBoardInfo) - 1);
-        lastBoardInfo[sizeof(lastBoardInfo) - 1] = '\0';
-    }
+    // LVGL_REG_THEMES_AVAILABLE 0x74
+    static char themesAvailable[MAX_THEME_LENGTH] = {0};
+    strncpy(themesAvailable, themePresetToString(THEME_BITAXE_RED), MAX_THEME_LENGTH);
+    ret = sendRegisterDataBAP(LVGL_REG_THEMES_AVAILABLE, themesAvailable, strlen(themesAvailable));
+    if (ret != ESP_OK) return ret;
+    
+    
 
     // New Flags 0x0E to
 
