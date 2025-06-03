@@ -49,6 +49,7 @@ themePreset_t themePresetFromString(const char* preset_str) {
     } else if (strcmp(preset_str, "THEME_SOLO_MINING_CO") == 0) {
         return THEME_SOLO_MINING_CO;
     } else {
+        ESP_LOGE(TAG, "Invalid theme name: %s", preset_str);
         return THEME_ACS_DEFAULT;
     }
 }
