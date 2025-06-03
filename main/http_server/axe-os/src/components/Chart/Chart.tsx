@@ -24,8 +24,12 @@ const Chart = ({ data, priceLineOptions, seriesOptions, title, ...rest }: ChartP
   useEffect(() => {
     if (!chartRef.current) return;
 
-    // Create chart instance
-    const chart = createChart(chartRef.current, chartOption);
+    // Create chart instance with explicit width
+    const chart = createChart(chartRef.current, {
+      ...chartOption,
+      width: chartRef.current.clientWidth,
+      height: 400,
+    });
     chartInstanceRef.current = chart;
 
     // Add line series
@@ -47,8 +51,33 @@ const Chart = ({ data, priceLineOptions, seriesOptions, title, ...rest }: ChartP
     // Fit content to show all data
     chart.timeScale().fitContent();
 
+    // Handle resize
+    const handleResize = () => {
+      if (chartRef.current && chartInstanceRef.current) {
+        chartInstanceRef.current.applyOptions({
+          width: chartRef.current.clientWidth,
+        });
+      }
+    };
+
+    // Add resize listener
+    window.addEventListener('resize', handleResize);
+
+    // Use ResizeObserver for container size changes
+    let resizeObserver: ResizeObserver | null = null;
+    if (window.ResizeObserver) {
+      resizeObserver = new ResizeObserver(() => {
+        handleResize();
+      });
+      resizeObserver.observe(chartRef.current);
+    }
+
     // Cleanup function
     return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       chart.remove();
       chartInstanceRef.current = null;
       seriesRef.current = null;

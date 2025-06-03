@@ -6,11 +6,7 @@ import {
   createPowerDataFetcher,
 } from "../../utils/realTimeDataFetcher";
 
-interface ChartDemoProps {
-  onBack?: () => void;
-}
-
-const ChartDemo = ({ onBack }: ChartDemoProps) => {
+const ChartDemo = () => {
   // Create data fetchers for different metrics
   const hashrateDataFetcher = useMemo(() => createHashrateDataFetcher(), []);
   const temperatureDataFetcher = useMemo(() => createTemperatureDataFetcher(), []);
@@ -22,22 +18,14 @@ const ChartDemo = ({ onBack }: ChartDemoProps) => {
         <div className='mb-8'>
           <div className='flex items-center justify-between mb-4'>
             <h1 className='text-3xl font-bold text-gray-900'>Real-Time Mining Data</h1>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className='px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md font-medium transition-colors'
-              >
-                ← Back to Charts
-              </button>
-            )}
           </div>
           <p className='text-gray-600'>
             Live data from your mining device, updated every 2 seconds
           </p>
         </div>
 
-        {/* Real-time charts grid */}
-        <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8'>
+        {/* Real-time charts - all full width */}
+        <div className='space-y-6 mb-8'>
           <RealTimeApiChart
             title='Mining Hashrate'
             dataFetcher={hashrateDataFetcher}
@@ -55,9 +43,7 @@ const ChartDemo = ({ onBack }: ChartDemoProps) => {
             color='#f59e0b'
             unit='°C'
           />
-        </div>
 
-        <div className='grid grid-cols-1 mb-8'>
           <RealTimeApiChart
             title='Power Consumption'
             dataFetcher={powerDataFetcher}
@@ -103,17 +89,6 @@ const ChartDemo = ({ onBack }: ChartDemoProps) => {
                 <p className='text-sm text-gray-600'>
                   Monitor hashrate, temperature, power consumption, and other key metrics in
                   real-time
-                </p>
-              </div>
-            </div>
-            <div className='flex items-start space-x-3'>
-              <div className='w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-white text-sm font-bold'>
-                4
-              </div>
-              <div>
-                <h3 className='font-semibold text-gray-800'>Error Handling</h3>
-                <p className='text-sm text-gray-600'>
-                  Graceful handling of API errors with user feedback and automatic retry
                 </p>
               </div>
             </div>
