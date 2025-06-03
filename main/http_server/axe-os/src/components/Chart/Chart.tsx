@@ -5,6 +5,8 @@ import {
   LineSeries,
   LineSeriesOptions,
   LineType,
+  AreaSeries,
+  Time,
 } from "lightweight-charts";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { chartOption, ChartDataPoint } from "./config";
@@ -14,40 +16,221 @@ interface ChartProps {
   priceLineOptions?: any;
   seriesOptions?: Partial<LineSeriesOptions>;
   title?: string;
+  movingAveragePeriod?: number;
+  showMovingAverage?: boolean;
+  smoothingFactor?: number;
+  useAreaChart?: boolean;
+  dataAggregationSeconds?: number;
   [key: string]: any;
 }
 
-const Chart = ({ data, priceLineOptions, seriesOptions, title, ...rest }: ChartProps) => {
+const Chart = ({
+  data,
+  priceLineOptions,
+  seriesOptions,
+  title,
+  movingAveragePeriod = 20,
+  showMovingAverage = false,
+  smoothingFactor = 3,
+  useAreaChart = false,
+  dataAggregationSeconds = 5,
+  ...rest
+}: ChartProps) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Line"> | ISeriesApi<"Area"> | null>(null);
+  const maSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+
+  // Simple data smoothing function
+  const applySmoothingFilter = (sourceData: ChartDataPoint[], factor: number): ChartDataPoint[] => {
+    if (factor <= 1 || sourceData.length < factor) return sourceData;
+
+    const smoothedData: ChartDataPoint[] = [];
+
+    for (let i = 0; i < sourceData.length; i++) {
+      if (i < Math.floor(factor / 2)) {
+        // Keep early points as-is
+        smoothedData.push(sourceData[i]);
+      } else if (i >= sourceData.length - Math.floor(factor / 2)) {
+        // Keep late points as-is
+        smoothedData.push(sourceData[i]);
+      } else {
+        // Apply simple moving average smoothing
+        let sum = 0;
+        const halfFactor = Math.floor(factor / 2);
+        for (let j = i - halfFactor; j <= i + halfFactor; j++) {
+          sum += sourceData[j].value;
+        }
+        smoothedData.push({
+          time: sourceData[i].time,
+          value: sum / factor
+        });
+      }
+    }
+
+    return smoothedData;
+  };
+
+  // Data aggregation function to reduce noise by averaging over time periods
+  const aggregateData = (sourceData: ChartDataPoint[], seconds: number): ChartDataPoint[] => {
+    if (seconds <= 1 || sourceData.length === 0) return sourceData;
+
+    const aggregatedData: ChartDataPoint[] = [];
+    const buckets = new Map<number, { sum: number; count: number; time: Time }>();
+
+    sourceData.forEach(point => {
+      // Handle both timestamp numbers and BusinessDay objects
+      let timeValue: number;
+      if (typeof point.time === 'number') {
+        timeValue = point.time;
+      } else {
+        // For BusinessDay, convert to timestamp (rough approximation)
+        const businessDay = point.time as any;
+        const date = new Date(businessDay.year, businessDay.month - 1, businessDay.day);
+        timeValue = Math.floor(date.getTime() / 1000);
+      }
+
+      const bucketKey = Math.floor(timeValue / seconds) * seconds;
+
+      const existing = buckets.get(bucketKey);
+      if (existing) {
+        existing.sum += point.value;
+        existing.count += 1;
+      } else {
+        buckets.set(bucketKey, { sum: point.value, count: 1, time: bucketKey as Time });
+      }
+    });
+
+    // Convert buckets back to data points
+    Array.from(buckets.values())
+      .sort((a, b) => {
+        const aTime = typeof a.time === 'number' ? a.time : 0;
+        const bTime = typeof b.time === 'number' ? b.time : 0;
+        return aTime - bTime;
+      })
+      .forEach(bucket => {
+        aggregatedData.push({
+          time: bucket.time,
+          value: bucket.sum / bucket.count
+        });
+      });
+
+    return aggregatedData;
+  };
+
+  // Calculate moving average data
+  const calculateMovingAverageData = (sourceData: ChartDataPoint[], period: number): ChartDataPoint[] => {
+    const maData: ChartDataPoint[] = [];
+
+    for (let i = 0; i < sourceData.length; i++) {
+      if (i < period - 1) {
+        // Provide whitespace data points until the MA can be calculated
+        maData.push({ time: sourceData[i].time, value: 0 });
+      } else {
+        // Calculate the moving average
+        let sum = 0;
+        for (let j = 0; j < period; j++) {
+          sum += sourceData[i - j].value;
+        }
+        const maValue = sum / period;
+        maData.push({ time: sourceData[i].time, value: maValue });
+      }
+    }
+
+    return maData;
+  };
 
   useEffect(() => {
     if (!chartRef.current) return;
 
-    // Create chart instance with explicit width
+    // Create chart instance with enhanced options for noise reduction
     const chart = createChart(chartRef.current, {
       ...chartOption,
       width: chartRef.current.clientWidth,
       height: 400,
+      // Enhanced chart options for smoother appearance
+      layout: {
+        ...chartOption.layout,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      },
+      rightPriceScale: {
+        ...chartOption.rightPriceScale,
+        autoScale: true,
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
+      },
+      timeScale: {
+        ...chartOption.timeScale,
+        fixLeftEdge: false,
+        fixRightEdge: true,
+        lockVisibleTimeRangeOnResize: true,
+      },
     });
     chartInstanceRef.current = chart;
 
-    // Add line series
-    const lineSeries = chart.addSeries(LineSeries, {
-      color: "#2563eb",
-      lineWidth: 2,
-      lineType: LineType.Curved,
-      ...seriesOptions,
-    });
-    seriesRef.current = lineSeries;
+    // Process data for noise reduction
+    let processedData = data;
 
-    // Set initial data
-    lineSeries.setData(data);
+    // Apply data aggregation if enabled
+    if (dataAggregationSeconds > 1) {
+      processedData = aggregateData(processedData, dataAggregationSeconds);
+    }
+
+    // Apply smoothing filter if enabled
+    if (smoothingFactor > 1) {
+      processedData = applySmoothingFilter(processedData, smoothingFactor);
+    }
+
+    // Add moving average series first (so it appears behind the main line)
+    if (showMovingAverage && processedData.length > 0) {
+      const maSeries = chart.addSeries(LineSeries, {
+        color: "#94a3b8",
+        lineWidth: 2,
+        lineType: LineType.Simple,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        crosshairMarkerVisible: true,
+        crosshairMarkerRadius: 3,
+      });
+      maSeriesRef.current = maSeries;
+
+      const maData = calculateMovingAverageData(processedData, movingAveragePeriod);
+      maSeries.setData(maData);
+    }
+
+    // Add main series - choose between line and area based on props
+    if (useAreaChart) {
+      const areaSeries = chart.addSeries(AreaSeries, {
+        lineColor: "#10b981",
+        topColor: "rgba(16, 185, 129, 0.4)",
+        bottomColor: "rgba(16, 185, 129, 0.05)",
+        lineWidth: 2,
+        lineType: LineType.Curved,
+        crosshairMarkerRadius: 4,
+        ...seriesOptions,
+      });
+      seriesRef.current = areaSeries;
+      areaSeries.setData(processedData);
+    } else {
+      const lineSeries = chart.addSeries(LineSeries, {
+        color: "#10b981",
+        lineWidth: 2,
+        lineType: LineType.Curved,
+        crosshairMarkerRadius: 4,
+        // Enhanced line options for smoother appearance
+        priceLineVisible: false,
+        lastValueVisible: true,
+        ...seriesOptions,
+      });
+      seriesRef.current = lineSeries;
+      lineSeries.setData(processedData);
+    }
 
     // Add price line if provided
-    if (priceLineOptions) {
-      lineSeries.createPriceLine(priceLineOptions);
+    if (priceLineOptions && seriesRef.current) {
+      seriesRef.current.createPriceLine(priceLineOptions);
     }
 
     // Fit content to show all data
@@ -83,20 +266,40 @@ const Chart = ({ data, priceLineOptions, seriesOptions, title, ...rest }: ChartP
       chart.remove();
       chartInstanceRef.current = null;
       seriesRef.current = null;
+      maSeriesRef.current = null;
     };
-  }, []);
+  }, [showMovingAverage, movingAveragePeriod, smoothingFactor, useAreaChart, dataAggregationSeconds]);
 
   // Update data when it changes
   useEffect(() => {
     if (seriesRef.current && data.length > 0) {
-      seriesRef.current.setData(data);
+      // Process data for noise reduction
+      let processedData = data;
+
+      // Apply data aggregation if enabled
+      if (dataAggregationSeconds > 1) {
+        processedData = aggregateData(processedData, dataAggregationSeconds);
+      }
+
+      // Apply smoothing filter if enabled
+      if (smoothingFactor > 1) {
+        processedData = applySmoothingFilter(processedData, smoothingFactor);
+      }
+
+      seriesRef.current.setData(processedData);
+
+      // Update moving average data if enabled
+      if (showMovingAverage && maSeriesRef.current) {
+        const maData = calculateMovingAverageData(processedData, movingAveragePeriod);
+        maSeriesRef.current.setData(maData);
+      }
 
       // Auto-scroll to show latest data
       if (chartInstanceRef.current) {
         chartInstanceRef.current.timeScale().scrollToRealTime();
       }
     }
-  }, [data]);
+  }, [data, showMovingAverage, movingAveragePeriod, smoothingFactor, useAreaChart, dataAggregationSeconds]);
 
   return (
     <div className='w-full'>
