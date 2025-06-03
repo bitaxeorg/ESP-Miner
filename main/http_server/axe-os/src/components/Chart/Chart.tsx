@@ -4,6 +4,7 @@ import {
   ISeriesApi,
   LineSeries,
   LineSeriesOptions,
+  LineType,
 } from "lightweight-charts";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { chartOption, ChartDataPoint } from "./config";
@@ -36,6 +37,7 @@ const Chart = ({ data, priceLineOptions, seriesOptions, title, ...rest }: ChartP
     const lineSeries = chart.addSeries(LineSeries, {
       color: "#2563eb",
       lineWidth: 2,
+      lineType: LineType.Curved,
       ...seriesOptions,
     });
     seriesRef.current = lineSeries;
