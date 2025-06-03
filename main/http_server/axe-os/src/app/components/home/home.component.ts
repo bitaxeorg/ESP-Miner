@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
@@ -7,7 +7,7 @@ import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
-
+import { Title } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-home',
@@ -42,10 +42,13 @@ export class HomeComponent {
   public activePoolUser!: string;
   public activePoolLabel!: 'Primary' | 'Fallback';
 
+  private pageDefaultTitle: string = '';
+
   constructor(
     private systemService: SystemService,
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
+    private titleService: Title,
     private shareRejectReasonsService: ShareRejectionExplanationService
   ) {
     this.initializeChart();
@@ -54,6 +57,10 @@ export class HomeComponent {
     this.themeService.getThemeSettings().subscribe(() => {
       this.updateChartColors();
     });
+  }
+
+  ngOnInit() {
+    this.pageDefaultTitle = this.titleService.getTitle();
   }
 
   private updateChartColors() {
@@ -285,6 +292,19 @@ export class HomeComponent {
         return this.quickLinkService.getQuickLink(url, user);
       })
     );
+
+    this.info$.subscribe(info => {
+      this.titleService.setTitle(
+        [
+          this.pageDefaultTitle,
+          info.hostname,
+          (info.hashRate ? HashSuffixPipe.transform(info.hashRate * 1000000000) : false),
+          (info.temp ? `${info.temp}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
+          (info.power ? `${info.power.toFixed()} W` : false),
+          (info.bestDiff ? info.bestDiff : false),
+        ].filter(Boolean).join(' • ')
+      );
+    });
   }
 
   getRejectionExplanation(reason: string): string | null {
