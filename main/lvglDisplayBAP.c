@@ -32,8 +32,9 @@
 extern GlobalState *GLOBAL_STATE;
 
 #define lvglDisplayI2CAddr 0x50
-#define DISPLAY_UPDATE_INTERVAL_MS 2500
+#define DISPLAY_UPDATE_INTERVAL_MS 2000
 #define MAX_BUFFER_SIZE_BAP 1024  //Placeholder Buffer Size
+#define SEND_DELAY_AFTER_RECEIVE_MS 1000  // 1 second delay
 
 
 extern bool apply_preset(DeviceModel device_model, const char* preset_name);
@@ -137,7 +138,7 @@ static uint8_t crcBufferTX[2];
 // Add at the top with other static variables
 static bool is_receiving_data = false;
 static TickType_t last_receive_time = 0;
-#define SEND_DELAY_AFTER_RECEIVE_MS 1000  // 1 second delay
+
 
 /// @brief waits for a serial response to Match CRC
 /// @param expectedCRC the expected crc 
@@ -483,7 +484,7 @@ esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE)
     static TickType_t lastMonitorUpdateTime = 0;
     TickType_t currentTime = xTaskGetTickCount();
     
-    if ((currentTime - lastMonitorUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS)) {
+    if ((currentTime - lastMonitorUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS*4)) {
         return ESP_OK;
     }
     lastMonitorUpdateTime = currentTime;
@@ -518,11 +519,8 @@ esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE)
     if (ret != ESP_OK) return ret;
 
     // LVGL_REG_THEMES_AVAILABLE 0x74
-    static char themesAvailable[MAX_THEME_LENGTH] = {0};
-    strncpy(themesAvailable, themePresetToString(THEME_BITAXE_RED), MAX_THEME_LENGTH);
-    ret = sendRegisterDataBAP(LVGL_REG_THEMES_AVAILABLE, themesAvailable, strlen(themesAvailable));
-    if (ret != ESP_OK) return ret;
-    
+
+    //TODO: Add all themes to the available themes
     
 
     // New Flags 0x0E to
@@ -869,6 +867,16 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
                     uint16_t flag_overheat_mode = 0x0000 + buf[4];
                     ESP_LOGI("Serial BAP", "Overheat mode: %d", flag_overheat_mode);
                     nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, flag_overheat_mode);
+                    break;
+                // current theme
+                case LVGL_REG_THEME_CURRENT:
+                    ESP_LOGI("Serial BAP", "Received current theme");
+                    char themeName[32] = {0};  // Create temporary buffer
+                    strncpy(themeName, (const char *)(buf + 4), data_len);
+                    themeName[data_len] = '\0';  // Ensure null termination
+                    ESP_LOGI("Serial BAP", "Theme: %s", themeName);
+                    theme = themePresetFromString(themeName);
+                    initializeTheme(theme);
                     break;
                 default:
                         ESP_LOGI("Serial BAP", "Received unknown register");

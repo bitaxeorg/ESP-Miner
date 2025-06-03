@@ -16,6 +16,7 @@ typedef enum {
 } themePreset_t;
 
 extern const char* themePresetToString(themePreset_t preset);
+extern themePreset_t themePresetFromString(const char* preset_str);
 
 typedef struct {
     char primaryColor[8];      // Main brand color (e.g. "#FF0000")
