@@ -293,7 +293,7 @@ static esp_err_t theme_active_themes_handler(httpd_req_t *req)
     cJSON *themes = cJSON_CreateArray();
 
     // Iterate through all theme presets
-    for (themePreset_t theme = THEME_ACS_DEFAULT; theme <= THEME_LUXOR; theme++) {
+    for (themePreset_t theme = THEME_ACS_DEFAULT; theme <= THEME_SOLO_MINING_CO; theme++) {
         // Skip any gaps in the enum values
         
         const char* themeName = themePresetToString(theme);
