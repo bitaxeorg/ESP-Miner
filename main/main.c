@@ -110,6 +110,7 @@ void app_main(void)
         ESP_LOGI(TAG, "Finished, waiting for user input.");
         while (1) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
+            
         }
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
@@ -118,6 +119,7 @@ void app_main(void)
         ESP_LOGI(TAG, "Finished, waiting for user input.");
         while (1) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
+
         }
     }
 

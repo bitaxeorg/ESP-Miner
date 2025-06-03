@@ -914,6 +914,7 @@ esp_err_t lvglStartupLoopBAP(GlobalState *GLOBAL_STATE)
     {
         ESP_LOGI("LVGL", "Sending startup done flag false");
         sendRegisterDataBAP(LVGL_FLAG_STARTUP_DONE, &module->startup_done, sizeof(uint8_t));
+        sendRegisterDataBAP(LVGL_REG_IP_ADDR, "", 0);
     }
 
     return ESP_OK;
@@ -934,6 +935,7 @@ esp_err_t lvglOverheatLoopBAP(GlobalState *GLOBAL_STATE) {
     {
         ESP_LOGI("LVGL", "Sending overheat mode flag true");
         sendRegisterDataBAP(LVGL_FLAG_OVERHEAT_MODE, &module->overheat_mode, sizeof(uint8_t));
+        sendRegisterDataBAP(LVGL_REG_IP_ADDR, "", 0);
     }
 
     return ESP_OK;
