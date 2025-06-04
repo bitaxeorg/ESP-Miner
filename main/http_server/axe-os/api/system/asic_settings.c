@@ -1,11 +1,14 @@
 #include <string.h>
 #include "esp_log.h"
+#include "esp_wifi.h"
+#include "esp_ota_ops.h"
 #include "esp_http_server.h"
 #include "cJSON.h"
 #include "global_state.h"
 #include "asic.h"
+#include "connect.h"
 #include "http_server.h"
-
+#include "esp_timer.h"
 static int system_asic_prebuffer_len = 256;
 
 // static const char *TAG = "asic_settings";
@@ -20,7 +23,7 @@ void asic_api_init(GlobalState *global_state) {
     GLOBAL_STATE = global_state;
 }
 
-/* Handler for system asic endpoint */
+/* Handler for system board info endpoint, generally static */
 esp_err_t GET_system_asic(httpd_req_t *req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -38,13 +41,13 @@ esp_err_t GET_system_asic(httpd_req_t *req)
     cJSON *root = cJSON_CreateObject();
 
     // Add ASIC model to the JSON object
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
-    cJSON_AddStringToObject(root, "deviceModel", GLOBAL_STATE->DEVICE_CONFIG.family.name);
-    cJSON_AddStringToObject(root, "swarmColor", GLOBAL_STATE->DEVICE_CONFIG.family.swarm_color);
+    cJSON_AddStringToObject(root, "asicModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
     cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count);
     cJSON_AddNumberToObject(root, "hashDomains", GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains);
+    cJSON_AddNumberToObject(root, "smallCoreCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count);
 
     cJSON_AddNumberToObject(root, "defaultFrequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_frequency_mhz);
+    cJSON_AddNumberToObject(root, "defaultVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv);
 
     // Create arrays for frequency and voltage options based on ASIC model
     cJSON *freqOptions = cJSON_CreateArray();
@@ -55,7 +58,6 @@ esp_err_t GET_system_asic(httpd_req_t *req)
     }
     cJSON_AddItemToObject(root, "frequencyOptions", freqOptions);
 
-    cJSON_AddNumberToObject(root, "defaultVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv);
 
     cJSON *voltageOptions = cJSON_CreateArray();
     count = 0;
