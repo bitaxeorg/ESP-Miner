@@ -119,6 +119,8 @@ bool apply_preset(DeviceModel device_model, const char* preset_name) {
     nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, selected_preset->fan_speed_percent);
     nvs_config_set_string(NVS_CONFIG_AUTOTUNE_PRESET, preset_name);
     nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+    nvs_config_set_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1);
+
 
     // send through BAP
     //lvglSendPresetBAP();
