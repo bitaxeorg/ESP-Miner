@@ -24,45 +24,45 @@ export interface ChartTimeConfig {
 export const CHART_CONFIGS: Record<string, ChartTimeConfig> = {
   SHORT: {
     name: "Short",
-    dataPoints: 360,      // 30 minutes
+    dataPoints: 360,      // 30 minutes with 5-second intervals
     hours: 0.5,
     intervalSeconds: 5,
-    description: "30 minutes of data"
+    description: "30 minutes"
   },
   MEDIUM: {
     name: "Medium",
-    dataPoints: 720,      // 1 hour
+    dataPoints: 240,      // 1 hour with 15-second intervals
     hours: 1,
-    intervalSeconds: 5,
+    intervalSeconds: 15,
     description: "1 hour of data"
   },
   LONG: {
     name: "Long",
-    dataPoints: 1440,     // 2 hours
+    dataPoints: 240,      // 2 hours with 30-second intervals
     hours: 2,
-    intervalSeconds: 5,
-    description: "2 hours of data"
+    intervalSeconds: 30,
+    description: "2 hours"
   },
   EXTENDED: {
     name: "Extended",
-    dataPoints: 2880,     // 4 hours
+    dataPoints: 240,      // 4 hours with 1-minute intervals
     hours: 4,
-    intervalSeconds: 5,
-    description: "4 hours of data"
+    intervalSeconds: 60,
+    description: "4 hours"
   },
   FULL_DAY: {
     name: "Full Day",
-    dataPoints: 4320,     // 6 hours (practical limit)
+    dataPoints: 360,      // 6 hours with 1-minute intervals
     hours: 6,
-    intervalSeconds: 5,
-    description: "6 hours of data"
+    intervalSeconds: 60,
+    description: "6 hours"
   }
 };
 
 /**
  * Calculate memory usage for chart data
  */
-export function calculateChartMemory(dataPoints: number): ChartMemoryInfo {
+export function calculateChartMemory(dataPoints: number, intervalSeconds: number = 5): ChartMemoryInfo {
   // Each data point consists of:
   // - time: 8 bytes (64-bit timestamp)
   // - value: 8 bytes (64-bit float)
@@ -76,8 +76,8 @@ export function calculateChartMemory(dataPoints: number): ChartMemoryInfo {
   return {
     dataPoints,
     estimatedMemoryKB: Math.round(totalKB * 100) / 100,
-    timeSpanHours: dataPoints * 5 / 3600, // Assuming 5-second intervals
-    updateIntervalSeconds: 5
+    timeSpanHours: dataPoints * intervalSeconds / 3600,
+    updateIntervalSeconds: intervalSeconds
   };
 }
 
@@ -95,7 +95,7 @@ export function getRecommendedConfig(maxMemoryKB?: number): ChartTimeConfig {
   // Find the largest config that fits within memory limit
   for (let i = configs.length - 1; i >= 0; i--) {
     const config = configs[i];
-    const memoryInfo = calculateChartMemory(config.dataPoints);
+    const memoryInfo = calculateChartMemory(config.dataPoints, config.intervalSeconds);
 
     if (memoryInfo.estimatedMemoryKB <= maxMemoryKB) {
       return config;
@@ -159,7 +159,7 @@ export function validateChartConfig(config: ChartTimeConfig): {
   memoryInfo: ChartMemoryInfo;
 } {
   const warnings: string[] = [];
-  const memoryInfo = calculateChartMemory(config.dataPoints);
+  const memoryInfo = calculateChartMemory(config.dataPoints, config.intervalSeconds);
 
   // Memory warnings
   if (memoryInfo.estimatedMemoryKB > 500) {
@@ -179,12 +179,25 @@ export function validateChartConfig(config: ChartTimeConfig): {
     warnings.push("Too few data points may not provide meaningful insights");
   }
 
-  // Interval warnings
+  // Interval warnings - adjust based on time span
   if (config.intervalSeconds < 1) {
     warnings.push("Update interval too frequent may impact system performance");
   }
 
-  if (config.intervalSeconds > 60) {
+  // For time spans, use different thresholds:
+  // - Under 1 hour: intervals over 60s are slow
+  // - 1-4 hours: intervals over 5 minutes (300s) are slow
+  // - Over 4 hours: intervals over 30 minutes (1800s) are slow
+  let maxReasonableInterval: number;
+  if (config.hours < 1) {
+    maxReasonableInterval = 60; // 1 minute
+  } else if (config.hours <= 4) {
+    maxReasonableInterval = 300; // 5 minutes
+  } else {
+    maxReasonableInterval = 1800; // 30 minutes
+  }
+
+  if (config.intervalSeconds > maxReasonableInterval) {
     warnings.push("Update interval too slow may miss important changes");
   }
 

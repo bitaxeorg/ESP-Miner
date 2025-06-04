@@ -22,15 +22,15 @@ const ChartDemo = () => {
   // State for selected chart configuration
   const [selectedConfigKey, setSelectedConfigKey] = useState<string>('FULL_DAY');
 
-  // Current configuration: 6 hours of data (4,320 data points at 5-second intervals)
+  // Current configuration: 6 hours of data (360 data points at 1-minute intervals)
   // Available options:
-  // - CHART_CONFIGS.SHORT: 30 minutes (360 points)
-  // - CHART_CONFIGS.MEDIUM: 1 hour (720 points)
-  // - CHART_CONFIGS.LONG: 2 hours (1,440 points)
-  // - CHART_CONFIGS.EXTENDED: 4 hours (2,880 points)
-  // - CHART_CONFIGS.FULL_DAY: 6 hours (4,320 points) ← Default selection
+  // - CHART_CONFIGS.SHORT: 30 minutes (360 points at 5-second intervals)
+  // - CHART_CONFIGS.MEDIUM: 1 hour (240 points at 15-second intervals)
+  // - CHART_CONFIGS.LONG: 2 hours (240 points at 30-second intervals)
+  // - CHART_CONFIGS.EXTENDED: 4 hours (240 points at 1-minute intervals)
+  // - CHART_CONFIGS.FULL_DAY: 6 hours (360 points at 1-minute intervals) ← Default selection
   const chartConfig = CHART_CONFIGS[selectedConfigKey];
-  const memoryInfo = calculateChartMemory(chartConfig.dataPoints);
+  const memoryInfo = calculateChartMemory(chartConfig.dataPoints, chartConfig.intervalSeconds);
   const configValidation = validateChartConfig(chartConfig);
 
   return (
@@ -173,33 +173,6 @@ const ChartDemo = () => {
             selectedConfigKey={selectedConfigKey}
             onConfigChange={setSelectedConfigKey}
           />
-
-          {/* Placeholder for future charts */}
-          {/*
-          <RealTimeApiChart
-            title='Temperature'
-            dataFetcher={temperatureDataFetcher}
-            updateInterval={chartConfig.intervalSeconds * 1000}
-            maxDataPoints={chartConfig.dataPoints}
-            color='#f59e0b'
-            unit='°C'
-            defaultSmoothingFactor={5}
-            defaultUseAreaChart={true}
-            defaultDataAggregation={5}
-          />
-
-          <RealTimeApiChart
-            title='Power Consumption'
-            dataFetcher={powerDataFetcher}
-            updateInterval={chartConfig.intervalSeconds * 1000}
-            maxDataPoints={chartConfig.dataPoints}
-            color='#ef4444'
-            unit='W'
-            defaultSmoothingFactor={5}
-            defaultUseAreaChart={true}
-            defaultDataAggregation={5}
-          />
-          */}
         </div>
       </div>
     </div>

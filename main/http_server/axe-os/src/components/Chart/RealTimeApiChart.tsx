@@ -45,17 +45,22 @@ const RealTimeApiChart = ({
 
   // Auto-configure plot intervals based on duration
   const getOptimalPlotInterval = (configKey: string): number => {
+    if (chartConfigs && chartConfigs[configKey]) {
+      return chartConfigs[configKey].intervalSeconds;
+    }
+
+    // Fallback to hardcoded values if chartConfigs not available
     switch (configKey) {
       case 'SHORT':    // 30 minutes
-        return 5;      // 5s intervals (360 points)
+        return 5;      // 5s intervals
       case 'MEDIUM':   // 1 hour
-        return 60;     // 1m intervals (60 points)
+        return 5;      // 5s intervals
       case 'LONG':     // 2 hours
-        return 900;    // 15m intervals (8 points)
+        return 5;      // 5s intervals
       case 'EXTENDED': // 4 hours
-        return 1800;   // 30m intervals (8 points)
+        return 900;    // 15m intervals
       case 'FULL_DAY': // 6 hours
-        return 3600;   // 1h intervals (6 points)
+        return 900;    // 15m intervals
       default:
         return 5;      // Default to 5s
     }
@@ -268,11 +273,11 @@ const RealTimeApiChart = ({
                       isConfigChanging ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
-                    <option value="SHORT">30 min (5s intervals)</option>
-                    <option value="MEDIUM">1 hour (1m intervals)</option>
-                    <option value="LONG">2 hours (15m intervals)</option>
-                    <option value="EXTENDED">4 hours (30m intervals)</option>
-                    <option value="FULL_DAY">6 hours (1h intervals)</option>
+                    {Object.entries(chartConfigs).map(([key, config]) => (
+                      <option key={key} value={key}>
+                        {config.description} ({formatInterval(config.intervalSeconds)} intervals)
+                      </option>
+                    ))}
                   </select>
                   {isConfigChanging && (
                     <div className='absolute right-2 top-1/2 transform -translate-y-1/2'>
