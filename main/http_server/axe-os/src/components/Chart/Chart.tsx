@@ -18,7 +18,6 @@ interface ChartProps {
   title?: string;
   movingAveragePeriod?: number;
   showMovingAverage?: boolean;
-  smoothingFactor?: number;
   useAreaChart?: boolean;
   dataAggregationSeconds?: number;
   [key: string]: any;
@@ -31,7 +30,6 @@ const Chart = ({
   title,
   movingAveragePeriod = 20,
   showMovingAverage = false,
-  smoothingFactor = 3,
   useAreaChart = false,
   dataAggregationSeconds = 5,
   ...rest
@@ -40,36 +38,6 @@ const Chart = ({
   const chartInstanceRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line"> | ISeriesApi<"Area"> | null>(null);
   const maSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
-
-  // Simple data smoothing function
-  const applySmoothingFilter = (sourceData: ChartDataPoint[], factor: number): ChartDataPoint[] => {
-    if (factor <= 1 || sourceData.length < factor) return sourceData;
-
-    const smoothedData: ChartDataPoint[] = [];
-
-    for (let i = 0; i < sourceData.length; i++) {
-      if (i < Math.floor(factor / 2)) {
-        // Keep early points as-is
-        smoothedData.push(sourceData[i]);
-      } else if (i >= sourceData.length - Math.floor(factor / 2)) {
-        // Keep late points as-is
-        smoothedData.push(sourceData[i]);
-      } else {
-        // Apply simple moving average smoothing
-        let sum = 0;
-        const halfFactor = Math.floor(factor / 2);
-        for (let j = i - halfFactor; j <= i + halfFactor; j++) {
-          sum += sourceData[j].value;
-        }
-        smoothedData.push({
-          time: sourceData[i].time,
-          value: sum / factor
-        });
-      }
-    }
-
-    return smoothedData;
-  };
 
   // Data aggregation function to reduce noise by averaging over time periods
   const aggregateData = (sourceData: ChartDataPoint[], seconds: number): ChartDataPoint[] => {
@@ -178,11 +146,6 @@ const Chart = ({
       processedData = aggregateData(processedData, dataAggregationSeconds);
     }
 
-    // Apply smoothing filter if enabled
-    if (smoothingFactor > 1) {
-      processedData = applySmoothingFilter(processedData, smoothingFactor);
-    }
-
     // Add moving average series first (so it appears behind the main line)
     if (showMovingAverage && processedData.length > 0) {
       const maSeries = chart.addSeries(LineSeries, {
@@ -268,7 +231,7 @@ const Chart = ({
       seriesRef.current = null;
       maSeriesRef.current = null;
     };
-  }, [showMovingAverage, movingAveragePeriod, smoothingFactor, useAreaChart, dataAggregationSeconds]);
+  }, [showMovingAverage, movingAveragePeriod, useAreaChart, dataAggregationSeconds]);
 
   // Update data when it changes
   useEffect(() => {
@@ -279,11 +242,6 @@ const Chart = ({
       // Apply data aggregation if enabled
       if (dataAggregationSeconds > 1) {
         processedData = aggregateData(processedData, dataAggregationSeconds);
-      }
-
-      // Apply smoothing filter if enabled
-      if (smoothingFactor > 1) {
-        processedData = applySmoothingFilter(processedData, smoothingFactor);
       }
 
       seriesRef.current.setData(processedData);
@@ -299,7 +257,7 @@ const Chart = ({
         chartInstanceRef.current.timeScale().scrollToRealTime();
       }
     }
-  }, [data, showMovingAverage, movingAveragePeriod, smoothingFactor, useAreaChart, dataAggregationSeconds]);
+  }, [data, showMovingAverage, movingAveragePeriod, useAreaChart, dataAggregationSeconds]);
 
   return (
     <div className='w-full'>

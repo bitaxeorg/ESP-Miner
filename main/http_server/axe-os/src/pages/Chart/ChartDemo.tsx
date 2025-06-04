@@ -167,7 +167,6 @@ const ChartDemo = () => {
             maxDataPoints={chartConfig.dataPoints}
             color='#10b981'
             unit='GH/s'
-            defaultSmoothingFactor={7}
             defaultUseAreaChart={true}
             defaultDataAggregation={5}
             chartConfigs={CHART_CONFIGS}

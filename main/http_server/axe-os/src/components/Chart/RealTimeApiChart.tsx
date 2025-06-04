@@ -10,11 +10,9 @@ interface RealTimeApiChartProps {
   maxDataPoints?: number;
   color?: string;
   unit?: string;
-  // New props for better default noise reduction
-  defaultSmoothingFactor?: number;
+  // Chart configuration props
   defaultUseAreaChart?: boolean;
   defaultDataAggregation?: number;
-  // Chart configuration props
   chartConfigs?: Record<string, any>;
   selectedConfigKey?: string;
   onConfigChange?: (configKey: string) => void;
@@ -27,7 +25,6 @@ const RealTimeApiChart = ({
   maxDataPoints = 50,
   color = "#10b981", // Updated to match the new chart color
   unit = "",
-  defaultSmoothingFactor = 5, // Increased from 3 to 5 for less noise
   defaultUseAreaChart = true, // Changed to true for better visual appeal
   defaultDataAggregation = 5, // Increased from 2 to 5 for better aggregation
   chartConfigs,
@@ -35,27 +32,52 @@ const RealTimeApiChart = ({
   onConfigChange,
 }: RealTimeApiChartProps) => {
   const [data, setData] = useState<ChartDataPoint[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
+  const [isRunning, setIsRunning] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // New state for noise reduction features
-  const [smoothingFactor, setSmoothingFactor] = useState(defaultSmoothingFactor);
+  // New state for chart configuration
   const [useAreaChart, setUseAreaChart] = useState(defaultUseAreaChart);
   const [dataAggregationSeconds, setDataAggregationSeconds] = useState(defaultDataAggregation);
-  const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   const [isConfigChanging, setIsConfigChanging] = useState(false);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const controlsContentRef = useRef<HTMLDivElement>(null);
-  const [controlsHeight, setControlsHeight] = useState(0);
 
-  // Measure controls content height when it mounts
-  useEffect(() => {
-    if (controlsContentRef.current) {
-      setControlsHeight(controlsContentRef.current.scrollHeight);
+  // Auto-configure plot intervals based on duration
+  const getOptimalPlotInterval = (configKey: string): number => {
+    switch (configKey) {
+      case 'SHORT':    // 30 minutes
+        return 5;      // 5s intervals (360 points)
+      case 'MEDIUM':   // 1 hour
+        return 60;     // 1m intervals (60 points)
+      case 'LONG':     // 2 hours
+        return 900;    // 15m intervals (8 points)
+      case 'EXTENDED': // 4 hours
+        return 1800;   // 30m intervals (8 points)
+      case 'FULL_DAY': // 6 hours
+        return 3600;   // 1h intervals (6 points)
+      default:
+        return 5;      // Default to 5s
     }
-  }, [showAdvancedControls]);
+  };
+
+  // Get current optimal interval
+  const optimalInterval = selectedConfigKey ? getOptimalPlotInterval(selectedConfigKey) : dataAggregationSeconds;
+
+  // Auto-update aggregation when config changes
+  useEffect(() => {
+    if (selectedConfigKey) {
+      const newInterval = getOptimalPlotInterval(selectedConfigKey);
+      setDataAggregationSeconds(newInterval);
+    }
+  }, [selectedConfigKey]);
+
+  // Format interval for display
+  const formatInterval = (seconds: number): string => {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    return `${Math.floor(seconds / 3600)}h`;
+  };
 
   // Initialize with historical data from API
   useEffect(() => {
@@ -76,6 +98,37 @@ const RealTimeApiChart = ({
 
     initializeData();
   }, [dataFetcher, maxDataPoints]);
+
+  // Start real-time updates automatically after initial data is loaded
+  useEffect(() => {
+    if (!isLoading && isRunning && !intervalRef.current) {
+      intervalRef.current = setInterval(async () => {
+        try {
+          const newPoint = await dataFetcher.fetchNextPoint();
+
+          if (newPoint) {
+            setData((prevData) => {
+              const newData = [...prevData, newPoint];
+              // Keep only the last maxDataPoints
+              return newData.slice(-maxDataPoints);
+            });
+            setError(null);
+          }
+        } catch (err) {
+          console.error("Failed to fetch new data point:", err);
+          setError("Failed to fetch data");
+        }
+      }, updateInterval);
+    }
+
+    // Cleanup interval if component unmounts or running state changes
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isLoading, isRunning, dataFetcher, maxDataPoints, updateInterval]);
 
   // Start/stop real-time updates
   const toggleRealTime = () => {
@@ -106,15 +159,6 @@ const RealTimeApiChart = ({
       setIsRunning(true);
     }
   };
-
-  // Cleanup interval on unmount
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, []);
 
   const resetData = async () => {
     setIsLoading(true);
@@ -209,27 +253,6 @@ const RealTimeApiChart = ({
           </p>
         </div>
         <div className='flex flex-col gap-2'>
-          {/* Primary Controls Row */}
-          <div className='flex gap-2 items-center justify-end'>
-            <button
-              onClick={toggleRealTime}
-              disabled={isLoading || isConfigChanging}
-              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50 ${
-                isRunning
-                  ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-green-500 hover:bg-green-600 text-white"
-              }`}
-            >
-              {isRunning ? "Stop" : "Start"} Live Updates
-            </button>
-            <button
-              onClick={resetData}
-              disabled={isLoading || isConfigChanging}
-              className='px-3 py-1.5 border border-blue-500 text-blue-500 hover:bg-blue-50 rounded text-sm font-medium transition-colors disabled:opacity-50'
-            >
-              Reset Data
-            </button>
-          </div>
 
           {/* Chart Duration Selector */}
           {chartConfigs && selectedConfigKey && onConfigChange && (
@@ -245,11 +268,11 @@ const RealTimeApiChart = ({
                       isConfigChanging ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
-                    <option value="SHORT">30 minutes</option>
-                    <option value="MEDIUM">1 hour</option>
-                    <option value="LONG">2 hours</option>
-                    <option value="EXTENDED">4 hours</option>
-                    <option value="FULL_DAY">6 hours</option>
+                    <option value="SHORT">30 min (5s intervals)</option>
+                    <option value="MEDIUM">1 hour (1m intervals)</option>
+                    <option value="LONG">2 hours (15m intervals)</option>
+                    <option value="EXTENDED">4 hours (30m intervals)</option>
+                    <option value="FULL_DAY">6 hours (1h intervals)</option>
                   </select>
                   {isConfigChanging && (
                     <div className='absolute right-2 top-1/2 transform -translate-y-1/2'>
@@ -260,87 +283,6 @@ const RealTimeApiChart = ({
               </div>
             </div>
           )}
-
-          {/* Advanced Controls Toggle */}
-          <div className='flex justify-end'>
-            <button
-              onClick={() => setShowAdvancedControls(!showAdvancedControls)}
-              className='text-sm text-gray-500 hover:text-gray-700 underline transition-colors flex items-center gap-1'
-              aria-expanded={showAdvancedControls}
-              aria-controls="noise-reduction-controls"
-            >
-              <span>{showAdvancedControls ? 'Hide' : 'Show'} Noise Reduction Controls</span>
-              <svg
-                className={`w-3 h-3 transition-transform duration-200 ${
-                  showAdvancedControls ? 'rotate-180' : 'rotate-0'
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Advanced Controls Panel with smooth transition */}
-          <div
-            id="noise-reduction-controls"
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              showAdvancedControls
-                ? 'opacity-100'
-                : 'opacity-0'
-            }`}
-            style={{
-              height: showAdvancedControls ? `${controlsHeight}px` : '0px'
-            }}
-            aria-hidden={!showAdvancedControls}
-          >
-            <div
-              ref={controlsContentRef}
-              className='flex flex-wrap gap-3 p-3 bg-gray-50 rounded-lg text-sm'
-            >
-              <div className='flex items-center gap-2'>
-                <label className='flex items-center gap-1'>
-                  <input
-                    type="checkbox"
-                    checked={useAreaChart}
-                    onChange={(e) => setUseAreaChart((e.target as HTMLInputElement).checked)}
-                    className='rounded'
-                  />
-                  Area Chart
-                </label>
-              </div>
-
-              <div className='flex items-center gap-2'>
-                <label className='whitespace-nowrap'>Smoothing:</label>
-                <select
-                  value={smoothingFactor}
-                  onChange={(e) => setSmoothingFactor(Number((e.target as HTMLSelectElement).value))}
-                  className='px-2 py-1 border border-gray-300 rounded'
-                >
-                  <option value={1}>None</option>
-                  <option value={3}>Light</option>
-                  <option value={5}>Medium</option>
-                  <option value={7}>Heavy</option>
-                </select>
-              </div>
-
-              <div className='flex items-center gap-2'>
-                <label className='whitespace-nowrap'>Data Aggregation:</label>
-                <select
-                  value={dataAggregationSeconds}
-                  onChange={(e) => setDataAggregationSeconds(Number((e.target as HTMLSelectElement).value))}
-                  className='px-2 py-1 border border-gray-300 rounded'
-                >
-                  <option value={1}>None</option>
-                  <option value={2}>2s</option>
-                  <option value={5}>5s</option>
-                  <option value={10}>10s</option>
-                </select>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -361,8 +303,7 @@ const RealTimeApiChart = ({
             ? "Live"
             : "Paused"} • {data.length} data points
           {useAreaChart && <span className='text-green-500 ml-2'>• Area Chart</span>}
-          {smoothingFactor > 1 && <span className='text-blue-500 ml-2'>• Smoothed({smoothingFactor})</span>}
-          {dataAggregationSeconds > 1 && <span className='text-purple-500 ml-2'>• Aggregated({dataAggregationSeconds}s)</span>}
+          {dataAggregationSeconds > 1 && <span className='text-purple-500 ml-2'>• Aggregated({formatInterval(dataAggregationSeconds)})</span>}
           {error && <span className='text-red-500 ml-2'>• {error}</span>}
         </span>
       </div>
@@ -379,7 +320,6 @@ const RealTimeApiChart = ({
         <Chart
           data={data}
           seriesOptions={{ color }}
-          smoothingFactor={smoothingFactor}
           useAreaChart={useAreaChart}
           dataAggregationSeconds={dataAggregationSeconds}
         />
