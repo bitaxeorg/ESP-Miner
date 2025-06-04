@@ -168,7 +168,7 @@ static esp_err_t is_network_allowed(httpd_req_t * req)
 
 esp_err_t init_fs(void)
 {
-    esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = NULL, .max_files = 5, .format_if_mount_failed = false};
+    esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = "www", .max_files = 5, .format_if_mount_failed = false};
     esp_err_t ret = esp_vfs_spiffs_register(&conf);
 
     if (ret != ESP_OK) {
