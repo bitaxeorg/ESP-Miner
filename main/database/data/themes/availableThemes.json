@@ -1,0 +1,35 @@
+{
+  "themes": [
+    {
+      "name": "THEME_ACS_DEFAULT",
+      "description": "ACS Default green theme",
+      "version": "1.0"
+    },
+    {
+      "name": "THEME_BITAXE_RED",
+      "description": "Bitaxe red theme",
+      "version": "1.0"
+    },
+    {
+      "name": "THEME_BLOCKSTREAM_JADE",
+      "description": "Blockstream jade theme",
+      "version": "1.0"
+    },
+    {
+      "name": "THEME_BLOCKSTREAM_BLUE",
+      "description": "Blockstream blue theme",
+      "version": "1.0"
+    },
+    {
+      "name": "THEME_SOLO_SATOSHI",
+      "description": "Solo Satoshi theme",
+      "version": "1.0"
+    },
+    {
+      "name": "THEME_SOLO_MINING_CO",
+      "description": "Solo Mining Co theme",
+      "version": "1.0"
+    }
+  ],
+  "lastUpdated": 1706798400
+} 

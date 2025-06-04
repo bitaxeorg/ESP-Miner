@@ -2,6 +2,7 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "nvs_config.h"
+#include "dataBase.h"
 #include "cJSON.h"
 #include <string.h>
 
@@ -11,11 +12,29 @@ static const char *TAG = "theme_api";
 uiTheme_t currentTheme;
 
 themePreset_t loadThemefromNVS(void) {
-    // Get the theme preset as an integer from NVS, defaulting to THEME_ACS_DEFAULT (0)
-    uint16_t themeValue = nvs_config_get_u16(NVS_CONFIG_THEME_NAME, THEME_ACS_DEFAULT);
-    ESP_LOGI(TAG, "Loaded theme from NVS: %d", themeValue);
-    return (themePreset_t)themeValue;
+    // First try to load from database
+    char theme_name[32];
+    esp_err_t ret = dataBase_get_active_theme(theme_name, sizeof(theme_name));
     
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Loaded theme from database: %s", theme_name);
+        themePreset_t preset = themePresetFromString(theme_name);
+        
+        // Also update NVS for backward compatibility
+        nvs_config_set_u16(NVS_CONFIG_THEME_NAME, preset);
+        
+        return preset;
+    } else {
+        // Fallback to NVS if database fails
+        uint16_t themeValue = nvs_config_get_u16(NVS_CONFIG_THEME_NAME, THEME_ACS_DEFAULT);
+        ESP_LOGI(TAG, "Loaded theme from NVS (fallback): %d", themeValue);
+        
+        // Try to sync with database
+        const char* theme_name_str = themePresetToString((themePreset_t)themeValue);
+        dataBase_set_active_theme(theme_name_str);
+        
+        return (themePreset_t)themeValue;
+    }
 }
 
 // Helper function to convert theme preset to string
@@ -253,9 +272,22 @@ static esp_err_t theme_patch_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
     
-    // Update the theme in NVS and initialize it
+    // Update the theme in database and NVS
+    esp_err_t ret = dataBase_set_active_theme(theme_name);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save theme to database: %s", theme_name);
+        // Continue anyway, save to NVS as fallback
+    }
+    
+    // Also save to NVS for backward compatibility
     nvs_config_set_u16(NVS_CONFIG_THEME_NAME, themePreset);
     initializeTheme(themePreset);
+
+    // Log the theme change event
+    char log_data[128];
+    snprintf(log_data, sizeof(log_data), "{\"previousTheme\":\"%s\",\"newTheme\":\"%s\"}", 
+             themePresetToString(getCurrentThemePreset()), theme_name);
+    dataBase_log_event("theme", "info", "Theme changed", log_data);
 
     // send theme to BAP
     lvglSendThemeBAP(themePresetToString(themePreset));
@@ -290,29 +322,44 @@ static esp_err_t theme_active_themes_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     set_cors_headers(req);
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON *themes = cJSON_CreateArray();
-
-    // Iterate through all theme presets
-    for (themePreset_t theme = THEME_ACS_DEFAULT; theme <= THEME_SOLO_MINING_CO; theme++) {
-        // Skip any gaps in the enum values
+    // Try to get themes from database first
+    cJSON *database_themes = NULL;
+    esp_err_t ret = dataBase_get_available_themes(&database_themes);
+    
+    if (ret == ESP_OK && database_themes != NULL) {
+        // Use themes from database
+        const char *response = cJSON_Print(database_themes);
+        httpd_resp_sendstr(req, response);
         
-        const char* themeName = themePresetToString(theme);
-        if (themeName) {
-            cJSON_AddItemToArray(themes, cJSON_CreateString(themeName));
+        free((char *)response);
+        cJSON_Delete(database_themes);
+    } else {
+        // Fallback to hardcoded themes list
+        cJSON *root = cJSON_CreateObject();
+        cJSON *themes = cJSON_CreateArray();
+
+        // Iterate through all theme presets
+        for (themePreset_t theme = THEME_ACS_DEFAULT; theme <= THEME_SOLO_MINING_CO; theme++) {
+            // Skip any gaps in the enum values
+            
+            const char* themeName = themePresetToString(theme);
+            if (themeName) {
+                cJSON_AddItemToArray(themes, cJSON_CreateString(themeName));
+            }
         }
+
+        cJSON_AddItemToObject(root, "themes", themes);
+
+        const char *response = cJSON_Print(root);
+        httpd_resp_sendstr(req, response);
+
+        free((char *)response);
+        cJSON_Delete(root);
     }
-
-    cJSON_AddItemToObject(root, "themes", themes);
-
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
-
-    free((char *)response);
-    cJSON_Delete(root);
 
     return ESP_OK;
 }
+
 esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
 {
     httpd_uri_t theme_get = {

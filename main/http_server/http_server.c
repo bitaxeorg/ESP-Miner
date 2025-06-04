@@ -1,6 +1,7 @@
 #include "http_server.h"
 #include "recovery_page.h"
 #include "theme_api.h"  // Add theme API include
+#include "dataBase.h"  // Add database API include
 #include "cJSON.h"
 #include "esp_chip_info.h"
 #include "esp_http_server.h"
@@ -825,6 +826,61 @@ void websocket_log_handler()
     }
 }
 
+/* Handler for getting recent logs from database */
+static esp_err_t GET_recent_logs(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    // Parse query parameters for limit
+    int limit = 50; // Default limit
+    char query_buf[128];
+    if (httpd_req_get_url_query_str(req, query_buf, sizeof(query_buf)) == ESP_OK) {
+        char limit_str[16];
+        if (httpd_query_key_value(query_buf, "limit", limit_str, sizeof(limit_str)) == ESP_OK) {
+            int parsed_limit = atoi(limit_str);
+            if (parsed_limit > 0 && parsed_limit <= 100) {
+                limit = parsed_limit;
+            }
+        }
+    }
+
+    // Get logs from database
+    cJSON* logs_json = NULL;
+    esp_err_t ret = dataBase_get_recent_logs(limit, &logs_json);
+    
+    if (ret != ESP_OK || logs_json == NULL) {
+        ESP_LOGW(TAG, "Failed to get logs from database, returning empty response");
+        // Return empty logs response
+        cJSON* empty_response = cJSON_CreateObject();
+        cJSON_AddArrayToObject(empty_response, "events");
+        cJSON_AddNumberToObject(empty_response, "count", 0);
+        
+        const char* response_str = cJSON_Print(empty_response);
+        httpd_resp_sendstr(req, response_str);
+        free((char*)response_str);
+        cJSON_Delete(empty_response);
+        return ESP_OK;
+    }
+
+    // Send the logs response
+    const char* logs_str = cJSON_Print(logs_json);
+    httpd_resp_sendstr(req, logs_str);
+    free((char*)logs_str);
+    cJSON_Delete(logs_json);
+    
+    return ESP_OK;
+}
+
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -835,6 +891,12 @@ esp_err_t start_rest_server(void * pvParameters)
         // Unable to initialize the web app filesystem.
         // Enter recovery mode
         enter_recovery = true;
+    }
+    
+    // Initialize data partition database (independent of www partition)
+    esp_err_t db_ret = dataBase_init();
+    if (db_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to initialize database system, continuing without database features");
     }
 
     REST_CHECK(base_path, "wrong base path", err);
@@ -927,6 +989,15 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
+
+    /* URI handler for fetching recent logs */
+    httpd_uri_t logs_recent_get_uri = {
+        .uri = "/api/logs/recent", 
+        .method = HTTP_GET, 
+        .handler = GET_recent_logs, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &logs_recent_get_uri);
 
     httpd_uri_t ws = {
         .uri = "/api/ws", 

@@ -1,0 +1,335 @@
+# JSON Database System for ESP32 Miner
+
+This directory contains a lightweight JSON-based database system designed specifically for the ESP32 miner project. The database manages the data SPIFFS partition separately from the web UI partition, providing persistent storage for themes and event logging.
+
+## Database Structure
+
+The database system uses a JSON file-based approach with the following structure:
+
+```
+/data (or /www/data in legacy mode)
+├── themes/
+│   ├── activeThemes.json      # Currently active theme
+│   └── availableThemes.json   # List of all available themes
+└── logs/
+    └── recentLogs.json        # Recent event logs (max 100 entries)
+```
+
+### Partition Support
+
+The database automatically detects and supports two partition layouts:
+
+- **New Layout**: 2MB www + 1MB data partitions (recommended)
+- **Legacy Layout**: Single 3MB www partition with data subdirectory (backward compatible)
+
+### File Structure Examples
+
+#### activeThemes.json
+```json
+{
+  "activeTheme": "THEME_ACS_DEFAULT",
+  "lastUpdated": 1706798400
+}
+```
+
+#### availableThemes.json
+```json
+{
+  "themes": [
+    {
+      "name": "THEME_ACS_DEFAULT",
+      "description": "ACS Default green theme",
+      "version": "1.0"
+    },
+    {
+      "name": "THEME_BITAXE_RED", 
+      "description": "Bitaxe red theme",
+      "version": "1.0"
+    }
+  ],
+  "lastUpdated": 1706798400
+}
+```
+
+#### recentLogs.json
+```json
+{
+  "maxEvents": 100,
+  "currentCount": 2,
+  "lastArchived": 1706798400,
+  "events": [
+    {
+      "timestamp": 1706798400,
+      "type": "system",
+      "severity": "info",
+      "message": "System started",
+      "data": {"bootTime": 1706798400}
+    }
+  ]
+}
+```
+
+## Initializing Database
+
+### Main Initialization
+
+The database is initialized through the main initialization function:
+
+```c
+#include "dataBase.h"
+
+esp_err_t ret = dataBase_init();
+if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to initialize database");
+    return ret;
+}
+```
+
+### Initialization Process
+
+The `dataBase_init()` function performs the following steps:
+
+1. **Partition Detection**: Automatically detects whether using new or legacy partition layout
+2. **SPIFFS Mounting**: Mounts the data partition (or creates data directory in legacy mode)  
+3. **Theme Database**: Initializes theme storage files
+4. **Logging Database**: Initializes event logging files
+5. **Directory Creation**: Creates necessary directory structure
+
+### Integration with HTTP Server
+
+The database initialization is integrated with the HTTP server startup:
+
+```c
+// In start_rest_server()
+if (init_fs() != ESP_OK) {
+    enter_recovery = true;
+}
+
+// Initialize data partition database (independent of www partition)
+esp_err_t db_ret = dataBase_init();
+if (db_ret != ESP_OK) {
+    ESP_LOGW(TAG, "Failed to initialize database system, continuing without database features");
+}
+```
+
+## Reading from Database
+
+### Utility Function
+
+The database provides a general-purpose JSON file reader:
+
+```c
+esp_err_t dataBase_read_json_file(const char* path, cJSON** json);
+```
+
+**Usage Example:**
+```c
+cJSON* data;
+esp_err_t ret = dataBase_read_json_file("/data/themes/activeThemes.json", &data);
+if (ret == ESP_OK) {
+    // Process the JSON data
+    cJSON* theme = cJSON_GetObjectItem(data, "activeTheme");
+    if (cJSON_IsString(theme)) {
+        ESP_LOGI(TAG, "Active theme: %s", theme->valuestring);
+    }
+    cJSON_Delete(data);
+}
+```
+
+### Error Handling
+
+Reading functions return standard ESP-IDF error codes:
+- `ESP_OK`: Success
+- `ESP_FAIL`: File not found or JSON parse error
+- `ESP_ERR_NO_MEM`: Memory allocation failure
+
+## Writing to Database
+
+### Utility Function
+
+The database provides a general-purpose JSON file writer:
+
+```c
+esp_err_t dataBase_write_json_file(const char* path, cJSON* json);
+```
+
+**Usage Example:**
+```c
+cJSON* root = cJSON_CreateObject();
+cJSON_AddStringToObject(root, "activeTheme", "THEME_BITAXE_RED");
+cJSON_AddNumberToObject(root, "lastUpdated", esp_timer_get_time() / 1000000);
+
+esp_err_t ret = dataBase_write_json_file("/data/themes/activeThemes.json", root);
+if (ret == ESP_OK) {
+    ESP_LOGI(TAG, "Successfully saved theme data");
+}
+cJSON_Delete(root);
+```
+
+### Atomic Operations
+
+The write function ensures atomic operations by:
+1. Creating parent directories if they don't exist
+2. Writing the complete JSON string to file
+3. Properly closing the file handle
+4. Returning appropriate error codes
+
+## Theme Management Implementation
+
+The theme management system provides persistent storage for theme configurations and selections.
+
+### API Functions
+
+#### Set Active Theme
+```c
+esp_err_t dataBase_set_active_theme(const char* theme_name);
+```
+
+**Example:**
+```c
+esp_err_t ret = dataBase_set_active_theme("THEME_BITAXE_RED");
+if (ret == ESP_OK) {
+    ESP_LOGI(TAG, "Theme changed successfully");
+}
+```
+
+#### Get Active Theme
+```c
+esp_err_t dataBase_get_active_theme(char* theme_name, size_t max_len);
+```
+
+**Example:**
+```c
+char current_theme[32];
+esp_err_t ret = dataBase_get_active_theme(current_theme, sizeof(current_theme));
+if (ret == ESP_OK) {
+    ESP_LOGI(TAG, "Current theme: %s", current_theme);
+}
+```
+
+#### Get Available Themes
+```c
+esp_err_t dataBase_get_available_themes(cJSON** themes_json);
+```
+
+**Example:**
+```c
+cJSON* themes;
+esp_err_t ret = dataBase_get_available_themes(&themes);
+if (ret == ESP_OK) {
+    cJSON* themes_array = cJSON_GetObjectItem(themes, "themes");
+    int theme_count = cJSON_GetArraySize(themes_array);
+    ESP_LOGI(TAG, "Found %d available themes", theme_count);
+    cJSON_Delete(themes);
+}
+```
+
+### Integration with Theme API
+
+The theme system integrates with the existing `theme_api.c`:
+
+1. **Loading**: `loadThemefromNVS()` first tries the database, falls back to NVS
+2. **Saving**: Theme changes are saved to both database and NVS for compatibility
+3. **Logging**: Theme changes are automatically logged to the event system
+
+### Supported Themes
+
+Currently supported themes:
+- `THEME_ACS_DEFAULT`: ACS Default green theme
+- `THEME_BITAXE_RED`: Bitaxe red theme  
+- `THEME_SOLO_MINING_CO`: Solo Mining Co theme
+
+## Event Logging Implementation
+
+The logging system provides persistent storage for system events with automatic rotation and structured data support.
+
+### API Functions
+
+#### Log Event
+```c
+esp_err_t dataBase_log_event(const char* event_type, const char* severity, 
+                             const char* message, const char* data);
+```
+
+**Example:**
+```c
+// Simple event
+dataBase_log_event("system", "info", "Miner started", NULL);
+
+// Event with structured data
+char event_data[128];
+snprintf(event_data, sizeof(event_data), 
+         "{\"hashrate\":%.2f,\"temperature\":%d}", 
+         current_hashrate, chip_temp);
+dataBase_log_event("mining", "info", "Status update", event_data);
+```
+
+#### Get Recent Logs
+```c
+esp_err_t dataBase_get_recent_logs(int max_count, cJSON** logs_json);
+```
+
+**Example:**
+```c
+cJSON* logs;
+esp_err_t ret = dataBase_get_recent_logs(10, &logs);
+if (ret == ESP_OK) {
+    cJSON* events = cJSON_GetObjectItem(logs, "events");
+    cJSON* count = cJSON_GetObjectItem(logs, "count");
+    ESP_LOGI(TAG, "Retrieved %d log entries", count->valueint);
+    cJSON_Delete(logs);
+}
+```
+
+### Event Categories
+
+Supported event types:
+- `system`: System-level events (startup, shutdown, errors)
+- `theme`: Theme change events
+- `mining`: Mining-related events (hashrate, shares, etc.)
+- `network`: Network connectivity events
+- `power`: Power management events
+- `user`: User-initiated actions
+
+### Severity Levels
+
+Supported severity levels:
+- `debug`: Detailed debugging information
+- `info`: General information messages
+- `warning`: Warning conditions
+- `error`: Error conditions
+- `critical`: Critical system errors
+
+### Automatic Features
+
+1. **Rotation**: Automatically removes oldest events when limit (100) is reached
+2. **Timestamps**: Automatically adds timestamps to all events
+3. **Structured Data**: Supports both simple string data and complex JSON objects
+4. **Performance**: Efficient file-based storage with minimal memory usage
+
+## Error Handling
+
+All database functions follow ESP-IDF error handling conventions:
+
+- Return `ESP_OK` on success
+- Return appropriate error codes on failure
+- Log errors using ESP-IDF logging system
+- Graceful degradation when database is unavailable
+
+## Performance Considerations
+
+1. **Memory Usage**: JSON objects are created and destroyed immediately to minimize heap usage
+2. **File I/O**: Files are opened, processed, and closed in single operations
+3. **SPIFFS Limitations**: Aware of SPIFFS write endurance and optimizes for minimal writes
+4. **Error Recovery**: Robust error handling prevents system crashes from database issues
+
+## Future Enhancements
+
+Potential improvements for future versions:
+
+1. **Data Compression**: Implement compression for log files
+2. **Log Archiving**: Archive old logs to prevent partition filling
+3. **Data Validation**: Add JSON schema validation
+4. **Backup/Restore**: Implement data backup and restore functionality
+5. **API Extensions**: Add more sophisticated query capabilities
+6. **Performance Monitoring**: Add metrics for database operations 
