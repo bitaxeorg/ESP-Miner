@@ -5,14 +5,14 @@ export type ToastType = "success" | "error" | "info" | "warning";
 
 export interface Toast {
   id: string;
-  message: string;
+  message: string | preact.ComponentChildren;
   type: ToastType;
   persistent?: boolean;
 }
 
 interface ToastContextType {
   toasts: Toast[];
-  showToast: (message: string, type?: ToastType, persistent?: boolean) => void;
+  showToast: (message: string | preact.ComponentChildren, type?: ToastType, persistent?: boolean) => void;
   hideToast: (id: string) => void;
   hidePersistentToasts: (type?: ToastType) => void;
 }
@@ -27,7 +27,7 @@ const ToastContext = createContext<ToastContextType>({
 export function ToastProvider({ children }: { children: preact.ComponentChildren }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = "info", persistent: boolean = false) => {
+  const showToast = useCallback((message: string | preact.ComponentChildren, type: ToastType = "info", persistent: boolean = false) => {
     const id = Date.now().toString();
     const newToast = { id, message, type, persistent };
 

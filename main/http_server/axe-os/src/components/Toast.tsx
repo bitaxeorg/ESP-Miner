@@ -32,7 +32,7 @@ export function Toast({ toast, onClose }: ToastProps) {
     >
       <div className='flex items-center'>
         <span className='font-bold mr-2'>{ICONS[type]}</span>
-        <span className={persistent ? "font-semibold" : ""}>{message}</span>
+        <div className={persistent ? "font-semibold" : ""}>{message}</div>
       </div>
       <button
         onClick={() => onClose(id)}

@@ -25,7 +25,17 @@ export function OverheatWarningProvider({ children }: { children: preact.Compone
       if (isOverheating) {
         // Show persistent warning toast
         showToast(
-          `⚠️ OVERHEAT MODE ACTIVE - Temperature: ${systemInfo.temp}°C. Mining performance may be reduced for hardware protection.`,
+          <div>
+            ⚠️ OVERHEAT PROTECTION TRIGGERED! Frequency and voltage have been reset to default values.{" "}
+            <a
+              href="https://help.advancedcryptoservices.com/en/articles/11510751-overheat-protection"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              Learn more
+            </a>
+          </div>,
           "warning",
           true
         );
