@@ -87,110 +87,50 @@ components:
     SystemInfo:
       type: object
       required:
-        - asicModel
-        - apEnabled
-        - asicCount
-        - autoFanSpeed
         - bestDiff
         - bestSessionDiff
-        - boardVersion
-        - coreVoltage
         - coreVoltageActual
         - current
-        - fallbackStratumPort
-        - fallbackStratumURL
-        - fallbackStratumUser
+        - expectedHashrate
         - fanRPM
         - fanSpeed
-        - tempTarget
-        - flipScreen
         - freeHeap
-        - frequency
         - hashrate
-        - expectedHashrate
-        - hostname
-        - idfVersion
-        - invertScreen
-        - isPSRAMAvailable
         - isUsingFallbackStratum
-        - macAddr
-        - maxPower
-        - nominalVoltage
         - overheatMode
-        - overclockEnabled
         - power
-        - runningPartition
         - sharesAccepted
         - sharesRejected
         - sharesRejectedReasons
-        - smallCoreCount
-        - ssid
         - stratumDiff
-        - stratumPort
-        - stratumURL
-        - stratumUser
         - temp
         - uptimeSeconds
-        - version
         - voltage
         - vrTemp
-        - wifiStatus
         - wifiRSSI
-        - displayTimeout
-        - statisticsLimit
-        - statisticsDuration
+        - wifiStatus
       properties:
-        asicModel:
-          type: string
-          description: ASIC model identifier
-        apEnabled:
-          type: number
-          description: Whether AP mode is enabled (0=no, 1=yes)
-        asicCount:
-          type: number
-          description: Number of ASICs detected
-        autoFanSpeed:
-          type: number
-          description: Automatic fan speed control (0=manual, 1=auto)
         bestDiff:
-          type: string
+          type: number
           description: Best difficulty achieved
         bestSessionDiff:
-          type: string
-          description: Best difficulty achieved in current session
-        boardVersion:
-          type: string
-          description: Hardware board version
-        coreVoltage:
           type: number
-          description: Configured ASIC core voltage
+          description: Best difficulty achieved in current session
         coreVoltageActual:
           type: number
           description: Actual measured ASIC core voltage
         current:
           type: number
           description: Current draw in milliamps
-        fallbackStratumPort:
+        expectedHashrate:
           type: number
-          description: Fallback stratum server port
-        fallbackStratumURL:
-          type: string
-          description: Fallback stratum server URL
-        fallbackStratumUser:
-          type: string
-          description: Fallback stratum username
+          description: Expected hashrate at the current frequency setting
         fanRPM:
           type: number
           description: Current fan speed in RPM
         fanSpeed:
           type: number
           description: Current fan speed percentage
-        tempTarget:
-          type: number
-          description: Target Temperature for the PID Controller
-        flipScreen:
-          type: number
-          description: Screen flip setting (0=normal, 1=flipped)
         freeHeap:
           type: number
           description: Available heap memory in bytes
@@ -200,30 +140,9 @@ components:
         hashrate:
           type: number
           description: Current hashrate
-        hostname:
-          type: string
-          description: Device hostname
-        idfVersion:
-          type: string
-          description: ESP-IDF version
-        invertScreen:
-          type: number
-          description: Screen invert setting (0=normal, 1=inverted)
-        isPSRAMAvailable:
-          type: number
-          description: Whether PSRAM is available (0=no, 1=yes)
         isUsingFallbackStratum:
           type: number
           description: Whether using fallback stratum (0=no, 1=yes)
-        macAddr:
-          type: string
-          description: Device MAC address
-        maxPower:
-          type: integer
-          description: Maxmium power draw of the board in watts
-        nominalVoltage:
-          type: integer
-          description: Nominal board voltage
         overheatMode:
           type: number
           description: Overheat protection mode
@@ -236,9 +155,6 @@ components:
         powerFault:
           type: string
           description: Voltage regulator fault reason, if any
-        runningPartition:
-          type: string
-          description: Currently active OTA partition
         sharesAccepted:
           type: number
           description: Number of accepted shares
@@ -250,33 +166,15 @@ components:
           description: Reason(s) shares were rejected
           items:
             $ref: '#/components/schemas/SharesRejectedReason'
-        smallCoreCount:
-          type: number
-          description: Number of small cores
-        ssid:
-          type: string
-          description: Connected WiFi network SSID
         stratumDiff:
           type: number
           description: Current stratum difficulty
-        stratumPort:
-          type: number
-          description: Primary stratum server port
-        stratumURL:
-          type: string
-          description: Primary stratum server URL
-        stratumUser:
-          type: string
-          description: Primary stratum username
         temp:
           type: number
           description: Average chip temperature
         uptimeSeconds:
           type: number
           description: System uptime in seconds
-        version:
-          type: string
-          description: Firmware version
         voltage:
           type: number
           description: Input voltage
@@ -289,15 +187,179 @@ components:
         wifiRSSI:
           type: number
           description: WiFi signal strength
+
+    BoardInfo:
+      type: object
+      required:
+        - apEnabled
+        - asicCount
+        - asicModel
+        - boardFamily
+        - boardVersion
+        - defaultFrequency
+        - defaultVoltage
+        - frequencyOptions
+        - idfVersion
+        - isPSRAMAvailable
+        - macAddr
+        - maxPower
+        - nominalVoltage
+        - runningPartition
+        - smallCoreCount
+        - version
+        - voltageOptions
+      properties:
+        apEnabled:
+          type: number
+          description: Whether AP mode is enabled (0=no, 1=yes)
+        asicCount:
+          type: number
+          description: Number of ASICs detected
+        asicModel:
+          type: string
+          description: ASIC model identifier
+          enum:
+            - BM1366
+            - BM1368
+            - BM1370
+            - BM1397
+          examples:
+            - "BM1366"
+        boardFamily:
+          type: string
+          description: Board family name
+          examples:
+            - "Ultra"
+        boardVersion:
+          type: string
+          description: Hardware board version
+        defaultFrequency:
+          type: number
+          description: Default frequency for the ASIC model in MHz
+          examples:
+            - 450
+        defaultVoltage:
+          type: number
+          description: Default voltage for the ASIC model in millivolts
+          examples:
+            - 1100
+        frequencyOptions:
+          type: array
+          description: Available frequency options for the ASIC model in MHz
+          items:
+            type: number
+          examples:
+            - [400, 425, 450, 475, 485, 500, 525, 550, 575]
+        idfVersion:
+          type: string
+          description: ESP-IDF version
+        isPSRAMAvailable:
+          type: number
+          description: Whether PSRAM is available (0=no, 1=yes)
+        macAddr:
+          type: string
+          description: Device MAC address
+        maxPower:
+          type: integer
+          description: Maxmium power draw of the board in watts
+        nominalVoltage:
+          type: integer
+          description: Nominal board voltage
+        runningPartition:
+          type: string
+          description: Currently active OTA partition
+        smallCoreCount:
+          type: number
+          description: Number of small cores
+        version:
+          type: string
+          description: Firmware version
+        voltageOptions:
+          type: array
+          description: Available voltage options for the ASIC model in millivolts
+          items:
+            type: number
+          examples:
+            - [1100, 1150, 1200, 1250, 1300]
+
+    ConfigInfo:
+      type: object
+      required:
+        - autoFanSpeed
+        - coreVoltage
+        - display
+        - displayTimeout
+        - fallbackStratumPort
+        - fallbackStratumURL
+        - fallbackStratumUser
+        - flipScreen
+        - frequency
+        - hostname
+        - invertScreen
+        - overclockEnabled
+        - overheatMode
+        - ssid
+        - statisticsDuration
+        - statisticsLimit
+        - stratumPort
+        - stratumURL
+        - stratumUser
+        - tempTarget
+      properties:
+        autoFanSpeed:
+          type: number
+          description: Automatic fan speed control (0=manual, 1=auto)
+        coreVoltage:
+          type: number
+          description: Configured ASIC core voltage
+        display:
+            type: string
+            description: Display name and resolution
         displayTimeout:
           type: number
           description: Turn off display after timeout
+        fallbackStratumPort:
+          type: number
+          description: Fallback stratum server port
+        fallbackStratumURL:
+          type: string
+          description: Fallback stratum server URL
+        fallbackStratumUser:
+          type: string
+          description: Fallback stratum username
+        flipScreen:
+          type: number
+          description: Screen flip setting (0=normal, 1=flipped)
+        hostname:
+          type: string
+          description: Device hostname
+        invertScreen:
+          type: number
+          description: Screen invert setting (0=normal, 1=inverted)
+        overheatMode:
+          type: number
+          description: Overheat protection mode
+        ssid:
+          type: string
+          description: Connected WiFi network SSID
         statsLimit:
           type: number
           description: Max limit data points for statistics
         statsDuration:
           type: number
           description: Statistics duration in hours
+        stratumPort:
+          type: number
+          description: Primary stratum server port
+        stratumURL:
+          type: string
+          description: Primary stratum server URL
+        stratumUser:
+          type: string
+          description: Primary stratum username
+        tempTarget:
+          type: number
+          description: Target Temperature for the PID Controller
 
     Settings:
       type: object
@@ -418,9 +480,9 @@ components:
           maximum: 100
           examples:
             - 80
-        temptarget:
+        tempTarget:
           type: integer
-          description: Manual Temperature Target in °C when autofanspeed is enabled
+          description: Manual temperature target in °C when autoFanSpeed is enabled
           minimum: 0
           maximum: 100
           examples:
@@ -456,6 +518,20 @@ components:
       description: Internal server error
 
 paths:
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: metrics
+      tags:
+        - metrics
+      responses:
+        '200':
+          description: Metrics response
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
   /api/v2/system/wifi/scan:
     get:
       summary: Scan for available WiFi networks
@@ -482,11 +558,11 @@ paths:
         '500':
           description: Internal server error
 
-  /api/v2/system/info:
+  /api/v2/system/status:
     get:
-      summary: Get system information
-      description: Returns current system status and information
-      operationId: getSystemInfo
+      summary: Get system status
+      description: Returns current system status
+      operationId: getSystemStatus
       tags:
         - system
       responses:
@@ -501,11 +577,11 @@ paths:
         '500':
           description: Internal server error
 
-  /api/v2/system/asic:
+  /api/v2/system/board:
     get:
-      summary: Get ASIC settings information
-      description: Returns current ASIC model and corresponding available frequency and voltage options
-      operationId: getAsicSettings
+      summary: Get board info
+      description: Returns current board info, such as the ASIC model and corresponding available frequency and voltage options
+      operationId: getBoardInfo
       tags:
         - system
       responses:
@@ -514,54 +590,26 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - ASICModel
-                  - boardFamily
-                  - defaultFrequency
-                  - frequencyOptions
-                  - defaultVoltage
-                  - voltageOptions
-                properties:
-                  asicModel:
-                    type: string
-                    description: ASIC model identifier
-                    enum:
-                      - BM1366
-                      - BM1368
-                      - BM1370
-                      - BM1397
-                    examples:
-                      - "BM1366"
-                  boardFamily:
-                    type: string
-                    description: Board family name
-                    examples:
-                      - "Ultra"
-                  defaultFrequency:
-                    type: number
-                    description: Default frequency for the ASIC model in MHz
-                    examples:
-                      - 450
-                  frequencyOptions:
-                    type: array
-                    description: Available frequency options for the ASIC model in MHz
-                    items:
-                      type: number
-                    examples:
-                      - [400, 425, 450, 475, 485, 500, 525, 550, 575]
-                  defaultVoltage:
-                    type: number
-                    description: Default voltage for the ASIC model in millivolts
-                    examples:
-                      - 1100
-                  voltageOptions:
-                    type: array
-                    description: Available voltage options for the ASIC model in millivolts
-                    items:
-                      type: number
-                    examples:
-                      - [1100, 1150, 1200, 1250, 1300]
+                $ref: '#/components/schemas/BoardInfo'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/v2/system/config:
+    get:
+      summary: Get board settings
+      description: Returns current board settings
+      operationId: getBoardSettings
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigInfo'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
