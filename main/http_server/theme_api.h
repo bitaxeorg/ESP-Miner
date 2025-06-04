@@ -32,6 +32,7 @@ extern uiTheme_t* getCurrentTheme(void);
 extern themePreset_t getCurrentThemePreset(void);
 extern void initializeTheme(themePreset_t preset);
 extern themePreset_t loadThemefromNVS(void);
+extern void saveThemetoNVS(const char* theme_name, themePreset_t themePreset);
 
 
 #endif // THEME_API_H

@@ -20,8 +20,10 @@ themePreset_t loadThemefromNVS(void) {
         ESP_LOGI(TAG, "Loaded theme from database: %s", theme_name);
         themePreset_t preset = themePresetFromString(theme_name);
         
-        // Also update NVS for backward compatibility
-        nvs_config_set_u16(NVS_CONFIG_THEME_NAME, preset);
+        // Also update NVS for backward compatibility. check to avoid unnecessary writes.
+        if (nvs_config_get_u16(NVS_CONFIG_THEME_NAME, THEME_ACS_DEFAULT) != preset) {
+            nvs_config_set_u16(NVS_CONFIG_THEME_NAME, preset);
+        }
         
         return preset;
     } else {
@@ -197,6 +199,22 @@ void initializeTheme(themePreset_t preset) {
     }
 }
 
+// Function to save theme to both database and NVS
+void saveThemetoNVS(const char* theme_name, themePreset_t themePreset) {
+    // Update the theme in database and NVS
+    esp_err_t ret = dataBase_set_active_theme(theme_name);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save theme to database: %s", theme_name);
+        // Continue anyway, save to NVS as fallback
+    }
+    
+    // Also save to NVS for backward compatibility check to avoid unnecessary writes.
+    if (nvs_config_get_u16(NVS_CONFIG_THEME_NAME, THEME_ACS_DEFAULT) != themePreset) {
+        nvs_config_set_u16(NVS_CONFIG_THEME_NAME, themePreset);
+    }
+    initializeTheme(themePreset);
+}
+
 // Helper function to set CORS headers
 static esp_err_t set_cors_headers(httpd_req_t *req)
 {
@@ -272,16 +290,8 @@ static esp_err_t theme_patch_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
     
-    // Update the theme in database and NVS
-    esp_err_t ret = dataBase_set_active_theme(theme_name);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to save theme to database: %s", theme_name);
-        // Continue anyway, save to NVS as fallback
-    }
-    
-    // Also save to NVS for backward compatibility
-    nvs_config_set_u16(NVS_CONFIG_THEME_NAME, themePreset);
-    initializeTheme(themePreset);
+    // Save theme to database and NVS
+    saveThemetoNVS(theme_name, themePreset);
 
     // Log the theme change event
     char log_data[128];
