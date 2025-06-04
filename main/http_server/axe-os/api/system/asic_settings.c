@@ -1,11 +1,14 @@
 #include <string.h>
 #include "esp_log.h"
+#include "esp_wifi.h"
+#include "esp_ota_ops.h"
 #include "esp_http_server.h"
 #include "cJSON.h"
 #include "global_state.h"
 #include "asic.h"
+#include "connect.h"
 #include "http_server.h"
-
+#include "esp_timer.h"
 static int system_asic_prebuffer_len = 256;
 
 // static const char *TAG = "asic_settings";
@@ -20,8 +23,8 @@ void asic_api_init(GlobalState *global_state) {
     GLOBAL_STATE = global_state;
 }
 
-/* Handler for system asic endpoint */
-esp_err_t GET_system_asic(httpd_req_t *req)
+/* Handler for system board info endpoint, generally static */
+esp_err_t GET_system_board(httpd_req_t *req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
@@ -35,13 +38,41 @@ esp_err_t GET_system_asic(httpd_req_t *req)
         return ESP_OK;
     }
 
+    char * ipv4 = GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str;
+    char * ipv6 = GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str;
+
+    int8_t wifi_rssi = -90;
+    get_wifi_current_rssi(&wifi_rssi);
+
+    uint8_t mac[6];
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    char formattedMac[18];
+    snprintf(formattedMac, sizeof(formattedMac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
     cJSON *root = cJSON_CreateObject();
 
     // Add ASIC model to the JSON object
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
-    cJSON_AddStringToObject(root, "deviceModel", GLOBAL_STATE->DEVICE_CONFIG.family.name);
-    cJSON_AddStringToObject(root, "swarmColor", GLOBAL_STATE->DEVICE_CONFIG.family.swarm_color);
+    cJSON_AddStringToObject(root, "asicModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
     cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count);
+    cJSON_AddNumberToObject(root, "smallCoreCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count);
+    cJSON_AddStringToObject(root, "swarmColor", GLOBAL_STATE->DEVICE_CONFIG.family.swarm_color);
+    cJSON_AddStringToObject(root, "deviceModel", GLOBAL_STATE->DEVICE_CONFIG.family.name);
+    cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
+    cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
+    cJSON_AddNumberToObject(root, "maxPower", GLOBAL_STATE->DEVICE_CONFIG.family.max_power);
+    cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage);
+    cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
+    cJSON_AddStringToObject(root, "macAddr", formattedMac);
+    cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
+    cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
+    cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
+
+    cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000);
+
+    cJSON_AddNumberToObject(root, "wifiRSSI", wifi_rssi);
+    cJSON_AddStringToObject(root, "ipv4", ipv4);
+    cJSON_AddStringToObject(root, "ipv6", ipv6);
+
 
     cJSON_AddNumberToObject(root, "defaultFrequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_frequency_mhz);
 
