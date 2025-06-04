@@ -13,7 +13,7 @@ export interface ThemeAssets {
 export const themeAssetsMap: Record<string, ThemeAssets> = {
   THEME_ACS_DEFAULT: {
     logo: "/acs-brandmark-white.png",
-    favicon: "/favicon.png",
+    favicon: "/favicon-acs.png",
     colors: {
       primary: "blue-600",
       secondary: "blue-400",
