@@ -173,7 +173,7 @@ export function Sidebar({ children }: SidebarProps) {
       )}
     >
       <div className='flex h-full flex-col overflow-y-auto border-r border-slate-800'>
-        <div className='h-16 border-b border-slate-800 flex items-center justify-center px-3'>
+        <div className='h-16 border-b border-slate-800 flex items-center justify-start px-6'>
           {/* On mobile and sidebar open, show only favicon. Otherwise, show logo or favicon as before. Only favicon is clickable to toggle. */}
           {collapsed || (isMobile && !collapsed) ? (
             <div className='flex justify-center w-full'>
