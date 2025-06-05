@@ -68,6 +68,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     private shareRejectReasonsService: ShareRejectionExplanationService
   ) {
     this.initializeChart();
+    this.loadPreviousData();
 
     // Subscribe to theme changes
     this.themeService.getThemeSettings()
@@ -136,7 +137,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           // Clear previous data
-          this.initializeChart();
+          this.clearDataPoints();
+          this.loadPreviousData();
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error('Error.', `Could not save chart source. ${err.message}`);
@@ -149,8 +151,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
-
-    this.clearDataPoints();
 
     this.chartData = {
       labels: [this.dataLabel],
@@ -255,7 +255,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.chartData.labels = this.dataLabel;
     this.chartData.datasets[0].data = this.chartY1Data;
     this.chartData.datasets[1].data = this.chartY2Data;
+  }
 
+  private loadPreviousData()
+  {
     // load previous data
     this.stats$ = this.systemService.getStatistics()
       .pipe(shareReplay({ refCount: true, bufferSize: 1 }));
@@ -304,13 +307,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             this.chartY2Data.push(0.0);
           }
 
-          if (this.dataLabel.length >= 720) {
-            this.dataLabel.shift();
-            this.hashrateData.shift();
-            this.powerData.shift();
-            this.chartY1Data.shift();
-            this.chartY2Data.shift();
-          }
+          this.limitDataPoints();
         }),
         this.startGetLiveData();
       });
@@ -350,13 +347,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.chartY1Data.push(HomeComponent.getDataForLabel(chartY1DataValue, info));
           this.chartY2Data.push(HomeComponent.getDataForLabel(chartY2DataValue, info));
 
-          if ((this.dataLabel.length) >= 720) {
-            this.dataLabel.shift();
-            this.hashrateData.shift();
-            this.powerData.shift();
-            this.chartY1Data.shift();
-            this.chartY2Data.shift();
-          }
+          this.limitDataPoints();
 
           this.chartData.datasets[0].label = chartY1DataValue;
           this.chartData.datasets[1].label = chartY2DataValue;
@@ -460,11 +451,21 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   public clearDataPoints() {
-    this.dataLabel = [];
-    this.hashrateData = [];
-    this.powerData = [];
-    this.chartY1Data = [];
-    this.chartY2Data = [];
+    this.dataLabel.length = 0;
+    this.hashrateData.length = 0;
+    this.powerData.length = 0;
+    this.chartY1Data.length = 0;
+    this.chartY2Data.length = 0;
+  }
+
+  public limitDataPoints() {
+    if (this.dataLabel.length >= 720) {
+      this.dataLabel.shift();
+      this.hashrateData.shift();
+      this.powerData.shift();
+      this.chartY1Data.shift();
+      this.chartY2Data.shift();
+    }
   }
 
   public getSuggestedMaxForLabel(label: eChartLabel, info: ISystemInfo): number {
