@@ -450,7 +450,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     // Log critical overheat event
                     char overheat_data[128];
                     snprintf(overheat_data, sizeof(overheat_data), 
-                             "{\"chipTemp\":%.1f,\"threshold\":%d,\"device\":\"DEVICE_MAX\"}", 
+                             "{\"chipTemp\":%.1f,\"threshold\":%f,\"device\":\"DEVICE_MAX\"}", 
                              power_management->chip_temp_avg, THROTTLE_TEMP);
                     dataBase_log_event("power", "critical", "Overheat mode activated - ASIC temperature exceeded threshold", overheat_data);
                     
@@ -494,7 +494,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     // Log critical overheat event
                     char overheat_data[128];
                     snprintf(overheat_data, sizeof(overheat_data), 
-                             "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%d,\"chipThreshold\":%d,\"device\":\"DEVICE_ULTRA_SUPRA\"}", 
+                             "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%f,\"chipThreshold\":%f,\"device\":\"DEVICE_ULTRA_SUPRA\"}", 
                              power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
                     dataBase_log_event("power", "critical", "Overheat mode activated - VR or ASIC temperature exceeded threshold", overheat_data);
                     
@@ -530,7 +530,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     // Log critical overheat event
                     char overheat_data[128];
                     snprintf(overheat_data, sizeof(overheat_data), 
-                             "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%d,\"chipThreshold\":%d,\"device\":\"DEVICE_GAMMA\"}", 
+                             "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%f,\"chipThreshold\":%f,\"device\":\"DEVICE_GAMMA\"}", 
                              power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
                     dataBase_log_event("power", "critical", "Overheat mode activated - VR or ASIC temperature exceeded threshold", overheat_data);
                     

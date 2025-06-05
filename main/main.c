@@ -21,6 +21,7 @@
 #include "lvglDisplayBAP.h"
 #include "serial.h"
 #include "theme_api.h"
+#include "dataBase.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -102,6 +103,13 @@ void app_main(void)
     if (result_bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);
         strncpy(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, "Connected!", 20);
+        
+        // Log WiFi connection event
+        char wifi_data[128];
+        snprintf(wifi_data, sizeof(wifi_data), 
+                 "{\"ipAddress\":\"%s\",\"ssid\":\"%s\"}", 
+                 GLOBAL_STATE.SYSTEM_MODULE.ip_addr_str, wifi_ssid);
+        dataBase_log_event("network", "info", "WiFi connection established", wifi_data);
     } else if (result_bits & WIFI_FAIL_BIT) {
         ESP_LOGE(TAG, "Failed to connect to SSID: %s", wifi_ssid);
 
