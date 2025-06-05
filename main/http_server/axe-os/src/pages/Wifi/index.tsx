@@ -1,12 +1,20 @@
-import { useState } from "preact/hooks";
+import { useState, useEffect } from "preact/hooks";
 import { Button } from "../../components/Button";
-import { setSSID } from "../../utils/api";
+import { setSSID, getSystemInfo } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
+import { PageHeading } from "../../components/PageHeading";
 
 interface WifiFormData {
   ssid: string;
   wifiPass: string;
+}
+
+interface WifiStatus {
+  isConnected: boolean;
+  currentSSID: string;
+  macAddr: string;
+  hostname: string;
 }
 
 export function WifiPage() {
@@ -16,6 +24,45 @@ export function WifiPage() {
     wifiPass: "",
   });
   const [loading, setLoading] = useState(false);
+  const [wifiStatus, setWifiStatus] = useState<WifiStatus>({
+    isConnected: false,
+    currentSSID: "",
+    macAddr: "",
+    hostname: "",
+  });
+
+  // Fetch current WiFi status on component mount
+  useEffect(() => {
+    const fetchWifiStatus = async () => {
+      try {
+        const systemInfo = await getSystemInfo();
+        setWifiStatus({
+          isConnected: systemInfo.wifiStatus === "Connected!",
+          currentSSID: systemInfo.ssid || "",
+          macAddr: systemInfo.macAddr || "",
+          hostname: systemInfo.hostname || "",
+        });
+      } catch (error) {
+        console.error("Failed to fetch WiFi status:", error);
+      }
+    };
+
+    fetchWifiStatus();
+  }, []);
+
+  const refreshWifiStatus = async () => {
+    try {
+      const systemInfo = await getSystemInfo();
+      setWifiStatus({
+        isConnected: systemInfo.wifiStatus === "Connected!",
+        currentSSID: systemInfo.ssid || "",
+        macAddr: systemInfo.macAddr || "",
+        hostname: systemInfo.hostname || "",
+      });
+    } catch (error) {
+      console.error("Failed to refresh WiFi status:", error);
+    }
+  };
 
   const handleInputChange = (field: keyof WifiFormData) => (e: Event) => {
     const target = e.target as HTMLInputElement;
@@ -47,6 +94,7 @@ export function WifiPage() {
         showToast(result.message, "success");
         // Reset form on success
         setFormData({ ssid: "", wifiPass: "" });
+        await refreshWifiStatus();
       } else {
         showToast(result.message, "error");
       }
@@ -60,14 +108,52 @@ export function WifiPage() {
 
   return (
     <Container>
-      <div className='flex justify-between items-center mb-6'>
-        <h1 className='text-2xl font-bold'>Wi-Fi Settings</h1>
-      </div>
+      <PageHeading
+        title='Wi-Fi Settings'
+        subtitle='Configure wireless network connection for your miner.'
+        link='https://help.advancedcryptoservices.com/en/articles/11517746-wifi-settings'
+      />
 
-      <div className='bg-[var(--card-bg)] p-4 md:p-6 rounded-lg shadow-md max-w-full md:max-w-2xl'>
+      <div className='bg-[var(--card-bg)] rounded-lg shadow-md max-w-full md:max-w-xl'>
         <form onSubmit={handleSubmit}>
           <div className='flex justify-between items-center mb-6'>
             <h2 className='text-xl font-medium'>Network Configuration</h2>
+          </div>
+
+          <div className='mb-6'>
+            <div className='flex items-center gap-2 mb-4'>
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  wifiStatus.isConnected ? 'bg-green-500' : 'bg-red-500'
+                }`}
+              />
+              <span className='text-[var(--text-secondary)]'>
+                Status: {wifiStatus.isConnected ? 'Connected' : 'Offline'}
+              </span>
+            </div>
+
+            {wifiStatus.isConnected && (
+              <div className='grid grid-cols-3 gap-3 mb-4'>
+                {wifiStatus.currentSSID && (
+                  <div className='bg-[var(--input-bg)] border border-slate-700 rounded-md p-3 text-center'>
+                    <div className='text-xs text-[var(--text-secondary)] mb-1'>Network</div>
+                    <div className='text-sm font-medium truncate'>{wifiStatus.currentSSID}</div>
+                  </div>
+                )}
+                {wifiStatus.macAddr && (
+                  <div className='bg-[var(--input-bg)] border border-slate-700 rounded-md p-3 text-center'>
+                    <div className='text-xs text-[var(--text-secondary)] mb-1'>MAC Address</div>
+                    <div className='text-sm font-medium font-mono'>{wifiStatus.macAddr}</div>
+                  </div>
+                )}
+                {wifiStatus.hostname && (
+                  <div className='bg-[var(--input-bg)] border border-slate-700 rounded-md p-3 text-center'>
+                    <div className='text-xs text-[var(--text-secondary)] mb-1'>Hostname</div>
+                    <div className='text-sm font-medium'>{wifiStatus.hostname}</div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className='mb-6'>
@@ -105,12 +191,12 @@ export function WifiPage() {
                   disabled={loading}
                 />
               </div>
+
+              <Button type='submit' disabled={loading} className='bg-blue-600 hover:bg-blue-700'>
+                {loading ? "Configuring..." : "Connect to Network"}
+              </Button>
             </div>
           </div>
-
-          <Button type='submit' disabled={loading} className='bg-blue-600 hover:bg-blue-700'>
-            {loading ? "Configuring..." : "Connect to Network"}
-          </Button>
         </form>
       </div>
     </Container>

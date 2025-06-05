@@ -10,11 +10,20 @@ import {
   TableCell,
 } from "../../components/Table";
 import { Container } from "../../components/Container";
+import { PageHeading } from "../../components/PageHeading";
+import { Tabs } from "../../components/Tabs";
 
 export function Miners() {
   const [miners, setMiners] = useState<SystemInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("all");
+
+  const tabs = [
+    { id: "all", label: "All" },
+    { id: "online", label: "Online" },
+    { id: "offline", label: "Offline" },
+  ];
 
   useEffect(() => {
     const loadMiners = async () => {
@@ -48,6 +57,14 @@ export function Miners() {
     return `${speed}%`;
   };
 
+  // Filter miners based on active tab
+  const filteredMiners = miners.filter((miner) => {
+    if (activeTab === "all") return true;
+    if (activeTab === "online") return miner.status === "online";
+    if (activeTab === "offline") return miner.status !== "online";
+    return true;
+  });
+
   if (isLoading && miners.length === 0) {
     return (
       <div className='flex justify-center items-center min-h-[60vh]'>Loading miner data...</div>
@@ -56,7 +73,12 @@ export function Miners() {
 
   return (
     <Container>
-      <h1 className='text-2xl font-bold mb-6'>Miners</h1>
+      <PageHeading
+        title="Miners"
+        subtitle="Monitor and manage all connected mining devices"
+      />
+
+      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       {error && (
         <div className='mb-4 p-3 bg-red-500/10 border border-red-500 rounded-md text-red-500'>
@@ -64,7 +86,7 @@ export function Miners() {
         </div>
       )}
 
-      <div className='rounded-md border border-border text-slate-200'>
+      <div className='rounded-md mt-6 border border-border text-slate-200'>
         <Table>
           <TableHeader>
             <TableRow>
@@ -79,14 +101,17 @@ export function Miners() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {miners.length === 0 ? (
+            {filteredMiners.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className='text-center py-6'>
-                  No miners found. Check your connection to the miner.
+                  {activeTab === "all"
+                    ? "No miners found. Check your connection to the miner."
+                    : `No ${activeTab} miners found.`
+                  }
                 </TableCell>
               </TableRow>
             ) : (
-              miners.map((miner, index) => (
+              filteredMiners.map((miner, index) => (
                 <TableRow key={index}>
                   <TableCell>{miner.hostname || "Unknown"}</TableCell>
                   <TableCell>{miner.ipAddress || "Unknown"}</TableCell>
@@ -121,7 +146,8 @@ export function Miners() {
 
       {!isLoading && miners.length > 0 && (
         <div className='mt-2 text-right text-sm text-muted-foreground'>
-          Last updated: {new Date().toLocaleTimeString()}
+          Last updated: {new Date().toLocaleTimeString()} •
+          Showing {filteredMiners.length} of {miners.length} miners
         </div>
       )}
     </Container>

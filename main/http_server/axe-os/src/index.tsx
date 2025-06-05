@@ -2,9 +2,13 @@ import { render } from "preact";
 import { LocationProvider, Router, Route } from "preact-iso";
 import { Layout } from "./components/Layout";
 import { HomePage } from "./pages/Home/index.jsx";
-import { Settings } from "./pages/Settings/index.js";
-import { Theme } from "./pages/Theme/index";
 import { Miners } from "./pages/Miners/index";
+import { PoolsPage } from "./pages/Pool";
+import { LogsPage } from "./pages/Logs";
+import { Theme } from "./pages/Theme/index";
+import { WifiPage } from "./pages/Wifi";
+import { Settings } from "./pages/Settings/index.js";
+import { UpdatesPage } from "./pages/Updates";
 import { NotFound } from "./pages/_404.jsx";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider, useToast } from "./context/ToastContext";
@@ -12,12 +16,8 @@ import { OverheatWarningProvider, useOverheatWarning } from "./context/OverheatW
 import { ToastContainer } from "./components/Toast";
 import { setOverheatWarningCheck } from "./utils/api";
 import "./style.css";
-import { LogsPage } from "./pages/Logs";
-import { PoolsPage } from "./pages/Pool";
-import { WifiPage } from "./pages/Wifi";
-import ChartPage from "./pages/Chart";
-import UpdatesPage from "./pages/Updates";
 import { useEffect } from "preact/hooks";
+import { AnalyticsPage } from "./pages/Analytics/index";
 
 function AppContent() {
   const { toasts, hideToast } = useToast();
@@ -34,13 +34,13 @@ function AppContent() {
         <Layout>
           <Router>
             <Route path='/' component={HomePage} />
-            {/* <Route path='/logs' component={LogsPage} /> */}
+            <Route path='/logs' component={LogsPage} />
             <Route path='/settings' component={Settings} />
             <Route path='/theme' component={Theme} />
             <Route path='/miners' component={Miners} />
             <Route path='/pools' component={PoolsPage} />
             <Route path='/wifi' component={WifiPage} />
-            <Route path='/chart' component={ChartPage} />
+            <Route path='/analytics' component={AnalyticsPage} />
             <Route path='/updates' component={UpdatesPage} />
             <Route default component={NotFound} />
           </Router>

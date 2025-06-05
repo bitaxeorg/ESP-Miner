@@ -3,6 +3,7 @@ import { Button } from "../../components/Button";
 import { getSystemInfo, updatePoolInfo, restartSystem } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
+import { PageHeading } from "../../components/PageHeading";
 
 const POOL_OPTIONS = ["public-pool.io", "solo.ckpool.org", "Other"];
 
@@ -207,11 +208,13 @@ export function PoolsPage() {
 
   return (
     <Container>
-      <div className='flex justify-between items-center mb-6'>
-        <h1 className='text-2xl font-bold'>Pool Settings</h1>
-      </div>
+      <PageHeading
+        title='Pool Settings'
+        subtitle='Configure mining pools and stratum connections.'
+        link='https://help.advancedcryptoservices.com/en/articles/11517348-mining-pools'
+      />
 
-      <div className='bg-[var(--card-bg)] p-4 md:p-6 rounded-lg shadow-md max-w-full md:max-w-3xl'>
+      <div className='bg-[var(--card-bg)] rounded-lg shadow-md max-w-full md:max-w-3xl'>
         <form onSubmit={handleSubmitAndRestart}>
           <div className='flex justify-between items-center mb-6'>
             <h2 className='text-xl font-medium'>Stratum URLs</h2>

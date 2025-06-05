@@ -5,10 +5,11 @@ import {
   LineSeries,
   LineSeriesOptions,
   LineType,
+  LineStyle,
   AreaSeries,
   Time,
 } from "lightweight-charts";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import { chartOption, ChartDataPoint } from "./config";
 
 interface ChartProps {
@@ -20,6 +21,7 @@ interface ChartProps {
   showMovingAverage?: boolean;
   useAreaChart?: boolean;
   dataAggregationSeconds?: number;
+  lineStyle?: 'solid' | 'dotted' | 'dashed';
   [key: string]: any;
 }
 
@@ -32,6 +34,7 @@ const Chart = ({
   showMovingAverage = false,
   useAreaChart = false,
   dataAggregationSeconds = 5,
+  lineStyle = 'solid',
   ...rest
 }: ChartProps) => {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -171,6 +174,9 @@ const Chart = ({
         bottomColor: "rgba(16, 185, 129, 0.05)",
         lineWidth: 2,
         lineType: LineType.Curved,
+        lineStyle: lineStyle === 'dotted' ? LineStyle.Dotted :
+                  lineStyle === 'dashed' ? LineStyle.Dashed :
+                  LineStyle.Solid,
         crosshairMarkerRadius: 4,
         ...seriesOptions,
       });
@@ -181,6 +187,9 @@ const Chart = ({
         color: "#10b981",
         lineWidth: 2,
         lineType: LineType.Curved,
+        lineStyle: lineStyle === 'dotted' ? LineStyle.Dotted :
+                  lineStyle === 'dashed' ? LineStyle.Dashed :
+                  LineStyle.Solid,
         crosshairMarkerRadius: 4,
         // Enhanced line options for smoother appearance
         priceLineVisible: false,
@@ -231,7 +240,7 @@ const Chart = ({
       seriesRef.current = null;
       maSeriesRef.current = null;
     };
-  }, [showMovingAverage, movingAveragePeriod, useAreaChart, dataAggregationSeconds]);
+  }, [showMovingAverage, movingAveragePeriod, useAreaChart, dataAggregationSeconds, lineStyle]);
 
   // Update data when it changes
   useEffect(() => {

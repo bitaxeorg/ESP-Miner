@@ -16,6 +16,7 @@ interface RealTimeApiChartProps {
   chartConfigs?: Record<string, any>;
   selectedConfigKey?: string;
   onConfigChange?: (configKey: string) => void;
+  lineStyle?: 'solid' | 'dotted' | 'dashed';
 }
 
 const RealTimeApiChart = ({
@@ -30,6 +31,7 @@ const RealTimeApiChart = ({
   chartConfigs,
   selectedConfigKey,
   onConfigChange,
+  lineStyle = 'solid',
 }: RealTimeApiChartProps) => {
   const [data, setData] = useState<ChartDataPoint[]>([]);
   const [isRunning, setIsRunning] = useState(true);
@@ -251,12 +253,15 @@ const RealTimeApiChart = ({
   return (
     <div className='bg-white rounded-lg shadow-lg p-6'>
       <div className='flex justify-between items-start mb-4'>
-        <div>
-          <h2 className='text-xl font-bold text-gray-800'>{title}</h2>
-          <p className='text-2xl font-semibold' style={{ color }}>
-            {currentValue.toFixed(2)} {unit}
-          </p>
-        </div>
+        {title && (
+          <div>
+            <h2 className='text-sm text-gray-600'>{title}</h2>
+            {/* <p className='text-2xl font-semibold' style={{ color }}>
+              {currentValue.toFixed(2)} {unit}
+            </p> */}
+          </div>
+        )}
+        {!title && <div></div>}
         <div className='flex flex-col gap-2'>
 
           {/* Chart Duration Selector */}
@@ -327,6 +332,7 @@ const RealTimeApiChart = ({
           seriesOptions={{ color }}
           useAreaChart={useAreaChart}
           dataAggregationSeconds={dataAggregationSeconds}
+          lineStyle={lineStyle}
         />
       </div>
     </div>

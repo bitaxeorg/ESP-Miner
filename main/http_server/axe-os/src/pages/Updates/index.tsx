@@ -10,6 +10,7 @@ import {
 } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
+import { PageHeading } from "../../components/PageHeading";
 
 interface ActionCardProps {
   title: string;
@@ -56,7 +57,7 @@ function ActionCard({
   );
 }
 
-export default function UpdatesPage() {
+export function UpdatesPage() {
   const { showToast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isWebAppUpdating, setIsWebAppUpdating] = useState(false);
@@ -171,7 +172,10 @@ export default function UpdatesPage() {
 
   return (
     <Container>
-      <h2 className='text-xl font-bold text-white mb-6'>Firmware & Web App Updates</h2>
+      <PageHeading
+        title="Firmware & Web App Updates"
+        subtitle="Keep your device up-to-date with the latest firmware and web interface"
+      />
       <div className='grid grid-cols-1 gap-6 max-w-4xl mx-auto'>
         <ActionCard
           title='Update Device Firmware'
@@ -217,8 +221,9 @@ export default function UpdatesPage() {
                       type='button'
                       size='sm'
                       onClick={handleFirmwareFileClick}
+                      className='border-blue-600 text-white hover:bg-blue-600'
                     >
-                      Choose File
+                      2. Choose File
                     </Button>
                     <span className='text-sm text-[#8B96A5]'>
                       {firmwareFile ? firmwareFile.name : "No file selected"}
@@ -234,10 +239,10 @@ export default function UpdatesPage() {
                 </div>
                 <Button
                   onClick={handleFirmwareUpload}
-                  disabled={isUpdating}
+                  disabled={isUpdating || !firmwareFile}
                   className='bg-blue-600 hover:bg-blue-700'
                 >
-                  {isUpdating ? "Updating..." : "Install"}
+                  {isUpdating ? "Updating..." : "3. Install"}
                 </Button>
               </div>
               {firmwareFile && (
@@ -286,8 +291,9 @@ export default function UpdatesPage() {
                       type='button'
                       size='sm'
                       onClick={handleWebAppFileClick}
+                      className='border-blue-600 text-white hover:bg-blue-600'
                     >
-                      Choose File
+                      2. Choose File
                     </Button>
                     <span className='text-sm text-[#8B96A5]'>
                       {webAppFile ? webAppFile.name : "No file selected"}
@@ -303,10 +309,10 @@ export default function UpdatesPage() {
                 </div>
                 <Button
                   onClick={handleWebAppUpload}
-                  disabled={isWebAppUpdating}
+                  disabled={isWebAppUpdating || !webAppFile}
                   className='bg-blue-600 hover:bg-blue-700'
                 >
-                  {isWebAppUpdating ? "Updating..." : "Install"}
+                  {isWebAppUpdating ? "Updating..." : "3. Install"}
                 </Button>
               </div>
               {webAppFile && (
