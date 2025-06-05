@@ -124,16 +124,16 @@ export function WifiPage() {
             <div className='flex items-center gap-2 mb-4'>
               <div
                 className={`w-2 h-2 rounded-full ${
-                  wifiStatus.isConnected ? 'bg-green-500' : 'bg-red-500'
+                  wifiStatus.isConnected ? "bg-green-500" : "bg-red-500"
                 }`}
               />
               <span className='text-[var(--text-secondary)]'>
-                Status: {wifiStatus.isConnected ? 'Connected' : 'Offline'}
+                Status: {wifiStatus.isConnected ? "Connected" : "Offline"}
               </span>
             </div>
 
             {wifiStatus.isConnected && (
-              <div className='grid grid-cols-3 gap-3 mb-4'>
+              <div className='grid grid-cols-1 md:grid-cols-3 gap-3 mb-4'>
                 {wifiStatus.currentSSID && (
                   <div className='bg-[var(--input-bg)] border border-slate-700 rounded-md p-3 text-center'>
                     <div className='text-xs text-[var(--text-secondary)] mb-1'>Network</div>

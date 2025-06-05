@@ -174,7 +174,8 @@ export function UpdatesPage() {
     <Container>
       <PageHeading
         title='Firmware & Web App Updates'
-        subtitle='Keep your device up-to-date with the latest firmware and web interface'
+        subtitle='Keep your device up-to-date with the latest firmware and web interface.'
+        link='https://help.advancedcryptoservices.com/en/articles/11519242-firmware-updates'
       />
 
       <ActionCard
