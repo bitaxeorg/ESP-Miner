@@ -16,6 +16,7 @@ interface RealTimeApiChartProps {
   chartConfigs?: Record<string, any>;
   selectedConfigKey?: string;
   onConfigChange?: (configKey: string) => void;
+  lineStyle?: 'solid' | 'dotted' | 'dashed';
 }
 
 const RealTimeApiChart = ({
@@ -30,6 +31,7 @@ const RealTimeApiChart = ({
   chartConfigs,
   selectedConfigKey,
   onConfigChange,
+  lineStyle = 'solid',
 }: RealTimeApiChartProps) => {
   const [data, setData] = useState<ChartDataPoint[]>([]);
   const [isRunning, setIsRunning] = useState(true);
@@ -330,6 +332,7 @@ const RealTimeApiChart = ({
           seriesOptions={{ color }}
           useAreaChart={useAreaChart}
           dataAggregationSeconds={dataAggregationSeconds}
+          lineStyle={lineStyle}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { JSX } from "preact/jsx-runtime";
+
 import { useRef, useEffect, useState } from "preact/hooks";
 
 interface SliderProps {

@@ -1,17 +1,18 @@
 import { ComponentChildren } from "preact";
 import { useState, useContext, useEffect } from "preact/hooks";
 import { useTheme } from "../context/ThemeContext";
+import { getSystemInfo } from "../utils/api";
 import {
   Activity,
   Layers,
   Users,
-  Palette,
   Settings,
   Home,
   PanelLeft,
   ChartBar,
   Download,
   Wifi,
+  HelpCircle,
 } from "lucide-preact";
 import { SidebarContext } from "./Layout";
 
@@ -76,6 +77,11 @@ const navItems = [
     href: "/updates",
     icon: Download,
   },
+  {
+    label: "Support",
+    href: "https://help.advancedcryptoservices.com/en/collections/12812285-bitaxe-support",
+    icon: HelpCircle,
+  },
 ];
 
 function NavItem({
@@ -118,6 +124,7 @@ export function Sidebar({ children }: SidebarProps) {
   const { collapsed, setCollapsed } = useContext(SidebarContext);
   const [logoLoaded, setLogoLoaded] = useState(true);
   const { getThemeLogo, getThemeFavicon } = useTheme();
+  const [isWifiConnected, setIsWifiConnected] = useState(false);
   const [activeItem, setActiveItem] = useState(() => {
     // Initialize based on current path
     if (typeof window !== "undefined") {
@@ -134,6 +141,28 @@ export function Sidebar({ children }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
+
+  // Fetch WiFi status
+  useEffect(() => {
+    const fetchWifiStatus = async () => {
+      try {
+        const systemInfo = await getSystemInfo();
+        setIsWifiConnected(systemInfo.wifiStatus === "Connected!");
+      } catch (error) {
+        console.error("Failed to fetch WiFi status:", error);
+        setIsWifiConnected(false);
+      }
+    };
+
+    // Fetch immediately
+    fetchWifiStatus();
+
+    // Set up periodic refresh every 30 seconds
+    const interval = setInterval(fetchWifiStatus, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     function handleResize() {
       setIsMobile(window.innerWidth < 768);
@@ -229,8 +258,8 @@ export function Sidebar({ children }: SidebarProps) {
             )}
           >
             <div className='flex items-center gap-3'>
-              <div className='h-2 w-2 rounded-full bg-emerald-500'></div>
-              {!collapsed && <span>Connected</span>}
+              <div className={`h-2 w-2 rounded-full ${isWifiConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+              {!collapsed && <span>{isWifiConnected ? 'Connected' : 'Offline'}</span>}
             </div>
             <button
               onClick={() => setCollapsed(!collapsed)}

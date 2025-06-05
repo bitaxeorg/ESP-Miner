@@ -202,6 +202,7 @@ const ChartContent = () => {
             chartConfigs={CHART_CONFIGS}
             selectedConfigKey={selectedConfigKey}
             onConfigChange={setSelectedConfigKey}
+            lineStyle='dotted'
           />
         </div>
       </div>
