@@ -577,6 +577,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
     cJSON_AddNumberToObject(root, "autotune", nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1));
     cJSON_AddStringToObject(root, "autotune_preset", nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, ""));
+    cJSON_AddStringToObject(root, "serialnumber", nvs_config_get_string(NVS_CONFIG_SERIAL_NUMBER, ""));
 
     free(ssid);
     free(hostname);

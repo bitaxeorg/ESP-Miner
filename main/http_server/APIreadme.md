@@ -74,7 +74,8 @@ Get comprehensive system information including mining stats, hardware info, and 
   "fanspeed": 50,
   "fanrpm": 3000,
   "autotune": 1,
-  "autotune_preset": "efficiency"
+  "autotune_preset": "balance",
+  "serialnumber": "ACS240001"
 }
 ```
 

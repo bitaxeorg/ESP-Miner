@@ -122,6 +122,7 @@ components:
         - sharesAccepted
         - sharesRejected
         - sharesRejectedReasons
+        - serialnumber
         - smallCoreCount
         - ssid
         - stratumDiff
@@ -246,6 +247,9 @@ components:
           description: Reason(s) shares were rejected
           items:
             $ref: "#/components/schemas/SharesRejectedReason"
+        serialnumber:
+          type: string
+          description: Device serial number
         smallCoreCount:
           type: number
           description: Number of small cores
