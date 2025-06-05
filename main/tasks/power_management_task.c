@@ -272,7 +272,11 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
             ESP_LOGI(TAG, "freq or power limit reached, no adjustments possible");
             ESP_LOGI(TAG, "Autotune - Frequency: %u MHz, Power: %d W, Max Frequency: %u MHz, Max Power: %d W", 
                      currentFrequency, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
-            
+            char data[128];
+            snprintf(data, sizeof(data), "{\"frequency\":%u,\"power\":%d,\"maxFrequency\":%u,\"maxPower\":%d}", 
+                     currentFrequency, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
+            dataBase_log_event("power", "warn", "Autotune - Frequency or power limit reached, no adjustments possible", data);
+
             return;
         }
         // Increase voltage by 0.2%
@@ -289,6 +293,9 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
         ESP_LOGI(TAG, "Autotune - Temperature under target, increasing frequency from %u MHz to %u MHz", 
                  currentFrequency, newFrequency);
         ESP_LOGI(TAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+        char data[128];
+        snprintf(data, sizeof(data), "{\"frequency\":%u,\"voltage\":%u}", newFrequency, newVoltage);
+        dataBase_log_event("power", "info", "Autotune - Temperature under target, increasing frequency and voltage", data);
         
         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
@@ -304,7 +311,11 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
         ESP_LOGI(TAG, "Autotune - Temperature over target, decreasing frequency from %u MHz to %u MHz", 
                  currentFrequency, newFrequency);
         ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+        char data[128];
+        snprintf(data, sizeof(data), "{\"frequency\":%u,\"voltage\":%u}", newFrequency, newVoltage);
+        dataBase_log_event("power", "info", "Autotune - Temperature over target, decreasing frequency and voltage", data);
         
+
         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
         return;
