@@ -11,13 +11,9 @@ import {
   calculateChartMemory,
   formatMemorySize,
   validateChartConfig,
-  ChartTimeConfig
+  ChartTimeConfig,
 } from "../../utils/chartMemoryUtils";
-import {
-  Activity,
-  Thermometer,
-  Target,
-} from "lucide-preact";
+import { Activity, Thermometer, Target } from "lucide-preact";
 
 const ChartContent = () => {
   // System info state management
@@ -31,7 +27,7 @@ const ChartContent = () => {
   const powerDataFetcher = useMemo(() => createPowerDataFetcher(), []);
 
   // State for selected chart configuration
-  const [selectedConfigKey, setSelectedConfigKey] = useState<string>('FULL_DAY');
+  const [selectedConfigKey, setSelectedConfigKey] = useState<string>("FULL_DAY");
 
   const chartConfig = CHART_CONFIGS[selectedConfigKey];
   const memoryInfo = calculateChartMemory(chartConfig.dataPoints, chartConfig.intervalSeconds);
@@ -71,33 +67,59 @@ const ChartContent = () => {
               <h1 className='text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 leading-tight'>
                 Real-Time Mining Dashboard
               </h1>
-              <p className='text-lg sm:text-xl text-blue-100 max-w-2xl leading-relaxed'>
-                Monitor your mining performance with live data updates every 10 seconds or customize your duration and interval settings.
+              <p className='text-sm md:text-xl text-blue-100 max-w-2xl leading-relaxed'>
+                Monitor your mining performance with live data updates every 10 seconds or customize
+                your duration and interval settings.
               </p>
             </div>
 
             {/* Performance Stats Card - Mobile Optimized */}
             <div className='w-full xl:w-auto xl:min-w-[320px] bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-white/20'>
               <div className='flex items-center justify-between mb-3 sm:mb-4'>
-                <h3 className='text-base sm:text-lg font-semibold text-blue-100'>Miner Specifications</h3>
+                <h3 className='text-base sm:text-lg font-semibold text-blue-100'>
+                  Miner Specifications
+                </h3>
               </div>
 
               <div className='space-y-2 text-xs sm:text-sm'>
                 <div className='flex justify-between items-center'>
                   <span className='text-blue-200'>ASIC Model:</span>
-                  <span className='font-medium text-right'>{loading ? 'Loading...' : systemInfo?.ASICModel || 'N/A'}</span>
+                  <span className='font-medium text-right'>
+                    {loading ? "Loading..." : systemInfo?.ASICModel || "N/A"}
+                  </span>
                 </div>
                 <div className='flex justify-between items-center'>
                   <span className='text-blue-200'>Autotune Preset:</span>
-                  <span className='font-medium text-right'>{loading ? 'Loading...' : systemInfo?.autotune_preset ? systemInfo.autotune_preset.charAt(0).toUpperCase() + systemInfo.autotune_preset.slice(1) : 'N/A'}</span>
+                  <span className='font-medium text-right'>
+                    {loading
+                      ? "Loading..."
+                      : systemInfo?.autotune_preset
+                      ? systemInfo.autotune_preset.charAt(0).toUpperCase() +
+                        systemInfo.autotune_preset.slice(1)
+                      : "N/A"}
+                  </span>
                 </div>
                 <div className='flex justify-between items-center'>
                   <span className='text-blue-200'>Expected Hashrate:</span>
-                  <span className='font-medium text-right'>{loading ? 'Loading...' : systemInfo?.expectedHashrate ? `${(systemInfo.expectedHashrate / 1000).toFixed(2)} TH/s` : 'N/A'}</span>
+                  <span className='font-medium text-right'>
+                    {loading
+                      ? "Loading..."
+                      : systemInfo?.expectedHashrate
+                      ? `${(systemInfo.expectedHashrate / 1000).toFixed(2)} TH/s`
+                      : "N/A"}
+                  </span>
                 </div>
                 <div className='flex justify-between items-center'>
                   <span className='text-blue-200'>Uptime:</span>
-                  <span className='font-medium text-right'>{loading ? 'Loading...' : systemInfo?.uptimeSeconds ? `${Math.floor(systemInfo.uptimeSeconds / 60)}m ${systemInfo.uptimeSeconds % 60}s` : 'N/A'}</span>
+                  <span className='font-medium text-right'>
+                    {loading
+                      ? "Loading..."
+                      : systemInfo?.uptimeSeconds
+                      ? `${Math.floor(systemInfo.uptimeSeconds / 60)}m ${
+                          systemInfo.uptimeSeconds % 60
+                        }s`
+                      : "N/A"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -116,10 +138,16 @@ const ChartContent = () => {
               </div>
               <h3 className='font-semibold text-gray-900 mb-1 text-sm sm:text-base'>Hash Rate</h3>
               <p className='text-xs sm:text-sm text-gray-500 mb-2 sm:mb-3'>
-                {loading ? 'Loading...' : error ? 'Error' : 'Current performance'}
+                {loading ? "Loading..." : error ? "Error" : "Current performance"}
               </p>
               <p className='text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2'>
-                {loading ? '--' : error ? 'N/A' : systemInfo?.hashRate ? `${(systemInfo.hashRate / 1000).toFixed(2)} TH/s` : '--'}
+                {loading
+                  ? "--"
+                  : error
+                  ? "N/A"
+                  : systemInfo?.hashRate
+                  ? `${(systemInfo.hashRate / 1000).toFixed(2)} TH/s`
+                  : "--"}
               </p>
               <p className='text-xs sm:text-sm text-gray-600 max-w-50 mx-auto leading-relaxed'>
                 Real-time hashrate produced by your miner.
@@ -134,10 +162,10 @@ const ChartContent = () => {
               </div>
               <h3 className='font-semibold text-gray-900 mb-1 text-sm sm:text-base'>Temperature</h3>
               <p className='text-xs sm:text-sm text-gray-500 mb-2 sm:mb-3'>
-                {loading ? 'Loading...' : error ? 'Error' : 'ASIC temperature'}
+                {loading ? "Loading..." : error ? "Error" : "ASIC temperature"}
               </p>
               <p className='text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2'>
-                {loading ? '--' : error ? 'N/A' : systemInfo?.temp ? `${systemInfo.temp}°C` : '--'}
+                {loading ? "--" : error ? "N/A" : systemInfo?.temp ? `${systemInfo.temp}°C` : "--"}
               </p>
               <p className='text-xs sm:text-sm text-gray-600 max-w-50 mx-auto leading-relaxed'>
                 Current operating temperature of your mining ASIC chip.
@@ -152,10 +180,16 @@ const ChartContent = () => {
               </div>
               <h3 className='font-semibold text-gray-900 mb-1 text-sm sm:text-base'>Best Diff</h3>
               <p className='text-xs sm:text-sm text-gray-500 mb-2 sm:mb-3'>
-                {loading ? 'Loading...' : error ? 'Error' : 'Highest difficulty'}
+                {loading ? "Loading..." : error ? "Error" : "Highest difficulty"}
               </p>
               <p className='text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2'>
-                {loading ? '--' : error ? 'N/A' : systemInfo?.bestDiff ? systemInfo.bestDiff.toLocaleString() : '--'}
+                {loading
+                  ? "--"
+                  : error
+                  ? "N/A"
+                  : systemInfo?.bestDiff
+                  ? systemInfo.bestDiff.toLocaleString()
+                  : "--"}
               </p>
               <p className='text-xs sm:text-sm text-gray-600 max-w-50 mx-auto leading-relaxed'>
                 The highest difficulty share found by your miner.
@@ -169,12 +203,24 @@ const ChartContent = () => {
           <div className='bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8'>
             <div className='flex items-start gap-3'>
               <div className='w-6 h-6 sm:w-8 sm:h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5'>
-                <svg className='w-4 h-4 sm:w-5 sm:h-5 text-amber-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' />
+                <svg
+                  className='w-4 h-4 sm:w-5 sm:h-5 text-amber-600'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                  />
                 </svg>
               </div>
               <div className='flex-1 min-w-0'>
-                <h3 className='font-semibold text-amber-800 mb-2 text-sm sm:text-base'>Performance Recommendations</h3>
+                <h3 className='font-semibold text-amber-800 mb-2 text-sm sm:text-base'>
+                  Performance Recommendations
+                </h3>
                 <ul className='space-y-1 text-xs sm:text-sm text-amber-700'>
                   {configValidation.warnings.map((warning, index) => (
                     <li key={index} className='flex items-start gap-2'>

@@ -7,7 +7,7 @@ interface WelcomeProps {
 
 export function Welcome({
   title = "Welcome back",
-  subtitle = "Monitor, manage and optimize your mining performance"
+  subtitle = "Monitor, manage and optimize your mining performance",
 }: WelcomeProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -27,13 +27,9 @@ export function Welcome({
   };
 
   return (
-    <div class="mb-6 text-left md:pt-2">
-      <h1 class="text-xl md:text-2xl font-bold text-slate-100 mb-1 text-left">
-        {getGreeting()}
-      </h1>
-      <p class="text-slate-400 text-sm text-left">
-        {subtitle}
-      </p>
+    <div class='mb-2 text-left md:pt-2'>
+      <h1 class='text-xl md:text-2xl font-bold text-slate-100 mb-1 text-left'>{getGreeting()}</h1>
+      <p class='text-slate-400  md:text-sm text-xs text-left'>{subtitle}</p>
     </div>
   );
 }
