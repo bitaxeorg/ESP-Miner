@@ -4,6 +4,7 @@ export interface SystemInfo {
   current: number;
   temp: number;
   vrTemp: number;
+  expectedHashrate: number;
   hashRate: number;
   bestDiff: string;
   bestSessionDiff: string;
@@ -46,6 +47,8 @@ export interface SystemInfo {
   autofanspeed: number;
   fanspeed: number;
   fanrpm: number;
+  autotune?: number;
+  autotune_preset?: string;
   status?: "online" | "offline" | "warning";
   ipAddress?: string;
 }

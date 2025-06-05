@@ -533,3 +533,91 @@ export async function fetchThemeData(themeName: string): Promise<any | null> {
     return null;
   }
 }
+
+/**
+ * Log event interface
+ */
+export interface LogEvent {
+  timestamp: number;
+  type: string;
+  level: 'info' | 'warning' | 'error' | 'critical';
+  message: string;
+  data?: Record<string, any>;
+}
+
+/**
+ * Fetch recent system event logs
+ * @param limit - Maximum number of events to return (default: 50, max: 100)
+ * @returns Array of recent log events
+ */
+export async function fetchRecentLogs(limit?: number): Promise<{
+  events: LogEvent[];
+  count: number;
+}> {
+  try {
+    const params = new URLSearchParams();
+    if (limit !== undefined) {
+      params.append('limit', limit.toString());
+    }
+
+    const url = `/api/logs/recent${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      events: data.events || [],
+      count: data.count || 0,
+    };
+  } catch (error) {
+    console.error("Failed to fetch recent logs:", error);
+    return {
+      events: [],
+      count: 0,
+    };
+  }
+}
+
+/**
+ * Fetch error logs (errors and critical events only)
+ * @param limit - Maximum number of errors to return (default: all errors)
+ * @returns Array of error log events with additional metadata
+ */
+export async function fetchErrorLogs(limit?: number): Promise<{
+  errors: LogEvent[];
+  count: number;
+  totalErrors: number;
+  lastError?: number;
+}> {
+  try {
+    const params = new URLSearchParams();
+    if (limit !== undefined) {
+      params.append('limit', limit.toString());
+    }
+
+    const url = `/api/logs/errors${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      errors: data.errors || [],
+      count: data.count || 0,
+      totalErrors: data.totalErrors || 0,
+      lastError: data.lastError,
+    };
+  } catch (error) {
+    console.error("Failed to fetch error logs:", error);
+    return {
+      errors: [],
+      count: 0,
+      totalErrors: 0,
+    };
+  }
+}

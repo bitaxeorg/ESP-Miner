@@ -1,17 +1,18 @@
 import { ComponentChildren } from "preact";
 import { useState, useContext, useEffect } from "preact/hooks";
 import { useTheme } from "../context/ThemeContext";
+import { getSystemInfo } from "../utils/api";
 import {
   Activity,
   Layers,
   Users,
-  Palette,
   Settings,
   Home,
   PanelLeft,
   ChartBar,
   Download,
   Wifi,
+  HelpCircle,
 } from "lucide-preact";
 import { SidebarContext } from "./Layout";
 
@@ -47,20 +48,20 @@ const navItems = [
     icon: Users,
   },
   {
-    label: "Chart",
-    href: "/chart",
+    label: "Analytics",
+    href: "/analytics",
     icon: ChartBar,
   },
-  // {
-  //   label: "Logs",
-  //   href: "/logs",
-  //   icon: Activity,
-  // },
   {
-    label: "Theme",
-    href: "/theme",
-    icon: Palette,
+    label: "Logs",
+    href: "/logs",
+    icon: Activity,
   },
+  // {
+  //   label: "Theme",
+  //   href: "/theme",
+  //   icon: Palette,
+  // },
   {
     label: "Wifi",
     href: "/wifi",
@@ -75,6 +76,11 @@ const navItems = [
     label: "Updates",
     href: "/updates",
     icon: Download,
+  },
+  {
+    label: "Support",
+    href: "https://help.advancedcryptoservices.com/en/collections/12812285-bitaxe-support",
+    icon: HelpCircle,
   },
 ];
 
@@ -118,6 +124,7 @@ export function Sidebar({ children }: SidebarProps) {
   const { collapsed, setCollapsed } = useContext(SidebarContext);
   const [logoLoaded, setLogoLoaded] = useState(true);
   const { getThemeLogo, getThemeFavicon } = useTheme();
+  const [isWifiConnected, setIsWifiConnected] = useState(false);
   const [activeItem, setActiveItem] = useState(() => {
     // Initialize based on current path
     if (typeof window !== "undefined") {
@@ -134,6 +141,28 @@ export function Sidebar({ children }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
+
+  // Fetch WiFi status
+  useEffect(() => {
+    const fetchWifiStatus = async () => {
+      try {
+        const systemInfo = await getSystemInfo();
+        setIsWifiConnected(systemInfo.wifiStatus === "Connected!");
+      } catch (error) {
+        console.error("Failed to fetch WiFi status:", error);
+        setIsWifiConnected(false);
+      }
+    };
+
+    // Fetch immediately
+    fetchWifiStatus();
+
+    // Set up periodic refresh every 30 seconds
+    const interval = setInterval(fetchWifiStatus, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     function handleResize() {
       setIsMobile(window.innerWidth < 768);
@@ -168,12 +197,13 @@ export function Sidebar({ children }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen transform bg-slate-900 text-slate-200 transition-all duration-300 sm:translate-x-0",
+        "fixed left-0 top-0 z-40 h-screen transform text-slate-200 transition-all duration-300 sm:translate-x-0",
         collapsed ? "w-[70px]" : "w-[240px]"
       )}
+      style={{ backgroundColor: '#121319' }}
     >
       <div className='flex h-full flex-col overflow-y-auto border-r border-slate-800'>
-        <div className='h-16 border-b border-slate-800 flex items-center justify-center px-3'>
+        <div className='h-16 flex items-center justify-start px-6 pt-6'>
           {/* On mobile and sidebar open, show only favicon. Otherwise, show logo or favicon as before. Only favicon is clickable to toggle. */}
           {collapsed || (isMobile && !collapsed) ? (
             <div className='flex justify-center w-full'>
@@ -201,7 +231,7 @@ export function Sidebar({ children }: SidebarProps) {
           )}
         </div>
 
-        <div className='flex-1 py-4'>
+        <div className='flex-1 py-10'>
           <nav className='space-y-1 px-2'>
             {navItems.map((item) => (
               <NavItem
@@ -228,8 +258,8 @@ export function Sidebar({ children }: SidebarProps) {
             )}
           >
             <div className='flex items-center gap-3'>
-              <div className='h-2 w-2 rounded-full bg-emerald-500'></div>
-              {!collapsed && <span>Connected</span>}
+              <div className={`h-2 w-2 rounded-full ${isWifiConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+              {!collapsed && <span>{isWifiConnected ? 'Connected' : 'Offline'}</span>}
             </div>
             <button
               onClick={() => setCollapsed(!collapsed)}
