@@ -1,7 +1,7 @@
 import { createContext } from "preact";
 import { useState, useEffect, useContext } from "preact/hooks";
 import { ComponentChildren } from "preact";
-import { themeAssetsMap, defaultAssets } from "../utils/themeConfig";
+import { themeAssetsMap, defaultAssets, initializeThemeAssets } from "../utils/themeConfig";
 
 interface ThemeData {
   themeName: string;
@@ -147,9 +147,22 @@ export function ThemeProvider({ children }: { children: ComponentChildren }) {
     }
   };
 
-  // Fetch theme on mount
+  // Initialize theme assets and fetch theme on mount
   useEffect(() => {
-    fetchTheme();
+    const initializeAndFetchTheme = async () => {
+      try {
+        // Initialize theme assets from API first
+        await initializeThemeAssets();
+        // Then fetch the current theme
+        await fetchTheme();
+      } catch (error) {
+        console.error("Failed to initialize themes:", error);
+        // Still try to fetch theme even if initialization fails
+        await fetchTheme();
+      }
+    };
+
+    initializeAndFetchTheme();
   }, []);
 
   return (

@@ -492,3 +492,44 @@ export async function updatePresetSettings(
     };
   }
 }
+
+/**
+ * Fetch all themes data from the API
+ * @returns Array of theme objects with color information
+ */
+export async function fetchThemesData(): Promise<any[]> {
+  try {
+    const response = await fetch("/api/themes");
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.themes || [];
+  } catch (error) {
+    console.error("Failed to fetch themes data:", error);
+    return [];
+  }
+}
+
+/**
+ * Fetch specific theme data from the API
+ * @param themeName - The name of the theme to fetch
+ * @returns Theme object with color information
+ */
+export async function fetchThemeData(themeName: string): Promise<any | null> {
+  try {
+    const response = await fetch(`/api/themes/${themeName}`);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Failed to fetch theme data for ${themeName}:`, error);
+    return null;
+  }
+}
