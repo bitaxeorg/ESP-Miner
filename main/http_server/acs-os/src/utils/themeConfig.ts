@@ -121,11 +121,11 @@ export const themeAssetsMap: Record<string, ThemeAssets> = {
     favicon: "/favicon.png",
     ...API_THEME_PLACEHOLDER,
   },
-  THEME_SOLO_MINING_CO: {
-    logo: "/acs-brandmark-white.png",
-    favicon: "/favicon.png",
-    ...API_THEME_PLACEHOLDER,
-  },
+  // THEME_SOLO_MINING_CO: {
+  //   logo: "/acs-brandmark-white.png",
+  //   favicon: "/favicon.png",
+  //   ...API_THEME_PLACEHOLDER,
+  // },
 };
 
 // Default assets to use as fallback

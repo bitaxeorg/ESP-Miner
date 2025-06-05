@@ -57,7 +57,7 @@ export function Settings() {
     try {
       const result = await updatePresetSettings(selectedMode);
 
-      if (result.success) {
+      if (result.status === "success") {
         showToast(result.message, "success");
       } else {
         showToast(result.message, "error");

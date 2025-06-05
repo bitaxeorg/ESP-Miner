@@ -1,7 +1,7 @@
 import { createContext } from "preact";
-import { useState, useEffect, useContext } from "preact/hooks";
+import { useState, useContext } from "preact/hooks";
 import { ComponentChildren } from "preact";
-import { themeAssetsMap, defaultAssets, initializeThemeAssets } from "../utils/themeConfig";
+import { defaultAssets } from "../utils/themeConfig";
 
 interface ThemeData {
   themeName: string;
@@ -37,133 +37,48 @@ const defaultThemeContext: ThemeContextType = {
 export const ThemeContext = createContext<ThemeContextType>(defaultThemeContext);
 
 export function ThemeProvider({ children }: { children: ComponentChildren }) {
-  const [themeData, setThemeData] = useState<ThemeData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Disabled theme state - using static values
+  const [themeData] = useState<ThemeData | null>({
+    themeName: "THEME_ACS_DEFAULT",
+    primaryColor: "#3b82f6",
+    secondaryColor: "#60a5fa",
+    backgroundColor: "#111827",
+    textColor: "#f9fafb",
+    borderColor: "#374151",
+  });
+  const [loading] = useState(false);
+  const [error] = useState<string | null>(null);
 
-  // FETCH CURRENT THEME
+  // DISABLED: FETCH CURRENT THEME
   const fetchTheme = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch("/api/themes/current");
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setThemeData(data);
-
-      // Apply theme colors to CSS variables
-      if (data) {
-        document.documentElement.style.setProperty("--primary-color", data.primaryColor);
-        document.documentElement.style.setProperty("--secondary-color", data.secondaryColor);
-        document.documentElement.style.setProperty("--background-color", data.backgroundColor);
-        document.documentElement.style.setProperty("--text-color", data.textColor);
-        document.documentElement.style.setProperty("--border-color", data.borderColor);
-        document.documentElement.style.setProperty("--primary-color-text", "#ffffff");
-
-        // Update favicon
-        updateFavicon(data.themeName);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch theme data");
-    } finally {
-      setLoading(false);
-    }
+    // Theme functionality temporarily disabled
+    console.warn("Theme functionality is temporarily disabled");
   };
-  // LIST THEMES
+
+  // DISABLED: LIST THEMES
   const fetchThemes = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch("/api/themes");
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      // Just fetch themes - no need to return them
-      await response.json();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch themes data");
-    } finally {
-      setLoading(false);
-    }
+    // Theme functionality temporarily disabled
+    console.warn("Theme functionality is temporarily disabled");
   };
-  // APPLY THEME
+
+  // DISABLED: APPLY THEME
   const applyTheme = async (themeName: string) => {
-    try {
-      // Using the themeName directly in the URL
-      const response = await fetch(`/api/themes/${themeName}`, {
-        method: "PATCH",
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      // Get the response data and update themeData directly
-      const data = await response.json();
-      setThemeData(data);
-
-      // Apply theme colors to CSS variables
-      if (data) {
-        document.documentElement.style.setProperty("--primary-color", data.primaryColor);
-        document.documentElement.style.setProperty("--secondary-color", data.secondaryColor);
-        document.documentElement.style.setProperty("--background-color", data.backgroundColor);
-        document.documentElement.style.setProperty("--text-color", data.textColor);
-        document.documentElement.style.setProperty("--border-color", data.borderColor);
-        document.documentElement.style.setProperty("--primary-color-text", "#ffffff");
-
-        // Update favicon
-        updateFavicon(data.themeName);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to apply theme");
-    }
+    // Theme functionality temporarily disabled
+    console.warn("Theme functionality is temporarily disabled - cannot apply theme:", themeName);
   };
 
-  // Get the appropriate logo for the current theme
+  // Get the default logo (static)
   const getThemeLogo = () => {
-    if (!themeData || !themeData.themeName) return defaultAssets.logo;
-    return themeAssetsMap[themeData.themeName]?.logo || defaultAssets.logo;
+    return defaultAssets.logo;
   };
 
-  // Get the appropriate favicon for the current theme
+  // Get the default favicon (static)
   const getThemeFavicon = () => {
-    if (!themeData || !themeData.themeName) return defaultAssets.favicon;
-    return themeAssetsMap[themeData.themeName]?.favicon || defaultAssets.favicon;
+    return defaultAssets.favicon;
   };
 
-  // Update the favicon in the document
-  const updateFavicon = (themeName: string) => {
-    const faviconLink = document.querySelector("link[rel='icon']") as HTMLLinkElement;
-    if (faviconLink) {
-      const faviconPath = themeName
-        ? themeAssetsMap[themeName]?.favicon || defaultAssets.favicon
-        : defaultAssets.favicon;
-      faviconLink.href = faviconPath;
-    }
-  };
-
-  // Initialize theme assets and fetch theme on mount
-  useEffect(() => {
-    const initializeAndFetchTheme = async () => {
-      try {
-        // Initialize theme assets from API first
-        await initializeThemeAssets();
-        // Then fetch the current theme
-        await fetchTheme();
-      } catch (error) {
-        console.error("Failed to initialize themes:", error);
-        // Still try to fetch theme even if initialization fails
-        await fetchTheme();
-      }
-    };
-
-    initializeAndFetchTheme();
-  }, []);
+  // DISABLED: No theme initialization on mount
+  // useEffect removed - no API calls or dynamic theme loading
 
   return (
     <ThemeContext.Provider

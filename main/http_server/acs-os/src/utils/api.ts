@@ -449,7 +449,7 @@ export async function updateASICSettings(
  */
 export async function updatePresetSettings(
   presetName: string
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ status: string; message: string; updatedSettings: [];timestamps: any }> {
   try {
     const payload = {
       presetName,
@@ -477,18 +477,20 @@ export async function updatePresetSettings(
         return result;
       } catch (parseError) {
         console.log("Response is not JSON:", text);
-        return { success: true, message: `${presetName} mode applied successfully` };
+        return { status: "success", message: `${presetName} mode applied successfully`, updatedSettings: [], timestamps: [] };
       }
     }
 
     // For empty responses with 200 status
     console.log("Preset settings update successful (empty response)");
-    return { success: true, message: `${presetName} mode applied successfully` };
+    return { status: "success", message: `${presetName} mode applied successfully`, updatedSettings: [], timestamps: [] };
   } catch (error) {
     console.error("Failed to update preset settings:", error);
     return {
-      success: false,
+      status: "error",
       message: error instanceof Error ? error.message : "Unknown error occurred",
+      updatedSettings: [],
+      timestamps: [],
     };
   }
 }
