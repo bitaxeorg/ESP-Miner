@@ -446,8 +446,100 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         }
     }
 
+    // Create response JSON with updated settings
+    httpd_resp_set_type(req, "application/json");
+    
+    cJSON *response = cJSON_CreateObject();
+    cJSON *updated_settings = cJSON_CreateObject();
+    
+    // Add each setting that was updated to the response
+    if ((item = cJSON_GetObjectItem(root, "stratumURL")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "stratumURL", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumURL")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "fallbackStratumURL", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "stratumUser")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "stratumUser", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "stratumPassword")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "stratumPassword", "***"); // Don't expose password
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumUser")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "fallbackStratumUser", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPassword")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "fallbackStratumPassword", "***"); // Don't expose password
+    }
+    if ((item = cJSON_GetObjectItem(root, "stratumPort")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "stratumPort", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPort")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "fallbackStratumPort", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "ssid")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "ssid", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "wifiPass")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "wifiPass", "***"); // Don't expose password
+    }
+    if ((item = cJSON_GetObjectItem(root, "hostname")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "hostname", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
+        cJSON_AddNumberToObject(updated_settings, "coreVoltage", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL && item->valueint > 0) {
+        cJSON_AddNumberToObject(updated_settings, "frequency", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "flipscreen")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "flipscreen", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "overheat_mode", 0);
+    }
+    if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "invertscreen", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "invertfanpolarity")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "invertfanpolarity", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "autofanspeed")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "autofanspeed", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "fanspeed", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "autotune")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "autotune", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "presetName")) != NULL && item->valuestring != NULL) {
+        cJSON_AddStringToObject(updated_settings, "presetName", item->valuestring);
+        cJSON_AddBoolToObject(updated_settings, "presetApplied", apply_preset(GLOBAL_STATE->device_model, item->valuestring));
+    }
+    
+    // Add metadata to response
+    cJSON_AddStringToObject(response, "status", "success");
+    cJSON_AddStringToObject(response, "message", "Settings updated successfully");
+    cJSON_AddItemToObject(response, "updatedSettings", updated_settings);
+    time_t now;
+    time(&now);
+    cJSON_AddNumberToObject(response, "timestamp", now);
+    
+    // Send response
+    const char *response_str = cJSON_Print(response);
+    httpd_resp_sendstr(req, response_str);
+
+    // Log the event
+    char data[128];
+    snprintf(data, sizeof(data), "{\"updatedSettings\":%s}", response_str);
+    dataBase_log_event("settings", "info", "Settings updated via WebUI", data);
+    
+    // Cleanup
+    free((char *)response_str);
+    cJSON_Delete(response);
     cJSON_Delete(root);
-    httpd_resp_send_chunk(req, NULL, 0);
+    
     return ESP_OK;
 }
 

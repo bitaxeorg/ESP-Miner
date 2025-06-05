@@ -197,7 +197,9 @@ esp_err_t dataBase_init_themes(void) {
         // Create default active themes file
         cJSON* root = cJSON_CreateObject();
         cJSON_AddStringToObject(root, "activeTheme", "THEME_ACS_DEFAULT");
-        cJSON_AddNumberToObject(root, "lastUpdated", esp_timer_get_time() / 1000000);
+        time_t now;
+        time(&now);
+        cJSON_AddNumberToObject(root, "lastUpdated", now);
         
         esp_err_t ret = dataBase_write_json_file(active_themes_path, root);
         cJSON_Delete(root);
