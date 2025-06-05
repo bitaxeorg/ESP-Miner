@@ -29,6 +29,17 @@ Access-Control-Allow-Headers: Content-Type
 #### GET `/api/system/info`
 Get comprehensive system information including mining stats, hardware info, and configuration.
 
+**Key Response Fields:**
+- `hashRate`: Current actual hashrate in GH/s
+- `expectedHashrate`: Theoretical maximum hashrate in GH/s based on current frequency and hardware configuration
+- `temp`: ASIC temperature in Celsius
+- `power`: Current power consumption in watts
+- `voltage`: Input voltage in volts
+- `frequency`: Current ASIC frequency in MHz
+- `coreVoltage`: Target core voltage in millivolts
+- `asicCount`: Number of ASIC chips
+- `smallCoreCount`: Number of small cores per ASIC
+
 **Response Example:**
 ```json
 {
@@ -38,6 +49,7 @@ Get comprehensive system information including mining stats, hardware info, and 
   "temp": 65,
   "vrTemp": 58,
   "hashRate": 120.5,
+  "expectedHashrate": 134.4,
   "bestDiff": "1.2K",
   "bestSessionDiff": "2.1K", 
   "stratumDiff": 16.0,
