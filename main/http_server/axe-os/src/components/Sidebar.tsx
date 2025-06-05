@@ -51,11 +51,11 @@ const navItems = [
     href: "/chart",
     icon: ChartBar,
   },
-  // {
-  //   label: "Logs",
-  //   href: "/logs",
-  //   icon: Activity,
-  // },
+  {
+    label: "Logs",
+    href: "/logs",
+    icon: Activity,
+  },
   {
     label: "Theme",
     href: "/theme",
