@@ -46,6 +46,8 @@
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
 
+static char wwwVersion[256];
+
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
@@ -232,19 +234,15 @@ esp_err_t init_fs(void)
         ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
     }
 
-    FILE* f = fopen("/version.json", "r");
+    FILE* f = fopen("/version.txt", "r");
     if (f != NULL) {
-        char wwwVersion[256];
         fread(wwwVersion, 1, sizeof(wwwVersion), f);
         fclose(f);
 
         ESP_LOGI(TAG, "www.bin version: %s", wwwVersion);
     } else {
-        ESP_LOGE(TAG, "Failed to open /version.json");
-        // return ESP_FAIL;
+        ESP_LOGE(TAG, "Failed to open version.txt");
     }
-
-    // cJSON_AddStringToObject(root, "version-www", wwwVersion);
 
     return ESP_OK;
 }
@@ -278,8 +276,8 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
         type = "application/pdf";
     } else if (CHECK_FILE_EXTENSION(filepath, ".woff2")) {
         type = "font/woff2";
-    } else if (CHECK_FILE_EXTENSION(filepath, ".json")) {
-        type = "application/json";
+    } else if (CHECK_FILE_EXTENSION(filepath, ".txt")) {
+        type = "text/plain";
     }
     return httpd_resp_set_type(req, type);
 }
@@ -637,13 +635,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
-
-    // FILE* f = fopen("/version.json", "r");
-    // char wwwVersion[256];
-    // fread(wwwVersion, 1, sizeof(wwwVersion), f);
-    // fclose(f);
-
-    // cJSON_AddStringToObject(root, "version-www", wwwVersion);
+    cJSON_AddStringToObject(root, "wwwVersion", wwwVersion);
 
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);

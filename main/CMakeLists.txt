@@ -70,8 +70,6 @@ EMBED_FILES "http_server/recovery_page.html"
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_INCLUDE_SIMPLE=1" APPEND)
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH= ${CMAKE_SOURCE_DIR}/main/lv_conf.h" APPEND)
 
-idf_build_get_property(APP_VERSION PROJECT_VER)
-
 set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/axe-os")
 
 if("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
@@ -93,7 +91,7 @@ else()
             ${NPM_EXECUTABLE}  i
         USES_TERMINAL_BUILD true
         BUILD_COMMAND
-            APP_VERSION=${APP_VERSION} ${NPM_EXECUTABLE} run build
+            ${NPM_EXECUTABLE} run build
         INSTALL_COMMAND ""
         BUILD_ALWAYS OFF
         BUILD_IN_SOURCE TRUE
