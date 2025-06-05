@@ -51,7 +51,7 @@ export function Layout({ children, title }: LayoutProps) {
         {/* Main content */}
         <main
           class={`transition-all duration-300 ${
-            collapsed ? "pl-[70px] md:pl-[40px]" : "pl-[180px] md:pl-[180px]"
+            collapsed ? "pl-[70px] md:pl-[80px]" : "pl-[180px] md:pl-[240px]"
           }`}
           style={{ backgroundColor: "#121319" }}
         >
