@@ -19,6 +19,10 @@
         text="Using fallback pool - Share stats reset. Check Pool Settings and or / reboot Bitaxe">
     </p-message>
 
+    <p-message *ngIf="info.version !== info.axeOSVersion" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
+        text="Firmware and Axe-OS versions do not match. Please update Axe-OS (www.bin) to the same version.">
+    </p-message>
+
     <div class="grid" *ngIf="info$ | async as info; else loading">
         <div class="col-12 md:col-6 xl:col-3">
             <div class="card mb-0">
