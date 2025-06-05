@@ -284,8 +284,6 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
         type = "application/pdf";
     } else if (CHECK_FILE_EXTENSION(filepath, ".woff2")) {
         type = "font/woff2";
-    } else if (CHECK_FILE_EXTENSION(filepath, ".txt")) {
-        type = "text/plain";
     }
     return httpd_resp_set_type(req, type);
 }
@@ -342,28 +340,25 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
         strlcat(filepath, req->uri, filePathLength);
     }
     set_content_type_from_file(req, filepath);
-
+    strcat(filepath, ".gz");
     int fd = open(filepath, O_RDONLY, 0);
     if (fd == -1) {
-        strcat(filepath, ".gz");
-        fd = open(filepath, O_RDONLY, 0);
-        if (fd == -1) {
-            // Set status
-            httpd_resp_set_status(req, "302 Temporary Redirect");
-            // Redirect to the "/" root directory
-            httpd_resp_set_hdr(req, "Location", "/");
-            // iOS requires content in the response to detect a captive portal, simply redirecting is not sufficient.
-            httpd_resp_send(req, "Redirect to the captive portal", HTTPD_RESP_USE_STRLEN);
+        // Set status
+        httpd_resp_set_status(req, "302 Temporary Redirect");
+        // Redirect to the "/" root directory
+        httpd_resp_set_hdr(req, "Location", "/");
+        // iOS requires content in the response to detect a captive portal, simply redirecting is not sufficient.
+        httpd_resp_send(req, "Redirect to the captive portal", HTTPD_RESP_USE_STRLEN);
 
-            ESP_LOGI(TAG, "Redirecting to root");
-            return ESP_OK;
-        }
-        httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+        ESP_LOGI(TAG, "Redirecting to root");
+        return ESP_OK;
     }
-
+    
     if (req->uri[strlen(req->uri) - 1] != '/') {
         httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
     }
+
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
 
     char * chunk = rest_context->scratch;
     ssize_t read_bytes;
