@@ -1,5 +1,6 @@
-import { useMemo, useState } from "preact/hooks";
+import { useMemo, useState, useEffect } from "preact/hooks";
 import RealTimeApiChart from "../../components/Chart/RealTimeApiChart";
+import { getSystemInfo, SystemInfo } from "../../utils/api";
 import {
   createHashrateDataFetcher,
   createTemperatureDataFetcher,
@@ -12,8 +13,18 @@ import {
   validateChartConfig,
   ChartTimeConfig
 } from "../../utils/chartMemoryUtils";
+import {
+  Activity,
+  Thermometer,
+  Target,
+} from "lucide-preact";
 
-const ChartDemo = () => {
+const ChartContent = () => {
+  // System info state management
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   // Create data fetchers for different metrics
   const hashrateDataFetcher = useMemo(() => createHashrateDataFetcher(), []);
   const temperatureDataFetcher = useMemo(() => createTemperatureDataFetcher(), []);
@@ -22,16 +33,33 @@ const ChartDemo = () => {
   // State for selected chart configuration
   const [selectedConfigKey, setSelectedConfigKey] = useState<string>('FULL_DAY');
 
-  // Current configuration: 6 hours of data (360 data points at 1-minute intervals)
-  // Available options:
-  // - CHART_CONFIGS.SHORT: 30 minutes (360 points at 5-second intervals)
-  // - CHART_CONFIGS.MEDIUM: 1 hour (240 points at 15-second intervals)
-  // - CHART_CONFIGS.LONG: 2 hours (240 points at 30-second intervals)
-  // - CHART_CONFIGS.EXTENDED: 4 hours (240 points at 1-minute intervals)
-  // - CHART_CONFIGS.FULL_DAY: 6 hours (360 points at 1-minute intervals) ← Default selection
   const chartConfig = CHART_CONFIGS[selectedConfigKey];
   const memoryInfo = calculateChartMemory(chartConfig.dataPoints, chartConfig.intervalSeconds);
   const configValidation = validateChartConfig(chartConfig);
+
+  // Fetch system info
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await getSystemInfo();
+        setSystemInfo(data);
+        setError(null);
+      } catch (err) {
+        setError("Failed to load system information");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+
+    // Refresh data every 10 seconds
+    const intervalId = setInterval(fetchData, 10000);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-slate-50 to-gray-100'>
@@ -44,8 +72,7 @@ const ChartDemo = () => {
                 Real-Time Mining Dashboard
               </h1>
               <p className='text-xl text-blue-100 max-w-2xl'>
-                Monitor your mining performance with live data updates every 5 seconds.
-                Advanced analytics and noise reduction controls included.
+                Monitor your mining performance with live data updates every 5 seconds or customized duration and interval settings.
               </p>
             </div>
 
@@ -80,57 +107,60 @@ const ChartDemo = () => {
 
       {/* Main Content */}
       <div className='max-w-7xl mx-auto px-6 py-8'>
-        {/* Technology Stack Cards */}
+        {/* Mining Metrics Cards */}
         <div className='grid grid-cols-1 md:grid-cols-3 gap-6 mb-8'>
           <div className='bg-white rounded-xl shadow-sm border border-gray-200 p-6'>
-            <div className='flex items-center gap-3 mb-3'>
-              <div className='w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center'>
-                <svg className='w-6 h-6 text-green-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M13 10V3L4 14h7v7l9-11h-7z' />
-                </svg>
+            <div className='text-center'>
+              <div className='w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3'>
+                <Activity className='w-6 h-6 text-green-600' />
               </div>
-              <div>
-                <h3 className='font-semibold text-gray-900'>Real-Time Data</h3>
-                <p className='text-sm text-gray-500'>Live updates every 5s</p>
-              </div>
+              <h3 className='font-semibold text-gray-900 mb-1'>Hash Rate</h3>
+              <p className='text-sm text-gray-500 mb-3'>
+                {loading ? 'Loading...' : error ? 'Error' : 'Current performance'}
+              </p>
+              <p className='text-2xl font-bold text-gray-900 mb-2'>
+                {loading ? '--' : error ? 'N/A' : systemInfo?.hashRate ? `${(systemInfo.hashRate / 1000).toFixed(2)} TH/s` : '--'}
+              </p>
+              <p className='text-sm text-gray-600 max-w-50 mx-auto'>
+                Real-time hashrate produced by your miner.
+              </p>
             </div>
-            <p className='text-sm text-gray-600'>
-              Streaming data directly from your mining hardware with minimal latency.
-            </p>
           </div>
 
           <div className='bg-white rounded-xl shadow-sm border border-gray-200 p-6'>
-            <div className='flex items-center gap-3 mb-3'>
-              <div className='w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center'>
-                <svg className='w-6 h-6 text-blue-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' />
-                </svg>
+            <div className='text-center'>
+              <div className='w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-3'>
+                <Thermometer className='w-6 h-6 text-orange-600' />
               </div>
-              <div>
-                <h3 className='font-semibold text-gray-900'>Advanced Charts</h3>
-                <p className='text-sm text-gray-500'>TradingView engine</p>
-              </div>
+              <h3 className='font-semibold text-gray-900 mb-1'>Temperature</h3>
+              <p className='text-sm text-gray-500 mb-3'>
+                {loading ? 'Loading...' : error ? 'Error' : 'ASIC temperature'}
+              </p>
+              <p className='text-2xl font-bold text-gray-900 mb-2'>
+                {loading ? '--' : error ? 'N/A' : systemInfo?.temp ? `${systemInfo.temp}°C` : '--'}
+              </p>
+              <p className='text-sm text-gray-600 max-w-50 mx-auto'>
+                Current operating temperature of your mining ASIC chip.
+              </p>
             </div>
-            <p className='text-sm text-gray-600'>
-              Professional-grade charting with smoothing and noise reduction features.
-            </p>
           </div>
 
           <div className='bg-white rounded-xl shadow-sm border border-gray-200 p-6'>
-            <div className='flex items-center gap-3 mb-3'>
-              <div className='w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center'>
-                <svg className='w-6 h-6 text-purple-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z' />
-                </svg>
+            <div className='text-center'>
+              <div className='w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3'>
+                <Target className='w-6 h-6 text-purple-600' />
               </div>
-              <div>
-                <h3 className='font-semibold text-gray-900'>Optimized Performance</h3>
-                <p className='text-sm text-gray-500'>Memory efficient</p>
-              </div>
+              <h3 className='font-semibold text-gray-900 mb-1'>Best Diff</h3>
+              <p className='text-sm text-gray-500 mb-3'>
+                {loading ? 'Loading...' : error ? 'Error' : 'Highest difficulty'}
+              </p>
+              <p className='text-2xl font-bold text-gray-900 mb-2'>
+                {loading ? '--' : error ? 'N/A' : systemInfo?.bestDiff ? systemInfo.bestDiff.toLocaleString() : '--'}
+              </p>
+              <p className='text-sm text-gray-600 max-w-50 mx-auto'>
+                The highest difficulty share found by your miner.
+              </p>
             </div>
-            <p className='text-sm text-gray-600'>
-              In-memory data storage with automatic cleanup and performance monitoring.
-            </p>
           </div>
         </div>
 
@@ -179,4 +209,4 @@ const ChartDemo = () => {
   );
 };
 
-export default ChartDemo;
+export default ChartContent;

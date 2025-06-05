@@ -47,8 +47,8 @@ const navItems = [
     icon: Users,
   },
   {
-    label: "Chart",
-    href: "/chart",
+    label: "Test",
+    href: "/test",
     icon: ChartBar,
   },
   {
@@ -168,9 +168,10 @@ export function Sidebar({ children }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen transform bg-slate-900 text-slate-200 transition-all duration-300 sm:translate-x-0",
+        "fixed left-0 top-0 z-40 h-screen transform text-slate-200 transition-all duration-300 sm:translate-x-0",
         collapsed ? "w-[70px]" : "w-[240px]"
       )}
+      style={{ backgroundColor: '#121319' }}
     >
       <div className='flex h-full flex-col overflow-y-auto border-r border-slate-800'>
         <div className='h-16 flex items-center justify-start px-6 pt-6'>

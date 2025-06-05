@@ -57,7 +57,7 @@ function ActionCard({
   );
 }
 
-export default function UpdatesPage() {
+export function UpdatesPage() {
   const { showToast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isWebAppUpdating, setIsWebAppUpdating] = useState(false);

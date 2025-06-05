@@ -5,7 +5,7 @@ interface PageHeadingProps {
 
 export function PageHeading({ title, subtitle }: PageHeadingProps) {
   return (
-    <div class="mb-6 text-left">
+    <div class="mb-6 text-left pt-2">
       <h1 class="text-xl md:text-2xl font-bold text-slate-100 mb-1 text-left">
         {title}
       </h1>

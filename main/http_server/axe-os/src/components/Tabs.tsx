@@ -32,7 +32,7 @@ export function Tabs({ tabs, activeTab, onTabChange }: TabsProps) {
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               class={`
-                px-6 py-2.5 text-sm font-semibold rounded-md transition-all cursor-pointer
+                px-6 py-2.5 text-sm font-semibold rounded-md transition-all cursor-pointer min-w-20
                 ${
                   activeTab === tab.id
                     ? "bg-blue-900/50 text-blue-400"
