@@ -191,7 +191,7 @@ const ChartContent = () => {
         {/* Charts Section */}
         <div className='space-y-8'>
           <RealTimeApiChart
-            title='Mining Hashrate'
+            title='Hash Rate'
             dataFetcher={hashrateDataFetcher}
             updateInterval={chartConfig.intervalSeconds * 1000}
             maxDataPoints={chartConfig.dataPoints}
