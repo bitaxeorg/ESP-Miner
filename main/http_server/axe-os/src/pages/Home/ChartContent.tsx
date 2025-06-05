@@ -72,7 +72,7 @@ const ChartContent = () => {
                 Real-Time Mining Dashboard
               </h1>
               <p className='text-xl text-blue-100 max-w-2xl'>
-                Monitor your mining performance with live data updates every 5 seconds or customize your duration and interval settings.
+                Monitor your mining performance with live data updates every 10 seconds or customize your duration and interval settings.
               </p>
             </div>
 

@@ -24,16 +24,16 @@ export interface ChartTimeConfig {
 export const CHART_CONFIGS: Record<string, ChartTimeConfig> = {
   SHORT: {
     name: "Short",
-    dataPoints: 360,      // 30 minutes with 5-second intervals
+    dataPoints: 180,      // 30 minutes with 10-second intervals
     hours: 0.5,
-    intervalSeconds: 5,
+    intervalSeconds: 10,
     description: "30 minutes"
   },
   MEDIUM: {
     name: "Medium",
-    dataPoints: 240,      // 1 hour with 15-second intervals
+    dataPoints: 120,      // 1 hour with 30-second intervals
     hours: 1,
-    intervalSeconds: 15,
+    intervalSeconds: 30,
     description: "1 hour of data"
   },
   LONG: {

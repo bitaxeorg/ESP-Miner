@@ -221,8 +221,9 @@ export function UpdatesPage() {
                       type='button'
                       size='sm'
                       onClick={handleFirmwareFileClick}
+                      className='border-blue-600 text-white hover:bg-blue-600'
                     >
-                      Choose File
+                      2. Choose File
                     </Button>
                     <span className='text-sm text-[#8B96A5]'>
                       {firmwareFile ? firmwareFile.name : "No file selected"}
@@ -238,10 +239,10 @@ export function UpdatesPage() {
                 </div>
                 <Button
                   onClick={handleFirmwareUpload}
-                  disabled={isUpdating}
+                  disabled={isUpdating || !firmwareFile}
                   className='bg-blue-600 hover:bg-blue-700'
                 >
-                  {isUpdating ? "Updating..." : "Install"}
+                  {isUpdating ? "Updating..." : "3. Install"}
                 </Button>
               </div>
               {firmwareFile && (
@@ -290,8 +291,9 @@ export function UpdatesPage() {
                       type='button'
                       size='sm'
                       onClick={handleWebAppFileClick}
+                      className='border-blue-600 text-white hover:bg-blue-600'
                     >
-                      Choose File
+                      2. Choose File
                     </Button>
                     <span className='text-sm text-[#8B96A5]'>
                       {webAppFile ? webAppFile.name : "No file selected"}
@@ -307,10 +309,10 @@ export function UpdatesPage() {
                 </div>
                 <Button
                   onClick={handleWebAppUpload}
-                  disabled={isWebAppUpdating}
+                  disabled={isWebAppUpdating || !webAppFile}
                   className='bg-blue-600 hover:bg-blue-700'
                 >
-                  {isWebAppUpdating ? "Updating..." : "Install"}
+                  {isWebAppUpdating ? "Updating..." : "3. Install"}
                 </Button>
               </div>
               {webAppFile && (

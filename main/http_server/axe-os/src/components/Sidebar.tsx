@@ -56,11 +56,11 @@ const navItems = [
     href: "/logs",
     icon: Activity,
   },
-  {
-    label: "Theme",
-    href: "/theme",
-    icon: Palette,
-  },
+  // {
+  //   label: "Theme",
+  //   href: "/theme",
+  //   icon: Palette,
+  // },
   {
     label: "Wifi",
     href: "/wifi",

@@ -80,7 +80,7 @@ export function Settings() {
 
       <ActionCard
         title='Choose Your Mode'
-        description='Adjust your Touch for quiet operation, balanced performance, or maximum hashing power—just tap and save.'
+        description='Adjust your device for quiet operation, balanced performance, or maximum hashing power—just tap and save.'
       >
         <div className='space-y-6'>
           {/* Mode Selection Cards */}
@@ -94,11 +94,11 @@ export function Settings() {
                   key={mode.id}
                   onClick={() => handleModeSelect(mode.id)}
                   className={`
-                    relative p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:scale-105
+                    relative p-4 rounded-md border cursor-pointer transition-all duration-200
                     ${
                       isSelected
-                        ? "border-[var(--primary-color)] bg-[color-mix(in_srgb,var(--primary-color),transparent_90%)]"
-                        : "border-[#1C2F52] bg-[var(--card-bg)] hover:border-[color-mix(in_srgb,var(--primary-color),transparent_50%)]"
+                        ? "border-blue-500 bg-blue-500/10"
+                        : "border-slate-700 bg-[var(--card-bg)] hover:border-slate-500 hover:bg-slate-800/30"
                     }
                   `}
                 >
@@ -108,7 +108,7 @@ export function Settings() {
                       p-3 rounded-full transition-colors
                       ${
                         isSelected
-                          ? "bg-[var(--primary-color)] text-[var(--primary-color-text)]"
+                          ? "bg-blue-500 text-white"
                           : "bg-[#1C2F52] text-[#8B96A5]"
                       }
                     `}
@@ -138,7 +138,7 @@ export function Settings() {
                   {/* Selected indicator */}
                   {isSelected && (
                     <div className='absolute top-2 right-2'>
-                      <div className='w-3 h-3 bg-[var(--primary-color)] rounded-full'></div>
+                      <div className='w-3 h-3 bg-blue-500 rounded-full'></div>
                     </div>
                   )}
                 </div>
