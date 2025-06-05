@@ -14,7 +14,6 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
   const isProd = mode === "production";
   const API_TARGET = isProd ? undefined : env.VITE_API_URL || "http://10.1.1.168";
-  const NGROK_HOST = "59569bf4f1ea.ngrok.app";
 
   return {
     plugins: [preact(), tailwindcss()],
@@ -31,21 +30,25 @@ export default defineConfig(({ mode }) => {
               "/api": {
                 target: API_TARGET,
                 changeOrigin: true,
-                secure: false,
-                // Enable debug logging for proxy requests
-                configure: (proxy, _options) => {
-                  proxy.on("error", (err, _req, _res) => {
-                    console.log("proxy error", err);
-                  });
-                  proxy.on("proxyReq", (proxyReq, req, _res) => {
-                    console.log("Sending Request to Target:", req.method, req.url);
-                    console.log("Request Headers:", proxyReq.getHeaders());
-                  });
-                  proxy.on("proxyRes", (proxyRes, req, _res) => {
-                    console.log("Received Response from Target:", proxyRes.statusCode, req.url);
-                    console.log("Response Headers:", proxyRes.headers);
-                  });
-                },
+                secure: true, // Enable SSL certificate validation
+                // Only enable debug logging in development mode
+                configure: !isProd
+                  ? (proxy, _options) => {
+                      proxy.on("error", (err, _req, _res) => {
+                        console.log("proxy error", err);
+                      });
+                      proxy.on("proxyReq", (proxyReq, req, _res) => {
+                        console.log("Sending Request to Target:", req.method, req.url);
+                        // Avoid logging headers that might contain sensitive data
+                        console.log("Request Headers:", Object.keys(proxyReq.getHeaders()));
+                      });
+                      proxy.on("proxyRes", (proxyRes, req, _res) => {
+                        console.log("Received Response from Target:", proxyRes.statusCode, req.url);
+                        // Avoid logging response headers that might contain sensitive data
+                        console.log("Response Headers:", Object.keys(proxyRes.headers));
+                      });
+                    }
+                  : undefined,
               },
             }
           : {},
