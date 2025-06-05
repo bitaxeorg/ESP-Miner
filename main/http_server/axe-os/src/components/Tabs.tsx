@@ -11,7 +11,7 @@ interface TabsProps {
 
 export function Tabs({ tabs, activeTab, onTabChange }: TabsProps) {
   return (
-    <div class='w-full mb-4'>
+    <div class='w-full'>
       {/* Dropdown for xs screens */}
       <select
         class='block sm:hidden w-full rounded-lg bg-slate-800/50 p-2 border border-slate-700 text-slate-200 focus:ring-2 focus:ring-blue-400'

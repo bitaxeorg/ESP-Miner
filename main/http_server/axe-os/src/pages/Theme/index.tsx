@@ -8,7 +8,6 @@ export function Theme() {
 
   return (
     <Container>
-      <div class='rounded-lg bg-gray-900 p-6 text-gray-100'>
         <PageHeading
           title="Available Themes"
           subtitle="Customize the look and feel of your miner interface"
@@ -49,7 +48,6 @@ export function Theme() {
             </div>
           </div>
         )}
-      </div>
     </Container>
   );
 }

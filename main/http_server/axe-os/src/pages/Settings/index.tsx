@@ -73,8 +73,9 @@ export function Settings() {
   return (
     <Container>
       <PageHeading
-        title="Settings"
-        subtitle="Configure your miner's performance and operational modes"
+        title='Settings'
+        subtitle="Configure your miner's performance and operational modes."
+        link='https://help.advancedcryptoservices.com/en/articles/11517773-settings'
       />
 
       <ActionCard

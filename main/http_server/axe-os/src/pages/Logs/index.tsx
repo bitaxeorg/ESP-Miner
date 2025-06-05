@@ -1,16 +1,20 @@
 import { useState, useEffect } from "preact/hooks";
 import { Button } from "../../components/Button";
+import { Switch } from "../../components/Switch";
 import { Terminal } from "../../components/Terminal";
 import { PageHeading } from "../../components/PageHeading";
+import { Tabs } from "../../components/Tabs";
 import { fetchRecentLogs, fetchErrorLogs, LogEvent } from "../../utils/api";
+import { Container } from "../../components/Container";
 
-type LogViewType = 'recent' | 'errors';
+type LogLevel = 'all' | 'info' | 'warn' | 'error' | 'critical';
 
 export function LogsPage() {
   const [logs, setLogs] = useState<string[]>([]);
+  const [allLogs, setAllLogs] = useState<LogEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [viewType, setViewType] = useState<LogViewType>('recent');
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [logLevel, setLogLevel] = useState<LogLevel>('all');
   const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
   const [errorInfo, setErrorInfo] = useState<{
     totalErrors: number;
@@ -32,7 +36,17 @@ export function LogsPage() {
         clearInterval(intervalId);
       }
     };
-  }, [autoRefresh, viewType]);
+  }, [autoRefresh]);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchLogs();
+  }, []);
+
+  // Filter logs when log level changes
+  useEffect(() => {
+    filterLogs();
+  }, [logLevel, allLogs]);
 
   // Format log event to display string
   function formatLogEvent(event: LogEvent): string {
@@ -51,26 +65,38 @@ export function LogsPage() {
     return logLine;
   }
 
+  // Filter logs based on selected level
+  function filterLogs() {
+    let filteredLogs = allLogs;
+
+    if (logLevel !== 'all') {
+      filteredLogs = allLogs.filter(log =>
+        log.level.toLowerCase() === logLevel.toLowerCase()
+      );
+    }
+
+    const formattedLogs = filteredLogs.map(formatLogEvent);
+    setLogs(formattedLogs);
+
+    // Update error info for error level
+    if (logLevel === 'error') {
+      const errorLogs = filteredLogs;
+      setErrorInfo({
+        totalErrors: errorLogs.length,
+        lastError: errorLogs.length > 0 ? errorLogs[0].timestamp : undefined,
+      });
+    } else {
+      setErrorInfo(null);
+    }
+  }
+
   // Fetch logs from API
   async function fetchLogs() {
     setIsLoading(true);
 
     try {
-      if (viewType === 'recent') {
-        const response = await fetchRecentLogs(100);
-        const formattedLogs = response.events.map(formatLogEvent);
-        setLogs(formattedLogs);
-        setErrorInfo(null);
-      } else {
-        const response = await fetchErrorLogs();
-        const formattedLogs = response.errors.map(formatLogEvent);
-        setLogs(formattedLogs);
-        setErrorInfo({
-          totalErrors: response.totalErrors,
-          lastError: response.lastError,
-        });
-      }
-
+      const response = await fetchRecentLogs(500); // Fetch more logs for better filtering
+      setAllLogs(response.events);
       setLastFetchTime(new Date());
     } catch (error) {
       console.error('Failed to fetch logs:', error);
@@ -80,80 +106,63 @@ export function LogsPage() {
     }
   }
 
-  // Handle view type change
-  function handleViewTypeChange(newViewType: LogViewType) {
-    setViewType(newViewType);
-    setLogs([]); // Clear current logs when switching views
-    setErrorInfo(null);
+  // Handle log level change
+  function handleLogLevelChange(newLogLevel: string) {
+    setLogLevel(newLogLevel as LogLevel);
   }
 
   // Clear logs
   function clearLogs() {
     setLogs([]);
+    setAllLogs([]);
     setErrorInfo(null);
   }
 
-  // Toggle auto-refresh
-  function toggleAutoRefresh() {
-    setAutoRefresh(prev => !prev);
-  }
+  const tabs = [
+    { id: 'all', label: 'All' },
+    { id: 'info', label: 'Info' },
+    { id: 'warn', label: 'Warn' },
+    { id: 'error', label: 'Error' },
+    { id: 'critical', label: 'Critical' },
+  ];
 
   return (
-    <div className='flex flex-col gap-4 p-4 h-full'>
+    <Container>
       <PageHeading
-        title="System Logs"
-        subtitle="Monitor system events and debug information in real-time"
+        title='System Logs'
+        subtitle='Monitor system events and debug information in real-time.'
+        link='https://help.advancedcryptoservices.com/en/articles/11517662-system-logs'
       />
 
-      <div className='flex justify-end gap-2'>
-        <Button
-          variant={autoRefresh ? "default" : "outline"}
-          onClick={toggleAutoRefresh}
-          className={autoRefresh ? "bg-green-600 hover:bg-green-700" : ""}
-        >
-          {autoRefresh ? "Auto-Refresh On" : "Auto-Refresh Off"}
-        </Button>
-        <Button
-          variant="default"
-          onClick={fetchLogs}
-          disabled={isLoading}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          {isLoading ? "Loading..." : "Refresh"}
-        </Button>
-        <Button variant='ghost' onClick={clearLogs} disabled={logs.length === 0}>
-          Clear
-        </Button>
+      <div className='flex items-center justify-between gap-4 mb-4'>
+        <div className='flex-1'>
+          <Tabs tabs={tabs} activeTab={logLevel} onTabChange={handleLogLevelChange} />
+        </div>
+        <div className='flex items-center gap-4'>
+          <div className='flex items-center gap-2'>
+            <Switch
+              checked={autoRefresh}
+              onCheckedChange={setAutoRefresh}
+              aria-label='Auto-refresh logs'
+            />
+            <span className='text-sm text-slate-300'>Auto-Refresh</span>
+          </div>
+          <Button variant='ghost' onClick={clearLogs} disabled={logs.length === 0}>
+            Clear
+          </Button>
+        </div>
       </div>
 
-      <div className='flex gap-2 items-center'>
-        <span className='text-sm font-medium'>View:</span>
-        <Button
-          variant={viewType === 'recent' ? "default" : "outline"}
-          onClick={() => handleViewTypeChange('recent')}
-          size="sm"
-        >
-          Recent Logs
-        </Button>
-        <Button
-          variant={viewType === 'errors' ? "default" : "outline"}
-          onClick={() => handleViewTypeChange('errors')}
-          size="sm"
-        >
-          Errors Only
-        </Button>
-
-        {errorInfo && (
-          <span className='text-sm text-red-600 ml-4'>
-            Total Errors: {errorInfo.totalErrors}
-            {errorInfo.lastError && (
-              <span className='ml-2'>
-                | Last Error: {new Date(errorInfo.lastError * 1000).toLocaleString()}
-              </span>
-            )}
-          </span>
-        )}
-      </div>
+      {errorInfo && (
+        <div className='text-sm text-gray-400 mb-1'>
+          Total Errors: {errorInfo.totalErrors}
+          {errorInfo.lastError && (
+            <span className='ml-2'>
+              | Last Error: {new Date(errorInfo.lastError * 1000).toLocaleString()}
+            </span>
+          )}
+        </div>
+      )}
 
       <Terminal logs={logs} className='flex-grow h-[calc(100vh-200px)]' />
 
@@ -169,10 +178,10 @@ export function LogsPage() {
 
         {logs.length > 0 && (
           <span className='ml-4'>
-            Showing {logs.length} {viewType === 'recent' ? 'recent events' : 'error events'}
+            Showing {logs.length} {logLevel === "all" ? "events" : `${logLevel} events`}
           </span>
         )}
       </div>
-    </div>
+    </Container>
   );
 }

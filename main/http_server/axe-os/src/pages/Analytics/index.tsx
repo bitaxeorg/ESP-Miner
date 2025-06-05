@@ -3,7 +3,7 @@ import { getSystemInfo, SystemInfo } from "../../utils/api";
 import { formatUptime } from "../../utils/formatters";
 import { DataSection } from "../../components/DataSection";
 import { Tabs } from "../../components/Tabs";
-import { Welcome } from "../../components/Welcome";
+import { PageHeading } from "../../components/PageHeading";
 import {
   Activity,
   AudioLines,
@@ -24,7 +24,7 @@ import {
   Zap,
 } from "lucide-preact";
 
-export function TestPage() {
+export function AnalyticsPage() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -243,7 +243,11 @@ export function TestPage() {
 
   return (
     <div class='space-y-6'>
-      <Welcome subtitle="Track, manage and optimize your miner" />
+      <PageHeading
+        title='Analytics'
+        subtitle='Track, manage and optimize your miner performance.'
+        link='https://help.advancedcryptoservices.com/en/articles/11517739-analytics'
+      />
       <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
       {activeTab === "overview" && (
         <>

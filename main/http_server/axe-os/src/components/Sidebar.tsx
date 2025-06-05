@@ -47,8 +47,8 @@ const navItems = [
     icon: Users,
   },
   {
-    label: "Test",
-    href: "/test",
+    label: "Analytics",
+    href: "/analytics",
     icon: ChartBar,
   },
   {

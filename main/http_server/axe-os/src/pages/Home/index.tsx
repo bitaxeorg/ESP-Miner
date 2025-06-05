@@ -1,5 +1,11 @@
 import ChartContent from "./ChartContent";
+import { Welcome } from "../../components/Welcome";
 
 export function HomePage() {
-  return <ChartContent />;
+  return (
+    <div>
+      <Welcome />
+      <ChartContent />
+    </div>
+  );
 }

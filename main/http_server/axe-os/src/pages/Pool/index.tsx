@@ -209,11 +209,12 @@ export function PoolsPage() {
   return (
     <Container>
       <PageHeading
-        title="Pool Settings"
-        subtitle="Configure mining pools and stratum connections"
+        title='Pool Settings'
+        subtitle='Configure mining pools and stratum connections.'
+        link='https://help.advancedcryptoservices.com/en/articles/11517348-mining-pools'
       />
 
-      <div className='bg-[var(--card-bg)] p-4 md:p-6 rounded-lg shadow-md max-w-full md:max-w-3xl'>
+      <div className='bg-[var(--card-bg)] rounded-lg shadow-md max-w-full md:max-w-3xl'>
         <form onSubmit={handleSubmitAndRestart}>
           <div className='flex justify-between items-center mb-6'>
             <h2 className='text-xl font-medium'>Stratum URLs</h2>

@@ -17,7 +17,7 @@ import { ToastContainer } from "./components/Toast";
 import { setOverheatWarningCheck } from "./utils/api";
 import "./style.css";
 import { useEffect } from "preact/hooks";
-import { TestPage } from "./pages/Test/index";
+import { AnalyticsPage } from "./pages/Analytics/index";
 
 function AppContent() {
   const { toasts, hideToast } = useToast();
@@ -40,7 +40,7 @@ function AppContent() {
             <Route path='/miners' component={Miners} />
             <Route path='/pools' component={PoolsPage} />
             <Route path='/wifi' component={WifiPage} />
-            <Route path='/test' component={TestPage} />
+            <Route path='/analytics' component={AnalyticsPage} />
             <Route path='/updates' component={UpdatesPage} />
             <Route default component={NotFound} />
           </Router>
