@@ -1,6 +1,6 @@
 import { ComponentChildren } from "preact";
 import { Sidebar } from "./Sidebar";
-import { Navbar } from "./Navbar";
+import { Welcome } from "./Welcome";
 import { createContext } from "preact";
 import { useContext, useState, useEffect } from "preact/hooks";
 
@@ -48,19 +48,21 @@ export function Layout({ children, title }: LayoutProps) {
     <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
       <div
         class='min-h-screen overflow-x-hidden'
-        style={{ backgroundColor: 'var(--background-color)' }}
+        style={{ backgroundColor: '#121319' }}
       >
         <Sidebar />
-        <Navbar title={title} />
 
-        {/* Main content - adjust padding based on sidebar state */}
+        {/* Main content */}
         <main
-          class={`pt-16 transition-all duration-300 ${
-            collapsed ? "pl-[50px] md:pl-[70px]" : "pl-[50px] md:pl-[240px]"
+          class={`transition-all duration-300 ${
+            collapsed ? "pl-[20px] md:pl-[20px]" : "pl-[50px] md:pl-[180px]"
           }`}
-          style={{ backgroundColor: 'var(--background-color)' }}
+          style={{ backgroundColor: '#121319' }}
         >
-          <div class=' py-3 md:px-6 md:py-4 w-full'>{children}</div>
+          <div class='px-4 py-4 md:px-2 md:pt-4 w-full'>
+            <Welcome subtitle="Track, manage and optimize your miner" />
+            {children}
+          </div>
         </main>
       </div>
     </SidebarContext.Provider>

@@ -26,7 +26,7 @@ export function Tabs({ tabs, activeTab, onTabChange }: TabsProps) {
       </select>
       {/* Tabs for sm+ screens */}
       <div class='hidden sm:flex w-full justify-start'>
-        <div class='inline-flex space-x-1 rounded-lg bg-slate-800/50 p-1 border border-slate-700 overflow-x-auto whitespace-nowrap scrollbar-thin scrollbar-thumb-slate-700'>
+        <div class='inline-flex space-x-1 rounded-lg bg-slate-800/50 px-0 border border-slate-700 overflow-x-auto whitespace-nowrap scrollbar-thin scrollbar-thumb-slate-700'>
           {tabs.map((tab) => (
             <button
               key={tab.id}
