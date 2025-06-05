@@ -8,15 +8,25 @@ import { Miners } from "./pages/Miners/index";
 import { NotFound } from "./pages/_404.jsx";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider, useToast } from "./context/ToastContext";
+import { OverheatWarningProvider, useOverheatWarning } from "./context/OverheatWarningContext";
 import { ToastContainer } from "./components/Toast";
+import { setOverheatWarningCheck } from "./utils/api";
 import "./style.css";
 import { LogsPage } from "./pages/Logs";
 import { PoolsPage } from "./pages/Pool";
 import { WifiPage } from "./pages/Wifi";
 import ChartPage from "./pages/Chart";
 import UpdatesPage from "./pages/Updates";
+import { useEffect } from "preact/hooks";
+
 function AppContent() {
   const { toasts, hideToast } = useToast();
+  const { checkOverheatStatus } = useOverheatWarning();
+
+  useEffect(() => {
+    // Set up the global overheat warning check
+    setOverheatWarningCheck(checkOverheatStatus);
+  }, [checkOverheatStatus]);
 
   return (
     <ThemeProvider>
@@ -44,7 +54,9 @@ function AppContent() {
 export function App() {
   return (
     <ToastProvider>
-      <AppContent />
+      <OverheatWarningProvider>
+        <AppContent />
+      </OverheatWarningProvider>
     </ToastProvider>
   );
 }

@@ -46,7 +46,10 @@ export function Layout({ children, title }: LayoutProps) {
 
   return (
     <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
-      <div class='min-h-screen overflow-x-hidden bg-gray-950'>
+      <div
+        class='min-h-screen overflow-x-hidden'
+        style={{ backgroundColor: 'var(--background-color)' }}
+      >
         <Sidebar />
         <Navbar title={title} />
 
@@ -54,7 +57,8 @@ export function Layout({ children, title }: LayoutProps) {
         <main
           class={`pt-16 transition-all duration-300 ${
             collapsed ? "pl-[50px] md:pl-[70px]" : "pl-[50px] md:pl-[240px]"
-          } bg-gray-950`}
+          }`}
+          style={{ backgroundColor: 'var(--background-color)' }}
         >
           <div class=' py-3 md:px-6 md:py-4 w-full'>{children}</div>
         </main>

@@ -56,11 +56,11 @@ const navItems = [
   //   href: "/logs",
   //   icon: Activity,
   // },
-  // {
-  //   label: "Theme",
-  //   href: "/theme",
-  //   icon: Palette,
-  // },
+  {
+    label: "Theme",
+    href: "/theme",
+    icon: Palette,
+  },
   {
     label: "Wifi",
     href: "/wifi",
@@ -117,7 +117,7 @@ function cn(...classes: string[]) {
 export function Sidebar({ children }: SidebarProps) {
   const { collapsed, setCollapsed } = useContext(SidebarContext);
   const [logoLoaded, setLogoLoaded] = useState(true);
-  const { getThemeLogo } = useTheme();
+  const { getThemeLogo, getThemeFavicon } = useTheme();
   const [activeItem, setActiveItem] = useState(() => {
     // Initialize based on current path
     if (typeof window !== "undefined") {
@@ -178,7 +178,7 @@ export function Sidebar({ children }: SidebarProps) {
           {collapsed || (isMobile && !collapsed) ? (
             <div className='flex justify-center w-full'>
               <img
-                src='/american-btc-small.png'
+                src={getThemeFavicon()}
                 alt='Favicon'
                 className='h-4 w-4 cursor-pointer hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-400'
                 tabIndex={0}

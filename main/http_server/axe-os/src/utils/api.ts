@@ -3,6 +3,13 @@ import { SystemInfo } from "./types/systemInfo";
 // Re-export SystemInfo type for convenience
 export type { SystemInfo };
 
+// Global reference for overheat warning system
+let globalOverheatWarningCheck: ((systemInfo: SystemInfo) => void) | null = null;
+
+export function setOverheatWarningCheck(checkFn: (systemInfo: SystemInfo) => void) {
+  globalOverheatWarningCheck = checkFn;
+}
+
 // Constants for firmware and webapp URLs
 export const FIRMWARE_LATEST_URL =
   "https://acs-bitaxe-touch.s3.us-east-2.amazonaws.com/firmware/acs-esp-miner/latest/esp-miner.bin";
@@ -17,7 +24,14 @@ export async function getSystemInfo(): Promise<SystemInfo> {
       throw new Error(`API error: ${response.status}`);
     }
 
-    return await response.json();
+    const systemInfo = await response.json();
+
+    // Trigger overheat warning check if available
+    if (globalOverheatWarningCheck) {
+      globalOverheatWarningCheck(systemInfo);
+    }
+
+    return systemInfo;
   } catch (error) {
     console.error("Failed to fetch system info:", error);
     throw error;
@@ -40,6 +54,11 @@ export async function fetchMiners(): Promise<SystemInfo[]> {
         window.location.hostname !== "localhost" ? window.location.hostname : "localhost:5173",
       status: "online", // Assume online since we're able to get data
     };
+
+    // Trigger overheat warning check if available
+    if (globalOverheatWarningCheck) {
+      globalOverheatWarningCheck(enhancedMinerInfo);
+    }
 
     // Return as an array with the single miner
     // In a multi-miner setup, this would be expanded to query multiple miners
@@ -471,5 +490,46 @@ export async function updatePresetSettings(
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred",
     };
+  }
+}
+
+/**
+ * Fetch all themes data from the API
+ * @returns Array of theme objects with color information
+ */
+export async function fetchThemesData(): Promise<any[]> {
+  try {
+    const response = await fetch("/api/themes");
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.themes || [];
+  } catch (error) {
+    console.error("Failed to fetch themes data:", error);
+    return [];
+  }
+}
+
+/**
+ * Fetch specific theme data from the API
+ * @param themeName - The name of the theme to fetch
+ * @returns Theme object with color information
+ */
+export async function fetchThemeData(themeName: string): Promise<any | null> {
+  try {
+    const response = await fetch(`/api/themes/${themeName}`);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Failed to fetch theme data for ${themeName}:`, error);
+    return null;
   }
 }

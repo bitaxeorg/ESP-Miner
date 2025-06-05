@@ -10,25 +10,29 @@ const TOAST_VARIANTS = {
   success: "bg-green-100 border-green-400 text-green-800",
   error: "bg-red-100 border-red-400 text-red-800",
   info: "bg-blue-100 border-blue-400 text-blue-800",
+  warning: "bg-yellow-100 border-yellow-400 text-yellow-800",
 };
 
 const ICONS = {
   success: "✓",
   error: "✕",
   info: "ℹ",
+  warning: "⚠",
 };
 
 export function Toast({ toast, onClose }: ToastProps) {
-  const { id, message, type } = toast;
+  const { id, message, type, persistent } = toast;
 
   return (
     <div
-      className={`rounded-md px-4 py-3 mb-2 border-l-4 flex items-center justify-between ${TOAST_VARIANTS[type]}`}
+      className={`rounded-md px-4 py-3 mb-2 border-l-4 flex items-center justify-between ${TOAST_VARIANTS[type]} ${
+        persistent ? "shadow-lg animate-pulse" : ""
+      }`}
       role='alert'
     >
       <div className='flex items-center'>
         <span className='font-bold mr-2'>{ICONS[type]}</span>
-        <span>{message}</span>
+        <div className={persistent ? "font-semibold" : ""}>{message}</div>
       </div>
       <button
         onClick={() => onClose(id)}
