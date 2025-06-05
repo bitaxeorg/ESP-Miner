@@ -29,6 +29,8 @@ static partition_layout_t current_layout;
 #define ACTIVE_THEMES_FILE "activeThemes.json"
 #define AVAILABLE_THEMES_FILE "availableThemes.json"
 #define RECENT_LOGS_FILE "recentLogs.json"
+#define ERROR_LOGS_FILE "errorLogs.json"
+#define CRITICAL_LOGS_FILE "criticalLogs.json"
 
 static char themes_dir[32];
 static char logs_dir[32];
@@ -420,6 +422,22 @@ esp_err_t dataBase_log_event(const char* event_type, const char* severity, const
         ESP_LOGE(TAG, "Failed to write event log");
     }
     
+    // Also log to error logs if severity is error or critical
+    if (strcmp(severity, "error") == 0 || strcmp(severity, "critical") == 0) {
+        esp_err_t error_ret = dataBase_log_error(event_type, severity, message, data);
+        if (error_ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to log to error logs");
+        }
+    }
+    
+    // Also log to critical logs if severity is critical
+    if (strcmp(severity, "critical") == 0) {
+        esp_err_t critical_ret = dataBase_log_critical(event_type, severity, message, data);
+        if (critical_ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to log to critical logs");
+        }
+    }
+    
     return ret;
 }
 
@@ -462,6 +480,344 @@ esp_err_t dataBase_get_recent_logs(int max_count, cJSON** logs_json) {
     return ESP_OK;
 }
 
+// Initialize error logs database
+esp_err_t dataBase_init_error_logs(void) {
+    // Create logs directory if it doesn't exist (should already exist from regular logs init)
+    if (mkdir(logs_dir, 0755) != 0) {
+        // Directory might already exist, which is fine
+    }
+    
+    char error_logs_path[128];
+    get_file_path(logs_dir, ERROR_LOGS_FILE, error_logs_path, sizeof(error_logs_path));
+    
+    // Check if errorLogs.json exists
+    FILE* file = fopen(error_logs_path, "r");
+    if (!file) {
+        ESP_LOGI(TAG, "Creating errorLogs.json");
+        
+        // Create empty error logs file
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "totalErrors", 0);
+        cJSON_AddNumberToObject(root, "lastError", 0);
+        cJSON_AddStringToObject(root, "description", "Persistent error logs - no automatic rotation");
+        
+        cJSON* errors_array = cJSON_CreateArray();
+        cJSON_AddItemToObject(root, "errors", errors_array);
+        
+        esp_err_t ret = dataBase_write_json_file(error_logs_path, root);
+        cJSON_Delete(root);
+        
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create errorLogs.json");
+            return ret;
+        }
+    } else {
+        fclose(file);
+    }
+    
+    ESP_LOGI(TAG, "Error logs database initialized successfully");
+    return ESP_OK;
+}
+
+// Log an error event (persistent)
+esp_err_t dataBase_log_error(const char* event_type, const char* severity, const char* message, const char* data) {
+    char error_logs_path[128];
+    get_file_path(logs_dir, ERROR_LOGS_FILE, error_logs_path, sizeof(error_logs_path));
+    
+    cJSON* root;
+    esp_err_t ret = dataBase_read_json_file(error_logs_path, &root);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read error logs file");
+        return ret;
+    }
+    
+    cJSON* errors_array = cJSON_GetObjectItem(root, "errors");
+    if (!cJSON_IsArray(errors_array)) {
+        ESP_LOGE(TAG, "Errors array not found in error logs file");
+        cJSON_Delete(root);
+        return ESP_FAIL;
+    }
+    
+    // Create new error event
+    cJSON* new_error = cJSON_CreateObject();
+    uint64_t timestamp = esp_timer_get_time() / 1000000;
+    cJSON_AddNumberToObject(new_error, "timestamp", timestamp);
+    cJSON_AddStringToObject(new_error, "type", event_type);
+    cJSON_AddStringToObject(new_error, "severity", severity);
+    cJSON_AddStringToObject(new_error, "message", message);
+    
+    if (data && strlen(data) > 0) {
+        cJSON* data_json = cJSON_Parse(data);
+        if (data_json) {
+            cJSON_AddItemToObject(new_error, "data", data_json);
+        } else {
+            cJSON_AddStringToObject(new_error, "data", data);
+        }
+    }
+    
+    // Add to errors array
+    cJSON_AddItemToArray(errors_array, new_error);
+    
+    // Update total count and last error timestamp
+    cJSON* total_errors = cJSON_GetObjectItem(root, "totalErrors");
+    if (cJSON_IsNumber(total_errors)) {
+        total_errors->valueint++;
+    }
+    
+    cJSON* last_error = cJSON_GetObjectItem(root, "lastError");
+    if (cJSON_IsNumber(last_error)) {
+        last_error->valueint = timestamp;
+    }
+    
+    // Write back to file (no size limit - persistent storage)
+    ret = dataBase_write_json_file(error_logs_path, root);
+    cJSON_Delete(root);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Error logged: %s - %s", event_type, message);
+    } else {
+        ESP_LOGE(TAG, "Failed to write error log");
+    }
+    
+    return ret;
+}
+
+// Get error logs
+esp_err_t dataBase_get_error_logs(int max_count, cJSON** logs_json) {
+    char error_logs_path[128];
+    get_file_path(logs_dir, ERROR_LOGS_FILE, error_logs_path, sizeof(error_logs_path));
+    
+    cJSON* root;
+    esp_err_t ret = dataBase_read_json_file(error_logs_path, &root);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    
+    cJSON* errors_array = cJSON_GetObjectItem(root, "errors");
+    if (!cJSON_IsArray(errors_array)) {
+        cJSON_Delete(root);
+        return ESP_FAIL;
+    }
+    
+    // Create response with limited errors
+    cJSON* response = cJSON_CreateObject();
+    cJSON* limited_errors = cJSON_CreateArray();
+    
+    int array_size = cJSON_GetArraySize(errors_array);
+    int count = (max_count > 0 && max_count < array_size) ? max_count : array_size;
+    
+    // Get the most recent errors
+    for (int i = array_size - count; i < array_size; i++) {
+        cJSON* error = cJSON_GetArrayItem(errors_array, i);
+        cJSON_AddItemToArray(limited_errors, cJSON_Duplicate(error, 1));
+    }
+    
+    cJSON_AddItemToObject(response, "errors", limited_errors);
+    cJSON_AddNumberToObject(response, "count", count);
+    cJSON_AddNumberToObject(response, "totalErrors", cJSON_GetObjectItem(root, "totalErrors")->valueint);
+    cJSON_AddNumberToObject(response, "lastError", cJSON_GetObjectItem(root, "lastError")->valueint);
+    
+    cJSON_Delete(root);
+    *logs_json = response;
+    
+    return ESP_OK;
+}
+
+// Clear all error logs
+esp_err_t dataBase_clear_error_logs(void) {
+    char error_logs_path[128];
+    get_file_path(logs_dir, ERROR_LOGS_FILE, error_logs_path, sizeof(error_logs_path));
+    
+    // Create empty error logs file
+    cJSON* root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "totalErrors", 0);
+    cJSON_AddNumberToObject(root, "lastError", 0);
+    cJSON_AddStringToObject(root, "description", "Persistent error logs - no automatic rotation");
+    
+    cJSON* errors_array = cJSON_CreateArray();
+    cJSON_AddItemToObject(root, "errors", errors_array);
+    
+    esp_err_t ret = dataBase_write_json_file(error_logs_path, root);
+    cJSON_Delete(root);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Error logs cleared successfully");
+    } else {
+        ESP_LOGE(TAG, "Failed to clear error logs");
+    }
+    
+    return ret;
+}
+
+// Initialize critical logs database
+esp_err_t dataBase_init_critical_logs(void) {
+    // Create logs directory if it doesn't exist (should already exist from regular logs init)
+    if (mkdir(logs_dir, 0755) != 0) {
+        // Directory might already exist, which is fine
+    }
+    
+    char critical_logs_path[128];
+    get_file_path(logs_dir, CRITICAL_LOGS_FILE, critical_logs_path, sizeof(critical_logs_path));
+    
+    // Check if criticalLogs.json exists
+    FILE* file = fopen(critical_logs_path, "r");
+    if (!file) {
+        ESP_LOGI(TAG, "Creating criticalLogs.json");
+        
+        // Create empty critical logs file
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "totalCritical", 0);
+        cJSON_AddNumberToObject(root, "lastCritical", 0);
+        cJSON_AddStringToObject(root, "description", "Persistent critical logs - no automatic rotation");
+        
+        cJSON* critical_array = cJSON_CreateArray();
+        cJSON_AddItemToObject(root, "critical", critical_array);
+        
+        esp_err_t ret = dataBase_write_json_file(critical_logs_path, root);
+        cJSON_Delete(root);
+        
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create criticalLogs.json");
+            return ret;
+        }
+    } else {
+        fclose(file);
+    }
+    
+    ESP_LOGI(TAG, "Critical logs database initialized successfully");
+    return ESP_OK;
+}
+
+// Log a critical event (persistent)
+esp_err_t dataBase_log_critical(const char* event_type, const char* severity, const char* message, const char* data) {
+    char critical_logs_path[128];
+    get_file_path(logs_dir, CRITICAL_LOGS_FILE, critical_logs_path, sizeof(critical_logs_path));
+    
+    cJSON* root;
+    esp_err_t ret = dataBase_read_json_file(critical_logs_path, &root);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read critical logs file");
+        return ret;
+    }
+    
+    cJSON* critical_array = cJSON_GetObjectItem(root, "critical");
+    if (!cJSON_IsArray(critical_array)) {
+        ESP_LOGE(TAG, "Critical array not found in critical logs file");
+        cJSON_Delete(root);
+        return ESP_FAIL;
+    }
+    
+    // Create new critical event
+    cJSON* new_critical = cJSON_CreateObject();
+    uint64_t timestamp = esp_timer_get_time() / 1000000;
+    cJSON_AddNumberToObject(new_critical, "timestamp", timestamp);
+    cJSON_AddStringToObject(new_critical, "type", event_type);
+    cJSON_AddStringToObject(new_critical, "severity", severity);
+    cJSON_AddStringToObject(new_critical, "message", message);
+    
+    if (data && strlen(data) > 0) {
+        cJSON* data_json = cJSON_Parse(data);
+        if (data_json) {
+            cJSON_AddItemToObject(new_critical, "data", data_json);
+        } else {
+            cJSON_AddStringToObject(new_critical, "data", data);
+        }
+    }
+    
+    // Add to critical array
+    cJSON_AddItemToArray(critical_array, new_critical);
+    
+    // Update total count and last critical timestamp
+    cJSON* total_critical = cJSON_GetObjectItem(root, "totalCritical");
+    if (cJSON_IsNumber(total_critical)) {
+        total_critical->valueint++;
+    }
+    
+    cJSON* last_critical = cJSON_GetObjectItem(root, "lastCritical");
+    if (cJSON_IsNumber(last_critical)) {
+        last_critical->valueint = timestamp;
+    }
+    
+    // Write back to file (no size limit - persistent storage)
+    ret = dataBase_write_json_file(critical_logs_path, root);
+    cJSON_Delete(root);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Critical event logged: %s - %s", event_type, message);
+    } else {
+        ESP_LOGE(TAG, "Failed to write critical log");
+    }
+    
+    return ret;
+}
+
+// Get critical logs
+esp_err_t dataBase_get_critical_logs(int max_count, cJSON** logs_json) {
+    char critical_logs_path[128];
+    get_file_path(logs_dir, CRITICAL_LOGS_FILE, critical_logs_path, sizeof(critical_logs_path));
+    
+    cJSON* root;
+    esp_err_t ret = dataBase_read_json_file(critical_logs_path, &root);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    
+    cJSON* critical_array = cJSON_GetObjectItem(root, "critical");
+    if (!cJSON_IsArray(critical_array)) {
+        cJSON_Delete(root);
+        return ESP_FAIL;
+    }
+    
+    // Create response with limited critical events
+    cJSON* response = cJSON_CreateObject();
+    cJSON* limited_critical = cJSON_CreateArray();
+    
+    int array_size = cJSON_GetArraySize(critical_array);
+    int count = (max_count > 0 && max_count < array_size) ? max_count : array_size;
+    
+    // Get the most recent critical events
+    for (int i = array_size - count; i < array_size; i++) {
+        cJSON* critical = cJSON_GetArrayItem(critical_array, i);
+        cJSON_AddItemToArray(limited_critical, cJSON_Duplicate(critical, 1));
+    }
+    
+    cJSON_AddItemToObject(response, "critical", limited_critical);
+    cJSON_AddNumberToObject(response, "count", count);
+    cJSON_AddNumberToObject(response, "totalCritical", cJSON_GetObjectItem(root, "totalCritical")->valueint);
+    cJSON_AddNumberToObject(response, "lastCritical", cJSON_GetObjectItem(root, "lastCritical")->valueint);
+    
+    cJSON_Delete(root);
+    *logs_json = response;
+    
+    return ESP_OK;
+}
+
+// Clear all critical logs
+esp_err_t dataBase_clear_critical_logs(void) {
+    char critical_logs_path[128];
+    get_file_path(logs_dir, CRITICAL_LOGS_FILE, critical_logs_path, sizeof(critical_logs_path));
+    
+    // Create empty critical logs file
+    cJSON* root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "totalCritical", 0);
+    cJSON_AddNumberToObject(root, "lastCritical", 0);
+    cJSON_AddStringToObject(root, "description", "Persistent critical logs - no automatic rotation");
+    
+    cJSON* critical_array = cJSON_CreateArray();
+    cJSON_AddItemToObject(root, "critical", critical_array);
+    
+    esp_err_t ret = dataBase_write_json_file(critical_logs_path, root);
+    cJSON_Delete(root);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Critical logs cleared successfully");
+    } else {
+        ESP_LOGE(TAG, "Failed to clear critical logs");
+    }
+    
+    return ret;
+}
+
 // Main database initialization - only handles data partition
 esp_err_t dataBase_init(void) {
     ESP_LOGI(TAG, "Initializing database system (data partition only)...");
@@ -491,6 +847,20 @@ esp_err_t dataBase_init(void) {
     ret = dataBase_init_logs();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize logs database");
+        return ret;
+    }
+    
+    // Initialize error logs database
+    ret = dataBase_init_error_logs();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize error logs database");
+        return ret;
+    }
+    
+    // Initialize critical logs database
+    ret = dataBase_init_critical_logs();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize critical logs database");
         return ret;
     }
     

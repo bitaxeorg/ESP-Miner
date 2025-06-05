@@ -223,6 +223,74 @@ Get recent system event logs.
 }
 ```
 
+#### GET `/api/logs/errors`
+Get persistent error logs (errors and critical events only).
+
+**Query Parameters:**
+- `limit` (optional): Maximum number of errors to return (default: all errors)
+
+**Response Example:**
+```json
+{
+  "errors": [
+    {
+      "timestamp": 1706798600,
+      "type": "system",
+      "severity": "error",
+      "message": "ASIC communication failed",
+      "data": {"attempts": 3, "lastResponse": "timeout"}
+    },
+    {
+      "timestamp": 1706798700,
+      "type": "network",
+      "severity": "critical",
+      "message": "Pool connection lost",
+      "data": {"reconnectAttempts": 5, "poolUrl": "stratum+tcp://pool.example.com"}
+    }
+  ],
+  "count": 2,
+  "totalErrors": 15,
+  "lastError": 1706798700
+}
+```
+
+#### GET `/api/logs/critical`
+Get persistent critical logs (critical events only).
+
+**Query Parameters:**
+- `limit` (optional): Maximum number of critical events to return (default: all critical events)
+
+**Response Example:**
+```json
+{
+  "critical": [
+    {
+      "timestamp": 1706798600,
+      "type": "power",
+      "severity": "critical",
+      "message": "Overheat mode activated",
+      "data": {"chipTemp": 85.0, "threshold": 80, "device": "DEVICE_MAX"}
+    },
+    {
+      "timestamp": 1706798700,
+      "type": "system",
+      "severity": "critical",
+      "message": "Hardware failure detected",
+      "data": {"component": "ASIC", "errorCode": "0xFF"}
+    }
+  ],
+  "count": 2,
+  "totalCritical": 8,
+  "lastCritical": 1706798700
+}
+```
+
+**Key Features:**
+- **Critical-Only**: Only contains events with "critical" severity
+- **Triple Logging**: Critical events are automatically logged to recent logs, error logs, AND critical logs
+- **Dedicated Storage**: Separate persistent storage for the most severe issues
+- **Emergency Monitoring**: Designed for tracking system-threatening events
+
 **Event Types:**
 - `system`: System-level events (startup, shutdown, errors)
 - `theme`: Theme change events
@@ -369,6 +437,18 @@ await fetch('/api/system', {
 const logs = await fetch('/api/logs/recent?limit=10');
 const logData = await logs.json();
 console.log('Recent events:', logData.events);
+
+// Get error logs
+const errorLogs = await fetch('/api/logs/errors?limit=20');
+const errorData = await errorLogs.json();
+console.log('Error events:', errorData.errors);
+console.log('Total errors:', errorData.totalErrors);
+
+// Get critical logs
+const criticalLogs = await fetch('/api/logs/critical?limit=10');
+const criticalData = await criticalLogs.json();
+console.log('Critical events:', criticalData.critical);
+console.log('Total critical:', criticalData.totalCritical);
 ```
 
 ### cURL Examples
@@ -387,6 +467,12 @@ curl -X PATCH http://192.168.1.100/api/system \
 
 # Get recent logs
 curl -X GET "http://192.168.1.100/api/logs/recent?limit=20"
+
+# Get error logs
+curl -X GET "http://192.168.1.100/api/logs/errors?limit=50"
+
+# Get critical logs
+curl -X GET "http://192.168.1.100/api/logs/critical?limit=25"
 
 # Upload firmware (example)
 curl -X POST http://192.168.1.100/api/system/OTA \

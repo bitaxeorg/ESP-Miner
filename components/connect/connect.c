@@ -1,4 +1,3 @@
-
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -14,6 +13,7 @@
 
 #include "connect.h"
 #include "main.h"
+#include "dataBase.h"
 
 #if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
 #define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_HUNT_AND_PECK
@@ -86,6 +86,13 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         MINER_set_wifi_status(WIFI_CONNECTED, 0, 0);
+        
+        // Log WiFi connection event
+        char wifi_data[128];
+        snprintf(wifi_data, sizeof(wifi_data), 
+                 "{\"ipAddress\":\"%s\",\"retryCount\":%d}", 
+                 _ip_addr_str, s_retry_num);
+        dataBase_log_event("network", "info", "WiFi connection established", wifi_data);
     }
 }
 

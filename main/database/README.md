@@ -12,7 +12,9 @@ The database system uses a JSON file-based approach with the following structure
 │   ├── activeThemes.json      # Currently active theme
 │   └── availableThemes.json   # List of all available themes
 └── logs/
-    └── recentLogs.json        # Recent event logs (max 100 entries)
+    ├── recentLogs.json        # Recent event logs (max 100 entries)
+    ├── errorLogs.json         # Persistent error logs (no rotation)
+    └── criticalLogs.json      # Persistent critical logs (no rotation)
 ```
 
 ### Partition Support
@@ -69,6 +71,56 @@ The database automatically detects and supports two partition layouts:
 }
 ```
 
+#### errorLogs.json
+```json
+{
+  "totalErrors": 3,
+  "lastError": 1706798700,
+  "description": "Persistent error logs - no automatic rotation",
+  "errors": [
+    {
+      "timestamp": 1706798600,
+      "type": "system",
+      "severity": "error",
+      "message": "ASIC communication failed",
+      "data": {"attempts": 3, "lastResponse": "timeout"}
+    },
+    {
+      "timestamp": 1706798700,
+      "type": "network",
+      "severity": "critical",
+      "message": "Pool connection lost",
+      "data": {"reconnectAttempts": 5, "poolUrl": "stratum+tcp://pool.example.com"}
+    }
+  ]
+}
+```
+
+#### criticalLogs.json
+```json
+{
+  "totalCritical": 3,
+  "lastCritical": 1706798700,
+  "description": "Persistent critical logs - no automatic rotation",
+  "critical": [
+    {
+      "timestamp": 1706798600,
+      "type": "system",
+      "severity": "critical",
+      "message": "ASIC overheating",
+      "data": {"temperature": 85, "threshold": 80}
+    },
+    {
+      "timestamp": 1706798700,
+      "type": "network",
+      "severity": "critical",
+      "message": "Pool connection timeout",
+      "data": {"poolUrl": "stratum+tcp://pool.example.com", "timeout": 30}
+    }
+  ]
+}
+```
+
 ## Initializing Database
 
 ### Main Initialization
@@ -93,7 +145,8 @@ The `dataBase_init()` function performs the following steps:
 2. **SPIFFS Mounting**: Mounts the data partition (or creates data directory in legacy mode)  
 3. **Theme Database**: Initializes theme storage files
 4. **Logging Database**: Initializes event logging files
-5. **Directory Creation**: Creates necessary directory structure
+5. **Error Logs Database**: Initializes persistent error logging files
+6. **Directory Creation**: Creates necessary directory structure
 
 ### Integration with HTTP Server
 
@@ -306,6 +359,244 @@ Supported severity levels:
 2. **Timestamps**: Automatically adds timestamps to all events
 3. **Structured Data**: Supports both simple string data and complex JSON objects
 4. **Performance**: Efficient file-based storage with minimal memory usage
+
+## Persistent Error Logging Implementation
+
+The persistent error logging system provides long-term storage for error and critical events without automatic rotation. These logs persist across system reboots and are designed for troubleshooting and system health monitoring.
+
+### Key Features
+
+- **Persistent Storage**: No automatic rotation or size limits
+- **Automatic Dual Logging**: Error and critical events are automatically logged to both recent logs and error logs
+- **Comprehensive Metadata**: Tracks total error count and last error timestamp
+- **Manual Management**: Requires explicit clearing via API calls
+
+### API Functions
+
+#### Log Error Event
+```c
+esp_err_t dataBase_log_error(const char* event_type, const char* severity, 
+                            const char* message, const char* data);
+```
+
+**Example:**
+```c
+// Log a critical system error
+dataBase_log_error("system", "critical", "ASIC overheating", 
+                   "{\"temperature\":85,\"threshold\":80}");
+
+// Log a network error
+dataBase_log_error("network", "error", "Pool connection timeout", 
+                   "{\"poolUrl\":\"stratum+tcp://pool.example.com\",\"timeout\":30}");
+```
+
+#### Get Error Logs
+```c
+esp_err_t dataBase_get_error_logs(int max_count, cJSON** logs_json);
+```
+
+**Example:**
+```c
+cJSON* error_logs;
+// Get last 20 errors (0 = get all errors)
+esp_err_t ret = dataBase_get_error_logs(20, &error_logs);
+if (ret == ESP_OK) {
+    cJSON* errors = cJSON_GetObjectItem(error_logs, "errors");
+    cJSON* total = cJSON_GetObjectItem(error_logs, "totalErrors");
+    ESP_LOGI(TAG, "Retrieved %d of %d total errors", 
+             cJSON_GetArraySize(errors), total->valueint);
+    cJSON_Delete(error_logs);
+}
+```
+
+#### Clear Error Logs
+```c
+esp_err_t dataBase_clear_error_logs(void);
+```
+
+**Example:**
+```c
+esp_err_t ret = dataBase_clear_error_logs();
+if (ret == ESP_OK) {
+    ESP_LOGI(TAG, "Error logs cleared successfully");
+}
+```
+
+### Automatic Integration
+
+Error logs are automatically populated when using the standard logging function with error/critical severity:
+
+```c
+// This will log to both recentLogs.json AND errorLogs.json
+dataBase_log_event("system", "error", "Memory allocation failed", NULL);
+dataBase_log_event("mining", "critical", "Hardware failure detected", 
+                   "{\"chip\":1,\"errorCode\":\"0xFF\"}");
+```
+
+### Response Format
+
+Error logs API returns comprehensive metadata:
+
+```json
+{
+  "errors": [
+    {
+      "timestamp": 1706798600,
+      "type": "system", 
+      "severity": "error",
+      "message": "ASIC communication failed",
+      "data": {"attempts": 3, "lastResponse": "timeout"}
+    }
+  ],
+  "count": 1,          // Number of errors returned
+  "totalErrors": 15,   // Total errors since last clear
+  "lastError": 1706798600  // Timestamp of most recent error
+}
+```
+
+### Use Cases
+
+1. **System Health Monitoring**: Track error patterns over time
+2. **Troubleshooting**: Review historical errors for debugging
+3. **Quality Assurance**: Monitor system stability metrics
+4. **Alert Integration**: Check error counts for alerting systems
+5. **Performance Analysis**: Correlate errors with system performance
+
+### Best Practices
+
+1. **Regular Monitoring**: Periodically check error logs via API
+2. **Proactive Clearing**: Clear logs after addressing issues
+3. **Trend Analysis**: Monitor error frequency patterns
+4. **Structured Data**: Include relevant context in error data fields
+5. **Severity Classification**: Use appropriate severity levels (error vs critical)
+
+## Critical Logging Implementation
+
+The critical logging system provides dedicated persistent storage specifically for critical-severity events. This system runs in parallel with both regular logs and error logs, ensuring critical events receive special attention.
+
+### Key Features
+
+- **Critical-Only Focus**: Only logs events with "critical" severity
+- **Persistent Storage**: No automatic rotation or size limits
+- **Triple Logging**: Critical events are logged to recent logs, error logs, AND critical logs
+- **Dedicated API**: Separate endpoint for retrieving only critical events
+- **System Health**: Designed for monitoring the most severe system issues
+
+### API Functions
+
+#### Log Critical Event
+```c
+esp_err_t dataBase_log_critical(const char* event_type, const char* severity, 
+                               const char* message, const char* data);
+```
+
+**Example:**
+```c
+// Log a critical system failure
+dataBase_log_critical("power", "critical", "Overheat mode activated", 
+                     "{\"chipTemp\":85.0,\"threshold\":80,\"device\":\"DEVICE_MAX\"}");
+
+// Log a critical network issue
+dataBase_log_critical("network", "critical", "Pool connection completely lost", 
+                     "{\"downtime\":300,\"poolUrl\":\"stratum+tcp://pool.example.com\"}");
+```
+
+#### Get Critical Logs
+```c
+esp_err_t dataBase_get_critical_logs(int max_count, cJSON** logs_json);
+```
+
+**Example:**
+```c
+cJSON* critical_logs;
+// Get last 10 critical events (0 = get all critical events)
+esp_err_t ret = dataBase_get_critical_logs(10, &critical_logs);
+if (ret == ESP_OK) {
+    cJSON* critical = cJSON_GetObjectItem(critical_logs, "critical");
+    cJSON* total = cJSON_GetObjectItem(critical_logs, "totalCritical");
+    ESP_LOGI(TAG, "Retrieved %d of %d total critical events", 
+             cJSON_GetArraySize(critical), total->valueint);
+    cJSON_Delete(critical_logs);
+}
+```
+
+#### Clear Critical Logs
+```c
+esp_err_t dataBase_clear_critical_logs(void);
+```
+
+**Example:**
+```c
+esp_err_t ret = dataBase_clear_critical_logs();
+if (ret == ESP_OK) {
+    ESP_LOGI(TAG, "Critical logs cleared successfully");
+}
+```
+
+### Automatic Integration
+
+Critical events are automatically logged to all three systems:
+
+```c
+// This will log to recentLogs.json, errorLogs.json, AND criticalLogs.json
+dataBase_log_event("system", "critical", "Hardware failure detected", 
+                   "{\"component\":\"ASIC\",\"errorCode\":\"0xFF\"}");
+```
+
+### Response Format
+
+Critical logs API returns focused metadata:
+
+```json
+{
+  "critical": [
+    {
+      "timestamp": 1706798600,
+      "type": "power", 
+      "severity": "critical",
+      "message": "Overheat mode activated",
+      "data": {"chipTemp": 85.0, "threshold": 80, "device": "DEVICE_MAX"}
+    }
+  ],
+  "count": 1,              // Number of critical events returned
+  "totalCritical": 5,      // Total critical events since last clear
+  "lastCritical": 1706798600  // Timestamp of most recent critical event
+}
+```
+
+### Common Critical Events
+
+The system automatically logs these critical events:
+
+1. **Overheat Protection**: When thermal limits are exceeded
+   ```json
+   {
+     "type": "power",
+     "severity": "critical", 
+     "message": "Overheat mode activated - VR or ASIC temperature exceeded threshold",
+     "data": {"vrTemp": 85.0, "chipTemp": 75.0, "device": "DEVICE_GAMMA"}
+   }
+   ```
+
+2. **System Failures**: Hardware or software failures
+3. **Network Critical Issues**: Complete loss of connectivity
+4. **Power Management**: Critical power events
+
+### Use Cases
+
+1. **Emergency Monitoring**: Track only the most severe issues
+2. **Alert Systems**: Trigger immediate notifications on critical events
+3. **Failure Analysis**: Analyze patterns in critical system failures
+4. **Compliance**: Maintain records of critical system events
+5. **Diagnostics**: Quick identification of severe problems
+
+### Best Practices
+
+1. **Reserve for Genuine Critical Events**: Don't overuse critical severity
+2. **Include Context**: Always provide relevant data for troubleshooting
+3. **Monitor Regularly**: Check critical logs frequently for system health
+4. **Act Quickly**: Critical events often require immediate attention
+5. **Clear After Resolution**: Clear logs once critical issues are addressed
 
 ## Error Handling
 

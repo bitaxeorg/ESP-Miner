@@ -881,6 +881,120 @@ static esp_err_t GET_recent_logs(httpd_req_t * req)
     return ESP_OK;
 }
 
+/* Handler for getting error logs from database */
+static esp_err_t GET_error_logs(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    // Parse query parameters for limit
+    int limit = 0; // Default: return all errors
+    char query_buf[128];
+    if (httpd_req_get_url_query_str(req, query_buf, sizeof(query_buf)) == ESP_OK) {
+        char limit_str[16];
+        if (httpd_query_key_value(query_buf, "limit", limit_str, sizeof(limit_str)) == ESP_OK) {
+            int parsed_limit = atoi(limit_str);
+            if (parsed_limit > 0) {
+                limit = parsed_limit;
+            }
+        }
+    }
+
+    // Get error logs from database
+    cJSON* logs_json = NULL;
+    esp_err_t ret = dataBase_get_error_logs(limit, &logs_json);
+    
+    if (ret != ESP_OK || logs_json == NULL) {
+        ESP_LOGW(TAG, "Failed to get error logs from database, returning empty response");
+        // Return empty error logs response
+        cJSON* empty_response = cJSON_CreateObject();
+        cJSON_AddArrayToObject(empty_response, "errors");
+        cJSON_AddNumberToObject(empty_response, "count", 0);
+        cJSON_AddNumberToObject(empty_response, "totalErrors", 0);
+        cJSON_AddNumberToObject(empty_response, "lastError", 0);
+        
+        const char* response_str = cJSON_Print(empty_response);
+        httpd_resp_sendstr(req, response_str);
+        free((char*)response_str);
+        cJSON_Delete(empty_response);
+        return ESP_OK;
+    }
+
+    // Send the error logs response
+    const char* logs_str = cJSON_Print(logs_json);
+    httpd_resp_sendstr(req, logs_str);
+    free((char*)logs_str);
+    cJSON_Delete(logs_json);
+    
+    return ESP_OK;
+}
+
+/* Handler for getting critical logs from database */
+static esp_err_t GET_critical_logs(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    // Parse query parameters for limit
+    int limit = 0; // Default: return all critical events
+    char query_buf[128];
+    if (httpd_req_get_url_query_str(req, query_buf, sizeof(query_buf)) == ESP_OK) {
+        char limit_str[16];
+        if (httpd_query_key_value(query_buf, "limit", limit_str, sizeof(limit_str)) == ESP_OK) {
+            int parsed_limit = atoi(limit_str);
+            if (parsed_limit > 0) {
+                limit = parsed_limit;
+            }
+        }
+    }
+
+    // Get critical logs from database
+    cJSON* logs_json = NULL;
+    esp_err_t ret = dataBase_get_critical_logs(limit, &logs_json);
+    
+    if (ret != ESP_OK || logs_json == NULL) {
+        ESP_LOGW(TAG, "Failed to get critical logs from database, returning empty response");
+        // Return empty critical logs response
+        cJSON* empty_response = cJSON_CreateObject();
+        cJSON_AddArrayToObject(empty_response, "critical");
+        cJSON_AddNumberToObject(empty_response, "count", 0);
+        cJSON_AddNumberToObject(empty_response, "totalCritical", 0);
+        cJSON_AddNumberToObject(empty_response, "lastCritical", 0);
+        
+        const char* response_str = cJSON_Print(empty_response);
+        httpd_resp_sendstr(req, response_str);
+        free((char*)response_str);
+        cJSON_Delete(empty_response);
+        return ESP_OK;
+    }
+
+    // Send the critical logs response
+    const char* logs_str = cJSON_Print(logs_json);
+    httpd_resp_sendstr(req, logs_str);
+    free((char*)logs_str);
+    cJSON_Delete(logs_json);
+    
+    return ESP_OK;
+}
+
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -998,6 +1112,24 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &logs_recent_get_uri);
+
+    /* URI handler for fetching error logs */
+    httpd_uri_t logs_errors_get_uri = {
+        .uri = "/api/logs/errors", 
+        .method = HTTP_GET, 
+        .handler = GET_error_logs, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &logs_errors_get_uri);
+
+    /* URI handler for fetching critical logs */
+    httpd_uri_t logs_critical_get_uri = {
+        .uri = "/api/logs/critical", 
+        .method = HTTP_GET, 
+        .handler = GET_critical_logs, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &logs_critical_get_uri);
 
     httpd_uri_t ws = {
         .uri = "/api/ws", 

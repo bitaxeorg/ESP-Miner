@@ -25,6 +25,18 @@ esp_err_t dataBase_log_event(const char* event_type, const char* severity, const
 esp_err_t dataBase_get_recent_logs(int max_count, cJSON** logs_json);
 esp_err_t dataBase_archive_old_logs(void);
 
+// Error logging functions (persistent)
+esp_err_t dataBase_init_error_logs(void);
+esp_err_t dataBase_log_error(const char* event_type, const char* severity, const char* message, const char* data);
+esp_err_t dataBase_get_error_logs(int max_count, cJSON** logs_json);
+esp_err_t dataBase_clear_error_logs(void);
+
+// Critical logging functions (persistent)
+esp_err_t dataBase_init_critical_logs(void);
+esp_err_t dataBase_log_critical(const char* event_type, const char* severity, const char* message, const char* data);
+esp_err_t dataBase_get_critical_logs(int max_count, cJSON** logs_json);
+esp_err_t dataBase_clear_critical_logs(void);
+
 // HTTP API endpoints
 esp_err_t dataBase_register_api_endpoints(httpd_handle_t server, void* ctx);
 

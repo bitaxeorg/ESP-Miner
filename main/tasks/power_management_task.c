@@ -14,6 +14,10 @@
 #include "vcore.h"
 #include "esp_timer.h"
 #include "lvglDisplayBAP.h"
+#include "dataBase.h"
+#include "driver/gpio.h"
+#include "common.h"
+#include "system.h"
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_ASIC_RESET  CONFIG_GPIO_ASIC_RESET
 #define GPIO_PLUG_SENSE  CONFIG_GPIO_PLUG_SENSE
@@ -124,6 +128,14 @@ bool apply_preset(DeviceModel device_model, const char* preset_name) {
 
     // send through BAP
     //lvglSendPresetBAP();
+    
+    // Log preset change event
+    char preset_data[256];
+    snprintf(preset_data, sizeof(preset_data), 
+             "{\"presetName\":\"%s\",\"voltage\":%u,\"frequency\":%u,\"fanSpeed\":%u,\"deviceModel\":%d}", 
+             preset_name, selected_preset->domain_voltage_mv, selected_preset->frequency_mhz, 
+             selected_preset->fan_speed_percent, device_model);
+    dataBase_log_event("power", "info", "Preset configuration applied", preset_data);
     
     return true;
 }
@@ -434,6 +446,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
                     nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
                     nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+                    
+                    // Log critical overheat event
+                    char overheat_data[128];
+                    snprintf(overheat_data, sizeof(overheat_data), 
+                             "{\"chipTemp\":%.1f,\"threshold\":%d,\"device\":\"DEVICE_MAX\"}", 
+                             power_management->chip_temp_avg, THROTTLE_TEMP);
+                    dataBase_log_event("power", "critical", "Overheat mode activated - ASIC temperature exceeded threshold", overheat_data);
+                    
                     exit(EXIT_FAILURE);
                 }
                 break;
@@ -470,6 +490,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
                     nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
                     nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+                    
+                    // Log critical overheat event
+                    char overheat_data[128];
+                    snprintf(overheat_data, sizeof(overheat_data), 
+                             "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%d,\"chipThreshold\":%d,\"device\":\"DEVICE_ULTRA_SUPRA\"}", 
+                             power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
+                    dataBase_log_event("power", "critical", "Overheat mode activated - VR or ASIC temperature exceeded threshold", overheat_data);
+                    
                     exit(EXIT_FAILURE);
                 }
 
@@ -498,6 +526,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
                     nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
                     nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+                    
+                    // Log critical overheat event
+                    char overheat_data[128];
+                    snprintf(overheat_data, sizeof(overheat_data), 
+                             "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%d,\"chipThreshold\":%d,\"device\":\"DEVICE_GAMMA\"}", 
+                             power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
+                    dataBase_log_event("power", "critical", "Overheat mode activated - VR or ASIC temperature exceeded threshold", overheat_data);
+                    
                     exit(EXIT_FAILURE);
                 }
                 break;
