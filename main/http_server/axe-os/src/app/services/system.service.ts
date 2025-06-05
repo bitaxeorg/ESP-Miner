@@ -18,7 +18,7 @@ export class SystemService {
 
   public getInfo(uri: string = ''): Observable<ISystemInfo> {
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/info`) as Observable<ISystemInfo>;
+      return this.httpClient.get(`${uri}/api/v2/system/info`) as Observable<ISystemInfo>;
     }
 
     // Mock data for development
@@ -31,7 +31,7 @@ export class SystemService {
         vrTemp: 45,
         maxPower: 25,
         nominalVoltage: 5,
-        hashRate: 475,
+        hashrate: 475,
         expectedHashrate: 420,
         bestDiff: "0",
         bestSessionDiff: "0",
@@ -51,7 +51,7 @@ export class SystemService {
         uptimeSeconds: 38,
         asicCount: 1,
         smallCoreCount: 672,
-        ASICModel: eASICModel.BM1366,
+        asicModel: eASICModel.BM1366,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
         fallbackStratumURL: "test.public-pool.io",
@@ -64,26 +64,26 @@ export class SystemService {
         idfVersion: "v5.1.2",
         boardVersion: "204",
         display: "SSD1306 (128x32)",
-        flipscreen: 1,
-        invertscreen: 0,
+        flipScreen: 1,
+        invertScreen: 0,
         displayTimeout: -1,
-        autofanspeed: 1,
-        fanspeed: 100,
-        temptarget: 60,
+        autoFanSpeed: 1,
+        fanSpeed: 100,
+        tempTarget: 60,
         statsLimit: 360,
         statsDuration: 2,
-        fanrpm: 0,
+        fanRPM: 0,
 
         boardtemp1: 30,
         boardtemp2: 40,
-        overheat_mode: 0
+        overheatMode: 0
       }
     ).pipe(delay(1000));
   }
 
   public getStatistics(uri: string = ''): Observable<ISystemStatistics> {
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/statistics/dashboard`) as Observable<ISystemStatistics>;
+      return this.httpClient.get(`${uri}/api/v2/system/statistics/dashboard`) as Observable<ISystemStatistics>;
     }
 
     // Mock data for development
@@ -105,12 +105,12 @@ export class SystemService {
   }
 
   public restart(uri: string = '') {
-    return this.httpClient.post(`${uri}/api/system/restart`, {}, {responseType: 'text'});
+    return this.httpClient.post(`${uri}/api/v2/system/restart`, {}, {responseType: 'text'});
   }
 
   public updateSystem(uri: string = '', update: any) {
     if (environment.production) {
-      return this.httpClient.patch(`${uri}/api/system`, update);
+      return this.httpClient.patch(`${uri}/api/v2/system`, update);
     } else {
       return of(true);
     }
@@ -148,10 +148,10 @@ export class SystemService {
   }
 
   public performOTAUpdate(file: File | Blob) {
-    return this.otaUpdate(file, `/api/system/OTA`);
+    return this.otaUpdate(file, `/api/v2/system/ota`);
   }
   public performWWWOTAUpdate(file: File | Blob) {
-    return this.otaUpdate(file, `/api/system/OTAWWW`);
+    return this.otaUpdate(file, `/api/v2/system/otawww`);
   }
 
 
@@ -163,7 +163,7 @@ export class SystemService {
     voltageOptions: number[];
   }> {
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/asic`) as Observable<{
+      return this.httpClient.get(`${uri}/api/v2/system/asic`) as Observable<{
         ASICModel: eASICModel;
         defaultFrequency: number;
         frequencyOptions: number[];
@@ -183,10 +183,10 @@ export class SystemService {
   }
 
   public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
-    return this.httpClient.get(`${uri}/api/swarm/info`) as Observable<{ ip: string }[]>;
+    return this.httpClient.get(`${uri}/api/v2/swarm/info`) as Observable<{ ip: string }[]>;
   }
 
   public updateSwarm(uri: string = '', swarmConfig: any) {
-    return this.httpClient.patch(`${uri}/api/swarm`, swarmConfig);
+    return this.httpClient.patch(`${uri}/api/v2/swarm`, swarmConfig);
   }
 }

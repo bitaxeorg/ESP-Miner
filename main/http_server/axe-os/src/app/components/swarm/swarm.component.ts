@@ -29,7 +29,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalTime = 30;
   public refreshTimeSet = 30;
 
-  public totals: { hashRate: number, power: number, bestDiff: string } = { hashRate: 0, power: 0, bestDiff: '0' };
+  public totals: { hashrate: number, power: number, bestDiff: string } = { hashrate: 0, power: 0, bestDiff: '0' };
 
   public isRefreshing = false;
 
@@ -117,9 +117,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
     const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
     from(ips).pipe(
       mergeMap(ipAddr =>
-        this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
+        this.httpClient.get(`http://${ipAddr}/api/v2/system/info`).pipe(
           map(result => {
-            if ('hashRate' in result) {
+            if ('hashrate' in result) {
               return {
                 IP: ipAddr,
                 ...result
@@ -129,7 +129,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
           }),
           timeout(5000), // Set the timeout to 5 seconds
           catchError(error => {
-            //console.error(`Request to ${ipAddr}/api/system/info failed or timed out`, error);
+            //console.error(`Request to ${ipAddr}/api/v2/system/info failed or timed out`, error);
             return []; // Return an empty result or handle as desired
           })
         ),
@@ -164,7 +164,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
 
     this.systemService.getInfo(`http://${newIp}`).subscribe((res) => {
-      if (res.ASICModel) {
+      if (res.asicModel) {
         this.swarm.push({ IP: newIp, ...res });
         this.sortSwarm();
         this.localStorageService.setObject(SWARM_DATA, this.swarm);
@@ -208,7 +208,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     from(ips).pipe(
       mergeMap(ipAddr =>
-        this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
+        this.httpClient.get(`http://${ipAddr}/api/v2/system/info`).pipe(
           map(result => {
             return {
               IP: ipAddr,
@@ -223,7 +223,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
             const existingDevice = this.swarm.find(axeOs => axeOs.IP === ipAddr);
             return of({
               ...existingDevice,
-              hashRate: 0,
+              hashrate: 0,
               sharesAccepted: 0,
               power: 0,
               voltage: 0,
@@ -311,7 +311,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   private calculateTotals() {
-    this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
+    this.totals.hashrate = this.swarm.reduce((sum, axe) => sum + (axe.hashrate || 0), 0);
     this.totals.power = this.swarm.reduce((sum, axe) => sum + (axe.power || 0), 0);
     this.totals.bestDiff = this.swarm
       .map(axe => axe.bestDiff || '0')

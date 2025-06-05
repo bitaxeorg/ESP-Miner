@@ -3,7 +3,7 @@
 </ng-template>
 <ng-container *ngIf="info$ | async as info; else loading">
     <!-- Temp warning alert -->
-    <p-message *ngIf="info.overheat_mode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
+    <p-message *ngIf="info.overheatMode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
         text="Bitaxe has overheated - See settings">
     </p-message>
 
@@ -11,8 +11,8 @@
         text="Bitaxe frequency is set low - See settings">
     </p-message>
 
-    <p-message *ngIf="info.power_fault" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="{{info.power_fault}} Check your Power Supply.">
+    <p-message *ngIf="info.powerFault" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
+        text="{{info.powerFault}} Check your Power Supply.">
     </p-message>
 
     <p-message *ngIf="info.isUsingFallbackStratum" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
@@ -24,26 +24,26 @@
             <div class="card mb-0">
                 <div class="flex justify-content-between mb-3">
                     <div>
-                        <span class="block text-500 font-medium mb-3">Hash Rate</span>
+                        <span class="block text-500 font-medium mb-3">Hashrate</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
-                            <span *ngIf="!info.power_fault">
-                                {{info.hashRate * 1000000000 | hashSuffix}}
+                            <span *ngIf="!info.powerFault">
+                                {{info.hashrate * 1000000000 | hashSuffix}}
                             </span>
-                            <span *ngIf="info.power_fault" class="text-red-500">
+                            <span *ngIf="info.powerFault" class="text-red-500">
                                 Not available - Power fault
                             </span>
                         </div>
                     </div>
                 </div>
 
-                <ng-container *ngIf="!info.power_fault">
+                <ng-container *ngIf="!info.powerFault">
                     Average:
                     <span class="text-green-500 font-medium">
                         {{calculateAverage(previousHashrateData.concat(hashrateData)) | hashSuffix}}
                     </span>
                 </ng-container>
 
-                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
+                <div class="text-500 text-xs" *ngIf="!info.powerFault && info.expectedHashrate">
                     Expected: {{info.expectedHashrate * 1000000000 | hashSuffix}}
                 </div>
             </div>
@@ -54,24 +54,24 @@
                     <div>
                         <span class="block text-500 font-medium mb-3">Efficiency</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
-                            <span *ngIf="!info.power_fault">
-                                {{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/TH</small>
+                            <span *ngIf="!info.powerFault">
+                                {{info.power / (info.hashrate/1000) | number: '1.2-2'}} <small>J/TH</small>
                             </span>
-                            <span *ngIf="info.power_fault" class="text-red-500">
+                            <span *ngIf="info.powerFault" class="text-red-500">
                                 Not available - Power fault
                             </span>
                         </div>
                     </div>
                 </div>
 
-                <ng-container *ngIf="!info.power_fault">
+                <ng-container *ngIf="!info.powerFault">
                     Average:
                     <span class="text-green-500 font-medium">
                         {{calculateEfficiencyAverage(previousHashrateData.concat(hashrateData), previousPowerData.concat(powerData)) | number: '1.2-2'}} <small>J/TH</small>
                     </span>
                 </ng-container>
 
-                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
+                <div class="text-500 text-xs" *ngIf="!info.powerFault && info.expectedHashrate">
                     Expected: {{info.power / (info.expectedHashrate/1000) | number: '1.2-2'}} J/TH
                 </div>
             </div>
@@ -131,7 +131,7 @@
             </div>
         </div>
 
-        <div class="col-12" *ngIf="!info.power_fault">
+        <div class="col-12" *ngIf="!info.powerFault">
             <div class="card">
                 <p-chart [data]="chartData" [options]="chartOptions"></p-chart>
             </div>
@@ -224,8 +224,8 @@
                             High Temperature</span>
                     </div>
                     <div class="col-12">
-                        <h6>Fan Speed<span style="float: right;">{{info.fanspeed}}%  ({{info.fanrpm}} RPM)</span></h6>
-                        <p-progressBar [value]="info.fanspeed" [style]="{ height: '6px' }" >
+                        <h6>Fan Speed<span style="float: right;">{{info.fanSpeed}}%  ({{info.fanRPM}} RPM)</span></h6>
+                        <p-progressBar [value]="info.fanSpeed" [style]="{ height: '6px' }" >
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
                     </div>
