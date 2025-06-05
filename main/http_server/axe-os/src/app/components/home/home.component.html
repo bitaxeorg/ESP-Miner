@@ -20,7 +20,7 @@
     </p-message>
 
     <p-message *ngIf="info.version !== info.axeOSVersion" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Firmware and Axe-OS versions do not match. Please make sure to update both esp-miner.bin and www.bin.">
+        text="Firmware and Axe-OS versions do not match. Please make sure to update both www.bin and esp-miner.bin.">
     </p-message>
 
     <div class="grid" *ngIf="info$ | async as info; else loading">
