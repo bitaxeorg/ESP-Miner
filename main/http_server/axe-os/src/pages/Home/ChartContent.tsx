@@ -72,32 +72,32 @@ const ChartContent = () => {
                 Real-Time Mining Dashboard
               </h1>
               <p className='text-xl text-blue-100 max-w-2xl'>
-                Monitor your mining performance with live data updates every 5 seconds or customized duration and interval settings.
+                Monitor your mining performance with live data updates every 5 seconds or customize your duration and interval settings.
               </p>
             </div>
 
             {/* Performance Stats Card - simplified without Duration Selector */}
             <div className='bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 min-w-[320px]'>
               <div className='flex items-center justify-between mb-4'>
-                <h3 className='text-lg font-semibold text-blue-100'>Chart Settings</h3>
+                <h3 className='text-lg font-semibold text-blue-100'>Miner Specifications</h3>
               </div>
 
               <div className='space-y-2 text-sm'>
                 <div className='flex justify-between'>
-                  <span className='text-blue-200'>Duration:</span>
-                  <span className='font-medium'>{chartConfig.description}</span>
+                  <span className='text-blue-200'>ASIC Model:</span>
+                  <span className='font-medium'>{loading ? 'Loading...' : systemInfo?.ASICModel || 'N/A'}</span>
                 </div>
                 <div className='flex justify-between'>
-                  <span className='text-blue-200'>Data Points:</span>
-                  <span className='font-medium'>{chartConfig.dataPoints.toLocaleString()}</span>
+                  <span className='text-blue-200'>Autotune Preset:</span>
+                  <span className='font-medium'>{loading ? 'Loading...' : systemInfo?.autotune_preset ? systemInfo.autotune_preset.charAt(0).toUpperCase() + systemInfo.autotune_preset.slice(1) : 'N/A'}</span>
                 </div>
                 <div className='flex justify-between'>
-                  <span className='text-blue-200'>Memory Usage:</span>
-                  <span className='font-medium'>{formatMemorySize(memoryInfo.estimatedMemoryKB)}</span>
+                  <span className='text-blue-200'>Expected Hashrate:</span>
+                  <span className='font-medium'>TBD</span>
                 </div>
                 <div className='flex justify-between'>
-                  <span className='text-blue-200'>Update Rate:</span>
-                  <span className='font-medium'>Every {chartConfig.intervalSeconds}s</span>
+                  <span className='text-blue-200'>Uptime:</span>
+                  <span className='font-medium'>{loading ? 'Loading...' : systemInfo?.uptimeSeconds ? `${Math.floor(systemInfo.uptimeSeconds / 60)}m ${systemInfo.uptimeSeconds % 60}s` : 'N/A'}</span>
                 </div>
               </div>
             </div>
