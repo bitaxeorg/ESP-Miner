@@ -213,7 +213,8 @@ esp_err_t is_network_allowed(httpd_req_t * req)
 static void readAxeOSVersion(void) {
     FILE* f = fopen("/version.txt", "r");
     if (f != NULL) {
-        fread(axeOSVersion, 1, sizeof(axeOSVersion), f);
+        size_t n = fread(axeOSVersion, 1, sizeof(axeOSVersion) - 1, f);
+        axeOSVersion[n] = '\0';
         fclose(f);
 
         ESP_LOGI(TAG, "Axe-OS version: %s", axeOSVersion);
@@ -222,6 +223,7 @@ static void readAxeOSVersion(void) {
             ESP_LOGE(TAG, "Firmware (%s) and Axe-OS (%s) versions do not match. Please make sure to update both www.bin and esp-miner.bin.", esp_app_get_description()->version, axeOSVersion);
         }
     } else {
+        strcpy(axeOSVersion, "unknown");
         ESP_LOGE(TAG, "Failed to open Axe-OS version.txt");
     }
 }
