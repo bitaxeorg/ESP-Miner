@@ -379,7 +379,9 @@ esp_err_t dataBase_log_event(const char* event_type, const char* severity, const
     
     // Create new event
     cJSON* new_event = cJSON_CreateObject();
-    cJSON_AddNumberToObject(new_event, "timestamp", esp_timer_get_time() / 1000000);
+    time_t now;
+    time(&now);
+    cJSON_AddNumberToObject(new_event, "timestamp", now);
     cJSON_AddStringToObject(new_event, "type", event_type);
     cJSON_AddStringToObject(new_event, "severity", severity);
     cJSON_AddStringToObject(new_event, "message", message);
@@ -540,8 +542,9 @@ esp_err_t dataBase_log_error(const char* event_type, const char* severity, const
     
     // Create new error event
     cJSON* new_error = cJSON_CreateObject();
-    uint64_t timestamp = esp_timer_get_time() / 1000000;
-    cJSON_AddNumberToObject(new_error, "timestamp", timestamp);
+    time_t now;
+    time(&now);
+    cJSON_AddNumberToObject(new_error, "timestamp", now);
     cJSON_AddStringToObject(new_error, "type", event_type);
     cJSON_AddStringToObject(new_error, "severity", severity);
     cJSON_AddStringToObject(new_error, "message", message);
@@ -566,7 +569,7 @@ esp_err_t dataBase_log_error(const char* event_type, const char* severity, const
     
     cJSON* last_error = cJSON_GetObjectItem(root, "lastError");
     if (cJSON_IsNumber(last_error)) {
-        last_error->valueint = timestamp;
+        last_error->valueint = now;
     }
     
     // Write back to file (no size limit - persistent storage)
@@ -709,8 +712,9 @@ esp_err_t dataBase_log_critical(const char* event_type, const char* severity, co
     
     // Create new critical event
     cJSON* new_critical = cJSON_CreateObject();
-    uint64_t timestamp = esp_timer_get_time() / 1000000;
-    cJSON_AddNumberToObject(new_critical, "timestamp", timestamp);
+    time_t now;
+    time(&now);
+    cJSON_AddNumberToObject(new_critical, "timestamp", now);
     cJSON_AddStringToObject(new_critical, "type", event_type);
     cJSON_AddStringToObject(new_critical, "severity", severity);
     cJSON_AddStringToObject(new_critical, "message", message);
@@ -735,7 +739,7 @@ esp_err_t dataBase_log_critical(const char* event_type, const char* severity, co
     
     cJSON* last_critical = cJSON_GetObjectItem(root, "lastCritical");
     if (cJSON_IsNumber(last_critical)) {
-        last_critical->valueint = timestamp;
+        last_critical->valueint = now;
     }
     
     // Write back to file (no size limit - persistent storage)

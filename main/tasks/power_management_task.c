@@ -247,10 +247,16 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
             // Increase voltage by 10mV
             uint16_t newVoltage = targetDomainVoltage + 10;
             ESP_LOGI(autotuneTAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+            char data[128];
+            snprintf(data, sizeof(data), "{\"voltage\":%u}", newVoltage);
+            dataBase_log_event("power", "info", "Autotune - Hashrate below target, increasing voltage", data);
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
             return;
         } else {
             ESP_LOGI(TAG, "Autotune - Hashrate above target, no adjustments needed");
+            char data[128];
+            snprintf(data, sizeof(data), "{\"voltage\":%u}", targetDomainVoltage);
+            dataBase_log_event("power", "info", "Autotune - Hashrate above target, no adjustments needed", data);
             return;
         }
     }
@@ -266,6 +272,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
             ESP_LOGI(TAG, "freq or power limit reached, no adjustments possible");
             ESP_LOGI(TAG, "Autotune - Frequency: %u MHz, Power: %d W, Max Frequency: %u MHz, Max Power: %d W", 
                      currentFrequency, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
+            
             return;
         }
         // Increase voltage by 0.2%
