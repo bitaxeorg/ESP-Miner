@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [preact(), tailwindcss()],
     build: {
-      outDir: resolve(__dirname, "dist/axe-os"),
+      outDir: resolve(__dirname, "dist/acs-os"),
       assetsInlineLimit: 0, // Disable inlining assets
     },
     publicDir: resolve(__dirname, "public"), // Ensure public directory is explicitly set

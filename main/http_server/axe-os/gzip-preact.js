@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const sourceDirectory = path.join(__dirname, "dist/axe-os");
+const sourceDirectory = path.join(__dirname, "dist/acs-os");
 
 // Function to gzip a file
 function gzipFile(filePath) {
