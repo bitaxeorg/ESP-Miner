@@ -349,7 +349,7 @@ Supported event types:
 Supported level levels:
 - `debug`: Detailed debugging information
 - `info`: General information messages
-- `warning`: Warning conditions
+- `warn`: Warning conditions
 - `error`: Error conditions
 - `critical`: Critical system errors
 
