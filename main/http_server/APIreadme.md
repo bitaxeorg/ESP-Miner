@@ -123,7 +123,39 @@ Update system configuration parameters.
 }
 ```
 
-**Response:** Empty with HTTP 200 status
+**Response Example:**
+```json
+{
+  "status": "success",
+  "message": "Settings updated successfully",
+  "updatedSettings": {
+    "frequency": 500,
+    "coreVoltage": 1200,
+    "autofanspeed": 1,
+    "fanspeed": 60,
+    "stratumURL": "stratum+tcp://newpool.example.com",
+    "stratumPort": 4334,
+    "stratumUser": "newuser.worker",
+    "stratumPassword": "***",
+    "hostname": "my-miner",
+    "presetName": "efficiency",
+    "presetApplied": true
+  },
+  "timestamp": 1706798400
+}
+```
+
+**Response Fields:**
+- `status`: "success" indicates all settings were processed successfully
+- `message`: Human-readable status message
+- `updatedSettings`: Object containing only the settings that were actually changed
+- `timestamp`: Unix timestamp of when the update occurred
+
+**Notes:**
+- Only settings that were included in the request and successfully updated are returned in `updatedSettings`
+- Passwords are masked with "***" in the response for security
+- If a preset is applied, `presetApplied` indicates whether it was successful
+- The response is logged to the database as a settings update event
 
 #### OPTIONS `/api/system`
 Get allowed methods for system endpoint.
@@ -437,7 +469,7 @@ await fetch('/api/themes/THEME_BITAXE_RED', {
 });
 
 // Update configuration
-await fetch('/api/system', {
+const updateResponse = await fetch('/api/system', {
     method: 'PATCH',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
@@ -445,6 +477,9 @@ await fetch('/api/system', {
         coreVoltage: 1250
     })
 });
+const updateResult = await updateResponse.json();
+console.log('Update status:', updateResult.status);
+console.log('Updated settings:', updateResult.updatedSettings);
 
 // Get recent logs
 const logs = await fetch('/api/logs/recent?limit=10');
