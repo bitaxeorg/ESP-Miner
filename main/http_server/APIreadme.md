@@ -200,21 +200,21 @@ Get recent system event logs.
     {
       "timestamp": 1706798400,
       "type": "system",
-      "severity": "info",
+      "level": "info",
       "message": "System started",
       "data": {"bootTime": 1706798400}
     },
     {
       "timestamp": 1706798460,
       "type": "theme",
-      "severity": "info", 
+      "level": "info", 
       "message": "Theme changed",
       "data": {"previousTheme": "THEME_ACS_DEFAULT", "newTheme": "THEME_BITAXE_RED"}
     },
     {
       "timestamp": 1706798520,
       "type": "mining",
-      "severity": "info",
+      "level": "info",
       "message": "Mining status update",
       "data": {"hashrate": 120.5, "temperature": 65}
     }
@@ -236,14 +236,14 @@ Get persistent error logs (errors and critical events only).
     {
       "timestamp": 1706798600,
       "type": "system",
-      "severity": "error",
+      "level": "error",
       "message": "ASIC communication failed",
       "data": {"attempts": 3, "lastResponse": "timeout"}
     },
     {
       "timestamp": 1706798700,
       "type": "network",
-      "severity": "critical",
+      "level": "critical",
       "message": "Pool connection lost",
       "data": {"reconnectAttempts": 5, "poolUrl": "stratum+tcp://pool.example.com"}
     }
@@ -267,14 +267,14 @@ Get persistent critical logs (critical events only).
     {
       "timestamp": 1706798600,
       "type": "power",
-      "severity": "critical",
+      "level": "critical",
       "message": "Overheat mode activated",
       "data": {"chipTemp": 85.0, "threshold": 80, "device": "DEVICE_MAX"}
     },
     {
       "timestamp": 1706798700,
       "type": "system",
-      "severity": "critical",
+      "level": "critical",
       "message": "Hardware failure detected",
       "data": {"component": "ASIC", "errorCode": "0xFF"}
     }
@@ -286,7 +286,7 @@ Get persistent critical logs (critical events only).
 ```
 
 **Key Features:**
-- **Critical-Only**: Only contains events with "critical" severity
+- **Critical-Only**: Only contains events with "critical" level
 - **Triple Logging**: Critical events are automatically logged to recent logs, error logs, AND critical logs
 - **Dedicated Storage**: Separate persistent storage for the most severe issues
 - **Emergency Monitoring**: Designed for tracking system-threatening events
@@ -299,7 +299,7 @@ Get persistent critical logs (critical events only).
 - `power`: Power management events
 - `user`: User-initiated actions
 
-**Severity Levels:**
+**Log Levels:**
 - `debug`: Detailed debugging information
 - `info`: General information messages
 - `warning`: Warning conditions

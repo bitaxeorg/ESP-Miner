@@ -63,7 +63,7 @@ The database automatically detects and supports two partition layouts:
     {
       "timestamp": 1706798400,
       "type": "system",
-      "severity": "info",
+      "level": "info",
       "message": "System started",
       "data": {"bootTime": 1706798400}
     }
@@ -81,14 +81,14 @@ The database automatically detects and supports two partition layouts:
     {
       "timestamp": 1706798600,
       "type": "system",
-      "severity": "error",
+      "level": "error",
       "message": "ASIC communication failed",
       "data": {"attempts": 3, "lastResponse": "timeout"}
     },
     {
       "timestamp": 1706798700,
       "type": "network",
-      "severity": "critical",
+      "level": "critical",
       "message": "Pool connection lost",
       "data": {"reconnectAttempts": 5, "poolUrl": "stratum+tcp://pool.example.com"}
     }
@@ -106,14 +106,14 @@ The database automatically detects and supports two partition layouts:
     {
       "timestamp": 1706798600,
       "type": "system",
-      "severity": "critical",
+      "level": "critical",
       "message": "ASIC overheating",
       "data": {"temperature": 85, "threshold": 80}
     },
     {
       "timestamp": 1706798700,
       "type": "network",
-      "severity": "critical",
+      "level": "critical",
       "message": "Pool connection timeout",
       "data": {"poolUrl": "stratum+tcp://pool.example.com", "timeout": 30}
     }
@@ -300,7 +300,7 @@ The logging system provides persistent storage for system events with automatic 
 
 #### Log Event
 ```c
-esp_err_t dataBase_log_event(const char* event_type, const char* severity, 
+esp_err_t dataBase_log_event(const char* event_type, const char* level, 
                              const char* message, const char* data);
 ```
 
@@ -344,9 +344,9 @@ Supported event types:
 - `power`: Power management events
 - `user`: User-initiated actions
 
-### Severity Levels
+### Level Levels
 
-Supported severity levels:
+Supported level levels:
 - `debug`: Detailed debugging information
 - `info`: General information messages
 - `warning`: Warning conditions
@@ -375,7 +375,7 @@ The persistent error logging system provides long-term storage for error and cri
 
 #### Log Error Event
 ```c
-esp_err_t dataBase_log_error(const char* event_type, const char* severity, 
+esp_err_t dataBase_log_error(const char* event_type, const char* level, 
                             const char* message, const char* data);
 ```
 
@@ -424,7 +424,7 @@ if (ret == ESP_OK) {
 
 ### Automatic Integration
 
-Error logs are automatically populated when using the standard logging function with error/critical severity:
+Error logs are automatically populated when using the standard logging function with error/critical level:
 
 ```c
 // This will log to both recentLogs.json AND errorLogs.json
@@ -443,7 +443,7 @@ Error logs API returns comprehensive metadata:
     {
       "timestamp": 1706798600,
       "type": "system", 
-      "severity": "error",
+      "level": "error",
       "message": "ASIC communication failed",
       "data": {"attempts": 3, "lastResponse": "timeout"}
     }
@@ -468,15 +468,15 @@ Error logs API returns comprehensive metadata:
 2. **Proactive Clearing**: Clear logs after addressing issues
 3. **Trend Analysis**: Monitor error frequency patterns
 4. **Structured Data**: Include relevant context in error data fields
-5. **Severity Classification**: Use appropriate severity levels (error vs critical)
+5. **Level Classification**: Use appropriate level levels (error vs critical)
 
 ## Critical Logging Implementation
 
-The critical logging system provides dedicated persistent storage specifically for critical-severity events. This system runs in parallel with both regular logs and error logs, ensuring critical events receive special attention.
+The critical logging system provides dedicated persistent storage specifically for critical-level events. This system runs in parallel with both regular logs and error logs, ensuring critical events receive special attention.
 
 ### Key Features
 
-- **Critical-Only Focus**: Only logs events with "critical" severity
+- **Critical-Only Focus**: Only logs events with "critical" level
 - **Persistent Storage**: No automatic rotation or size limits
 - **Triple Logging**: Critical events are logged to recent logs, error logs, AND critical logs
 - **Dedicated API**: Separate endpoint for retrieving only critical events
@@ -486,7 +486,7 @@ The critical logging system provides dedicated persistent storage specifically f
 
 #### Log Critical Event
 ```c
-esp_err_t dataBase_log_critical(const char* event_type, const char* severity, 
+esp_err_t dataBase_log_critical(const char* event_type, const char* level, 
                                const char* message, const char* data);
 ```
 
@@ -553,7 +553,7 @@ Critical logs API returns focused metadata:
     {
       "timestamp": 1706798600,
       "type": "power", 
-      "severity": "critical",
+      "level": "critical",
       "message": "Overheat mode activated",
       "data": {"chipTemp": 85.0, "threshold": 80, "device": "DEVICE_MAX"}
     }
@@ -572,7 +572,7 @@ The system automatically logs these critical events:
    ```json
    {
      "type": "power",
-     "severity": "critical", 
+     "level": "critical", 
      "message": "Overheat mode activated - VR or ASIC temperature exceeded threshold",
      "data": {"vrTemp": 85.0, "chipTemp": 75.0, "device": "DEVICE_GAMMA"}
    }
@@ -592,7 +592,7 @@ The system automatically logs these critical events:
 
 ### Best Practices
 
-1. **Reserve for Genuine Critical Events**: Don't overuse critical severity
+1. **Reserve for Genuine Critical Events**: Don't overuse critical level
 2. **Include Context**: Always provide relevant data for troubleshooting
 3. **Monitor Regularly**: Check critical logs frequently for system health
 4. **Act Quickly**: Critical events often require immediate attention

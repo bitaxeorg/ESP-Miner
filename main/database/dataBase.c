@@ -353,7 +353,7 @@ esp_err_t dataBase_init_logs(void) {
 }
 
 // Log an event
-esp_err_t dataBase_log_event(const char* event_type, const char* severity, const char* message, const char* data) {
+esp_err_t dataBase_log_event(const char* event_type, const char* level, const char* message, const char* data) {
     char recent_logs_path[128];
     get_file_path(logs_dir, RECENT_LOGS_FILE, recent_logs_path, sizeof(recent_logs_path));
     
@@ -377,7 +377,7 @@ esp_err_t dataBase_log_event(const char* event_type, const char* severity, const
     time(&now);
     cJSON_AddNumberToObject(new_event, "timestamp", now);
     cJSON_AddStringToObject(new_event, "type", event_type);
-    cJSON_AddStringToObject(new_event, "severity", severity);
+    cJSON_AddStringToObject(new_event, "level", level);
     cJSON_AddStringToObject(new_event, "message", message);
     
     if (data && strlen(data) > 0) {
@@ -418,17 +418,17 @@ esp_err_t dataBase_log_event(const char* event_type, const char* severity, const
         ESP_LOGE(TAG, "Failed to write event log");
     }
     
-    // Also log to error logs if severity is error or critical
-    if (strcmp(severity, "error") == 0 || strcmp(severity, "critical") == 0) {
-        esp_err_t error_ret = dataBase_log_error(event_type, severity, message, data);
+    // Also log to error logs if level is error or critical
+    if (strcmp(level, "error") == 0 || strcmp(level, "critical") == 0) {
+        esp_err_t error_ret = dataBase_log_error(event_type, level, message, data);
         if (error_ret != ESP_OK) {
             ESP_LOGW(TAG, "Failed to log to error logs");
         }
     }
     
-    // Also log to critical logs if severity is critical
-    if (strcmp(severity, "critical") == 0) {
-        esp_err_t critical_ret = dataBase_log_critical(event_type, severity, message, data);
+    // Also log to critical logs if level is critical
+    if (strcmp(level, "critical") == 0) {
+        esp_err_t critical_ret = dataBase_log_critical(event_type, level, message, data);
         if (critical_ret != ESP_OK) {
             ESP_LOGW(TAG, "Failed to log to critical logs");
         }
@@ -516,7 +516,7 @@ esp_err_t dataBase_init_error_logs(void) {
 }
 
 // Log an error event (persistent)
-esp_err_t dataBase_log_error(const char* event_type, const char* severity, const char* message, const char* data) {
+esp_err_t dataBase_log_error(const char* event_type, const char* level, const char* message, const char* data) {
     char error_logs_path[128];
     get_file_path(logs_dir, ERROR_LOGS_FILE, error_logs_path, sizeof(error_logs_path));
     
@@ -540,7 +540,7 @@ esp_err_t dataBase_log_error(const char* event_type, const char* severity, const
     time(&now);
     cJSON_AddNumberToObject(new_error, "timestamp", now);
     cJSON_AddStringToObject(new_error, "type", event_type);
-    cJSON_AddStringToObject(new_error, "severity", severity);
+    cJSON_AddStringToObject(new_error, "level", level);
     cJSON_AddStringToObject(new_error, "message", message);
     
     if (data && strlen(data) > 0) {
@@ -686,7 +686,7 @@ esp_err_t dataBase_init_critical_logs(void) {
 }
 
 // Log a critical event (persistent)
-esp_err_t dataBase_log_critical(const char* event_type, const char* severity, const char* message, const char* data) {
+esp_err_t dataBase_log_critical(const char* event_type, const char* level, const char* message, const char* data) {
     char critical_logs_path[128];
     get_file_path(logs_dir, CRITICAL_LOGS_FILE, critical_logs_path, sizeof(critical_logs_path));
     
@@ -710,7 +710,7 @@ esp_err_t dataBase_log_critical(const char* event_type, const char* severity, co
     time(&now);
     cJSON_AddNumberToObject(new_critical, "timestamp", now);
     cJSON_AddStringToObject(new_critical, "type", event_type);
-    cJSON_AddStringToObject(new_critical, "severity", severity);
+    cJSON_AddStringToObject(new_critical, "level", level);
     cJSON_AddStringToObject(new_critical, "message", message);
     
     if (data && strlen(data) > 0) {
