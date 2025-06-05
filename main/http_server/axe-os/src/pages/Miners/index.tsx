@@ -10,6 +10,7 @@ import {
   TableCell,
 } from "../../components/Table";
 import { Container } from "../../components/Container";
+import { PageHeading } from "../../components/PageHeading";
 
 export function Miners() {
   const [miners, setMiners] = useState<SystemInfo[]>([]);
@@ -56,7 +57,10 @@ export function Miners() {
 
   return (
     <Container>
-      <h1 className='text-2xl font-bold mb-6'>Miners</h1>
+      <PageHeading
+        title="Miners"
+        subtitle="Monitor and manage all connected mining devices"
+      />
 
       {error && (
         <div className='mb-4 p-3 bg-red-500/10 border border-red-500 rounded-md text-red-500'>

@@ -1,6 +1,5 @@
 import { ComponentChildren } from "preact";
 import { Sidebar } from "./Sidebar";
-import { Welcome } from "./Welcome";
 import { createContext } from "preact";
 import { useContext, useState, useEffect } from "preact/hooks";
 
@@ -60,7 +59,6 @@ export function Layout({ children, title }: LayoutProps) {
           style={{ backgroundColor: '#121319' }}
         >
           <div class='px-4 py-4 md:px-2 md:pt-4 w-full'>
-            <Welcome subtitle="Track, manage and optimize your miner" />
             {children}
           </div>
         </main>

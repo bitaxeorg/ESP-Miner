@@ -10,6 +10,7 @@ import {
 } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
+import { PageHeading } from "../../components/PageHeading";
 
 interface ActionCardProps {
   title: string;
@@ -171,7 +172,10 @@ export default function UpdatesPage() {
 
   return (
     <Container>
-      <h2 className='text-xl font-bold text-white mb-6'>Firmware & Web App Updates</h2>
+      <PageHeading
+        title="Firmware & Web App Updates"
+        subtitle="Keep your device up-to-date with the latest firmware and web interface"
+      />
       <div className='grid grid-cols-1 gap-6 max-w-4xl mx-auto'>
         <ActionCard
           title='Update Device Firmware'

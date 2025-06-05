@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import { ActionCard } from "../../components/ActionCard";
 import { Button } from "../../components/Button";
 import { Container } from "../../components/Container";
+import { PageHeading } from "../../components/PageHeading";
 import { updatePresetSettings } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Volume2, BarChart3, Zap } from "lucide-preact";
@@ -71,9 +72,10 @@ export function Settings() {
 
   return (
     <Container>
-      <div className='flex justify-between items-center mb-6'>
-        <h1 className='text-2xl font-bold'>Settings</h1>
-      </div>
+      <PageHeading
+        title="Settings"
+        subtitle="Configure your miner's performance and operational modes"
+      />
 
       <ActionCard
         title='Choose Your Mode'

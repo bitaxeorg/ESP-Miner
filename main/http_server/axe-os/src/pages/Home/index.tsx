@@ -3,6 +3,7 @@ import { getSystemInfo, SystemInfo } from "../../utils/api";
 import { formatUptime } from "../../utils/formatters";
 import { DataSection } from "../../components/DataSection";
 import { Tabs } from "../../components/Tabs";
+import { Welcome } from "../../components/Welcome";
 import {
   Activity,
   AudioLines,
@@ -242,6 +243,7 @@ export function HomePage() {
 
   return (
     <div class='space-y-6'>
+      <Welcome subtitle="Track, manage and optimize your miner" />
       <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
       {activeTab === "overview" && (
         <>

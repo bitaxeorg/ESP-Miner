@@ -1,6 +1,7 @@
 import { useState, useEffect } from "preact/hooks";
 import { Button } from "../../components/Button";
 import { Terminal } from "../../components/Terminal";
+import { PageHeading } from "../../components/PageHeading";
 import { fetchRecentLogs, fetchErrorLogs, LogEvent } from "../../utils/api";
 
 type LogViewType = 'recent' | 'errors';
@@ -99,28 +100,30 @@ export function LogsPage() {
 
   return (
     <div className='flex flex-col gap-4 p-4 h-full'>
-      <div className='flex justify-between items-center'>
-        <h1 className='text-2xl font-semibold'>System Logs</h1>
-        <div className='flex gap-2'>
-          <Button
-            variant={autoRefresh ? "default" : "outline"}
-            onClick={toggleAutoRefresh}
-            className={autoRefresh ? "bg-green-600 hover:bg-green-700" : ""}
-          >
-            {autoRefresh ? "Auto-Refresh On" : "Auto-Refresh Off"}
-          </Button>
-          <Button
-            variant="default"
-            onClick={fetchLogs}
-            disabled={isLoading}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {isLoading ? "Loading..." : "Refresh"}
-          </Button>
-          <Button variant='ghost' onClick={clearLogs} disabled={logs.length === 0}>
-            Clear
-          </Button>
-        </div>
+      <PageHeading
+        title="System Logs"
+        subtitle="Monitor system events and debug information in real-time"
+      />
+
+      <div className='flex justify-end gap-2'>
+        <Button
+          variant={autoRefresh ? "default" : "outline"}
+          onClick={toggleAutoRefresh}
+          className={autoRefresh ? "bg-green-600 hover:bg-green-700" : ""}
+        >
+          {autoRefresh ? "Auto-Refresh On" : "Auto-Refresh Off"}
+        </Button>
+        <Button
+          variant="default"
+          onClick={fetchLogs}
+          disabled={isLoading}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          {isLoading ? "Loading..." : "Refresh"}
+        </Button>
+        <Button variant='ghost' onClick={clearLogs} disabled={logs.length === 0}>
+          Clear
+        </Button>
       </div>
 
       <div className='flex gap-2 items-center'>
