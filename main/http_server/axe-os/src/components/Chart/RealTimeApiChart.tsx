@@ -16,7 +16,7 @@ interface RealTimeApiChartProps {
   chartConfigs?: Record<string, any>;
   selectedConfigKey?: string;
   onConfigChange?: (configKey: string) => void;
-  lineStyle?: 'solid' | 'dotted' | 'dashed';
+  lineStyle?: "solid" | "dotted" | "dashed";
 }
 
 const RealTimeApiChart = ({
@@ -31,7 +31,7 @@ const RealTimeApiChart = ({
   chartConfigs,
   selectedConfigKey,
   onConfigChange,
-  lineStyle = 'solid',
+  lineStyle = "solid",
 }: RealTimeApiChartProps) => {
   const [data, setData] = useState<ChartDataPoint[]>([]);
   const [isRunning, setIsRunning] = useState(true);
@@ -53,23 +53,25 @@ const RealTimeApiChart = ({
 
     // Fallback to hardcoded values if chartConfigs not available
     switch (configKey) {
-      case 'SHORT':    // 30 minutes
-        return 5;      // 5s intervals
-      case 'MEDIUM':   // 1 hour
-        return 5;      // 5s intervals
-      case 'LONG':     // 2 hours
-        return 5;      // 5s intervals
-      case 'EXTENDED': // 4 hours
-        return 900;    // 15m intervals
-      case 'FULL_DAY': // 6 hours
-        return 900;    // 15m intervals
+      case "SHORT": // 30 minutes
+        return 5; // 5s intervals
+      case "MEDIUM": // 1 hour
+        return 5; // 5s intervals
+      case "LONG": // 2 hours
+        return 5; // 5s intervals
+      case "EXTENDED": // 4 hours
+        return 900; // 15m intervals
+      case "FULL_DAY": // 6 hours
+        return 900; // 15m intervals
       default:
-        return 5;      // Default to 5s
+        return 5; // Default to 5s
     }
   };
 
   // Get current optimal interval
-  const optimalInterval = selectedConfigKey ? getOptimalPlotInterval(selectedConfigKey) : dataAggregationSeconds;
+  const optimalInterval = selectedConfigKey
+    ? getOptimalPlotInterval(selectedConfigKey)
+    : dataAggregationSeconds;
 
   // Auto-update aggregation when config changes
   useEffect(() => {
@@ -205,7 +207,7 @@ const RealTimeApiChart = ({
       onConfigChange(configKey);
 
       // Wait a bit for the parent component to update
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Reload data with new configuration
       const newData = await dataFetcher.generateInitialData(maxDataPoints);
@@ -252,21 +254,20 @@ const RealTimeApiChart = ({
 
   return (
     <div className='bg-white rounded-lg shadow-lg p-6'>
-      <div className='flex justify-between items-start mb-4'>
+      <div className='flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-0 mb-4'>
         {title && (
-          <div>
+          <div className='order-1'>
             <h2 className='text-sm text-gray-600'>{title}</h2>
             {/* <p className='text-2xl font-semibold' style={{ color }}>
               {currentValue.toFixed(2)} {unit}
             </p> */}
           </div>
         )}
-        {!title && <div></div>}
-        <div className='flex flex-col gap-2'>
-
+        {!title && <div className='hidden sm:block'></div>}
+        <div className='flex flex-col gap-2 order-2'>
           {/* Chart Duration Selector */}
           {chartConfigs && selectedConfigKey && onConfigChange && (
-            <div className='flex justify-end'>
+            <div className='flex justify-start sm:justify-end'>
               <div className='flex items-center gap-2 text-sm'>
                 <label className='text-gray-600 whitespace-nowrap'>Duration:</label>
                 <div className='relative'>
@@ -275,7 +276,7 @@ const RealTimeApiChart = ({
                     onChange={(e) => handleConfigChange((e.target as HTMLSelectElement).value)}
                     disabled={isConfigChanging}
                     className={`px-2 py-1 border border-gray-300 rounded text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent ${
-                      isConfigChanging ? 'opacity-50 cursor-not-allowed' : ''
+                      isConfigChanging ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
                     {Object.entries(chartConfigs).map(([key, config]) => (
@@ -307,13 +308,14 @@ const RealTimeApiChart = ({
           }`}
         ></span>
         <span className='text-sm text-gray-600'>
-          {isConfigChanging
-            ? "Updating configuration..."
-            : isRunning
-            ? "Live"
-            : "Paused"} • {data.length} data points
+          {isConfigChanging ? "Updating configuration..." : isRunning ? "Live" : "Paused"} •{" "}
+          {data.length} data points
           {useAreaChart && <span className='text-green-500 ml-2'>• Area Chart</span>}
-          {dataAggregationSeconds > 1 && <span className='text-purple-500 ml-2'>• Aggregated({formatInterval(dataAggregationSeconds)})</span>}
+          {dataAggregationSeconds > 1 && (
+            <span className='text-purple-500 ml-2'>
+              • Aggregated({formatInterval(dataAggregationSeconds)})
+            </span>
+          )}
           {error && <span className='text-red-500 ml-2'>• {error}</span>}
         </span>
       </div>

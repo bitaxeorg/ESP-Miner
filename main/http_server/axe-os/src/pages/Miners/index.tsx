@@ -50,7 +50,7 @@ export function Miners() {
   }, []);
 
   const formatHashRate = (hashRate: number): string => {
-    return `${hashRate.toFixed(2)} MH/s`;
+    return `${hashRate.toFixed(2)} GH/s`;
   };
 
   const formatFanSpeed = (speed: number): string => {
@@ -73,10 +73,7 @@ export function Miners() {
 
   return (
     <Container>
-      <PageHeading
-        title="Miners"
-        subtitle="Monitor and manage all connected mining devices"
-      />
+      <PageHeading title='Miners' subtitle='Monitor and manage all connected mining devices' />
 
       <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -106,8 +103,7 @@ export function Miners() {
                 <TableCell colSpan={8} className='text-center py-6'>
                   {activeTab === "all"
                     ? "No miners found. Check your connection to the miner."
-                    : `No ${activeTab} miners found.`
-                  }
+                    : `No ${activeTab} miners found.`}
                 </TableCell>
               </TableRow>
             ) : (
@@ -146,8 +142,8 @@ export function Miners() {
 
       {!isLoading && miners.length > 0 && (
         <div className='mt-2 text-right text-sm text-muted-foreground'>
-          Last updated: {new Date().toLocaleTimeString()} •
-          Showing {filteredMiners.length} of {miners.length} miners
+          Last updated: {new Date().toLocaleTimeString()} • Showing {filteredMiners.length} of{" "}
+          {miners.length} miners
         </div>
       )}
     </Container>

@@ -173,155 +173,170 @@ export function UpdatesPage() {
   return (
     <Container>
       <PageHeading
-        title="Firmware & Web App Updates"
-        subtitle="Keep your device up-to-date with the latest firmware and web interface"
+        title='Firmware & Web App Updates'
+        subtitle='Keep your device up-to-date with the latest firmware and web interface'
       />
-      <div className='grid grid-cols-1 gap-6 max-w-4xl mx-auto'>
-        <ActionCard
-          title='Update Device Firmware'
-          description={getFirmwareDescription()}
-          link={FIRMWARE_LATEST_URL}
-        >
-          <div className='space-y-4'>
-            <div className='flex flex-wrap gap-3'>
-              <Button
-                as='a'
+
+      <ActionCard
+        title='Update Device Firmware'
+        description={getFirmwareDescription()}
+        link={FIRMWARE_LATEST_URL}
+      >
+        <div className='space-y-4'>
+          <div className='flex flex-wrap gap-3'>
+            <Button
+              as='a'
+              href={FIRMWARE_LATEST_URL}
+              download='esp-miner.bin'
+              className='bg-blue-600 hover:bg-blue-700'
+            >
+              <span className='sm:hidden'>Download Firmware</span>
+              <span className='hidden sm:inline'>1. Download Latest Firmware</span>
+            </Button>
+          </div>
+
+          <div className='mt-2 text-sm text-[#8B96A5]'>
+            <p>
+              If the button doesn't work,{" "}
+              <a
                 href={FIRMWARE_LATEST_URL}
                 download='esp-miner.bin'
-                className='bg-blue-600 hover:bg-blue-700'
+                className='text-blue-400 underline'
               >
-                <span className='sm:hidden'>Download Firmware</span>
-                <span className='hidden sm:inline'>1. Download Latest Firmware</span>
-              </Button>
-            </div>
-
-            <div className='mt-2 text-sm text-[#8B96A5]'>
-              <p>
-                If the button doesn't work,{" "}
-                <a
-                  href={FIRMWARE_LATEST_URL}
-                  download='esp-miner.bin'
-                  className='text-blue-400 underline'
-                >
-                  click here
-                </a>{" "}
-                to download directly.
-              </p>
-            </div>
-
-            <div className='mt-4'>
-              <label className='block text-sm text-[#8B96A5] mb-2'>
-                2. Upload downloaded firmware:
-              </label>
-              <div className='flex items-center gap-3'>
-                <div className='flex-1'>
-                  <div className='flex items-center gap-2'>
-                    <Button
-                      variant='outline'
-                      type='button'
-                      size='sm'
-                      onClick={handleFirmwareFileClick}
-                      className='border-blue-600 text-white hover:bg-blue-600'
-                    >
-                      2. Choose File
-                    </Button>
-                    <span className='text-sm text-[#8B96A5]'>
-                      {firmwareFile ? firmwareFile.name : "No file selected"}
-                    </span>
-                    <input
-                      ref={fileInputRef}
-                      type='file'
-                      accept='.bin'
-                      onChange={handleFirmwareFileChange}
-                      className='sr-only' // Hidden but accessible
-                    />
-                  </div>
-                </div>
-                <Button
-                  onClick={handleFirmwareUpload}
-                  disabled={isUpdating || !firmwareFile}
-                  className='bg-blue-600 hover:bg-blue-700'
-                >
-                  {isUpdating ? "Updating..." : "3. Install"}
-                </Button>
-              </div>
-              {firmwareFile && (
-                <p className='text-sm text-green-500 mt-2'>✓ File selected: {firmwareFile.name}</p>
-              )}
-            </div>
+                click here
+              </a>{" "}
+              to download directly.
+            </p>
           </div>
-        </ActionCard>
-        <ActionCard
-          title='Update Web App'
-          description='Download the latest web app and then upload it to update your device.'
-          link={WEBAPP_LATEST_URL}
-        >
-          <div className='space-y-4'>
-            <div className='flex flex-wrap gap-3'>
+
+          <div className='mt-4'>
+            <label className='block text-sm text-[#8B96A5] mb-2'>
+              2. Upload downloaded firmware:
+            </label>
+            <div className='flex flex-col sm:flex-row sm:items-center gap-3'>
+              <div className='flex-1'>
+                <div className='flex items-center gap-2'>
+                  <Button
+                    variant='outline'
+                    type='button'
+                    size='sm'
+                    onClick={handleFirmwareFileClick}
+                    className='border-blue-600 text-white hover:bg-blue-600'
+                  >
+                    <span className='sm:hidden'>Choose</span>
+                    <span className='hidden sm:inline'>2. Choose File</span>
+                  </Button>
+                  <span className='text-sm text-[#8B96A5]'>
+                    {firmwareFile ? firmwareFile.name : "No file selected"}
+                  </span>
+                  <input
+                    ref={fileInputRef}
+                    type='file'
+                    accept='.bin'
+                    onChange={handleFirmwareFileChange}
+                    className='sr-only' // Hidden but accessible
+                  />
+                </div>
+              </div>
               <Button
-                as='a'
-                href={WEBAPP_LATEST_URL}
-                download='www.bin'
-                className='bg-blue-600 hover:bg-blue-700'
+                onClick={handleFirmwareUpload}
+                disabled={isUpdating || !firmwareFile}
+                className='bg-blue-600 hover:bg-blue-700 w-full sm:w-auto'
               >
-                <span className='sm:hidden'>Download www.bin</span>
-                <span className='hidden sm:inline'>1. Download Latest Web App</span>
+                {isUpdating ? (
+                  "Updating..."
+                ) : (
+                  <>
+                    <span className='sm:hidden'>Install</span>
+                    <span className='hidden sm:inline'>3. Install</span>
+                  </>
+                )}
               </Button>
             </div>
-
-            <div className='mt-2 text-sm text-[#8B96A5]'>
-              <p>
-                If the button doesn't work,{" "}
-                <a href={WEBAPP_LATEST_URL} download='www.bin' className='text-blue-400 underline'>
-                  click here
-                </a>{" "}
-                to download directly.
-              </p>
-            </div>
-
-            <div className='mt-4'>
-              <label className='block text-sm text-[#8B96A5] mb-2'>
-                2. Upload downloaded web app:
-              </label>
-              <div className='flex items-center gap-3'>
-                <div className='flex-1'>
-                  <div className='flex items-center gap-2'>
-                    <Button
-                      variant='outline'
-                      type='button'
-                      size='sm'
-                      onClick={handleWebAppFileClick}
-                      className='border-blue-600 text-white hover:bg-blue-600'
-                    >
-                      2. Choose File
-                    </Button>
-                    <span className='text-sm text-[#8B96A5]'>
-                      {webAppFile ? webAppFile.name : "No file selected"}
-                    </span>
-                    <input
-                      ref={webAppFileInputRef}
-                      type='file'
-                      accept='.bin'
-                      onChange={handleWebAppFileChange}
-                      className='sr-only' // Hidden but accessible
-                    />
-                  </div>
-                </div>
-                <Button
-                  onClick={handleWebAppUpload}
-                  disabled={isWebAppUpdating || !webAppFile}
-                  className='bg-blue-600 hover:bg-blue-700'
-                >
-                  {isWebAppUpdating ? "Updating..." : "3. Install"}
-                </Button>
-              </div>
-              {webAppFile && (
-                <p className='text-sm text-green-500 mt-2'>✓ File selected: {webAppFile.name}</p>
-              )}
-            </div>
+            {firmwareFile && (
+              <p className='text-sm text-green-500 mt-2'>✓ File selected: {firmwareFile.name}</p>
+            )}
           </div>
-        </ActionCard>
-      </div>
+        </div>
+      </ActionCard>
+      <ActionCard
+        title='Update Web App'
+        description='Download the latest web app and then upload it to update your device.'
+        link={WEBAPP_LATEST_URL}
+      >
+        <div className='space-y-4'>
+          <div className='flex flex-wrap gap-3'>
+            <Button
+              as='a'
+              href={WEBAPP_LATEST_URL}
+              download='www.bin'
+              className='bg-blue-600 hover:bg-blue-700'
+            >
+              <span className='sm:hidden'>Download www.bin</span>
+              <span className='hidden sm:inline'>1. Download Latest Web App</span>
+            </Button>
+          </div>
+
+          <div className='mt-2 text-sm text-[#8B96A5]'>
+            <p>
+              If the button doesn't work,{" "}
+              <a href={WEBAPP_LATEST_URL} download='www.bin' className='text-blue-400 underline'>
+                click here
+              </a>{" "}
+              to download directly.
+            </p>
+          </div>
+
+          <div className='mt-4'>
+            <label className='block text-sm text-[#8B96A5] mb-2'>
+              2. Upload downloaded web app:
+            </label>
+            <div className='flex flex-col sm:flex-row sm:items-center gap-3'>
+              <div className='flex-1'>
+                <div className='flex items-center gap-2'>
+                  <Button
+                    variant='outline'
+                    type='button'
+                    size='sm'
+                    onClick={handleWebAppFileClick}
+                    className='border-blue-600 text-white hover:bg-blue-600'
+                  >
+                    <span className='sm:hidden'>Choose</span>
+                    <span className='hidden sm:inline'>2. Choose File</span>
+                  </Button>
+                  <span className='text-sm text-[#8B96A5]'>
+                    {webAppFile ? webAppFile.name : "No file selected"}
+                  </span>
+                  <input
+                    ref={webAppFileInputRef}
+                    type='file'
+                    accept='.bin'
+                    onChange={handleWebAppFileChange}
+                    className='sr-only' // Hidden but accessible
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleWebAppUpload}
+                disabled={isWebAppUpdating || !webAppFile}
+                className='bg-blue-600 hover:bg-blue-700 w-full sm:w-auto'
+              >
+                {isWebAppUpdating ? (
+                  "Updating..."
+                ) : (
+                  <>
+                    <span className='sm:hidden'>Install</span>
+                    <span className='hidden sm:inline'>3. Install</span>
+                  </>
+                )}
+              </Button>
+            </div>
+            {webAppFile && (
+              <p className='text-sm text-green-500 mt-2'>✓ File selected: {webAppFile.name}</p>
+            )}
+          </div>
+        </div>
+      </ActionCard>
     </Container>
   );
 }
