@@ -144,10 +144,11 @@ export function LogsPage() {
               checked={autoRefresh}
               onCheckedChange={setAutoRefresh}
               aria-label='Auto-refresh logs'
+              className={`focus-visible:ring-blue-500 ${autoRefresh ? '!bg-blue-600' : ''}`}
             />
             <span className='text-sm text-slate-300'>Auto-Refresh</span>
           </div>
-          <Button variant='ghost' onClick={clearLogs} disabled={logs.length === 0}>
+          <Button variant='ghost' onClick={clearLogs} disabled={logs.length === 0} className="text-slate-400 hover:text-slate-300">
             Clear
           </Button>
         </div>

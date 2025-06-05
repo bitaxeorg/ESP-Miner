@@ -93,7 +93,7 @@ const ChartContent = () => {
                 </div>
                 <div className='flex justify-between'>
                   <span className='text-blue-200'>Expected Hashrate:</span>
-                  <span className='font-medium'>TBD</span>
+                  <span className='font-medium'>{loading ? 'Loading...' : systemInfo?.expectedHashrate ? `${(systemInfo.expectedHashrate / 1000).toFixed(2)} TH/s` : 'N/A'}</span>
                 </div>
                 <div className='flex justify-between'>
                   <span className='text-blue-200'>Uptime:</span>

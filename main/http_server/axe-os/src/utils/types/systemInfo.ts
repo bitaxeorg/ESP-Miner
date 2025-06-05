@@ -4,6 +4,7 @@ export interface SystemInfo {
   current: number;
   temp: number;
   vrTemp: number;
+  expectedHashrate: number;
   hashRate: number;
   bestDiff: string;
   bestSessionDiff: string;
