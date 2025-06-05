@@ -293,6 +293,9 @@ static esp_err_t theme_patch_handler(httpd_req_t *req)
     // Save theme to database and NVS
     saveThemetoNVS(theme_name, themePreset);
 
+    // save theme to database
+    dataBase_set_active_theme(theme_name);
+
     // Log the theme change event
     char log_data[128];
     snprintf(log_data, sizeof(log_data), "{\"previousTheme\":\"%s\",\"newTheme\":\"%s\"}", 

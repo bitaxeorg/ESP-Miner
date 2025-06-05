@@ -229,22 +229,14 @@ esp_err_t dataBase_init_themes(void) {
             "THEME_SOLO_MINING_CO"
         };
         
-        const char* theme_descriptions[] = {
-            "ACS Default green theme",
-            "Bitaxe red theme",
-            "Solo Mining Co theme"
-        };
-        
         for (int i = 0; i < 6; i++) {
-            cJSON* theme = cJSON_CreateObject();
-            cJSON_AddStringToObject(theme, "name", theme_names[i]);
-            cJSON_AddStringToObject(theme, "description", theme_descriptions[i]);
-            cJSON_AddStringToObject(theme, "version", "1.0");
-            cJSON_AddItemToArray(themes_array, theme);
+            cJSON_AddItemToArray(themes_array, cJSON_CreateString(theme_names[i]));
         }
         
         cJSON_AddItemToObject(root, "themes", themes_array);
-        cJSON_AddNumberToObject(root, "lastUpdated", esp_timer_get_time() / 1000000);
+        time_t now;
+        time(&now);
+        cJSON_AddNumberToObject(root, "lastUpdated", now);
         
         esp_err_t ret = dataBase_write_json_file(available_themes_path, root);
         cJSON_Delete(root);
@@ -268,7 +260,9 @@ esp_err_t dataBase_set_active_theme(const char* theme_name) {
     
     cJSON* root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "activeTheme", theme_name);
-    cJSON_AddNumberToObject(root, "lastUpdated", esp_timer_get_time() / 1000000);
+    time_t now;
+    time(&now);
+    cJSON_AddNumberToObject(root, "lastUpdated", now);      
     
     esp_err_t ret = dataBase_write_json_file(active_themes_path, root);
     cJSON_Delete(root);
