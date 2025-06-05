@@ -27,7 +27,7 @@ export function Welcome({
   };
 
   return (
-    <div class="mb-6 text-left pt-2">
+    <div class="mb-6 text-left md:pt-2">
       <h1 class="text-xl md:text-2xl font-bold text-slate-100 mb-1 text-left">
         {getGreeting()}
       </h1>

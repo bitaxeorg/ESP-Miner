@@ -54,11 +54,11 @@ export function Layout({ children, title }: LayoutProps) {
         {/* Main content */}
         <main
           class={`transition-all duration-300 ${
-            collapsed ? "pl-[20px] md:pl-[20px]" : "pl-[50px] md:pl-[180px]"
+            collapsed ? "pl-[40px] md:pl-[20px]" : "pl-[50px] md:pl-[180px]"
           }`}
           style={{ backgroundColor: '#121319' }}
         >
-          <div class='px-4 py-4 md:px-2 md:pt-4 w-full'>
+          <div class='py-0 md:px-2 md:pt-4 w-full'>
             {children}
           </div>
         </main>

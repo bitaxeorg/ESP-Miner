@@ -176,7 +176,7 @@ export function UpdatesPage() {
         title="Firmware & Web App Updates"
         subtitle="Keep your device up-to-date with the latest firmware and web interface"
       />
-      <div className='grid grid-cols-1 gap-6 max-w-4xl mx-auto'>
+
         <ActionCard
           title='Update Device Firmware'
           description={getFirmwareDescription()}
@@ -321,7 +321,6 @@ export function UpdatesPage() {
             </div>
           </div>
         </ActionCard>
-      </div>
     </Container>
   );
 }
