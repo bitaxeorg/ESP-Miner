@@ -67,6 +67,9 @@
     "cSpell.words": [
         "ssid"
     ],
-    "idf.port": "/dev/ttyACM0",
-    "C_Cpp.intelliSenseEngine": "Tag Parser"
+    "idf.port": "/dev/tty.usbmodem1112201",
+    "C_Cpp.intelliSenseEngine": "Tag Parser",
+    "idf.espIdfPathWin": "C:\\Users\\benPC\\esp\\v5.4\\esp-idf",
+    "idf.toolsPathWin": "C:\\Users\\benPC\\.espressif",
+    "idf.pythonInstallPath": "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3"
 }

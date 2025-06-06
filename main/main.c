@@ -23,7 +23,6 @@
 #include "theme_api.h"
 #include "dataBase.h"
 
-
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
     .extranonce_2_len = 0, 
@@ -119,7 +118,7 @@ void app_main(void)
         ESP_LOGI(TAG, "Finished, waiting for user input.");
         while (1) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-
+            
         }
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
