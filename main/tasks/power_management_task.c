@@ -219,7 +219,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     
     // Determine timing interval based on temperature
     uint32_t intervalMs;
-    if (currentAsicTemp <= 68) {
+    if (currentAsicTemp < 68) {
         intervalMs = 300000; // 5 minutes for normal operation
     } else {
         intervalMs = 500;  // 5 seconds for higher temperatures
@@ -248,14 +248,16 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
             uint16_t newVoltage = targetDomainVoltage + 10;
             ESP_LOGI(autotuneTAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
             char data[128];
-            snprintf(data, sizeof(data), "{\"voltage\":%u}", newVoltage);
+            snprintf(data, sizeof(data), "{\"voltage\":%u, \"frequency\":%u, \"temperature\":%u, \"hashrate\":%.2f, \"targetHashrate\":%.2f, }", 
+            newVoltage, currentFrequency, currentAsicTemp, currentHashrate, targetHashrate);
             dataBase_log_event("power", "info", "Autotune - Hashrate below target, increasing voltage", data);
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
             return;
         } else {
             ESP_LOGI(TAG, "Autotune - Hashrate above target, no adjustments needed");
             char data[128];
-            snprintf(data, sizeof(data), "{\"voltage\":%u}", targetDomainVoltage);
+            snprintf(data, sizeof(data), "{\"voltage\":%u, \"frequency\":%u, \"temperature\":%u, \"hashrate\":%.2f, \"targetHashrate\":%.2f, }", 
+            targetDomainVoltage, currentFrequency, currentAsicTemp, currentHashrate, targetHashrate);
             dataBase_log_event("power", "info", "Autotune - Hashrate above target, no adjustments needed", data);
             return;
         }
@@ -294,7 +296,8 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
                  currentFrequency, newFrequency);
         ESP_LOGI(TAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
         char data[128];
-        snprintf(data, sizeof(data), "{\"frequency\":%u,\"voltage\":%u}", newFrequency, newVoltage);
+        snprintf(data, sizeof(data), "{\"newFrequency\":%u,\"newVoltage\":%u, \"currentTemperature\":%u, \"currentHashrate\":%.2f, \"targetHashrate\":%.2f}", 
+        newFrequency, newVoltage, currentAsicTemp, currentHashrate, targetHashrate);
         dataBase_log_event("power", "info", "Autotune - Temperature under target, increasing frequency and voltage", data);
         
         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
@@ -312,7 +315,8 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
                  currentFrequency, newFrequency);
         ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
         char data[128];
-        snprintf(data, sizeof(data), "{\"frequency\":%u,\"voltage\":%u}", newFrequency, newVoltage);
+        snprintf(data, sizeof(data), "{\"newFrequency\":%u,\"newVoltage\":%u, \"currentTemperature\":%u, \"currentHashrate\":%.2f, \"targetHashrate\":%.2f}", 
+        newFrequency, newVoltage, currentAsicTemp, currentHashrate, targetHashrate);
         dataBase_log_event("power", "info", "Autotune - Temperature over target, decreasing frequency and voltage", data);
         
 
