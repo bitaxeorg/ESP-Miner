@@ -32,9 +32,25 @@
 #define NVS_CONFIG_SWARM "swarmconfig"
 
 // Theme configuration
-#define NVS_CONFIG_THEME_SCHEME "themescheme"
 #define NVS_CONFIG_THEME_NAME "themename"
-#define NVS_CONFIG_THEME_COLORS "themecolors"
+
+// Autotune configuration
+#define NVS_CONFIG_AUTOTUNE_FLAG "autotune"
+#define NVS_CONFIG_AUTOTUNE_PRESET "preset"
+
+// Warranty Checks
+#define NVS_CONFIG_SERIAL_NUMBER "serialnumber"
+#define NVS_CONFIG_BUILD_DATE "builddate"
+#define NVS_CONFIG_HIGHEST_FREQUENCY "highfreq"
+#define NVS_CONFIG_HIGHEST_DOMAIN_VOLTAGE "highdomvolt"
+#define NVS_CONFIG_HIGHEST_TEMPERATURE "hightemp"
+#define NVS_CONFIG_OVERHEAT_COUNT "overheat"
+#define NVS_CONFIG_OVERVOLT_COUNT "overvolt"
+#define NVS_CONFIG_OVERPOWER_COUNT "overpower"
+
+
+
+
 
 char * nvs_config_get_string(const char * key, const char * default_value);
 void nvs_config_set_string(const char * key, const char * default_value);

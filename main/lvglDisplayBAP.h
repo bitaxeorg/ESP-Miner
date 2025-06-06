@@ -38,7 +38,7 @@
 #define LVGL_REG_POWER_STATS    0x43
 #define LVGL_REG_ASIC_INFO      0x44
 #define LVGL_REG_UPTIME         0x45
-#define LVGL_REG_TARGET_VOLTAGE 0x46 // (uint16_t )
+#define LVGL_REG_VREG_TEMP   0x46
 
 // Device status registers (on change only)
 #define LVGL_REG_FLAGS          0x50
@@ -62,6 +62,17 @@
 #define LVGL_REG_API_ECONOMY_FEE 0x6B
 #define LVGL_REG_API_MINIMUM_FEE 0x6C
 
+// device info registers
+// define max lengths for serial number, model, and firmware version
+#define MAX_SERIAL_LENGTH 32
+#define MAX_MODEL_LENGTH 32
+#define MAX_FIRMWARE_VERSION_LENGTH 32
+#define MAX_THEME_LENGTH 128
+#define LVGL_REG_DEVICE_SERIAL 0x70 // MAX_SERIAL_LENGTH bytes
+#define LVGL_REG_BOARD_MODEL 0x71 // MAX_MODEL_LENGTH bytes
+#define LVGL_REG_BOARD_FIRMWARE_VERSION 0x72 // MAX_FIRMWARE_VERSION_LENGTH bytes
+#define LVGL_REG_THEME_CURRENT 0x73 // 128 bytes
+#define LVGL_REG_THEMES_AVAILABLE 0x74 // 128 bytes
 // Settings registers 
 // Network settings
 #define LVGL_REG_SETTINGS_HOSTNAME 0x90 // 32 bytes
@@ -84,6 +95,8 @@
 #define LVGL_REG_SETTINGS_AUTO_FAN_SPEED 0x9E // 2 bytes
 
 // Special registers (0xF0 - 0xFF)
+#define LVGL_REG_SPECIAL_THEME 0xF0
+#define LVGL_REG_SPECIAL_PRESET 0xF1
 #define LVGL_REG_SPECIAL_RESTART 0xFE
 
 // Flags (0xE0 - 0xEF)
@@ -103,5 +116,10 @@ esp_err_t lvglUpdateDisplayMonitoringBAP(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE);
 esp_err_t lvglUpdateDisplayAPIBAP(void);
 esp_err_t lvglGetSettingsBAP(void);
+
+esp_err_t lvglSendPresetBAP();
+esp_err_t lvglSendThemeBAP(char themeName[32]);
+
+int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, uint16_t timeout_ms);
 
 #endif

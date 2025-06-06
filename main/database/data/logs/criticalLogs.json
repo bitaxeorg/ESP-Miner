@@ -1,0 +1,6 @@
+{
+  "totalCritical": 0,
+  "lastCritical": 0,
+  "description": "Persistent critical logs - no automatic rotation",
+  "critical": []
+} 

@@ -12,7 +12,12 @@
 #include "serial.h"
 #include "TPS546.h"
 #include "vcore.h"
-
+#include "esp_timer.h"
+#include "lvglDisplayBAP.h"
+#include "dataBase.h"
+#include "driver/gpio.h"
+#include "common.h"
+#include "system.h"
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_ASIC_RESET  CONFIG_GPIO_ASIC_RESET
 #define GPIO_PLUG_SENSE  CONFIG_GPIO_PLUG_SENSE
@@ -33,6 +38,289 @@
 #define GAMMA_POWER_OFFSET 5
 
 static const char * TAG = "power_management";
+
+
+// Define preset arrays for each device model
+// DEVICE_MAX presets
+static const DevicePreset DEVICE_MAX_PRESETS[] = {
+    {"quiet", 1100, 450, 50},       // Quiet: Low power, conservative
+    {"balanced", 1200, 550, 65},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1400, 750, 100},      // Turbo: Maximum performance
+};
+
+// DEVICE_ULTRA presets
+static const DevicePreset DEVICE_ULTRA_PRESETS[] = {
+    {"quiet", 1130, 420, 25},       // Quiet: Low power, conservative
+    {"balanced", 1190, 490,35},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1250, 625, 95},       // Turbo: Maximum performance
+};
+
+// DEVICE_SUPRA presets
+static const DevicePreset DEVICE_SUPRA_PRESETS[] = {
+    {"quiet", 1100, 425, 25},       // Quiet: Low power, conservative
+    {"balanced", 1200, 575, 35},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1350, 750, 95},       // Turbo: Maximum performance
+};
+
+// DEVICE_GAMMA presets
+static const DevicePreset DEVICE_GAMMA_PRESETS[] = {
+    {"quiet", 1000, 400, 25},        // Quiet: Low power, conservative
+    {"balanced", 1090, 490, 35},    // Balanced: Good performance/efficiency balance
+    {"turbo", 1150, 525, 95},       // Turbo: Maximum performance
+};
+
+// Simple function to apply a preset by name
+bool apply_preset(DeviceModel device_model, const char* preset_name) {
+    const DevicePreset* presets = NULL;
+    uint8_t preset_count = 0;
+    
+    // Get the correct preset array for the device
+    switch (device_model) {
+        case DEVICE_MAX:
+            presets = DEVICE_MAX_PRESETS;
+            preset_count = sizeof(DEVICE_MAX_PRESETS) / sizeof(DevicePreset);
+            break;
+        case DEVICE_ULTRA:
+            presets = DEVICE_ULTRA_PRESETS;
+            preset_count = sizeof(DEVICE_ULTRA_PRESETS) / sizeof(DevicePreset);
+            break;
+        case DEVICE_SUPRA:
+            presets = DEVICE_SUPRA_PRESETS;
+            preset_count = sizeof(DEVICE_SUPRA_PRESETS) / sizeof(DevicePreset);
+            break;
+        case DEVICE_GAMMA:
+            presets = DEVICE_GAMMA_PRESETS;
+            preset_count = sizeof(DEVICE_GAMMA_PRESETS) / sizeof(DevicePreset);
+            break;
+        default:
+            ESP_LOGI(TAG, "Unknown device model: %d", device_model);
+            return false;
+    }
+    
+    // Find the preset by name
+    const DevicePreset* selected_preset = NULL;
+    for (uint8_t i = 0; i < preset_count; i++) {
+        if (strcmp(presets[i].name, preset_name) == 0) {
+            selected_preset = &presets[i];
+            break;
+        }
+    }
+    
+    if (selected_preset == NULL) {
+        ESP_LOGI(TAG, "Invalid preset name '%s' for device model %d", preset_name, device_model);
+        return false;
+    }
+    
+    ESP_LOGI(TAG, "Applying preset \"%s\": %umV, %uMHz, %u%% fan", 
+             selected_preset->name, selected_preset->domain_voltage_mv, 
+             selected_preset->frequency_mhz, selected_preset->fan_speed_percent);
+    
+    // Set the values directly to NVS
+    // set fan speed high for safety
+    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
+    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, selected_preset->domain_voltage_mv);
+    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, selected_preset->frequency_mhz);
+    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, selected_preset->fan_speed_percent);
+    nvs_config_set_string(NVS_CONFIG_AUTOTUNE_PRESET, preset_name);
+    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+    nvs_config_set_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1);
+
+
+    // send through BAP
+    //lvglSendPresetBAP();
+    
+    // Log preset change event
+    char preset_data[256];
+    snprintf(preset_data, sizeof(preset_data), 
+             "{\"presetName\":\"%s\",\"voltage\":%u,\"frequency\":%u,\"fanSpeed\":%u,\"deviceModel\":%d}", 
+             preset_name, selected_preset->domain_voltage_mv, selected_preset->frequency_mhz, 
+             selected_preset->fan_speed_percent, device_model);
+    dataBase_log_event("power", "info", "Preset configuration applied", preset_data);
+    
+    return true;
+}
+
+// autotune function
+static void autotuneOffset(GlobalState * GLOBAL_STATE)
+{
+    // Access the autotune module
+    AutotuneModule *autotune = &GLOBAL_STATE->AUTOTUNE_MODULE;
+    PowerManagementModule *power = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    SystemModule *system = &GLOBAL_STATE->SYSTEM_MODULE;
+    static const char *autotuneTAG = "autotune";
+
+    // Check if autotune is enabled
+    if (nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1) == 0) {
+        ESP_LOGI(autotuneTAG, "Autotune is disabled");
+        return;
+    }
+
+    // Get current global variables for autotune calculations
+    uint16_t currentDomainVoltage = VCORE_get_voltage_mv(GLOBAL_STATE);  // Domain Voltage in mV
+    uint16_t currentFrequency = (uint16_t)power->frequency_value;        // Frequency in MHz
+    uint8_t currentAsicTemp = (uint8_t)power->chip_temp_avg;            // ASIC Temperature in °C
+    uint8_t currentFanSpeed = (uint8_t)(power->fan_perc);               // Fan Speed in percentage
+    float currentHashrate = system->current_hashrate;                   // Hashrate in GH/s
+    int16_t currentPower = (int16_t)power->power;                       // Power in watts
+
+    // Early return if temperature is invalid or hashrate is 0
+    if (currentAsicTemp == 255) {
+        ESP_LOGI(autotuneTAG, "Skipping autotune - Temperature sensor not initialized");
+        return;
+    }
+
+    if (currentHashrate <= 0) {
+        ESP_LOGI(autotuneTAG, "Skipping autotune - Hashrate is 0");
+        return;
+    }
+
+    // Get target values from autotune module
+    //int16_t targetPower = autotune->targetPower;                        // Target power in watts
+    uint16_t targetDomainVoltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);     // Target voltage in mV
+    //uint16_t targetFrequency = autotune->targetFrequency;               // Target frequency in MHz
+    //uint8_t targetFanSpeed = autotune->targetFanSpeed;                  // Target fan speed in percentage
+    uint8_t targetAsicTemp = 60;            // Target temperature in °C
+    float targetHashrate = currentFrequency * ((GLOBAL_STATE->small_core_count * GLOBAL_STATE->asic_count) / 1000.0);
+
+
+
+    // Log current values
+    ESP_LOGI(autotuneTAG, "Autotune - Current Values:");
+    ESP_LOGI(autotuneTAG, "  Domain Voltage: %u mV", currentDomainVoltage);
+    ESP_LOGI(autotuneTAG, "  Frequency: %u MHz", currentFrequency);
+    ESP_LOGI(autotuneTAG, "  ASIC Temp: %u °C", currentAsicTemp);
+    ESP_LOGI(autotuneTAG, "  Fan Speed: %u %%", currentFanSpeed);
+    ESP_LOGI(autotuneTAG, "  Hashrate: %.2f GH/s", currentHashrate);
+    ESP_LOGI(autotuneTAG, "  Power: %d W", currentPower);
+    ESP_LOGI(autotuneTAG, "  Max Power: %d W", GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
+    ESP_LOGI(autotuneTAG, "  Max Domain Voltage: %u mV", GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage);
+    ESP_LOGI(autotuneTAG, "  Max Frequency: %u MHz", GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency);
+
+    // Log target values
+    ESP_LOGI(autotuneTAG, "Autotune - Target Values:");
+    //ESP_LOGI(autotuneTAG, "  Target Power: %d W", targetPower);
+    ESP_LOGI(autotuneTAG, "  Target Domain Voltage: %u mV", targetDomainVoltage);
+    //ESP_LOGI(autotuneTAG, "  Target Frequency: %u MHz", targetFrequency);
+    //ESP_LOGI(autotuneTAG, "  Target Fan Speed: %u %%", targetFanSpeed);
+    ESP_LOGI(autotuneTAG, "  Target Temperature: %u °C", targetAsicTemp);
+    ESP_LOGI(autotuneTAG, "  Target Hashrate: %.2f GH/s", targetHashrate);
+
+    
+    // Timing mechanism for normal operation
+    static TickType_t lastAutotuneTime = 0;
+    TickType_t currentTime = xTaskGetTickCount();
+    uint32_t uptimeSeconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
+    
+    // Check if we need to wait for initial warmup (15 minutes)
+    if (uptimeSeconds < 900 && currentAsicTemp < targetAsicTemp) { // 15 minutes = 900 seconds
+        ESP_LOGI(autotuneTAG, "Autotune - Waiting for initial warmup period (%lu seconds remaining)", 900 - uptimeSeconds);
+        return;
+    }
+    
+    // Determine timing interval based on temperature
+    uint32_t intervalMs;
+    if (currentAsicTemp <= 68) {
+        intervalMs = 300000; // 5 minutes for normal operation
+    } else {
+        intervalMs = 500;  // 5 seconds for higher temperatures
+    }
+    
+    // Check if enough time has passed since last autotune
+    if ((currentTime - lastAutotuneTime) < pdMS_TO_TICKS(intervalMs)) {
+        ESP_LOGI(autotuneTAG, "Autotune - Waiting for next adjustment interval (%lu ms remaining)", 
+                 intervalMs - ((currentTime - lastAutotuneTime) * portTICK_PERIOD_MS));
+        return;
+    }
+    
+    // Update last autotune time
+    lastAutotuneTime = currentTime;
+    
+    // Temperature-based adjustments
+    int8_t tempDiff = currentAsicTemp - targetAsicTemp;
+    
+    // If temperature is within 2 degrees of target
+    if (tempDiff >= -2 && tempDiff <= 2) {
+        // Check hashrate
+        float hashrateDiffPercent = ((currentHashrate - targetHashrate) / targetHashrate) * 100.0;
+        
+        if (hashrateDiffPercent < -20.0) { // Hashrate is below target by 20%
+            // Increase voltage by 10mV
+            uint16_t newVoltage = targetDomainVoltage + 10;
+            ESP_LOGI(autotuneTAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+            char data[128];
+            snprintf(data, sizeof(data), "{\"voltage\":%u}", newVoltage);
+            dataBase_log_event("power", "info", "Autotune - Hashrate below target, increasing voltage", data);
+            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
+            return;
+        } else {
+            ESP_LOGI(TAG, "Autotune - Hashrate above target, no adjustments needed");
+            char data[128];
+            snprintf(data, sizeof(data), "{\"voltage\":%u}", targetDomainVoltage);
+            dataBase_log_event("power", "info", "Autotune - Hashrate above target, no adjustments needed", data);
+            return;
+        }
+    }
+    // If temperature is under target
+    else if (tempDiff < -2) {
+        static uint16_t newFrequency = 0;
+        static uint16_t newVoltage = 0;
+        // Increase frequency by 2%
+        if (currentFrequency < GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency && GLOBAL_STATE->AUTOTUNE_MODULE.maxPower > currentPower) {
+           newFrequency = currentFrequency * 1.02;
+        }
+        else {
+            ESP_LOGI(TAG, "freq or power limit reached, no adjustments possible");
+            ESP_LOGI(TAG, "Autotune - Frequency: %u MHz, Power: %d W, Max Frequency: %u MHz, Max Power: %d W", 
+                     currentFrequency, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
+            char data[128];
+            snprintf(data, sizeof(data), "{\"frequency\":%u,\"power\":%d,\"maxFrequency\":%u,\"maxPower\":%d}", 
+                     currentFrequency, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
+            dataBase_log_event("power", "warn", "Autotune - Frequency or power limit reached, no adjustments possible", data);
+
+            return;
+        }
+        // Increase voltage by 0.2%
+        if (targetDomainVoltage < GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage && GLOBAL_STATE->AUTOTUNE_MODULE.maxPower > currentPower) {
+            newVoltage = targetDomainVoltage * 1.002;
+        }
+        else {
+            ESP_LOGI(TAG, "voltage or power limit reached, no adjustments possible");
+            ESP_LOGI(TAG, "Autotune - Voltage: %u mV, Power: %d W, Max Voltage: %u mV, Max Power: %d W", 
+                     targetDomainVoltage, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
+            return;
+        }
+        
+        ESP_LOGI(TAG, "Autotune - Temperature under target, increasing frequency from %u MHz to %u MHz", 
+                 currentFrequency, newFrequency);
+        ESP_LOGI(TAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+        char data[128];
+        snprintf(data, sizeof(data), "{\"frequency\":%u,\"voltage\":%u}", newFrequency, newVoltage);
+        dataBase_log_event("power", "info", "Autotune - Temperature under target, increasing frequency and voltage", data);
+        
+        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
+        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
+        return;
+    }
+    // If temperature is over target
+    else {
+        // Decrease frequency by 2%
+        uint16_t newFrequency = currentFrequency * 0.98;
+        // Decrease voltage by 0.2%
+        uint16_t newVoltage = targetDomainVoltage * 0.998;
+        
+        ESP_LOGI(TAG, "Autotune - Temperature over target, decreasing frequency from %u MHz to %u MHz", 
+                 currentFrequency, newFrequency);
+        ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+        char data[128];
+        snprintf(data, sizeof(data), "{\"frequency\":%u,\"voltage\":%u}", newFrequency, newVoltage);
+        dataBase_log_event("power", "info", "Autotune - Temperature over target, decreasing frequency and voltage", data);
+        
+
+        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
+        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
+        return;
+    }
+}
 
 // static float _fbound(float value, float lower_bound, float upper_bound)
 // {
@@ -176,6 +464,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
                     nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
                     nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+                    
+                    // Log critical overheat event
+                    char overheat_data[128];
+                    snprintf(overheat_data, sizeof(overheat_data), 
+                             "{\"chipTemp\":%.1f,\"threshold\":%f,\"device\":\"DEVICE_MAX\"}", 
+                             power_management->chip_temp_avg, THROTTLE_TEMP);
+                    dataBase_log_event("power", "critical", "Overheat mode activated - ASIC temperature exceeded threshold", overheat_data);
+                    
                     exit(EXIT_FAILURE);
                 }
                 break;
@@ -212,6 +508,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
                     nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
                     nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+                    
+                    // Log critical overheat event
+                    char overheat_data[128];
+                    snprintf(overheat_data, sizeof(overheat_data), 
+                             "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%f,\"chipThreshold\":%f,\"device\":\"DEVICE_ULTRA_SUPRA\"}", 
+                             power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
+                    dataBase_log_event("power", "critical", "Overheat mode activated - VR or ASIC temperature exceeded threshold", overheat_data);
+                    
                     exit(EXIT_FAILURE);
                 }
 
@@ -240,6 +544,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
                     nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
                     nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+                    
+                    // Log critical overheat event
+                    char overheat_data[128];
+                    snprintf(overheat_data, sizeof(overheat_data), 
+                             "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%f,\"chipThreshold\":%f,\"device\":\"DEVICE_GAMMA\"}", 
+                             power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
+                    dataBase_log_event("power", "critical", "Overheat mode activated - VR or ASIC temperature exceeded threshold", overheat_data);
+                    
                     exit(EXIT_FAILURE);
                 }
                 break;
@@ -305,7 +617,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             module->overheat_mode = new_overheat_mode;
             ESP_LOGI(TAG, "Overheat mode updated to: %d", module->overheat_mode);
         }
-
+        autotuneOffset(GLOBAL_STATE);
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
     }
 }

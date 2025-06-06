@@ -97,6 +97,8 @@ typedef struct
     AsicModel asic_model;
     char * asic_model_str;
     uint16_t asic_count;
+    uint16_t small_core_count;
+
     uint16_t voltage_domain;
     AsicFunctions ASIC_functions;
     double asic_job_frequency_ms;
@@ -110,6 +112,8 @@ typedef struct
     AsicTaskModule ASIC_TASK_MODULE;
     PowerManagementModule POWER_MANAGEMENT_MODULE;
     SelfTestModule SELF_TEST_MODULE;
+    AutotuneModule AUTOTUNE_MODULE;
+
 
     char * extranonce_str;
     int extranonce_2_len;

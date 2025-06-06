@@ -1,0 +1,100 @@
+@import "tailwindcss";
+@import "./assets/theme.css";
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color: #222;
+  background-color: #ffffff;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Update dark mode styling to use CSS variables */
+[data-color-scheme="dark"] {
+  color: #ccc;
+  background-color: #1a1a1a;
+}
+
+body {
+  margin: 0;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+header {
+  display: flex;
+  justify-content: flex-end;
+  background-color: #673ab8;
+}
+
+header nav {
+  display: flex;
+}
+
+header a {
+  color: #fff;
+  padding: 0.75rem;
+  text-decoration: none;
+}
+
+header a.active {
+  background-color: #0005;
+}
+
+header a:hover {
+  background-color: #0008;
+}
+
+main {
+  flex: auto;
+  display: flex;
+  align-items: center;
+  max-width: 1280px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+@media (max-width: 639px) {
+  main {
+    margin: 2rem;
+  }
+}
+
+/* Remove the media query since we're controlling dark mode via theme now */
+/* @media (prefers-color-scheme: light) {
+  :root {
+    color: #ccc;
+    background-color: #1a1a1a;
+  }
+} */
+
+/* Global button cursor styling */
+button,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+.cursor-pointer,
+[onclick] {
+  cursor: pointer !important;
+}
+
+/* Ensure disabled buttons don't show pointer cursor */
+button:disabled,
+[role="button"]:disabled,
+[type="button"]:disabled,
+[type="submit"]:disabled,
+[type="reset"]:disabled {
+  cursor: not-allowed !important;
+}

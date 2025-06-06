@@ -4,6 +4,8 @@
 #include "nvs_flash.h"
 #include "nvs_config.h"
 #include "nvs_device.h"
+#include "vcore.h"
+
 
 #include "connect.h"
 #include "global_state.h"
@@ -45,21 +47,37 @@ esp_err_t NVSDevice_parse_config(GlobalState * GLOBAL_STATE) {
         GLOBAL_STATE->device_model = DEVICE_MAX;
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
+        GLOBAL_STATE->small_core_count = BM1397_SMALL_CORE_COUNT;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1800;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 1000;
     } else if (strcmp(GLOBAL_STATE->device_model_str, "ultra") == 0) {
         ESP_LOGI(TAG, "DEVICE: Ultra");
         GLOBAL_STATE->device_model = DEVICE_ULTRA;
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
+        GLOBAL_STATE->small_core_count = BM1366_SMALL_CORE_COUNT;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1400;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 900;
     } else if (strcmp(GLOBAL_STATE->device_model_str, "supra") == 0) {
         ESP_LOGI(TAG, "DEVICE: Supra");
         GLOBAL_STATE->device_model = DEVICE_SUPRA;
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
-        } else if (strcmp(GLOBAL_STATE->device_model_str, "gamma") == 0) {
+        GLOBAL_STATE->small_core_count = BM1368_SMALL_CORE_COUNT;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1450;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 1000;
+    } else if (strcmp(GLOBAL_STATE->device_model_str, "gamma") == 0) {
         ESP_LOGI(TAG, "DEVICE: Gamma");
         GLOBAL_STATE->device_model = DEVICE_GAMMA;
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
+        GLOBAL_STATE->small_core_count = BM1370_SMALL_CORE_COUNT;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1300;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 1000;
     } else {
         ESP_LOGE(TAG, "Invalid DEVICE model");
         // maybe should return here to now execute anything with a faulty device parameter !
@@ -67,6 +85,7 @@ esp_err_t NVSDevice_parse_config(GlobalState * GLOBAL_STATE) {
         GLOBAL_STATE->device_model = DEVICE_UNKNOWN;
         GLOBAL_STATE->asic_count = -1;
         GLOBAL_STATE->voltage_domain = 1;
+        GLOBAL_STATE->small_core_count = -1;
 
         return ESP_FAIL;
     }
@@ -141,6 +160,36 @@ esp_err_t NVSDevice_parse_config(GlobalState * GLOBAL_STATE) {
         GLOBAL_STATE->ASIC_functions = ASIC_functions;
         // maybe should return here to not execute anything with a faulty device parameter !
         return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t NVSDevice_CompareandUpdateHighestValues(GlobalState * GLOBAL_STATE) {
+
+    // get the current values
+    uint16_t current_frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+    uint16_t domain_voltage = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage * GLOBAL_STATE->voltage_domain;
+    uint16_t current_temp = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg;
+    float currentVIN = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage;
+    float currentPower = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power;
+
+
+    // compare the current values with the highest values and update the highest values if the current values are higher
+    if (current_frequency > nvs_config_get_u16(NVS_CONFIG_HIGHEST_FREQUENCY, 0)) {
+        nvs_config_set_u16(NVS_CONFIG_HIGHEST_FREQUENCY, current_frequency);
+    }
+    if (domain_voltage > nvs_config_get_u16(NVS_CONFIG_HIGHEST_DOMAIN_VOLTAGE, 0)) {
+        nvs_config_set_u16(NVS_CONFIG_HIGHEST_DOMAIN_VOLTAGE, domain_voltage);
+    }
+    if (current_temp > nvs_config_get_u16(NVS_CONFIG_HIGHEST_TEMPERATURE, 0)) {
+        nvs_config_set_u16(NVS_CONFIG_HIGHEST_TEMPERATURE, current_temp);
+    }
+    if (currentVIN > 5600) {
+        nvs_config_set_u16(NVS_CONFIG_OVERVOLT_COUNT, nvs_config_get_u16(NVS_CONFIG_OVERVOLT_COUNT, 0) + 1);
+    }
+    if (currentPower > 28000) {
+        nvs_config_set_u16(NVS_CONFIG_OVERPOWER_COUNT, nvs_config_get_u16(NVS_CONFIG_OVERPOWER_COUNT, 0) + 1);
     }
 
     return ESP_OK;

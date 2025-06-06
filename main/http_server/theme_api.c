@@ -2,9 +2,219 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "nvs_config.h"
+#include "dataBase.h"
 #include "cJSON.h"
+#include <string.h>
+
+extern esp_err_t lvglSendThemeBAP(char themeName[32]);
 
 static const char *TAG = "theme_api";
+uiTheme_t currentTheme;
+
+themePreset_t loadThemefromNVS(void) {
+    // First try to load from database
+    char theme_name[32];
+    esp_err_t ret = dataBase_get_active_theme(theme_name, sizeof(theme_name));
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Loaded theme from database: %s", theme_name);
+        themePreset_t preset = themePresetFromString(theme_name);
+        
+        // Also update NVS for backward compatibility. check to avoid unnecessary writes.
+        if (nvs_config_get_u16(NVS_CONFIG_THEME_NAME, THEME_ACS_DEFAULT) != preset) {
+            nvs_config_set_u16(NVS_CONFIG_THEME_NAME, preset);
+        }
+        
+        return preset;
+    } else {
+        // Fallback to NVS if database fails
+        uint16_t themeValue = nvs_config_get_u16(NVS_CONFIG_THEME_NAME, THEME_ACS_DEFAULT);
+        ESP_LOGI(TAG, "Loaded theme from NVS (fallback): %d", themeValue);
+        
+        // Try to sync with database
+        const char* theme_name_str = themePresetToString((themePreset_t)themeValue);
+        dataBase_set_active_theme(theme_name_str);
+        
+        return (themePreset_t)themeValue;
+    }
+}
+
+// Helper function to convert theme preset to string
+const char* themePresetToString(themePreset_t preset) {
+    switch (preset) {
+        case THEME_BITAXE_RED:
+            return "THEME_BITAXE_RED";
+        case THEME_BLOCKSTREAM_JADE:
+            return "THEME_BLOCKSTREAM_JADE";
+        case THEME_BLOCKSTREAM_BLUE:
+            return "THEME_BLOCKSTREAM_BLUE";
+        case THEME_SOLO_SATOSHI:
+            return "THEME_SOLO_SATOSHI";
+        case THEME_SOLO_MINING_CO:
+            return "THEME_SOLO_MINING_CO";
+        default:
+            return "THEME_ACS_DEFAULT";
+    }
+}
+
+// Helper function to convert string to theme preset
+themePreset_t themePresetFromString(const char* preset_str) {
+    if (strcmp(preset_str, "THEME_BITAXE_RED") == 0) {
+        return THEME_BITAXE_RED;
+    } else if (strcmp(preset_str, "THEME_BLOCKSTREAM_JADE") == 0) {
+        return THEME_BLOCKSTREAM_JADE;
+    } else if (strcmp(preset_str, "THEME_BLOCKSTREAM_BLUE") == 0) {
+        return THEME_BLOCKSTREAM_BLUE;
+    } else if (strcmp(preset_str, "THEME_SOLO_SATOSHI") == 0) {
+        return THEME_SOLO_SATOSHI;
+    } else if (strcmp(preset_str, "THEME_SOLO_MINING_CO") == 0) {
+        return THEME_SOLO_MINING_CO;
+    } else {
+        ESP_LOGE(TAG, "Invalid theme name: %s", preset_str);
+        return THEME_ACS_DEFAULT;
+    }
+}
+
+
+uiTheme_t* getCurrentTheme(void) {
+    return &currentTheme;
+    ESP_LOGI(TAG, "Current theme: %s", themePresetToString(currentTheme.themePreset));
+}
+
+themePreset_t getCurrentThemePreset(void) {
+    return currentTheme.themePreset;
+    ESP_LOGI(TAG, "Current theme preset: %d", currentTheme.themePreset);
+}
+
+void initializeTheme(themePreset_t preset) {
+    switch (preset) {
+        case THEME_BITAXE_RED:
+            strncpy(currentTheme.primaryColor, "#F80421", sizeof(currentTheme.primaryColor) - 1);
+            currentTheme.primaryColor[sizeof(currentTheme.primaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.secondaryColor, "#FC4D62", sizeof(currentTheme.secondaryColor) - 1);
+            currentTheme.secondaryColor[sizeof(currentTheme.secondaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.backgroundColor, "#070D17", sizeof(currentTheme.backgroundColor) - 1);
+            currentTheme.backgroundColor[sizeof(currentTheme.backgroundColor) - 1] = '\0';
+            
+            strncpy(currentTheme.textColor, "#F80421", sizeof(currentTheme.textColor) - 1);
+            currentTheme.textColor[sizeof(currentTheme.textColor) - 1] = '\0';
+            
+            strncpy(currentTheme.borderColor, "#FC4D62", sizeof(currentTheme.borderColor) - 1);
+            currentTheme.borderColor[sizeof(currentTheme.borderColor) - 1] = '\0';
+            
+            currentTheme.themePreset = THEME_BITAXE_RED;
+            break;
+        case THEME_BLOCKSTREAM_JADE:
+            strncpy(currentTheme.primaryColor, "#00B093", sizeof(currentTheme.primaryColor) - 1);
+            currentTheme.primaryColor[sizeof(currentTheme.primaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.secondaryColor, "#006D62", sizeof(currentTheme.secondaryColor) - 1);
+            currentTheme.secondaryColor[sizeof(currentTheme.secondaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.backgroundColor, "#111316", sizeof(currentTheme.backgroundColor) - 1);
+            currentTheme.backgroundColor[sizeof(currentTheme.backgroundColor) - 1] = '\0';
+            
+            strncpy(currentTheme.textColor, "#21CCAB", sizeof(currentTheme.textColor) - 1);
+            currentTheme.textColor[sizeof(currentTheme.textColor) - 1] = '\0';
+            
+            strncpy(currentTheme.borderColor, "#01544A", sizeof(currentTheme.borderColor) - 1);
+            currentTheme.borderColor[sizeof(currentTheme.borderColor) - 1] = '\0';
+            
+            currentTheme.themePreset = THEME_BLOCKSTREAM_JADE;
+            break;
+        case THEME_BLOCKSTREAM_BLUE:
+            strncpy(currentTheme.primaryColor, "#00C3FF", sizeof(currentTheme.primaryColor) - 1);
+            currentTheme.primaryColor[sizeof(currentTheme.primaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.secondaryColor, "#00C3FF", sizeof(currentTheme.secondaryColor) - 1);
+            currentTheme.secondaryColor[sizeof(currentTheme.secondaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.backgroundColor, "#111316", sizeof(currentTheme.backgroundColor) - 1);
+            currentTheme.backgroundColor[sizeof(currentTheme.backgroundColor) - 1] = '\0';
+            
+            strncpy(currentTheme.textColor, "#00C3FF", sizeof(currentTheme.textColor) - 1);
+            currentTheme.textColor[sizeof(currentTheme.textColor) - 1] = '\0';
+            
+            strncpy(currentTheme.borderColor, "#00C3FF", sizeof(currentTheme.borderColor) - 1);
+            currentTheme.borderColor[sizeof(currentTheme.borderColor) - 1] = '\0';
+            
+            currentTheme.themePreset = THEME_BLOCKSTREAM_BLUE;
+            break;
+        case THEME_SOLO_SATOSHI:
+            strncpy(currentTheme.primaryColor, "#F80421", sizeof(currentTheme.primaryColor) - 1);
+            currentTheme.primaryColor[sizeof(currentTheme.primaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.secondaryColor, "#F7931A", sizeof(currentTheme.secondaryColor) - 1);
+            currentTheme.secondaryColor[sizeof(currentTheme.secondaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.backgroundColor, "#070D17", sizeof(currentTheme.backgroundColor) - 1);
+            currentTheme.backgroundColor[sizeof(currentTheme.backgroundColor) - 1] = '\0';
+            
+            strncpy(currentTheme.textColor, "#FFFFFF", sizeof(currentTheme.textColor) - 1);
+            currentTheme.textColor[sizeof(currentTheme.textColor) - 1] = '\0';
+            
+            strncpy(currentTheme.borderColor, "#F7931A", sizeof(currentTheme.borderColor) - 1);
+            currentTheme.borderColor[sizeof(currentTheme.borderColor) - 1] = '\0';
+            
+            currentTheme.themePreset = THEME_SOLO_SATOSHI;
+            break;
+        case THEME_SOLO_MINING_CO:
+            strncpy(currentTheme.primaryColor, "#F15900", sizeof(currentTheme.primaryColor) - 1);
+            currentTheme.primaryColor[sizeof(currentTheme.primaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.secondaryColor, "#C5900F", sizeof(currentTheme.secondaryColor) - 1);
+            currentTheme.secondaryColor[sizeof(currentTheme.secondaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.backgroundColor, "#111316", sizeof(currentTheme.backgroundColor) - 1);
+            currentTheme.backgroundColor[sizeof(currentTheme.backgroundColor) - 1] = '\0';
+            
+            strncpy(currentTheme.textColor, "#FFFFFF", sizeof(currentTheme.textColor) - 1);
+            currentTheme.textColor[sizeof(currentTheme.textColor) - 1] = '\0';
+            
+            strncpy(currentTheme.borderColor, "#C5900F", sizeof(currentTheme.borderColor) - 1);
+            currentTheme.borderColor[sizeof(currentTheme.borderColor) - 1] = '\0';
+            
+            currentTheme.themePreset = THEME_SOLO_MINING_CO;
+            break;
+        case THEME_ACS_DEFAULT:
+            strncpy(currentTheme.primaryColor, "#A7F3D0", sizeof(currentTheme.primaryColor) - 1);
+            currentTheme.primaryColor[sizeof(currentTheme.primaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.secondaryColor, "#A7F3D0", sizeof(currentTheme.secondaryColor) - 1);
+            currentTheme.secondaryColor[sizeof(currentTheme.secondaryColor) - 1] = '\0';
+            
+            strncpy(currentTheme.backgroundColor, "#161F1B", sizeof(currentTheme.backgroundColor) - 1);
+            currentTheme.backgroundColor[sizeof(currentTheme.backgroundColor) - 1] = '\0';
+            
+            strncpy(currentTheme.textColor, "#A7F3D0", sizeof(currentTheme.textColor) - 1);
+            currentTheme.textColor[sizeof(currentTheme.textColor) - 1] = '\0';
+            
+            strncpy(currentTheme.borderColor, "#A7F3D0", sizeof(currentTheme.borderColor) - 1);
+            currentTheme.borderColor[sizeof(currentTheme.borderColor) - 1] = '\0';
+            
+            currentTheme.themePreset = THEME_ACS_DEFAULT;
+            break;
+    }
+}
+
+// Function to save theme to both database and NVS
+void saveThemetoNVS(const char* theme_name, themePreset_t themePreset) {
+    // Update the theme in database and NVS
+    esp_err_t ret = dataBase_set_active_theme(theme_name);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save theme to database: %s", theme_name);
+        // Continue anyway, save to NVS as fallback
+    }
+    
+    // Also save to NVS for backward compatibility check to avoid unnecessary writes.
+    if (nvs_config_get_u16(NVS_CONFIG_THEME_NAME, THEME_ACS_DEFAULT) != themePreset) {
+        nvs_config_set_u16(NVS_CONFIG_THEME_NAME, themePreset);
+    }
+    initializeTheme(themePreset);
+}
+
 
 // Helper function to set CORS headers
 static esp_err_t set_cors_headers(httpd_req_t *req)
@@ -29,121 +239,179 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     set_cors_headers(req);
 
-    char *scheme = nvs_config_get_string(NVS_CONFIG_THEME_SCHEME, "dark");
-    char *name = nvs_config_get_string(NVS_CONFIG_THEME_NAME, "dark");
-    char *colors = nvs_config_get_string(NVS_CONFIG_THEME_COLORS, 
-        "{"
-        "\"--primary-color\":\"#F80421\","
-        "\"--primary-color-text\":\"#ffffff\","
-        "\"--highlight-bg\":\"#F80421\","
-        "\"--highlight-text-color\":\"#ffffff\","
-        "\"--focus-ring\":\"0 0 0 0.2rem rgba(248,4,33,0.2)\","
-        "\"--slider-bg\":\"#dee2e6\","
-        "\"--slider-range-bg\":\"#F80421\","
-        "\"--slider-handle-bg\":\"#F80421\","
-        "\"--progressbar-bg\":\"#dee2e6\","
-        "\"--progressbar-value-bg\":\"#F80421\","
-        "\"--checkbox-border\":\"#F80421\","
-        "\"--checkbox-bg\":\"#F80421\","
-        "\"--checkbox-hover-bg\":\"#df031d\","
-        "\"--button-bg\":\"#F80421\","
-        "\"--button-hover-bg\":\"#df031d\","
-        "\"--button-focus-shadow\":\"0 0 0 2px #ffffff, 0 0 0 4px #F80421\","
-        "\"--togglebutton-bg\":\"#F80421\","
-        "\"--togglebutton-border\":\"1px solid #F80421\","
-        "\"--togglebutton-hover-bg\":\"#df031d\","
-        "\"--togglebutton-hover-border\":\"1px solid #df031d\","
-        "\"--togglebutton-text-color\":\"#ffffff\""
-        "}"
-    );
+    uiTheme_t* theme = getCurrentTheme();
 
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "colorScheme", scheme);
-    cJSON_AddStringToObject(root, "theme", name);
     
-    // Parse stored colors JSON string
-    cJSON *colors_json = cJSON_Parse(colors);
-    if (colors_json) {
-        cJSON_AddItemToObject(root, "accentColors", colors_json);
-    }
+    // Add theme preset
+    cJSON_AddStringToObject(root, "themeName", themePresetToString(theme->themePreset));
+    
+    // Add all color values
+    cJSON_AddStringToObject(root, "primaryColor", theme->primaryColor);
+    cJSON_AddStringToObject(root, "secondaryColor", theme->secondaryColor);
+    cJSON_AddStringToObject(root, "backgroundColor", theme->backgroundColor);
+    cJSON_AddStringToObject(root, "textColor", theme->textColor);
+    cJSON_AddStringToObject(root, "borderColor", theme->borderColor);
 
     const char *response = cJSON_Print(root);
     httpd_resp_sendstr(req, response);
 
-    free(scheme);
-    free(name);
-    free(colors);
     free((char *)response);
     cJSON_Delete(root);
 
     return ESP_OK;
 }
 
-// POST /api/theme handler
-static esp_err_t theme_post_handler(httpd_req_t *req)
+
+// Patch /api/theme handler
+static esp_err_t theme_patch_handler(httpd_req_t *req)
 {
     set_cors_headers(req);
+    httpd_resp_set_type(req, "application/json");
 
-    // Read POST data
-    char content[1024];
-    int ret = httpd_req_recv(req, content, sizeof(content) - 1);
-    if (ret <= 0) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read request");
+    // Get the theme name from the URL path
+    char theme_name[32] = {0};
+    const char *uri = req->uri;
+    const char *theme_start = strrchr(uri, '/');
+    if (theme_start == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid theme URL");
         return ESP_FAIL;
     }
-    content[ret] = '\0';
+    theme_start++; // Skip the '/'
+    strncpy(theme_name, theme_start, sizeof(theme_name) - 1);
+    theme_name[sizeof(theme_name) - 1] = '\0';
 
-    cJSON *root = cJSON_Parse(content);
-    if (!root) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    // Convert the theme name to a theme preset
+    themePreset_t themePreset = themePresetFromString(theme_name);
+    
+    // Check if the theme exists
+    if (themePreset == THEME_ACS_DEFAULT && strcmp(theme_name, "THEME_ACS_DEFAULT") != 0) {
+        ESP_LOGE(TAG, "Invalid theme name: %s", theme_name);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid theme name");
         return ESP_FAIL;
     }
+    
+    // Save theme to database and NVS
+    saveThemetoNVS(theme_name, themePreset);
 
-    // Update theme settings
-    cJSON *item;
-    if ((item = cJSON_GetObjectItem(root, "colorScheme")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_THEME_SCHEME, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "theme")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_THEME_NAME, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "accentColors")) != NULL) {
-        char *colors_str = cJSON_Print(item);
-        nvs_config_set_string(NVS_CONFIG_THEME_COLORS, colors_str);
-        free(colors_str);
+    // save theme to database
+    dataBase_set_active_theme(theme_name);
+
+    // Log the theme change event
+    char log_data[128];
+    snprintf(log_data, sizeof(log_data), "{\"previousTheme\":\"%s\",\"newTheme\":\"%s\"}", 
+             themePresetToString(getCurrentThemePreset()), theme_name);
+    dataBase_log_event("theme", "info", "Theme changed", log_data);
+
+    // send theme to BAP
+    lvglSendThemeBAP(themePresetToString(themePreset));
+
+    // Get the current theme after update
+    uiTheme_t* theme = getCurrentTheme();
+
+    // Create response JSON
+    cJSON *response_root = cJSON_CreateObject();
+    
+    // Add theme preset
+    cJSON_AddStringToObject(response_root, "themeName", themePresetToString(theme->themePreset));
+    
+    // Add all color values
+    cJSON_AddStringToObject(response_root, "primaryColor", theme->primaryColor);
+    cJSON_AddStringToObject(response_root, "secondaryColor", theme->secondaryColor);
+    cJSON_AddStringToObject(response_root, "backgroundColor", theme->backgroundColor);
+    cJSON_AddStringToObject(response_root, "textColor", theme->textColor);
+    cJSON_AddStringToObject(response_root, "borderColor", theme->borderColor);
+
+    const char *response = cJSON_Print(response_root);
+    httpd_resp_sendstr(req, response);
+
+    free((char *)response);
+    cJSON_Delete(response_root);
+
+    return ESP_OK;
+}
+
+static esp_err_t theme_active_themes_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    set_cors_headers(req);
+
+    // Try to get themes from database first
+    cJSON *database_themes = NULL;
+    esp_err_t ret = dataBase_get_available_themes(&database_themes);
+    
+    if (ret == ESP_OK && database_themes != NULL) {
+        // Use themes from database
+        const char *response = cJSON_Print(database_themes);
+        httpd_resp_sendstr(req, response);
+        
+        free((char *)response);
+        cJSON_Delete(database_themes);
+    } else {
+        // Fallback to hardcoded themes list
+        cJSON *root = cJSON_CreateObject();
+        cJSON *themes = cJSON_CreateArray();
+
+        // Iterate through all theme presets
+        for (themePreset_t theme = THEME_ACS_DEFAULT; theme <= THEME_SOLO_MINING_CO; theme++) {
+            // Skip any gaps in the enum values
+            
+            const char* themeName = themePresetToString(theme);
+            if (themeName) {
+                cJSON_AddItemToArray(themes, cJSON_CreateString(themeName));
+            }
+        }
+
+        cJSON_AddItemToObject(root, "themes", themes);
+
+        const char *response = cJSON_Print(root);
+        httpd_resp_sendstr(req, response);
+
+        free((char *)response);
+        cJSON_Delete(root);
     }
 
-    cJSON_Delete(root);
-    httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
+=======
+
     return ESP_OK;
 }
 
 esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
 {
     httpd_uri_t theme_get = {
-        .uri = "/api/theme",
+        .uri = "/api/themes/current",
         .method = HTTP_GET,
         .handler = theme_get_handler,
         .user_ctx = ctx
     };
 
-    httpd_uri_t theme_post = {
-        .uri = "/api/theme",
-        .method = HTTP_POST,
-        .handler = theme_post_handler,
+    httpd_uri_t theme_patch = {
+        .uri = "/api/themes/*",
+        .method = HTTP_PATCH,
+        .handler = theme_patch_handler,
         .user_ctx = ctx
     };
 
     httpd_uri_t theme_options = {
-        .uri = "/api/theme",
+        .uri = "/api/themes",
+
         .method = HTTP_OPTIONS,
         .handler = theme_options_handler,
         .user_ctx = ctx
     };
 
+    httpd_uri_t theme_active_themes = {
+        .uri = "/api/themes",
+        .method = HTTP_GET,
+        .handler = theme_active_themes_handler,
+        .user_ctx = ctx
+    };
+
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_get));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_post));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_patch));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_options));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_active_themes));
 
     return ESP_OK;
 }
+

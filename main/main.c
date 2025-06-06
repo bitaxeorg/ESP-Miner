@@ -1,4 +1,3 @@
-
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -21,6 +20,9 @@
 #include "self_test.h"
 #include "lvglDisplayBAP.h"
 #include "serial.h"
+#include "theme_api.h"
+#include "dataBase.h"
+
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -68,6 +70,10 @@ void app_main(void)
 
     SYSTEM_init_system(&GLOBAL_STATE);
 
+    initializeTheme(THEME_ACS_DEFAULT);
+    ESP_LOGI(TAG, "Theme initialized");
+    ESP_LOGI(TAG, "Current theme preset: %d", getCurrentThemePreset());
+
     // pull the wifi credentials and hostname out of NVS
     char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, WIFI_SSID);
     char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, WIFI_PASS);
@@ -83,6 +89,8 @@ void app_main(void)
     generate_ssid(GLOBAL_STATE.SYSTEM_MODULE.ap_ssid);
 
     SYSTEM_init_peripherals(&GLOBAL_STATE);
+
+   
     
     xTaskCreate(SYSTEM_task, "SYSTEM_task", 4096, (void *) &GLOBAL_STATE, 3, NULL);
     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL);
@@ -96,6 +104,13 @@ void app_main(void)
     if (result_bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);
         strncpy(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, "Connected!", 20);
+        
+        // Log WiFi connection event
+        char wifi_data[128];
+        snprintf(wifi_data, sizeof(wifi_data), 
+                 "{\"ipAddress\":\"%s\",\"ssid\":\"%s\"}", 
+                 GLOBAL_STATE.SYSTEM_MODULE.ip_addr_str, wifi_ssid);
+        dataBase_log_event("network", "info", "WiFi connection established", wifi_data);
     } else if (result_bits & WIFI_FAIL_BIT) {
         ESP_LOGE(TAG, "Failed to connect to SSID: %s", wifi_ssid);
 
@@ -104,6 +119,7 @@ void app_main(void)
         ESP_LOGI(TAG, "Finished, waiting for user input.");
         while (1) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
+
         }
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
@@ -112,6 +128,7 @@ void app_main(void)
         ESP_LOGI(TAG, "Finished, waiting for user input.");
         while (1) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
+
         }
     }
 

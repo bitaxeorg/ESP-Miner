@@ -1,6 +1,8 @@
 #include "http_server.h"
 #include "recovery_page.h"
 #include "theme_api.h"  // Add theme API include
+#include "dataBase.h"  // Add database API include
+
 #include "cJSON.h"
 #include "esp_chip_info.h"
 #include "esp_http_server.h"
@@ -16,6 +18,8 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "vcore.h"
+#include "power_management_task.h"  // Add this for preset support
+
 #include <fcntl.h>
 #include <string.h>
 #include <sys/param.h>
@@ -32,9 +36,13 @@
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
 #include <pthread.h>
+#include "lvglDisplayBAP.h"
+
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
+
+extern bool apply_preset(DeviceModel device_model, const char* preset_name);
 
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
@@ -164,7 +172,8 @@ static esp_err_t is_network_allowed(httpd_req_t * req)
 
 esp_err_t init_fs(void)
 {
-    esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = NULL, .max_files = 5, .format_if_mount_failed = false};
+    esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = "www", .max_files = 5, .format_if_mount_failed = false};
+
     esp_err_t ret = esp_vfs_spiffs_register(&conf);
 
     if (ret != ESP_OK) {
@@ -428,9 +437,114 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
     }
+    if ((item = cJSON_GetObjectItem(root, "autotune")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_AUTOTUNE_FLAG, item->valueint);
+    }
+    // Apply preset immediately if "presetName" field is present
+    if ((item = cJSON_GetObjectItem(root, "presetName")) != NULL && item->valuestring != NULL) {
+        if (apply_preset(GLOBAL_STATE->device_model, item->valuestring)) {
+            ESP_LOGI(TAG, "Preset '%s' applied successfully", item->valuestring);
+            lvglSendPresetBAP();
+        } else {
+            ESP_LOGE(TAG, "Failed to apply preset '%s'", item->valuestring);
+        }
+    }
 
+    // Create response JSON with updated settings
+    httpd_resp_set_type(req, "application/json");
+    
+    cJSON *response = cJSON_CreateObject();
+    cJSON *updated_settings = cJSON_CreateObject();
+    
+    // Add each setting that was updated to the response
+    if ((item = cJSON_GetObjectItem(root, "stratumURL")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "stratumURL", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumURL")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "fallbackStratumURL", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "stratumUser")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "stratumUser", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "stratumPassword")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "stratumPassword", "***"); // Don't expose password
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumUser")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "fallbackStratumUser", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPassword")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "fallbackStratumPassword", "***"); // Don't expose password
+    }
+    if ((item = cJSON_GetObjectItem(root, "stratumPort")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "stratumPort", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPort")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "fallbackStratumPort", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "ssid")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "ssid", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "wifiPass")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "wifiPass", "***"); // Don't expose password
+    }
+    if ((item = cJSON_GetObjectItem(root, "hostname")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "hostname", item->valuestring);
+    }
+    if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
+        cJSON_AddNumberToObject(updated_settings, "coreVoltage", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL && item->valueint > 0) {
+        cJSON_AddNumberToObject(updated_settings, "frequency", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "flipscreen")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "flipscreen", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "overheat_mode", 0);
+    }
+    if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "invertscreen", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "invertfanpolarity")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "invertfanpolarity", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "autofanspeed")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "autofanspeed", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "fanspeed", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "autotune")) != NULL) {
+        cJSON_AddNumberToObject(updated_settings, "autotune", item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "presetName")) != NULL && item->valuestring != NULL) {
+        cJSON_AddStringToObject(updated_settings, "presetName", item->valuestring);
+        cJSON_AddBoolToObject(updated_settings, "presetApplied", apply_preset(GLOBAL_STATE->device_model, item->valuestring));
+    }
+    
+    // Add metadata to response
+    cJSON_AddStringToObject(response, "status", "success");
+    cJSON_AddStringToObject(response, "message", "Settings updated successfully");
+    cJSON_AddItemToObject(response, "updatedSettings", updated_settings);
+    time_t now;
+    time(&now);
+    cJSON_AddNumberToObject(response, "timestamp", now);
+    
+    // Send response
+    const char *response_str = cJSON_Print(response);
+    httpd_resp_sendstr(req, response_str);
+
+    // Log the event
+    char data[128];
+    snprintf(data, sizeof(data), "{\"updatedSettings\":%s}", response_str);
+    dataBase_log_event("settings", "info", "Settings updated via WebUI", data);
+    
+    // Cleanup
+    free((char *)response_str);
+    cJSON_Delete(response);
     cJSON_Delete(root);
-    httpd_resp_send_chunk(req, NULL, 0);
+    
+
     return ESP_OK;
 }
 
@@ -498,6 +612,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
     cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
     cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
+    // Calculate expected hashrate based on current frequency, small core count, and ASIC count
+    float expectedHashrate = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY) * ((GLOBAL_STATE->small_core_count * GLOBAL_STATE->asic_count) / 1000.0);
+    cJSON_AddNumberToObject(root, "expectedHashrate", expectedHashrate);
+
     cJSON_AddStringToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_diff_string);
     cJSON_AddStringToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_diff_string);
     cJSON_AddNumberToObject(root, "stratumDiff", GLOBAL_STATE->stratum_difficulty);
@@ -558,6 +676,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
+    cJSON_AddNumberToObject(root, "autotune", nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1));
+    cJSON_AddStringToObject(root, "autotune_preset", nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, ""));
+    cJSON_AddStringToObject(root, "serialnumber", nvs_config_get_string(NVS_CONFIG_SERIAL_NUMBER, ""));
+
 
     free(ssid);
     free(hostname);
@@ -807,6 +929,175 @@ void websocket_log_handler()
     }
 }
 
+/* Handler for getting recent logs from database */
+static esp_err_t GET_recent_logs(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    // Parse query parameters for limit
+    int limit = 50; // Default limit
+    char query_buf[128];
+    if (httpd_req_get_url_query_str(req, query_buf, sizeof(query_buf)) == ESP_OK) {
+        char limit_str[16];
+        if (httpd_query_key_value(query_buf, "limit", limit_str, sizeof(limit_str)) == ESP_OK) {
+            int parsed_limit = atoi(limit_str);
+            if (parsed_limit > 0 && parsed_limit <= 100) {
+                limit = parsed_limit;
+            }
+        }
+    }
+
+    // Get logs from database
+    cJSON* logs_json = NULL;
+    esp_err_t ret = dataBase_get_recent_logs(limit, &logs_json);
+    
+    if (ret != ESP_OK || logs_json == NULL) {
+        ESP_LOGW(TAG, "Failed to get logs from database, returning empty response");
+        // Return empty logs response
+        cJSON* empty_response = cJSON_CreateObject();
+        cJSON_AddArrayToObject(empty_response, "events");
+        cJSON_AddNumberToObject(empty_response, "count", 0);
+        
+        const char* response_str = cJSON_Print(empty_response);
+        httpd_resp_sendstr(req, response_str);
+        free((char*)response_str);
+        cJSON_Delete(empty_response);
+        return ESP_OK;
+    }
+
+    // Send the logs response
+    const char* logs_str = cJSON_Print(logs_json);
+    httpd_resp_sendstr(req, logs_str);
+    free((char*)logs_str);
+    cJSON_Delete(logs_json);
+    
+    return ESP_OK;
+}
+
+/* Handler for getting error logs from database */
+static esp_err_t GET_error_logs(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    // Parse query parameters for limit
+    int limit = 0; // Default: return all errors
+    char query_buf[128];
+    if (httpd_req_get_url_query_str(req, query_buf, sizeof(query_buf)) == ESP_OK) {
+        char limit_str[16];
+        if (httpd_query_key_value(query_buf, "limit", limit_str, sizeof(limit_str)) == ESP_OK) {
+            int parsed_limit = atoi(limit_str);
+            if (parsed_limit > 0) {
+                limit = parsed_limit;
+            }
+        }
+    }
+
+    // Get error logs from database
+    cJSON* logs_json = NULL;
+    esp_err_t ret = dataBase_get_error_logs(limit, &logs_json);
+    
+    if (ret != ESP_OK || logs_json == NULL) {
+        ESP_LOGW(TAG, "Failed to get error logs from database, returning empty response");
+        // Return empty error logs response
+        cJSON* empty_response = cJSON_CreateObject();
+        cJSON_AddArrayToObject(empty_response, "errors");
+        cJSON_AddNumberToObject(empty_response, "count", 0);
+        cJSON_AddNumberToObject(empty_response, "totalErrors", 0);
+        cJSON_AddNumberToObject(empty_response, "lastError", 0);
+        
+        const char* response_str = cJSON_Print(empty_response);
+        httpd_resp_sendstr(req, response_str);
+        free((char*)response_str);
+        cJSON_Delete(empty_response);
+        return ESP_OK;
+    }
+
+    // Send the error logs response
+    const char* logs_str = cJSON_Print(logs_json);
+    httpd_resp_sendstr(req, logs_str);
+    free((char*)logs_str);
+    cJSON_Delete(logs_json);
+    
+    return ESP_OK;
+}
+
+/* Handler for getting critical logs from database */
+static esp_err_t GET_critical_logs(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    // Parse query parameters for limit
+    int limit = 0; // Default: return all critical events
+    char query_buf[128];
+    if (httpd_req_get_url_query_str(req, query_buf, sizeof(query_buf)) == ESP_OK) {
+        char limit_str[16];
+        if (httpd_query_key_value(query_buf, "limit", limit_str, sizeof(limit_str)) == ESP_OK) {
+            int parsed_limit = atoi(limit_str);
+            if (parsed_limit > 0) {
+                limit = parsed_limit;
+            }
+        }
+    }
+
+    // Get critical logs from database
+    cJSON* logs_json = NULL;
+    esp_err_t ret = dataBase_get_critical_logs(limit, &logs_json);
+    
+    if (ret != ESP_OK || logs_json == NULL) {
+        ESP_LOGW(TAG, "Failed to get critical logs from database, returning empty response");
+        // Return empty critical logs response
+        cJSON* empty_response = cJSON_CreateObject();
+        cJSON_AddArrayToObject(empty_response, "critical");
+        cJSON_AddNumberToObject(empty_response, "count", 0);
+        cJSON_AddNumberToObject(empty_response, "totalCritical", 0);
+        cJSON_AddNumberToObject(empty_response, "lastCritical", 0);
+        
+        const char* response_str = cJSON_Print(empty_response);
+        httpd_resp_sendstr(req, response_str);
+        free((char*)response_str);
+        cJSON_Delete(empty_response);
+        return ESP_OK;
+    }
+
+    // Send the critical logs response
+    const char* logs_str = cJSON_Print(logs_json);
+    httpd_resp_sendstr(req, logs_str);
+    free((char*)logs_str);
+    cJSON_Delete(logs_json);
+    
+    return ESP_OK;
+}
+
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -817,6 +1108,12 @@ esp_err_t start_rest_server(void * pvParameters)
         // Unable to initialize the web app filesystem.
         // Enter recovery mode
         enter_recovery = true;
+    }
+    
+    // Initialize data partition database (independent of www partition)
+    esp_err_t db_ret = dataBase_init();
+    if (db_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to initialize database system, continuing without database features");
     }
 
     REST_CHECK(base_path, "wrong base path", err);
@@ -853,7 +1150,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_info_get_uri);
-
+/*
     httpd_uri_t swarm_options_uri = {
         .uri = "/api/swarm",
         .method = HTTP_OPTIONS,
@@ -868,6 +1165,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_restart_uri);
+*/
 
     httpd_uri_t system_restart_options_uri = {
         .uri = "/api/system/restart", 
@@ -908,6 +1206,33 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
+
+    /* URI handler for fetching recent logs */
+    httpd_uri_t logs_recent_get_uri = {
+        .uri = "/api/logs/recent", 
+        .method = HTTP_GET, 
+        .handler = GET_recent_logs, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &logs_recent_get_uri);
+
+    /* URI handler for fetching error logs */
+    httpd_uri_t logs_errors_get_uri = {
+        .uri = "/api/logs/errors", 
+        .method = HTTP_GET, 
+        .handler = GET_error_logs, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &logs_errors_get_uri);
+
+    /* URI handler for fetching critical logs */
+    httpd_uri_t logs_critical_get_uri = {
+        .uri = "/api/logs/critical", 
+        .method = HTTP_GET, 
+        .handler = GET_critical_logs, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &logs_critical_get_uri);
 
     httpd_uri_t ws = {
         .uri = "/api/ws", 
