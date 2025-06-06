@@ -1,10 +1,8 @@
-[![](https://dcbadge.vercel.app/api/server/3E8ca2dkcC)](https://discord.gg/3E8ca2dkcC)
+[![](https://dcbadge.vercel.app/api/server/3E8ca2dkcC)](https://discord.gg/osmu)
 
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/skot/esp-miner/total)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/t/skot/esp-miner)
-![GitHub contributors](https://img.shields.io/github/contributors/skot/esp-miner)
-
-![Alt](https://repobeats.axiom.co/api/embed/9830d39ca088153c7db39a7c0e1645c62a0454fd.svg "Repobeats analytics image")
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/bitaxeorg/esp-miner/total)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/t/bitaxeorg/esp-miner)
+![GitHub contributors](https://img.shields.io/github/contributors/bitaxeorg/esp-miner)
 
 
 # ESP-Miner
