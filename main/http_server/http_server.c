@@ -547,9 +547,7 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     httpd_resp_sendstr(req, response_str);
 
     // Log the event
-    char data[128];
-    snprintf(data, sizeof(data), "{\"updatedSettings\":%s}", response_str);
-    dataBase_log_event("settings", "info", "Settings updated via WebUI", data);
+    dataBase_log_event("settings", "info", "Settings updated via WebUI", response_str);
     
     // Cleanup
     free((char *)response_str);
