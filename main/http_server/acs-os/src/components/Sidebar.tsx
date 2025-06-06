@@ -258,7 +258,7 @@ export function Sidebar({ children }: SidebarProps) {
             )}
           >
             <div className='flex items-center gap-3'>
-              <div className={`h-2 w-2 rounded-full ${isWifiConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+              <div className={`h-2 w-2 rounded-full ${isWifiConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
               {!collapsed && <span>{isWifiConnected ? 'Connected' : 'Offline'}</span>}
             </div>
             <button

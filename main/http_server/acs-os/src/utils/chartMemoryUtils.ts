@@ -34,7 +34,7 @@ export const CHART_CONFIGS: Record<string, ChartTimeConfig> = {
     dataPoints: 120,      // 1 hour with 30-second intervals
     hours: 1,
     intervalSeconds: 30,
-    description: "1 hour of data"
+    description: "1 hour"
   },
   LONG: {
     name: "Long",
