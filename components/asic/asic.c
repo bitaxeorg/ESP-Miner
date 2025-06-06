@@ -16,6 +16,8 @@ static const char *TAG = "asic";
 
 uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
 {
+    ESP_LOGI(TAG, "Initializing %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.model) {
         case BM1397:
             return BM1397_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
