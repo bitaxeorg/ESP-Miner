@@ -15,6 +15,7 @@ import { PoolComponent } from './components/pool/pool.component';
 import { NetworkEditComponent } from './components/network-edit/network.edit.component';
 import { HomeComponent } from './components/home/home.component';
 import { LoadingComponent } from './components/loading/loading.component';
+import { ModalComponent } from './components/modal/modal.component';
 import { LogsComponent } from './components/logs/logs.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SettingsComponent } from './components/settings/settings.component';
@@ -38,6 +39,7 @@ const components = [
   NetworkEditComponent,
   HomeComponent,
   LoadingComponent,
+  ModalComponent,
   NetworkComponent,
   SettingsComponent,
   LogsComponent,

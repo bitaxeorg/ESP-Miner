@@ -1,10 +1,12 @@
 import { HttpClient } from '@angular/common/http';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { catchError, from, map, mergeMap, of, take, timeout, toArray } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { SystemService } from 'src/app/services/system.service';
+import { ModalComponent } from '../modal/modal.component';
+
 const SWARM_DATA = 'SWARM_DATA'
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 const SWARM_SORTING = 'SWARM_SORTING'
@@ -16,10 +18,11 @@ const SWARM_SORTING = 'SWARM_SORTING'
 })
 export class SwarmComponent implements OnInit, OnDestroy {
 
+  @ViewChild(ModalComponent) modalComponent!: ModalComponent;
+
   public swarm: any[] = [];
 
   public selectedAxeOs: any = null;
-  public showEdit = false;
 
   public form: FormGroup;
 
@@ -175,7 +178,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public edit(axe: any) {
     this.selectedAxeOs = axe;
-    this.showEdit = true;
+    this.modalComponent.isVisible = true;
   }
 
   public restart(axe: any) {
