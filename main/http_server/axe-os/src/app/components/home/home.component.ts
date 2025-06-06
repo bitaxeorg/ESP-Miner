@@ -1,6 +1,10 @@
-import { Component, ViewChild } from '@angular/core';
+import { Component, ViewChild, Input } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ToastrService } from 'ngx-toastr';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
+import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
 import { SystemService } from 'src/app/services/system.service';
@@ -8,6 +12,8 @@ import { ThemeService } from 'src/app/services/theme.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { UIChart } from 'primeng/chart';
+import { eChartLabel } from 'src/models/enum/eChartLabel';
+import { LoadingService } from 'src/app/services/loading.service';
 
 
 @Component({
@@ -23,8 +29,9 @@ export class HomeComponent {
   public chartOptions: any;
   public dataLabel: number[] = [];
   public hashrateData: number[] = [];
-  public temperatureData: number[] = [];
   public powerData: number[] = [];
+  public chartY1Data: number[] = [];
+  public chartY2Data: number[] = [];
   public chartData?: any;
 
   public maxPower: number = 0;
@@ -41,13 +48,21 @@ export class HomeComponent {
   @ViewChild('chart')
   private chart?: UIChart
 
+  public form!: FormGroup;
+
+  @Input() uri = '';
+
   constructor(
+    private fb: FormBuilder,
     private systemService: SystemService,
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
+    private loadingService: LoadingService,
+    private toastr: ToastrService,
     private shareRejectReasonsService: ShareRejectionExplanationService
   ) {
     this.initializeChart();
+    this.loadPreviousData();
 
     // Subscribe to theme changes
     this.themeService.getThemeSettings().subscribe(() => {
@@ -72,7 +87,6 @@ export class HomeComponent {
 
     // Update chart options
     if (this.chartOptions) {
-      this.chartOptions.plugins.legend.labels.color = textColor;
       this.chartOptions.scales.x.ticks.color = textColorSecondary;
       this.chartOptions.scales.x.grid.color = surfaceBorder;
       this.chartOptions.scales.y.ticks.color = primaryColor;
@@ -85,22 +99,51 @@ export class HomeComponent {
     this.chartData = { ...this.chartData };
   }
 
-  
+  ngOnInit(): void {
+    this.systemService.getInfo(this.uri)
+      .subscribe(info => {
+        this.form = this.fb.group({
+          chartY1Data: [info.chartY1Data, [Validators.required]],
+          chartY2Data: [info.chartY2Data, [Validators.required]],
+        });
+
+        this.form.valueChanges.subscribe(() => {
+          this.updateSystem();
+        })
+      });
+  }
+
+  public updateSystem() {
+    const form = this.form.getRawValue();
+
+    this.systemService.updateSystem(this.uri, form)
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => {
+          // Clear previous data
+          this.clearDataPoints();
+          this.loadPreviousData();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error('Error.', `Could not save chart source. ${err.message}`);
+        }
+      });
+  }
 
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColor = documentStyle.getPropertyValue('--text-color');
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
 
     this.chartData = {
-      labels: [],
+      labels: [this.dataLabel],
       datasets: [
         {
           type: 'line',
-          label: 'Hashrate',
-          data: [this.hashrateData],
+          label: eChartLabel.hashrate,
+          data: [this.chartY1Data],
+          fill: true,
           backgroundColor: primaryColor + '30',
           borderColor: primaryColor,
           tension: 0,
@@ -108,12 +151,12 @@ export class HomeComponent {
           pointHoverRadius: 5,
           borderWidth: 1,
           yAxisID: 'y',
-          fill: true,
+          hidden: false
         },
         {
           type: 'line',
-          label: 'ASIC Temp',
-          data: [this.temperatureData],
+          label: eChartLabel.asicTemp,
+          data: [this.chartY2Data],
           fill: false,
           backgroundColor: textColorSecondary,
           borderColor: textColorSecondary,
@@ -122,6 +165,7 @@ export class HomeComponent {
           pointHoverRadius: 5,
           borderWidth: 1,
           yAxisID: 'y2',
+          hidden: false
         }
       ]
     };
@@ -131,23 +175,17 @@ export class HomeComponent {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          labels: {
-            color: textColor
-          }
+          display: false
         },
         tooltip: {
           callbacks: {
             label: function (tooltipItem: any) {
               let label = tooltipItem.dataset.label || '';
               if (label) {
-                label += ': ';
-              }
-              if (tooltipItem.dataset.label === 'ASIC Temp') {
-                label += tooltipItem.raw + '°C';
+                return label += ': ' + HomeComponent.cbFormatValue(tooltipItem.raw, label);
               } else {
-                label += HashSuffixPipe.transform(tooltipItem.raw);
+                return tooltipItem.raw;
               }
-              return label;
             }
           }
         },
@@ -168,14 +206,18 @@ export class HomeComponent {
           }
         },
         y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
           ticks: {
             color: primaryColor,
-            callback: (value: number) => HashSuffixPipe.transform(value)
+            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[0].label)
           },
           grid: {
             color: surfaceBorder,
             drawBorder: false
-          }
+          },
+          suggestedMax: 0
         },
         y2: {
           type: 'linear',
@@ -183,7 +225,7 @@ export class HomeComponent {
           position: 'right',
           ticks: {
             color: textColorSecondary,
-            callback: (value: number) => value + '°C'
+            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[1].label)
           },
           grid: {
             drawOnChartArea: false,
@@ -195,29 +237,57 @@ export class HomeComponent {
     };
 
     this.chartData.labels = this.dataLabel;
-    this.chartData.datasets[0].data = this.hashrateData;
-    this.chartData.datasets[1].data = this.temperatureData;
+    this.chartData.datasets[0].data = this.chartY1Data;
+    this.chartData.datasets[1].data = this.chartY2Data;
+  }
 
+  private loadPreviousData()
+  {
     // load previous data
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
     this.stats$.subscribe(stats => {
+      const idxTimestamp = 0;
+      const idxHashrate = 1;
+      const idxPower = 2;
+      let idxChartY1Data = 3;
+      let idxChartY2Data = 4;
+
+      if (stats.chartY1Data === eChartLabel.hashrate) {
+        idxChartY1Data = 1;
+      } else if (stats.chartY1Data === eChartLabel.power) {
+        idxChartY1Data = 2;
+      } else if (stats.chartY1Data === eChartLabel.none) {
+        idxChartY1Data = -1;
+      }
+
+      if (stats.chartY2Data === eChartLabel.hashrate) {
+        idxChartY2Data = 1;
+      } else if (stats.chartY2Data === eChartLabel.power) {
+        idxChartY2Data = 2;
+      } else if (stats.chartY2Data === eChartLabel.none) {
+        idxChartY2Data = -1;
+      } else if (idxChartY1Data < 3) { // no additional data for Y1
+        idxChartY2Data = 3;
+      }
+
       stats.statistics.forEach(element => {
-        const idxHashrate = 0;
-        const idxTemperature = 1;
-        const idxPower = 2;
-        const idxTimestamp = 3;
+        element[idxHashrate] = element[idxHashrate] * 1000000000; // convert to H/s
 
-        this.hashrateData.push(element[idxHashrate] * 1000000000);
-        this.temperatureData.push(element[idxTemperature]);
-        this.powerData.push(element[idxPower]);
         this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
-
-        if (this.hashrateData.length >= 720) {
-          this.hashrateData.shift();
-          this.temperatureData.shift();
-          this.powerData.shift();
-          this.dataLabel.shift();
+        this.hashrateData.push(element[idxHashrate]);
+        this.powerData.push(element[idxPower]);
+        if ((-1 != idxChartY1Data) && (idxChartY1Data < element.length)) {
+          this.chartY1Data.push(element[idxChartY1Data]);
+        } else {
+          this.chartY1Data.push(0.0);
         }
+        if ((-1 != idxChartY2Data) && (idxChartY2Data < element.length)) {
+          this.chartY2Data.push(element[idxChartY2Data]);
+        } else {
+          this.chartY2Data.push(0.0);
+        }
+
+        this.limitDataPoints();
       }),
       this.startGetLiveData();
     });
@@ -231,27 +301,48 @@ export class HomeComponent {
       switchMap(() => {
         return this.systemService.getInfo()
       }),
+      map(info => {
+        info.hashRate = info.hashRate * 1000000000; // convert to H/s
+        info.expectedHashrate = info.expectedHashrate * 1000000000; // convert to H/s
+        info.voltage = info.voltage / 1000;
+        info.current = info.current / 1000;
+        info.coreVoltageActual = info.coreVoltageActual / 1000;
+        info.coreVoltage = info.coreVoltage / 1000;
+        return info;
+      }),
       tap(info => {
-        // Only collect and update chart data if there's no power fault
-        if (!info.power_fault) {
-          this.hashrateData.push(info.hashRate * 1000000000);
-          this.temperatureData.push(info.temp);
-          this.powerData.push(info.power);
-          this.dataLabel.push(new Date().getTime());
+        const chartY1DataValue = this.form.get('chartY1Data')?.value;
+        const chartY2DataValue = this.form.get('chartY2Data')?.value;
 
-          if ((this.hashrateData.length) >= 720) {
-            this.hashrateData.shift();
-            this.temperatureData.shift();
-            this.powerData.shift();
-            this.dataLabel.shift();
-          }
-        }
-
-        this.chart?.refresh();
         this.maxPower = Math.max(info.maxPower, info.power);
         this.nominalVoltage = info.nominalVoltage;
         this.maxTemp = Math.max(75, info.temp);
         this.maxFrequency = Math.max(800, info.frequency);
+
+        // Only collect and update chart data if there's no power fault
+        if (!info.power_fault) {
+          this.dataLabel.push(new Date().getTime());
+          this.hashrateData.push(info.hashRate);
+          this.powerData.push(info.power);
+          this.chartY1Data.push(HomeComponent.getDataForLabel(chartY1DataValue, info));
+          this.chartY2Data.push(HomeComponent.getDataForLabel(chartY2DataValue, info));
+
+          this.limitDataPoints();
+
+          this.chartData.datasets[0].label = chartY1DataValue;
+          this.chartData.datasets[1].label = chartY2DataValue;
+
+          this.chartData.datasets[0].hidden = (chartY1DataValue === eChartLabel.none);
+          this.chartData.datasets[1].hidden = (chartY2DataValue === eChartLabel.none);
+
+          this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartY1DataValue, info);
+          this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartY2DataValue, info);
+
+          this.chartOptions.scales.y.display = (chartY1DataValue != eChartLabel.none);
+          this.chartOptions.scales.y2.display = (chartY2DataValue != eChartLabel.none);
+        }
+
+        this.chart?.refresh();
 
         const isFallback = info.isUsingFallbackStratum;
 
@@ -262,10 +353,10 @@ export class HomeComponent {
       }),
       map(info => {
         info.power = parseFloat(info.power.toFixed(1))
-        info.voltage = parseFloat((info.voltage / 1000).toFixed(1));
-        info.current = parseFloat((info.current / 1000).toFixed(1));
-        info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
-        info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
+        info.voltage = parseFloat(info.voltage.toFixed(1));
+        info.current = parseFloat(info.current.toFixed(1));
+        info.coreVoltageActual = parseFloat(info.coreVoltageActual.toFixed(2));
+        info.coreVoltage = parseFloat(info.coreVoltage.toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
 
         return info;
@@ -314,5 +405,88 @@ export class HomeComponent {
     });
 
     return this.calculateAverage(efficiencies);
+  }
+
+  public clearDataPoints() {
+    this.dataLabel.length = 0;
+    this.hashrateData.length = 0;
+    this.powerData.length = 0;
+    this.chartY1Data.length = 0;
+    this.chartY2Data.length = 0;
+  }
+
+  public limitDataPoints() {
+    if (this.dataLabel.length >= 720) {
+      this.dataLabel.shift();
+      this.hashrateData.shift();
+      this.powerData.shift();
+      this.chartY1Data.shift();
+      this.chartY2Data.shift();
+    }
+  }
+
+  public getSuggestedMaxForLabel(label: eChartLabel, info: ISystemInfo): number {
+    switch (label) {
+      case eChartLabel.hashrate:    return info.expectedHashrate;
+      case eChartLabel.asicTemp:    return this.maxTemp;
+      case eChartLabel.vrTemp:      return this.maxTemp + 25;
+      case eChartLabel.asicVoltage: return info.coreVoltage;
+      case eChartLabel.voltage:     return (info.nominalVoltage + .5);
+      case eChartLabel.power:       return this.maxPower;
+      case eChartLabel.current:     return (this.maxPower / info.coreVoltage);
+      case eChartLabel.fanSpeed:    return 100;
+      case eChartLabel.fanRpm:      return 7000;
+      case eChartLabel.wifiRssi:    return 0;
+      case eChartLabel.freeHeap:    return 0;
+      default: return 0;
+    }
+  }
+
+  static getDataForLabel(label: eChartLabel, info: ISystemInfo): number {
+    switch (label) {
+      case eChartLabel.hashrate:    return info.hashRate;
+      case eChartLabel.asicTemp:    return info.temp;
+      case eChartLabel.vrTemp:      return info.vrTemp;
+      case eChartLabel.asicVoltage: return info.coreVoltageActual;
+      case eChartLabel.voltage:     return info.voltage;
+      case eChartLabel.power:       return info.power;
+      case eChartLabel.current:     return info.current;
+      case eChartLabel.fanSpeed:    return info.fanspeed;
+      case eChartLabel.fanRpm:      return info.fanrpm;
+      case eChartLabel.wifiRssi:    return info.wifiRSSI;
+      case eChartLabel.freeHeap:    return info.freeHeap;
+      default: return 0.0;
+    }
+  }
+
+  static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number} {
+    switch (label) {
+      case eChartLabel.hashrate:    return {suffix: ' H/s', precision: 0};
+      case eChartLabel.asicTemp:    return {suffix: '°C', precision: 1};
+      case eChartLabel.vrTemp:      return {suffix: '°C', precision: 1};
+      case eChartLabel.asicVoltage: return {suffix: ' V', precision: 3};
+      case eChartLabel.voltage:     return {suffix: ' V', precision: 1};
+      case eChartLabel.power:       return {suffix: ' W', precision: 1};
+      case eChartLabel.current:     return {suffix: ' A', precision: 1};
+      case eChartLabel.fanSpeed:    return {suffix: ' %', precision: 0};
+      case eChartLabel.fanRpm:      return {suffix: ' rpm', precision: 0};
+      case eChartLabel.wifiRssi:    return {suffix: ' dBm', precision: 0};
+      case eChartLabel.freeHeap:    return {suffix: ' B', precision: 0};
+      default: return {suffix: '', precision: 0};
+    }
+  }
+
+  static cbFormatValue(value: number, datasetLabel: eChartLabel): string {
+    switch (datasetLabel) {
+      case eChartLabel.hashrate:    return HashSuffixPipe.transform(value);
+      case eChartLabel.freeHeap:    return ByteSuffixPipe.transform(value);
+      default:
+        const settings = HomeComponent.getSettingsForLabel(datasetLabel);
+        return value.toFixed(settings.precision) + settings.suffix;
+    }
+  }
+
+  get dataSourceLabels() {
+    return Object.values(eChartLabel).map(label => ({name: label, value: label}));
   }
 }
