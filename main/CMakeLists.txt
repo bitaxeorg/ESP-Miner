@@ -65,11 +65,14 @@ PRIV_REQUIRES
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_INCLUDE_SIMPLE=1" APPEND)
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH= ${CMAKE_SOURCE_DIR}/main/lv_conf.h" APPEND)
 
+
 set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/acs-os")
 set(DATA_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/database/data")
 
+
 if("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
     message(STATUS "Running on GitHub Actions. Web ui will be prebuilt.")
+
 
     spiffs_create_partition_image(www ${WEB_SRC_DIR}/dist/acs-os FLASH_IN_PROJECT)
     
@@ -108,4 +111,3 @@ else()
     if(EXISTS "${DATA_SRC_DIR}")
         spiffs_create_partition_image(data ${DATA_SRC_DIR} FLASH_IN_PROJECT)
     endif()
-endif()

@@ -36,7 +36,6 @@
 
 
 
-
 static const char * TAG = "SystemModule";
 
 static void _suffix_string(uint64_t, char *, size_t, int);

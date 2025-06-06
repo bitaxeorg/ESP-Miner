@@ -215,6 +215,7 @@ void saveThemetoNVS(const char* theme_name, themePreset_t themePreset) {
     initializeTheme(themePreset);
 }
 
+
 // Helper function to set CORS headers
 static esp_err_t set_cors_headers(httpd_req_t *req)
 {
@@ -370,6 +371,8 @@ static esp_err_t theme_active_themes_handler(httpd_req_t *req)
         cJSON_Delete(root);
     }
 
+=======
+
     return ESP_OK;
 }
 
@@ -391,6 +394,7 @@ esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
 
     httpd_uri_t theme_options = {
         .uri = "/api/themes",
+
         .method = HTTP_OPTIONS,
         .handler = theme_options_handler,
         .user_ctx = ctx

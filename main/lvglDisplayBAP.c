@@ -14,6 +14,7 @@
 #include "driver/uart.h"
 #include "esp_system.h"
 
+
 #include "nvs_config.h"
 #include "i2c_bitaxe.h"
 #include "global_state.h"
@@ -38,6 +39,7 @@ extern GlobalState *GLOBAL_STATE;
 
 
 extern bool apply_preset(DeviceModel device_model, const char* preset_name);
+
 
 /*  sent to the display
 Network:
@@ -216,6 +218,7 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
     //memset(displayBufferBAP, 0, dataLen + 2);
     
     // Prepare data
+
     memset(displayBufferBAP, 0, MAX_BUFFER_SIZE_BAP);
     displayBufferBAP[0] = 0xFF;
     displayBufferBAP[1] = 0xAA;
@@ -236,6 +239,7 @@ static esp_err_t sendRegisterDataBAP(uint8_t reg, const void* data, size_t dataL
     ESP_LOGI("LVGL", "Sending reg 0x%02X, len %d, CRC: 0x%04X", reg, dataLen, crc);
     SERIAL_send_BAP(displayBufferBAP, dataLen + 6, false);
     // Wait for CRC feedback
+
 
     return ESP_OK;
 }
@@ -475,6 +479,7 @@ esp_err_t lvglUpdateDisplayMonitoringBAP(GlobalState *GLOBAL_STATE)
     ret = sendRegisterDataBAP(LVGL_REG_VREG_TEMP, &vreg_temp, sizeof(float));
     if (ret != ESP_OK) return ret;
 
+
     return ESP_OK;
 }
 
@@ -484,7 +489,9 @@ esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE)
     static TickType_t lastMonitorUpdateTime = 0;
     TickType_t currentTime = xTaskGetTickCount();
     
+
     if ((currentTime - lastMonitorUpdateTime) < pdMS_TO_TICKS(DISPLAY_UPDATE_INTERVAL_MS*4)) {
+
         return ESP_OK;
     }
     lastMonitorUpdateTime = currentTime;
@@ -522,6 +529,7 @@ esp_err_t lvglUpdateDisplayDeviceStatusBAP(GlobalState *GLOBAL_STATE)
 
     //TODO: Add all themes to the available themes
     
+
 
     // New Flags 0x0E to
 
@@ -651,6 +659,7 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
         // Update last receive time
         last_receive_time = xTaskGetTickCount();
         
+
         ESP_LOGI("Serial BAP", "rx: ");
         prettyHex((unsigned char*) buf, bytes_read);
         ESP_LOGI("Serial BAP", " [%d]\n", bytes_read);
@@ -894,6 +903,7 @@ int16_t SERIAL_rx_BAP(GlobalState *GLOBAL_STATE, uint8_t *buf, uint16_t size, ui
     
     // Clear receiving flag
     is_receiving_data = false;
+
     return bytes_read;
 }
 
@@ -915,6 +925,7 @@ esp_err_t lvglStartupLoopBAP(GlobalState *GLOBAL_STATE)
         ESP_LOGI("LVGL", "Sending startup done flag false");
         sendRegisterDataBAP(LVGL_FLAG_STARTUP_DONE, &module->startup_done, sizeof(uint8_t));
         sendRegisterDataBAP(LVGL_REG_IP_ADDR, "", 0);
+
     }
 
     return ESP_OK;
@@ -936,11 +947,11 @@ esp_err_t lvglOverheatLoopBAP(GlobalState *GLOBAL_STATE) {
         ESP_LOGI("LVGL", "Sending overheat mode flag true");
         sendRegisterDataBAP(LVGL_FLAG_OVERHEAT_MODE, &module->overheat_mode, sizeof(uint8_t));
         sendRegisterDataBAP(LVGL_REG_IP_ADDR, "", 0);
+
     }
 
     return ESP_OK;
 }
-
 // send theme to BAP
 esp_err_t lvglSendThemeBAP(char themeName[32]) {
     sendRegisterDataBAP(LVGL_REG_SPECIAL_THEME, themeName, strlen(themeName));
@@ -973,4 +984,5 @@ esp_err_t lvglSendPresetBAP() {
     
     return ESP_OK;
 }
+
 

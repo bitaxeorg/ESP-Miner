@@ -2,6 +2,7 @@
 #include "recovery_page.h"
 #include "theme_api.h"  // Add theme API include
 #include "dataBase.h"  // Add database API include
+
 #include "cJSON.h"
 #include "esp_chip_info.h"
 #include "esp_http_server.h"
@@ -18,6 +19,7 @@
 #include "nvs_config.h"
 #include "vcore.h"
 #include "power_management_task.h"  // Add this for preset support
+
 #include <fcntl.h>
 #include <string.h>
 #include <sys/param.h>
@@ -35,6 +37,7 @@
 #include "lwip/sys.h"
 #include <pthread.h>
 #include "lvglDisplayBAP.h"
+
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -170,6 +173,7 @@ static esp_err_t is_network_allowed(httpd_req_t * req)
 esp_err_t init_fs(void)
 {
     esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = "www", .max_files = 5, .format_if_mount_failed = false};
+
     esp_err_t ret = esp_vfs_spiffs_register(&conf);
 
     if (ret != ESP_OK) {
@@ -540,6 +544,7 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     cJSON_Delete(response);
     cJSON_Delete(root);
     
+
     return ESP_OK;
 }
 
@@ -607,11 +612,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
     cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
     cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
-    
     // Calculate expected hashrate based on current frequency, small core count, and ASIC count
     float expectedHashrate = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY) * ((GLOBAL_STATE->small_core_count * GLOBAL_STATE->asic_count) / 1000.0);
     cJSON_AddNumberToObject(root, "expectedHashrate", expectedHashrate);
-    
+
     cJSON_AddStringToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_diff_string);
     cJSON_AddStringToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_diff_string);
     cJSON_AddNumberToObject(root, "stratumDiff", GLOBAL_STATE->stratum_difficulty);
@@ -675,6 +679,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "autotune", nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1));
     cJSON_AddStringToObject(root, "autotune_preset", nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, ""));
     cJSON_AddStringToObject(root, "serialnumber", nvs_config_get_string(NVS_CONFIG_SERIAL_NUMBER, ""));
+
 
     free(ssid);
     free(hostname);
@@ -1144,7 +1149,6 @@ esp_err_t start_rest_server(void * pvParameters)
         .handler = GET_system_info, 
         .user_ctx = rest_context
     };
-    
     httpd_register_uri_handler(server, &system_info_get_uri);
 /*
     httpd_uri_t swarm_options_uri = {
@@ -1162,6 +1166,7 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &system_restart_uri);
 */
+
     httpd_uri_t system_restart_options_uri = {
         .uri = "/api/system/restart", 
         .method = HTTP_OPTIONS, 

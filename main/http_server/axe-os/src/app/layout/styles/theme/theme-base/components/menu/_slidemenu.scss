@@ -1,0 +1,59 @@
+.p-slidemenu {
+    padding: $verticalMenuPadding;
+    background: $menuBg;
+    color: $menuTextColor;
+    border: $menuBorder;
+    border-radius: $borderRadius;
+    width: $menuWidth;
+    
+    .p-slidemenu-root-list {
+        outline: 0 none;
+    }
+
+    .p-submenu-list {
+        outline: 0 none;
+    }
+
+    .p-menuitem {
+        @include menuitem();
+    }
+
+    &.p-slidemenu-overlay {
+        background: $overlayMenuBg;
+        border: $overlayMenuBorder;
+        box-shadow: $overlayMenuShadow;
+    }
+
+    .p-slidemenu-list {
+        padding: $verticalMenuPadding;
+        background: $overlayMenuBg;
+        border: $overlayMenuBorder;
+        box-shadow: $overlayMenuShadow;
+    }
+
+    .p-menuitem-separator {
+        border-top: $divider;
+        margin: $menuSeparatorMargin;
+    }
+
+    .p-slidemenu-icon {
+        font-size: $menuitemSubmenuIconFontSize;
+    }
+
+    .p-icon {
+        width: $menuitemSubmenuIconFontSize;
+        height: $menuitemSubmenuIconFontSize;
+    }
+
+    .p-slidemenu-backward {
+        padding: $menuitemPadding;
+	    color: $menuitemTextColor;
+        &:not(.p-disabled):focus {
+            @include focused-inset();
+        }
+    }
+
+    .p-menuitem-badge {
+        @include menuitem-badge();
+    }
+}
