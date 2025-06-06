@@ -11,6 +11,13 @@ extern esp_err_t lvglSendThemeBAP(char themeName[32]);
 static const char *TAG = "theme_api";
 uiTheme_t currentTheme;
 
+// Pre-allocated buffers for memory safety
+#define MAX_THEME_JSON_RESPONSE_SIZE 2048  // Maximum JSON response size for themes
+#define MAX_THEME_LOG_DATA_SIZE 256        // Maximum log data size
+
+static char theme_json_response_buffer[MAX_THEME_JSON_RESPONSE_SIZE];
+static char theme_log_data_buffer[MAX_THEME_LOG_DATA_SIZE];
+
 themePreset_t loadThemefromNVS(void) {
     // First try to load from database
     char theme_name[32];
@@ -252,12 +259,24 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "textColor", theme->textColor);
     cJSON_AddStringToObject(root, "borderColor", theme->borderColor);
 
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
+    // Use pre-allocated buffer for JSON response
+    char* json_string = cJSON_PrintUnformatted(root);
+    if (json_string != NULL) {
+        size_t json_len = strlen(json_string);
+        if (json_len < MAX_THEME_JSON_RESPONSE_SIZE) {
+            strncpy(theme_json_response_buffer, json_string, MAX_THEME_JSON_RESPONSE_SIZE - 1);
+            theme_json_response_buffer[MAX_THEME_JSON_RESPONSE_SIZE - 1] = '\0';
+            httpd_resp_sendstr(req, theme_json_response_buffer);
+        } else {
+            ESP_LOGE(TAG, "JSON response too large: %d bytes", json_len);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Response too large");
+        }
+        free(json_string);  // Free the cJSON allocated string
+    } else {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON creation failed");
+    }
 
-    free((char *)response);
     cJSON_Delete(root);
-
     return ESP_OK;
 }
 
@@ -296,11 +315,11 @@ static esp_err_t theme_patch_handler(httpd_req_t *req)
     // save theme to database
     dataBase_set_active_theme(theme_name);
 
-    // Log the theme change event
-    char log_data[128];
-    snprintf(log_data, sizeof(log_data), "{\"previousTheme\":\"%s\",\"newTheme\":\"%s\"}", 
+    // Log the theme change event using pre-allocated buffer
+    snprintf(theme_log_data_buffer, MAX_THEME_LOG_DATA_SIZE, 
+             "{\"previousTheme\":\"%s\",\"newTheme\":\"%s\"}", 
              themePresetToString(getCurrentThemePreset()), theme_name);
-    dataBase_log_event("theme", "info", "Theme changed", log_data);
+    dataBase_log_event("theme", "info", "Theme changed", theme_log_data_buffer);
 
     // send theme to BAP
     lvglSendThemeBAP(themePresetToString(themePreset));
@@ -321,10 +340,23 @@ static esp_err_t theme_patch_handler(httpd_req_t *req)
     cJSON_AddStringToObject(response_root, "textColor", theme->textColor);
     cJSON_AddStringToObject(response_root, "borderColor", theme->borderColor);
 
-    const char *response = cJSON_Print(response_root);
-    httpd_resp_sendstr(req, response);
+    // Use pre-allocated buffer for JSON response
+    char* json_string = cJSON_PrintUnformatted(response_root);
+    if (json_string != NULL) {
+        size_t json_len = strlen(json_string);
+        if (json_len < MAX_THEME_JSON_RESPONSE_SIZE) {
+            strncpy(theme_json_response_buffer, json_string, MAX_THEME_JSON_RESPONSE_SIZE - 1);
+            theme_json_response_buffer[MAX_THEME_JSON_RESPONSE_SIZE - 1] = '\0';
+            httpd_resp_sendstr(req, theme_json_response_buffer);
+        } else {
+            ESP_LOGE(TAG, "JSON response too large: %d bytes", json_len);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Response too large");
+        }
+        free(json_string);  // Free the cJSON allocated string
+    } else {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON creation failed");
+    }
 
-    free((char *)response);
     cJSON_Delete(response_root);
 
     return ESP_OK;
@@ -340,11 +372,22 @@ static esp_err_t theme_active_themes_handler(httpd_req_t *req)
     esp_err_t ret = dataBase_get_available_themes(&database_themes);
     
     if (ret == ESP_OK && database_themes != NULL) {
-        // Use themes from database
-        const char *response = cJSON_Print(database_themes);
-        httpd_resp_sendstr(req, response);
-        
-        free((char *)response);
+        // Use themes from database with pre-allocated buffer
+        char* json_string = cJSON_PrintUnformatted(database_themes);
+        if (json_string != NULL) {
+            size_t json_len = strlen(json_string);
+            if (json_len < MAX_THEME_JSON_RESPONSE_SIZE) {
+                strncpy(theme_json_response_buffer, json_string, MAX_THEME_JSON_RESPONSE_SIZE - 1);
+                theme_json_response_buffer[MAX_THEME_JSON_RESPONSE_SIZE - 1] = '\0';
+                httpd_resp_sendstr(req, theme_json_response_buffer);
+            } else {
+                ESP_LOGE(TAG, "JSON response too large: %d bytes", json_len);
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Response too large");
+            }
+            free(json_string);  // Free the cJSON allocated string
+        } else {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON creation failed");
+        }
         cJSON_Delete(database_themes);
     } else {
         // Fallback to hardcoded themes list
@@ -363,10 +406,22 @@ static esp_err_t theme_active_themes_handler(httpd_req_t *req)
 
         cJSON_AddItemToObject(root, "themes", themes);
 
-        const char *response = cJSON_Print(root);
-        httpd_resp_sendstr(req, response);
-
-        free((char *)response);
+        // Use pre-allocated buffer for JSON response
+        char* json_string = cJSON_PrintUnformatted(root);
+        if (json_string != NULL) {
+            size_t json_len = strlen(json_string);
+            if (json_len < MAX_THEME_JSON_RESPONSE_SIZE) {
+                strncpy(theme_json_response_buffer, json_string, MAX_THEME_JSON_RESPONSE_SIZE - 1);
+                theme_json_response_buffer[MAX_THEME_JSON_RESPONSE_SIZE - 1] = '\0';
+                httpd_resp_sendstr(req, theme_json_response_buffer);
+            } else {
+                ESP_LOGE(TAG, "JSON response too large: %d bytes", json_len);
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Response too large");
+            }
+            free(json_string);  // Free the cJSON allocated string
+        } else {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON creation failed");
+        }
         cJSON_Delete(root);
     }
 
