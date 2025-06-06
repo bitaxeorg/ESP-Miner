@@ -62,5 +62,6 @@
         "ssid"
     ],
     "idf.port": "/dev/ttyACM0",
-    "C_Cpp.intelliSenseEngine": "Tag Parser"
+    "C_Cpp.intelliSenseEngine": "Tag Parser",
+    "idf.pythonInstallPath": "/opt/esp/python_env/idf5.4_py3.12_env/bin/python"
 }
