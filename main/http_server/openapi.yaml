@@ -130,10 +130,12 @@ components:
         - stratumURL
         - stratumUser
         - temp
+        - tempMax
         - uptimeSeconds
         - version
         - voltage
         - vrTemp
+        - vrTempMax
         - wifiStatus
         - wifiRSSI
         - displayTimeout
@@ -271,6 +273,9 @@ components:
         temp:
           type: number
           description: Average chip temperature
+        tempMax:
+          type: number
+          description: Maximum average chip temperature
         uptimeSeconds:
           type: number
           description: System uptime in seconds
@@ -283,6 +288,9 @@ components:
         vrTemp:
           type: number
           description: Voltage regulator temperature
+        vrTempMax:
+          type: number
+          description: Maximum voltage regulator temperature
         wifiStatus:
           type: string
           description: WiFi connection status
