@@ -174,7 +174,7 @@ export function SettingsAdvanced() {
               </div>
               <div className='mt-4'>
                 <div className='flex items-center gap-3'>
-                  <div className='flex-1'></div>
+                  <div className='flex-1' />
                 </div>
               </div>
             </div>
@@ -219,7 +219,7 @@ export function SettingsAdvanced() {
               </div>
               <div className='mt-4'>
                 <div className='flex items-center gap-3'>
-                  <div className='flex-1'></div>
+                  <div className='flex-1' />
                 </div>
               </div>
             </div>
@@ -252,7 +252,7 @@ export function SettingsAdvanced() {
               <div className='text-white text-sm font-medium'>{frequency} MHz</div>
               <div className='mt-4'>
                 <div className='flex items-center gap-3'>
-                  <div className='flex-1'></div>
+                  <div className='flex-1' />
                 </div>
               </div>
             </div>
@@ -271,7 +271,7 @@ export function SettingsAdvanced() {
               <div className='text-white text-sm font-medium'>{voltage} mV</div>
               <div className='mt-4'>
                 <div className='flex items-center gap-3'>
-                  <div className='flex-1'></div>
+                  <div className='flex-1' />
                 </div>
               </div>
             </div>
