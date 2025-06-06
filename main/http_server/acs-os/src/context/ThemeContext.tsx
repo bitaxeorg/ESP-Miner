@@ -37,7 +37,8 @@ const defaultThemeContext: ThemeContextType = {
 export const ThemeContext = createContext<ThemeContextType>(defaultThemeContext);
 
 export function ThemeProvider({ children }: { children: ComponentChildren }) {
-  // Disabled theme state - using static values
+  // THEMES DISABLED FOR PRODUCTION - All theme functionality is intentionally disabled
+  // to prevent API calls to /api/themes endpoints. Using static default theme only.
   const [themeData] = useState<ThemeData | null>({
     themeName: "THEME_ACS_DEFAULT",
     primaryColor: "#3b82f6",

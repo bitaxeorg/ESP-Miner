@@ -59,6 +59,17 @@ static int fd = -1;
 #define SCRATCH_BUFSIZE (10240)
 #define MESSAGE_QUEUE_SIZE (128)
 
+#define MAX_HTTP_REQUEST_SIZE 4096  // Maximum HTTP request body size
+#define MAX_JSON_RESPONSE_SIZE 4096  // Maximum JSON response size
+#define MAX_NVS_STRING_SIZE 128      // Maximum NVS string length
+#define MAX_OTA_BUFFER_SIZE 1000     // Maximum OTA buffer size
+
+// Pre-allocated buffers for HTTP request handling
+static char http_request_buffer[MAX_HTTP_REQUEST_SIZE];
+static char json_response_buffer[MAX_JSON_RESPONSE_SIZE];
+static char nvs_string_buffer[MAX_NVS_STRING_SIZE];
+static char ota_buffer[MAX_OTA_BUFFER_SIZE];  // Dedicated buffer for OTA operations
+
 typedef struct rest_server_context
 {
     char base_path[ESP_VFS_PATH_MAX + 1];
@@ -351,15 +362,20 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
     int total_len = req->content_len;
     int cur_len = 0;
-    char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
     int received = 0;
-    if (total_len >= SCRATCH_BUFSIZE) {
+    
+    // Use pre-allocated buffer instead of scratch buffer
+    if (total_len >= MAX_HTTP_REQUEST_SIZE) {
         /* Respond with 500 Internal Server Error */
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
         return ESP_OK;
     }
+    
+    // Clear buffer before use
+    memset(http_request_buffer, 0, MAX_HTTP_REQUEST_SIZE);
+    
     while (cur_len < total_len) {
-        received = httpd_req_recv(req, buf + cur_len, total_len);
+        received = httpd_req_recv(req, http_request_buffer + cur_len, total_len - cur_len);
         if (received <= 0) {
             /* Respond with 500 Internal Server Error */
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
@@ -367,9 +383,9 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         }
         cur_len += received;
     }
-    buf[total_len] = '\0';
+    http_request_buffer[total_len] = '\0';
 
-    cJSON * root = cJSON_Parse(buf);
+    cJSON * root = cJSON_Parse(http_request_buffer);
     cJSON * item;
     if (root == NULL) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
@@ -531,9 +547,7 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     httpd_resp_sendstr(req, response_str);
 
     // Log the event
-    char data[128];
-    snprintf(data, sizeof(data), "{\"updatedSettings\":%s}", response_str);
-    dataBase_log_event("settings", "info", "Settings updated via WebUI", data);
+    dataBase_log_event("settings", "info", "Settings updated via WebUI", response_str);
     
     // Cleanup
     free((char *)response_str);
@@ -572,6 +586,15 @@ static esp_err_t POST_restart(httpd_req_t * req)
 }
 
 /* Simple handler for getting system handler */
+// Pre-allocated buffers for NVS strings to avoid dynamic allocation
+static char ssid_buffer[MAX_NVS_STRING_SIZE];
+static char hostname_buffer[MAX_NVS_STRING_SIZE];
+static char stratum_url_buffer[MAX_NVS_STRING_SIZE];
+static char fallback_stratum_url_buffer[MAX_NVS_STRING_SIZE];
+static char stratum_user_buffer[MAX_NVS_STRING_SIZE];
+static char fallback_stratum_user_buffer[MAX_NVS_STRING_SIZE];
+static char board_version_buffer[MAX_NVS_STRING_SIZE];
+
 static esp_err_t GET_system_info(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -586,17 +609,44 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         return ESP_OK;
     }
 
+    // Use safe string copying to pre-allocated buffers
+    const char* ssid_temp = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
+    strncpy(ssid_buffer, ssid_temp, MAX_NVS_STRING_SIZE - 1);
+    ssid_buffer[MAX_NVS_STRING_SIZE - 1] = '\0';
+    free((char*)ssid_temp);
 
-    char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
-    char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
+    const char* hostname_temp = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
+    strncpy(hostname_buffer, hostname_temp, MAX_NVS_STRING_SIZE - 1);
+    hostname_buffer[MAX_NVS_STRING_SIZE - 1] = '\0';
+    free((char*)hostname_temp);
+
+    const char* stratum_url_temp = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
+    strncpy(stratum_url_buffer, stratum_url_temp, MAX_NVS_STRING_SIZE - 1);
+    stratum_url_buffer[MAX_NVS_STRING_SIZE - 1] = '\0';
+    free((char*)stratum_url_temp);
+
+    const char* fallback_stratum_url_temp = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
+    strncpy(fallback_stratum_url_buffer, fallback_stratum_url_temp, MAX_NVS_STRING_SIZE - 1);
+    fallback_stratum_url_buffer[MAX_NVS_STRING_SIZE - 1] = '\0';
+    free((char*)fallback_stratum_url_temp);
+
+    const char* stratum_user_temp = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
+    strncpy(stratum_user_buffer, stratum_user_temp, MAX_NVS_STRING_SIZE - 1);
+    stratum_user_buffer[MAX_NVS_STRING_SIZE - 1] = '\0';
+    free((char*)stratum_user_temp);
+
+    const char* fallback_stratum_user_temp = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
+    strncpy(fallback_stratum_user_buffer, fallback_stratum_user_temp, MAX_NVS_STRING_SIZE - 1);
+    fallback_stratum_user_buffer[MAX_NVS_STRING_SIZE - 1] = '\0';
+    free((char*)fallback_stratum_user_temp);
+
+    const char* board_version_temp = nvs_config_get_string(NVS_CONFIG_BOARD_VERSION, "unknown");
+    strncpy(board_version_buffer, board_version_temp, MAX_NVS_STRING_SIZE - 1);
+    board_version_buffer[MAX_NVS_STRING_SIZE - 1] = '\0';
+    free((char*)board_version_temp);
+
     uint8_t mac[6];
     char formattedMac[18];
-    char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
-    char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
-    char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
-    char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
-    char * board_version = nvs_config_get_string(NVS_CONFIG_BOARD_VERSION, "unknown");
-
     esp_wifi_get_mac(WIFI_IF_STA, mac);
     snprintf(formattedMac, 18, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
@@ -622,9 +672,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
     cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "frequency", nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY));
-    cJSON_AddStringToObject(root, "ssid", ssid);
+    cJSON_AddStringToObject(root, "ssid", ssid_buffer);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
-    cJSON_AddStringToObject(root, "hostname", hostname);
+    cJSON_AddStringToObject(root, "hostname", hostname_buffer);
     cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
     cJSON_AddNumberToObject(root, "sharesAccepted", GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
     cJSON_AddNumberToObject(root, "sharesRejected", GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
@@ -651,16 +701,16 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     }
     cJSON_AddNumberToObject(root, "smallCoreCount", small_core_count);
     cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->asic_model_str);
-    cJSON_AddStringToObject(root, "stratumURL", stratumURL);
-    cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
+    cJSON_AddStringToObject(root, "stratumURL", stratum_url_buffer);
+    cJSON_AddStringToObject(root, "fallbackStratumURL", fallback_stratum_url_buffer);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT));
     cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT));
-    cJSON_AddStringToObject(root, "stratumUser", stratumUser);
-    cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
+    cJSON_AddStringToObject(root, "stratumUser", stratum_user_buffer);
+    cJSON_AddStringToObject(root, "fallbackStratumUser", fallback_stratum_user_buffer);
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
-    cJSON_AddStringToObject(root, "boardVersion", board_version);
+    cJSON_AddStringToObject(root, "boardVersion", board_version_buffer);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
     cJSON_AddNumberToObject(root, "flipscreen", nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1));
@@ -673,20 +723,35 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
     cJSON_AddNumberToObject(root, "autotune", nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1));
-    cJSON_AddStringToObject(root, "autotune_preset", nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, ""));
-    cJSON_AddStringToObject(root, "serialnumber", nvs_config_get_string(NVS_CONFIG_SERIAL_NUMBER, ""));
+    const char* autotune_preset_temp = nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, "");
+    strncpy(nvs_string_buffer, autotune_preset_temp, MAX_NVS_STRING_SIZE - 1);
+    nvs_string_buffer[MAX_NVS_STRING_SIZE - 1] = '\0';
+    free((char*)autotune_preset_temp);
+    cJSON_AddStringToObject(root, "autotune_preset", nvs_string_buffer);
+    
+    const char* serial_temp = nvs_config_get_string(NVS_CONFIG_SERIAL_NUMBER, "");
+    strncpy(nvs_string_buffer, serial_temp, MAX_NVS_STRING_SIZE - 1);
+    nvs_string_buffer[MAX_NVS_STRING_SIZE - 1] = '\0';
+    free((char*)serial_temp);
+    cJSON_AddStringToObject(root, "serialnumber", nvs_string_buffer);
 
-    free(ssid);
-    free(hostname);
-    free(stratumURL);
-    free(fallbackStratumURL);
-    free(stratumUser);
-    free(fallbackStratumUser);
-    free(board_version);
-
-    const char * sys_info = cJSON_Print(root);
-    httpd_resp_sendstr(req, sys_info);
-    free((char *)sys_info);
+    // Use pre-allocated buffer for JSON response
+    char* sys_info = cJSON_PrintUnformatted(root);
+    if (sys_info != NULL) {
+        size_t sys_info_len = strlen(sys_info);
+        if (sys_info_len < MAX_JSON_RESPONSE_SIZE) {
+            strncpy(json_response_buffer, sys_info, MAX_JSON_RESPONSE_SIZE - 1);
+            json_response_buffer[MAX_JSON_RESPONSE_SIZE - 1] = '\0';
+            httpd_resp_sendstr(req, json_response_buffer);
+        } else {
+            ESP_LOGE(TAG, "JSON response too large: %d bytes", sys_info_len);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Response too large");
+        }
+        free(sys_info);  // Free the cJSON allocated string
+    } else {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON creation failed");
+    }
+    
     cJSON_Delete(root);
     return ESP_OK;
 }
@@ -705,8 +770,9 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         return ESP_OK;
     }
 
-    char buf[1000];
     int remaining = req->content_len;
+    char* buf = ota_buffer;  // Use dedicated OTA buffer
+    const int buf_size = MAX_OTA_BUFFER_SIZE;
 
     const esp_partition_t * www_partition =
         esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "www");
@@ -725,7 +791,7 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     ESP_ERROR_CHECK(esp_partition_erase_range(www_partition, 0, www_partition->size));
 
     while (remaining > 0) {
-        int recv_len = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
+        int recv_len = httpd_req_recv(req, buf, MIN(remaining, buf_size));
 
         if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
             continue;
@@ -763,15 +829,16 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         return ESP_OK;
     }
     
-    char buf[1000];
     esp_ota_handle_t ota_handle;
     int remaining = req->content_len;
+    char* buf = ota_buffer;  // Use dedicated OTA buffer
+    const int buf_size = MAX_OTA_BUFFER_SIZE;
 
     const esp_partition_t * ota_partition = esp_ota_get_next_update_partition(NULL);
     ESP_ERROR_CHECK(esp_ota_begin(ota_partition, OTA_SIZE_UNKNOWN, &ota_handle));
 
     while (remaining > 0) {
-        int recv_len = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
+        int recv_len = httpd_req_recv(req, buf, MIN(remaining, buf_size));
 
         // Timeout Error: Just retry
         if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
@@ -807,53 +874,73 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     return ESP_OK;
 }
 
+#define MAX_LOG_BUFFER_SIZE 1024  // Define maximum log message size
+static char log_buffer[MAX_LOG_BUFFER_SIZE];  // Pre-allocated buffer for log messages
+
 int log_to_queue(const char * format, va_list args)
 {
     va_list args_copy;
     va_copy(args_copy, args);
 
-    // Calculate the required buffer size
-    int needed_size = vsnprintf(NULL, 0, format, args_copy) + 1;
+    // Format the string into the pre-allocated buffer
+    int written = vsnprintf(log_buffer, MAX_LOG_BUFFER_SIZE - 1, format, args_copy);
     va_end(args_copy);
 
-    // Allocate the buffer dynamically
-    char * log_buffer = (char *) calloc(needed_size + 2, sizeof(char));  // +2 for potential \n and \0
-    if (log_buffer == NULL) {
-        return 0;
+    if (written < 0) {
+        return 0;  // Formatting error
     }
-
-    // Format the string into the allocated buffer
-    va_copy(args_copy, args);
-    vsnprintf(log_buffer, needed_size, format, args_copy);
-    va_end(args_copy);
 
     // Ensure the log message ends with a newline
     size_t len = strlen(log_buffer);
     if (len > 0 && log_buffer[len - 1] != '\n') {
-        log_buffer[len] = '\n';
-        log_buffer[len + 1] = '\0';
-        len++;
+        if (len < MAX_LOG_BUFFER_SIZE - 2) {  // Check if we have space for \n\0
+            log_buffer[len] = '\n';
+            log_buffer[len + 1] = '\0';
+            len++;
+        }
     }
 
     // Print to standard output
     printf("%s", log_buffer);
 
-    if (xQueueSendToBack(log_queue, (void*)&log_buffer, (TickType_t) 0) != pdPASS) {
-        if (log_buffer != NULL) {
-            free((void*)log_buffer);
-        }
+    // Create a copy of the message for the queue
+    char *queue_message = pvPortMalloc(len + 1);
+    if (queue_message == NULL) {
+        return 0;  // Memory allocation failed
+    }
+    strncpy(queue_message, log_buffer, len);
+    queue_message[len] = '\0';
+
+    if (xQueueSendToBack(log_queue, (void*)&queue_message, (TickType_t) 0) != pdPASS) {
+        vPortFree(queue_message);
     }
 
     return 0;
 }
 
+#define MAX_WS_FRAME_SIZE 1024  // Define maximum WebSocket frame size
+static uint8_t ws_frame_buffer[MAX_WS_FRAME_SIZE];  // Pre-allocated buffer for WebSocket frames
+
 void send_log_to_websocket(char *message)
 {
+    if (message == NULL) {
+        return;
+    }
+
     // Prepare the WebSocket frame
     httpd_ws_frame_t ws_pkt;
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-    ws_pkt.payload = (uint8_t *)message;
-    ws_pkt.len = strlen(message);
+    
+    // Copy message to pre-allocated buffer
+    size_t msg_len = strlen(message);
+    if (msg_len >= MAX_WS_FRAME_SIZE) {
+        msg_len = MAX_WS_FRAME_SIZE - 1;  // Leave room for null terminator
+    }
+    memcpy(ws_frame_buffer, message, msg_len);
+    ws_frame_buffer[msg_len] = '\0';
+    
+    ws_pkt.payload = ws_frame_buffer;
+    ws_pkt.len = msg_len;
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
     // Ensure server and fd are valid
@@ -864,8 +951,8 @@ void send_log_to_websocket(char *message)
         }
     }
 
-    // Free the allocated buffer
-    free((void*)message);
+    // Free the message buffer
+    vPortFree(message);
 }
 
 /*
@@ -903,19 +990,23 @@ esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
 
 void websocket_log_handler()
 {
+    char *message;
+    const TickType_t queue_timeout = pdMS_TO_TICKS(100);  // 100ms timeout
+
     while (true)
     {
-        char *message;
-        if (xQueueReceive(log_queue, &message, (TickType_t) portMAX_DELAY) != pdPASS) {
-            if (message != NULL) {
-                free((void*)message);
-            }
+        if (xQueueReceive(log_queue, &message, queue_timeout) != pdPASS) {
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        if (message == NULL) {
             vTaskDelay(10 / portTICK_PERIOD_MS);
             continue;
         }
 
         if (fd == -1) {
-            free((void*)message);
+            vPortFree(message);
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
         }

@@ -263,7 +263,7 @@ const RealTimeApiChart = ({
             </p> */}
           </div>
         )}
-        {!title && <div className='hidden sm:block'></div>}
+        {!title && <div className='hidden sm:block' />}
         <div className='flex flex-col gap-2 order-2'>
           {/* Chart Duration Selector */}
           {chartConfigs && selectedConfigKey && onConfigChange && (
@@ -287,7 +287,7 @@ const RealTimeApiChart = ({
                   </select>
                   {isConfigChanging && (
                     <div className='absolute right-2 top-1/2 transform -translate-y-1/2'>
-                      <div className='w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin'></div>
+                      <div className='w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin' />
                     </div>
                   )}
                 </div>
@@ -306,7 +306,7 @@ const RealTimeApiChart = ({
               ? "bg-green-500 animate-pulse"
               : "bg-gray-400"
           }`}
-        ></span>
+         />
         <span className='text-sm text-gray-600'>
           {isConfigChanging ? "Updating configuration..." : isRunning ? "Live" : "Paused"} •{" "}
           {data.length} data points
@@ -324,7 +324,7 @@ const RealTimeApiChart = ({
         {isConfigChanging && (
           <div className='absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg'>
             <div className='flex items-center gap-3 text-gray-600'>
-              <div className='w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin'></div>
+              <div className='w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin' />
               <span className='text-sm font-medium'>Updating chart configuration...</span>
             </div>
           </div>

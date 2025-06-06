@@ -166,7 +166,7 @@ export function UpdatesPage() {
 
   const getFirmwareDescription = () => {
     if (isLoading) return "Loading current firmware information...";
-    let baseText = minerInfo?.version ? `Current version: ${minerInfo.version}. ` : "";
+    const baseText = minerInfo?.version ? `Current version: ${minerInfo.version}. ` : "";
     return `${baseText}Download the latest firmware and then upload it to update your device.`;
   };
 
