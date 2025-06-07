@@ -38,7 +38,8 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "ASSET_NAME=${{ github.event.inputs.asset_name }}" >> $GITHUB_ENV
           else
-            echo "ASSET_NAME=${{ github.event.release.assets[0].name }}" >> $GITHUB_ENV
+            # For release events, default to esp-miner.bin
+            echo "ASSET_NAME=esp-miner.bin" >> $GITHUB_ENV
           fi
 
       - name: Print asset name (debug)
