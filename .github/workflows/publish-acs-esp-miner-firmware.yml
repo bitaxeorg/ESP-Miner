@@ -5,6 +5,12 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
+    inputs:
+      asset_name:
+        description: 'Name of the asset to upload (e.g. esp-miner.bin)'
+        required: true
+        default: esp-miner.bin
   release:
     types: [published]
 
@@ -28,14 +34,19 @@ jobs:
           aws-region:    ${{ env.AWS_REGION }}
 
       - name: Determine asset name
-        id: asset
         run: |
-          ASSET_NAME=$(basename "${{ github.event.release.assets[0].name }}")
-          echo "ASSET_NAME=$ASSET_NAME" >> $GITHUB_ENV
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ASSET_NAME=${{ github.event.inputs.asset_name }}" >> $GITHUB_ENV
+          else
+            echo "ASSET_NAME=${{ github.event.release.assets[0].name }}" >> $GITHUB_ENV
+          fi
+
+      - name: Print asset name (debug)
+        run: echo "Using asset: $ASSET_NAME"
 
       - name: Download release asset
         run: |
-          URL="https://github.com/${REPO}/releases/download/${{ github.event.release.tag_name }}/${ASSET_NAME}"
+          URL="https://github.com/${REPO}/releases/download/${{ github.event.release.tag_name || 'latest' }}/$ASSET_NAME"
           echo "Downloading $URL"
           curl -L -o "$ASSET_NAME" "$URL"
 
