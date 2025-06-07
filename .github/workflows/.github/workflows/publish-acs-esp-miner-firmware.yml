@@ -1,0 +1,53 @@
+# .github/workflows/publish-firmware.yml
+name: Publish Latest Firmware to S3
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      asset_name:
+        description: "Name of the asset to upload (e.g. esp-miner.bin)"
+        required: true
+        default: esp-miner.bin
+  release:
+    types: [published]
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    env:
+      REPO: Advanced-Crypto-Services/acs-esp-miner
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      ROLE_ARN: arn:aws:iam::603187095057:role/GitHubActionsFirmwareUploadRole
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set asset name
+        run: |
+          echo "ASSET_NAME=${{ github.event.inputs.asset_name || github.event.release.assets[0].name }}" >> $GITHUB_ENV
+
+      - name: Debug release (only works on actual release)
+        if: github.event.release != null
+        run: echo '${{ toJson(github.event.release) }}'
+
+      - name: Download firmware asset
+        run: |
+          URL="https://github.com/${REPO}/releases/latest/download/${ASSET_NAME}"
+          echo "Downloading: $URL"
+          curl -L -o "$ASSET_NAME" "$URL"
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp "$ASSET_NAME_
