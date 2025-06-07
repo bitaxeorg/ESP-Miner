@@ -1,4 +1,3 @@
-# .github/workflows/publish-firmware.yml
 name: Publish Latest Firmware to S3
 
 permissions:
@@ -9,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       asset_name:
-        description: "Name of the asset to upload (e.g. esp-miner.bin)"
+        description: 'Name of the asset to upload (e.g. esp-miner.bin)'
         required: true
         default: esp-miner.bin
   release:
@@ -32,22 +31,27 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region:    ${{ env.AWS_REGION }}
 
-      - name: Set asset name
+      - name: Determine asset name
         run: |
-          echo "ASSET_NAME=${{ github.event.inputs.asset_name || github.event.release.assets[0].name }}" >> $GITHUB_ENV
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ASSET_NAME=${{ github.event.inputs.asset_name }}" >> $GITHUB_ENV
+          else
+            echo "ASSET_NAME=${{ github.event.release.assets[0].name }}" >> $GITHUB_ENV
+          fi
 
-      - name: Debug release (only works on actual release)
-        if: github.event.release != null
-        run: echo '${{ toJson(github.event.release) }}'
+      - name: Print asset name (debug)
+        run: echo "Using asset: $ASSET_NAME"
 
-      - name: Download firmware asset
+      - name: Download release asset
         run: |
-          URL="https://github.com/${REPO}/releases/latest/download/${ASSET_NAME}"
-          echo "Downloading: $URL"
+          URL="https://github.com/${REPO}/releases/download/${{ github.event.release.tag_name || 'latest' }}/$ASSET_NAME"
+          echo "Downloading $URL"
           curl -L -o "$ASSET_NAME" "$URL"
 
       - name: Upload to S3
         run: |
-          aws s3 cp "$ASSET_NAME_
+          aws s3 cp "$ASSET_NAME" \
+            s3://$S3_BUCKET/firmware/acs-esp-miner/latest/"$ASSET_NAME" \
+            --acl public-read --region $AWS_REGION
