@@ -8,6 +8,7 @@ import {
   WEBAPP_LATEST_URL,
   getVersionInfo,
   VersionInfo,
+  waitForFirmwareUpdate,
 } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
@@ -62,6 +63,9 @@ function ActionCard({
 export function UpdatesPage() {
   const { showToast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [updatePhase, setUpdatePhase] = useState<"idle" | "uploading" | "rebooting" | "polling">(
+    "idle"
+  );
   const [isWebAppUpdating, setIsWebAppUpdating] = useState(false);
 
   const [firmwareFile, setFirmwareFile] = useState<File | null>(null);
@@ -113,15 +117,34 @@ export function UpdatesPage() {
     }
 
     setIsUpdating(true);
+    setUpdatePhase("uploading");
     showToast("Uploading and installing firmware...", "info");
 
     try {
       const result = await uploadFirmware(firmwareFile);
       if (result.success) {
-        showToast(result.message, "success");
-        setFirmwareFile(null);
-        // Refresh version info to get the updated firmware version
-        await fetchSystemInfo();
+        setUpdatePhase("rebooting");
+        showToast("Firmware uploaded successfully! Device is rebooting...", "success");
+
+        // Wait a moment for the device to start rebooting
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+
+        setUpdatePhase("polling");
+        showToast("Waiting for device to come back online...", "info");
+
+        // Poll for the device to come back online
+        const pollResult = await waitForFirmwareUpdate(versionInfo.latest || undefined);
+
+        if (pollResult.success) {
+          showToast(pollResult.message, "success");
+          setFirmwareFile(null);
+          // Refresh version info to get the updated firmware version
+          await fetchSystemInfo();
+        } else {
+          showToast(`Update status unclear: ${pollResult.message}`, "warning");
+          // Still refresh to see current state
+          await fetchSystemInfo();
+        }
       } else {
         showToast(`Failed to update firmware: ${result.message}`, "error");
       }
@@ -129,6 +152,7 @@ export function UpdatesPage() {
       showToast(`Error: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
     } finally {
       setIsUpdating(false);
+      setUpdatePhase("idle");
     }
   };
 
@@ -281,7 +305,15 @@ export function UpdatesPage() {
                   className='bg-blue-600 hover:bg-blue-700'
                   size='sm'
                 >
-                  {isUpdating ? "Installing..." : "Install Firmware"}
+                  {isUpdating
+                    ? updatePhase === "uploading"
+                      ? "Installing..."
+                      : updatePhase === "rebooting"
+                      ? "Device Rebooting..."
+                      : updatePhase === "polling"
+                      ? "Waiting for Device..."
+                      : "Installing..."
+                    : "Install Firmware"}
                 </Button>
               </div>
             </>
