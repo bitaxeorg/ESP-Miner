@@ -1,0 +1,46 @@
+name: Publish Latest Firmware to S3
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    env:
+      REPO: Advanced-Crypto-Services/acs-esp-miner
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      ROLE_ARN: arn:aws:iam::603187095057:role/GitHubActionsFirmwareUploadRole
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region:    ${{ env.AWS_REGION }}
+
+      - name: Determine asset name
+        id: asset
+        run: |
+          ASSET_NAME=$(basename "${{ github.event.release.assets[0].name }}")
+          echo "ASSET_NAME=$ASSET_NAME" >> $GITHUB_ENV
+
+      - name: Download release asset
+        run: |
+          URL="https://github.com/${REPO}/releases/download/${{ github.event.release.tag_name }}/${ASSET_NAME}"
+          echo "Downloading $URL"
+          curl -L -o "$ASSET_NAME" "$URL"
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp "$ASSET_NAME" \
+            s3://$S3_BUCKET/firmware/acs-esp-miner/latest/"$ASSET_NAME" \
+            --acl public-read --region $AWS_REGION
