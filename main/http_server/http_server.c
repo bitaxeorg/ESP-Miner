@@ -39,7 +39,7 @@
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
 
-extern bool apply_preset(DeviceModel device_model, const char* preset_name);
+#include "tasks/power_management_task.h"
 
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;

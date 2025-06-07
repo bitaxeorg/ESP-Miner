@@ -50,6 +50,6 @@ typedef struct {
 void POWER_MANAGEMENT_task(void * pvParameters);
 
 // Simple preset function - applies preset immediately
-
+bool apply_preset(int device_model, const char* preset_name);
 
 #endif

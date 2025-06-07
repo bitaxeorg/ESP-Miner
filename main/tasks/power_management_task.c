@@ -72,12 +72,12 @@ static const DevicePreset DEVICE_GAMMA_PRESETS[] = {
 };
 
 // Simple function to apply a preset by name
-bool apply_preset(DeviceModel device_model, const char* preset_name) {
+bool apply_preset(int device_model, const char* preset_name) {
     const DevicePreset* presets = NULL;
     uint8_t preset_count = 0;
     
     // Get the correct preset array for the device
-    switch (device_model) {
+    switch ((DeviceModel)device_model) {
         case DEVICE_MAX:
             presets = DEVICE_MAX_PRESETS;
             preset_count = sizeof(DEVICE_MAX_PRESETS) / sizeof(DevicePreset);
