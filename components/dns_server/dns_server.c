@@ -26,7 +26,7 @@
 #define QD_TYPE_A (0x0001)
 #define ANS_TTL_SEC (300)
 
-static const char * TAG = "example_dns_redirect_server";
+static const char * TAG = "dns_server";
 
 // DNS Header Packet
 typedef struct __attribute__((__packed__))

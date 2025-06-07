@@ -6,7 +6,7 @@
 #define ADC_ATTEN   ADC_ATTEN_DB_12
 #define ADC_CHANNEL ADC_CHANNEL_1
 
-static const char * TAG = "ADC";
+static const char * TAG = "adc";
 
 static adc_cali_handle_t adc1_cali_chan1_handle;
 static adc_oneshot_unit_handle_t adc1_handle;
