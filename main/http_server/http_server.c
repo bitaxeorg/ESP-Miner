@@ -560,6 +560,8 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 static esp_err_t POST_restart(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
+        ESP_LOGW(TAG, "Unauthorized system restart attempt from client");
+        dataBase_log_event("system", "warning", "Unauthorized system restart attempt", NULL);
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -777,6 +779,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 esp_err_t POST_WWW_update(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
+        ESP_LOGW(TAG, "Unauthorized WWW update attempt from client");
+        dataBase_log_event("system", "warning", "Unauthorized WWW update attempt", NULL);
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -784,6 +788,8 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     esp_wifi_get_mode(&mode);
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
     {
+        ESP_LOGE(TAG, "WWW update attempted while in AP mode");
+        dataBase_log_event("system", "error", "WWW update failed: Not allowed in AP mode", NULL);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
         return ESP_OK;
     }
@@ -795,12 +801,16 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     const esp_partition_t * www_partition =
         esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "www");
     if (www_partition == NULL) {
+        ESP_LOGE(TAG, "WWW partition not found during update");
+        dataBase_log_event("system", "error", "WWW update failed: WWW partition not found", NULL);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "WWW partition not found");
         return ESP_OK;
     }
 
     // Don't attempt to write more than what can be stored in the partition
     if (remaining > www_partition->size) {
+        ESP_LOGE(TAG, "WWW update file too large: %d bytes, partition size: %lu bytes", remaining, www_partition->size);
+        dataBase_log_event("system", "error", "WWW update failed: File too large for partition", NULL);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "File provided is too large for device");
         return ESP_OK;
     }
@@ -814,11 +824,15 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         if (recv_len == HTTPD_SOCK_ERR_TIMEOUT) {
             continue;
         } else if (recv_len <= 0) {
+            ESP_LOGE(TAG, "WWW update protocol error: recv_len=%d", recv_len);
+            dataBase_log_event("system", "error", "WWW update failed: Protocol error during file receive", NULL);
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
             return ESP_OK;
         }
 
         if (esp_partition_write(www_partition, www_partition->size - remaining, (const void *) buf, recv_len) != ESP_OK) {
+            ESP_LOGE(TAG, "WWW update write error: offset=%lu, length=%d", www_partition->size - remaining, recv_len);
+            dataBase_log_event("system", "error", "WWW update failed: Write error to partition", NULL);
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
             return ESP_OK;
         }
@@ -857,6 +871,8 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
 esp_err_t POST_OTA_update(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
+        ESP_LOGW(TAG, "Unauthorized OTA firmware update attempt from client");
+        dataBase_log_event("system", "warning", "Unauthorized OTA firmware update attempt", NULL);
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -864,6 +880,8 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
     esp_wifi_get_mode(&mode);
     if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
     {
+        ESP_LOGE(TAG, "OTA firmware update attempted while in AP mode");
+        dataBase_log_event("system", "error", "OTA firmware update failed: Not allowed in AP mode", NULL);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
         return ESP_OK;
     }
@@ -885,12 +903,16 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
             // Serious Error: Abort OTA
         } else if (recv_len <= 0) {
+            ESP_LOGE(TAG, "OTA firmware update protocol error: recv_len=%d", recv_len);
+            dataBase_log_event("system", "error", "OTA firmware update failed: Protocol error during file receive", NULL);
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
             return ESP_OK;
         }
 
         // Successful Upload: Flash firmware chunk
         if (esp_ota_write(ota_handle, (const void *) buf, recv_len) != ESP_OK) {
+            ESP_LOGE(TAG, "OTA firmware update flash error: length=%d", recv_len);
+            dataBase_log_event("system", "error", "OTA firmware update failed: Flash write error", NULL);
             esp_ota_abort(ota_handle);
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Flash Error");
             return ESP_OK;
@@ -901,6 +923,8 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
     // Validate and switch to new OTA image and reboot
     if (esp_ota_end(ota_handle) != ESP_OK || esp_ota_set_boot_partition(ota_partition) != ESP_OK) {
+        ESP_LOGE(TAG, "OTA firmware update validation/activation error");
+        dataBase_log_event("system", "error", "OTA firmware update failed: Validation or activation error", NULL);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Validation / Activation Error");
         return ESP_OK;
     }
