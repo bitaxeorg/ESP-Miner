@@ -540,6 +540,7 @@ export async function fetchLatestRelease(): Promise<GitHubRelease> {
     }
 
     const release = await response.json();
+    console.log("Latest release:", release.tag_name);
     return release;
   } catch (error) {
     console.error("Failed to fetch latest release:", error);
