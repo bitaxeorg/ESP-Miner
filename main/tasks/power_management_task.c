@@ -66,7 +66,7 @@ static const DevicePreset DEVICE_SUPRA_PRESETS[] = {
 static const DevicePreset DEVICE_GAMMA_PRESETS[] = {
     {"quiet", 1000, 400, 25},        // Quiet: Low power, conservative
     {"balanced", 1090, 490, 35},    // Balanced: Good performance/efficiency balance
-    {"turbo", 1180, 600, 95},       // Turbo: Maximum performance
+    {"turbo", 1160, 600, 95},       // Turbo: Maximum performance
 };
 
 // Simple function to apply a preset by name
@@ -236,6 +236,55 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     
     // Update last autotune time
     lastAutotuneTime = currentTime;
+    
+    // Safety mechanism: Track consecutive low hashrate attempts
+    static uint8_t consecutiveLowHashrateAttempts = 0;
+    float hashrateThreshold = targetHashrate * 0.5; // 50% of target hashrate
+    
+    if (currentHashrate < hashrateThreshold) {
+        consecutiveLowHashrateAttempts++;
+        ESP_LOGI(autotuneTAG, "Low hashrate detected: %.2f GH/s (threshold: %.2f GH/s), consecutive attempts: %u", 
+                 currentHashrate, hashrateThreshold, consecutiveLowHashrateAttempts);
+        char data[128];
+        snprintf(data, sizeof(data), "{\"currentHashrate\":%.2f,\"hashrateThreshold\":%.2f,\"consecutiveAttempts\":%u}", 
+                 currentHashrate, hashrateThreshold, consecutiveLowHashrateAttempts);
+        dataBase_log_event("power", "warn", "Autotune - Low hashrate detected", data);
+        
+        // If we've had 3 consecutive low hashrate attempts, reapply preset
+        if (consecutiveLowHashrateAttempts >= 3) {
+            static char current_preset[32];
+            char* preset_ptr = nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, "balanced");
+            strncpy(current_preset, preset_ptr, sizeof(current_preset) - 1);
+            current_preset[sizeof(current_preset) - 1] = '\0';
+            free(preset_ptr);
+            
+            ESP_LOGE(autotuneTAG, "SAFETY: 3 consecutive low hashrate attempts detected, reapplying preset '%s'", current_preset);
+            
+            // Log safety reset event
+            char safety_data[256];
+            snprintf(safety_data, sizeof(safety_data), 
+                     "{\"consecutiveAttempts\":%u,\"currentHashrate\":%.2f,\"targetHashrate\":%.2f,\"threshold\":%.2f,\"preset\":\"%s\"}", 
+                     consecutiveLowHashrateAttempts, currentHashrate, targetHashrate, hashrateThreshold, current_preset);
+            dataBase_log_event("power", "critical", "Autotune safety reset - consecutive low hashrate attempts", safety_data);
+            
+            // Reapply the current preset
+            if (apply_preset(GLOBAL_STATE->device_model, current_preset)) {
+                ESP_LOGI(autotuneTAG, "Successfully reapplied preset '%s'", current_preset);
+            } else {
+                ESP_LOGE(autotuneTAG, "Failed to reapply preset '%s'", current_preset);
+            }
+            
+            // Reset the counter
+            consecutiveLowHashrateAttempts = 0;
+            return;
+        }
+    } else {
+        // Hashrate is good, reset the counter
+        if (consecutiveLowHashrateAttempts > 0) {
+            ESP_LOGI(autotuneTAG, "Hashrate recovered: %.2f GH/s, resetting consecutive low hashrate counter", currentHashrate);
+            consecutiveLowHashrateAttempts = 0;
+        }
+    }
     
     // Temperature-based adjustments
     int8_t tempDiff = currentAsicTemp - targetAsicTemp;
