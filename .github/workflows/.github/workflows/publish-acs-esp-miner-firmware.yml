@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       asset_name:
-        description: 'Name of the asset to upload (e.g. esp-miner.bin)'
+        description: "Name of the asset to upload (e.g. esp-miner.bin)"
         required: true
         default: esp-miner.bin
   release:
@@ -31,7 +31,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.ROLE_ARN }}
-          aws-region:    ${{ env.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Determine asset name
         run: |
@@ -42,7 +42,8 @@ jobs:
           fi
 
       - name: Print asset name (debug)
-        run: echo "Using asset: $ASSET_NAME"
+        run: |
+          echo "Using asset: $ASSET_NAME"
 
       - name: Download release asset
         run: |
