@@ -18,6 +18,7 @@
 #include "driver/gpio.h"
 #include "common.h"
 #include "system.h"
+#include "esp_system.h"
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_ASIC_RESET  CONFIG_GPIO_ASIC_RESET
 #define GPIO_PLUG_SENSE  CONFIG_GPIO_PLUG_SENSE
@@ -38,6 +39,7 @@
 #define GAMMA_POWER_OFFSET 5
 
 static const char * TAG = "power_management";
+
 
 
 // Define preset arrays for each device model
@@ -450,6 +452,75 @@ static double automatic_fan_speed(float chip_temp, GlobalState * GLOBAL_STATE)
 	return result;
 }
 
+// Soft overheat recovery function
+static void handle_overheat_recovery(GlobalState * GLOBAL_STATE, const char* device_info, const char* log_data) {
+    ESP_LOGE(TAG, "OVERHEAT DETECTED: %s", device_info);
+    
+    // Set fan to full speed and turn off VCORE (immediate safety measures)
+    EMC2101_set_fan_speed(1);
+    
+    // Turn off VCORE based on device type
+    PowerManagementModule *power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+            if (power_management->HAS_POWER_EN) {
+                gpio_set_level(GPIO_ASIC_ENABLE, 1);
+            }
+            break;
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
+                VCORE_set_voltage(0.0, GLOBAL_STATE);
+            } else if (power_management->HAS_POWER_EN) {
+                gpio_set_level(GPIO_ASIC_ENABLE, 1);
+            }
+            break;
+        case DEVICE_GAMMA:
+            VCORE_set_voltage(0.0, GLOBAL_STATE);
+            break;
+        default:
+            break;
+    }
+    
+    // Set safe NVS values and enable overheat mode
+    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
+    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
+    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
+    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+    
+    // Log the overheat event
+    dataBase_log_event("power", "critical", "Overheat mode activated - temperature exceeded threshold", log_data);
+    
+    ESP_LOGE(TAG, "Entering overheat recovery mode. Waiting 30 seconds before automatic recovery...");
+    
+    // Wait 30 seconds for cooling
+    vTaskDelay(30000 / portTICK_PERIOD_MS);
+    
+    ESP_LOGI(TAG, "Overheat recovery: Applying balanced preset and restarting...");
+    
+    // Reset overheat mode and apply balanced preset
+    
+    
+    // Apply balanced preset for safe recovery
+    if (apply_preset(GLOBAL_STATE->device_model, "balanced")) {
+        ESP_LOGI(TAG, "Successfully applied balanced preset for recovery");
+    } else {
+        ESP_LOGE(TAG, "Failed to apply balanced preset, using safe defaults");
+        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1100);
+        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 400);
+        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 75);
+        nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1);
+    }
+    
+    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+    // Log recovery event
+    dataBase_log_event("power", "info", "Overheat recovery completed - restarting system", "{}");
+    
+    // Restart the ESP32
+    esp_restart();
+}
+
 void POWER_MANAGEMENT_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
@@ -539,26 +610,17 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
                 if ((power_management->chip_temp_avg > THROTTLE_TEMP) &&
                     (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                    ESP_LOGE(TAG, "OVERHEAT ASIC %fC", power_management->chip_temp_avg );
-
-                    EMC2101_set_fan_speed(1);
-                    if (power_management->HAS_POWER_EN) {
-                        gpio_set_level(GPIO_ASIC_ENABLE, 1);
-                    }
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
                     
-                    // Log critical overheat event
+                    // Prepare log data
                     char overheat_data[128];
                     snprintf(overheat_data, sizeof(overheat_data), 
                              "{\"chipTemp\":%.1f,\"threshold\":%f,\"device\":\"DEVICE_MAX\"}", 
                              power_management->chip_temp_avg, THROTTLE_TEMP);
-                    dataBase_log_event("power", "critical", "Overheat mode activated - ASIC temperature exceeded threshold", overheat_data);
                     
-                    exit(EXIT_FAILURE);
+                    // Use soft overheat recovery
+                    char device_info[64];
+                    snprintf(device_info, sizeof(device_info), "DEVICE_MAX ASIC %.1fC", power_management->chip_temp_avg);
+                    handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
                 }
                 break;
             case DEVICE_ULTRA:
@@ -580,29 +642,18 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 //overheat mode if the voltage regulator or ASIC is too hot
                 if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) &&
                     (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                    ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg );
-
-                    EMC2101_set_fan_speed(1);
-                    if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
-                        // Turn off core voltage
-                        VCORE_set_voltage(0.0, GLOBAL_STATE);
-                    } else if (power_management->HAS_POWER_EN) {
-                        gpio_set_level(GPIO_ASIC_ENABLE, 1);
-                    }
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
                     
-                    // Log critical overheat event
+                    // Prepare log data
                     char overheat_data[128];
                     snprintf(overheat_data, sizeof(overheat_data), 
                              "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%f,\"chipThreshold\":%f,\"device\":\"DEVICE_ULTRA_SUPRA\"}", 
                              power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
-                    dataBase_log_event("power", "critical", "Overheat mode activated - VR or ASIC temperature exceeded threshold", overheat_data);
                     
-                    exit(EXIT_FAILURE);
+                    // Use soft overheat recovery
+                    char device_info[64];
+                    snprintf(device_info, sizeof(device_info), "DEVICE_ULTRA/SUPRA VR: %.1fC ASIC %.1fC", 
+                             power_management->vr_temp, power_management->chip_temp_avg);
+                    handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
                 }
 
                 break;
@@ -618,27 +669,18 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 //overheat mode if the voltage regulator or ASIC is too hot
                 if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) &&
                     (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                    ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg );
-
-                    EMC2101_set_fan_speed(1);
-
-                    // Turn off core voltage
-                    VCORE_set_voltage(0.0, GLOBAL_STATE);
-
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
                     
-                    // Log critical overheat event
+                    // Prepare log data
                     char overheat_data[128];
                     snprintf(overheat_data, sizeof(overheat_data), 
                              "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%f,\"chipThreshold\":%f,\"device\":\"DEVICE_GAMMA\"}", 
                              power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
-                    dataBase_log_event("power", "critical", "Overheat mode activated - VR or ASIC temperature exceeded threshold", overheat_data);
                     
-                    exit(EXIT_FAILURE);
+                    // Use soft overheat recovery
+                    char device_info[64];
+                    snprintf(device_info, sizeof(device_info), "DEVICE_GAMMA VR: %.1fC ASIC %.1fC", 
+                             power_management->vr_temp, power_management->chip_temp_avg);
+                    handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
                 }
                 break;
             default:
