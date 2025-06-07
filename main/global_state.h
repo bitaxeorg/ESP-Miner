@@ -97,6 +97,7 @@ typedef struct
     pthread_mutex_t valid_jobs_lock;
 
     uint32_t stratum_difficulty;
+    bool new_set_mining_difficulty_msg;
     uint32_t version_mask;
     bool new_stratum_version_rolling_msg;
 
