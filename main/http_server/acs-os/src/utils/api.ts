@@ -155,7 +155,7 @@ export async function updatePoolInfo(
         const result = JSON.parse(text);
         console.log("Pool info update response:", result);
         return result;
-      } catch (parseError) {
+      } catch {
         console.log("Response is not JSON:", text);
         return { success: true, message: "Pool information updated successfully" };
       }
@@ -240,6 +240,62 @@ export async function uploadFirmware(file: File): Promise<{ success: boolean; me
       message: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
+}
+
+/**
+ * Poll the device until it comes back online after firmware update
+ * @param expectedVersion - The expected firmware version after update
+ * @param maxRetries - Maximum number of retry attempts (default: 30)
+ * @param retryDelay - Delay between retry attempts in milliseconds (default: 2000)
+ * @returns Promise that resolves when device is back online with updated firmware
+ */
+export async function waitForFirmwareUpdate(
+  expectedVersion?: string,
+  maxRetries: number = 30,
+  retryDelay: number = 2000
+): Promise<{ success: boolean; currentVersion?: string; message: string }> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Polling attempt ${attempt}/${maxRetries}...`);
+
+      // Try to get system info
+      const systemInfo = await getSystemInfo();
+
+      if (systemInfo && systemInfo.version) {
+        // Device is back online
+        console.log(`Device online with version: ${systemInfo.version}`);
+
+        // If we have an expected version, check if it matches
+        if (expectedVersion && systemInfo.version !== expectedVersion) {
+          console.log(`Version mismatch: expected ${expectedVersion}, got ${systemInfo.version}`);
+          // Continue polling if version doesn't match
+        } else {
+          return {
+            success: true,
+            currentVersion: systemInfo.version,
+            message: `Device updated successfully to version ${systemInfo.version}`,
+          };
+        }
+      }
+    } catch (error) {
+      console.log(
+        `Attempt ${attempt} failed:`,
+        error instanceof Error ? error.message : "Unknown error"
+      );
+      // Expected during reboot - device is not responding yet
+    }
+
+    // Wait before next attempt
+    if (attempt < maxRetries) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
+    }
+  }
+
+  return {
+    success: false,
+    message:
+      "Device did not come back online within expected time. Please check device status manually.",
+  };
 }
 
 /**
@@ -370,7 +426,7 @@ export async function updateFanSettings(
         const result = JSON.parse(text);
         console.log("Fan settings update response:", result);
         return result;
-      } catch (parseError) {
+      } catch {
         console.log("Response is not JSON:", text);
         return { success: true, message: "Fan settings updated successfully" };
       }
@@ -424,7 +480,7 @@ export async function updateASICSettings(
         const result = JSON.parse(text);
         console.log("ASIC settings update response:", result);
         return result;
-      } catch (parseError) {
+      } catch {
         console.log("Response is not JSON:", text);
         return { success: true, message: "ASIC settings updated successfully" };
       }
@@ -475,7 +531,7 @@ export async function updatePresetSettings(
         const result = JSON.parse(text);
         console.log("Preset settings update response:", result);
         return result;
-      } catch (parseError) {
+      } catch {
         console.log("Response is not JSON:", text);
         return {
           status: "success",
