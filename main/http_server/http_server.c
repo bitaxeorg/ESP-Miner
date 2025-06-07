@@ -571,9 +571,27 @@ static esp_err_t POST_restart(httpd_req_t * req)
 
     ESP_LOGI(TAG, "Restarting System because of API Request");
 
-    // Send HTTP response before restarting
-    const char* resp_str = "System will restart shortly.";
-    httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
+    // Set content type to JSON
+    httpd_resp_set_type(req, "application/json");
+
+    // Create JSON response
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "status", "success");
+    cJSON_AddStringToObject(response, "message", "System will restart shortly");
+    time_t now;
+    time(&now);
+    cJSON_AddNumberToObject(response, "timestamp", now);
+    
+    // Send JSON response before restarting
+    const char *response_str = cJSON_Print(response);
+    httpd_resp_sendstr(req, response_str);
+    
+    // Log the restart event
+    dataBase_log_event("system", "info", "System restart initiated via API", response_str);
+    
+    // Cleanup
+    free((char *)response_str);
+    cJSON_Delete(response);
 
     // Delay to ensure the response is sent
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -808,7 +826,28 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         remaining -= recv_len;
     }
 
-    httpd_resp_sendstr(req, "WWW update complete\n");
+    // Set content type to JSON
+    httpd_resp_set_type(req, "application/json");
+
+    // Create JSON response
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "status", "success");
+    cJSON_AddStringToObject(response, "message", "WWW update completed successfully");
+    time_t now;
+    time(&now);
+    cJSON_AddNumberToObject(response, "timestamp", now);
+    
+    // Send JSON response
+    const char *response_str = cJSON_Print(response);
+    httpd_resp_sendstr(req, response_str);
+    
+    // Log the update event
+    dataBase_log_event("system", "info", "WWW partition updated via API", response_str);
+    
+    // Cleanup
+    free((char *)response_str);
+    cJSON_Delete(response);
+    
     return ESP_OK;
 }
 
@@ -866,7 +905,28 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         return ESP_OK;
     }
 
-    httpd_resp_sendstr(req, "Firmware update complete, rebooting now!\n");
+    // Set content type to JSON
+    httpd_resp_set_type(req, "application/json");
+
+    // Create JSON response
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "status", "success");
+    cJSON_AddStringToObject(response, "message", "Firmware update completed successfully, rebooting now");
+    time_t now;
+    time(&now);
+    cJSON_AddNumberToObject(response, "timestamp", now);
+    
+    // Send JSON response
+    const char *response_str = cJSON_Print(response);
+    httpd_resp_sendstr(req, response_str);
+    
+    // Log the update event
+    dataBase_log_event("system", "info", "Firmware OTA update completed via API", response_str);
+    
+    // Cleanup
+    free((char *)response_str);
+    cJSON_Delete(response);
+    
     ESP_LOGI(TAG, "Restarting System because of Firmware update complete");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     esp_restart();
@@ -1237,22 +1297,13 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     
     httpd_register_uri_handler(server, &system_info_get_uri);
-/*
-    httpd_uri_t swarm_options_uri = {
-        .uri = "/api/swarm",
-        .method = HTTP_OPTIONS,
-        .handler = handle_options_request,
-        .user_ctx = NULL,
-    };
-    httpd_register_uri_handler(server, &swarm_options_uri);
-
     httpd_uri_t system_restart_uri = {
-        .uri = "/api/system/restart", .method = HTTP_POST, 
+        .uri = "/api/system/restart", 
+        .method = HTTP_POST, 
         .handler = POST_restart, 
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_restart_uri);
-*/
     httpd_uri_t system_restart_options_uri = {
         .uri = "/api/system/restart", 
         .method = HTTP_OPTIONS, 
