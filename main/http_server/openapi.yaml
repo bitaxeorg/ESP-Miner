@@ -137,8 +137,7 @@ components:
         - wifiStatus
         - wifiRSSI
         - displayTimeout
-        - statisticsLimit
-        - statisticsDuration
+        - statsFrequency
       properties:
         ASICModel:
           type: string
@@ -292,12 +291,9 @@ components:
         displayTimeout:
           type: number
           description: Turn off display after timeout
-        statsLimit:
+        statsFrequency:
           type: number
-          description: Max limit data points for statistics
-        statsDuration:
-          type: number
-          description: Statistics duration in hours
+          description: Statistics frequency in seconds
 
     Settings:
       type: object
@@ -432,20 +428,12 @@ components:
           maximum: 71582
           examples:
             - 10
-        statsLimit:
+        statsFrequency:
           type: integer
-          description: Set max limit data points for statistics (0=live data points only)
+          description: Set statistics frequency in seconds (0=disabled)
           minimum: 0
-          maximum: 720
           examples:
-            - 0
-        statsDuration:
-          type: integer
-          description: Set statistics duration in hours
-          minimum: 1
-          maximum: 720
-          examples:
-            - 1
+            - 120
       additionalProperties: true
 
   responses:

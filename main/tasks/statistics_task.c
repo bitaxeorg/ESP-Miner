@@ -12,9 +12,6 @@
 #include "vcore.h"
 
 #define DEFAULT_POLL_RATE 5000
-#define MAX_DATA_COUNT 720
-#define MAX_DURATION 720
-#define MIN_DURATION 1
 
 static const char * TAG = "statistics_task";
 
@@ -22,13 +19,13 @@ static StatisticsNodePtr statisticsDataStart = NULL;
 static StatisticsNodePtr statisticsDataEnd = NULL;
 static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 
-static uint16_t maxDataCount = 0;
-static uint16_t currentDataCount = 0;
-static uint16_t duration = 0;
+static const uint16_t maxDataCount = 720;
+static uint16_t currentDataCount;
+static uint16_t statsFrequency;
 
 StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
 {
-    if ((NULL == data) || (0 == maxDataCount)) {
+    if ((NULL == data) || (0 == statsFrequency)) {
         return NULL;
     }
 
@@ -70,7 +67,7 @@ StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
 
 StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr dataOut)
 {
-    if ((NULL == nodeIn) || (NULL == dataOut) || (0 == maxDataCount)) {
+    if ((NULL == nodeIn) || (NULL == dataOut) || (0 == statsFrequency)) {
         return NULL;
     }
 
@@ -100,23 +97,10 @@ void statistics_task(void * pvParameters)
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
-    maxDataCount = nvs_config_get_u16(NVS_CONFIG_STATISTICS_LIMIT, 0);
-    if (MAX_DATA_COUNT < maxDataCount) {
-        maxDataCount = MAX_DATA_COUNT;
-        nvs_config_set_u16(NVS_CONFIG_STATISTICS_LIMIT, maxDataCount);
-    }
-    duration = nvs_config_get_u16(NVS_CONFIG_STATISTICS_DURATION, 1);
-    if (MAX_DURATION < duration) {
-        duration = MAX_DURATION;
-        nvs_config_set_u16(NVS_CONFIG_STATISTICS_DURATION, duration);
-    }
-    if (MIN_DURATION > duration) {
-        duration = MIN_DURATION;
-        nvs_config_set_u16(NVS_CONFIG_STATISTICS_DURATION, duration);
-    }
+    statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0);
 
-    if (0 != maxDataCount) {
-        const TickType_t pollRate = DEFAULT_POLL_RATE * duration * (MAX_DATA_COUNT / maxDataCount);
+    if (0 != statsFrequency) {
+        const TickType_t pollRate = statsFrequency * 1000;
         struct StatisticsData statsData;
 
         ESP_LOGI(TAG, "Ready!");
