@@ -66,7 +66,7 @@ static const DevicePreset DEVICE_SUPRA_PRESETS[] = {
 static const DevicePreset DEVICE_GAMMA_PRESETS[] = {
     {"quiet", 1000, 400, 25},        // Quiet: Low power, conservative
     {"balanced", 1090, 490, 35},    // Balanced: Good performance/efficiency balance
-    {"turbo", 1150, 525, 95},       // Turbo: Maximum performance
+    {"turbo", 1180, 600, 95},       // Turbo: Maximum performance
 };
 
 // Simple function to apply a preset by name
@@ -195,6 +195,8 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     ESP_LOGI(autotuneTAG, "  Max Power: %d W", GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
     ESP_LOGI(autotuneTAG, "  Max Domain Voltage: %u mV", GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage);
     ESP_LOGI(autotuneTAG, "  Max Frequency: %u MHz", GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency);
+    ESP_LOGI(autotuneTAG, "  Min Domain Voltage: %u mV", GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage);
+    ESP_LOGI(autotuneTAG, "  Min Frequency: %u MHz", GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency);
 
     // Log target values
     ESP_LOGI(autotuneTAG, "Autotune - Target Values:");
@@ -308,20 +310,51 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     else {
         // Decrease frequency by 2%
         uint16_t newFrequency = currentFrequency * 0.98;
+        // Ensure frequency doesn't go below minimum
+        if (newFrequency < GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency) {
+            newFrequency = GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency;
+            ESP_LOGI(TAG, "Autotune - Frequency limited to minimum: %u MHz", newFrequency);
+        }
+        
         // Decrease voltage by 0.2%
         uint16_t newVoltage = targetDomainVoltage * 0.998;
+        // Ensure voltage doesn't go below minimum
+        if (newVoltage < GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage) {
+            newVoltage = GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage;
+            ESP_LOGI(TAG, "Autotune - Voltage limited to minimum: %u mV", newVoltage);
+        }
         
-        ESP_LOGI(TAG, "Autotune - Temperature over target, decreasing frequency from %u MHz to %u MHz", 
-                 currentFrequency, newFrequency);
-        ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+        // Only apply changes if they're different from current values
+        bool frequencyChanged = (newFrequency != currentFrequency);
+        bool voltageChanged = (newVoltage != targetDomainVoltage);
+        
+        if (!frequencyChanged && !voltageChanged) {
+            ESP_LOGI(TAG, "Autotune - At minimum limits, no further adjustments possible");
+            char data[128];
+            snprintf(data, sizeof(data), "{\"currentFrequency\":%u,\"currentVoltage\":%u,\"minFrequency\":%u,\"minVoltage\":%u,\"currentTemperature\":%u}", 
+                     currentFrequency, targetDomainVoltage, GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency, 
+                     GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage, currentAsicTemp);
+            dataBase_log_event("power", "warn", "Autotune - At minimum limits, no further adjustments possible", data);
+            return;
+        }
+        
+        if (frequencyChanged) {
+            ESP_LOGI(TAG, "Autotune - Temperature over target, decreasing frequency from %u MHz to %u MHz", 
+                     currentFrequency, newFrequency);
+            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
+        }
+        
+        if (voltageChanged) {
+            ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+            char data[128];
+            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
+        }
+        
         char data[128];
-        snprintf(data, sizeof(data), "{\"newFrequency\":%u,\"newVoltage\":%u, \"currentTemperature\":%u, \"currentHashrate\":%.2f, \"targetHashrate\":%.2f}", 
-        newFrequency, newVoltage, currentAsicTemp, currentHashrate, targetHashrate);
-        dataBase_log_event("power", "info", "Autotune - Temperature over target, decreasing frequency and voltage", data);
+        snprintf(data, sizeof(data), "{\"newFrequency\":%u,\"newVoltage\":%u,\"currentTemperature\":%u,\"currentHashrate\":%.2f,\"targetHashrate\":%.2f}", 
+                 newFrequency, newVoltage, currentAsicTemp, currentHashrate, targetHashrate);
+        dataBase_log_event("power", "info", "Autotune - Temperature over target, decreasing frequency and/or voltage", data);
         
-
-        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
-        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
         return;
     }
 }
