@@ -48,7 +48,14 @@ jobs:
 
       - name: Download release asset
         run: |
-          URL="https://github.com/${REPO}/releases/download/${{ github.event.release.tag_name || 'latest' }}/$ASSET_NAME"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Get the latest release tag from GitHub API
+            LATEST_TAG=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | jq -r '.tag_name')
+            echo "Latest release tag: $LATEST_TAG"
+            URL="https://github.com/${REPO}/releases/download/$LATEST_TAG/$ASSET_NAME"
+          else
+            URL="https://github.com/${REPO}/releases/download/${{ github.event.release.tag_name }}/$ASSET_NAME"
+          fi
           echo "Downloading $URL"
           curl -L -o "$ASSET_NAME" "$URL"
 
