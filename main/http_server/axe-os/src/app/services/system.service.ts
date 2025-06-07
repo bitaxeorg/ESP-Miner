@@ -70,8 +70,7 @@ export class SystemService {
         autofanspeed: 1,
         fanspeed: 100,
         temptarget: 60,
-        statsLimit: 360,
-        statsDuration: 2,
+        statsFrequency: 30,
         fanrpm: 0,
 
         boardtemp1: 30,
