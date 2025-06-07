@@ -449,7 +449,7 @@ export async function updateASICSettings(
  */
 export async function updatePresetSettings(
   presetName: string
-): Promise<{ status: string; message: string; updatedSettings: [];timestamps: any }> {
+): Promise<{ status: string; message: string; updatedSettings: []; timestamps: any }> {
   try {
     const payload = {
       presetName,
@@ -477,13 +477,23 @@ export async function updatePresetSettings(
         return result;
       } catch (parseError) {
         console.log("Response is not JSON:", text);
-        return { status: "success", message: `${presetName} mode applied successfully`, updatedSettings: [], timestamps: [] };
+        return {
+          status: "success",
+          message: `${presetName} mode applied successfully`,
+          updatedSettings: [],
+          timestamps: [],
+        };
       }
     }
 
     // For empty responses with 200 status
     console.log("Preset settings update successful (empty response)");
-    return { status: "success", message: `${presetName} mode applied successfully`, updatedSettings: [], timestamps: [] };
+    return {
+      status: "success",
+      message: `${presetName} mode applied successfully`,
+      updatedSettings: [],
+      timestamps: [],
+    };
   } catch (error) {
     console.error("Failed to update preset settings:", error);
     return {
@@ -495,7 +505,201 @@ export async function updatePresetSettings(
   }
 }
 
+// GitHub Release Types
+export interface GitHubRelease {
+  tag_name: string;
+  name: string;
+  body: string;
+  published_at: string;
+  prerelease: boolean;
+  draft: boolean;
+  html_url: string;
+}
 
+export interface VersionInfo {
+  current: string | null;
+  latest: string | null;
+  hasUpdate: boolean;
+  isLoading: boolean;
+  error: string | null;
+  lastChecked: Date | null;
+}
+
+/**
+ * Fetch the latest release from GitHub
+ * @returns The latest release information
+ */
+export async function fetchLatestRelease(): Promise<GitHubRelease> {
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/Advanced-Crypto-Services/acs-esp-miner/releases/latest"
+    );
+
+    if (!response.ok) {
+      throw new Error(`GitHub API error: ${response.status}`);
+    }
+
+    const release = await response.json();
+    return release;
+  } catch (error) {
+    console.error("Failed to fetch latest release:", error);
+    throw error;
+  }
+}
+
+/**
+ * Compare two version strings
+ * Handles various version formats like "v1.2.3", "ACSOSv0.1-U2", etc.
+ * @param current - Current version string
+ * @param latest - Latest version string
+ * @returns true if latest is newer than current
+ */
+export function isNewerVersion(current: string, latest: string): boolean {
+  if (!current || !latest) return false;
+
+  // Clean up version strings (remove 'v' prefix, handle special formats)
+  const cleanCurrent = cleanVersionString(current);
+  const cleanLatest = cleanVersionString(latest);
+
+  console.log("Version comparison:", {
+    original: { current, latest },
+    cleaned: { current: cleanCurrent, latest: cleanLatest },
+    areEqual: cleanCurrent === cleanLatest,
+    stringComparison: cleanLatest > cleanCurrent,
+  });
+
+  // If versions are exactly the same, no update needed
+  if (cleanCurrent === cleanLatest) {
+    return false;
+  }
+
+  // For ACSOS versions, handle the specific format
+  if (cleanCurrent.includes("-u") && cleanLatest.includes("-u")) {
+    return compareAcsosVersions(cleanCurrent, cleanLatest);
+  }
+
+  // For other versions, try semver-style comparison
+  return compareSemverVersions(cleanCurrent, cleanLatest);
+}
+
+/**
+ * Clean and normalize version strings for comparison
+ * @param version - Raw version string
+ * @returns Cleaned version string
+ */
+function cleanVersionString(version: string): string {
+  // Remove 'v' prefix if present
+  let cleaned = version.replace(/^v/i, "");
+
+  // Handle ACSOS format like "ACSOSv0.1-U2"
+  if (cleaned.startsWith("ACSOS")) {
+    cleaned = cleaned.replace(/^ACSOS/i, "");
+    if (cleaned.startsWith("v")) {
+      cleaned = cleaned.replace(/^v/i, "");
+    }
+  }
+
+  return cleaned.toLowerCase();
+}
+
+/**
+ * Compare ACSOS-style versions like "0.1-u1" vs "0.1-u2"
+ * @param current - Current version string (cleaned)
+ * @param latest - Latest version string (cleaned)
+ * @returns true if latest is newer than current
+ */
+function compareAcsosVersions(current: string, latest: string): boolean {
+  // Parse format like "0.1-u2"
+  const parseAcsosVersion = (version: string) => {
+    const match = version.match(/^(\d+)\.(\d+)-u(\d+)$/);
+    if (!match) return null;
+    return {
+      major: parseInt(match[1], 10),
+      minor: parseInt(match[2], 10),
+      update: parseInt(match[3], 10),
+    };
+  };
+
+  const currentParts = parseAcsosVersion(current);
+  const latestParts = parseAcsosVersion(latest);
+
+  if (!currentParts || !latestParts) {
+    // Fallback to string comparison if parsing fails
+    return latest > current;
+  }
+
+  // Compare major.minor.update
+  if (latestParts.major !== currentParts.major) {
+    return latestParts.major > currentParts.major;
+  }
+  if (latestParts.minor !== currentParts.minor) {
+    return latestParts.minor > currentParts.minor;
+  }
+  return latestParts.update > currentParts.update;
+}
+
+/**
+ * Compare semver-style versions like "1.2.3" vs "1.2.4"
+ * @param current - Current version string (cleaned)
+ * @param latest - Latest version string (cleaned)
+ * @returns true if latest is newer than current
+ */
+function compareSemverVersions(current: string, latest: string): boolean {
+  // Parse semver format
+  const parseSemver = (version: string) => {
+    const parts = version.split(/[.-]/).map((part) => {
+      const num = parseInt(part, 10);
+      return isNaN(num) ? 0 : num;
+    });
+    return {
+      major: parts[0] || 0,
+      minor: parts[1] || 0,
+      patch: parts[2] || 0,
+    };
+  };
+
+  const currentParts = parseSemver(current);
+  const latestParts = parseSemver(latest);
+
+  // Compare major.minor.patch
+  if (latestParts.major !== currentParts.major) {
+    return latestParts.major > currentParts.major;
+  }
+  if (latestParts.minor !== currentParts.minor) {
+    return latestParts.minor > currentParts.minor;
+  }
+  return latestParts.patch > currentParts.patch;
+}
+
+/**
+ * Get comprehensive version information including update availability
+ * @param currentVersion - Current firmware version
+ * @returns Version information object
+ */
+export async function getVersionInfo(currentVersion: string | null): Promise<VersionInfo> {
+  try {
+    const release = await fetchLatestRelease();
+    const latestVersion = release.tag_name;
+
+    return {
+      current: currentVersion,
+      latest: latestVersion,
+      hasUpdate: currentVersion ? isNewerVersion(currentVersion, latestVersion) : true,
+      isLoading: false,
+      error: null,
+      lastChecked: new Date(),
+    };
+  } catch (error) {
+    return {
+      current: currentVersion,
+      latest: null,
+      hasUpdate: false,
+      isLoading: false,
+      error: error instanceof Error ? error.message : "Failed to check for updates",
+      lastChecked: new Date(),
+    };
+  }
+}
 
 /**
  * Log event interface
@@ -503,7 +707,7 @@ export async function updatePresetSettings(
 export interface LogEvent {
   timestamp: number;
   type: string;
-  level: 'info' | 'warning' | 'error' | 'critical';
+  level: "info" | "warning" | "error" | "critical";
   message: string;
   data?: Record<string, any>;
 }
@@ -520,10 +724,10 @@ export async function fetchRecentLogs(limit?: number): Promise<{
   try {
     const params = new URLSearchParams();
     if (limit !== undefined) {
-      params.append('limit', limit.toString());
+      params.append("limit", limit.toString());
     }
 
-    const url = `/api/logs/recent${params.toString() ? `?${params.toString()}` : ''}`;
+    const url = `/api/logs/recent${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -558,10 +762,10 @@ export async function fetchErrorLogs(limit?: number): Promise<{
   try {
     const params = new URLSearchParams();
     if (limit !== undefined) {
-      params.append('limit', limit.toString());
+      params.append("limit", limit.toString());
     }
 
-    const url = `/api/logs/errors${params.toString() ? `?${params.toString()}` : ''}`;
+    const url = `/api/logs/errors${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await fetch(url);
 
     if (!response.ok) {
