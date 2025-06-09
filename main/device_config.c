@@ -29,14 +29,14 @@ esp_err_t device_config_init(void * pvParameters)
         }
     }
 
-    ESP_LOGE(TAG, "Custom Board Version: %s", board_version);
+    ESP_LOGI(TAG, "Custom Board Version: %s", board_version);
 
     GLOBAL_STATE->DEVICE_CONFIG.board_version = strdup(board_version);
 
     char * device_model = nvs_config_get_string(NVS_CONFIG_DEVICE_MODEL, "unknown");
 
     for (int i = 0 ; i < ARRAY_SIZE(default_families); i++) {
-        if (strcmp(default_families[i].name, device_model) == 0) {
+        if (strcasecmp(default_families[i].name, device_model) == 0) {
             GLOBAL_STATE->DEVICE_CONFIG.family = default_families[i];
 
             ESP_LOGI(TAG, "Device Model: %s", GLOBAL_STATE->DEVICE_CONFIG.family.name);
@@ -48,10 +48,10 @@ esp_err_t device_config_init(void * pvParameters)
     char * asic_model = nvs_config_get_string(NVS_CONFIG_ASIC_MODEL, "unknown");
 
     for (int i = 0 ; i < ARRAY_SIZE(default_asic_configs); i++) {
-        if (strcmp(default_asic_configs[i].name, asic_model) == 0) {
+        if (strcasecmp(default_asic_configs[i].name, asic_model) == 0) {
             GLOBAL_STATE->DEVICE_CONFIG.family.asic = default_asic_configs[i];
 
-            ESP_LOGI(TAG, "ASIC Model: %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+            ESP_LOGI(TAG, "ASIC: %dx %s (%d cores)", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name, GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count);
 
             break;
         }
@@ -75,5 +75,5 @@ esp_err_t device_config_init(void * pvParameters)
     free(device_model);
     free(asic_model);
 
-    return ESP_FAIL;
+    return ESP_OK;
 }
