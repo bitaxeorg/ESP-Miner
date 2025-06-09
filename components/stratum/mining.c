@@ -52,15 +52,15 @@ char *calculate_merkle_root_hash(const char *coinbase_tx, const uint8_t merkle_b
 }
 
 // take a mining_notify struct with ascii hex strings and convert it to a bm_job struct
-bm_job construct_bm_job(mining_notify *params, const char *merkle_root, const uint32_t version_mask)
+bm_job construct_bm_job(mining_notify *params, const char *merkle_root, const uint32_t version_mask, const uint32_t difficulty)
 {
     bm_job new_job;
 
     new_job.version = params->version;
-    new_job.starting_nonce = 0;
     new_job.target = params->target;
     new_job.ntime = params->ntime;
-    new_job.pool_diff = params->difficulty;
+    new_job.starting_nonce = 0;
+    new_job.pool_diff = difficulty;
 
     hex2bin(merkle_root, new_job.merkle_root, 32);
 

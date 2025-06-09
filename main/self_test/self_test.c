@@ -31,6 +31,7 @@
 #include "bm1370.h"
 #include "asic.h"
 #include "device_config.h"
+#include "asic_reset.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
@@ -306,6 +307,12 @@ void self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, TESTS_FAILED);
     }
 
+    if (asic_reset() != ESP_OK) {
+        ESP_LOGE(TAG, "ASIC reset failed!");
+        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        return;
+    }
+
     //test for number of ASICs
     if (SERIAL_init() != ESP_OK) {
         ESP_LOGE(TAG, "SERIAL init failed!");
@@ -359,10 +366,8 @@ void self_test(void * pvParameters)
     notify_message.job_id = 0;
     notify_message.prev_block_hash = "0c859545a3498373a57452fac22eb7113df2a465000543520000000000000000";
     notify_message.version = 0x20000004;
-    notify_message.version_mask = 0x1fffe000;
     notify_message.target = 0x1705ae3a;
     notify_message.ntime = 0x647025b5;
-    notify_message.difficulty = 1000000;
 
     const char * coinbase_tx = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfab"
                                "e6d6d5cbab26a2599e92916edec"
@@ -392,7 +397,7 @@ void self_test(void * pvParameters)
 
     char * merkle_root = calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles);
 
-    bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000);
+    bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
 
     uint8_t difficulty_mask = 8;
 

@@ -22,6 +22,10 @@
     }
 }
 
+.p-button-icon-only:focus {
+    box-shadow: none;
+}
+
 .ansi-red { color: #ff0000; }
 .ansi-green { color: #00ff00; }
 .ansi-yellow { color: #ffff00; }
