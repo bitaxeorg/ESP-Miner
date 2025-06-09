@@ -39,7 +39,7 @@
                 <ng-container *ngIf="!info.power_fault">
                     Average:
                     <span class="text-green-500 font-medium">
-                        {{calculateAverage(previousHashrateData.concat(hashrateData)) | hashSuffix}}
+                        {{calculateAverage(hashrateData) | hashSuffix}}
                     </span>
                 </ng-container>
 
@@ -67,7 +67,7 @@
                 <ng-container *ngIf="!info.power_fault">
                     Average:
                     <span class="text-green-500 font-medium">
-                        {{calculateEfficiencyAverage(previousHashrateData.concat(hashrateData), previousPowerData.concat(powerData)) | number: '1.2-2'}} <small>J/TH</small>
+                        {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} <small>J/TH</small>
                     </span>
                 </ng-container>
 
@@ -133,7 +133,7 @@
 
         <div class="col-12" *ngIf="!info.power_fault">
             <div class="card">
-                <p-chart [data]="chartData" [options]="chartOptions"></p-chart>
+                <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
             </div>
         </div>
         <div class="col-12 lg:col-6 xl:col-6">

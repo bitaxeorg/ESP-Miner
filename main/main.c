@@ -19,6 +19,7 @@
 #include "asic.h"
 #include "device_config.h"
 #include "connect.h"
+#include "asic_reset.h"
 
 static GlobalState GLOBAL_STATE;
 
@@ -81,6 +82,12 @@ void app_main(void)
 
     queue_init(&GLOBAL_STATE.stratum_queue);
     queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
+
+    if (asic_reset() != ESP_OK) {
+        GLOBAL_STATE.SYSTEM_MODULE.asic_status = "ASIC reset failed";
+        ESP_LOGE(TAG, "ASIC reset failed!");
+        return;
+    }
 
     SERIAL_init();
 
