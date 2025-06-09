@@ -153,7 +153,7 @@ esp_err_t display_init(void * pvParameters)
         .hres = GLOBAL_STATE->DISPLAY_CONFIG.h_res,
         .vres = GLOBAL_STATE->DISPLAY_CONFIG.v_res,
         .monochrome = true,
-        .color_format = LV_COLOR_FORMAT_RGB565,
+        .color_format = LV_COLOR_FORMAT_I1,
         .rotation = {
             .swap_xy = false,
             .mirror_x = !flip_screen, // The screen is not flipped, this is for backwards compatibility
