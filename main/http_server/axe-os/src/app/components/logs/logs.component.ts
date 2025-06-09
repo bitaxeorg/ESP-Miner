@@ -1,4 +1,5 @@
-import { AfterViewChecked, Component, ElementRef, OnDestroy, ViewChild, HostListener } from '@angular/core';
+import { AfterViewChecked, Component, Input, OnInit, ElementRef, OnDestroy, ViewChild, HostListener } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap } from 'rxjs';
 import { SystemService } from 'src/app/services/system.service';
 import { WebsocketService } from 'src/app/services/web-socket.service';
@@ -9,7 +10,9 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
   templateUrl: './logs.component.html',
   styleUrl: './logs.component.scss'
 })
-export class LogsComponent implements OnDestroy, AfterViewChecked {
+export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
+
+  public form!: FormGroup;
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
   public info$: Observable<ISystemInfo>;
@@ -30,8 +33,10 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
       this.isExpanded = false;
     }
   }
+  @Input() uri = '';
 
   constructor(
+    private fb: FormBuilder,
     private websocketService: WebsocketService,
     private systemService: SystemService
   ) {
@@ -55,14 +60,19 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
 
 
   }
+
+  ngOnInit(): void {
+    this.form = this.fb.group({
+      filter: ["", [Validators.required]]
+    });
+  }
+
   ngOnDestroy(): void {
     this.websocketSubscription?.unsubscribe();
   }
-  public toggleLogs() {
-    this.showLogs = !this.showLogs;
 
-    if (this.showLogs) {
-      this.websocketSubscription = this.websocketService.ws$.subscribe({
+  private subscribeLogs() {
+    this.websocketSubscription = this.websocketService.ws$.subscribe({
         next: (val) => {
           const matches = val.matchAll(/\[(\d+;\d+)m(.*?)(?=\[|\n|$)/g);
           let className = 'ansi-white'; // default color
@@ -80,16 +90,32 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
             }
           }
 
-          this.logs.push({ className, text: val });
+          // Get current filter value from form
+          const currentFilter = this.form?.get('filter')?.value;
+
+          if (!currentFilter || val.includes(currentFilter)) {
+            this.logs.push({ className, text: val });
+          }
 
           if (this.logs.length > 256) {
             this.logs.shift();
           }
         }
       })
+  }
+
+  public toggleLogs() {
+    this.showLogs = !this.showLogs;
+
+    if (this.showLogs) {
+      this.subscribeLogs();
     } else {
       this.websocketSubscription?.unsubscribe();
     }
+  }
+
+  public clearLogs() {
+    this.logs.length = 0;
   }
 
   ngAfterViewChecked(): void {
