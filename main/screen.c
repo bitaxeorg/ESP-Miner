@@ -75,12 +75,19 @@ static float current_chip_temp;
 static bool found_block;
 static bool self_test_finished;
 
-static lv_obj_t * create_scr_self_test() {
+static lv_obj_t * create_flex_screen(int expected_lines) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    if (screen_lines > 4) lv_obj_set_style_pad_row(scr, 1, LV_PART_MAIN);
+    // Give text a bit more space on larger displays
+    if (screen_lines > expected_lines) lv_obj_set_style_pad_row(scr, 1, LV_PART_MAIN);
+
+    return scr;
+}
+
+static lv_obj_t * create_scr_self_test() {
+    lv_obj_t * scr = create_flex_screen(4);
 
     lv_obj_t *label1 = lv_label_create(scr);
     lv_label_set_text(label1, "BITAXE SELF TEST");
@@ -96,11 +103,7 @@ static lv_obj_t * create_scr_self_test() {
 }
 
 static lv_obj_t * create_scr_overheat(SystemModule * module) {
-    lv_obj_t * scr = lv_obj_create(NULL);
-
-    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    if (screen_lines > 4) lv_obj_set_style_pad_row(scr, 1, LV_PART_MAIN);
+    lv_obj_t * scr = create_flex_screen(4);
 
     lv_obj_t *label1 = lv_label_create(scr);
     lv_label_set_text(label1, "DEVICE OVERHEAT!");
@@ -119,11 +122,7 @@ static lv_obj_t * create_scr_overheat(SystemModule * module) {
 }
 
 static lv_obj_t * create_scr_asic_status(SystemModule * module) {
-    lv_obj_t * scr = lv_obj_create(NULL);
-
-    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    if (screen_lines > 4) lv_obj_set_style_pad_row(scr, 1, LV_PART_MAIN);
+    lv_obj_t * scr = create_flex_screen(2);
 
     lv_obj_t *label1 = lv_label_create(scr);
     lv_label_set_text(label1, "ASIC STATUS:");
@@ -135,11 +134,7 @@ static lv_obj_t * create_scr_asic_status(SystemModule * module) {
 }
 
 static lv_obj_t * create_scr_configure(SystemModule * module) {
-    lv_obj_t * scr = lv_obj_create(NULL);
-
-    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    if (screen_lines > 4) lv_obj_set_style_pad_row(scr, 1, LV_PART_MAIN);
+    lv_obj_t * scr = create_flex_screen(3);
 
     lv_obj_t *label1 = lv_label_create(scr);
     lv_obj_set_width(label1, LV_HOR_RES);
@@ -147,8 +142,8 @@ static lv_obj_t * create_scr_configure(SystemModule * module) {
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(label1, "Welcome to your new Bitaxe! Connect to the configuration Wi-Fi and connect the Bitaxe to your network.");
 
-    // skip a line, it looks nicer this way
-    lv_label_create(scr);
+    // add a bit of padding, it looks nicer this way
+    lv_obj_set_style_pad_bottom(label1, 4, LV_PART_MAIN);
 
     lv_obj_t *label2 = lv_label_create(scr);
     lv_label_set_text(label2, "Wi-Fi (for setup):");
@@ -160,11 +155,7 @@ static lv_obj_t * create_scr_configure(SystemModule * module) {
 }
 
 static lv_obj_t * create_scr_ota(SystemModule * module) {
-    lv_obj_t * scr = lv_obj_create(NULL);
-
-    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    if (screen_lines > 4) lv_obj_set_style_pad_row(scr, 1, LV_PART_MAIN);
+    lv_obj_t * scr = create_flex_screen(3);
 
     lv_obj_t *label1 = lv_label_create(scr);
     lv_obj_set_width(label1, LV_HOR_RES);
@@ -178,11 +169,7 @@ static lv_obj_t * create_scr_ota(SystemModule * module) {
 }
 
 static lv_obj_t * create_scr_connection(SystemModule * module) {
-    lv_obj_t * scr = lv_obj_create(NULL);
-
-    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    if (screen_lines > 4) lv_obj_set_style_pad_row(scr, 1, LV_PART_MAIN);
+    lv_obj_t * scr = create_flex_screen(4);
 
     lv_obj_t *label1 = lv_label_create(scr);
     lv_obj_set_width(label1, LV_HOR_RES);
@@ -207,15 +194,15 @@ static lv_obj_t * create_scr_bitaxe_logo(const char * name, const char * board_v
 
     lv_obj_t *img = lv_img_create(scr);
     lv_img_set_src(img, &bitaxe_logo);
-    lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(img, LV_ALIGN_CENTER, 0, 1);
 
     lv_obj_t *label1 = lv_label_create(scr);
     lv_label_set_text(label1, name);
-    lv_obj_align(label1, LV_ALIGN_RIGHT_MID, -6, -13);
+    lv_obj_align(label1, LV_ALIGN_RIGHT_MID, -6, -12);
 
     lv_obj_t *label2 = lv_label_create(scr);
     lv_label_set_text(label2, board_version);
-    lv_obj_align(label2, LV_ALIGN_RIGHT_MID, -6, -5);
+    lv_obj_align(label2, LV_ALIGN_RIGHT_MID, -6, -4);
 
     return scr;
 }
@@ -231,11 +218,7 @@ static lv_obj_t * create_scr_osmu_logo() {
 }
 
 static lv_obj_t * create_scr_urls(SystemModule * module) {
-    lv_obj_t * scr = lv_obj_create(NULL);
-
-    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    if (screen_lines > 4) lv_obj_set_style_pad_row(scr, 1, LV_PART_MAIN);
+    lv_obj_t * scr = create_flex_screen(4);
 
     lv_obj_t *label1 = lv_label_create(scr);
     lv_label_set_text(label1, "Stratum Host:");
@@ -253,11 +236,7 @@ static lv_obj_t * create_scr_urls(SystemModule * module) {
 }
 
 static lv_obj_t * create_scr_stats() {
-    lv_obj_t * scr = lv_obj_create(NULL);
-
-    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    if (screen_lines > 4) lv_obj_set_style_pad_row(scr, 1, LV_PART_MAIN);
+    lv_obj_t * scr = create_flex_screen(4);
 
     hashrate_label = lv_label_create(scr);
     lv_label_set_text(hashrate_label, "Gh/s: --");
@@ -275,11 +254,7 @@ static lv_obj_t * create_scr_stats() {
 }
 
 static lv_obj_t * create_scr_wifi_rssi() {
-    lv_obj_t * scr = lv_obj_create(NULL);
-
-    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    if (screen_lines > 4) lv_obj_set_style_pad_row(scr, 1, LV_PART_MAIN);
+    lv_obj_t * scr = create_flex_screen(3);
 
     lv_obj_t *title_label = lv_label_create(scr);
     lv_label_set_text(title_label, "Wi-Fi Signal");
