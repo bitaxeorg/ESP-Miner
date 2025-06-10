@@ -64,7 +64,7 @@ export class SystemService {
         idfVersion: "v5.1.2",
         boardVersion: "204",
         display: "SSD1306 (128x32)",
-        flipscreen: 1,
+        rotation: 0,
         invertscreen: 0,
         displayTimeout: -1,
         autofanspeed: 1,

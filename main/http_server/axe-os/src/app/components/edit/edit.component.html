@@ -80,7 +80,22 @@
         <div class="field grid p-fluid">
             <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="display">Display</label>
             <div class="col-12 md:col-10">
-                <p-dropdown [options]="getDisplays()" formControlName="display"></p-dropdown>
+                <p-dropdown [options]="displays" formControlName="display"></p-dropdown>
+            </div>
+        </div>
+
+        <div class="field grid p-fluid">
+            <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="rotation">Rotation</label>
+            <div class="col-12 md:col-10">
+                <p-dropdown [options]="rotations" formControlName="rotation"></p-dropdown>
+            </div>
+        </div>
+
+        <div class="col-12 md:col-4">
+            <div class="field-checkbox">
+                <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen"
+                    [binary]="true"></p-checkbox>
+                <label for="invertscreen">Invert Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Inverts the colors"></i></label>
             </div>
         </div>
 
@@ -102,22 +117,6 @@
                 </label>
                 <p-slider [min]="0" [max]="displayTimeoutMaxSteps" [step]="1" [formControl]="displayTimeoutControl"></p-slider>
                 <input type="hidden" formControlName="displayTimeout" />
-            </div>
-        </div>
-
-        <div class="col-12 md:col-4">
-            <div class="field-checkbox">
-                <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
-                    [binary]="true"></p-checkbox>
-                <label for="flipscreen">Flip Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Rotates the LCD screen by 180 degrees"></i></label>
-            </div>
-        </div>
-
-        <div class="col-12 md:col-4">
-            <div class="field-checkbox">
-                <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen"
-                    [binary]="true"></p-checkbox>
-                <label for="invertscreen">Invert Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Inverts the colors"></i></label>
             </div>
         </div>
 

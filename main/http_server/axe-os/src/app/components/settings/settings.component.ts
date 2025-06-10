@@ -48,15 +48,14 @@ export class SettingsComponent {
       return releases[0];
     }));
 
-    this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}))
+    this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}));
 
-
-      this.info$.pipe(this.loadingService.lockUIUntilComplete())
+    this.info$.pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
         this.ASICModel = info.ASICModel;
         this.form = this.fb.group({
           display: [info.display, [Validators.required]],
-          flipscreen: [info.flipscreen == 1],
+          rotation: [info.rotation, [Validators.required]],
           invertscreen: [info.invertscreen == 1],
           displayTimeout: [info.displayTimeout, [Validators.required]],
           stratumURL: [info.stratumURL, [
@@ -91,17 +90,15 @@ export class SettingsComponent {
           }
         });
       });
-
   }
-  public updateSystem() {
 
+  public updateSystem() {
     const form = this.form.getRawValue();
 
     form.frequency = parseInt(form.frequency);
     form.coreVoltage = parseInt(form.coreVoltage);
 
     // bools to ints
-    form.flipscreen = form.flipscreen == true ? 1 : 0;
     form.invertscreen = form.invertscreen == true ? 1 : 0;
     form.autofanspeed = form.autofanspeed == true ? 1 : 0;
 
