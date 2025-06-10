@@ -130,6 +130,10 @@ button.color-dot {
     .p-progressbar-value {
         background: var(--progressbar-value-bg);
     }
+
+    &--thin {
+        height: 6px !important;
+    }
 }
 
 /* Dropdown Theme*/
