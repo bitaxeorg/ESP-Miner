@@ -130,7 +130,7 @@
                         Data logging disabled
                     </ng-container>
                     <ng-container *ngIf="this.form.controls['statsFrequency'].value > 0">
-                        Log data every {{form.controls['statsFrequency'].value | dateAgo}} for {{(form.controls['statsFrequency'].value * 720) | dateAgo}}
+                        Log data every {{form.controls['statsFrequency'].value | dateAgo: {strict: true} }} for {{(form.controls['statsFrequency'].value * 720) | dateAgo}}
                     </ng-container>
                 </label>
                 <p-slider [min]="0" [max]="statsFrequencyMaxSteps" [step]="1" [formControl]="statsFrequencyControl"></p-slider>
