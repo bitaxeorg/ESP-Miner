@@ -146,7 +146,6 @@ export class EditComponent implements OnInit, OnDestroy {
           invertscreen: [info.invertscreen == 1],
           displayTimeout: [info.displayTimeout, [
             Validators.required,
-            Validators.pattern(/^[^:]*$/),
             Validators.min(-1),
             Validators.max(this.displayTimeoutMaxValue)
           ]],
@@ -158,7 +157,6 @@ export class EditComponent implements OnInit, OnDestroy {
           overheat_mode: [info.overheat_mode, [Validators.required]],
           statsFrequency: [info.statsFrequency, [
             Validators.required,
-            Validators.pattern(/^[^:]*$/),
             Validators.min(0),
             Validators.max(this.statsFrequencyMaxValue)
           ]]
