@@ -86,7 +86,7 @@ export class EditComponent implements OnInit, OnDestroy {
       }
 
       this.form.patchValue({ displayTimeout: DISPLAY_TIMEOUT_STEPS[next] });
-      this.form.markAsDirty();
+      this.form.controls['displayTimeout'].markAsDirty();
     });
 
     this.statsFrequencyControl = new FormControl();
@@ -96,7 +96,7 @@ export class EditComponent implements OnInit, OnDestroy {
       }
 
       this.form.patchValue({ statsFrequency: STATS_FREQUENCY_STEPS[next] });
-      this.form.markAsDirty();
+      this.form.controls['statsFrequency'].markAsDirty();
     });
   }
 
