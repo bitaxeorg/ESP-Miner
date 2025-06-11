@@ -44,6 +44,8 @@ export class EditComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
+  public displays = ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
+  public rotations = [0, 90, 180, 270];
   public displayTimeoutControl: FormControl;
 
   constructor(
@@ -130,7 +132,7 @@ export class EditComponent implements OnInit, OnDestroy {
 
         this.form = this.fb.group({
           display: [info.display, [Validators.required]],
-          flipscreen: [info.flipscreen == 1],
+          rotation: [info.rotation, [Validators.required]],
           invertscreen: [info.invertscreen == 1],
           displayTimeout: [info.displayTimeout, [
             Validators.required,
@@ -245,10 +247,6 @@ export class EditComponent implements OnInit, OnDestroy {
 
   get dropdownVoltage(): Dropdown {
     return this.buildDropdown('coreVoltage', this.voltageOptions, this.defaultVoltage);
-  }
-
-  getDisplays() {
-    return ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
   }
 
   get displayTimeoutMaxSteps(): number {

@@ -144,7 +144,6 @@ esp_err_t display_init(void * pvParameters)
 
     ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL init failed");
 
-    uint8_t flip_screen = nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1);
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,
         .panel_handle = panel_handle,
@@ -153,12 +152,7 @@ esp_err_t display_init(void * pvParameters)
         .hres = GLOBAL_STATE->DISPLAY_CONFIG.h_res,
         .vres = GLOBAL_STATE->DISPLAY_CONFIG.v_res,
         .monochrome = true,
-        .color_format = LV_COLOR_FORMAT_RGB565,
-        .rotation = {
-            .swap_xy = false,
-            .mirror_x = !flip_screen, // The screen is not flipped, this is for backwards compatibility
-            .mirror_y = !flip_screen,
-        },
+        .color_format = LV_COLOR_FORMAT_I1,
         .flags = {
             .swap_bytes = false,
             .sw_rotate = false,
@@ -174,11 +168,23 @@ esp_err_t display_init(void * pvParameters)
         return ESP_FAIL;
     }
 
-
     if (esp_lcd_panel_init_err == ESP_OK) {
         if (lvgl_port_lock(0)) {
 
-            // lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);
+            uint16_t rotation = nvs_config_get_u16(NVS_CONFIG_ROTATION, 0);
+
+            ESP_LOGI(TAG, "Rotation: %d", rotation);
+            switch(rotation) {
+                case 90:
+                    lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);
+                    break;
+                case 180:
+                    lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_180);
+                    break;
+                case 270:
+                    lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270);
+                    break;
+            }
 
             lv_style_init(&scr_style);
             lv_style_set_text_font(&scr_style, &lv_font_portfolio_6x8);
