@@ -96,21 +96,20 @@ void statistics_task(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    struct StatisticsData statsData = {};
 
-    statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0);
+    TickType_t taskWakeTime = xTaskGetTickCount();
 
-    if (0 != statsFrequency) {
-        const TickType_t pollRate = statsFrequency * 1000;
-        struct StatisticsData statsData;
+    while (1) {
+        const int64_t currentTime = esp_timer_get_time() / 1000;
+        statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0) * 1000;
+        const int64_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
 
-        ESP_LOGI(TAG, "Ready!");
-
-        TickType_t taskWakeTime = xTaskGetTickCount();
-        while (1) {
+        if ((0 != statsFrequency) && (currentTime > waitingTime)) {
             int8_t wifiRSSI = -90;
             get_wifi_current_rssi(&wifiRSSI);
 
-            statsData.timestamp = esp_timer_get_time() / 1000;
+            statsData.timestamp = currentTime;
             statsData.hashrate = sys_module->current_hashrate;
             statsData.chipTemperature = power_management->chip_temp_avg;
             statsData.vrTemperature = power_management->vr_temp;
@@ -124,14 +123,8 @@ void statistics_task(void * pvParameters)
             statsData.freeHeap = esp_get_free_heap_size();
 
             addStatisticData(&statsData);
+        }
 
-            // looper:
-            vTaskDelayUntil(&taskWakeTime, pollRate / portTICK_PERIOD_MS); // taskWakeTime is automatically updated
-        }
-    } else {
-        ESP_LOGI(TAG, "Disabled!");
-        while (1) {
-            vTaskDelay(DEFAULT_POLL_RATE / portTICK_PERIOD_MS);
-        }
+        vTaskDelayUntil(&taskWakeTime, DEFAULT_POLL_RATE / portTICK_PERIOD_MS); // taskWakeTime is automatically updated
     }
 }

@@ -328,7 +328,8 @@ export class EditComponent implements OnInit, OnDestroy {
       'autofanspeed',
       'fanspeed',
       'temptarget',
-      'overheat_mode'
+      'overheat_mode',
+      'statsFrequency'
     ];
   }
 
