@@ -319,7 +319,6 @@ bool self_test(void * pvParameters)
     if (asic_reset() != ESP_OK) {
         ESP_LOGE(TAG, "ASIC reset failed!");
         tests_done(GLOBAL_STATE, TESTS_FAILED);
-        return;
     }
 
     //test for number of ASICs
