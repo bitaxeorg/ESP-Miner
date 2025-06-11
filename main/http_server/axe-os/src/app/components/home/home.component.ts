@@ -27,6 +27,7 @@ export class HomeComponent {
   public powerData: number[] = [];
   public chartData?: any;
 
+  public swarmColor!: string;
   public maxPower: number = 0;
   public nominalVoltage: number = 0;
   public maxTemp: number = 75;
@@ -255,6 +256,7 @@ export class HomeComponent {
         }
 
         this.chart?.refresh();
+        this.swarmColor = info.swarmColor;
         this.maxPower = Math.max(info.maxPower, info.power);
         this.nominalVoltage = info.nominalVoltage;
         this.maxTemp = Math.max(75, info.temp);

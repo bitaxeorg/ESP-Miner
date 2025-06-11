@@ -116,6 +116,7 @@ components:
         - macAddr
         - maxPower
         - nominalVoltage
+        - swarmColor
         - overheat_mode
         - overclockEnabled
         - power
@@ -224,6 +225,9 @@ components:
         nominalVoltage:
           type: integer
           description: Nominal board voltage
+        swarmColor:
+          type: string
+          description: Swarm color setting
         overheat_mode:
           type: number
           description: Overheat protection mode

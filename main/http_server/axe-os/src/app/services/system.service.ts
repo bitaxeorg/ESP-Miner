@@ -1,7 +1,6 @@
 import { HttpClient, HttpEvent } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { delay, Observable, of } from 'rxjs';
-import { eASICModel } from 'src/models/enum/eASICModel';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 
@@ -51,7 +50,9 @@ export class SystemService {
         uptimeSeconds: 38,
         asicCount: 1,
         smallCoreCount: 672,
-        ASICModel: eASICModel.BM1366,
+        ASICModel: "BM1366",
+        familyName: "Max",
+        swarmColor: "white",
         stratumURL: "public-pool.io",
         stratumPort: 21496,
         fallbackStratumURL: "test.public-pool.io",
@@ -154,9 +155,8 @@ export class SystemService {
     return this.otaUpdate(file, `/api/system/OTAWWW`);
   }
 
-
   public getAsicSettings(uri: string = ''): Observable<{
-    ASICModel: eASICModel;
+    ASICModel: string;
     defaultFrequency: number;
     frequencyOptions: number[];
     defaultVoltage: number;
@@ -164,7 +164,7 @@ export class SystemService {
   }> {
     if (environment.production) {
       return this.httpClient.get(`${uri}/api/system/asic`) as Observable<{
-        ASICModel: eASICModel;
+        ASICModel: string;
         defaultFrequency: number;
         frequencyOptions: number[];
         defaultVoltage: number;
@@ -174,7 +174,7 @@ export class SystemService {
 
     // Mock data for development
     return of({
-      ASICModel: eASICModel.BM1366,
+      ASICModel: "BM1366",
       defaultFrequency: 485,
       frequencyOptions: [400, 425, 450, 475, 485, 500, 525, 550, 575],
       defaultVoltage: 1200,

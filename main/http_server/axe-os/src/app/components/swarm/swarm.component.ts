@@ -320,12 +320,14 @@ export class SwarmComponent implements OnInit, OnDestroy {
       .reduce((max, curr) => this.compareBestDiff(max, curr), '0');
   }
 
-  hasModel(model: string): string {
-    return this.swarm.some(axe => axe.ASICModel === model) ? '1' : '0.5';
+  get getFamilies(): { familyName: string, swarmColor: string, ASICModel: string }[] {
+    const seen = new Set<string>();
+    return this.swarm.filter(item => {
+      if (seen.has(item.familyName)) {
+        return false;
+      }
+      seen.add(item.familyName);
+      return true;
+    });
   }
-
-  hasMultipleChips(): string {
-    return this.swarm.some(axe => axe.asicCount > 1) ? '1' : '0.5';
-  }
-
 }

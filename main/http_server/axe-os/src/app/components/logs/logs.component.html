@@ -5,7 +5,7 @@
             <table *ngIf="info$ | async as info">
                 <tr>
                     <td>Model:</td>
-                    <td>{{info.ASICModel}}</td>
+                    <td>{{info.familyName}} ({{info.ASICModel}})</td>
                 </tr>
                 <tr>
                     <td>Uptime:</td>

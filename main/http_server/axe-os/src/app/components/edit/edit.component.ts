@@ -5,7 +5,6 @@ import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
-import { eASICModel } from 'src/models/enum/eASICModel';
 import { ActivatedRoute } from '@angular/router';
 
 type Dropdown = {
@@ -29,10 +28,6 @@ export class EditComponent implements OnInit, OnDestroy {
 
   public savedChanges: boolean = false;
   public settingsUnlocked: boolean = false;
-  public eASICModel = eASICModel;
-  public ASICModel!: eASICModel;
-  public restrictedModels: eASICModel[] = Object.values(eASICModel)
-    .filter((v): v is eASICModel => typeof v === 'string');
 
   @Input() uri = '';
 
@@ -111,8 +106,6 @@ export class EditComponent implements OnInit, OnDestroy {
       takeUntil(this.destroy$)
     )
     .subscribe(({ info, asicSettings }) => {
-      this.ASICModel = info.ASICModel;
-
       // Store the frequency and voltage options from the API
       this.defaultFrequency = asicSettings.defaultFrequency;
       this.frequencyOptions = asicSettings.frequencyOptions;

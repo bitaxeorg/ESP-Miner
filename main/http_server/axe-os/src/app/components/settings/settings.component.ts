@@ -7,7 +7,6 @@ import { map, Observable, shareReplay, startWith } from 'rxjs';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
-import { eASICModel } from 'src/models/enum/eASICModel';
 
 @Component({
   selector: 'app-settings',
@@ -20,10 +19,6 @@ export class SettingsComponent {
 
   public firmwareUpdateProgress: number | null = null;
   public websiteUpdateProgress: number | null = null;
-
-
-  public eASICModel = eASICModel;
-  public ASICModel!: eASICModel;
 
   public checkLatestRelease: boolean = false;
   public latestRelease$: Observable<any>;
@@ -53,7 +48,6 @@ export class SettingsComponent {
 
       this.info$.pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
-        this.ASICModel = info.ASICModel;
         this.form = this.fb.group({
           display: [info.display, [Validators.required]],
           flipscreen: [info.flipscreen == 1],
