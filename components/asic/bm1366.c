@@ -20,12 +20,6 @@
 #define BM1366_CHIP_ID 0x1366
 #define BM1366_CHIP_ID_RESPONSE_LENGTH 11
 
-#ifdef CONFIG_GPIO_ASIC_RESET
-#define GPIO_ASIC_RESET CONFIG_GPIO_ASIC_RESET
-#else
-#define GPIO_ASIC_RESET 1
-#endif
-
 #define TYPE_JOB 0x20
 #define TYPE_CMD 0x40
 
@@ -66,7 +60,7 @@ typedef struct __attribute__((__packed__))
 
 static float current_frequency = 56.25;
 
-static const char * TAG = "bm1366Module";
+static const char * TAG = "bm1366";
 
 static task_result result;
 
@@ -212,8 +206,7 @@ bool BM1366_set_frequency(float target_freq) {
     return do_frequency_transition(target_freq, BM1366_send_hash_frequency, 1366);
 }
 
-
-static uint8_t _send_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
+uint8_t BM1366_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
 {
     // set version mask
     for (int i = 0; i < 3; i++) {
@@ -297,21 +290,6 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count, uint16_t diff
     return chip_counter;
 }
 
-// reset the BM1366 via the RTS line
-static void _reset(void)
-{
-    gpio_set_level(GPIO_ASIC_RESET, 0);
-
-    // delay for 100ms
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-
-    // set the gpio pin high
-    gpio_set_level(GPIO_ASIC_RESET, 1);
-
-    // delay for 100ms
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-}
-
 // static void _send_read_address(void)
 // {
 
@@ -319,19 +297,6 @@ static void _reset(void)
 //     // send serial data
 //     _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_READ), read_address, 2, BM1366_SERIALTX_DEBUG);
 // }
-
-uint8_t BM1366_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
-{
-    ESP_LOGI(TAG, "Initializing BM1366");
-
-    esp_rom_gpio_pad_select_gpio(GPIO_ASIC_RESET);
-    gpio_set_direction(GPIO_ASIC_RESET, GPIO_MODE_OUTPUT);
-
-    // reset the bm1366
-    _reset();
-
-    return _send_init(frequency, asic_count, difficulty);
-}
 
 // Baud formula = 25M/((denominator+1)*8)
 // The denominator is 5 bits found in the misc_control (bits 9-13)

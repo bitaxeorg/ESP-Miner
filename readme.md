@@ -1,16 +1,14 @@
-[![](https://dcbadge.vercel.app/api/server/3E8ca2dkcC)](https://discord.gg/3E8ca2dkcC)
+[![](https://dcbadge.vercel.app/api/server/3E8ca2dkcC)](https://discord.gg/osmu)
 
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/skot/esp-miner/total)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/t/skot/esp-miner)
-![GitHub contributors](https://img.shields.io/github/contributors/skot/esp-miner)
-
-![Alt](https://repobeats.axiom.co/api/embed/9830d39ca088153c7db39a7c0e1645c62a0454fd.svg "Repobeats analytics image")
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/bitaxeorg/esp-miner/total)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/t/bitaxeorg/esp-miner)
+![GitHub contributors](https://img.shields.io/github/contributors/bitaxeorg/esp-miner)
 
 
 # ESP-Miner
-esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/skot/bitaxe)
+esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/bitaxeorg/bitaxe)
 
-If you are looking for premade images to load on your Bitaxe, check out the [releases](https://github.com/bitaxeorg/ESP-Miner/releases) page. Maybe you want [instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md) for loading factory images.
+If you are looking for premade images to load on your Bitaxe, check out the [latest release](https://github.com/bitaxeorg/ESP-Miner/releases/latest) page. Maybe you want [instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md) for loading factory images.
 
 # Bitaxetool
 We also have a command line python tool for flashing Bitaxe and updating the config called Bitaxetool 

@@ -4,13 +4,13 @@
 #include "freertos/task.h"
 #include <math.h>
 
-const char *FREQUENCY_TRANSITION_TAG = "frequency_transition";
+static const char * TAG = "frequency_transition";
 
 static float current_frequency = 56.25;
 
 bool do_frequency_transition(float target_frequency, set_hash_frequency_fn set_frequency_fn, int asic_type) {
     if (set_frequency_fn == NULL) {
-        ESP_LOGE(FREQUENCY_TRANSITION_TAG, "Invalid function pointer provided");
+        ESP_LOGE(TAG, "Invalid function pointer provided");
         return false;
     }
 
@@ -51,6 +51,6 @@ bool do_frequency_transition(float target_frequency, set_hash_frequency_fn set_f
     set_frequency_fn(target);
     current_frequency = target;
     
-    ESP_LOGI(FREQUENCY_TRANSITION_TAG, "Successfully transitioned ASIC type %d to %.2f MHz", asic_type, target);
+    ESP_LOGI(TAG, "Successfully transitioned ASIC type %d to %.2f MHz", asic_type, target);
     return true;
 }
