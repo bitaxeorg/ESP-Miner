@@ -246,6 +246,7 @@ void stratum_task(void * pvParameters)
         dest_addr.sin_port = htons(port);
 
         GLOBAL_STATE->sock = socket(addr_family, SOCK_STREAM, ip_protocol);
+        vTaskDelay(300 / portTICK_PERIOD_MS);
         if (GLOBAL_STATE->sock < 0) {
             ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
             if (++retry_critical_attempts > MAX_CRITICAL_RETRY_ATTEMPTS) {

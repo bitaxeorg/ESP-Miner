@@ -63,6 +63,7 @@ static lv_obj_t *self_test_result_label;
 static lv_obj_t *self_test_finished_label;
 
 static lv_obj_t *wifi_rssi_value_label;
+static lv_obj_t *wifi_signal_strength_label;
 static lv_obj_t *esp_uptime_label;
 
 static double current_hashrate;
@@ -275,6 +276,9 @@ static lv_obj_t * create_scr_wifi_rssi() {
     wifi_rssi_value_label = lv_label_create(scr);
     lv_label_set_text(wifi_rssi_value_label, "RSSI: -- dBm");
 
+    wifi_signal_strength_label = lv_label_create(scr);
+    lv_label_set_text(wifi_signal_strength_label, "Signal: --%%");
+
     esp_uptime_label = lv_label_create(scr);
     lv_label_set_text(esp_uptime_label, "Uptime: --");
 
@@ -440,14 +444,31 @@ static void screen_update_cb(lv_timer_t * timer)
 
     
     char rssi_buf[25];
+    char signal_strength_buf[25];
         
     if (rssi_value < 0 && rssi_value >= -127) { // Typical RSSI range
         snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: %d dBm", rssi_value);
+        
+        const char* signal_strength;
+        if (rssi_value > -50) {
+            signal_strength = "Excellent";
+        } else if (rssi_value <= -50 && rssi_value > -60) {
+            signal_strength = "Good";
+        } else if (rssi_value <= -60 && rssi_value > -70) {
+            signal_strength = "Fair";
+        } else {
+            signal_strength = "Weak";
+        }
+        snprintf(signal_strength_buf, sizeof(signal_strength_buf), "Signal: %s", signal_strength);
     } else {
         snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: -- dBm");
+        snprintf(signal_strength_buf, sizeof(signal_strength_buf), "Signal: --");
         }
     if (strcmp(lv_label_get_text(wifi_rssi_value_label), rssi_buf) != 0) {
         lv_label_set_text(wifi_rssi_value_label, rssi_buf);
+    }
+    if (strcmp(lv_label_get_text(wifi_signal_strength_label), signal_strength_buf) != 0) {
+        lv_label_set_text(wifi_signal_strength_label, signal_strength_buf);
     }
     
 
