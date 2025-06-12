@@ -454,11 +454,11 @@ static void screen_update_cb(lv_timer_t * timer)
     if (rssi_value != current_rssi_value) {
         if (rssi_value > -50) {
             lv_label_set_text(wifi_signal_strength_label, "Signal: Excellent");
-        } else if (rssi_value <= -50 && rssi_value > -60) {
+        } else if (rssi_value > -60) {
             lv_label_set_text(wifi_signal_strength_label, "Signal: Good");
-        } else if (rssi_value <= -60 && rssi_value > -70) {
+        } else if (rssi_value > -70) {
             lv_label_set_text(wifi_signal_strength_label, "Signal: Fair");
-        } else if (rssi_value <= -70 && rssi_value > -128){
+        } else if (rssi_value > -128){
             lv_label_set_text(wifi_signal_strength_label, "Signal: Weak");
         } else {
             lv_label_set_text(wifi_signal_strength_label, "Signal: --");
