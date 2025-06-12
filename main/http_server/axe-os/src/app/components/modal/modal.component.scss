@@ -1,0 +1,30 @@
+.modal {
+    position: fixed;
+    max-height: 80dvh;
+    width: 90dvw;
+    z-index: 999;
+    top: 50%;
+    left: 50%;
+    transform: translate3d(-50%, -50%, 0);
+    padding: 1rem 1rem 2rem;
+    display: flex;
+    flex-direction: column;
+
+    @media (min-width: 768px) {
+        width: 70dvw;
+    }
+
+    @media (min-width: 1024px) {
+        width: 50dvw;
+    }
+
+    &-backdrop {
+        background-color: rgba(0, 0, 0, 0.5);
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        position: fixed;
+        z-index: 9;
+    }
+}
