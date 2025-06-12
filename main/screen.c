@@ -464,7 +464,7 @@ static void screen_update_cb(lv_timer_t * timer)
             lv_label_set_text(wifi_signal_strength_label, "Signal: --");
         }
 
-        if (rssi_value != -128) {
+        if (rssi_value > -128) {
             lv_label_set_text_fmt(wifi_rssi_value_label, "RSSI: %d dBm", rssi_value);
         } else {
             lv_label_set_text(wifi_rssi_value_label, "RSSI: -- dBm");
