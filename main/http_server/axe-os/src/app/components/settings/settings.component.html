@@ -27,6 +27,17 @@
                         [href]="asset.browser_download_url">www.bin</a>
                 </div>
             </div>
+
+            <a class="text-500 underline block mt-3 cursor-pointer" type="button" (click)="showReleaseNotes = true">
+                Release Notes
+            </a>
+
+            <div class="modal-backdrop" *ngIf="showReleaseNotes" (click)="showReleaseNotes = false"></div>
+            <div class="modal card" *ngIf="showReleaseNotes">
+                <div class="close" (click)="showReleaseNotes = false">&#10006;</div>
+                <h1>{{latestRelease.name}}</h1>
+                <div [innerHTML]="simpleMarkdownParser(latestRelease.body)"></div>
+            </div>
         </ng-container>
         </div>
     </div>
