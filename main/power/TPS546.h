@@ -21,7 +21,7 @@
 #define OPERATION_OFF 0x00
 #define OPERATION_ON  0x80
 
-#define TPS546_INIT_PHASE 0x00  /* phase */
+#define TPS546_INIT_PHASE 0xFF  /* default phase register value from TPS546 datasheet */
 
 #define TPS546_INIT_FREQUENCY 650  /* KHz */
 
