@@ -1,8 +1,8 @@
-import { Component, OnInit, ViewChild, Input } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, Input } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { interval, map, Observable, shareReplay, startWith, switchMap, tap } from 'rxjs';
+import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap, tap } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
@@ -49,6 +49,7 @@ export class HomeComponent {
   private chart?: UIChart
 
   private pageDefaultTitle: string = '';
+  private titleSubscription?: Subscription;
   public form!: FormGroup;
 
   @Input() uri = '';
@@ -88,6 +89,10 @@ export class HomeComponent {
       });
   }
 
+  ngOnDestroy(): void {
+    this.titleSubscription?.unsubscribe();
+  }
+
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
     const textColor = documentStyle.getPropertyValue('--text-color');
@@ -124,7 +129,8 @@ export class HomeComponent {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          // Clear previous data
+          this.titleSubscription?.unsubscribe();
+          // Clear and reload previous data
           this.clearDataPoints();
           this.loadPreviousData();
         },
@@ -376,12 +382,12 @@ export class HomeComponent {
       })
     );
 
-    this.info$.subscribe(info => {
+    this.titleSubscription = this.info$.subscribe(info => {
       this.titleService.setTitle(
         [
           this.pageDefaultTitle,
           info.hostname,
-          (info.hashRate ? HashSuffixPipe.transform(info.hashRate * 1000000000) : false),
+          (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : false),
           (info.temp ? `${info.temp}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
           (!info.power_fault ? `${info.power} W` : false),
           (info.bestDiff ? info.bestDiff : false),
