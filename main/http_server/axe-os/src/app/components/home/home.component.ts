@@ -1,5 +1,5 @@
 import { Component, OnInit, ViewChild, Input, OnDestroy } from '@angular/core';
-import { interval, map, Observable, shareReplay, startWith, switchMap, tap, first, Subject, takeUntil } from 'rxjs';
+import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap, tap, first, Subject, takeUntil } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
@@ -15,7 +15,6 @@ import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
-import { LoadingService } from 'src/app/services/loading.service';
 
 @Component({
   selector: 'app-home',
@@ -53,6 +52,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private pageDefaultTitle: string = '';
   private destroy$ = new Subject<void>();
+  private titleSubscription?: Subscription;
   public form!: FormGroup;
 
   @Input() uri = '';
@@ -136,7 +136,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          // Clear previous data
+          this.titleSubscription?.unsubscribe();
+          // Clear and reload previous data
           this.clearDataPoints();
           this.loadPreviousData();
         },
@@ -400,7 +401,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       })
     );
 
-    this.info$
+    this.titleSubscription = this.info$
       .pipe(takeUntil(this.destroy$))
       .subscribe(info => {
         this.titleService.setTitle(
