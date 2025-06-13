@@ -166,19 +166,12 @@
                     </div>
 
                     <div class="col-12">
-                        <!-- <p-knob [min]="100" [max]="maxFrequency" [readonly]="true" [(ngModel)]="info.frequency"
-                            valueTemplate="{value}"></p-knob>
-                        ASIC Frequency (MHz) -->
-
                         <h6>ASIC Frequency <span style="float: right;">{{info.frequency}} MHz</span></h6>
                         <p-progressBar [value]="(info.frequency / maxFrequency) * 100" [style]="{ height: '6px' }" >
                             <ng-template pTemplate="content" let-value></ng-template>
                         </p-progressBar>
                     </div>
                     <div class="col-12">
-                        <!-- <p-knob [min]="0.9" [max]="1.8" [readonly]="true" [(ngModel)]="info.coreVoltageActual"
-                            valueTemplate="{value}V"></p-knob>
-                        ASIC Voltage Measured -->
                         <h6>Measured ASIC Voltage <span style="float: right;">{{info.coreVoltageActual}} V</span></h6>
                         <p-progressBar [value]="(info.coreVoltageActual / 1.8) * 100" [style]="{ height: '6px' }" >
                             <ng-template pTemplate="content" let-value></ng-template>
