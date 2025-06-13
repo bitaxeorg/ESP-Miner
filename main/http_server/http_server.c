@@ -1,6 +1,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <string.h>
+#include <limits.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 
@@ -44,6 +45,8 @@
 #include "websocket.h"
 
 #define JSON_ALL_STATS_ELEMENT_SIZE 120
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -106,6 +109,27 @@ DataSource strToDataSource(const char * sourceStr)
 
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
+
+typedef enum
+{
+    STORAGE_U8,
+    STORAGE_I8,
+    STORAGE_U16,
+    STORAGE_I16,
+    STORAGE_U32,
+    STORAGE_I32,
+    STORAGE_U64,
+    STORAGE_I64,
+    STORAGE_STR,
+    STORAGE_FLOAT
+} StorageType;
+
+typedef struct {
+    const char * name;
+    int json_type;
+    StorageType storage_type;
+    const char * nvs_name;
+} SettingsFormat;
 
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
@@ -506,44 +530,153 @@ bool check_json_type(int expected_type, const cJSON * const item)
         return false;
     }
 
-    bool result = false;
-
-    if ((expected_type & cJSON_String) != 0) {
-        result = cJSON_IsString(item);
+    if (((expected_type & cJSON_String) != 0) && cJSON_IsString(item)) {
+        return true;
     }
-    if (!result && (expected_type & cJSON_Number) != 0) {
-        result = cJSON_IsNumber(item);
+    if (((expected_type & cJSON_Number) != 0) && cJSON_IsNumber(item)) {
+        return true;
     }
-    if (!result && (expected_type & (cJSON_True | cJSON_False)) != 0) {
-        result = cJSON_IsBool(item);
+    if (((expected_type & (cJSON_True | cJSON_False)) != 0) && cJSON_IsBool(item)) {
+        return true;
     }
-    if (!result && (expected_type & cJSON_True) != 0) {
-        result = cJSON_IsTrue(item);
+    if (((expected_type & cJSON_True) != 0) && cJSON_IsTrue(item)) {
+        return true;
     }
-    if (!result && (expected_type & cJSON_False) != 0) {
-        result = cJSON_IsFalse(item);
+    if (((expected_type & cJSON_False) != 0) && cJSON_IsFalse(item)) {
+        return true;
     }
-    if (!result && (expected_type & cJSON_Array) != 0) {
-        result = cJSON_IsArray(item);
+    if (((expected_type & cJSON_Array) != 0) && cJSON_IsArray(item)) {
+        return true;
     }
-    if (!result && (expected_type & cJSON_Object) != 0) {
-        result = cJSON_IsObject(item);
+    if (((expected_type & cJSON_Object) != 0) && cJSON_IsObject(item)) {
+        return true;
     }
-    if (!result && (expected_type & cJSON_Raw) != 0) {
-        result = cJSON_IsRaw(item);
+    if (((expected_type & cJSON_Raw) != 0) && cJSON_IsRaw(item)) {
+        return true;
     }
-    if (!result && (expected_type & cJSON_Invalid) != 0) {
-        result = cJSON_IsInvalid(item);
+    if (((expected_type & cJSON_Invalid) != 0) && cJSON_IsInvalid(item)) {
+        return true;
     }
-    if (!result && (expected_type & cJSON_NULL) != 0) {
-        result = cJSON_IsNull(item);
+    if (((expected_type & cJSON_NULL) != 0) && cJSON_IsNull(item)) {
+        return true;
     }
 
-    if (!result) {
-        ESP_LOGW(TAG, "Wrong API input type for setting '%s'", item->string);
+    return false;
+}
+
+bool check_settings_and_update(const cJSON * const root, bool update)
+{
+    const int cJSON_Option = (cJSON_Number | cJSON_True | cJSON_False);
+
+    const SettingsFormat settings_format[] = {
+        { .name = "stratumURL",                         .json_type = cJSON_String, .storage_type = STORAGE_STR,   .nvs_name = NVS_CONFIG_STRATUM_URL },
+        { .name = "fallbackStratumURL",                 .json_type = cJSON_String, .storage_type = STORAGE_STR,   .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_URL },
+        { .name = "stratumExtranonceSubscribe",         .json_type = cJSON_Option, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE },
+        { .name = "stratumSuggestedDifficulty",         .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_STRATUM_DIFFICULTY },
+        { .name = "stratumUser",                        .json_type = cJSON_String, .storage_type = STORAGE_STR,   .nvs_name = NVS_CONFIG_STRATUM_USER },
+        { .name = "stratumPassword",                    .json_type = cJSON_String, .storage_type = STORAGE_STR,   .nvs_name = NVS_CONFIG_STRATUM_PASS },
+        { .name = "useFallbackStratum",                 .json_type = cJSON_Option, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_USE_FALLBACK_STRATUM },
+        { .name = "fallbackStratumExtranonceSubscribe", .json_type = cJSON_Option, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE },
+        { .name = "fallbackStratumSuggestedDifficulty", .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY },
+        { .name = "fallbackStratumUser",                .json_type = cJSON_String, .storage_type = STORAGE_STR,   .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_USER },
+        { .name = "fallbackStratumPassword",            .json_type = cJSON_String, .storage_type = STORAGE_STR,   .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_PASS },
+        { .name = "stratumPort",                        .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_STRATUM_PORT },
+        { .name = "fallbackStratumPort",                .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_PORT },
+        { .name = "ssid",                               .json_type = cJSON_String, .storage_type = STORAGE_STR,   .nvs_name = NVS_CONFIG_WIFI_SSID },
+        { .name = "wifiPass",                           .json_type = cJSON_String, .storage_type = STORAGE_STR,   .nvs_name = NVS_CONFIG_WIFI_PASS },
+        { .name = "hostname",                           .json_type = cJSON_String, .storage_type = STORAGE_STR,   .nvs_name = NVS_CONFIG_HOSTNAME },
+        { .name = "coreVoltage",                        .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_ASIC_VOLTAGE },
+        { .name = "frequency",                          .json_type = cJSON_Number, .storage_type = STORAGE_FLOAT, .nvs_name = NVS_CONFIG_ASIC_FREQUENCY_FLOAT },
+        { .name = "overheat_mode",                      .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_OVERHEAT_MODE },
+        { .name = "display",                            .json_type = cJSON_String, .storage_type = STORAGE_STR,   .nvs_name = NVS_CONFIG_DISPLAY },
+        { .name = "rotation",                           .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_ROTATION },
+        { .name = "invertscreen",                       .json_type = cJSON_Option, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_INVERT_SCREEN },
+        { .name = "displayTimeout",                     .json_type = cJSON_Number, .storage_type = STORAGE_I32,   .nvs_name = NVS_CONFIG_DISPLAY_TIMEOUT },
+        { .name = "autofanspeed",                       .json_type = cJSON_Option, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_AUTO_FAN_SPEED },
+        { .name = "fanspeed",                           .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_FAN_SPEED },
+        { .name = "minFanSpeed",                        .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_MIN_FAN_SPEED },
+        { .name = "temptarget",                         .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_TEMP_TARGET },
+        { .name = "statsFrequency",                     .json_type = cJSON_Number, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_STATISTICS_FREQUENCY },
+        { .name = "overclockEnabled",                   .json_type = cJSON_Option, .storage_type = STORAGE_U16,   .nvs_name = NVS_CONFIG_OVERCLOCK_ENABLED }
+    };
+
+    for (int i = 0; i < ARRAY_SIZE(settings_format); i++) {
+        cJSON * item = cJSON_GetObjectItem(root, settings_format[i].name);
+        if (item) {
+            if (check_json_type(settings_format[i].json_type, item)) {
+                switch (settings_format[i].storage_type) {
+                    case STORAGE_U8:
+                        if ((0 > item->valueint) || (UCHAR_MAX < item->valueint)) {
+                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_U8", item->valueint, settings_format[i].name);
+                            return false;
+                        }
+                        if (update) {
+                            nvs_config_set_u16(settings_format[i].nvs_name, item->valueint); // nvs u8 is not used
+                        }
+                        break;
+                    case STORAGE_U16:
+                        if ((0 > item->valueint) || (USHRT_MAX < item->valueint)) {
+                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_U16", item->valueint, settings_format[i].name);
+                            return false;
+                        }
+                        if (update) {
+                            nvs_config_set_u16(settings_format[i].nvs_name, item->valueint);
+                        }
+                        break;
+                    case STORAGE_U32:
+                        if (0 > item->valueint) {
+                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_U32", item->valueint, settings_format[i].name);
+                            return false;
+                        }
+                        if (update) {
+                            nvs_config_set_u64(settings_format[i].nvs_name, item->valueint); // nvs u32 is not used
+                        }
+                        break;
+                    case STORAGE_I8:
+                        if ((CHAR_MIN > item->valueint) || (CHAR_MAX < item->valueint)) {
+                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_I8", item->valueint, settings_format[i].name);
+                            return false;
+                        }
+                        if (update) {
+                            nvs_config_set_i32(settings_format[i].nvs_name, item->valueint); // nvs i8 is not used
+                        }
+                        break;
+                    case STORAGE_I16:
+                        if ((SHRT_MIN > item->valueint) || (SHRT_MAX < item->valueint)) {
+                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_I16", item->valueint, settings_format[i].name);
+                            return false;
+                        }
+                        if (update) {
+                            nvs_config_set_i32(settings_format[i].nvs_name, item->valueint); // nvs i16 is not used
+                        }
+                        break;
+                    case STORAGE_I32:
+                        if (update) {
+                            nvs_config_set_i32(settings_format[i].nvs_name, item->valueint);
+                        }
+                        break;
+                    case STORAGE_STR:
+                        if (update) {
+                            nvs_config_set_string(settings_format[i].nvs_name, item->valuestring);
+                        }
+                        break;
+                    case STORAGE_FLOAT:
+                        if (update) {
+                            nvs_config_set_float(settings_format[i].nvs_name, (float) item->valuedouble);
+                        }
+                        break;
+                    default:
+                        ESP_LOGW(TAG, "Storage type (%d) for '%s' not supported", settings_format[i].storage_type, settings_format[i].name);
+                        return false;
+                }
+            } else {
+                ESP_LOGW(TAG, "Expected JSON type (%d) for setting '%s'", settings_format[i].json_type, settings_format[i].name);
+                return false;
+            }
+        }
     }
 
-    return result;
+    return true;
 }
 
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
@@ -579,105 +712,17 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     buf[total_len] = '\0';
 
     cJSON * root = cJSON_Parse(buf);
-    cJSON * item;
     if (root == NULL) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         return ESP_OK;
     }
 
-    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "stratumURL"))) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_URL, item->valuestring);
-    }
-    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "fallbackStratumURL"))) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, item->valuestring);
-    }
-    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "stratumExtranonceSubscribe"))) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "stratumSuggestedDifficulty"))) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_DIFFICULTY, item->valueint);
-    }
-    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "stratumUser"))) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_USER, item->valuestring);
-    }
-    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "stratumPassword"))) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, item->valuestring);
-    }
-    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "useFallbackStratum"))) {
-        nvs_config_set_u16(NVS_CONFIG_USE_FALLBACK_STRATUM, item->valueint);
-    }
-    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "fallbackStratumExtranonceSubscribe"))) {
-        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "fallbackStratumSuggestedDifficulty"))) {
-        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, item->valueint);
-    }
-    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "fallbackStratumUser"))) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, item->valuestring);
-    }
-    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "fallbackStratumPassword"))) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, item->valuestring);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "stratumPort"))) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, item->valueint);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "fallbackStratumPort"))) {
-        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, item->valueint);
-    }
-    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "ssid"))) {
-        nvs_config_set_string(NVS_CONFIG_WIFI_SSID, item->valuestring);
-    }
-    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "wifiPass"))) {
-        nvs_config_set_string(NVS_CONFIG_WIFI_PASS, item->valuestring);
-    }
-    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "hostname"))) {
-        nvs_config_set_string(NVS_CONFIG_HOSTNAME, item->valuestring);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "coreVoltage"))) {
-        if (item->valueint > 0) {
-            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
-        }
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "frequency"))) {
-        if (item->valuedouble > 0) {
-            float frequency = item->valuedouble;
-            nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
-            // also store as u16 for backwards compatibility
-            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, (int) frequency);
-        }
-    }
-    if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-    }
-    if (check_json_type(cJSON_String, item = cJSON_GetObjectItem(root, "display"))) {
-        nvs_config_set_string(NVS_CONFIG_DISPLAY, item->valuestring);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "rotation"))) {
-        nvs_config_set_u16(NVS_CONFIG_ROTATION, item->valueint);
-    }
-    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "invertscreen"))) {
-        nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "displayTimeout"))) {
-        nvs_config_set_i32(NVS_CONFIG_DISPLAY_TIMEOUT, item->valueint);
-    }
-    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "autofanspeed"))) {
-        nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, item->valueint);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "fanspeed"))) {
-        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "minFanSpeed"))) {
-        nvs_config_set_u16(NVS_CONFIG_MIN_FAN_SPEED, item->valueint);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "temptarget"))) {
-        nvs_config_set_u16(NVS_CONFIG_TEMP_TARGET, item->valueint);
-    }
-    if (check_json_type(cJSON_Number, item = cJSON_GetObjectItem(root, "statsFrequency"))) {
-        nvs_config_set_u16(NVS_CONFIG_STATISTICS_FREQUENCY, item->valueint);
-    }
-    if (check_json_type((cJSON_Number | cJSON_True | cJSON_False), item = cJSON_GetObjectItem(root, "overclockEnabled"))) {
-        nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
+    if (check_settings_and_update(root, false)) {
+        check_settings_and_update(root, true);
+    } else {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Wrong API input");
+        return ESP_OK;
     }
 
     cJSON_Delete(root);
