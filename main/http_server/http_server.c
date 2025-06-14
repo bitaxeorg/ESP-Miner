@@ -61,9 +61,42 @@ static const char * STATS_LABEL_FAN_SPEED = "Fan Speed";
 static const char * STATS_LABEL_FAN_RPM = "Fan RPM";
 static const char * STATS_LABEL_WIFI_RSSI = "Wi-Fi Strength";
 static const char * STATS_LABEL_FREE_HEAP = "Free Heap";
+
 static const char * STATS_LABEL_TIMESTAMP = "Timestamp";
 
-static const char * STATS_LABEL_NONE = "None";
+typedef enum
+{
+    SRC_HASHRATE,
+    SRC_ASIC_TEMP,
+    SRC_VR_TEMP,
+    SRC_ASIC_VOLTAGE,
+    SRC_VOLTAGE,
+    SRC_POWER,
+    SRC_CURRENT,
+    SRC_FAN_SPEED,
+    SRC_FAN_RPM,
+    SRC_WIFI_RSSI,
+    SRC_FREE_HEAP,
+    SRC_NONE
+} DataSource;
+
+DataSource strToDataSource(const char * sourceStr)
+{
+    if (NULL != sourceStr) {
+        if (strcmp(sourceStr, STATS_LABEL_HASHRATE) == 0)     return SRC_HASHRATE;
+        if (strcmp(sourceStr, STATS_LABEL_ASIC_TEMP) == 0)    return SRC_ASIC_TEMP;
+        if (strcmp(sourceStr, STATS_LABEL_VR_TEMP) == 0)      return SRC_VR_TEMP;
+        if (strcmp(sourceStr, STATS_LABEL_ASIC_VOLTAGE) == 0) return SRC_ASIC_VOLTAGE;
+        if (strcmp(sourceStr, STATS_LABEL_VOLTAGE) == 0)      return SRC_VOLTAGE;
+        if (strcmp(sourceStr, STATS_LABEL_POWER) == 0)        return SRC_POWER;
+        if (strcmp(sourceStr, STATS_LABEL_CURRENT) == 0)      return SRC_CURRENT;
+        if (strcmp(sourceStr, STATS_LABEL_FAN_SPEED) == 0)    return SRC_FAN_SPEED;
+        if (strcmp(sourceStr, STATS_LABEL_FAN_RPM) == 0)      return SRC_FAN_RPM;
+        if (strcmp(sourceStr, STATS_LABEL_WIFI_RSSI) == 0)    return SRC_WIFI_RSSI;
+        if (strcmp(sourceStr, STATS_LABEL_FREE_HEAP) == 0)    return SRC_FREE_HEAP;
+    }
+    return SRC_NONE;
+}
 
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
@@ -461,41 +494,6 @@ static esp_err_t handle_options_request(httpd_req_t * req)
     return ESP_OK;
 }
 
-float * mapChartLabelToValue(char * label, struct StatisticsData * statsData)
-{
-    float * value = NULL;
-
-    if ((NULL != label) && (NULL != statsData)) {
-        if (strcmp(label, STATS_LABEL_HASHRATE) == 0) {
-            value = &statsData->hashrate;
-        } else if (strcmp(label, STATS_LABEL_ASIC_TEMP) == 0) {
-            value = &statsData->chipTemperature;
-        } else if (strcmp(label, STATS_LABEL_VR_TEMP) == 0) {
-            value = &statsData->vrTemperature;
-        } else if (strcmp(label, STATS_LABEL_ASIC_VOLTAGE) == 0) {
-            value = &statsData->coreVoltageActual;
-        } else if (strcmp(label, STATS_LABEL_VOLTAGE) == 0) {
-            value = &statsData->voltage;
-        } else if (strcmp(label, STATS_LABEL_POWER) == 0) {
-            value = &statsData->power;
-        } else if (strcmp(label, STATS_LABEL_CURRENT) == 0) {
-            value = &statsData->current;
-        } else if (strcmp(label, STATS_LABEL_FAN_SPEED) == 0) {
-            value = &statsData->fanSpeed;
-        } else if (strcmp(label, STATS_LABEL_FAN_RPM) == 0) {
-            value = &statsData->fanRPM;
-        } else if (strcmp(label, STATS_LABEL_WIFI_RSSI) == 0) {
-            value = &statsData->wifiRSSI;
-        } else if (strcmp(label, STATS_LABEL_FREE_HEAP) == 0) {
-            value = &statsData->freeHeap;
-        } else {
-            value = NULL;
-        }
-    }
-
-    return value;
-}
-
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -620,16 +618,10 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         nvs_config_set_u16(NVS_CONFIG_STATISTICS_FREQUENCY, item->valueint);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "chartY1Data"))) {
-        struct StatisticsData dummy;
-        if (NULL != mapChartLabelToValue(item->valuestring, &dummy) || (0 == strcmp(item->valuestring, STATS_LABEL_NONE))) {
-            nvs_config_set_string(NVS_CONFIG_CHART_Y1_DATA, item->valuestring);
-        }
+        nvs_config_set_string(NVS_CONFIG_CHART_Y1_DATA, item->valuestring);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "chartY2Data"))) {
-        struct StatisticsData dummy;
-        if (NULL != mapChartLabelToValue(item->valuestring, &dummy) || (0 == strcmp(item->valuestring, STATS_LABEL_NONE))) {
-            nvs_config_set_string(NVS_CONFIG_CHART_Y2_DATA, item->valuestring);
-        }
+        nvs_config_set_string(NVS_CONFIG_CHART_Y2_DATA, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "overclockEnabled")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
@@ -872,16 +864,12 @@ int create_json_statistics_dashboard(cJSON * root)
 
         if (NULL != GLOBAL_STATE->STATISTICS_MODULE.statisticsList) {
             StatisticsNodePtr node = *GLOBAL_STATE->STATISTICS_MODULE.statisticsList; // double pointer
+            DataSource chartY1Source = strToDataSource(chartY1Data);
+            DataSource chartY2Source = strToDataSource(chartY2Data);
             struct StatisticsData statsData;
-            float * chartY1Value = mapChartLabelToValue(chartY1Data, &statsData);
-            float * chartY2Value = mapChartLabelToValue(chartY2Data, &statsData);
 
-            // hashrate and power data are always available
-            if ((&statsData.hashrate == chartY1Value) || (&statsData.power == chartY1Value)) {
-                chartY1Value = NULL;
-            }
-            if ((&statsData.hashrate == chartY2Value) || (&statsData.power == chartY2Value)) {
-                chartY2Value = NULL;
+            if (chartY1Source == chartY2Source) {
+                chartY2Source = SRC_NONE;
             }
 
             while (NULL != node) {
@@ -891,11 +879,29 @@ int create_json_statistics_dashboard(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
-                if (NULL != chartY1Value) {
-                    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(*chartY1Value));
+                switch (chartY1Source) {
+                    case SRC_ASIC_TEMP:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));   break;
+                    case SRC_VR_TEMP:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature));     break;
+                    case SRC_ASIC_VOLTAGE: cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); break;
+                    case SRC_VOLTAGE:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage));           break;
+                    case SRC_CURRENT:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current));           break;
+                    case SRC_FAN_SPEED:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed));          break;
+                    case SRC_FAN_RPM:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM));            break;
+                    case SRC_WIFI_RSSI:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI));          break;
+                    case SRC_FREE_HEAP:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap));          break;
+                    default: break;
                 }
-                if (NULL != chartY2Value) {
-                    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(*chartY2Value));
+                switch (chartY2Source) {
+                    case SRC_ASIC_TEMP:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));   break;
+                    case SRC_VR_TEMP:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature));     break;
+                    case SRC_ASIC_VOLTAGE: cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); break;
+                    case SRC_VOLTAGE:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage));           break;
+                    case SRC_CURRENT:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current));           break;
+                    case SRC_FAN_SPEED:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed));          break;
+                    case SRC_FAN_RPM:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM));            break;
+                    case SRC_WIFI_RSSI:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI));          break;
+                    case SRC_FREE_HEAP:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap));          break;
+                    default: break;
                 }
 
                 cJSON_AddItemToArray(statsArray, valueArray);

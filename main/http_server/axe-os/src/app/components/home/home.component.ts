@@ -280,8 +280,9 @@ export class HomeComponent implements OnInit, OnDestroy {
         } else if (stats.chartY1Data === eChartLabel.none) {
           idxChartY1Data = -1;
         }
-
-        if (stats.chartY2Data === eChartLabel.hashrate) {
+        if (stats.chartY1Data === stats.chartY2Data) {
+          idxChartY2Data = idxChartY1Data;
+        } else if (stats.chartY2Data === eChartLabel.hashrate) {
           idxChartY2Data = 1;
         } else if (stats.chartY2Data === eChartLabel.power) {
           idxChartY2Data = 2;
@@ -293,6 +294,24 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         stats.statistics.forEach(element => {
           element[idxHashrate] = element[idxHashrate] * 1000000000; // convert to H/s
+          switch (stats.chartY1Data) {
+            case eChartLabel.asicVoltage:
+            case eChartLabel.voltage:
+            case eChartLabel.current:
+              element[idxChartY1Data] = element[idxChartY1Data] / 1000;
+              break;
+            default:
+              break;
+          }
+          switch (stats.chartY2Data) {
+            case eChartLabel.asicVoltage:
+            case eChartLabel.voltage:
+            case eChartLabel.current:
+              element[idxChartY2Data] = element[idxChartY2Data] / 1000;
+              break;
+            default:
+              break;
+          }
 
           this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
           this.hashrateData.push(element[idxHashrate]);
