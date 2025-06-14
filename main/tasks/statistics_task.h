@@ -7,17 +7,17 @@ typedef struct StatisticsData * StatisticsNextNodePtr;
 struct StatisticsData
 {
     int64_t timestamp;
-    float hashrate;
+    double hashrate;
     float chipTemperature;
     float vrTemperature;
     float power;
     float voltage;
     float current;
-    float coreVoltageActual;
-    float fanSpeed;
-    float fanRPM;
-    float wifiRSSI;
-    float freeHeap;
+    int16_t coreVoltageActual;
+    uint16_t fanSpeed;
+    uint16_t fanRPM;
+    int8_t wifiRSSI;
+    uint32_t freeHeap;
 
     StatisticsNextNodePtr next;
 };
