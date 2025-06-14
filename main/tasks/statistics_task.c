@@ -132,17 +132,17 @@ void statistics_task(void * pvParameters)
                 get_wifi_current_rssi(&wifiRSSI);
 
                 statsData.timestamp = currentTime;
-                statsData.hashrate = (float)sys_module->current_hashrate;
+                statsData.hashrate = sys_module->current_hashrate;
                 statsData.chipTemperature = power_management->chip_temp_avg;
                 statsData.vrTemperature = power_management->vr_temp;
                 statsData.power = power_management->power;
-                statsData.voltage = power_management->voltage / 1000.0;
-                statsData.current = Power_get_current(GLOBAL_STATE) / 1000.0;
-                statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE) / 1000.0;
-                statsData.fanSpeed = (float)power_management->fan_perc;
-                statsData.fanRPM = (float)power_management->fan_rpm;
-                statsData.wifiRSSI = (float)wifiRSSI;
-                statsData.freeHeap = (float)esp_get_free_heap_size();
+                statsData.voltage = power_management->voltage;
+                statsData.current = Power_get_current(GLOBAL_STATE);
+                statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
+                statsData.fanSpeed = power_management->fan_perc;
+                statsData.fanRPM = power_management->fan_rpm;
+                statsData.wifiRSSI = wifiRSSI;
+                statsData.freeHeap = esp_get_free_heap_size();
 
                 addStatisticData(&statsData);
             }
