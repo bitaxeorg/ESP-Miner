@@ -141,13 +141,13 @@ components:
           type: number
           description: Current hashrate
         isUsingFallbackStratum:
-          type: number
-          description: Whether using fallback stratum (0=no, 1=yes)
+          type: boolean
+          description: Whether using fallback stratum
         overheatMode:
-          type: number
+          type: boolean
           description: Overheat protection mode
         overclockEnabled:
-          type: integer
+          type: boolean
           description: Set custom voltage/frequency in AxeOS
         power:
           type: number
@@ -210,8 +210,8 @@ components:
         - voltageOptions
       properties:
         apEnabled:
-          type: number
-          description: Whether AP mode is enabled (0=no, 1=yes)
+          type: boolean
+          description: Whether AP mode is enabled
         asicCount:
           type: number
           description: Number of ASICs detected
@@ -254,8 +254,8 @@ components:
           type: string
           description: ESP-IDF version
         isPSRAMAvailable:
-          type: number
-          description: Whether PSRAM is available (0=no, 1=yes)
+          type: boolean
+          description: Whether PSRAM is available
         macAddr:
           type: string
           description: Device MAC address
@@ -328,16 +328,16 @@ components:
           type: string
           description: Fallback stratum username
         flipScreen:
-          type: number
-          description: Screen flip setting (0=normal, 1=flipped)
+          type: boolean
+          description: Screen flip setting (false=normal, true=flipped)
         hostname:
           type: string
           description: Device hostname
         invertScreen:
-          type: number
-          description: Screen invert setting (0=normal, 1=inverted)
+          type: boolean
+          description: Screen invert setting (false=normal, true=inverted)
         overheatMode:
-          type: number
+          type: boolean
           description: Overheat protection mode
         ssid:
           type: string
