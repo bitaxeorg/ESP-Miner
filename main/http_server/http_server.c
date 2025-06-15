@@ -608,14 +608,14 @@ static esp_err_t GET_system_status(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_nonce_diff);
     cJSON_AddNumberToObject(root, "wifiRSSI", wifi_rssi);
     cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
-    cJSON_AddNumberToObject(root, "overheatMode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
+    cJSON_AddBoolToObject(root, "overheatMode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
 
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "powerFault", VCORE_get_fault_string(GLOBAL_STATE));
     }
 
-    const char * status_res = cJSON_Print(root);
+    const char * status_res = cJSON_PrintUnformatted(root);
     httpd_resp_sendstr(req, status_res);
     free((char *)status_res);
     cJSON_Delete(root);
@@ -677,7 +677,7 @@ static esp_err_t GET_system_config(httpd_req_t *req)
     free(fallbackStratumUser);
     free(display);
 
-    const char * conf_response = cJSON_Print(root);
+    const char * conf_response = cJSON_PrintUnformatted(root);
     httpd_resp_sendstr(req, conf_response);
 
     free((char *)conf_response);
