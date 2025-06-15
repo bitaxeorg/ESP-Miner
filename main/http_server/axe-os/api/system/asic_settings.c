@@ -78,7 +78,7 @@ esp_err_t GET_system_board(httpd_req_t *req)
     }
     cJSON_AddItemToObject(root, "voltageOptions", voltageOptions);
 
-    const char *response = cJSON_Print(root);
+    const char *response = cJSON_PrintUnformatted(root);
     httpd_resp_sendstr(req, response);
 
     free((void *)response);
