@@ -47,10 +47,10 @@ esp_err_t GET_system_board(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "smallCoreCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count);
     cJSON_AddStringToObject(root, "boardFamily", GLOBAL_STATE->DEVICE_CONFIG.family.name);
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
-    cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
+    cJSON_AddBoolToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
     cJSON_AddNumberToObject(root, "maxPower", GLOBAL_STATE->DEVICE_CONFIG.family.max_power);
     cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage);
-    cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
+    cJSON_AddBoolToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
