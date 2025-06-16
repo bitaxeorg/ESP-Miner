@@ -155,7 +155,7 @@ export async function updatePoolInfo(
         const result = JSON.parse(text);
         console.log("Pool info update response:", result);
         return result;
-      } catch (parseError) {
+      } catch {
         console.log("Response is not JSON:", text);
         return { success: true, message: "Pool information updated successfully" };
       }
@@ -301,6 +301,56 @@ export async function uploadWebApp(file: File): Promise<{ success: boolean; mess
   }
 }
 
+/**
+ * WiFi network interface for scanning results
+ */
+export interface WifiNetwork {
+  ssid: string;
+  rssi: number;
+  authmode: number;
+}
+
+/**
+ * WiFi scanning response interface
+ */
+export interface WifiScanResponse {
+  networks: WifiNetwork[];
+}
+
+/**
+ * Scan for available WiFi networks
+ * @returns Available WiFi networks in range
+ */
+export async function scanWifiNetworks(): Promise<{
+  success: boolean;
+  networks: WifiNetwork[];
+  message?: string
+}> {
+  try {
+    const response = await fetch("/api/system/wifi/scan");
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result: WifiScanResponse = await response.json();
+    console.log("WiFi scan response:", result);
+
+    return {
+      success: true,
+      networks: result.networks || [],
+      message: "WiFi networks scanned successfully"
+    };
+  } catch (error) {
+    console.error("Failed to scan WiFi networks:", error);
+    return {
+      success: false,
+      networks: [],
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
 export async function setSSID(
   ssid: string,
   wifiPass: string
@@ -370,7 +420,7 @@ export async function updateFanSettings(
         const result = JSON.parse(text);
         console.log("Fan settings update response:", result);
         return result;
-      } catch (parseError) {
+      } catch {
         console.log("Response is not JSON:", text);
         return { success: true, message: "Fan settings updated successfully" };
       }
@@ -424,7 +474,7 @@ export async function updateASICSettings(
         const result = JSON.parse(text);
         console.log("ASIC settings update response:", result);
         return result;
-      } catch (parseError) {
+      } catch {
         console.log("Response is not JSON:", text);
         return { success: true, message: "ASIC settings updated successfully" };
       }
@@ -475,7 +525,7 @@ export async function updatePresetSettings(
         const result = JSON.parse(text);
         console.log("Preset settings update response:", result);
         return result;
-      } catch (parseError) {
+      } catch {
         console.log("Response is not JSON:", text);
         return { status: "success", message: `${presetName} mode applied successfully`, updatedSettings: [], timestamps: [] };
       }
