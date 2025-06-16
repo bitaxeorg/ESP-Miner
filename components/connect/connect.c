@@ -54,6 +54,70 @@ static int s_retry_num = 0;
 
 static char * _ip_addr_str;
 
+static bool is_scanning = false;
+static uint16_t ap_number = 0;
+static wifi_ap_record_t ap_info[20];
+
+// Function to scan for available WiFi networks
+esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
+{
+    if (is_scanning) {
+        ESP_LOGW(TAG, "Scan already in progress");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Starting Wi-Fi scan!");
+    is_scanning = true;
+
+    wifi_ap_record_t current_ap_info;
+    if (esp_wifi_sta_get_ap_info(&current_ap_info) != ESP_OK) {
+        ESP_LOGI(TAG, "Forcing disconnect so that we can scan!");
+        esp_wifi_disconnect();
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+
+     wifi_scan_config_t scan_config = {
+        .ssid = 0,
+        .bssid = 0,
+        .channel = 0,
+        .show_hidden = false
+    };
+
+    esp_err_t err = esp_wifi_scan_start(&scan_config, false);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Wi-Fi scan start failed with error: %s", esp_err_to_name(err));
+        is_scanning = false;
+        return err;
+    }
+
+    uint16_t retries_remaining = 10;
+    while (is_scanning) {
+        retries_remaining--;
+        if (retries_remaining == 0) {
+            is_scanning = false;
+            return ESP_FAIL;
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+
+    ESP_LOGD(TAG, "Wi-Fi networks found: %d", ap_number);
+    if (ap_number == 0) {
+        ESP_LOGW(TAG, "No Wi-Fi networks found");
+    }
+
+    *ap_count = ap_number;
+    memset(ap_records, 0, (*ap_count) * sizeof(wifi_ap_record_simple_t));
+    for (int i = 0; i < ap_number; i++) {
+        memcpy(ap_records[i].ssid, ap_info[i].ssid, sizeof(ap_records[i].ssid));
+        ap_records[i].rssi = ap_info[i].rssi;
+        ap_records[i].authmode = ap_info[i].authmode;
+    }
+
+    ESP_LOGD(TAG, "Finished Wi-Fi scan!");
+
+    return ESP_OK;
+}
+
 static void event_handler(void * arg, esp_event_base_t event_base, int32_t event_id, void * event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
