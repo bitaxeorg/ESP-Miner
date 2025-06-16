@@ -140,60 +140,81 @@ void BM1370_set_version_mask(uint32_t version_mask)
 }
 
 void BM1370_send_hash_frequency(float target_freq) {
-    // default 200Mhz if it fails
-    unsigned char freqbuf[6] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41}; // freqbuf - pll0_parameter
-    float newf = 200.0;
+    unsigned char freqbuf[6] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41}; // pll0_parameter
+    float newf = 200.0f;
 
-    uint8_t fb_divider = 0;
-    uint8_t post_divider1 = 0, post_divider2 = 0;
-    uint8_t ref_divider = 0;
-    float min_difference = 10;
-    float max_diff = 1.0;
+    uint8_t best_fb_divider = 0, best_post_divider1 = 0, best_post_divider2 = 0, best_ref_divider = 0;
+    float min_difference = 10.0f;
+    const float max_diff = 1.0f;
 
-    // refdiver is 2 or 1
-    // postdivider 2 is 1 to 7
-    // postdivider 1 is 1 to 7 and greater than or equal to postdivider 2
-    // fbdiv is 0xa0 to 0xef
-    for (uint8_t refdiv_loop = 2; refdiv_loop > 0 && fb_divider == 0; refdiv_loop--) {
-        for (uint8_t postdiv1_loop = 7; postdiv1_loop > 0 && fb_divider == 0; postdiv1_loop--) {
-            for (uint8_t postdiv2_loop = 7; postdiv2_loop > 0 && fb_divider == 0; postdiv2_loop--) {
-                if (postdiv1_loop >= postdiv2_loop) {
-                    int temp_fb_divider = round(((float) (postdiv1_loop * postdiv2_loop * target_freq * refdiv_loop) / 25.0));
+    // Loop over refdiv and postdiv1, solve for postdiv2 algebraically
+    for (uint8_t refdiv = 1; refdiv <= 2; ++refdiv) {
+        for (uint8_t postdiv1 = 1; postdiv1 <= 7; ++postdiv1) {
+            // postdiv2 = (25 * fb_divider) / (refdiv * postdiv1 * target_freq)
+            // But we want integer postdiv2 in [1, postdiv1]
+            for (uint8_t postdiv2 = 1; postdiv2 <= postdiv1; ++postdiv2) {
+                float fb_divider_f = postdiv1 * postdiv2 * target_freq * refdiv / 25.0f;
+                int fb_divider = (int)(fb_divider_f + 0.5f);
+                if (fb_divider < 0xA0 || fb_divider > 0xEF) continue;
 
-                    if (temp_fb_divider >= 0xa0 && temp_fb_divider <= 0xef) {
-                        float temp_freq = 25.0 * (float) temp_fb_divider / (float) (refdiv_loop * postdiv2_loop * postdiv1_loop);
-                        float freq_diff = fabs(target_freq - temp_freq);
+                // Check if postdiv2 is integer and in range
+                float actual_freq = 25.0f * fb_divider / (refdiv * postdiv1 * postdiv2);
+                float diff = fabsf(target_freq - actual_freq);
 
-                        if (freq_diff < min_difference && freq_diff < max_diff) {
-                            fb_divider = temp_fb_divider;
-                            post_divider1 = postdiv1_loop;
-                            post_divider2 = postdiv2_loop;
-                            ref_divider = refdiv_loop;
-                            min_difference = freq_diff;
-                            newf = temp_freq;
-                        }
-                    }
+                if (diff < min_difference && diff < max_diff) {
+                    best_fb_divider = fb_divider;
+                    best_post_divider1 = postdiv1;
+                    best_post_divider2 = postdiv2;
+                    best_ref_divider = refdiv;
+                    min_difference = diff;
+                    newf = actual_freq;
                 }
             }
         }
     }
 
-    if (fb_divider == 0) {
-        ESP_LOGE(TAG, "Failed to find PLL settings for target frequency %.2f", target_freq);
-        return;
+    // If no valid divider found, find the closest possible frequency (even if diff > max_diff)
+    if (best_fb_divider == 0) {
+        min_difference = 1e6f;
+        for (uint8_t refdiv = 1; refdiv <= 2; ++refdiv) {
+            for (uint8_t postdiv1 = 1; postdiv1 <= 7; ++postdiv1) {
+                for (uint8_t postdiv2 = 1; postdiv2 <= postdiv1; ++postdiv2) {
+                    float fb_divider_f = postdiv1 * postdiv2 * target_freq * refdiv / 25.0f;
+                    int fb_divider = (int)(fb_divider_f + 0.5f);
+                    if (fb_divider < 0xA0 || fb_divider > 0xEF) continue;
+
+                    float actual_freq = 25.0f * fb_divider / (refdiv * postdiv1 * postdiv2);
+                    float diff = fabsf(target_freq - actual_freq);
+
+                    if (diff < min_difference) {
+                        best_fb_divider = fb_divider;
+                        best_post_divider1 = postdiv1;
+                        best_post_divider2 = postdiv2;
+                        best_ref_divider = refdiv;
+                        min_difference = diff;
+                        newf = actual_freq;
+                    }
+                }
+            }
+        }
+        if (best_fb_divider == 0) {
+            ESP_LOGE(TAG, "Failed to find any PLL settings for target frequency %.2f", target_freq);
+            return;
+        }
+        ESP_LOGW(TAG, "Using next best PLL settings for frequency %.2f (actual %.2f, diff %.2f)", target_freq, newf, min_difference);
     }
 
-    freqbuf[3] = fb_divider;
-    freqbuf[4] = ref_divider;
-    freqbuf[5] = (((post_divider1 - 1) & 0xf) << 4) + ((post_divider2 - 1) & 0xf);
+    freqbuf[3] = best_fb_divider;
+    freqbuf[4] = best_ref_divider;
+    freqbuf[5] = (((best_post_divider1 - 1) & 0xF) << 4) | ((best_post_divider2 - 1) & 0xF);
 
-    if (fb_divider * 25 / (float) ref_divider >= 2400) {
+    if ((best_fb_divider * 25.0f / (float)best_ref_divider) >= 2400.0f) {
         freqbuf[2] = 0x50;
     }
 
     _send_BM1370(TYPE_CMD | GROUP_ALL | CMD_WRITE, freqbuf, 6, BM1370_SERIALTX_DEBUG);
 
-    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", target_freq, newf);
+    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (actual %.2f)", target_freq, newf);
 }
 
 static void do_frequency_ramp_up(float target_frequency) {
