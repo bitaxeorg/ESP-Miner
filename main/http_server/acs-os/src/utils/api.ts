@@ -277,7 +277,7 @@ export async function restartSystem(): Promise<string> {
 export async function uploadWebApp(file: File): Promise<{ success: boolean; message: string }> {
   try {
     // Send the web app blob directly
-    const response = await fetch("/api/system/upload-webapp", {
+    const response = await fetch("/api/system/OTAWWW", {
       method: "POST",
       headers: {
         "Content-Type": "application/octet-stream",
@@ -494,8 +494,6 @@ export async function updatePresetSettings(
     };
   }
 }
-
-
 
 /**
  * Log event interface
