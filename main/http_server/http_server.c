@@ -475,7 +475,7 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         nvs_config_set_u16(NVS_CONFIG_FLIP_SCREEN, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
@@ -552,7 +552,7 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         cJSON_AddNumberToObject(updated_settings, "flipscreen", item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
-        cJSON_AddNumberToObject(updated_settings, "overheat_mode", 0);
+        cJSON_AddNumberToObject(updated_settings, "overheat_mode", item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
         cJSON_AddNumberToObject(updated_settings, "invertscreen", item->valueint);
@@ -1428,7 +1428,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for fetching error logs */
     httpd_uri_t logs_errors_get_uri = {
-        .uri = "/api/logs/errors", 
+        .uri = "/api/logs/error", 
         .method = HTTP_GET, 
         .handler = GET_error_logs, 
         .user_ctx = rest_context
