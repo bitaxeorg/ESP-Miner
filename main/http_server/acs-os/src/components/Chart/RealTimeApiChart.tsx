@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from "preact/hooks";
+import { useEffect, useState, useRef, useCallback } from "preact/hooks";
 import Chart from "./Chart";
 import { ChartDataPoint } from "./config";
-import { RealTimeDataFetcher, DataField } from "../../utils/realTimeDataFetcher";
+import { RealTimeDataFetcher } from "../../utils/realTimeDataFetcher";
 
 interface RealTimeApiChartProps {
   title: string;
@@ -9,7 +9,6 @@ interface RealTimeApiChartProps {
   updateInterval?: number;
   maxDataPoints?: number;
   color?: string;
-  unit?: string;
   // Chart configuration props
   defaultUseAreaChart?: boolean;
   defaultDataAggregation?: number;
@@ -25,7 +24,6 @@ const RealTimeApiChart = ({
   updateInterval = 2000, // Default to 2 seconds for API calls
   maxDataPoints = 50,
   color = "#10b981", // Updated to match the new chart color
-  unit = "",
   defaultUseAreaChart = true, // Changed to true for better visual appeal
   defaultDataAggregation = 5, // Increased from 2 to 5 for better aggregation
   chartConfigs,
@@ -39,14 +37,50 @@ const RealTimeApiChart = ({
   const [error, setError] = useState<string | null>(null);
 
   // New state for chart configuration
-  const [useAreaChart, setUseAreaChart] = useState(defaultUseAreaChart);
+  const [useAreaChart] = useState(defaultUseAreaChart);
   const [dataAggregationSeconds, setDataAggregationSeconds] = useState(defaultDataAggregation);
   const [isConfigChanging, setIsConfigChanging] = useState(false);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+    // localStorage persistence utilities
+  const getStorageKey = useCallback((dataField: string) => `chart_data_${dataField}`, []);
+
+  const saveDataToStorage = useCallback((chartData: ChartDataPoint[], dataField: string) => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(getStorageKey(dataField), JSON.stringify({
+          timestamp: Date.now(),
+          data: chartData.slice(-100) // Only store last 100 points
+        }));
+      }
+    } catch (err) {
+      console.warn('Failed to save chart data to localStorage:', err);
+    }
+  }, [getStorageKey]);
+
+  const loadDataFromStorage = useCallback((dataField: string): ChartDataPoint[] => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = window.localStorage.getItem(getStorageKey(dataField));
+        if (!stored) return [];
+
+        const parsed = JSON.parse(stored);
+        const age = Date.now() - parsed.timestamp;
+
+        // Only use stored data if it's less than 30 minutes old
+        if (age < 30 * 60 * 1000) {
+          return parsed.data || [];
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load chart data from localStorage:', err);
+    }
+    return [];
+  }, [getStorageKey]);
+
   // Auto-configure plot intervals based on duration
-  const getOptimalPlotInterval = (configKey: string): number => {
+  const getOptimalPlotInterval = useCallback((configKey: string): number => {
     if (chartConfigs && chartConfigs[configKey]) {
       return chartConfigs[configKey].intervalSeconds;
     }
@@ -66,12 +100,7 @@ const RealTimeApiChart = ({
       default:
         return 5; // Default to 5s
     }
-  };
-
-  // Get current optimal interval
-  const optimalInterval = selectedConfigKey
-    ? getOptimalPlotInterval(selectedConfigKey)
-    : dataAggregationSeconds;
+  }, [chartConfigs]);
 
   // Auto-update aggregation when config changes
   useEffect(() => {
@@ -79,7 +108,7 @@ const RealTimeApiChart = ({
       const newInterval = getOptimalPlotInterval(selectedConfigKey);
       setDataAggregationSeconds(newInterval);
     }
-  }, [selectedConfigKey]);
+  }, [selectedConfigKey, getOptimalPlotInterval]);
 
   // Format interval for display
   const formatInterval = (seconds: number): string => {
@@ -88,14 +117,24 @@ const RealTimeApiChart = ({
     return `${Math.floor(seconds / 3600)}h`;
   };
 
-  // Initialize with historical data from API
+  // Initialize with localStorage data or single current data point
   useEffect(() => {
     const initializeData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const initialData = await dataFetcher.generateInitialData(maxDataPoints);
+        // First, try to load from localStorage
+        const storedData = loadDataFromStorage(dataFetcher.getDataField());
+
+        if (storedData.length > 0) {
+          setData(storedData);
+          setIsLoading(false);
+          return;
+        }
+
+        // If no stored data, start with current data point
+        const initialData = await dataFetcher.generateInitialData(1);
         setData(initialData);
       } catch (err) {
         setError("Failed to load initial data");
@@ -106,7 +145,14 @@ const RealTimeApiChart = ({
     };
 
     initializeData();
-  }, [dataFetcher, maxDataPoints]);
+  }, [dataFetcher]);
+
+  // Save data to localStorage when it updates
+  useEffect(() => {
+    if (data.length > 0) {
+      saveDataToStorage(data, dataFetcher.getDataField());
+    }
+  }, [data, dataFetcher]);
 
   // Start real-time updates automatically after initial data is loaded
   useEffect(() => {
@@ -139,53 +185,6 @@ const RealTimeApiChart = ({
     };
   }, [isLoading, isRunning, dataFetcher, maxDataPoints, updateInterval]);
 
-  // Start/stop real-time updates
-  const toggleRealTime = () => {
-    if (isRunning) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      setIsRunning(false);
-    } else {
-      intervalRef.current = setInterval(async () => {
-        try {
-          const newPoint = await dataFetcher.fetchNextPoint();
-
-          if (newPoint) {
-            setData((prevData) => {
-              const newData = [...prevData, newPoint];
-              // Keep only the last maxDataPoints
-              return newData.slice(-maxDataPoints);
-            });
-            setError(null);
-          }
-        } catch (err) {
-          console.error("Failed to fetch new data point:", err);
-          setError("Failed to fetch data");
-        }
-      }, updateInterval);
-      setIsRunning(true);
-    }
-  };
-
-  const resetData = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const newData = await dataFetcher.generateInitialData(maxDataPoints);
-      setData(newData);
-    } catch (err) {
-      setError("Failed to reset data");
-      console.error("Failed to reset chart data:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const currentValue = data.length > 0 ? data[data.length - 1].value : 0;
-
   // Handle configuration changes with loading state
   const handleConfigChange = async (configKey: string) => {
     if (!onConfigChange) return;
@@ -209,8 +208,8 @@ const RealTimeApiChart = ({
       // Wait a bit for the parent component to update
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Reload data with new configuration
-      const newData = await dataFetcher.generateInitialData(maxDataPoints);
+      // Start with current data point only (no fake historical data)
+      const newData = await dataFetcher.generateInitialData(1);
       setData(newData);
 
       // Restart real-time updates if they were running
@@ -242,11 +241,32 @@ const RealTimeApiChart = ({
     }
   };
 
-  if (isLoading && data.length === 0) {
+  if (isLoading) {
     return (
       <div className='bg-white rounded-lg shadow-lg p-6'>
-        <div className='flex justify-center items-center h-64'>
-          <div className='text-gray-500'>Loading chart data...</div>
+        <div className='flex flex-col items-center justify-center h-64 space-y-3'>
+          <div className='w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin' />
+          <div className='text-gray-600'>
+            {data.length === 0 ? 'Fetching initial data...' : 'Loading chart...'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (data.length === 0 && !isLoading) {
+    return (
+      <div className='bg-white rounded-lg shadow-lg p-6'>
+        <div className='flex flex-col items-center justify-center h-64 space-y-3'>
+          <div className='text-gray-600'>Waiting for data...</div>
+          <div className='text-sm text-gray-500'>
+            Chart will appear once data starts flowing
+          </div>
+          {error && (
+            <div className='text-red-500 text-sm mt-2'>
+              Error: {error}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -258,9 +278,6 @@ const RealTimeApiChart = ({
         {title && (
           <div className='order-1'>
             <h2 className='text-sm text-gray-600'>{title}</h2>
-            {/* <p className='text-2xl font-semibold' style={{ color }}>
-              {currentValue.toFixed(2)} {unit}
-            </p> */}
           </div>
         )}
         {!title && <div className='hidden sm:block' />}

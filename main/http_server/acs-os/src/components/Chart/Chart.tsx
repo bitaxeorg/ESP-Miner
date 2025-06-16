@@ -279,7 +279,16 @@ const Chart = ({
         }}
         ref={chartRef}
         {...rest}
-      />
+      >
+        {data.length === 0 && (
+          <div className='absolute inset-0 flex items-center justify-center bg-gray-50 rounded'>
+            <div className='text-gray-500 text-center'>
+              <div className='text-lg mb-2'>📊</div>
+              <div>Chart will appear as data arrives</div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
