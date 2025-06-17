@@ -140,6 +140,22 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         ESP_LOGI(TAG, "Retrying WiFi connection...");
         MINER_set_wifi_status(WIFI_RETRYING, s_retry_num, event->reason);
 
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
+        ESP_LOGI(TAG, "WiFi scan completed");
+        
+        // Get the scan results
+        ap_number = 20; // Max number of APs we can store
+        esp_err_t err = esp_wifi_scan_get_ap_records(&ap_number, ap_info);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to get scan results: %s", esp_err_to_name(err));
+            ap_number = 0;
+        } else {
+            ESP_LOGI(TAG, "Found %d WiFi networks", ap_number);
+        }
+        
+        // Reset scanning flag to allow wifi_scan function to proceed
+        is_scanning = false;
+        
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
 
         ip_event_got_ip_t * event = (ip_event_got_ip_t *) event_data;
