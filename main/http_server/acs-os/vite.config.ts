@@ -21,35 +21,55 @@ export default defineConfig(({ mode }) => {
     // Validate the URL format
     try {
       new URL(API_TARGET);
-    } catch (error) {
+    } catch {
       console.warn(`Invalid API_TARGET URL: ${API_TARGET}, falling back to default`);
       API_TARGET = "http://10.1.1.168";
     }
   }
 
-  const proxyConfig = !isProd && API_TARGET ? {
-    "/api": {
-      target: API_TARGET,
-      changeOrigin: true,
-      secure: false, // Set to false for development with self-signed certs
-      // Only enable debug logging in development mode
-      configure: (proxy, _options) => {
-        proxy.on("error", (err, _req, _res) => {
-          console.log("proxy error", err);
-        });
-        proxy.on("proxyReq", (proxyReq, req, _res) => {
-          console.log("Sending Request to Target:", req.method, req.url);
-          // Avoid logging headers that might contain sensitive data
-          console.log("Request Headers:", Object.keys(proxyReq.getHeaders()));
-        });
-        proxy.on("proxyRes", (proxyRes, req, _res) => {
-          console.log("Received Response from Target:", proxyRes.statusCode, req.url);
-          // Avoid logging response headers that might contain sensitive data
-          console.log("Response Headers:", Object.keys(proxyRes.headers));
-        });
-      },
-    },
-  } : {};
+  const proxyConfig =
+    !isProd && API_TARGET
+      ? {
+          "/api": {
+            target: API_TARGET,
+            changeOrigin: true,
+            secure: false, // Set to false for development with self-signed certs
+            // Only enable debug logging in development mode
+            configure: (proxy, _options) => {
+              proxy.on("error", (err, _req, _res) => {
+                console.log("proxy error", err);
+              });
+              proxy.on("proxyReq", (proxyReq, req, _res) => {
+                // Strip headers that can cause 431 errors on ESP32
+                const headersToRemove = [
+                  "sec-ch-ua",
+                  "sec-ch-ua-mobile",
+                  "sec-ch-ua-platform",
+                  "sec-fetch-site",
+                  "sec-fetch-mode",
+                  "sec-fetch-dest",
+                  "cookie",
+                  "referer",
+                ];
+
+                headersToRemove.forEach((header) => {
+                  proxyReq.removeHeader(header);
+                });
+
+                // Simplify User-Agent to reduce header size
+                proxyReq.setHeader("user-agent", "BitaxeUI/1.0");
+
+                console.log("Sending Request to Target:", req.method, req.url);
+                console.log("Request Headers:", Object.keys(proxyReq.getHeaders()));
+              });
+              proxy.on("proxyRes", (proxyRes, req, _res) => {
+                console.log("Received Response from Target:", proxyRes.statusCode, req.url);
+                console.log("Response Headers:", Object.keys(proxyRes.headers));
+              });
+            },
+          },
+        }
+      : {};
 
   return {
     plugins: [preact(), tailwindcss()],

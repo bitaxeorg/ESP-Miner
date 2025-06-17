@@ -37,7 +37,7 @@ extern GlobalState *GLOBAL_STATE;
 #define SEND_DELAY_AFTER_RECEIVE_MS 1000  // 1 second delay
 
 
-extern bool apply_preset(DeviceModel device_model, const char* preset_name);
+#include "tasks/power_management_task.h"
 
 /*  sent to the display
 Network:

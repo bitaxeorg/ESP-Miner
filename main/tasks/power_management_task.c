@@ -18,6 +18,7 @@
 #include "driver/gpio.h"
 #include "common.h"
 #include "system.h"
+#include "esp_system.h"
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_ASIC_RESET  CONFIG_GPIO_ASIC_RESET
 #define GPIO_PLUG_SENSE  CONFIG_GPIO_PLUG_SENSE
@@ -38,6 +39,7 @@
 #define GAMMA_POWER_OFFSET 5
 
 static const char * TAG = "power_management";
+
 
 
 // Define preset arrays for each device model
@@ -66,16 +68,16 @@ static const DevicePreset DEVICE_SUPRA_PRESETS[] = {
 static const DevicePreset DEVICE_GAMMA_PRESETS[] = {
     {"quiet", 1000, 400, 25},        // Quiet: Low power, conservative
     {"balanced", 1090, 490, 35},    // Balanced: Good performance/efficiency balance
-    {"turbo", 1150, 525, 95},       // Turbo: Maximum performance
+    {"turbo", 1160, 600, 95},       // Turbo: Maximum performance
 };
 
 // Simple function to apply a preset by name
-bool apply_preset(DeviceModel device_model, const char* preset_name) {
+bool apply_preset(int device_model, const char* preset_name) {
     const DevicePreset* presets = NULL;
     uint8_t preset_count = 0;
     
     // Get the correct preset array for the device
-    switch (device_model) {
+    switch ((DeviceModel)device_model) {
         case DEVICE_MAX:
             presets = DEVICE_MAX_PRESETS;
             preset_count = sizeof(DEVICE_MAX_PRESETS) / sizeof(DevicePreset);
@@ -195,6 +197,8 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     ESP_LOGI(autotuneTAG, "  Max Power: %d W", GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
     ESP_LOGI(autotuneTAG, "  Max Domain Voltage: %u mV", GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage);
     ESP_LOGI(autotuneTAG, "  Max Frequency: %u MHz", GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency);
+    ESP_LOGI(autotuneTAG, "  Min Domain Voltage: %u mV", GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage);
+    ESP_LOGI(autotuneTAG, "  Min Frequency: %u MHz", GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency);
 
     // Log target values
     ESP_LOGI(autotuneTAG, "Autotune - Target Values:");
@@ -219,7 +223,7 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     
     // Determine timing interval based on temperature
     uint32_t intervalMs;
-    if (currentAsicTemp <= 68) {
+    if (currentAsicTemp < 68) {
         intervalMs = 300000; // 5 minutes for normal operation
     } else {
         intervalMs = 500;  // 5 seconds for higher temperatures
@@ -235,6 +239,55 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     // Update last autotune time
     lastAutotuneTime = currentTime;
     
+    // Safety mechanism: Track consecutive low hashrate attempts
+    static uint8_t consecutiveLowHashrateAttempts = 0;
+    float hashrateThreshold = targetHashrate * 0.5; // 50% of target hashrate
+    
+    if (currentHashrate < hashrateThreshold) {
+        consecutiveLowHashrateAttempts++;
+        ESP_LOGI(autotuneTAG, "Low hashrate detected: %.2f GH/s (threshold: %.2f GH/s), consecutive attempts: %u", 
+                 currentHashrate, hashrateThreshold, consecutiveLowHashrateAttempts);
+        char data[128];
+        snprintf(data, sizeof(data), "{\"currentHashrate\":%.2f,\"hashrateThreshold\":%.2f,\"consecutiveAttempts\":%u}", 
+                 currentHashrate, hashrateThreshold, consecutiveLowHashrateAttempts);
+        dataBase_log_event("power", "warn", "Autotune - Low hashrate detected", data);
+        
+        // If we've had 3 consecutive low hashrate attempts, reapply preset
+        if (consecutiveLowHashrateAttempts >= 3) {
+            static char current_preset[32];
+            char* preset_ptr = nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, "balanced");
+            strncpy(current_preset, preset_ptr, sizeof(current_preset) - 1);
+            current_preset[sizeof(current_preset) - 1] = '\0';
+            free(preset_ptr);
+            
+            ESP_LOGE(autotuneTAG, "SAFETY: 3 consecutive low hashrate attempts detected, reapplying preset '%s'", current_preset);
+            
+            // Log safety reset event
+            char safety_data[256];
+            snprintf(safety_data, sizeof(safety_data), 
+                     "{\"consecutiveAttempts\":%u,\"currentHashrate\":%.2f,\"targetHashrate\":%.2f,\"threshold\":%.2f,\"preset\":\"%s\"}", 
+                     consecutiveLowHashrateAttempts, currentHashrate, targetHashrate, hashrateThreshold, current_preset);
+            dataBase_log_event("power", "critical", "Autotune safety reset - consecutive low hashrate attempts", safety_data);
+            
+            // Reapply the current preset
+            if (apply_preset(GLOBAL_STATE->device_model, current_preset)) {
+                ESP_LOGI(autotuneTAG, "Successfully reapplied preset '%s'", current_preset);
+            } else {
+                ESP_LOGE(autotuneTAG, "Failed to reapply preset '%s'", current_preset);
+            }
+            
+            // Reset the counter
+            consecutiveLowHashrateAttempts = 0;
+            return;
+        }
+    } else {
+        // Hashrate is good, reset the counter
+        if (consecutiveLowHashrateAttempts > 0) {
+            ESP_LOGI(autotuneTAG, "Hashrate recovered: %.2f GH/s, resetting consecutive low hashrate counter", currentHashrate);
+            consecutiveLowHashrateAttempts = 0;
+        }
+    }
+    
     // Temperature-based adjustments
     int8_t tempDiff = currentAsicTemp - targetAsicTemp;
     
@@ -248,14 +301,16 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
             uint16_t newVoltage = targetDomainVoltage + 10;
             ESP_LOGI(autotuneTAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
             char data[128];
-            snprintf(data, sizeof(data), "{\"voltage\":%u}", newVoltage);
+            snprintf(data, sizeof(data), "{\"voltage\":%u, \"frequency\":%u, \"temperature\":%u, \"hashrate\":%.2f, \"targetHashrate\":%.2f, }", 
+            newVoltage, currentFrequency, currentAsicTemp, currentHashrate, targetHashrate);
             dataBase_log_event("power", "info", "Autotune - Hashrate below target, increasing voltage", data);
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
             return;
         } else {
             ESP_LOGI(TAG, "Autotune - Hashrate above target, no adjustments needed");
             char data[128];
-            snprintf(data, sizeof(data), "{\"voltage\":%u}", targetDomainVoltage);
+            snprintf(data, sizeof(data), "{\"voltage\":%u, \"frequency\":%u, \"temperature\":%u, \"hashrate\":%.2f, \"targetHashrate\":%.2f, }", 
+            targetDomainVoltage, currentFrequency, currentAsicTemp, currentHashrate, targetHashrate);
             dataBase_log_event("power", "info", "Autotune - Hashrate above target, no adjustments needed", data);
             return;
         }
@@ -294,7 +349,8 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
                  currentFrequency, newFrequency);
         ESP_LOGI(TAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
         char data[128];
-        snprintf(data, sizeof(data), "{\"frequency\":%u,\"voltage\":%u}", newFrequency, newVoltage);
+        snprintf(data, sizeof(data), "{\"newFrequency\":%u,\"newVoltage\":%u, \"currentTemperature\":%u, \"currentHashrate\":%.2f, \"targetHashrate\":%.2f}", 
+        newFrequency, newVoltage, currentAsicTemp, currentHashrate, targetHashrate);
         dataBase_log_event("power", "info", "Autotune - Temperature under target, increasing frequency and voltage", data);
         
         nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
@@ -305,19 +361,51 @@ static void autotuneOffset(GlobalState * GLOBAL_STATE)
     else {
         // Decrease frequency by 2%
         uint16_t newFrequency = currentFrequency * 0.98;
+        // Ensure frequency doesn't go below minimum
+        if (newFrequency < GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency) {
+            newFrequency = GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency;
+            ESP_LOGI(TAG, "Autotune - Frequency limited to minimum: %u MHz", newFrequency);
+        }
+        
         // Decrease voltage by 0.2%
         uint16_t newVoltage = targetDomainVoltage * 0.998;
+        // Ensure voltage doesn't go below minimum
+        if (newVoltage < GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage) {
+            newVoltage = GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage;
+            ESP_LOGI(TAG, "Autotune - Voltage limited to minimum: %u mV", newVoltage);
+        }
         
-        ESP_LOGI(TAG, "Autotune - Temperature over target, decreasing frequency from %u MHz to %u MHz", 
-                 currentFrequency, newFrequency);
-        ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+        // Only apply changes if they're different from current values
+        bool frequencyChanged = (newFrequency != currentFrequency);
+        bool voltageChanged = (newVoltage != targetDomainVoltage);
+        
+        if (!frequencyChanged && !voltageChanged) {
+            ESP_LOGI(TAG, "Autotune - At minimum limits, no further adjustments possible");
+            char data[128];
+            snprintf(data, sizeof(data), "{\"currentFrequency\":%u,\"currentVoltage\":%u,\"minFrequency\":%u,\"minVoltage\":%u,\"currentTemperature\":%u}", 
+                     currentFrequency, targetDomainVoltage, GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency, 
+                     GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage, currentAsicTemp);
+            dataBase_log_event("power", "warn", "Autotune - At minimum limits, no further adjustments possible", data);
+            return;
+        }
+        
+        if (frequencyChanged) {
+            ESP_LOGI(TAG, "Autotune - Temperature over target, decreasing frequency from %u MHz to %u MHz", 
+                     currentFrequency, newFrequency);
+            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
+        }
+        
+        if (voltageChanged) {
+            ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
+            char data[128];
+            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
+        }
+        
         char data[128];
-        snprintf(data, sizeof(data), "{\"frequency\":%u,\"voltage\":%u}", newFrequency, newVoltage);
-        dataBase_log_event("power", "info", "Autotune - Temperature over target, decreasing frequency and voltage", data);
+        snprintf(data, sizeof(data), "{\"newFrequency\":%u,\"newVoltage\":%u,\"currentTemperature\":%u,\"currentHashrate\":%.2f,\"targetHashrate\":%.2f}", 
+                 newFrequency, newVoltage, currentAsicTemp, currentHashrate, targetHashrate);
+        dataBase_log_event("power", "info", "Autotune - Temperature over target, decreasing frequency and/or voltage", data);
         
-
-        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
-        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
         return;
     }
 }
@@ -362,6 +450,75 @@ static double automatic_fan_speed(float chip_temp, GlobalState * GLOBAL_STATE)
         default:
     }
 	return result;
+}
+
+// Soft overheat recovery function
+static void handle_overheat_recovery(GlobalState * GLOBAL_STATE, const char* device_info, const char* log_data) {
+    ESP_LOGE(TAG, "OVERHEAT DETECTED: %s", device_info);
+    
+    // Set fan to full speed and turn off VCORE (immediate safety measures)
+    EMC2101_set_fan_speed(1);
+    
+    // Turn off VCORE based on device type
+    PowerManagementModule *power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+            if (power_management->HAS_POWER_EN) {
+                gpio_set_level(GPIO_ASIC_ENABLE, 1);
+            }
+            break;
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
+                VCORE_set_voltage(0.0, GLOBAL_STATE);
+            } else if (power_management->HAS_POWER_EN) {
+                gpio_set_level(GPIO_ASIC_ENABLE, 1);
+            }
+            break;
+        case DEVICE_GAMMA:
+            VCORE_set_voltage(0.0, GLOBAL_STATE);
+            break;
+        default:
+            break;
+    }
+    
+    // Set safe NVS values and enable overheat mode
+    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
+    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
+    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
+    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+    
+    // Log the overheat event
+    dataBase_log_event("power", "critical", "Overheat mode activated - temperature exceeded threshold", log_data);
+    
+    ESP_LOGE(TAG, "Entering overheat recovery mode. Waiting 30 seconds before automatic recovery...");
+    
+    // Wait 30 seconds for cooling
+    vTaskDelay(30000 / portTICK_PERIOD_MS);
+    
+    ESP_LOGI(TAG, "Overheat recovery: Applying balanced preset and restarting...");
+    
+    // Reset overheat mode and apply balanced preset
+    
+    
+    // Apply balanced preset for safe recovery
+    if (apply_preset(GLOBAL_STATE->device_model, "balanced")) {
+        ESP_LOGI(TAG, "Successfully applied balanced preset for recovery");
+    } else {
+        ESP_LOGE(TAG, "Failed to apply balanced preset, using safe defaults");
+        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1100);
+        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 400);
+        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 75);
+        nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1);
+    }
+    
+    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+    // Log recovery event
+    dataBase_log_event("power", "info", "Overheat recovery completed - restarting system", "{}");
+    
+    // Restart the ESP32
+    esp_restart();
 }
 
 void POWER_MANAGEMENT_task(void * pvParameters)
@@ -453,26 +610,17 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
                 if ((power_management->chip_temp_avg > THROTTLE_TEMP) &&
                     (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                    ESP_LOGE(TAG, "OVERHEAT ASIC %fC", power_management->chip_temp_avg );
-
-                    EMC2101_set_fan_speed(1);
-                    if (power_management->HAS_POWER_EN) {
-                        gpio_set_level(GPIO_ASIC_ENABLE, 1);
-                    }
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
                     
-                    // Log critical overheat event
+                    // Prepare log data
                     char overheat_data[128];
                     snprintf(overheat_data, sizeof(overheat_data), 
                              "{\"chipTemp\":%.1f,\"threshold\":%f,\"device\":\"DEVICE_MAX\"}", 
                              power_management->chip_temp_avg, THROTTLE_TEMP);
-                    dataBase_log_event("power", "critical", "Overheat mode activated - ASIC temperature exceeded threshold", overheat_data);
                     
-                    exit(EXIT_FAILURE);
+                    // Use soft overheat recovery
+                    char device_info[64];
+                    snprintf(device_info, sizeof(device_info), "DEVICE_MAX ASIC %.1fC", power_management->chip_temp_avg);
+                    handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
                 }
                 break;
             case DEVICE_ULTRA:
@@ -494,29 +642,18 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 //overheat mode if the voltage regulator or ASIC is too hot
                 if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) &&
                     (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                    ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg );
-
-                    EMC2101_set_fan_speed(1);
-                    if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
-                        // Turn off core voltage
-                        VCORE_set_voltage(0.0, GLOBAL_STATE);
-                    } else if (power_management->HAS_POWER_EN) {
-                        gpio_set_level(GPIO_ASIC_ENABLE, 1);
-                    }
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
                     
-                    // Log critical overheat event
+                    // Prepare log data
                     char overheat_data[128];
                     snprintf(overheat_data, sizeof(overheat_data), 
                              "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%f,\"chipThreshold\":%f,\"device\":\"DEVICE_ULTRA_SUPRA\"}", 
                              power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
-                    dataBase_log_event("power", "critical", "Overheat mode activated - VR or ASIC temperature exceeded threshold", overheat_data);
                     
-                    exit(EXIT_FAILURE);
+                    // Use soft overheat recovery
+                    char device_info[64];
+                    snprintf(device_info, sizeof(device_info), "DEVICE_ULTRA/SUPRA VR: %.1fC ASIC %.1fC", 
+                             power_management->vr_temp, power_management->chip_temp_avg);
+                    handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
                 }
 
                 break;
@@ -532,27 +669,18 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 //overheat mode if the voltage regulator or ASIC is too hot
                 if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) &&
                     (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-                    ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg );
-
-                    EMC2101_set_fan_speed(1);
-
-                    // Turn off core voltage
-                    VCORE_set_voltage(0.0, GLOBAL_STATE);
-
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-                    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-                    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-                    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
                     
-                    // Log critical overheat event
+                    // Prepare log data
                     char overheat_data[128];
                     snprintf(overheat_data, sizeof(overheat_data), 
                              "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%f,\"chipThreshold\":%f,\"device\":\"DEVICE_GAMMA\"}", 
                              power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
-                    dataBase_log_event("power", "critical", "Overheat mode activated - VR or ASIC temperature exceeded threshold", overheat_data);
                     
-                    exit(EXIT_FAILURE);
+                    // Use soft overheat recovery
+                    char device_info[64];
+                    snprintf(device_info, sizeof(device_info), "DEVICE_GAMMA VR: %.1fC ASIC %.1fC", 
+                             power_management->vr_temp, power_management->chip_temp_avg);
+                    handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
                 }
                 break;
             default:

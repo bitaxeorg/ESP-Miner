@@ -216,7 +216,7 @@ export function PoolsPage() {
 
       <div className='bg-[var(--card-bg)] rounded-lg shadow-md max-w-full md:max-w-3xl'>
         <form onSubmit={handleSubmitAndRestart}>
-          <div className='flex justify-between items-center mb-6'>
+          <div className='flex justify-between items-center mb-4'>
             <h2 className='text-xl font-medium'>Stratum URLs</h2>
           </div>
 

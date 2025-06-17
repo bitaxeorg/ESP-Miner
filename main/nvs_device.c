@@ -50,33 +50,41 @@ esp_err_t NVSDevice_parse_config(GlobalState * GLOBAL_STATE) {
         GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
         GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1800;
         GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 1000;
+        GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage = 1000;  // quiet preset (1100mV) - 100mV
+        GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency = 350;       // quiet preset (450MHz) - 100MHz
     } else if (strcmp(GLOBAL_STATE->device_model_str, "ultra") == 0) {
         ESP_LOGI(TAG, "DEVICE: Ultra");
         GLOBAL_STATE->device_model = DEVICE_ULTRA;
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
         GLOBAL_STATE->small_core_count = BM1366_SMALL_CORE_COUNT;
-        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
-        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1400;
-        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 900;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 25;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1300;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 700;
+        GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage = 1030;  // quiet preset (1130mV) - 100mV
+        GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency = 420;       // quiet preset (420MHz) - 100MHz
     } else if (strcmp(GLOBAL_STATE->device_model_str, "supra") == 0) {
         ESP_LOGI(TAG, "DEVICE: Supra");
         GLOBAL_STATE->device_model = DEVICE_SUPRA;
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
         GLOBAL_STATE->small_core_count = BM1368_SMALL_CORE_COUNT;
-        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
-        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1450;
-        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 1000;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 25;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1400;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 850;
+        GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage = 1050;  // quiet preset (1100mV) - 100mV
+        GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency = 420;       // quiet preset (425MHz) - 100MHz
     } else if (strcmp(GLOBAL_STATE->device_model_str, "gamma") == 0) {
         ESP_LOGI(TAG, "DEVICE: Gamma");
         GLOBAL_STATE->device_model = DEVICE_GAMMA;
         GLOBAL_STATE->asic_count = 1;
         GLOBAL_STATE->voltage_domain = 1;
         GLOBAL_STATE->small_core_count = BM1370_SMALL_CORE_COUNT;
-        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 28;
-        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1300;
-        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 1000;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxPower = 25;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage = 1220;
+        GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency = 750;
+        GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage = 950;   // quiet preset (1000mV) - 100mV
+        GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency = 420;       // quiet preset (400MHz) - 100MHz
     } else {
         ESP_LOGE(TAG, "Invalid DEVICE model");
         // maybe should return here to now execute anything with a faulty device parameter !

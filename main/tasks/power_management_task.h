@@ -33,7 +33,8 @@ typedef struct
     uint16_t maxPower;            // Maximum power in watts
     uint16_t maxDomainVoltage;    // Maximum domain voltage in mV
     uint16_t maxFrequency;        // Maximum frequency in MHz
-
+    uint16_t minDomainVoltage;    // Minimum domain voltage in mV
+    uint16_t minFrequency;        // Minimum frequency in MHz
 
 } AutotuneModule;
 
@@ -49,6 +50,6 @@ typedef struct {
 void POWER_MANAGEMENT_task(void * pvParameters);
 
 // Simple preset function - applies preset immediately
-
+bool apply_preset(int device_model, const char* preset_name);
 
 #endif

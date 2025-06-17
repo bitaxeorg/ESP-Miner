@@ -6,14 +6,17 @@ import {
   uploadWebApp,
   FIRMWARE_LATEST_URL,
   WEBAPP_LATEST_URL,
-  SystemInfo,
+  getVersionInfo,
+  VersionInfo,
+  waitForFirmwareUpdate,
 } from "../../utils/api";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
 import { PageHeading } from "../../components/PageHeading";
+import { VersionDisplay, UpdateBadge } from "../../components/VersionDisplay";
 
 interface ActionCardProps {
-  title: string;
+  title: string | preact.ComponentChildren;
   description: string;
   buttonText?: string;
   onAction?: () => void;
@@ -60,27 +63,46 @@ function ActionCard({
 export function UpdatesPage() {
   const { showToast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [updatePhase, setUpdatePhase] = useState<"idle" | "uploading" | "rebooting" | "polling">(
+    "idle"
+  );
   const [isWebAppUpdating, setIsWebAppUpdating] = useState(false);
-  const [minerInfo, setMinerInfo] = useState<SystemInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+
   const [firmwareFile, setFirmwareFile] = useState<File | null>(null);
   const [webAppFile, setWebAppFile] = useState<File | null>(null);
+  const [versionInfo, setVersionInfo] = useState<VersionInfo>({
+    current: null,
+    latest: null,
+    hasUpdate: false,
+    isLoading: true,
+    error: null,
+    lastChecked: null,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const webAppFileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSystemInfo = async () => {
     try {
-      setIsLoading(true);
+      setVersionInfo((prev) => ({ ...prev, isLoading: true }));
       const miners = await fetchMiners();
       // Use the first miner (current implementation only returns one)
-      setMinerInfo(miners.length > 0 ? miners[0] : null);
+      const currentMiner = miners.length > 0 ? miners[0] : null;
+
+      // Fetch version information
+      const versionData = await getVersionInfo(currentMiner?.version || null);
+      setVersionInfo(versionData);
     } catch (error) {
       showToast(
         `Error fetching system info: ${error instanceof Error ? error.message : "Unknown error"}`,
         "error"
       );
-    } finally {
-      setIsLoading(false);
+      // Set error state for version info
+      setVersionInfo((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+        lastChecked: new Date(),
+      }));
     }
   };
 
@@ -95,15 +117,34 @@ export function UpdatesPage() {
     }
 
     setIsUpdating(true);
+    setUpdatePhase("uploading");
     showToast("Uploading and installing firmware...", "info");
 
     try {
       const result = await uploadFirmware(firmwareFile);
       if (result.success) {
-        showToast(result.message, "success");
-        setFirmwareFile(null);
-        // Refresh system info to get the updated firmware version
-        await fetchSystemInfo();
+        setUpdatePhase("rebooting");
+        showToast("Firmware uploaded successfully! Device is rebooting...", "success");
+
+        // Wait a moment for the device to start rebooting
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+
+        setUpdatePhase("polling");
+        showToast("Waiting for device to come back online...", "info");
+
+        // Poll for the device to come back online
+        const pollResult = await waitForFirmwareUpdate(versionInfo.latest || undefined);
+
+        if (pollResult.success) {
+          showToast(pollResult.message, "success");
+          setFirmwareFile(null);
+          // Refresh version info to get the updated firmware version
+          await fetchSystemInfo();
+        } else {
+          showToast(`Update status unclear: ${pollResult.message}`, "warning");
+          // Still refresh to see current state
+          await fetchSystemInfo();
+        }
       } else {
         showToast(`Failed to update firmware: ${result.message}`, "error");
       }
@@ -111,6 +152,7 @@ export function UpdatesPage() {
       showToast(`Error: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
     } finally {
       setIsUpdating(false);
+      setUpdatePhase("idle");
     }
   };
 
@@ -152,8 +194,8 @@ export function UpdatesPage() {
       if (result.success) {
         showToast(result.message, "success");
         setWebAppFile(null);
-        // Refresh system info if needed
-        await fetchSystemInfo();
+        // Note: Web app updates don't change firmware version
+        // await fetchSystemInfo();
       } else {
         showToast(`Failed to update web app: ${result.message}`, "error");
       }
@@ -162,12 +204,6 @@ export function UpdatesPage() {
     } finally {
       setIsWebAppUpdating(false);
     }
-  };
-
-  const getFirmwareDescription = () => {
-    if (isLoading) return "Loading current firmware information...";
-    const baseText = minerInfo?.version ? `Current version: ${minerInfo.version}. ` : "";
-    return `${baseText}Download the latest firmware and then upload it to update your device.`;
   };
 
   return (
@@ -179,53 +215,69 @@ export function UpdatesPage() {
       />
 
       <ActionCard
-        title='Update Device Firmware'
-        description={getFirmwareDescription()}
+        title={
+          <div className='flex items-center gap-3'>
+            <span>Update Device Firmware</span>
+            <UpdateBadge hasUpdate={versionInfo.hasUpdate} />
+          </div>
+        }
+        description={
+          versionInfo.hasUpdate
+            ? "Download the latest firmware and then upload it to update your device."
+            : "Your device is running the latest firmware version."
+        }
         link={FIRMWARE_LATEST_URL}
       >
         <div className='space-y-4'>
-          <div className='flex flex-wrap gap-3'>
-            <Button
-              as='a'
-              href={FIRMWARE_LATEST_URL}
-              download='esp-miner.bin'
-              className='bg-blue-600 hover:bg-blue-700'
-            >
-              <span className='sm:hidden'>Download Firmware</span>
-              <span className='hidden sm:inline'>1. Download Latest Firmware</span>
-            </Button>
-          </div>
+          <VersionDisplay versionInfo={versionInfo} className='mb-4' />
 
-          <div className='mt-2 text-sm text-[#8B96A5]'>
-            <p>
-              If the button doesn't work,{" "}
-              <a
-                href={FIRMWARE_LATEST_URL}
-                download='esp-miner.bin'
-                className='text-blue-400 underline'
-              >
-                click here
-              </a>{" "}
-              to download directly.
-            </p>
-          </div>
+          {versionInfo.hasUpdate ? (
+            // Show download/install UI when update is available
+            <>
+              <div className='mb-3'>
+                <p className='text-md text-white mb-2'>1. Download the latest firmware version</p>
+                <div className='flex flex-wrap gap-3'>
+                  <Button
+                    as='a'
+                    href={FIRMWARE_LATEST_URL}
+                    download='esp-miner.bin'
+                    className='bg-blue-600 hover:bg-blue-700'
+                    size='sm'
+                  >
+                    <span className='sm:hidden'>Download Firmware</span>
+                    <span className='hidden sm:inline'>Download Latest Firmware</span>
+                  </Button>
+                </div>
+              </div>
 
-          <div className='mt-4'>
-            <label className='block text-sm text-[#8B96A5] mb-2'>
-              2. Upload downloaded firmware:
-            </label>
-            <div className='flex flex-col sm:flex-row sm:items-center gap-3'>
-              <div className='flex-1'>
+              <div className='mt-2 text-sm text-[#8B96A5]'>
+                <p>
+                  If the button doesn't work,{" "}
+                  <a
+                    href={FIRMWARE_LATEST_URL}
+                    download='esp-miner.bin'
+                    className='text-blue-400 underline'
+                  >
+                    click here
+                  </a>{" "}
+                  to download directly.
+                </p>
+              </div>
+
+              <div className='mt-8'>
+                <label className='block text-md text-white mb-2'>
+                  2. Upload firmware file you just downloaded
+                </label>
                 <div className='flex items-center gap-2'>
                   <Button
-                    variant='outline'
+                    variant='default'
                     type='button'
                     size='sm'
                     onClick={handleFirmwareFileClick}
-                    className='border-blue-600 text-white hover:bg-blue-600'
+                    className='bg-blue-600 hover:bg-blue-700'
                   >
-                    <span className='sm:hidden'>Choose</span>
-                    <span className='hidden sm:inline'>2. Choose File</span>
+                    <span className='sm:hidden'>Choose File</span>
+                    <span className='hidden sm:inline'>Choose File to Upload</span>
                   </Button>
                   <span className='text-sm text-[#8B96A5]'>
                     {firmwareFile ? firmwareFile.name : "No file selected"}
@@ -238,26 +290,45 @@ export function UpdatesPage() {
                     className='sr-only' // Hidden but accessible
                   />
                 </div>
-              </div>
-              <Button
-                onClick={handleFirmwareUpload}
-                disabled={isUpdating || !firmwareFile}
-                className='bg-blue-600 hover:bg-blue-700 w-full sm:w-auto'
-              >
-                {isUpdating ? (
-                  "Updating..."
-                ) : (
-                  <>
-                    <span className='sm:hidden'>Install</span>
-                    <span className='hidden sm:inline'>3. Install</span>
-                  </>
+                {firmwareFile && (
+                  <p className='text-sm text-green-500 mt-2'>
+                    ✓ File selected: {firmwareFile.name}
+                  </p>
                 )}
+              </div>
+
+              <div className='mt-8'>
+                <p className='text-md text-white mb-2'>3. Click install to flash your device</p>
+                <Button
+                  onClick={handleFirmwareUpload}
+                  disabled={isUpdating || !firmwareFile}
+                  className='bg-blue-600 hover:bg-blue-700'
+                  size='sm'
+                >
+                  {isUpdating
+                    ? updatePhase === "uploading"
+                      ? "Installing..."
+                      : updatePhase === "rebooting"
+                      ? "Device Rebooting..."
+                      : updatePhase === "polling"
+                      ? "Waiting for Device..."
+                      : "Installing..."
+                    : "Install Firmware"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            // Show "Check for Updates" button when up-to-date
+            <div className='py-4'>
+              <Button
+                onClick={fetchSystemInfo}
+                disabled={versionInfo.isLoading}
+                className='bg-blue-600 hover:bg-blue-700'
+              >
+                {versionInfo.isLoading ? "Checking..." : "Check for Updates"}
               </Button>
             </div>
-            {firmwareFile && (
-              <p className='text-sm text-green-500 mt-2'>✓ File selected: {firmwareFile.name}</p>
-            )}
-          </div>
+          )}
         </div>
       </ActionCard>
       <ActionCard
