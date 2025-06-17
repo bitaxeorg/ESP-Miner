@@ -145,6 +145,67 @@ The autotuning system dynamically adjusts mining parameters to:
 - **VR Temperature Limit**: 105°C throttle, 145°C maximum
 - **Actions**: Fan to 100%, voltage/frequency reduction, system shutdown if needed
 
+#### Overheat Recovery System
+
+The system implements a cyclical overheat recovery pattern with two types of recovery mechanisms:
+
+##### Recovery Pattern
+The system uses a **3-event cycle** that provides both automatic recovery and mandatory manual intervention:
+
+| Event # | Recovery Type | Action |
+|---------|---------------|--------|
+| 1, 2    | Soft Recovery | Wait 5 minutes → Apply balanced preset → Restart ESP32 |
+| 3       | Hard Recovery | Exit power management task → Manual restart required |
+| 4, 5    | Soft Recovery | Wait 5 minutes → Apply balanced preset → Restart ESP32 |
+| 6       | Hard Recovery | Exit power management task → Manual restart required |
+| 7, 8    | Soft Recovery | Wait 5 minutes → Apply balanced preset → Restart ESP32 |
+| 9       | Hard Recovery | Exit power management task → Manual restart required |
+
+This pattern repeats indefinitely, ensuring regular manual intervention while allowing automatic recovery.
+
+##### Soft Recovery Process
+**Triggers**: Events 1, 2, 4, 5, 7, 8, etc. (non-multiples of 3)
+
+**Actions**:
+1. Increment `NVS_CONFIG_OVERHEAT_COUNT`
+2. Set fan to 100% speed immediately
+3. Turn off VCORE/ASIC power based on device type
+4. Apply emergency safe settings:
+   - Voltage: 1000mV
+   - Frequency: 50MHz
+   - Fan: 100%
+   - Disable auto fan control
+5. Wait 5 minutes for cooling
+6. Apply "balanced" preset for safe recovery
+7. Reset overheat mode flag
+8. Restart ESP32 for clean state
+
+##### Hard Recovery Process
+**Triggers**: Events 3, 6, 9, etc. (multiples of 3)
+
+**Actions**:
+1. Increment `NVS_CONFIG_OVERHEAT_COUNT`
+2. Set fan to 100% speed immediately
+3. Turn off VCORE/ASIC power based on device type
+4. Apply emergency safe settings (same as soft recovery)
+5. **Exit power management task** using `exit(EXIT_FAILURE)`
+6. System remains in overheat mode until manual restart
+7. Log critical event: "Overheat Mode Activated 3+ times, Restart Device Manually"
+
+##### Overheat Counter Tracking
+- **NVS Key**: `NVS_CONFIG_OVERHEAT_COUNT`
+- **Purpose**: Persistent tracking of overheat events across reboots
+- **Increment**: Every overheat event (both soft and hard recovery)
+- **Reset**: Manual only (requires user intervention or NVS reset)
+- **Logging**: Counter value included in all overheat event logs
+
+##### Benefits of Cyclical Pattern
+- **Safety**: Regular manual intervention prevents runaway heating
+- **Usability**: Automatic recovery for occasional thermal events
+- **Tracking**: Complete overheat history maintained
+- **Predictability**: Users know every 3rd event requires manual attention
+- **Flexibility**: System gets multiple chances after manual resets
+
 #### Data Logging
 All autotune adjustments are logged to the database with:
 - Timestamp and event type
