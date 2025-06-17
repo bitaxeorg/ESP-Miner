@@ -206,9 +206,6 @@
 
 </div>
 
-<div class="modal-backdrop" *ngIf="showEdit" (click)="showEdit = false"></div>
-<div class="modal card" *ngIf="showEdit">
-    <div class="close" (click)="showEdit = false">&#10006;</div>
-    <h1>{{selectedAxeOs.IP}}</h1>
-    <app-edit [uri]="'http://' + selectedAxeOs.IP"></app-edit>
-</div>
+<app-modal [headline]="selectedAxeOs?.IP">
+    <app-edit *ngIf="selectedAxeOs" [uri]="'http://' + selectedAxeOs.IP"></app-edit>
+</app-modal>
