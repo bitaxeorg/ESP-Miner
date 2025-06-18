@@ -32,7 +32,6 @@ export class SettingsComponent {
     private loadingService: LoadingService,
     private githubUpdateService: GithubUpdateService
   ) {
-
     this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}));
 
     this.info$.pipe(this.loadingService.lockUIUntilComplete())
