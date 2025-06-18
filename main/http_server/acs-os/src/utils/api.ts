@@ -1,4 +1,5 @@
 import { SystemInfo } from "./types/systemInfo";
+import { formatRelativeTime } from "./formatters";
 
 // Re-export SystemInfo type for convenience
 export type { SystemInfo };
@@ -945,7 +946,7 @@ export async function validateYouTubeChannel(url: string): Promise<{
     }
 
     // Use a CORS proxy service for development
-    const proxyUrl = "https://api.allorigins.win/raw?url=";
+    const proxyUrl = "https://corsproxy.io/?";
     let apiUrl = "";
 
     if (channelId) {
@@ -992,7 +993,121 @@ export async function validateYouTubeChannel(url: string): Promise<{
 }
 
 /**
- * Fetch YouTube channel statistics
+ * Get uploads playlist ID for a channel (cached in localStorage)
+ * @param channelId - The YouTube channel ID
+ * @returns Promise with uploads playlist ID
+ */
+export async function getUploadsPlaylistId(channelId: string): Promise<{
+  success: boolean;
+  playlistId?: string;
+  error?: string;
+}> {
+  try {
+    // Check cache first (only in browser environment)
+    const cacheKey = `youtube_uploads_${channelId}`;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const cached = window.localStorage.getItem(cacheKey);
+      if (cached) {
+        return { success: true, playlistId: cached };
+      }
+    }
+
+    const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+    if (!apiKey) {
+      return { success: false, error: "YouTube API key not configured" };
+    }
+
+    // Use CORS proxy for development
+    const proxyUrl = "https://corsproxy.io/?";
+    const youtubeUrl = `https://www.googleapis.com/youtube/v3/channels?id=${channelId}&part=contentDetails&key=${apiKey}`;
+    const apiUrl = proxyUrl + encodeURIComponent(youtubeUrl);
+
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.items && data.items.length > 0) {
+      const uploadsPlaylistId = data.items[0].contentDetails.relatedPlaylists.uploads;
+
+      // Cache the playlist ID permanently
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(cacheKey, uploadsPlaylistId);
+      }
+
+      return { success: true, playlistId: uploadsPlaylistId };
+    } else {
+      return { success: false, error: "Channel not found" };
+    }
+  } catch (error) {
+    console.error("Failed to get uploads playlist ID:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get uploads playlist ID"
+    };
+  }
+}
+
+/**
+ * Fetch latest videos from a channel's uploads playlist
+ * @param uploadsPlaylistId - The uploads playlist ID
+ * @returns Promise with latest videos
+ */
+export async function fetchLatestVideos(uploadsPlaylistId: string): Promise<{
+  success: boolean;
+  videos?: Array<{
+    title: string;
+    publishedAt: string;
+    relativeTime: string;
+    videoId: string;
+    thumbnailUrl: string;
+  }>;
+  error?: string;
+}> {
+  try {
+    const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+    if (!apiKey) {
+      return { success: false, error: "YouTube API key not configured" };
+    }
+
+    // Use CORS proxy for development
+    const proxyUrl = "https://corsproxy.io/?";
+    const youtubeUrl = `https://www.googleapis.com/youtube/v3/playlistItems?playlistId=${uploadsPlaylistId}&part=snippet&maxResults=3&key=${apiKey}`;
+    const apiUrl = proxyUrl + encodeURIComponent(youtubeUrl);
+
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.items && data.items.length > 0) {
+            const videos = data.items.map((item: any) => {
+        return {
+          title: item.snippet.title,
+          publishedAt: item.snippet.publishedAt,
+          relativeTime: formatRelativeTime(item.snippet.publishedAt),
+          videoId: item.snippet.resourceId.videoId,
+          thumbnailUrl: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || "",
+        };
+      });
+
+      return { success: true, videos };
+    } else {
+      return { success: false, error: "No videos found" };
+    }
+  } catch (error) {
+    console.error("Failed to fetch latest videos:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch latest videos"
+    };
+  }
+}
+
+/**
+ * Fetch YouTube channel statistics (optimized for reduced API calls)
  * @param channelId - The YouTube channel ID
  * @returns Promise with channel statistics
  */
@@ -1019,7 +1134,7 @@ export async function fetchYouTubeStats(channelId: string): Promise<{
     }
 
     // Use CORS proxy for development
-    const proxyUrl = "https://api.allorigins.win/raw?url=";
+    const proxyUrl = "https://corsproxy.io/?";
     const youtubeUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${apiKey}`;
     const apiUrl = proxyUrl + encodeURIComponent(youtubeUrl);
 
@@ -1060,15 +1175,19 @@ export async function fetchYouTubeStats(channelId: string): Promise<{
 }
 
 /**
- * Post YouTube stats to ESP32 for LCD display
- * @param stats - The YouTube channel statistics
+ * Post YouTube stats and latest videos to ESP32 for LCD display
+ * @param data - The combined YouTube channel data
  * @returns Promise with result
  */
-export async function postYouTubeStatsToESP(stats: {
+export async function postYouTubeStatsToESP(data: {
   subscriberCount: string;
   viewCount: string;
   videoCount: string;
   title: string;
+  latestVideos?: Array<{
+    title: string;
+    relativeTime: string;
+  }>;
 }): Promise<{ success: boolean; message: string }> {
   try {
     const response = await fetch("/api/youtube", {
@@ -1076,7 +1195,7 @@ export async function postYouTubeStatsToESP(stats: {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(stats),
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
