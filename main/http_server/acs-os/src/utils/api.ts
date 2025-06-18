@@ -561,6 +561,57 @@ export async function updatePresetSettings(
   }
 }
 
+/**
+ * Update YouTube channel URL
+ * @param youtubeUrl - The YouTube channel URL to save
+ * @returns A message indicating the YouTube URL update status
+ */
+export async function updateYouTubeUrl(
+  youtubeUrl: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const payload = {
+      youtubeUrl,
+    };
+
+    const response = await fetch("/api/system", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const text = await response.text();
+
+    // If the response has content, try to parse it as JSON
+    if (text.trim()) {
+      try {
+        const result = JSON.parse(text);
+        console.log("YouTube URL update response:", result);
+        return result;
+      } catch {
+        console.log("Response is not JSON:", text);
+        return { success: true, message: "YouTube URL updated successfully" };
+      }
+    }
+
+    // For empty responses with 200 status
+    console.log("YouTube URL update successful (empty response)");
+    return { success: true, message: "YouTube URL updated successfully" };
+  } catch (error) {
+    console.error("Failed to update YouTube URL:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
 // GitHub Release Types
 export interface GitHubRelease {
   tag_name: string;
@@ -842,6 +893,203 @@ export async function fetchErrorLogs(limit?: number): Promise<{
       errors: [],
       count: 0,
       totalErrors: 0,
+    };
+  }
+}
+
+/**
+ * Validate if a YouTube channel exists using YouTube Data API
+ * @param url - The YouTube channel URL to validate
+ * @returns Promise with validation result
+ */
+export async function validateYouTubeChannel(url: string): Promise<{
+  isValid: boolean;
+  channelInfo?: {
+    id: string;
+    title: string;
+    subscriberCount?: string;
+  };
+  error?: string;
+}> {
+  try {
+    const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+
+    if (!apiKey) {
+      return {
+        isValid: false,
+        error: "YouTube API key not configured"
+      };
+    }
+
+    // Extract channel ID or username from URL
+    let channelId = "";
+    let username = "";
+
+    // Handle @username format
+    const atMatch = url.match(/@([\w-]+)/);
+    if (atMatch) {
+      username = atMatch[1];
+    }
+
+    // Handle channel/ID format
+    const channelMatch = url.match(/channel\/([a-zA-Z0-9_-]+)/);
+    if (channelMatch) {
+      channelId = channelMatch[1];
+    }
+
+    if (!channelId && !username) {
+      return {
+        isValid: false,
+        error: "Could not extract channel information from URL"
+      };
+    }
+
+    // Use a CORS proxy service for development
+    const proxyUrl = "https://api.allorigins.win/raw?url=";
+    let apiUrl = "";
+
+    if (channelId) {
+      // Direct channel ID lookup
+      const youtubeUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${apiKey}`;
+      apiUrl = proxyUrl + encodeURIComponent(youtubeUrl);
+    } else if (username) {
+      // Username lookup (for @handle format)
+      const youtubeUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${username}&key=${apiKey}`;
+      apiUrl = proxyUrl + encodeURIComponent(youtubeUrl);
+    }
+
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.items && data.items.length > 0) {
+      const channel = data.items[0];
+      return {
+        isValid: true,
+        channelInfo: {
+          id: channel.id,
+          title: channel.snippet.title,
+          subscriberCount: channel.statistics?.subscriberCount,
+        }
+      };
+    } else {
+      return {
+        isValid: false,
+        error: "Channel not found"
+      };
+    }
+  } catch (error) {
+    console.error("YouTube validation error:", error);
+    return {
+      isValid: false,
+      error: error instanceof Error ? error.message : "Failed to validate YouTube channel"
+    };
+  }
+}
+
+/**
+ * Fetch YouTube channel statistics
+ * @param channelId - The YouTube channel ID
+ * @returns Promise with channel statistics
+ */
+export async function fetchYouTubeStats(channelId: string): Promise<{
+  success: boolean;
+  stats?: {
+    subscriberCount: string;
+    viewCount: string;
+    videoCount: string;
+    title: string;
+    description: string;
+    thumbnailUrl: string;
+  };
+  error?: string;
+}> {
+  try {
+    const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+
+    if (!apiKey) {
+      return {
+        success: false,
+        error: "YouTube API key not configured"
+      };
+    }
+
+    // Use CORS proxy for development
+    const proxyUrl = "https://api.allorigins.win/raw?url=";
+    const youtubeUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${apiKey}`;
+    const apiUrl = proxyUrl + encodeURIComponent(youtubeUrl);
+
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.items && data.items.length > 0) {
+      const channel = data.items[0];
+      return {
+        success: true,
+        stats: {
+          subscriberCount: channel.statistics.subscriberCount || "0",
+          viewCount: channel.statistics.viewCount || "0",
+          videoCount: channel.statistics.videoCount || "0",
+          title: channel.snippet.title,
+          description: channel.snippet.description,
+          thumbnailUrl: channel.snippet.thumbnails?.default?.url || "",
+        }
+      };
+    } else {
+      return {
+        success: false,
+        error: "Channel not found"
+      };
+    }
+  } catch (error) {
+    console.error("YouTube stats fetch error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch YouTube stats"
+    };
+  }
+}
+
+/**
+ * Post YouTube stats to ESP32 for LCD display
+ * @param stats - The YouTube channel statistics
+ * @returns Promise with result
+ */
+export async function postYouTubeStatsToESP(stats: {
+  subscriberCount: string;
+  viewCount: string;
+  videoCount: string;
+  title: string;
+}): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch("/api/youtube", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(stats),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return { success: true, message: result.message || "Stats posted successfully" };
+  } catch (error) {
+    console.error("Failed to post YouTube stats to ESP:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to post stats to ESP"
     };
   }
 }
