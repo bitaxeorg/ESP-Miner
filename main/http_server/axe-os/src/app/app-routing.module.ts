@@ -11,6 +11,8 @@ import { PoolComponent } from './components/pool/pool.component';
 import { AppLayoutComponent } from './layout/app.layout.component';
 import { ApModeGuard } from './guards/ap-mode.guard';
 
+const TITLE_PREFIX = 'AxeOS';
+
 const routes: Routes = [
   {
       path: 'ap',
@@ -18,7 +20,8 @@ const routes: Routes = [
       children: [
         {
           path: '',
-          component: NetworkComponent
+          component: NetworkComponent,
+          title: `${TITLE_PREFIX} Network`,
         }
       ]
   },
@@ -29,31 +32,38 @@ const routes: Routes = [
     children: [
       {
         path: '',
-        component: HomeComponent
+        component: HomeComponent,
+        title: TITLE_PREFIX,
       },
       {
         path: 'logs',
-        component: LogsComponent
+        component: LogsComponent,
+        title: `${TITLE_PREFIX} Logs`,
       },
       {
         path: 'network',
-        component: NetworkComponent
+        component: NetworkComponent,
+        title: `${TITLE_PREFIX} Network`,
       },
       {
         path: 'settings',
-        component: SettingsComponent
+        component: SettingsComponent,
+        title: `${TITLE_PREFIX} Settings`,
       },
       {
         path: 'swarm',
-        component: SwarmComponent
+        component: SwarmComponent,
+        title: `${TITLE_PREFIX} Swarm`,
       },
       {
         path: 'design',
-        component: DesignComponent
+        component: DesignComponent,
+        title: `${TITLE_PREFIX} Design`,
       },
       {
         path: 'pool',
-        component: PoolComponent
+        component: PoolComponent,
+        title: `${TITLE_PREFIX} Pool`,
       }
     ]
   },

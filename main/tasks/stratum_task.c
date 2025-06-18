@@ -29,7 +29,6 @@
 static const char * TAG = "stratum_task";
 
 static StratumApiV1Message stratum_api_v1_message = {};
-static SystemTaskModule SYSTEM_TASK_MODULE = {.stratum_difficulty = 8192};
 
 static const char * primary_stratum_url;
 static uint16_t primary_stratum_port;
@@ -153,7 +152,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 
         int send_uid = 1;
         STRATUM_V1_subscribe(sock, send_uid++, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
-        STRATUM_V1_authenticate(sock, send_uid++, GLOBAL_STATE->SYSTEM_MODULE.pool_user, GLOBAL_STATE->SYSTEM_MODULE.pool_pass);
+        STRATUM_V1_authorize(sock, send_uid++, GLOBAL_STATE->SYSTEM_MODULE.pool_user, GLOBAL_STATE->SYSTEM_MODULE.pool_pass);
 
         char recv_buffer[BUFFER_SIZE];
         memset(recv_buffer, 0, BUFFER_SIZE);
@@ -247,6 +246,7 @@ void stratum_task(void * pvParameters)
         dest_addr.sin_port = htons(port);
 
         GLOBAL_STATE->sock = socket(addr_family, SOCK_STREAM, ip_protocol);
+        vTaskDelay(300 / portTICK_PERIOD_MS);
         if (GLOBAL_STATE->sock < 0) {
             ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
             if (++retry_critical_attempts > MAX_CRITICAL_RETRY_ATTEMPTS) {
@@ -293,11 +293,9 @@ void stratum_task(void * pvParameters)
         char * username = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
         char * password = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_pass : GLOBAL_STATE->SYSTEM_MODULE.pool_pass;
 
+        int authorize_message_id = GLOBAL_STATE->send_uid++;
         //mining.authorize - ID: 3
-        STRATUM_V1_authenticate(GLOBAL_STATE->sock, GLOBAL_STATE->send_uid++, username, password);
-
-        //mining.suggest_difficulty - ID: 4
-        STRATUM_V1_suggest_difficulty(GLOBAL_STATE->sock, GLOBAL_STATE->send_uid++, STRATUM_DIFFICULTY);
+        STRATUM_V1_authorize(GLOBAL_STATE->sock, authorize_message_id, username, password);
 
         // Everything is set up, lets make sure we don't abandon work unnecessarily.
         GLOBAL_STATE->abandon_work = 0;
@@ -325,13 +323,11 @@ void stratum_task(void * pvParameters)
                     mining_notify * next_notify_json_str = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
                     STRATUM_V1_free_mining_notify(next_notify_json_str);
                 }
-                stratum_api_v1_message.mining_notification->difficulty = SYSTEM_TASK_MODULE.stratum_difficulty;
                 queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
             } else if (stratum_api_v1_message.method == MINING_SET_DIFFICULTY) {
-                if (stratum_api_v1_message.new_difficulty != SYSTEM_TASK_MODULE.stratum_difficulty) {
-                    SYSTEM_TASK_MODULE.stratum_difficulty = stratum_api_v1_message.new_difficulty;
-                    ESP_LOGI(TAG, "Set stratum difficulty: %ld", SYSTEM_TASK_MODULE.stratum_difficulty);
-                }
+                ESP_LOGI(TAG, "Set stratum difficulty: %ld", stratum_api_v1_message.new_difficulty);
+                GLOBAL_STATE->stratum_difficulty = stratum_api_v1_message.new_difficulty;
+                GLOBAL_STATE->new_set_mining_difficulty_msg = true;
             } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK ||
                     stratum_api_v1_message.method == STRATUM_RESULT_VERSION_MASK) {
                 // 1fffe000
@@ -358,6 +354,9 @@ void stratum_task(void * pvParameters)
                 retry_attempts = 0;
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "setup message accepted");
+                    if (stratum_api_v1_message.message_id == authorize_message_id) {
+                        STRATUM_V1_suggest_difficulty(GLOBAL_STATE->sock, GLOBAL_STATE->send_uid++, STRATUM_DIFFICULTY);
+                    }
                 } else {
                     ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);
                 }

@@ -5,7 +5,7 @@
 #include "global_state.h"
 #include "asic.h"
 
-// static const char *TAG = "asic_api";
+// static const char *TAG = "asic_settings";
 static GlobalState *GLOBAL_STATE = NULL;
 
 // Function declarations from http_server.c
@@ -36,7 +36,8 @@ esp_err_t GET_system_asic(httpd_req_t *req)
 
     // Add ASIC model to the JSON object
     cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
-    
+    cJSON_AddStringToObject(root, "boardFamily", GLOBAL_STATE->DEVICE_CONFIG.family.name);
+
     cJSON_AddNumberToObject(root, "defaultFrequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_frequency_mhz);
 
     // Create arrays for frequency and voltage options based on ASIC model

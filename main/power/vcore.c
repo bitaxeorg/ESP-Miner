@@ -10,8 +10,9 @@
 #include "driver/gpio.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
-#define GPIO_ASIC_RESET  CONFIG_GPIO_ASIC_RESET
 #define GPIO_PLUG_SENSE  CONFIG_GPIO_PLUG_SENSE
+
+static const char *TAG = "vcore";
 
 static TPS546_CONFIG TPS546_CONFIG_GAMMATURBO = {
     /* vin voltage */
@@ -44,8 +45,6 @@ static TPS546_CONFIG TPS546_CONFIG_GAMMA = {
     .TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00, /* A */
     .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00 /* A */
 };
-
-static const char *TAG = "vcore.c";
 
 esp_err_t VCORE_init(GlobalState * GLOBAL_STATE) {
     if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {

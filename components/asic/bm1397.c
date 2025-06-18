@@ -19,12 +19,6 @@
 #define BM1397_CHIP_ID 0x1397
 #define BM1397_CHIP_ID_RESPONSE_LENGTH 9
 
-#ifdef CONFIG_GPIO_ASIC_RESET
-#define GPIO_ASIC_RESET CONFIG_GPIO_ASIC_RESET
-#else
-#define GPIO_ASIC_RESET 1
-#endif
-
 #define TYPE_JOB 0x20
 #define TYPE_CMD 0x40
 
@@ -62,7 +56,7 @@ typedef struct __attribute__((__packed__))
     uint8_t crc;
 } bm1397_asic_result_t;
 
-static const char *TAG = "bm1397Module";
+static const char * TAG = "bm1397";
 
 static uint32_t prev_nonce = 0;
 static task_result result;
@@ -227,7 +221,7 @@ void BM1397_send_hash_frequency(float frequency)
     ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
 }
 
-static uint8_t _send_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
+uint8_t BM1397_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
 {
     // send the init command
     _send_read_address();
@@ -272,34 +266,6 @@ static uint8_t _send_init(uint64_t frequency, uint16_t asic_count, uint16_t diff
     BM1397_send_hash_frequency(frequency);
 
     return chip_counter;
-}
-
-// reset the BM1397 via the RTS line
-static void _reset(void)
-{
-    gpio_set_level(GPIO_ASIC_RESET, 0);
-
-    // delay for 100ms
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-
-    // set the gpio pin high
-    gpio_set_level(GPIO_ASIC_RESET, 1);
-
-    // delay for 100ms
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-}
-
-uint8_t BM1397_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
-{
-    ESP_LOGI(TAG, "Initializing BM1397");
-
-    esp_rom_gpio_pad_select_gpio(GPIO_ASIC_RESET);
-    gpio_set_direction(GPIO_ASIC_RESET, GPIO_MODE_OUTPUT);
-
-    // reset the bm1397
-    _reset();
-
-    return _send_init(frequency, asic_count, difficulty);
 }
 
 // Baud formula = 25M/((denominator+1)*8)

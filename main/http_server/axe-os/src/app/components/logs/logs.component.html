@@ -61,39 +61,63 @@
 
     <div class="col-12">
         <div class="card">
-            <div class="flex flex-wrap gap-3 align-items-center">
-                <h2 class="mb-0" [ngClass]="{'w-full sm:w-auto': showLogs}">
-                    Realtime Logs
-                </h2>
+            <ng-container *ngIf="form != null">
+                <form [formGroup]="form">
+                    <div class="flex flex-wrap gap-3 align-items-center">
+                        <h2 class="mb-0" [ngClass]="{'w-full sm:w-auto': showLogs}">
+                            Realtime Logs
+                        </h2>
 
-                <button pButton (click)="toggleLogs()" class="btn btn-secondary" [ngClass]="{'ml-auto sm:ml-0': !showLogs}">
-                    {{showLogs ? 'Hide': 'Show'}} Logs
-                </button>
+                        <button pButton (click)="toggleLogs()" class="btn btn-secondary" [ngClass]="{'ml-auto sm:ml-0': !showLogs}">
+                            {{showLogs ? 'Hide': 'Show'}} Logs
+                        </button>
 
-                <button pButton class="btn btn-secondary" (click)="stopScroll = !stopScroll" *ngIf="showLogs">
-                    {{stopScroll ? 'Start' : 'Stop'}} Scrolling
-                </button>
+                        <button pButton class="btn btn-secondary" (click)="stopScroll = !stopScroll" *ngIf="showLogs">
+                            {{stopScroll ? 'Start' : 'Stop'}} Scrolling
+                        </button>
 
-                <button pButton class="btn btn--icon ml-auto"
-                    (click)="isExpanded = !isExpanded"
-                    pTooltip="Maximize Logs"
-                    tooltipPosition="left"
-                    *ngIf="showLogs"
-                >
-                    <i class="pi pi-window-maximize"></i>
-                </button>
-            </div>
+                        <button pButton class="btn btn-secondary" (click)="clearLogs()" *ngIf="showLogs">
+                            Clear Logs
+                        </button>
 
-            <div *ngIf="showLogs" id="logs" #scrollContainer [ngClass]="{'is-expanded': isExpanded, 'mt-4': !isExpanded}">
-                <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
-                <button pButton class="btn btn--icon absolute top-0 right-0"
-                    (click)="isExpanded = !isExpanded"
-                    pTooltip="Minimize Logs"
-                    tooltipPosition="left"
-                >
-                    <i class="pi pi-window-minimize"></i>
-                </button>
-            </div>
+                        <input pInputText type="text" autocomplete="off" class="ml-auto" *ngIf="showLogs"
+                            placeholder="Case-sensitive filter" id="filter" formControlName="filter"
+                        />
+
+                        <p-button
+                            icon="pi pi-window-maximize"
+                            pp-button
+                            (click)="isExpanded = !isExpanded"
+                            class="ml-auto"
+                            pTooltip="Maximize Logs"
+                            tooltipPosition="left"
+                            *ngIf="showLogs">
+                        </p-button>
+                    </div>
+
+                    <div *ngIf="showLogs" id="logs" #scrollContainer [ngClass]="{'is-expanded': isExpanded, 'mt-4': !isExpanded}">
+                        <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
+
+                        <div class="fixed top-0 right-0 flex gap-2 p-2 md:mr-4">
+                            <p-button
+                                icon="pi pi-{{stopScroll ? 'play' : 'pause'}}-circle"
+                                pp-button
+                                (click)="stopScroll = !stopScroll"
+                                pTooltip="{{stopScroll ? 'Start' : 'Stop'}} Scrolling"
+                                tooltipPosition="left">
+                            </p-button>
+
+                            <p-button
+                                icon="pi pi-window-minimize"
+                                pp-button
+                                (click)="isExpanded = false"
+                                pTooltip="Minimize Logs"
+                                tooltipPosition="left">
+                            </p-button>
+                        </div>
+                    </div>
+                </form>
+            </ng-container>
         </div>
     </div>
 </div>

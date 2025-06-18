@@ -31,6 +31,7 @@
 #include "bm1370.h"
 #include "asic.h"
 #include "device_config.h"
+#include "asic_reset.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
@@ -55,7 +56,12 @@ SemaphoreHandle_t BootSemaphore;
 //local function prototypes
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
-bool should_test(GlobalState * GLOBAL_STATE) {
+static bool should_test(GlobalState * GLOBAL_STATE) {
+    // Optionally hold the boot button
+    if (gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0) { // LOW when pressed
+        return true;
+    }
+
     bool is_max = GLOBAL_STATE->DEVICE_CONFIG.family.asic.model == BM1397;
     uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
@@ -251,10 +257,14 @@ esp_err_t test_psram(GlobalState * GLOBAL_STATE){
  * diagnostic tests to ensure the system is functioning correctly.
  *
  * @param pvParameters Pointer to the parameters passed to the task (if any).
+ * @return true if the self-test was run, false if it was skipped.
  */
-void self_test(void * pvParameters)
+bool self_test(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+
+    // Should we run the self test?
+    if (!should_test(GLOBAL_STATE)) return false;
 
     ESP_LOGI(TAG, "Running Self Tests");
 
@@ -267,7 +277,7 @@ void self_test(void * pvParameters)
 
     if (BootSemaphore == NULL) {
         ESP_LOGE(TAG, "Failed to create semaphore");
-        return;
+        return true;
     }
 
     //Run PSRAM test
@@ -303,6 +313,11 @@ void self_test(void * pvParameters)
     //Voltage Regulator Testing
     if (test_voltage_regulator(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Voltage Regulator test failed!");
+        tests_done(GLOBAL_STATE, TESTS_FAILED);
+    }
+
+    if (asic_reset() != ESP_OK) {
+        ESP_LOGE(TAG, "ASIC reset failed!");
         tests_done(GLOBAL_STATE, TESTS_FAILED);
     }
 
@@ -359,10 +374,8 @@ void self_test(void * pvParameters)
     notify_message.job_id = 0;
     notify_message.prev_block_hash = "0c859545a3498373a57452fac22eb7113df2a465000543520000000000000000";
     notify_message.version = 0x20000004;
-    notify_message.version_mask = 0x1fffe000;
     notify_message.target = 0x1705ae3a;
     notify_message.ntime = 0x647025b5;
-    notify_message.difficulty = 1000000;
 
     const char * coinbase_tx = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfab"
                                "e6d6d5cbab26a2599e92916edec"
@@ -392,7 +405,7 @@ void self_test(void * pvParameters)
 
     char * merkle_root = calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles);
 
-    bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000);
+    bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
 
     uint8_t difficulty_mask = 8;
 
@@ -466,7 +479,7 @@ void self_test(void * pvParameters)
 
     tests_done(GLOBAL_STATE, TESTS_PASSED);
 
-    return;  
+    return true;
 }
 
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result) 
