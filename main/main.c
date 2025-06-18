@@ -22,6 +22,7 @@
 #include "serial.h"
 #include "theme_api.h"
 #include "dataBase.h"
+#include "power_management_task.h"
 
 static GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, 
@@ -139,9 +140,31 @@ void app_main(void)
 
 
     if (GLOBAL_STATE.SYSTEM_MODULE.overheat_mode) {
-        gpio_set_direction(GPIO_NUM_1, GPIO_MODE_OUTPUT);
-        gpio_set_level(GPIO_NUM_1, 0);
+        ESP_LOGI(TAG, "Device is in overheat mode. Resetting to balanced preset and clearing overheat mode flag.");
         
+        // Reset to balanced preset for safe operation
+        if (apply_preset(GLOBAL_STATE.device_model, "balanced")) {
+            ESP_LOGI(TAG, "Successfully applied balanced preset for overheat recovery");
+        } else {
+            ESP_LOGE(TAG, "Failed to apply balanced preset, using safe defaults");
+            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1100);
+            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 400);
+            nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 75);
+            nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1);
+            nvs_config_set_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1);
+            nvs_config_set_string(NVS_CONFIG_AUTOTUNE_PRESET, "balanced");
+        }
+        
+        // Clear overheat mode flag for normal operation
+        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+        GLOBAL_STATE.SYSTEM_MODULE.overheat_mode = 0;
+        
+        // Log the recovery event
+        char recovery_data[128];
+        snprintf(recovery_data, sizeof(recovery_data), 
+                 "{\"resetToPreset\":\"balanced\",\"deviceModel\":%d}", 
+                 GLOBAL_STATE.device_model);
+        dataBase_log_event("power", "info", "Startup overheat mode reset - applied balanced preset", recovery_data);
     }
 
     if (GLOBAL_STATE.ASIC_functions.init_fn != NULL && !GLOBAL_STATE.SYSTEM_MODULE.overheat_mode) {

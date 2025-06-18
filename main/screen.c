@@ -76,7 +76,7 @@ static lv_obj_t * create_scr_overheat(SystemModule * module) {
     lv_obj_t *label2 = lv_label_create(scr);
     lv_obj_set_width(label2, LV_HOR_RES);
     lv_label_set_long_mode(label2, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(label2, "Power, frequency and fan configurations have been reset. Go to AxeOS to reconfigure device.");
+    lv_label_set_text(label2, "Restart device to reset to save settings.");
 
     lv_obj_t *label3 = lv_label_create(scr);
     lv_label_set_text(label3, "Device IP:");

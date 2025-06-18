@@ -506,9 +506,10 @@ static void handle_hard_overheat_recovery(GlobalState * GLOBAL_STATE, const char
     
     ESP_LOGE(TAG, "CRITICAL: Hard overheat recovery initiated. Power management task will exit.");
     ESP_LOGE(TAG, "System remains in overheat mode until manual intervention.");
+    ESP_LOGE(TAG, "Device requires manual restart to resume normal operation.");
     
-    // Exit the task instead of restarting - system stays in safe mode
-    exit(EXIT_FAILURE);
+    // Delete this task cleanly - system stays in safe mode
+    vTaskDelete(NULL);
 }
 
 // Soft overheat recovery function (original behavior with counter)
