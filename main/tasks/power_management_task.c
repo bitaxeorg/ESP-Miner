@@ -564,8 +564,14 @@ static void handle_overheat_recovery(GlobalState * GLOBAL_STATE, const char* dev
     
     ESP_LOGE(TAG, "Entering overheat recovery mode. Waiting 5 minutes for cooling...");
     
-    // Wait 5 minutes for cooling
-    vTaskDelay(300000 / portTICK_PERIOD_MS);
+    // Use non-blocking delay to allow screen updates
+    TickType_t start_time = xTaskGetTickCount();
+    TickType_t delay_ticks = pdMS_TO_TICKS(300000); // 5 minutes in ticks
+    
+    while ((xTaskGetTickCount() - start_time) < delay_ticks) {
+        // Allow other tasks to run
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Check every second
+    }
     
     ESP_LOGI(TAG, "Overheat recovery: Applying balanced preset and restarting...");
     
