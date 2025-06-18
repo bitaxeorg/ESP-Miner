@@ -514,11 +514,8 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "temptarget")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_TEMP_TARGET, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "statsLimit")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STATISTICS_LIMIT, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "statsDuration")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STATISTICS_DURATION, item->valueint);
+    if ((item = cJSON_GetObjectItem(root, "statsFrequency")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_STATISTICS_FREQUENCY, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "overclockEnabled")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
@@ -660,9 +657,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
-    
-    cJSON_AddNumberToObject(root, "statsLimit", nvs_config_get_u16(NVS_CONFIG_STATISTICS_LIMIT, 0));
-    cJSON_AddNumberToObject(root, "statsDuration", nvs_config_get_u16(NVS_CONFIG_STATISTICS_DURATION, 1));
+
+    cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0));
 
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
