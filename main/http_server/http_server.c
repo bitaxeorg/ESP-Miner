@@ -381,7 +381,6 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
         ESP_LOGI(TAG, "Redirecting to root");
         return ESP_OK;
     }
-    
     if (req->uri[strlen(req->uri) - 1] != '/') {
         httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
     }
