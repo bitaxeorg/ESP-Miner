@@ -126,18 +126,15 @@
         <div class="flex flex-column mb-5 gap-3">
             <div>
                 <label class="block mb-2">
-                    Statistics Limit: {{form.controls['statsLimit'].value}} previous data points
-                    <b *ngIf="form.controls['statsLimit'].value == 0"> (live data points only)</b>
+                    <ng-container *ngIf="this.form.controls['statsFrequency'].value == 0">
+                        Data logging disabled
+                    </ng-container>
+                    <ng-container *ngIf="this.form.controls['statsFrequency'].value > 0">
+                        Log data every {{form.controls['statsFrequency'].value | dateAgo: {strict: true} }} for {{(form.controls['statsFrequency'].value * 720) | dateAgo}}
+                    </ng-container>
                 </label>
-                <p-slider [min]="0" [max]="720" [step]="60" formControlName="statsLimit"></p-slider>
-            </div>
-
-            <div>
-                <label class="block mb-2">
-                    Statistics Duration:
-                    {{form.controls['statsDuration'].value}} hour{{form.controls['statsDuration'].value > 1 ? 's': ''}}
-                </label>
-                <p-slider [min]="1" [max]="720" formControlName="statsDuration"></p-slider>
+                <p-slider [min]="0" [max]="statsFrequencyMaxSteps" [step]="1" [formControl]="statsFrequencyControl"></p-slider>
+                <input type="hidden" formControlName="statsFrequency" />
             </div>
         </div>
 

@@ -3,6 +3,8 @@ import { RouterModule, Routes } from '@angular/router';
 
 import { HomeComponent } from './components/home/home.component';
 import { LogsComponent } from './components/logs/logs.component';
+import { SystemComponent } from './components/system/system.component';
+import { UpdateComponent } from './components/update/update.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
@@ -41,6 +43,16 @@ const routes: Routes = [
         title: `${TITLE_PREFIX} Logs`,
       },
       {
+        path: 'system',
+        component: SystemComponent,
+        title: `${TITLE_PREFIX} System`,
+      },
+      {
+        path: 'update',
+        component: UpdateComponent,
+        title: `${TITLE_PREFIX} Update`,
+      },
+      {
         path: 'network',
         component: NetworkComponent,
         title: `${TITLE_PREFIX} Network`,
@@ -58,7 +70,7 @@ const routes: Routes = [
       {
         path: 'design',
         component: DesignComponent,
-        title: `${TITLE_PREFIX} Design`,
+        title: `${TITLE_PREFIX} Theme`,
       },
       {
         path: 'pool',

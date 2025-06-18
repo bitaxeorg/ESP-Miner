@@ -14,10 +14,9 @@ interface ThemeOption {
   selector: 'app-theme-config',
   template: `
     <div class="card">
-      <h5>Theme Configuration</h5>
       <div class="grid">
         <div class="col-12">
-          <h6>Color Scheme</h6>
+          <h5>Color Scheme</h5>
           <div class="flex gap-3">
             <div class="flex align-items-center">
               <p-radioButton name="colorScheme" [value]="'dark'" [(ngModel)]="selectedScheme"
@@ -33,7 +32,7 @@ interface ThemeOption {
         </div>
 
         <div class="col-12 mt-4">
-          <h6>Theme Colors</h6>
+          <h5>Theme Colors</h5>
           <div class="grid gap-2">
             <div *ngFor="let theme of themes" class="col-2 theme-color">
               <button pButton [class]="'p-button-rounded p-button-text color-dot'"
@@ -255,8 +254,8 @@ export class ThemeConfigComponent implements OnInit {
     config.colorScheme = scheme;
     this.layoutService.config.set(config);
     // Save color scheme to NVS
-    this.themeService.saveThemeSettings({ 
-      colorScheme: scheme 
+    this.themeService.saveThemeSettings({
+      colorScheme: scheme
     }).subscribe(
       () => { },
       error => console.error('Error saving theme settings:', error)

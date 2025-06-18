@@ -17,6 +17,8 @@ import { HomeComponent } from './components/home/home.component';
 import { LoadingComponent } from './components/loading/loading.component';
 import { ModalComponent } from './components/modal/modal.component';
 import { LogsComponent } from './components/logs/logs.component';
+import { SystemComponent } from './components/system/system.component';
+import { UpdateComponent } from './components/update/update.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
@@ -43,6 +45,8 @@ const components = [
   NetworkComponent,
   SettingsComponent,
   LogsComponent,
+  SystemComponent,
+  UpdateComponent,
   PoolComponent
 ];
 

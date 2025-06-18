@@ -1,9 +1,8 @@
-import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
-import { Component, ViewChild } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
-import { map, Observable, shareReplay, startWith } from 'rxjs';
+import { Observable, shareReplay, startWith } from 'rxjs';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
@@ -18,21 +17,12 @@ export class SettingsComponent {
 
   public form!: FormGroup;
 
-  public firmwareUpdateProgress: number | null = null;
-  public websiteUpdateProgress: number | null = null;
-
   public showReleaseNotes = false;
 
   public eASICModel = eASICModel;
   public ASICModel!: eASICModel;
 
-  public checkLatestRelease: boolean = false;
-  public latestRelease$: Observable<any>;
-
   public info$: Observable<any>;
-
-  @ViewChild('firmwareUpload') firmwareUpload!: FileUpload;
-  @ViewChild('websiteUpload') websiteUpload!: FileUpload;
 
   constructor(
     private fb: FormBuilder,
@@ -42,13 +32,6 @@ export class SettingsComponent {
     private loadingService: LoadingService,
     private githubUpdateService: GithubUpdateService
   ) {
-
-
-
-    this.latestRelease$ = this.githubUpdateService.getReleases().pipe(map(releases => {
-      return releases[0];
-    }));
-
     this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}))
 
 
@@ -118,85 +101,6 @@ export class SettingsComponent {
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error('Error.', `Could not save. ${err.message}`);
-        }
-      });
-  }
-
-  otaUpdate(event: FileUploadHandlerEvent) {
-    const file = event.files[0];
-    this.firmwareUpload.clear(); // clear the file upload component
-
-    if (file.name != 'esp-miner.bin') {
-      this.toastrService.error('Incorrect file, looking for esp-miner.bin.', 'Error');
-      return;
-    }
-
-    this.systemService.performOTAUpdate(file)
-      .pipe(this.loadingService.lockUIUntilComplete())
-      .subscribe({
-        next: (event) => {
-          if (event.type === HttpEventType.UploadProgress) {
-            this.firmwareUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
-          } else if (event.type === HttpEventType.Response) {
-            if (event.ok) {
-              this.toastrService.success('Firmware updated', 'Success!');
-
-            } else {
-              this.toastrService.error(event.statusText, 'Error');
-            }
-          }
-          else if (event instanceof HttpErrorResponse)
-          {
-            this.toastrService.error(event.error, 'Error');
-          }
-        },
-        error: (err) => {
-          this.toastrService.error(err.error, 'Error');
-        },
-        complete: () => {
-          this.firmwareUpdateProgress = null;
-        }
-      });
-  }
-
-  otaWWWUpdate(event: FileUploadHandlerEvent) {
-    const file = event.files[0];
-    this.websiteUpload.clear(); // clear the file upload component
-
-    if (file.name != 'www.bin') {
-      this.toastrService.error('Incorrect file, looking for www.bin.', 'Error');
-      return;
-    }
-
-    this.systemService.performWWWOTAUpdate(file)
-      .pipe(
-        this.loadingService.lockUIUntilComplete(),
-      ).subscribe({
-        next: (event) => {
-          if (event.type === HttpEventType.UploadProgress) {
-            this.websiteUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
-          } else if (event.type === HttpEventType.Response) {
-            if (event.ok) {
-              this.toastrService.success('Website updated', 'Success!');
-              setTimeout(() => {
-                window.location.reload();
-              }, 2000);
-            } else {
-              this.toastrService.error(event.statusText, 'Error');
-            }
-          }
-          else if (event instanceof HttpErrorResponse)
-          {
-            const errorMessage = event.error?.message || event.message || 'Unknown error occurred';
-            this.toastrService.error(errorMessage, 'Error');
-          }
-        },
-        error: (err) => {
-          const errorMessage = err.error?.message || err.message || 'Unknown error occurred';
-          this.toastrService.error(errorMessage, 'Error');
-        },
-        complete: () => {
-          this.websiteUpdateProgress = null;
         }
       });
   }
