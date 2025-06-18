@@ -305,6 +305,32 @@ static esp_err_t rest_recovery_handler(httpd_req_t * req)
     return ESP_OK;
 }
 
+/* Send a 404 as JSON for unhandled api routes */
+static esp_err_t rest_api_common_handler(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON * root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "error", "unknown route");
+
+    const char * error_obj = cJSON_Print(root);
+    httpd_resp_set_status(req, HTTPD_404);
+    httpd_resp_sendstr(req, error_obj);
+    free((char *)error_obj);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 /* Send HTTP response with the contents of the requested file */
 static esp_err_t rest_common_get_handler(httpd_req_t * req)
 {
@@ -1215,6 +1241,13 @@ esp_err_t start_rest_server(void * pvParameters)
         httpd_register_uri_handler(server, &recovery_implicit_get_uri);
 
     } else {
+        httpd_uri_t api_common_uri = {
+            .uri = "/api/*",
+            .method = HTTP_ANY,
+            .handler = rest_api_common_handler,
+            .user_ctx = rest_context
+        };
+        httpd_register_uri_handler(server, &api_common_uri);
         /* URI handler for getting web server files */
         httpd_uri_t common_get_uri = {
             .uri = "/*", 

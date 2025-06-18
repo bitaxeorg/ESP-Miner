@@ -517,6 +517,7 @@ paths:
                 type: object
                 required:
                   - ASICModel
+                  - boardFamily
                   - defaultFrequency
                   - frequencyOptions
                   - defaultVoltage
@@ -532,6 +533,11 @@ paths:
                       - BM1397
                     examples:
                       - "BM1366"
+                  boardFamily:
+                    type: string
+                    description: Board family name
+                    examples:
+                      - "Ultra"
                   defaultFrequency:
                     type: number
                     description: Default frequency for the ASIC model in MHz
