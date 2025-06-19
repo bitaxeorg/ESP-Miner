@@ -6,6 +6,7 @@ import { map, Observable, shareReplay, startWith } from 'rxjs';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
+import { ModalComponent } from '../modal/modal.component';
 
 @Component({
   selector: 'app-update',
@@ -24,6 +25,8 @@ export class UpdateComponent {
 
   @ViewChild('firmwareUpload') firmwareUpload!: FileUpload;
   @ViewChild('websiteUpload') websiteUpload!: FileUpload;
+
+  @ViewChild(ModalComponent) modalComponent!: ModalComponent;
 
   constructor(
     private systemService: SystemService,
@@ -115,5 +118,18 @@ export class UpdateComponent {
           this.websiteUpdateProgress = null;
         }
       });
+  }
+
+  // https://gist.github.com/elfefe/ef08e583e276e7617cd316ba2382fc40
+  public simpleMarkdownParser(markdown: string): string {
+    const toHTML = markdown
+      .replace(/^#{1,6}\s+(.+)$/gim, '<h4 class="mt-2">$1</h4>') // Headlines
+      .replace(/\*\*(.+?)\*\*|__(.+?)__/gim, '<b>$1</b>') // Bold text
+      .replace(/\*(.+?)\*|_(.+?)_/gim, '<i>$1</i>') // Italic text
+      .replace(/\[(.*?)\]\((.*?)\s?(?:"(.*?)")?\)/gm, '<a href="$2" class="underline text-white" target="_blank">$1</a>') // Links
+      .replace(/^\s*[-+*]\s?(.+)$/gim, '<li>$1</li>') // Unordered list
+      .replace(/\r\n\r\n/gim, '<br>'); // Breaks
+
+    return toHTML.trim();
   }
 }
