@@ -51,6 +51,6 @@ bool do_frequency_transition(float target_frequency, set_hash_frequency_fn set_f
     set_frequency_fn(target);
     current_frequency = target;
     
-    ESP_LOGI(TAG, "Successfully transitioned ASIC type %d to %.2f MHz", asic_type, target);
+    ESP_LOGI(TAG, "Successfully transitioned ASIC type %d to %g MHz", asic_type, target);
     return true;
 }

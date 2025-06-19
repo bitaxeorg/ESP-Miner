@@ -24,6 +24,7 @@
 #include "esp_psram.h"
 #include "power.h"
 #include "thermal.h"
+#include "power_management_task.h"
 
 #include "bm1397.h"
 #include "bm1366.h"
@@ -327,8 +328,7 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, TESTS_FAILED);
     }
 
-    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
+    POWER_MANAGEMENT_init_frequency(&GLOBAL_STATE->POWER_MANAGEMENT_MODULE);
 
     uint8_t chips_detected = ASIC_init(GLOBAL_STATE);
     uint8_t chips_expected = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;

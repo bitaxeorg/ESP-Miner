@@ -118,7 +118,7 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
 
 bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency)
 {
-    ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
+    ESP_LOGI(TAG, "Setting ASIC frequency to %g MHz", target_frequency);
     bool success = false;
     
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.model) {
@@ -139,9 +139,9 @@ bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency)
     }
     
     if (success) {
-        ESP_LOGI(TAG, "Successfully transitioned to new ASIC frequency: %.2f MHz", target_frequency);
+        ESP_LOGI(TAG, "Successfully transitioned to new ASIC frequency: %g MHz", target_frequency);
     } else {
-        ESP_LOGE(TAG, "Failed to transition to new ASIC frequency: %.2f MHz", target_frequency);
+        ESP_LOGE(TAG, "Failed to transition to new ASIC frequency: %g MHz", target_frequency);
     }
     
     return success;
