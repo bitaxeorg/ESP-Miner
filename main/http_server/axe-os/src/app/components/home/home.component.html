@@ -298,17 +298,23 @@
                     <tr>
                         <td colspan="2">{{info.uptimeSeconds | dateAgo}}</td>
                     </tr>
+                </table>
+                <table>
                     <tr>
                         <td>Maximum ASIC Temperature:</td>
-                        <ng-container *ngIf="info.tempMax > 0; else noTemp">
-                            <td>{{info.tempMax}}&deg;C</td>
-                        </ng-container>
+                        <td>
+                            <ng-container *ngIf="info.tempMax > 0; else noTemp">
+                                {{info.tempMax}}&deg;C
+                            </ng-container>
+                        </td>
                     </tr>
                     <tr>
-                        <ng-container *ngIf="info.vrTempMax > 0">
-                            <td>Maximum VR Temperature:</td>
-                            <td>{{info.vrTempMax}}&deg;C</td>
-                        </ng-container>
+                        <td>Maximum VR Temperature:</td>
+                        <td>
+                            <ng-container *ngIf="info.vrTempMax > 0; else noTemp">
+                                {{info.vrTempMax}}&deg;C
+                            </ng-container>
+                        </td>
                     </tr>
                 </table>
             </div>
