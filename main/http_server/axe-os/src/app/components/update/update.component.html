@@ -27,6 +27,14 @@
                                     [href]="asset.browser_download_url">www.bin</a>
                             </div>
                         </div>
+
+                        <a class="text-500 underline block mt-3 cursor-pointer" (click)="modalComponent.isVisible = true">
+                            Release Notes
+                        </a>
+
+                        <app-modal [headline]="latestRelease.name">
+                            <div [innerHTML]="simpleMarkdownParser(latestRelease.body)"></div>
+                        </app-modal>
                     </ng-container>
                 </ng-template>
             </div>
