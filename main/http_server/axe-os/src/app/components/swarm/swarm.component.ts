@@ -119,27 +119,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     const { start, end } = this.calculateIpRange(window.location.hostname, '255.255.255.0');
     const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
-    from(ips).pipe(
-      mergeMap(IP =>
-        forkJoin({
-          info: this.httpClient.get(`http://${IP}/api/system/info`),
-          asic: this.httpClient.get(`http://${IP}/api/system/asic`)
-        }).pipe(
-          map(({ info, asic }) => {
-            if ('hashRate' in info) {
-              return {IP, ...info, ...asic};
-            }
-            return null;
-          }),
-          timeout(5000), // Set the timeout to 5 seconds
-          catchError(error => {
-            return []; // Return an empty result or handle as desired
-          })
-        ),
-        128 // Limit concurrency to avoid overload
-      ),
-      toArray() // Collect all results into a single array
-    ).pipe(take(1)).subscribe({
+    this.getAllDeviceInfo(ips).subscribe({
       next: (result) => {
         // Filter out null items first
         const validResults = result.filter((item): item is NonNullable<typeof item> => item !== null);
@@ -155,6 +135,40 @@ export class SwarmComponent implements OnInit, OnDestroy {
         this.scanning = false;
       }
     });
+  }
+
+  private getAllDeviceInfo(ips: string[]) {
+    return from(ips).pipe(
+      mergeMap(IP => forkJoin({
+        info: this.httpClient.get(`http://${IP}/api/system/info`),
+        asic: this.httpClient.get(`http://${IP}/api/system/asic`)
+      }).pipe(
+        map(({ info, asic }) => {
+          return { IP, ...info, ...asic };
+        }),
+        timeout(5000),
+        catchError(error => {
+          const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
+          this.toastr.error('Failed to get info from ' + IP, errorMessage);
+          // Return existing device with zeroed stats instead of the previous state
+          const existingDevice = this.swarm.find(axeOs => axeOs.IP === IP);
+          return of({
+            ...existingDevice,
+            hashRate: 0,
+            sharesAccepted: 0,
+            power: 0,
+            voltage: 0,
+            temp: 0,
+            bestDiff: 0,
+            version: 0,
+            uptimeSeconds: 0,
+          });
+        })
+      ),
+        128
+      ),
+      toArray()
+    ).pipe(take(1));
   }
 
   public add() {
@@ -216,38 +230,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     const ips = this.swarm.map(axeOs => axeOs.IP);
     this.isRefreshing = true;
 
-    from(ips).pipe(
-      mergeMap(IP =>
-        forkJoin({
-          info: this.httpClient.get(`http://${IP}/api/system/info`),
-          asic: this.httpClient.get(`http://${IP}/api/system/asic`)
-        }).pipe(
-          map(({ info, asic }) => {
-            return {IP, ...info, ...asic}
-          }),
-          timeout(5000),
-          catchError(error => {
-            const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
-            this.toastr.error('Failed to get info from ' + IP, errorMessage);
-            // Return existing device with zeroed stats instead of the previous state
-            const existingDevice = this.swarm.find(axeOs => axeOs.IP === IP);
-            return of({
-              ...existingDevice,
-              hashRate: 0,
-              sharesAccepted: 0,
-              power: 0,
-              voltage: 0,
-              temp: 0,
-              bestDiff: 0,
-              version: 0,
-              uptimeSeconds: 0,
-            });
-          })
-        ),
-        128 // Limit concurrency to avoid overload
-      ),
-      toArray() // Collect all results into a single array
-    ).pipe(take(1)).subscribe({
+    this.getAllDeviceInfo(ips).subscribe({
       next: (result) => {
         this.swarm = result;
         this.sortSwarm();
