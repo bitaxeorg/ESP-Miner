@@ -1,6 +1,6 @@
 <div class="layout-topbar">
-    <a class="layout-topbar-logo" routerLink="">
-        <div [routerLink]="['/']" class="header-text"><span style="font-family: Angel Wish; font-size: 4rem;">Axe</span><span class="os" style=" font-size: 3rem;">OS</span></div>
+    <a class="flex-order-2 lg:flex-order-0" routerLink="">
+        <img src="/assets/images/AxeOS.svg" width="120" height="54" class="block" alt="AxeOS" />
     </a>
 
     <button *ngIf="!isAPMode" #menubutton class="p-link layout-menu-button layout-topbar-button" (click)="layoutService.onMenuToggle()">
