@@ -4,9 +4,27 @@
         <li *ngIf="item.separator" class="menu-separator"></li>
     </ng-container>
 
-
-    <li id="restart-container">
+    <li class="flex mx-3 mt-4">
         <p-button (click)="restart()" id="restart" label="Restart" severity="primary"></p-button>
     </li>
-
 </ul>
+
+<ng-container *ngIf="isMobile()">
+    <ul *ngIf="info$ | async as info" class="lg:hidden list-none absolute p-0 mt-0 mr-4 right-0 bottom-0 opacity-80">
+        <li class="flex align-items-center justify-content-end gap-2">
+            {{info.hostname}}
+            <img src="/assets/images/bitaxe.svg" width="16" height="16" alt="Bitaxe" />
+        </li>
+        <li class="flex align-items-center justify-content-end gap-2">
+            <span [ngClass]="{
+                'text-green-500': info.wifiRSSI > -50,
+                'text-blue-500': info.wifiRSSI <= -50 && info.wifiRSSI > -60,
+                'text-orange-500': info.wifiRSSI <= -60 && info.wifiRSSI > -70,
+                'text-red-500': info.wifiRSSI <= -70
+            }">
+                {{info.wifiRSSI}} dBm
+            </span>
+            <i class="pi pi-wifi" style="font-size: 1.143rem"></i>
+        </li>
+    </ul>
+</ng-container>

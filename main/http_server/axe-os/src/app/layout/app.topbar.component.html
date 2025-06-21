@@ -7,9 +7,33 @@
         <i class="pi pi-bars"></i>
     </button>
 
-
-    <div class="layout-topbar-menu">
-
-    </div>
-
+    <ng-container *ngIf="isDesktop()">
+        <ul *ngIf="info$ | async as info" class="hidden lg:flex lg:flex-column ml-auto opacity-80">
+            <li class="flex align-items-center justify-content-end gap-2 select-none pl-2"
+                tooltipPosition="left"
+                pTooltip="Hostname"
+            >
+                {{info.hostname}}
+                <img src="/assets/images/bitaxe.svg" width="16" height="16" alt="Bitaxe" />
+            </li>
+            <li class="flex align-items-center justify-content-end gap-2 select-none pl-2"
+                tooltipPosition="left"
+                pTooltip="WiFi RSSI {{
+                    info.wifiRSSI > -50 ? 'excellent' :
+                    (info.wifiRSSI <= -50 && info.wifiRSSI > -60 ? 'good' :
+                    (info.wifiRSSI <= -60 && info.wifiRSSI > -70 ? 'fair' : 'weak'))
+                }}"
+            >
+                <span [ngClass]="{
+                    'text-green-500': info.wifiRSSI > -50,
+                    'text-blue-500': info.wifiRSSI <= -50 && info.wifiRSSI > -60,
+                    'text-orange-500': info.wifiRSSI <= -60 && info.wifiRSSI > -70,
+                    'text-red-500': info.wifiRSSI <= -70
+                }">
+                    {{info.wifiRSSI}} dBm
+                </span>
+                <i class="pi pi-wifi" style="font-size: 1.143rem"></i>
+            </li>
+        </ul>
+    </ng-container>
 </div>

@@ -10,7 +10,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { RippleModule } from 'primeng/ripple';
 import { SidebarModule } from 'primeng/sidebar';
-
+import { TooltipModule } from 'primeng/tooltip';
 import { PrimeNGModule } from '../prime-ng.module';
 import { AppFooterComponent } from './app.footer.component';
 import { AppLayoutComponent } from './app.layout.component';
@@ -41,7 +41,7 @@ import { AppTopBarComponent } from './app.topbar.component';
         RippleModule,
         RouterModule,
         PrimeNGModule,
-
+        TooltipModule,
     ],
     exports: [AppLayoutComponent]
 })

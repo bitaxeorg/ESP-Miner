@@ -258,7 +258,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
     } else if (CHECK_FILE_EXTENSION(filepath, ".ico")) {
         type = "image/x-icon";
     } else if (CHECK_FILE_EXTENSION(filepath, ".svg")) {
-        type = "text/xml";
+        type = "image/svg+xml";
     } else if (CHECK_FILE_EXTENSION(filepath, ".pdf")) {
         type = "application/pdf";
     } else if (CHECK_FILE_EXTENSION(filepath, ".woff2")) {

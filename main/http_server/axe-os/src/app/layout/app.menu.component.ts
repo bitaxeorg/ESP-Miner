@@ -1,8 +1,9 @@
 import { Component, OnInit } from '@angular/core';
+import { Observable, shareReplay } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-
 import { SystemService } from '../services/system.service';
 import { LayoutService } from './service/app.layout.service';
+import { ISystemInfo } from 'src/models/ISystemInfo';
 
 @Component({
     selector: 'app-menu',
@@ -10,12 +11,16 @@ import { LayoutService } from './service/app.layout.service';
 })
 export class AppMenuComponent implements OnInit {
 
+    public info$!: Observable<ISystemInfo>;
+
     model: any[] = [];
 
     constructor(public layoutService: LayoutService,
         private systemService: SystemService,
         private toastr: ToastrService
-    ) { }
+    ) {
+        this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}))
+    }
 
     ngOnInit() {
         this.model = [
@@ -42,9 +47,11 @@ export class AppMenuComponent implements OnInit {
     }
 
     public restart() {
-        this.systemService.restart().subscribe(res => {
-
-        });
+        this.systemService.restart().subscribe(res => {});
         this.toastr.success('Success!', 'Bitaxe restarted');
+    }
+
+    public isMobile() {
+        return !window.matchMedia("(min-width: 991px)").matches;
     }
 }
