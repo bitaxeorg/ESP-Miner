@@ -1,7 +1,8 @@
 import { Component } from '@angular/core';
-import { interval, map, Observable, shareReplay, startWith, switchMap } from 'rxjs';
+import { interval, Observable, shareReplay, startWith, switchMap } from 'rxjs';
 import { SystemService } from 'src/app/services/system.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
+import { ISystemASIC } from 'src/models/ISystemASIC';
 
 @Component({
   selector: 'app-system',
@@ -9,6 +10,7 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 })
 export class SystemComponent {
   public info$: Observable<ISystemInfo>;
+  public asic$: Observable<ISystemASIC>;
 
   constructor(
     private systemService: SystemService
@@ -17,5 +19,9 @@ export class SystemComponent {
       startWith(() => this.systemService.getInfo()),
       switchMap(() => this.systemService.getInfo()),
       shareReplay({ refCount: true, bufferSize: 1 })
+    );
+
+    this.asic$ = this.systemService.getAsicSettings().pipe(
+      shareReplay({refCount: true, bufferSize: 1})
     );
 }}

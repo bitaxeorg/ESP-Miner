@@ -505,7 +505,8 @@ paths:
                 type: object
                 required:
                   - ASICModel
-                  - boardFamily
+                  - swarmColor
+                  - familyName
                   - defaultFrequency
                   - frequencyOptions
                   - defaultVoltage
@@ -521,11 +522,16 @@ paths:
                       - BM1397
                     examples:
                       - "BM1366"
-                  boardFamily:
+                  familyName:
                     type: string
                     description: Board family name
                     examples:
                       - "Ultra"
+                  swarmColor:
+                    type: string
+                    description: Swarm color
+                    examples:
+                      - "purple"
                   defaultFrequency:
                     type: number
                     description: Default frequency for the ASIC model in MHz

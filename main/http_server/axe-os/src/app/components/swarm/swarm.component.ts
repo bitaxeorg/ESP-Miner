@@ -2,9 +2,10 @@ import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { catchError, from, map, mergeMap, of, take, timeout, toArray } from 'rxjs';
+import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { SystemService } from 'src/app/services/system.service';
+import { ISystemASIC } from 'src/models/ISystemASIC';
 import { ModalComponent } from '../modal/modal.component';
 
 const SWARM_DATA = 'SWARM_DATA'
@@ -118,28 +119,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     const { start, end } = this.calculateIpRange(window.location.hostname, '255.255.255.0');
     const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
-    from(ips).pipe(
-      mergeMap(ipAddr =>
-        this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
-          map(result => {
-            if ('hashRate' in result) {
-              return {
-                IP: ipAddr,
-                ...result
-              };
-            }
-            return null;
-          }),
-          timeout(5000), // Set the timeout to 5 seconds
-          catchError(error => {
-            //console.error(`Request to ${ipAddr}/api/system/info failed or timed out`, error);
-            return []; // Return an empty result or handle as desired
-          })
-        ),
-        128 // Limit concurrency to avoid overload
-      ),
-      toArray() // Collect all results into a single array
-    ).pipe(take(1)).subscribe({
+    this.getAllDeviceInfo(ips).subscribe({
       next: (result) => {
         // Filter out null items first
         const validResults = result.filter((item): item is NonNullable<typeof item> => item !== null);
@@ -157,22 +137,63 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
+  private getAllDeviceInfo(ips: string[]) {
+    return from(ips).pipe(
+      mergeMap(IP => forkJoin({
+        info: this.httpClient.get(`http://${IP}/api/system/info`),
+        asic: this.httpClient.get(`http://${IP}/api/system/asic`)
+      }).pipe(
+        map(({ info, asic }) => {
+          return { IP, ...info, ...asic };
+        }),
+        timeout(5000),
+        catchError(error => {
+          const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
+          this.toastr.error('Failed to get info from ' + IP, errorMessage);
+          // Return existing device with zeroed stats instead of the previous state
+          const existingDevice = this.swarm.find(axeOs => axeOs.IP === IP);
+          return of({
+            ...existingDevice,
+            hashRate: 0,
+            sharesAccepted: 0,
+            power: 0,
+            voltage: 0,
+            temp: 0,
+            bestDiff: 0,
+            version: 0,
+            uptimeSeconds: 0,
+          });
+        })
+      ),
+        128
+      ),
+      toArray()
+    ).pipe(take(1));
+  }
+
   public add() {
-    const newIp = this.form.value.manualAddIp;
+    const IP = this.form.value.manualAddIp;
 
     // Check if IP already exists
-    if (this.swarm.some(item => item.IP === newIp)) {
+    if (this.swarm.some(item => item.IP === IP)) {
       this.toastr.warning('This IP address already exists in the swarm', 'Duplicate Entry');
       return;
     }
 
-    this.systemService.getInfo(`http://${newIp}`).subscribe((res) => {
-      if (res.ASICModel) {
-        this.swarm.push({ IP: newIp, ...res });
-        this.sortSwarm();
-        this.localStorageService.setObject(SWARM_DATA, this.swarm);
-        this.calculateTotals();
+    const uri = `http://${IP}`;
+
+    forkJoin({
+      info: this.systemService.getInfo(uri),
+      asic: this.systemService.getAsicSettings(uri)
+    }).subscribe(({ info, asic }) => {
+      if (!info.ASICModel || !asic.ASICModel) {
+        return;
       }
+
+      this.swarm.push({ IP, ...asic, ...info });
+      this.sortSwarm();
+      this.localStorageService.setObject(SWARM_DATA, this.swarm);
+      this.calculateTotals();
     });
   }
 
@@ -209,38 +230,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     const ips = this.swarm.map(axeOs => axeOs.IP);
     this.isRefreshing = true;
 
-    from(ips).pipe(
-      mergeMap(ipAddr =>
-        this.httpClient.get(`http://${ipAddr}/api/system/info`).pipe(
-          map(result => {
-            return {
-              IP: ipAddr,
-              ...result
-            }
-          }),
-          timeout(5000),
-          catchError(error => {
-            const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
-            this.toastr.error('Failed to get info from ' + ipAddr, errorMessage);
-            // Return existing device with zeroed stats instead of the previous state
-            const existingDevice = this.swarm.find(axeOs => axeOs.IP === ipAddr);
-            return of({
-              ...existingDevice,
-              hashRate: 0,
-              sharesAccepted: 0,
-              power: 0,
-              voltage: 0,
-              temp: 0,
-              bestDiff: 0,
-              version: 0,
-              uptimeSeconds: 0,
-            });
-          })
-        ),
-        128 // Limit concurrency to avoid overload
-      ),
-      toArray() // Collect all results into a single array
-    ).pipe(take(1)).subscribe({
+    this.getAllDeviceInfo(ips).subscribe({
       next: (result) => {
         this.swarm = result;
         this.sortSwarm();
@@ -323,12 +313,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
       .reduce((max, curr) => this.compareBestDiff(max, curr), '0');
   }
 
-  hasModel(model: string): string {
-    return this.swarm.some(axe => axe.ASICModel === model) ? '1' : '0.5';
+  get getFamilies(): ISystemASIC[] {
+    return this.swarm.filter((v, i, a) =>
+      a.findIndex(({ familyName }) => v.familyName === familyName) === i);
   }
-
-  hasMultipleChips(): string {
-    return this.swarm.some(axe => axe.asicCount > 1) ? '1' : '0.5';
-  }
-
 }

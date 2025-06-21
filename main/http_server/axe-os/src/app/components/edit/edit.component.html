@@ -5,7 +5,7 @@
             text="Custom settings can cause damage & system instability. Only modify these settings if you understand the risks of running outside designed parameters.">
         </p-message>
 
-        <ng-container *ngIf="!settingsUnlocked && restrictedModels.includes(ASICModel)">
+        <ng-container *ngIf="!settingsUnlocked">
             <div class="field grid p-fluid">
                 <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
                 <div class="col-12 md:col-10">

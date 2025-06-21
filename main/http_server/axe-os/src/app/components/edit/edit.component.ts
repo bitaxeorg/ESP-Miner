@@ -5,7 +5,6 @@ import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
-import { eASICModel } from 'src/models/enum/eASICModel';
 import { ActivatedRoute } from '@angular/router';
 
 type Dropdown = {
@@ -30,10 +29,6 @@ export class EditComponent implements OnInit, OnDestroy {
 
   public savedChanges: boolean = false;
   public settingsUnlocked: boolean = false;
-  public eASICModel = eASICModel;
-  public ASICModel!: eASICModel;
-  public restrictedModels: eASICModel[] = Object.values(eASICModel)
-    .filter((v): v is eASICModel => typeof v === 'string');
 
   @Input() uri = '';
 
@@ -116,20 +111,18 @@ export class EditComponent implements OnInit, OnDestroy {
     // Fetch both system info and ASIC settings in parallel
     forkJoin({
       info: this.systemService.getInfo(this.uri),
-      asicSettings: this.systemService.getAsicSettings(this.uri)
+      asic: this.systemService.getAsicSettings(this.uri)
     })
     .pipe(
       this.loadingService.lockUIUntilComplete(),
       takeUntil(this.destroy$)
     )
-    .subscribe(({ info, asicSettings }) => {
-      this.ASICModel = info.ASICModel;
-
+    .subscribe(({ info, asic }) => {
       // Store the frequency and voltage options from the API
-      this.defaultFrequency = asicSettings.defaultFrequency;
-      this.frequencyOptions = asicSettings.frequencyOptions;
-      this.defaultVoltage = asicSettings.defaultVoltage;
-      this.voltageOptions = asicSettings.voltageOptions;
+      this.defaultFrequency = asic.defaultFrequency;
+      this.frequencyOptions = asic.frequencyOptions;
+      this.defaultVoltage = asic.defaultVoltage;
+      this.voltageOptions = asic.voltageOptions;
 
       // Check if overclock is enabled in NVS
       if (info.overclockEnabled === 1) {
