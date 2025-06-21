@@ -1,4 +1,5 @@
 import { eASICModel } from './enum/eASICModel';
+import { eChartLabel } from './enum/eChartLabel';
 
 interface ISharesRejectedStat {
     message: string;
@@ -53,6 +54,8 @@ export interface ISystemInfo {
     temptarget: number,
     fanrpm: number,
     statsFrequency: number,
+    chartY1Data: eChartLabel,
+    chartY2Data: eChartLabel,
     coreVoltageActual: number,
 
     boardtemp1?: number,
