@@ -16,7 +16,7 @@ asicvoltage,data,u16,1200
 asicmodel,data,string,BM1366
 devicemodel,data,string,ultra
 boardversion,data,string,207
-flipscreen,data,u16,1
+rotation,data,u16,0
 autofanspeed,data,u16,1
 fanspeed,data,u16,100
 selftest,data,u16,1
