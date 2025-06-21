@@ -111,6 +111,8 @@ bitaxetool --config ./config-xxx.cvs --firmware ./esp-miner-merged.bin
 
 where xxx is the config file for your hardware version. You can see the list of available config files in the root of the repository.
 
+A custom board version is also possible with `config-custom.cvs`. A custom board needs to be based on an existing `devicemodel` and `asicmodel`.
+
 Note: if you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
 
 ## Attributions
