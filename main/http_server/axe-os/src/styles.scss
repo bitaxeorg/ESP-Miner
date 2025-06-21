@@ -69,10 +69,6 @@ p-chart>div {
         background: var(--button-hover-bg);
         border-color: var(--button-hover-bg);
     }
-
-    &:focus {
-        box-shadow: var(--button-focus-shadow);
-    }
 }
 
 .p-button.p-button-text.color-dot {
