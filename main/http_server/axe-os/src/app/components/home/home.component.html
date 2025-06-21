@@ -1,6 +1,7 @@
 <ng-template #loading>
     <h4>Loading...</h4>
 </ng-template>
+<ng-template #noTemp>--</ng-template>
 <ng-container *ngIf="info$ | async as info; else loading">
     <!-- Temp warning alert -->
     <p-message *ngIf="info.overheat_mode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
@@ -203,7 +204,6 @@
                     <h6 class="flex justify-content-between mb-1">
                         ASIC Temperature
                         <span>
-                            <ng-template #noTemp>--</ng-template>
                             <ng-container *ngIf="info.temp > 0; else noTemp">
                                 {{info.temp}} &deg;C
                             </ng-container>
@@ -283,8 +283,30 @@
 
         <div class="col-12 md:col-6">
             <div class="card" *ngIf="info$ | async as info; else loading">
-                <h5>Uptime</h5>
-                {{info.uptimeSeconds | dateAgo}}
+                <h5>Uptime Information</h5>
+                <table>
+                    <tr>
+                        <td colspan="2">{{info.uptimeSeconds | dateAgo}}</td>
+                    </tr>
+                </table>
+                <table>
+                    <tr>
+                        <td>Maximum ASIC Temperature:</td>
+                        <td>
+                            <ng-container *ngIf="info.tempMax > 0; else noTemp">
+                                {{info.tempMax}}&deg;C
+                            </ng-container>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Maximum VR Temperature:</td>
+                        <td>
+                            <ng-container *ngIf="info.vrTempMax > 0; else noTemp">
+                                {{info.vrTempMax}}&deg;C
+                            </ng-container>
+                        </td>
+                    </tr>
+                </table>
             </div>
         </div>
 
