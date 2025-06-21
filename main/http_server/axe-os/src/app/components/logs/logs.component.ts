@@ -1,7 +1,6 @@
 import { AfterViewChecked, Component, Input, OnInit, ElementRef, OnDestroy, ViewChild, HostListener } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { SystemService } from 'src/app/services/system.service';
 import { WebsocketService } from 'src/app/services/web-socket.service';
 
 @Component({
@@ -19,27 +18,27 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   private websocketSubscription?: Subscription;
 
-  public showLogs = false;
-
   public stopScroll: boolean = false;
 
   public isExpanded: boolean = false;
 
   @HostListener('document:keydown.esc', ['$event'])
-  onEscKey(event: KeyboardEvent) {
+  onEscKey() {
     if (this.isExpanded) {
       this.isExpanded = false;
     }
   }
+
   @Input() uri = '';
 
   constructor(
     private fb: FormBuilder,
     private websocketService: WebsocketService,
-    private systemService: SystemService
   ) {}
 
   ngOnInit(): void {
+    this.subscribeLogs();
+
     this.form = this.fb.group({
       filter: ["", [Validators.required]]
     });
@@ -47,6 +46,7 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   ngOnDestroy(): void {
     this.websocketSubscription?.unsubscribe();
+    this.clearLogs();
   }
 
   private subscribeLogs() {
@@ -80,16 +80,6 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
           }
         }
       })
-  }
-
-  public toggleLogs() {
-    this.showLogs = !this.showLogs;
-
-    if (this.showLogs) {
-      this.subscribeLogs();
-    } else {
-      this.websocketSubscription?.unsubscribe();
-    }
   }
 
   public clearLogs() {

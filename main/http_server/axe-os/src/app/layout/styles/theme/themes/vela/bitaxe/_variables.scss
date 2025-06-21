@@ -8,4 +8,6 @@ $highlightBg: rgba(100, 181, 246, .16) !default;
 $highlightTextColor: rgba(255,255,255,.87) !default;
 $highlightFocusBg: rgba($primaryColor, .24) !default;
 
+$inputPadding: 0.5rem 0.75rem !default;
+
 @import '../_variables';
