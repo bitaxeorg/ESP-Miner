@@ -10,8 +10,6 @@ import { WebsocketService } from 'src/app/services/web-socket.service';
 })
 export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
 
-  @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
-
   public form!: FormGroup;
 
   public logs: { className: string, text: string }[] = [];
@@ -21,6 +19,8 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
   public stopScroll: boolean = false;
 
   public isExpanded: boolean = false;
+
+  @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
   @HostListener('document:keydown.esc', ['$event'])
   onEscKey() {
