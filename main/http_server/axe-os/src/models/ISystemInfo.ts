@@ -46,6 +46,7 @@ export interface ISystemInfo {
     fallbackStratumUser: string,
     frequency: number,
     version: string,
+    axeOSVersion: string,
     idfVersion: string,
     boardVersion: string,
     autofanspeed: number,
