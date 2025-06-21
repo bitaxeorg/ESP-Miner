@@ -40,10 +40,13 @@
 #include "statistics_task.h"
 #include "theme_api.h"  // Add theme API include
 #include "axe-os/api/system/asic_settings.h"
+#include "display.h"
 #include "http_server.h"
 
 #define JSON_ALL_STATS_ELEMENT_SIZE 120
 #define JSON_DASHBOARD_STATS_ELEMENT_SIZE 60
+
+#define NVS_STR_LIMIT (4000 - 1)
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -54,8 +57,13 @@ typedef struct {
     const char * name;
     int json_type;
     nvs_type_t nvs_type;
+    int min;
+    int max;
     const char * nvs_name;
-} SettingsFormat;
+    bool updated;
+    int int_value;
+    char * str_value;
+} Settings;
 
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
@@ -462,113 +470,171 @@ bool check_json_type(int expected_type, const cJSON * const item)
     return false;
 }
 
-bool check_settings_and_update(const cJSON * const root, bool update)
+bool check_settings_and_update(const cJSON * const root)
 {
+    bool result = true;
     const int cJSON_Option = (cJSON_Number | cJSON_True | cJSON_False);
 
-    const SettingsFormat settings_format[] = {
-        { .name = "stratumURL",              .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .nvs_name = NVS_CONFIG_STRATUM_URL },
-        { .name = "fallbackStratumURL",      .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_URL },
-        { .name = "stratumUser",             .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .nvs_name = NVS_CONFIG_STRATUM_USER },
-        { .name = "stratumPassword",         .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .nvs_name = NVS_CONFIG_STRATUM_PASS },
-        { .name = "fallbackStratumUser",     .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_USER },
-        { .name = "fallbackStratumPassword", .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_PASS },
-        { .name = "stratumPort",             .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_STRATUM_PORT },
-        { .name = "fallbackStratumPort",     .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_PORT },
-        { .name = "ssid",                    .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .nvs_name = NVS_CONFIG_WIFI_SSID },
-        { .name = "wifiPass",                .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .nvs_name = NVS_CONFIG_WIFI_PASS },
-        { .name = "hostname",                .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .nvs_name = NVS_CONFIG_HOSTNAME },
-        { .name = "coreVoltage",             .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_ASIC_VOLTAGE },
-        { .name = "frequency",               .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_ASIC_FREQ },
-        { .name = "overheat_mode",           .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_OVERHEAT_MODE },
-        { .name = "display",                 .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .nvs_name = NVS_CONFIG_DISPLAY },
-        { .name = "flipscreen",              .json_type = cJSON_Option, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_FLIP_SCREEN },
-        { .name = "invertscreen",            .json_type = cJSON_Option, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_INVERT_SCREEN },
-        { .name = "displayTimeout",          .json_type = cJSON_Number, .nvs_type = NVS_TYPE_I32, .nvs_name = NVS_CONFIG_DISPLAY_TIMEOUT },
-        { .name = "autofanspeed",            .json_type = cJSON_Option, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_AUTO_FAN_SPEED },
-        { .name = "fanspeed",                .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_FAN_SPEED },
-        { .name = "temptarget",              .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_TEMP_TARGET },
-        { .name = "statsFrequency",          .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_STATISTICS_FREQUENCY },
-        { .name = "overclockEnabled",        .json_type = cJSON_Option, .nvs_type = NVS_TYPE_U16, .nvs_name = NVS_CONFIG_OVERCLOCK_ENABLED }
+    Settings settings[] = {
+        { .name = "stratumURL",              .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .min = 0,  .max = NVS_STR_LIMIT, .nvs_name = NVS_CONFIG_STRATUM_URL },
+        { .name = "fallbackStratumURL",      .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .min = 0,  .max = NVS_STR_LIMIT, .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_URL },
+        { .name = "stratumUser",             .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .min = 0,  .max = NVS_STR_LIMIT, .nvs_name = NVS_CONFIG_STRATUM_USER },
+        { .name = "stratumPassword",         .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .min = 0,  .max = NVS_STR_LIMIT, .nvs_name = NVS_CONFIG_STRATUM_PASS },
+        { .name = "fallbackStratumUser",     .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .min = 0,  .max = NVS_STR_LIMIT, .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_USER },
+        { .name = "fallbackStratumPassword", .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .min = 0,  .max = NVS_STR_LIMIT, .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_PASS },
+        { .name = "stratumPort",             .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .min = 0,  .max = USHRT_MAX,     .nvs_name = NVS_CONFIG_STRATUM_PORT },
+        { .name = "fallbackStratumPort",     .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .min = 0,  .max = USHRT_MAX,     .nvs_name = NVS_CONFIG_FALLBACK_STRATUM_PORT },
+        { .name = "ssid",                    .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .min = 1,  .max = 32,            .nvs_name = NVS_CONFIG_WIFI_SSID },
+        { .name = "wifiPass",                .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .min = 1,  .max = 63,            .nvs_name = NVS_CONFIG_WIFI_PASS },
+        { .name = "hostname",                .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .min = 1,  .max = 32,            .nvs_name = NVS_CONFIG_HOSTNAME },
+        { .name = "coreVoltage",             .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .min = 1,  .max = USHRT_MAX,     .nvs_name = NVS_CONFIG_ASIC_VOLTAGE },
+        { .name = "frequency",               .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .min = 1,  .max = USHRT_MAX,     .nvs_name = NVS_CONFIG_ASIC_FREQ },
+        { .name = "overheat_mode",           .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .min = 0,  .max = 0,             .nvs_name = NVS_CONFIG_OVERHEAT_MODE },
+        { .name = "display",                 .json_type = cJSON_String, .nvs_type = NVS_TYPE_STR, .min = 0,  .max = NVS_STR_LIMIT, .nvs_name = NVS_CONFIG_DISPLAY },
+        { .name = "flipscreen",              .json_type = cJSON_Option, .nvs_type = NVS_TYPE_U16, .min = 0,  .max = 1,             .nvs_name = NVS_CONFIG_FLIP_SCREEN },
+        { .name = "invertscreen",            .json_type = cJSON_Option, .nvs_type = NVS_TYPE_U16, .min = 0,  .max = 1,             .nvs_name = NVS_CONFIG_INVERT_SCREEN },
+        { .name = "displayTimeout",          .json_type = cJSON_Number, .nvs_type = NVS_TYPE_I32, .min = -1, .max = USHRT_MAX,     .nvs_name = NVS_CONFIG_DISPLAY_TIMEOUT },
+        { .name = "autofanspeed",            .json_type = cJSON_Option, .nvs_type = NVS_TYPE_U16, .min = 0,  .max = 1,             .nvs_name = NVS_CONFIG_AUTO_FAN_SPEED },
+        { .name = "fanspeed",                .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .min = 0,  .max = 100,           .nvs_name = NVS_CONFIG_FAN_SPEED },
+        { .name = "temptarget",              .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .min = 35, .max = 66,            .nvs_name = NVS_CONFIG_TEMP_TARGET },
+        { .name = "statsFrequency",          .json_type = cJSON_Number, .nvs_type = NVS_TYPE_U16, .min = 0,  .max = USHRT_MAX,     .nvs_name = NVS_CONFIG_STATISTICS_FREQUENCY },
+        { .name = "overclockEnabled",        .json_type = cJSON_Option, .nvs_type = NVS_TYPE_U16, .min = 0,  .max = 1,             .nvs_name = NVS_CONFIG_OVERCLOCK_ENABLED }
     };
 
-    for (int i = 0; i < ARRAY_SIZE(settings_format); i++) {
-        cJSON * item = cJSON_GetObjectItem(root, settings_format[i].name);
+    // check for data type and data type range
+    for (int i = 0; i < ARRAY_SIZE(settings); i++) {
+        cJSON * item = cJSON_GetObjectItem(root, settings[i].name);
         if (item) {
-            if (check_json_type(settings_format[i].json_type, item)) {
-                switch (settings_format[i].nvs_type) {
+            // check data type
+            if (check_json_type(settings[i].json_type, item)) {
+                // check data type range
+                switch (settings[i].nvs_type) {
                     case NVS_TYPE_U8:
                         if ((0 > item->valueint) || (UCHAR_MAX < item->valueint)) {
-                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_U8", item->valueint, settings_format[i].name);
-                            return false;
-                        }
-                        if (update) {
-                            nvs_config_set_u16(settings_format[i].nvs_name, item->valueint); // nvs u8 is not used
+                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_U8", item->valueint, settings[i].name);
+                            result = false;
                         }
                         break;
                     case NVS_TYPE_U16:
                         if ((0 > item->valueint) || (USHRT_MAX < item->valueint)) {
-                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_U16", item->valueint, settings_format[i].name);
-                            return false;
-                        }
-                        if (update) {
-                            nvs_config_set_u16(settings_format[i].nvs_name, item->valueint);
+                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_U16", item->valueint, settings[i].name);
+                            result = false;
                         }
                         break;
                     case NVS_TYPE_U32:
                         if (0 > item->valueint) {
-                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_U32", item->valueint, settings_format[i].name);
-                            return false;
-                        }
-                        if (update) {
-                            nvs_config_set_u64(settings_format[i].nvs_name, item->valueint); // nvs u32 is not used
+                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_U32", item->valueint, settings[i].name);
+                            result = false;
                         }
                         break;
                     case NVS_TYPE_I8:
                         if ((CHAR_MIN > item->valueint) || (CHAR_MAX < item->valueint)) {
-                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_I8", item->valueint, settings_format[i].name);
-                            return false;
-                        }
-                        if (update) {
-                            nvs_config_set_i32(settings_format[i].nvs_name, item->valueint); // nvs i8 is not used
+                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_I8", item->valueint, settings[i].name);
+                            result = false;
                         }
                         break;
                     case NVS_TYPE_I16:
                         if ((SHRT_MIN > item->valueint) || (SHRT_MAX < item->valueint)) {
-                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_I16", item->valueint, settings_format[i].name);
-                            return false;
-                        }
-                        if (update) {
-                            nvs_config_set_i32(settings_format[i].nvs_name, item->valueint); // nvs i16 is not used
+                            ESP_LOGW(TAG, "Value '%d' for '%s' is not compatible with NVS_TYPE_I16", item->valueint, settings[i].name);
+                            result = false;
                         }
                         break;
                     case NVS_TYPE_I32:
-                        if (update) {
-                            nvs_config_set_i32(settings_format[i].nvs_name, item->valueint);
-                        }
                         break;
                     case NVS_TYPE_STR:
-                        if (update) {
-                            nvs_config_set_string(settings_format[i].nvs_name, item->valuestring);
+                        const size_t str_value_len = strlen(item->valuestring);
+                        settings[i].str_value = strdup(item->valuestring);
+
+                        if (0 > settings[i].min) {
+                            settings[i].min = 0;
+                        }
+
+                        if ((str_value_len < settings[i].min) || (str_value_len > settings[i].max)) {
+                            ESP_LOGW(TAG, "Value '%s' for '%s' is out of length (%d-%d)", item->valuestring, settings[i].name, settings[i].min, settings[i].max);
+                            result = false;
                         }
                         break;
                     default:
-                        ESP_LOGW(TAG, "NVS type (%d) for '%s' not supported", settings_format[i].nvs_type, settings_format[i].name);
-                        return false;
+                        ESP_LOGW(TAG, "NVS type (%d) for '%s' not supported", settings[i].nvs_type, settings[i].name);
+                        result = false;
+                        break;
                 }
+
+                // check value range
+                if (NVS_TYPE_STR != settings[i].nvs_type) {
+                    if ((settings[i].min > item->valueint) || (settings[i].max < item->valueint)) {
+                        ESP_LOGW(TAG, "Value '%d' for '%s' is out of range (%d-%d)", item->valueint, settings[i].name, settings[i].min, settings[i].max);
+                        result = false;
+                    }
+                }
+
+                // mark for update
+                settings[i].int_value = item->valueint;
+                settings[i].updated = true;
             } else {
-                ESP_LOGW(TAG, "Expected JSON type (%d) for setting '%s'", settings_format[i].json_type, settings_format[i].name);
-                return false;
+                ESP_LOGW(TAG, "Expected JSON type (%d) for setting '%s'", settings[i].json_type, settings[i].name);
+                result = false;
             }
         }
     }
 
-    return true;
+    // check individual values
+    if (result) {
+        for (int i = 0; i < ARRAY_SIZE(settings); i++) {
+            if (settings[i].updated) {
+                if (strcmp(settings[i].name, "display") == 0) {
+                    if (NULL == get_display_config(settings[i].str_value)) {
+                        ESP_LOGW(TAG, "Display config '%s' for '%s' is not available", settings[i].str_value, settings[i].name);
+                        result = false;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // update NVS (if result is okay) clean up
+    for (int i = 0; i < ARRAY_SIZE(settings); i++) {
+        if (settings[i].updated) {
+            if (result) {
+                switch (settings[i].nvs_type) {
+                    case NVS_TYPE_U8:
+                        nvs_config_set_u16(settings[i].nvs_name, (uint16_t)settings[i].int_value); // nvs u8 is not used
+                        break;
+                    case NVS_TYPE_U16:
+                        nvs_config_set_u16(settings[i].nvs_name, (uint16_t)settings[i].int_value);
+                        break;
+                    case NVS_TYPE_U32:
+                        nvs_config_set_u64(settings[i].nvs_name, (uint64_t)settings[i].int_value); // nvs u32 is not used
+                        break;
+                    case NVS_TYPE_I8:
+                        nvs_config_set_i32(settings[i].nvs_name, settings[i].int_value); // nvs i8 is not used
+                        break;
+                    case NVS_TYPE_I16:
+                        nvs_config_set_i32(settings[i].nvs_name, settings[i].int_value); // nvs i16 is not used
+                        break;
+                    case NVS_TYPE_I32:
+                        nvs_config_set_i32(settings[i].nvs_name, settings[i].int_value);
+                        break;
+                    case NVS_TYPE_STR:
+                        nvs_config_set_string(settings[i].nvs_name, settings[i].str_value);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            if (NVS_TYPE_STR == settings[i].nvs_type) {
+                free(settings[i].str_value);
+            }
+        }
+    }
+
+    return result;
 }
 
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
-
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
@@ -605,9 +671,8 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         return ESP_OK;
     }
 
-    if (check_settings_and_update(root, false)) {
-        check_settings_and_update(root, true);
-    } else {
+    if (!check_settings_and_update(root)) {
+        cJSON_Delete(root);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Wrong API input");
         return ESP_OK;
     }
