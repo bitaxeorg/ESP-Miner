@@ -44,8 +44,23 @@ int pid_startup_counter = 0;
 #define PID_STARTUP_HOLD_DURATION 3  // Number of cycles to HOLD pid_d_startup
 #define PID_STARTUP_RAMP_DURATION 17 // Number of cycles to RAMP DOWN D (Total startup duration PID_STARTUP_HOLD_DURATION + PID_STARTUP_RAMP_DURATION)
 
+#define TAG "power_management"
 
 PIDController pid;
+
+void POWER_MANAGEMENT_init_frequency(PowerManagementModule * power_management)
+{
+    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, -1);
+    if (frequency < 0) { // fallback if the float value is not yet set
+        frequency = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY, CONFIG_ASIC_FREQUENCY);
+
+        nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
+    }
+
+    ESP_LOGI(TAG, "ASIC Frequency: %gMHz", frequency);
+
+    power_management->frequency_value = frequency;
+}
 
 void POWER_MANAGEMENT_task(void * pvParameters)
 {
@@ -55,6 +70,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    POWER_MANAGEMENT_init_frequency(power_management);
+    
+    float last_asic_frequency = power_management->frequency_value;
 
     pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
 
@@ -67,10 +86,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
 
-    power_management->frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    ESP_LOGI(TAG, "ASIC Frequency: %.2fMHz", (float)power_management->frequency_value);
-    uint16_t last_asic_frequency = power_management->frequency_value;
-    
     while (1) {
 
         // Refresh PID setpoint from NVS in case it was changed via API
@@ -99,7 +114,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             VCORE_set_voltage(0.0f, GLOBAL_STATE);
 
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
+            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, 50);
             nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
             nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
             nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
@@ -161,7 +176,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-        uint16_t asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+        float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
@@ -170,12 +185,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         if (asic_frequency != last_asic_frequency) {
-            ESP_LOGI(TAG, "New ASIC frequency requested: %uMHz (current: %uMHz)", asic_frequency, last_asic_frequency);
+            ESP_LOGI(TAG, "New ASIC frequency requested: %gMHz (current: %gMHz)", asic_frequency, last_asic_frequency);
             
-            bool success = ASIC_set_frequency(GLOBAL_STATE, (float)asic_frequency);
+            bool success = ASIC_set_frequency(GLOBAL_STATE, asic_frequency);
             
             if (success) {
-                power_management->frequency_value = (float)asic_frequency;
+                power_management->frequency_value = asic_frequency;
             }
             
             last_asic_frequency = asic_frequency;

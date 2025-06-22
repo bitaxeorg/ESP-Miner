@@ -25,15 +25,10 @@
 #define GROUP_SINGLE 0x00
 #define GROUP_ALL 0x10
 
-#define CMD_JOB 0x01
-
 #define CMD_SETADDRESS 0x00
 #define CMD_WRITE 0x01
 #define CMD_READ 0x02
 #define CMD_INACTIVE 0x03
-
-#define RESPONSE_CMD 0x00
-#define RESPONSE_JOB 0x80
 
 #define SLEEP_TIME 20
 #define FREQ_MULT 25.0
