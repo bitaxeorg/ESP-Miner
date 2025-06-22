@@ -139,76 +139,78 @@ void BM1370_set_version_mask(uint32_t version_mask)
     _send_BM1370(TYPE_CMD | GROUP_ALL | CMD_WRITE, version_cmd, 6, BM1370_SERIALTX_DEBUG);
 }
 
-void BM1370_send_hash_frequency(float target_freq) {
+void BM1370_send_hash_frequency(float target_freq)
+{
     unsigned char freqbuf[6] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41}; // pll0_parameter
     float newf = 200.0f;
 
     uint8_t best_fb_divider = 0, best_post_divider1 = 0, best_post_divider2 = 0, best_ref_divider = 0;
     float min_difference = 10.0f;
-    const float max_diff = 1.0f;
+    const double max_diff = 1.0;
+    uint8_t smallest_refdiv = UINT8_MAX; // Initialize to the maximum possible value of uint8_t
 
-    // Loop over refdiv and postdiv1, solve for postdiv2 algebraically
-    for (uint8_t refdiv = 1; refdiv <= 2; ++refdiv) {
-        for (uint8_t postdiv1 = 1; postdiv1 <= 7; ++postdiv1) {
-            // postdiv2 = (25 * fb_divider) / (refdiv * postdiv1 * target_freq)
-            // But we want integer postdiv2 in [1, postdiv1]
-            for (uint8_t postdiv2 = 1; postdiv2 <= postdiv1; ++postdiv2) {
-                float fb_divider_f = postdiv1 * postdiv2 * target_freq * refdiv / 25.0f;
-                int fb_divider = (int)(fb_divider_f + 0.5f);
-                if (fb_divider < 0xA0 || fb_divider > 0xEF) continue;
+    bool find_best_match(bool relaxed_mode, float *min_difference, float *newf,
+                         uint8_t *best_fb_divider, uint8_t *best_post_divider1, uint8_t *best_post_divider2,
+                         uint8_t *best_ref_divider, double target_freq) {
+        float threshold = relaxed_mode ? *min_difference : max_diff;
 
-                // Check if postdiv2 is integer and in range
-                float actual_freq = 25.0f * fb_divider / (refdiv * postdiv1 * postdiv2);
-                float diff = fabsf(target_freq - actual_freq);
-
-                if (diff < min_difference && diff < max_diff) {
-                    best_fb_divider = fb_divider;
-                    best_post_divider1 = postdiv1;
-                    best_post_divider2 = postdiv2;
-                    best_ref_divider = refdiv;
-                    min_difference = diff;
-                    newf = actual_freq;
-                }
-            }
-        }
-    }
-
-    // If no valid divider found, find the closest possible frequency (even if diff > max_diff)
-    if (best_fb_divider == 0) {
-        min_difference = 1e6f;
         for (uint8_t refdiv = 1; refdiv <= 2; ++refdiv) {
             for (uint8_t postdiv1 = 1; postdiv1 <= 7; ++postdiv1) {
                 for (uint8_t postdiv2 = 1; postdiv2 <= postdiv1; ++postdiv2) {
-                    float fb_divider_f = postdiv1 * postdiv2 * target_freq * refdiv / 25.0f;
-                    int fb_divider = (int)(fb_divider_f + 0.5f);
-                    if (fb_divider < 0xA0 || fb_divider > 0xEF) continue;
+                    double fb_divider_f = postdiv1 * postdiv2 * target_freq * refdiv / 25.0;
+                    int fb_divider = round(fb_divider_f);
 
-                    float actual_freq = 25.0f * fb_divider / (refdiv * postdiv1 * postdiv2);
-                    float diff = fabsf(target_freq - actual_freq);
+                    if (fb_divider < 0xA0 || fb_divider > 0xEF)
+                        continue;
 
-                    if (diff < min_difference) {
-                        best_fb_divider = fb_divider;
-                        best_post_divider1 = postdiv1;
-                        best_post_divider2 = postdiv2;
-                        best_ref_divider = refdiv;
-                        min_difference = diff;
-                        newf = actual_freq;
+                    double actual_freq = 25.0 * fb_divider / (refdiv * postdiv1 * postdiv2);
+                    double diff = fabs(target_freq - actual_freq);
+
+                    if (diff < *min_difference && diff < threshold) {
+                        *best_fb_divider = fb_divider;
+                        *best_post_divider1 = postdiv1;
+                        *best_post_divider2 = postdiv2;
+                        *best_ref_divider = refdiv;
+                        smallest_refdiv = refdiv; // Update the smallest refdiv found
+                        *min_difference = diff;
+                        *newf = actual_freq;
+
+                        ESP_LOGI(TAG,
+                            "Found better match: fb_divider=%d, postdiv1=%d, postdiv2=%d, refdiv=%d, smallest_refdiv=%d, diff=%.6f",
+                            *best_fb_divider, *best_post_divider1, *best_post_divider2, *best_ref_divider, smallest_refdiv, *min_difference);
+
+                        return true;
                     }
                 }
             }
         }
-        if (best_fb_divider == 0) {
+
+        return false;
+    };
+
+    // Try to find the closest match within max_diff
+    if (!find_best_match(false, &min_difference, &newf,
+                         &best_fb_divider, &best_post_divider1, &best_post_divider2,
+                         &best_ref_divider, target_freq)) {
+        // If no valid divider found, find the closest possible frequency (even if diff > max_diff)
+        min_difference = 1e6f;
+
+        if (!find_best_match(true, &min_difference, &newf,
+                             &best_fb_divider, &best_post_divider1, &best_post_divider2,
+                             &best_ref_divider, target_freq)) {
             ESP_LOGE(TAG, "Failed to find any PLL settings for target frequency %.2f", target_freq);
             return;
         }
-        ESP_LOGW(TAG, "Using next best PLL settings for frequency %.2f (actual %.2f, diff %.2f)", target_freq, newf, min_difference);
+
+        ESP_LOGW(TAG, "Using next best PLL settings for frequency %.2f (actual %.2f, diff %.2f)", target_freq, newf,
+                 min_difference);
     }
 
     freqbuf[3] = best_fb_divider;
     freqbuf[4] = best_ref_divider;
     freqbuf[5] = (((best_post_divider1 - 1) & 0xF) << 4) | ((best_post_divider2 - 1) & 0xF);
 
-    if ((best_fb_divider * 25.0f / (float)best_ref_divider) >= 2400.0f) {
+    if ((best_fb_divider * 25.0 / (float) best_ref_divider) >= 2400.0f) {
         freqbuf[2] = 0x50;
     }
 
