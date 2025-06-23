@@ -10,6 +10,8 @@
 #include "esp_wifi.h"
 #include <esp_sntp.h>
 #include <time.h>
+#include <sys/time.h>
+#include <stdbool.h>
 
 #define PORT CONFIG_STRATUM_PORT
 #define STRATUM_URL CONFIG_STRATUM_URL
@@ -193,6 +195,9 @@ void stratum_task(void * pvParameters)
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
+    struct timeval current_time;
+    double response_time_ms;
+
     xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL);
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
@@ -307,6 +312,15 @@ void stratum_task(void * pvParameters)
                 retry_attempts++;
                 stratum_close_connection(GLOBAL_STATE);
                 break;
+            }
+
+            // Calculate response time
+            if (is_tracking_response) {
+                gettimeofday(&current_time, NULL);
+                response_time_ms = (current_time.tv_sec - last_tx_time.tv_sec) * 1000.0 +
+                                 (current_time.tv_usec - last_tx_time.tv_usec) / 1000.0;
+                ESP_LOGI(TAG, "Stratum response time: %.2f ms", response_time_ms);
+                is_tracking_response = false;
             }
 
             ESP_LOGI(TAG, "rx: %s", line); // debug incoming stratum messages

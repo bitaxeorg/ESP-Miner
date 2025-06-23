@@ -19,6 +19,9 @@ static const char * TAG = "stratum_api";
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
 
+struct timeval last_tx_time;
+bool is_tracking_response = false;
+
 static void debug_stratum_tx(const char *);
 int _parse_stratum_subscribe_result_message(const char * result_json_str, char ** extranonce, int * extranonce2_len);
 
@@ -375,6 +378,9 @@ int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * ve
 
 static void debug_stratum_tx(const char * msg)
 {
+    // Record the timestamp when sending
+    gettimeofday(&last_tx_time, NULL);
+    is_tracking_response = true;
     //remove the trailing newline
     char * newline = strchr(msg, '\n');
     if (newline != NULL) {

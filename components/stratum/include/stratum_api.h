@@ -4,6 +4,10 @@
 #include "cJSON.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/time.h>
+
+extern struct timeval last_tx_time;
+extern bool is_tracking_response;
 
 #define MAX_MERKLE_BRANCHES 32
 #define HASH_SIZE 32
