@@ -52,6 +52,7 @@ export interface ISystemInfo {
     idfVersion: string,
     boardVersion: string,
     autofanspeed: number,
+    minFanSpeed: number,
     fanspeed: number,
     temptarget: number,
     fanrpm: number,
