@@ -328,6 +328,10 @@ void stratum_task(void * pvParameters)
                 ESP_LOGI(TAG, "Set version mask: %08lx", stratum_api_v1_message.version_mask);
                 GLOBAL_STATE->version_mask = stratum_api_v1_message.version_mask;
                 GLOBAL_STATE->new_stratum_version_rolling_msg = true;
+            } else if (stratum_api_v1_message.method == MINING_SET_EXTRANONCE) {
+                ESP_LOGI(TAG, "Set extranonce: %s", stratum_api_v1_message.extranonce_str);
+                GLOBAL_STATE->extranonce_str = stratum_api_v1_message.extranonce_str;
+                GLOBAL_STATE->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
                 GLOBAL_STATE->extranonce_str = stratum_api_v1_message.extranonce_str;
                 GLOBAL_STATE->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;

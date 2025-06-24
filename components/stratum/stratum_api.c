@@ -124,6 +124,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             result = MINING_SET_DIFFICULTY;
         } else if (strcmp("mining.set_version_mask", method_json->valuestring) == 0) {
             result = MINING_SET_VERSION_MASK;
+        } else if (strcmp("mining.set_extranonce", method_json->valuestring) == 0) {
+            result = MINING_SET_EXTRANONCE;
         } else if (strcmp("client.reconnect", method_json->valuestring) == 0) {
             result = CLIENT_RECONNECT;
         } else {
@@ -196,8 +198,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 message->response_success = false;
                 goto done;
             }
-            message->extranonce_str = malloc(strlen(extranonce_json->valuestring) + 1);
-            strcpy(message->extranonce_str, extranonce_json->valuestring);
+            message->extranonce_str = strdup(extranonce_json->valuestring);
             message->response_success = true;
 
             //print the extranonce_str
@@ -256,13 +257,17 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
     } else if (message->method == MINING_SET_DIFFICULTY) {
         cJSON * params = cJSON_GetObjectItem(json, "params");
         uint32_t difficulty = cJSON_GetArrayItem(params, 0)->valueint;
-
         message->new_difficulty = difficulty;
     } else if (message->method == MINING_SET_VERSION_MASK) {
-
         cJSON * params = cJSON_GetObjectItem(json, "params");
         uint32_t version_mask = strtoul(cJSON_GetArrayItem(params, 0)->valuestring, NULL, 16);
         message->version_mask = version_mask;
+    } else if (message->method == MINING_SET_EXTRANONCE) {
+        cJSON * params = cJSON_GetObjectItem(json, "params");
+        char * extranonce_str = cJSON_GetArrayItem(params, 0)->valuestring;
+        uint32_t extranonce_2_len = cJSON_GetArrayItem(params, 1)->valueint;
+        message->extranonce_str = strdup(extranonce_str);
+        message->extranonce_2_len = extranonce_2_len;
     }
     done:
     cJSON_Delete(json);
@@ -303,8 +308,7 @@ int _parse_stratum_subscribe_result_message(const char * result_json_str, char *
         ESP_LOGE(TAG, "Unable parse extranonce: %s", result->valuestring);
         return -1;
     }
-    *extranonce = malloc(strlen(extranonce_json->valuestring) + 1);
-    strcpy(*extranonce, extranonce_json->valuestring);
+    *extranonce = strdup(extranonce_json->valuestring);
 
     cJSON_Delete(root);
 
