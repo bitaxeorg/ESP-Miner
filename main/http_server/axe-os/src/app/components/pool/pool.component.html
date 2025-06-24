@@ -4,41 +4,39 @@
             <div class="card">
                 <h2>Pool Configuration</h2>
                 <div class="field grid p-fluid">
-                    <label htmlFor="stratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Host:</label>
+                    <label htmlFor="stratumURL" class="col-12 md:col-2 md:mb-0 md:pb-4">Stratum Host</label>
                     <div class="col-12 md:col-10">
                         <input pInputText id="stratumURL" type="text" formControlName="stratumURL" />
-                        <div>
-                            <small>Do not include 'stratum+tcp://' or port.</small>
-                        </div>
+                        <small>Do not include 'stratum+tcp://' or port.</small>
                     </div>
                 </div>
                 <div class="field grid p-fluid">
-                    <label htmlFor="stratumPort" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Port:</label>
+                    <label htmlFor="stratumPort" class="col-12 md:col-2 md:mb-0">Stratum Port</label>
                     <div class="col-12 md:col-10">
                         <input pInputText id="stratumPort" formControlName="stratumPort" type="number" />
                     </div>
                 </div>
-                <div class="field grid p-fluid">
-                    <label for="stratumExtranonceSubscribe" class="col-12 mb-2 md:col-2 md:mb-0">Enable Extranonce Subscribe:</label>
-                    <div class="col-12 md:col-10">
+                <div class="field-checkbox grid mb-2">
+                    <div class="col-1 md:col-10 md:flex-order-2">
                         <p-checkbox name="stratumExtranonceSubscribe" formControlName="stratumExtranonceSubscribe" inputId="stratumExtranonceSubscribe"
                             [binary]="true"></p-checkbox>
                     </div>
+                    <label htmlFor="stratumExtranonceSubscribe" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Enable Extranonce Subscribe</label>
                 </div>
                 <div class="field grid p-fluid">
-                    <label htmlFor="stratumDifficulty" class="col-12 mb-2 md:col-2 md:mb-0">Suggested Difficulty:</label>
+                    <label htmlFor="stratumDifficulty" class="col-12 md:col-2 md:mb-0">Suggested Difficulty</label>
                     <div class="col-12 md:col-10">
                         <input pInputText id="stratumDifficulty" formControlName="stratumDifficulty" type="number" />
                     </div>
                 </div>
                 <div class="field grid p-fluid">
-                    <label htmlFor="stratumUser" class="col-12 mb-2 md:col-2 md:mb-0">User:</label>
+                    <label htmlFor="stratumUser" class="col-12 md:col-2 md:mb-0">User</label>
                     <div class="col-12 md:col-10">
                         <input pInputText id="stratumUser" formControlName="stratumUser" type="text" />
                     </div>
                 </div>
                 <div class="field grid p-fluid">
-                    <label htmlFor="stratumPassword" class="col-12 mb-2 md:col-2 md:mb-0">Password:</label>
+                    <label htmlFor="stratumPassword" class="col-12 md:col-2 md:mb-0">Password</label>
                     <div class="col-12 md:col-10 p-input-icon-right">
                         <i *ngIf="form.get('stratumPassword')?.dirty" class="pi"
                         [ngClass]="{'pi-eye': !showStratumPassword, 'pi-eye-slash': showStratumPassword}"
@@ -49,46 +47,44 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="card">
                 <h2>Fallback Pool Configuration</h2>
 
                 <div class="field grid p-fluid mt-5">
-                    <label htmlFor="fallbackStratumURL" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Host:</label>
+                    <label htmlFor="fallbackStratumURL" class="col-12 md:col-2 md:mb-0">Stratum Host</label>
                     <div class="col-12 md:col-10">
                         <input pInputText id="fallbackStratumURL" type="text" formControlName="fallbackStratumURL" />
-                        <div>
-                            <small>Do not include 'stratum+tcp://' or port.</small>
-                        </div>
+                        <small>Do not include 'stratum+tcp://' or port.</small>
                     </div>
                 </div>
                 <div class="field grid p-fluid">
-                    <label htmlFor="fallbackStratumPort" class="col-12 mb-2 md:col-2 md:mb-0">Stratum Port:</label>
+                    <label htmlFor="fallbackStratumPort" class="col-12 md:col-2 md:mb-0">Stratum Port</label>
                     <div class="col-12 md:col-10">
                         <input pInputText id="fallbackStratumPort" formControlName="fallbackStratumPort" type="number" />
                     </div>
                 </div>
-                <div class="field grid p-fluid">
-                    <label for="fallbackStratumExtranonceSubscribe" class="col-12 mb-2 md:col-2 md:mb-0">Enable Extranonce Subscribe:</label>
-                    <div class="col-12 md:col-10">
+                <div class="field-checkbox grid mb-2">
+                    <div class="col-1 md:col-10 md:flex-order-2">
                         <p-checkbox name="fallbackStratumExtranonceSubscribe" formControlName="fallbackStratumExtranonceSubscribe" inputId="fallbackStratumExtranonceSubscribe"
                             [binary]="true"></p-checkbox>
                     </div>
+                    <label htmlFor="fallbackStratumExtranonceSubscribe" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Enable Extranonce Subscribe</label>
                 </div>
                 <div class="field grid p-fluid">
-                    <label htmlFor="fallbackStratumDifficulty" class="col-12 mb-2 md:col-2 md:mb-0">Suggested Difficulty:</label>
+                    <label htmlFor="fallbackStratumDifficulty" class="col-12 md:col-2 md:mb-0">Suggested Difficulty</label>
                     <div class="col-12 md:col-10">
                         <input pInputText id="fallbackStratumDifficulty" formControlName="fallbackStratumDifficulty" type="number" />
                     </div>
                 </div>
                 <div class="field grid p-fluid">
-                    <label htmlFor="fallbackStratumUser" class="col-12 mb-2 md:col-2 md:mb-0">User:</label>
+                    <label htmlFor="fallbackStratumUser" class="col-12 md:col-2 md:mb-0">User</label>
                     <div class="col-12 md:col-10">
                         <input pInputText id="fallbackStratumUser" formControlName="fallbackStratumUser" type="text" />
                     </div>
                 </div>
                 <div class="field grid p-fluid">
-                    <label htmlFor="fallbackStratumPassword" class="col-12 mb-2 md:col-2 md:mb-0">Password:</label>
+                    <label htmlFor="fallbackStratumPassword" class="col-12 md:col-2 md:mb-0">Password</label>
                     <div class="col-12 md:col-10 p-input-icon-right">
                         <i *ngIf="form.get('fallbackStratumPassword')?.dirty" class="pi"
                         [ngClass]="{'pi-eye': !showFallbackStratumPassword, 'pi-eye-slash': showFallbackStratumPassword}"
@@ -98,7 +94,6 @@
                             placeholder="Enter fallback stratum password" />
                     </div>
                 </div>
-
             </div>
 
             <div class="flex mt-5 gap-3">
