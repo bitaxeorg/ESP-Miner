@@ -11,6 +11,7 @@
 #include <esp_sntp.h>
 #include <time.h>
 #include <sys/time.h>
+#include "esp_timer.h"
 #include <stdbool.h>
 
 #define PORT CONFIG_STRATUM_PORT
@@ -315,12 +316,9 @@ void stratum_task(void * pvParameters)
             }
 
             // Calculate response time
-            if (is_tracking_response) {
-                gettimeofday(&current_time, NULL);
-                response_time_ms = (current_time.tv_sec - last_tx_time.tv_sec) * 1000.0 +
-                                 (current_time.tv_usec - last_tx_time.tv_usec) / 1000.0;
+            double response_time_ms = STRATUM_V1_get_response_time_ms();
+            if (response_time_ms >= 0) {
                 ESP_LOGI(TAG, "Stratum response time: %.2f ms", response_time_ms);
-                is_tracking_response = false;
             }
 
             ESP_LOGI(TAG, "rx: %s", line); // debug incoming stratum messages

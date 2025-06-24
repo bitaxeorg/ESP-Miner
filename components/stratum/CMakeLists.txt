@@ -11,4 +11,5 @@ REQUIRES
     "json"
     "mbedtls"
     "app_update"
+    "esp_timer"
 )

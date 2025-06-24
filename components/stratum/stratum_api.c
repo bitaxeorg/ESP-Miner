@@ -10,6 +10,7 @@
 #include "esp_ota_ops.h"
 #include "lwip/sockets.h"
 #include "utils.h"
+#include "esp_timer.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -19,8 +20,25 @@ static const char * TAG = "stratum_api";
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
 
-struct timeval last_tx_time;
-bool is_tracking_response = false;
+static int64_t last_tx_us = 0;
+static bool tracking = false;
+
+void STRATUM_V1_stamp_tx(void)
+{
+    last_tx_us = esp_timer_get_time();
+    tracking = true;
+}
+
+double STRATUM_V1_get_response_time_ms(void)
+{
+    if (!tracking) return -1;
+
+    int64_t delta_us = esp_timer_get_time() - last_tx_us;
+    tracking = false;
+    
+    return delta_us / 1000.0;  // convert to ms
+
+}
 
 static void debug_stratum_tx(const char *);
 int _parse_stratum_subscribe_result_message(const char * result_json_str, char ** extranonce, int * extranonce2_len);
@@ -379,8 +397,7 @@ int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * ve
 static void debug_stratum_tx(const char * msg)
 {
     // Record the timestamp when sending
-    gettimeofday(&last_tx_time, NULL);
-    is_tracking_response = true;
+    STRATUM_V1_stamp_tx();
     //remove the trailing newline
     char * newline = strchr(msg, '\n');
     if (newline != NULL) {
