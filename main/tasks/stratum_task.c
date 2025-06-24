@@ -319,6 +319,7 @@ void stratum_task(void * pvParameters)
             double response_time_ms = STRATUM_V1_get_response_time_ms();
             if (response_time_ms >= 0) {
                 ESP_LOGI(TAG, "Stratum response time: %.2f ms", response_time_ms);
+                GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
             }
 
             ESP_LOGI(TAG, "rx: %s", line); // debug incoming stratum messages

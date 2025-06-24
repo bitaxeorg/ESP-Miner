@@ -38,6 +38,7 @@ export class HomeComponent {
   public activePoolPort!: number;
   public activePoolUser!: string;
   public activePoolLabel!: 'Primary' | 'Fallback';
+  public responseTime!: number;
   @ViewChild('chart')
   private chart?: UIChart
 
@@ -266,6 +267,7 @@ export class HomeComponent {
         this.activePoolURL = isFallback ? info.fallbackStratumURL : info.stratumURL;
         this.activePoolUser = isFallback ? info.fallbackStratumUser : info.stratumUser;
         this.activePoolPort = isFallback ? info.fallbackStratumPort : info.stratumPort;
+        this.responseTime = info.responseTime;
       }),
       map(info => {
         info.power = parseFloat(info.power.toFixed(1))
