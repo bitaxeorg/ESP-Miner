@@ -13,6 +13,8 @@
 #include "esp_timer.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 #define BUFFER_SIZE 1024
 static const char * TAG = "stratum_api";
@@ -20,24 +22,66 @@ static const char * TAG = "stratum_api";
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
 
-static int64_t last_tx_us = 0;
-static bool tracking = false;
+static RequestTiming request_timings[MAX_REQUEST_IDS];
+static bool initialized = false;
 
-void STRATUM_V1_stamp_tx(void)
-{
-    last_tx_us = esp_timer_get_time();
-    tracking = true;
+static void init_request_timings() {
+    if (!initialized) {
+        for (int i = 0; i < MAX_REQUEST_IDS; i++) {
+            request_timings[i].timestamp_us = 0;
+            request_timings[i].tracking = false;
+        }
+        initialized = true;
+    }
 }
 
-double STRATUM_V1_get_response_time_ms(void)
-{
-    if (!tracking) return -1;
-
-    int64_t delta_us = esp_timer_get_time() - last_tx_us;
-    tracking = false;
+static int get_request_id(const char *msg) {
+    cJSON *root = cJSON_Parse(msg);
+    if (!root) return -1;
     
-    return delta_us / 1000.0;  // convert to ms
+    cJSON *id = cJSON_GetObjectItem(root, "id");
+    if (!id || !cJSON_IsNumber(id)) {
+        cJSON_Delete(root);
+        return -1;
+    }
+    
+    int request_id = id->valueint;
+    cJSON_Delete(root);
+    return request_id;
+}
 
+static RequestTiming* get_request_timing(int request_id) {
+    if (request_id < 0 || request_id >= MAX_REQUEST_IDS) return NULL;
+    return &request_timings[request_id];
+}
+
+void STRATUM_V1_stamp_tx(const char *msg)
+{
+    init_request_timings();
+    int request_id = get_request_id(msg);
+    if (request_id >= 0) {
+        RequestTiming *timing = get_request_timing(request_id);
+        if (timing) {
+            timing->timestamp_us = esp_timer_get_time();
+            timing->tracking = true;
+        }
+    }
+}
+
+double STRATUM_V1_get_response_time_ms(const char *msg)
+{
+    init_request_timings();
+    int request_id = get_request_id(msg);
+    if (request_id < 0) return -1.0;
+    
+    RequestTiming *timing = get_request_timing(request_id);
+    if (!timing || !timing->tracking) {
+        return -1.0;
+    }
+    
+    double response_time = (esp_timer_get_time() - timing->timestamp_us) / 1000.0;
+    timing->tracking = false;
+    return response_time;
 }
 
 static void debug_stratum_tx(const char *);
@@ -397,7 +441,7 @@ int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * ve
 static void debug_stratum_tx(const char * msg)
 {
     // Record the timestamp when sending
-    STRATUM_V1_stamp_tx();
+    STRATUM_V1_stamp_tx(msg);
     //remove the trailing newline
     char * newline = strchr(msg, '\n');
     if (newline != NULL) {
