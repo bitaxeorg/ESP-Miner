@@ -75,9 +75,11 @@ static double current_hashrate;
 static float current_power;
 static uint64_t current_difficulty;
 static float current_chip_temp;
+static uint64_t current_shares;
+static int8_t current_rssi_value;
+
 static bool found_block;
 static bool self_test_finished;
-static uint64_t current_shares;
 
 static lv_obj_t * create_flex_screen(int expected_lines) {
     lv_obj_t * scr = lv_obj_create(NULL);
@@ -316,12 +318,6 @@ static void screen_update_cb(lv_timer_t * timer)
         }
     }
 
-    // Update WiFi RSSI periodically
-    int8_t rssi_value = -128; // Invalid value by default
-    if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
-        get_wifi_current_rssi(&rssi_value);
-    }
-
     if (GLOBAL_STATE->SELF_TEST_MODULE.active) {
         screen_show(SCR_SELF_TEST);
 
@@ -409,7 +405,9 @@ static void screen_update_cb(lv_timer_t * timer)
             float efficiency = power_management->power / (module->current_hashrate / 1000.0);
             lv_label_set_text_fmt(efficiency_label, "J/Th: %.2f", efficiency);
         }
+        current_power = power_management->power;
     }
+    current_hashrate = module->current_hashrate;
 
     if (module->FOUND_BLOCK && !found_block) {
         found_block = true;
@@ -423,40 +421,42 @@ static void screen_update_cb(lv_timer_t * timer)
     } else {
         if (current_difficulty != module->best_session_nonce_diff) {
             lv_label_set_text_fmt(difficulty_label, "Best: %s/%s", module->best_session_diff_string, module->best_diff_string);
+            current_difficulty = module->best_session_nonce_diff;
         }
     }
 
-    if (current_chip_temp != power_management->chip_temp_avg && power_management->chip_temp_avg > 0) {
-        lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", power_management->chip_temp_avg);
+    if (current_chip_temp != power_management->chip_temp_avg) {
+        if (power_management->chip_temp_avg > 0) {
+            lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", power_management->chip_temp_avg);    
+        }
+        current_chip_temp = power_management->chip_temp_avg;
     }
 
-    char rssi_buf[25];
-    char signal_strength_buf[25];
-        
-    if (rssi_value < 0 && rssi_value >= -127) { // Typical RSSI range
-        snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: %d dBm", rssi_value);
-        
-        const char* signal_strength;
+    // Update WiFi RSSI periodically
+    int8_t rssi_value = -128;
+    if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
+        get_wifi_current_rssi(&rssi_value);
+    }
+
+    if (rssi_value != current_rssi_value) {
         if (rssi_value > -50) {
-            signal_strength = "Excellent";
-        } else if (rssi_value <= -50 && rssi_value > -60) {
-            signal_strength = "Good";
-        } else if (rssi_value <= -60 && rssi_value > -70) {
-            signal_strength = "Fair";
+            lv_label_set_text(wifi_signal_strength_label, "Signal: Excellent");
+        } else if (rssi_value > -60) {
+            lv_label_set_text(wifi_signal_strength_label, "Signal: Good");
+        } else if (rssi_value > -70) {
+            lv_label_set_text(wifi_signal_strength_label, "Signal: Fair");
+        } else if (rssi_value > -128){
+            lv_label_set_text(wifi_signal_strength_label, "Signal: Weak");
         } else {
-            signal_strength = "Weak";
+            lv_label_set_text(wifi_signal_strength_label, "Signal: --");
         }
-        snprintf(signal_strength_buf, sizeof(signal_strength_buf), "Signal: %s", signal_strength);
-    } else {
-        snprintf(rssi_buf, sizeof(rssi_buf), "RSSI: -- dBm");
-        snprintf(signal_strength_buf, sizeof(signal_strength_buf), "Signal: --");
-    }
-  
-    if (strcmp(lv_label_get_text(wifi_rssi_value_label), rssi_buf) != 0) {
-        lv_label_set_text(wifi_rssi_value_label, rssi_buf);
-    }
-    if (strcmp(lv_label_get_text(wifi_signal_strength_label), signal_strength_buf) != 0) {
-        lv_label_set_text(wifi_signal_strength_label, signal_strength_buf);
+
+        if (rssi_value > -128) {
+            lv_label_set_text_fmt(wifi_rssi_value_label, "RSSI: %d dBm", rssi_value);
+        } else {
+            lv_label_set_text(wifi_rssi_value_label, "RSSI: -- dBm");
+        }
+        current_rssi_value = rssi_value;
     }
 
     if (current_shares != module->shares_accepted) {
@@ -467,11 +467,6 @@ static void screen_update_cb(lv_timer_t * timer)
             lv_obj_add_flag(notification_dot, LV_OBJ_FLAG_HIDDEN);
         }
     }
-
-    current_hashrate = module->current_hashrate;
-    current_power = power_management->power;
-    current_difficulty = module->best_session_nonce_diff;
-    current_chip_temp = power_management->chip_temp_avg;
 
     if (current_screen_time_ms <= current_screen_delay_ms || found_block) {
         return;
