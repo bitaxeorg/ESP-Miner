@@ -266,15 +266,6 @@
                     </div>
                 </div>
 
-                <div class="flex flex-nowrap">
-                    <div class="col-fixed-width">
-                        <span>Ping:</span>
-                    </div>
-                    <div>
-                        {{ info.responseTime }} ms
-                    </div>
-                </div>
-
                 <div class="flex flex-nowrap ellipsis-magic" pTooltip="{{activePoolUser}}" tooltipPosition="top">
                     <div class="col-fixed-width">
                         <span>User:</span>
@@ -286,6 +277,15 @@
                     <span class="end">
                         {{ activePoolUser.substring(activePoolUser.length - 20) }}
                     </span>
+                </div>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width">
+                        <span>Share Response Time:</span>
+                    </div>
+                    <div>
+                        {{ info.responseTime }} ms
+                    </div>
                 </div>
             </div>
         </div>
