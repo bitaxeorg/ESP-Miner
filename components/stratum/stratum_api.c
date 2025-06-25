@@ -44,7 +44,7 @@ static RequestTiming* get_request_timing(int request_id) {
 void STRATUM_V1_stamp_tx(int request_id)
 {
     init_request_timings();
-    if (request_id >= 0) {
+    if (request_id >= 1) {
         RequestTiming *timing = get_request_timing(request_id);
         if (timing) {
             timing->timestamp_us = esp_timer_get_time();
