@@ -25,3 +25,6 @@ components/components/*
 config.bin
 config.cvs
 managed_components/*
+
+# macOS
+**/.DS_Store

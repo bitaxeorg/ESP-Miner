@@ -334,7 +334,7 @@ export async function restartSystem(): Promise<string> {
 export async function uploadWebApp(file: File): Promise<{ success: boolean; message: string }> {
   try {
     // Send the web app blob directly
-    const response = await fetch("/api/system/upload-webapp", {
+    const response = await fetch("/api/system/OTAWWW", {
       method: "POST",
       headers: {
         "Content-Type": "application/octet-stream",
@@ -353,6 +353,56 @@ export async function uploadWebApp(file: File): Promise<{ success: boolean; mess
     console.error("Failed to upload web app:", error);
     return {
       success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+/**
+ * WiFi network interface for scanning results
+ */
+export interface WifiNetwork {
+  ssid: string;
+  rssi: number;
+  authmode: number;
+}
+
+/**
+ * WiFi scanning response interface
+ */
+export interface WifiScanResponse {
+  networks: WifiNetwork[];
+}
+
+/**
+ * Scan for available WiFi networks
+ * @returns Available WiFi networks in range
+ */
+export async function scanWifiNetworks(): Promise<{
+  success: boolean;
+  networks: WifiNetwork[];
+  message?: string
+}> {
+  try {
+    const response = await fetch("/api/system/wifi/scan");
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const result: WifiScanResponse = await response.json();
+    console.log("WiFi scan response:", result);
+
+    return {
+      success: true,
+      networks: result.networks || [],
+      message: "WiFi networks scanned successfully"
+    };
+  } catch (error) {
+    console.error("Failed to scan WiFi networks:", error);
+    return {
+      success: false,
+      networks: [],
       message: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
@@ -809,7 +859,6 @@ export async function getVersionInfo(currentVersion: string | null): Promise<Ver
     };
   }
 }
-
 /**
  * Log event interface
  */

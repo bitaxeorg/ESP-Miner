@@ -5,6 +5,8 @@
 #include <lwip/netdb.h>
 
 #include "freertos/event_groups.h"
+#include "esp_wifi_types.h"
+
 
 #define WIFI_SSID CONFIG_ESP_WIFI_SSID
 #define WIFI_PASS CONFIG_ESP_WIFI_PASSWORD
@@ -26,6 +28,13 @@ typedef enum
     WIFI_RETRYING,
 } wifi_status_t;
 
+typedef struct {
+    char ssid[33];  // 32 chars + null terminator
+    int8_t rssi;
+    wifi_auth_mode_t authmode;
+} wifi_ap_record_simple_t;
+
+esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count);
 void toggle_wifi_softap(void);
 void wifi_softap_on(void);
 void wifi_softap_off(void);

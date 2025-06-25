@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include "EMC2101.h"
 #include "INA260.h"
 #include "bm1397.h"
@@ -452,9 +453,16 @@ static double automatic_fan_speed(float chip_temp, GlobalState * GLOBAL_STATE)
 	return result;
 }
 
-// Soft overheat recovery function
-static void handle_overheat_recovery(GlobalState * GLOBAL_STATE, const char* device_info, const char* log_data) {
-    ESP_LOGE(TAG, "OVERHEAT DETECTED: %s", device_info);
+// Hard overheat recovery function that exits the task
+static void handle_hard_overheat_recovery(GlobalState * GLOBAL_STATE, const char* device_info, const char* log_data) {
+    ESP_LOGE(TAG, "HARD OVERHEAT RECOVERY: %s", device_info);
+    
+    // Increment overheat counter
+    uint16_t overheat_count = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_COUNT, 0);
+    overheat_count++;
+    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_COUNT, overheat_count);
+    
+    ESP_LOGE(TAG, "Overheat count incremented to: %u", overheat_count);
     
     // Set fan to full speed and turn off VCORE (immediate safety measures)
     EMC2101_set_fan_speed(1);
@@ -489,13 +497,82 @@ static void handle_overheat_recovery(GlobalState * GLOBAL_STATE, const char* dev
     nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
     nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
     
-    // Log the overheat event
-    dataBase_log_event("power", "critical", "Overheat mode activated - temperature exceeded threshold", log_data);
+    // Log the hard overheat event with counter information
+    char enhanced_log_data[256];
+    snprintf(enhanced_log_data, sizeof(enhanced_log_data), 
+             "{\"overheatCount\":%u,\"originalData\":%s}", 
+             overheat_count, log_data);
+    dataBase_log_event("power", "critical", "Overheat Mode Activated 3+ times, Restart Device Manually", enhanced_log_data);
     
-    ESP_LOGE(TAG, "Entering overheat recovery mode. Waiting 30 seconds before automatic recovery...");
+    ESP_LOGE(TAG, "CRITICAL: Hard overheat recovery initiated. Power management task will exit.");
+    ESP_LOGE(TAG, "System remains in overheat mode until manual intervention.");
+    ESP_LOGE(TAG, "Device requires manual restart to resume normal operation.");
     
-    // Wait 30 seconds for cooling
-    vTaskDelay(30000 / portTICK_PERIOD_MS);
+    // Delete this task cleanly - system stays in safe mode
+    vTaskDelete(NULL);
+}
+
+// Soft overheat recovery function (original behavior with counter)
+static void handle_overheat_recovery(GlobalState * GLOBAL_STATE, const char* device_info, const char* log_data) {
+    ESP_LOGE(TAG, "OVERHEAT DETECTED: %s", device_info);
+    
+    // Increment overheat counter
+    uint16_t overheat_count = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_COUNT, 0);
+    overheat_count++;
+    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_COUNT, overheat_count);
+    
+    ESP_LOGE(TAG, "Overheat count incremented to: %u", overheat_count);
+    
+    // Set fan to full speed and turn off VCORE (immediate safety measures)
+    EMC2101_set_fan_speed(1);
+    
+    // Turn off VCORE based on device type
+    PowerManagementModule *power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    switch (GLOBAL_STATE->device_model) {
+        case DEVICE_MAX:
+            if (power_management->HAS_POWER_EN) {
+                gpio_set_level(GPIO_ASIC_ENABLE, 1);
+            }
+            break;
+        case DEVICE_ULTRA:
+        case DEVICE_SUPRA:
+            if (GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499) {
+                VCORE_set_voltage(0.0, GLOBAL_STATE);
+            } else if (power_management->HAS_POWER_EN) {
+                gpio_set_level(GPIO_ASIC_ENABLE, 1);
+            }
+            break;
+        case DEVICE_GAMMA:
+            VCORE_set_voltage(0.0, GLOBAL_STATE);
+            break;
+        default:
+            break;
+    }
+    
+    // Set safe NVS values and enable overheat mode
+    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
+    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
+    nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
+    nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+    
+    // Log the overheat event with counter information
+    char enhanced_log_data[256];
+    snprintf(enhanced_log_data, sizeof(enhanced_log_data), 
+             "{\"overheatCount\":%u,\"logData\":%s}", 
+             overheat_count, log_data);
+    dataBase_log_event("power", "critical", "Overheat mode activated - temperature exceeded threshold", enhanced_log_data);
+    
+    ESP_LOGE(TAG, "Entering overheat recovery mode. Waiting 5 minutes for cooling...");
+    
+    // Use non-blocking delay to allow screen updates
+    TickType_t start_time = xTaskGetTickCount();
+    TickType_t delay_ticks = pdMS_TO_TICKS(300000); // 5 minutes in ticks
+    
+    while ((xTaskGetTickCount() - start_time) < delay_ticks) {
+        // Allow other tasks to run
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Check every second
+    }
     
     ESP_LOGI(TAG, "Overheat recovery: Applying balanced preset and restarting...");
     
@@ -617,10 +694,19 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                              "{\"chipTemp\":%.1f,\"threshold\":%f,\"device\":\"DEVICE_MAX\"}", 
                              power_management->chip_temp_avg, THROTTLE_TEMP);
                     
-                    // Use soft overheat recovery
+                    // Check overheat count to determine recovery type
+                    uint16_t current_overheat_count = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_COUNT, 0);
                     char device_info[64];
                     snprintf(device_info, sizeof(device_info), "DEVICE_MAX ASIC %.1fC", power_management->chip_temp_avg);
-                    handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
+                    
+                    if ((current_overheat_count + 1) % 3 == 0) {
+                        // Use hard recovery every 3rd overheat event (counts 3, 6, 9, etc.)
+                        ESP_LOGE(TAG, "Overheat event #%u (multiple of 3), using hard recovery", current_overheat_count + 1);
+                        handle_hard_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
+                    } else {
+                        // Use soft recovery for other events
+                        handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
+                    }
                 }
                 break;
             case DEVICE_ULTRA:
@@ -649,11 +735,20 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                              "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%f,\"chipThreshold\":%f,\"device\":\"DEVICE_ULTRA_SUPRA\"}", 
                              power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
                     
-                    // Use soft overheat recovery
+                    // Check overheat count to determine recovery type
+                    uint16_t current_overheat_count = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_COUNT, 0);
                     char device_info[64];
                     snprintf(device_info, sizeof(device_info), "DEVICE_ULTRA/SUPRA VR: %.1fC ASIC %.1fC", 
                              power_management->vr_temp, power_management->chip_temp_avg);
-                    handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
+                    
+                    if ((current_overheat_count + 1) % 3 == 0) {
+                        // Use hard recovery every 3rd overheat event (counts 3, 6, 9, etc.)
+                        ESP_LOGE(TAG, "Overheat event #%u (multiple of 3), using hard recovery", current_overheat_count + 1);
+                        handle_hard_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
+                    } else {
+                        // Use soft recovery for other events
+                        handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
+                    }
                 }
 
                 break;
@@ -676,11 +771,20 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                              "{\"vrTemp\":%.1f,\"chipTemp\":%.1f,\"vrThreshold\":%f,\"chipThreshold\":%f,\"device\":\"DEVICE_GAMMA\"}", 
                              power_management->vr_temp, power_management->chip_temp_avg, TPS546_THROTTLE_TEMP, THROTTLE_TEMP);
                     
-                    // Use soft overheat recovery
+                    // Check overheat count to determine recovery type
+                    uint16_t current_overheat_count = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_COUNT, 0);
                     char device_info[64];
                     snprintf(device_info, sizeof(device_info), "DEVICE_GAMMA VR: %.1fC ASIC %.1fC", 
                              power_management->vr_temp, power_management->chip_temp_avg);
-                    handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
+                    
+                    if ((current_overheat_count + 1) % 3 == 0) {
+                        // Use hard recovery every 3rd overheat event (counts 3, 6, 9, etc.)
+                        ESP_LOGE(TAG, "Overheat event #%u (multiple of 3), using hard recovery", current_overheat_count + 1);
+                        handle_hard_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
+                    } else {
+                        // Use soft recovery for other events
+                        handle_overheat_recovery(GLOBAL_STATE, device_info, overheat_data);
+                    }
                 }
                 break;
             default:

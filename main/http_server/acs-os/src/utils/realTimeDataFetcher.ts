@@ -41,94 +41,28 @@ export class RealTimeDataFetcher {
     }
   }
 
-  async generateInitialData(points: number = 1440): Promise<ChartDataPoint[]> {
-    const data: ChartDataPoint[] = [];
-
+  async generateInitialData(_points: number = 1): Promise<ChartDataPoint[]> {
     try {
-      // Fetch current value as baseline
+      // Fetch current value only - no fake historical data
       const systemInfo = await getSystemInfo();
       const currentValue = this.extractValue(systemInfo, this.dataField);
 
-      // Generate 6 hours of historical data (5-second intervals)
-      const intervalMs = 5000; // 5 seconds
-      const startTime = Date.now() - (points * intervalMs);
-
-      for (let i = 0; i < points; i++) {
-        const timestamp = startTime + (i * intervalMs);
-
-        // Create more stable variations with reduced noise
-        let variation: number;
-        let value: number;
-
-        switch (this.dataField) {
-          case "hashRate":
-            // Hash rate: very gentle variations (±1-3%) for stability
-            variation = (Math.sin(i * 0.01) * 0.015 + Math.random() * 0.02 - 0.01) * currentValue;
-            value = Math.max(currentValue * 0.92, currentValue + variation);
-            break;
-
-          case "temp":
-            // Temperature: reduced cyclical pattern with less noise (±2-5°C)
-            const tempCycle = Math.sin(i * 0.008) * 2.5;
-            const tempNoise = (Math.random() - 0.5) * 3;
-            value = Math.max(25, currentValue + tempCycle + tempNoise);
-            break;
-
-          case "power":
-            // Power: correlates with hash rate, reduced variations (±2-6%)
-            variation = (Math.sin(i * 0.012) * 0.03 + Math.random() * 0.04 - 0.02) * currentValue;
-            value = Math.max(currentValue * 0.9, currentValue + variation);
-            break;
-
-          default:
-            // Default: very small random variations (±2%)
-            variation = (Math.random() - 0.5) * 0.04 * currentValue;
-            value = Math.max(0.1, currentValue + variation);
-        }
-
-        data.push({
-          time: Math.floor(timestamp / 1000) as Time,
-          value: Number(value.toFixed(2)),
-        });
-      }
-
       this.lastValue = currentValue;
+
+      // Return single current data point
+      return [{
+        time: Math.floor(Date.now() / 1000) as Time,
+        value: Number(currentValue.toFixed(2)),
+      }];
     } catch (error) {
-      console.error("Failed to generate initial data:", error);
+      console.error("Failed to get initial data:", error);
 
-      // Fallback: generate basic data even without API
-      const fallbackValue = this.getFallbackValue();
-      const intervalMs = 5000;
-      const startTime = Date.now() - (points * intervalMs);
-
-      for (let i = 0; i < points; i++) {
-        const timestamp = startTime + (i * intervalMs);
-        const variation = (Math.random() - 0.5) * 0.03 * fallbackValue; // Reduced fallback variation
-        const value = Math.max(0.1, fallbackValue + variation);
-
-        data.push({
-          time: Math.floor(timestamp / 1000) as Time,
-          value: Number(value.toFixed(2)),
-        });
-      }
-    }
-
-    return data;
-  }
-
-  private getFallbackValue(): number {
-    // Provide reasonable fallback values when API is unavailable
-    switch (this.dataField) {
-      case "hashRate": return 150.0;
-      case "temp": return 65.0;
-      case "power": return 1200.0;
-      case "voltage": return 12.0;
-      case "current": return 100.0;
-      case "fanrpm": return 2500.0;
-      case "frequency": return 600.0;
-      default: return 50.0;
+      // If API fails, return empty array - chart will wait for real-time data
+      return [];
     }
   }
+
+
 
   private extractValue(systemInfo: SystemInfo, field: DataField): number {
     switch (field) {

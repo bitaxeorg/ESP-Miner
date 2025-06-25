@@ -48,7 +48,6 @@ esp_netif_t * netif;
 
 //local function prototypes
 static esp_err_t ensure_overheat_mode_config();
-static void handle_system_overheat_recovery(GlobalState * GLOBAL_STATE);
 
 
 static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id);
@@ -181,46 +180,6 @@ void SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
 };
 
-// System-level overheat recovery function - mirrors power management approach
-static void handle_system_overheat_recovery(GlobalState * GLOBAL_STATE) {
-    ESP_LOGE(TAG, "SYSTEM OVERHEAT RECOVERY: Overheat flag detected in system task");
-    
-    // Log the system recovery event
-    char recovery_data[256];
-    snprintf(recovery_data, sizeof(recovery_data), 
-             "{\"source\":\"system_task\",\"recoveryType\":\"automatic_30s_recovery\"}");
-    dataBase_log_event("power", "critical", "System task overheat recovery activated", recovery_data);
-    
-    ESP_LOGE(TAG, "Entering system overheat recovery mode. Waiting 30 seconds before automatic recovery...");
-    
-    // Wait 30 seconds for cooling (same as power management task)
-    vTaskDelay(30000 / portTICK_PERIOD_MS);
-    
-    ESP_LOGI(TAG, "System overheat recovery: Applying balanced preset and restarting...");
-    
-    // Reset overheat mode and apply balanced preset
-    nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-    
-    // Apply balanced preset for safe recovery
-    if (apply_preset(GLOBAL_STATE->device_model, "balanced")) {
-        ESP_LOGI(TAG, "Successfully applied balanced preset for system recovery");
-    } else {
-        ESP_LOGE(TAG, "Failed to apply balanced preset, using system failsafe defaults");
-        // Set safe failsafe values
-        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1100);
-        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 400);
-        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 75);
-        nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1);
-        nvs_config_set_string(NVS_CONFIG_AUTOTUNE_PRESET, "balanced");
-        nvs_config_set_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1);
-    }
-    
-    // Log system recovery completion
-    dataBase_log_event("power", "info", "System task overheat recovery completed - restarting system", "{}");
-    
-    // Restart the ESP32
-    esp_restart();
-}
 
 void SYSTEM_task(void * pvParameters)
 {
@@ -246,9 +205,6 @@ void SYSTEM_task(void * pvParameters)
     int current_screen = 0;
     TickType_t last_update_time = xTaskGetTickCount();
     
-    // Variables for overheat recovery tracking - mirrors power management approach
-    static bool system_overheat_recovery_triggered = false;
-
     while (1) {
         // Check for overheat mode
         #if LVGL_MODE_BAP == 1
@@ -258,14 +214,6 @@ void SYSTEM_task(void * pvParameters)
         #endif
 
         if (module->overheat_mode == 1) {
-            // Trigger recovery only once per overheat event (mirrors power management approach)
-            if (!system_overheat_recovery_triggered) {
-                system_overheat_recovery_triggered = true;
-                ESP_LOGI(TAG, "System task detected overheat mode, triggering recovery");
-                handle_system_overheat_recovery(GLOBAL_STATE);
-                // This function will restart the system, so code below won't execute
-                return;
-            }
             
             gpio_set_level(GPIO_NUM_1, 0);
             #if LVGL_MODE_BAP == 1
@@ -276,11 +224,7 @@ void SYSTEM_task(void * pvParameters)
             //  vTaskDelay(5000 / portTICK_PERIOD_MS);  // Update every 5 seconds
             continue;  // Skip the normal screen cycle
         } else {
-            // Reset recovery flag when not in overheat mode
-            if (system_overheat_recovery_triggered) {
-                ESP_LOGI(TAG, "Exited overheat mode normally, resetting recovery flag");
-                system_overheat_recovery_triggered = false;
-            }
+
         }
         // Update the RGB display
         #if LVGL_MODE_BAP == 1
