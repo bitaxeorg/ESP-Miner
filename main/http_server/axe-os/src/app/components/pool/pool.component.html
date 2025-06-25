@@ -16,19 +16,6 @@
                         <input pInputText id="stratumPort" formControlName="stratumPort" type="number" />
                     </div>
                 </div>
-                <div class="field-checkbox grid mb-2">
-                    <div class="col-1 md:col-10 md:flex-order-2">
-                        <p-checkbox name="stratumExtranonceSubscribe" formControlName="stratumExtranonceSubscribe" inputId="stratumExtranonceSubscribe"
-                            [binary]="true"></p-checkbox>
-                    </div>
-                    <label htmlFor="stratumExtranonceSubscribe" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Enable Extranonce Subscribe</label>
-                </div>
-                <div class="field grid p-fluid">
-                    <label htmlFor="stratumDifficulty" class="col-12 md:col-2 md:mb-0">Suggested Difficulty</label>
-                    <div class="col-12 md:col-10">
-                        <input pInputText id="stratumDifficulty" formControlName="stratumDifficulty" type="number" />
-                    </div>
-                </div>
                 <div class="field grid p-fluid">
                     <label htmlFor="stratumUser" class="col-12 md:col-2 md:mb-0">User</label>
                     <div class="col-12 md:col-10">
@@ -45,6 +32,19 @@
                             [type]="showStratumPassword ? 'text' : 'password'"
                             placeholder="Enter stratum password" />
                     </div>
+                </div>
+                <div class="field grid p-fluid">
+                    <label htmlFor="stratumDifficulty" class="col-12 md:col-2 md:mb-0">Suggested Difficulty</label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText id="stratumDifficulty" formControlName="stratumDifficulty" type="number" />
+                    </div>
+                </div>
+                <div class="field-checkbox grid mb-2">
+                    <div class="col-1 md:col-10 md:flex-order-2">
+                        <p-checkbox name="stratumExtranonceSubscribe" formControlName="stratumExtranonceSubscribe" inputId="stratumExtranonceSubscribe"
+                            [binary]="true"></p-checkbox>
+                    </div>
+                    <label htmlFor="stratumExtranonceSubscribe" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Enable Extranonce Subscribe <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Required by some pools (f.e. NiceHash)."></i></label>
                 </div>
             </div>
 
@@ -64,19 +64,6 @@
                         <input pInputText id="fallbackStratumPort" formControlName="fallbackStratumPort" type="number" />
                     </div>
                 </div>
-                <div class="field-checkbox grid mb-2">
-                    <div class="col-1 md:col-10 md:flex-order-2">
-                        <p-checkbox name="fallbackStratumExtranonceSubscribe" formControlName="fallbackStratumExtranonceSubscribe" inputId="fallbackStratumExtranonceSubscribe"
-                            [binary]="true"></p-checkbox>
-                    </div>
-                    <label htmlFor="fallbackStratumExtranonceSubscribe" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Enable Extranonce Subscribe</label>
-                </div>
-                <div class="field grid p-fluid">
-                    <label htmlFor="fallbackStratumDifficulty" class="col-12 md:col-2 md:mb-0">Suggested Difficulty</label>
-                    <div class="col-12 md:col-10">
-                        <input pInputText id="fallbackStratumDifficulty" formControlName="fallbackStratumDifficulty" type="number" />
-                    </div>
-                </div>
                 <div class="field grid p-fluid">
                     <label htmlFor="fallbackStratumUser" class="col-12 md:col-2 md:mb-0">User</label>
                     <div class="col-12 md:col-10">
@@ -93,6 +80,19 @@
                             [type]="showFallbackStratumPassword ? 'text' : 'password'"
                             placeholder="Enter fallback stratum password" />
                     </div>
+                </div>
+                <div class="field grid p-fluid">
+                    <label htmlFor="fallbackStratumDifficulty" class="col-12 md:col-2 md:mb-0">Suggested Difficulty</label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText id="fallbackStratumDifficulty" formControlName="fallbackStratumDifficulty" type="number" />
+                    </div>
+                </div>
+                <div class="field-checkbox grid mb-2">
+                    <div class="col-1 md:col-10 md:flex-order-2">
+                        <p-checkbox name="fallbackStratumExtranonceSubscribe" formControlName="fallbackStratumExtranonceSubscribe" inputId="fallbackStratumExtranonceSubscribe"
+                            [binary]="true"></p-checkbox>
+                    </div>
+                    <label htmlFor="fallbackStratumExtranonceSubscribe" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Enable Extranonce Subscribe <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Required by some pools (f.e. NiceHash)."></i></label>
                 </div>
             </div>
 
