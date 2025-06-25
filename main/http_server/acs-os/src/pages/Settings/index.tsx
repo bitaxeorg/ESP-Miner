@@ -223,7 +223,7 @@ export function Settings() {
         </ActionCard>
       </div>
 
-      <div className="mt-8 border border-slate-600 rounded-lg p-6 bg-slate-900/20">
+      {/* <div className="mt-8 border border-slate-600 rounded-lg p-6 bg-slate-900/20">
         <ActionCard
           title='YouTube Channel'
           description='Set your preferred YouTube channel to display  stats on the Touch.'
@@ -260,7 +260,7 @@ export function Settings() {
             </div>
           </div>
         </ActionCard>
-      </div>
+      </div> */}
     </Container>
   );
 }
