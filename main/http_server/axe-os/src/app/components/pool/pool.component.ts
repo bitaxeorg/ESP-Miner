@@ -5,6 +5,8 @@ import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 
+type PoolType = 'stratum' | 'fallbackStratum';
+
 @Component({
   selector: 'app-pool',
   templateUrl: './pool.component.html',
@@ -13,6 +15,9 @@ import { SystemService } from 'src/app/services/system.service';
 export class PoolComponent implements OnInit {
   public form!: FormGroup;
   public savedChanges: boolean = false;
+
+  public pools: PoolType[] = ['stratum', 'fallbackStratum'];
+  public showPassword = {'stratum': false, 'fallbackStratum': false};
 
   @Input() uri = '';
 
@@ -88,16 +93,6 @@ export class PoolComponent implements OnInit {
           this.savedChanges = false;
         }
       });
-  }
-
-  showStratumPassword: boolean = false;
-  toggleStratumPasswordVisibility() {
-    this.showStratumPassword = !this.showStratumPassword;
-  }
-
-  showFallbackStratumPassword: boolean = false;
-  toggleFallbackStratumPasswordVisibility() {
-    this.showFallbackStratumPassword = !this.showFallbackStratumPassword;
   }
 
   public restart() {
