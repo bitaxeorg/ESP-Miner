@@ -53,6 +53,7 @@ typedef struct
     char * fallback_pool_url;
     uint16_t pool_port;
     uint16_t fallback_pool_port;
+    double response_time;
     char * pool_user;
     char * fallback_pool_user;
     char * pool_pass;

@@ -1,9 +1,9 @@
-<div class="grid">
-    <div class="col-12 lg:col-6">
-        <div class="card">
-            <h2>System</h2>
-            <ng-container *ngIf="info$ | async as info">
-                <table *ngIf="asic$ | async as asic">
+<div class="grid" *ngIf="info$ | async as info">
+    <ng-container *ngIf="asic$ | async as asic">
+        <div class="col-12 lg:col-6">
+            <div class="card">
+                <h2>System</h2>
+                <table>
                     <tr>
                         <td>Model:</td>
                         <td>
@@ -57,7 +57,7 @@
                         <td>{{info.boardVersion}}</td>
                     </tr>
                 </table>
-            </ng-container>
+            </div>
         </div>
-    </div>
+    </ng-container>
 </div>

@@ -10,6 +10,9 @@
 #include "esp_wifi.h"
 #include <esp_sntp.h>
 #include <time.h>
+#include <sys/time.h>
+#include "esp_timer.h"
+#include <stdbool.h>
 
 #define PORT CONFIG_STRATUM_PORT
 #define STRATUM_URL CONFIG_STRATUM_URL
@@ -193,6 +196,7 @@ void stratum_task(void * pvParameters)
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
+
     xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL);
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
@@ -296,6 +300,7 @@ void stratum_task(void * pvParameters)
         int authorize_message_id = GLOBAL_STATE->send_uid++;
         //mining.authorize - ID: 3
         STRATUM_V1_authorize(GLOBAL_STATE->sock, authorize_message_id, username, password);
+        STRATUM_V1_stamp_tx(authorize_message_id);
 
         // Everything is set up, lets make sure we don't abandon work unnecessarily.
         GLOBAL_STATE->abandon_work = 0;
@@ -307,6 +312,12 @@ void stratum_task(void * pvParameters)
                 retry_attempts++;
                 stratum_close_connection(GLOBAL_STATE);
                 break;
+            }
+
+            double response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id);
+            if (response_time_ms >= 0) {
+                ESP_LOGI(TAG, "Stratum response time: %.2f ms", response_time_ms);
+                GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
             }
 
             ESP_LOGI(TAG, "rx: %s", line); // debug incoming stratum messages

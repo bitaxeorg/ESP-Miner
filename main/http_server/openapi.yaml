@@ -103,7 +103,7 @@ components:
         - fanrpm
         - fanspeed
         - temptarget
-        - flipscreen
+        - rotation
         - freeHeap
         - frequency
         - hashRate
@@ -187,9 +187,9 @@ components:
         temptarget:
           type: number
           description: Target Temperature for the PID Controller
-        flipscreen:
+        rotation:
           type: number
-          description: Screen flip setting (0=normal, 1=flipped)
+          description: Screen rotation setting (0, 90, 180, 270)
         freeHeap:
           type: number
           description: Available heap memory in bytes
@@ -377,9 +377,9 @@ components:
           minimum: 1
           examples:
             - 450
-        flipscreen:
+        rotation:
           type: integer
-          description: Whether to flip the screen orientation (0=normal, 1=flipped)
+          description: Whether to rotate the screen orientation (0, 90, 180, 270 degrees)
           enum: [0, 1]
           examples:
             - 0

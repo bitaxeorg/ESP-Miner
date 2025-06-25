@@ -16,7 +16,7 @@ asicvoltage,data,u16,1166
 asicmodel,data,string,BM1368
 devicemodel,data,string,supra
 boardversion,data,string,401
-flipscreen,data,u16,1
+rotation,data,u16,0
 autofanspeed,data,u16,1
 fanspeed,data,u16,100
 selftest,data,u16,1
