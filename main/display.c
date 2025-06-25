@@ -49,19 +49,18 @@ static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
 
 static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
 {
-    char * display_config = nvs_config_get_string(NVS_CONFIG_DISPLAY, DEFAULT_DISPLAY);
+    char * display_config_name = nvs_config_get_string(NVS_CONFIG_DISPLAY, DEFAULT_DISPLAY);
+    const DisplayConfig * display_config = get_display_config(display_config_name);
 
-    for (int i = 0 ; i < ARRAY_SIZE(display_configs); i++) {
-        if (strcmp(display_configs[i].name, display_config) == 0) {
-            GLOBAL_STATE->DISPLAY_CONFIG = display_configs[i];
+    if (display_config) {
+        GLOBAL_STATE->DISPLAY_CONFIG = *display_config;
 
-            ESP_LOGI(TAG, "%s", GLOBAL_STATE->DISPLAY_CONFIG.name);
-            free(display_config);
-            return ESP_OK;
-        }
+        ESP_LOGI(TAG, "%s", GLOBAL_STATE->DISPLAY_CONFIG.name);
+        free(display_config_name);
+        return ESP_OK;
     }
 
-    free(display_config);
+    free(display_config_name);
     return ESP_FAIL;
 }
 
@@ -225,4 +224,14 @@ esp_err_t display_on(bool display_on)
     }
 
     return ESP_OK;
+}
+
+const DisplayConfig * get_display_config(const char * name)
+{
+    for (int i = 0 ; i < ARRAY_SIZE(display_configs); i++) {
+        if (strcmp(display_configs[i].name, name) == 0) {
+            return &display_configs[i];
+        }
+    }
+    return NULL;
 }
