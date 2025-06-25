@@ -37,8 +37,9 @@ static void init_request_timings() {
 }
 
 static RequestTiming* get_request_timing(int request_id) {
-    if (request_id < 0 || request_id >= MAX_REQUEST_IDS) return NULL;
-    return &request_timings[request_id];
+    if (request_id < 0) return NULL;
+    int index = request_id % MAX_REQUEST_IDS;
+    return &request_timings[index];
 }
 
 void STRATUM_V1_stamp_tx(int request_id)
