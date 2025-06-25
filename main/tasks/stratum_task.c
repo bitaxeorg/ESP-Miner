@@ -302,6 +302,7 @@ void stratum_task(void * pvParameters)
         int authorize_message_id = GLOBAL_STATE->send_uid++;
         //mining.authorize - ID: 3
         STRATUM_V1_authorize(GLOBAL_STATE->sock, authorize_message_id, username, password);
+        STRATUM_V1_stamp_tx(authorize_message_id);
 
         // Everything is set up, lets make sure we don't abandon work unnecessarily.
         GLOBAL_STATE->abandon_work = 0;
@@ -315,8 +316,7 @@ void stratum_task(void * pvParameters)
                 break;
             }
 
-            // Calculate response time
-            double response_time_ms = STRATUM_V1_get_response_time_ms(line);
+            double response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id);
             if (response_time_ms >= 0) {
                 ESP_LOGI(TAG, "Stratum response time: %.2f ms", response_time_ms);
                 GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;

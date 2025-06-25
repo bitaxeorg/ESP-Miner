@@ -21,6 +21,7 @@ static const char * TAG = "stratum_api";
 
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
+static int last_parsed_request_id = -1;
 
 static RequestTiming request_timings[MAX_REQUEST_IDS];
 static bool initialized = false;
@@ -35,30 +36,14 @@ static void init_request_timings() {
     }
 }
 
-static int get_request_id(const char *msg) {
-    cJSON *root = cJSON_Parse(msg);
-    if (!root) return -1;
-    
-    cJSON *id = cJSON_GetObjectItem(root, "id");
-    if (!id || !cJSON_IsNumber(id)) {
-        cJSON_Delete(root);
-        return -1;
-    }
-    
-    int request_id = id->valueint;
-    cJSON_Delete(root);
-    return request_id;
-}
-
 static RequestTiming* get_request_timing(int request_id) {
     if (request_id < 0 || request_id >= MAX_REQUEST_IDS) return NULL;
     return &request_timings[request_id];
 }
 
-void STRATUM_V1_stamp_tx(const char *msg)
+void STRATUM_V1_stamp_tx(int request_id)
 {
     init_request_timings();
-    int request_id = get_request_id(msg);
     if (request_id >= 0) {
         RequestTiming *timing = get_request_timing(request_id);
         if (timing) {
@@ -68,10 +53,9 @@ void STRATUM_V1_stamp_tx(const char *msg)
     }
 }
 
-double STRATUM_V1_get_response_time_ms(const char *msg)
+double STRATUM_V1_get_response_time_ms(int request_id)
 {
     init_request_timings();
-    int request_id = get_request_id(msg);
     if (request_id < 0) return -1.0;
     
     RequestTiming *timing = get_request_timing(request_id);
@@ -175,6 +159,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
     int64_t parsed_id = -1;
     if (id_json != NULL && cJSON_IsNumber(id_json)) {
         parsed_id = id_json->valueint;
+        last_parsed_request_id = parsed_id;
     }
     message->message_id = parsed_id;
 
@@ -440,8 +425,7 @@ int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * ve
 
 static void debug_stratum_tx(const char * msg)
 {
-    // Record the timestamp when sending
-    STRATUM_V1_stamp_tx(msg);
+    STRATUM_V1_stamp_tx(last_parsed_request_id);
     //remove the trailing newline
     char * newline = strchr(msg, '\n');
     if (newline != NULL) {
