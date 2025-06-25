@@ -1,4 +1,4 @@
-name: Publish Latest Firmware to S3
+name: Publish Latest Web App to S3
 
 permissions:
   id-token: write
@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       asset_name:
-        description: "Name of the asset to upload (e.g. esp-miner.bin)"
+        description: "Name of the asset to upload (e.g. www.bin)"
         required: true
-        default: esp-miner.bin
+        default: www.bin
   release:
     types: [published]
 
@@ -38,8 +38,8 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "ASSET_NAME=${{ github.event.inputs.asset_name }}" >> $GITHUB_ENV
           else
-            # For release events, default to esp-miner.bin
-            echo "ASSET_NAME=esp-miner.bin" >> $GITHUB_ENV
+            # For release events, default to www.bin
+            echo "ASSET_NAME=www.bin" >> $GITHUB_ENV
           fi
 
       - name: Print asset name (debug)
@@ -62,5 +62,5 @@ jobs:
       - name: Upload to S3
         run: |
           aws s3 cp "$ASSET_NAME" \
-            s3://$S3_BUCKET/firmware/acs-esp-miner/latest/"$ASSET_NAME" \
+            s3://$S3_BUCKET/web-app/acs-esp-miner/latest/"$ASSET_NAME" \
             --acl public-read --region $AWS_REGION
