@@ -1,15 +1,55 @@
 #loading {
-    background-color: rgba(0, 0, 0, 0.5);
-    top: 0;
+    background-color: var(--maskbg);
+    left: calc(4rem + var(--sidebar-width));
+    right: 2rem;
     bottom: 0;
-    left: 0;
-    right: 0;
+    top: 7rem;
+    padding-bottom: 7rem;
     position: fixed;
     z-index: 99999999999999999999;
+
+    ::ng-deep .layout-static-inactive & {
+        left: 2rem;
+    }
+
+    @media (max-width: 991px) {
+        left: 2rem;
+    }
+    @media (max-width: 768px) {
+        left: 1rem;
+        right: 1rem;
+    }
 }
 
-#loading-text {
-    text-align: center;
-    margin-top: 40vh;
-    font-size: 20pt;
+figure {
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+}
+
+.icon-bitaxe {
+    width: 41px;
+    height: 60px;
+}
+.icon-fan {
+    width: 32px;
+    height: 32px;
+    margin: 24px 0 0;
+    position: absolute;
+
+    animation: rotation 1s infinite linear;
+    transform-box: fill-box;
+    transform-origin: center;
+    will-change: transform;
+}
+
+@keyframes rotation {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }

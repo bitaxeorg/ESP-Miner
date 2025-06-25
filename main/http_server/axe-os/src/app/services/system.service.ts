@@ -59,8 +59,13 @@ export class SystemService {
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         fallbackStratumURL: "test.public-pool.io",
         fallbackStratumPort: 21497,
+<<<<<<< stratum-xnsub-diff-config
         fallbackStratumExtranonceSubscribe: 0,
         fallbackStratumDifficulty: 1000,
+=======
+        responseTime: 10,
+        stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
+>>>>>>> master
         fallbackStratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         isUsingFallbackStratum: true,
         frequency: 485,

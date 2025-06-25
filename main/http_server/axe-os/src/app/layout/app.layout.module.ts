@@ -10,7 +10,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { RippleModule } from 'primeng/ripple';
 import { SidebarModule } from 'primeng/sidebar';
-
+import { TooltipModule } from 'primeng/tooltip';
 import { PrimeNGModule } from '../prime-ng.module';
 import { AppFooterComponent } from './app.footer.component';
 import { AppLayoutComponent } from './app.layout.component';
@@ -18,6 +18,7 @@ import { AppMenuComponent } from './app.menu.component';
 import { AppMenuitemComponent } from './app.menuitem.component';
 import { AppSidebarComponent } from './app.sidebar.component';
 import { AppTopBarComponent } from './app.topbar.component';
+import { LoadingComponent } from '../components/loading/loading.component';
 
 @NgModule({
     declarations: [
@@ -27,6 +28,7 @@ import { AppTopBarComponent } from './app.topbar.component';
         AppMenuComponent,
         AppSidebarComponent,
         AppLayoutComponent,
+        LoadingComponent,
     ],
     imports: [
         BrowserModule,
@@ -41,7 +43,7 @@ import { AppTopBarComponent } from './app.topbar.component';
         RippleModule,
         RouterModule,
         PrimeNGModule,
-
+        TooltipModule,
     ],
     exports: [AppLayoutComponent]
 })

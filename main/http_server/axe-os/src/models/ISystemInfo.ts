@@ -38,9 +38,13 @@ export interface ISystemInfo {
     ASICModel: eASICModel,
     stratumURL: string,
     stratumPort: number,
+<<<<<<< stratum-xnsub-diff-config
     stratumExtranonceSubscribe: number,
     stratumDifficulty: number,
     stratumUser: string,
+=======
+    responseTime: number,
+>>>>>>> master
     fallbackStratumURL: string,
     fallbackStratumPort: number,
     fallbackStratumExtranonceSubscribe: number,

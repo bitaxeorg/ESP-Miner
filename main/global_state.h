@@ -55,8 +55,12 @@ typedef struct
     bool pool_extranonce_subscribe;
     uint16_t pool_difficulty;
     uint16_t fallback_pool_port;
+<<<<<<< stratum-xnsub-diff-config
     bool fallback_pool_extranonce_subscribe;
     uint16_t fallback_pool_difficulty;
+=======
+    double response_time;
+>>>>>>> master
     char * pool_user;
     char * fallback_pool_user;
     char * pool_pass;

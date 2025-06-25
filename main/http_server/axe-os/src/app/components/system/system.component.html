@@ -1,8 +1,8 @@
-<div class="grid">
+<div class="grid" *ngIf="info$ | async as info">
     <div class="col-12 lg:col-6">
         <div class="card">
             <h2>System</h2>
-            <table *ngIf="info$ | async as info">
+            <table>
                 <tr>
                     <td>Model:</td>
                     <td>{{info.ASICModel}}</td>

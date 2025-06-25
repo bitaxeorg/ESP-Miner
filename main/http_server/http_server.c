@@ -259,7 +259,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
     } else if (CHECK_FILE_EXTENSION(filepath, ".ico")) {
         type = "image/x-icon";
     } else if (CHECK_FILE_EXTENSION(filepath, ".svg")) {
-        type = "text/xml";
+        type = "image/svg+xml";
     } else if (CHECK_FILE_EXTENSION(filepath, ".pdf")) {
         type = "application/pdf";
     } else if (CHECK_FILE_EXTENSION(filepath, ".woff2")) {
@@ -652,8 +652,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "stratumExtranonceSubscribe", nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddNumberToObject(root, "stratumDifficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY, CONFIG_STRATUM_DIFFICULTY));
     cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT));
+<<<<<<< stratum-xnsub-diff-config
     cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddNumberToObject(root, "fallbackStratumDifficulty", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, CONFIG_FALLBACK_STRATUM_DIFFICULTY));
+=======
+    cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
+>>>>>>> master
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
     cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
 
