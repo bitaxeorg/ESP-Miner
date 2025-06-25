@@ -9,6 +9,7 @@ import { Theme } from "./pages/Theme/index";
 import { WifiPage } from "./pages/Wifi";
 import { Settings } from "./pages/Settings/index.js";
 import { UpdatesPage } from "./pages/Updates";
+import { YouTubeStatsPage } from "./pages/YouTubeStats";
 import { NotFound } from "./pages/_404.jsx";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider, useToast } from "./context/ToastContext";
@@ -42,6 +43,7 @@ function AppContent() {
             <Route path='/wifi' component={WifiPage} />
             <Route path='/analytics' component={AnalyticsPage} />
             <Route path='/updates' component={UpdatesPage} />
+            <Route path='/youtube-stats' component={YouTubeStatsPage} />
             <Route default component={NotFound} />
           </Router>
         </Layout>
