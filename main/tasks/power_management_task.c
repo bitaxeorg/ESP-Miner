@@ -58,7 +58,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
-    min_fan_pct = (double)nvs_config_get_u16(NVS_CONFIG_MIN_FAN_PCT, min_fan_pct);
+    min_fan_pct = (double)nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED, min_fan_pct);
 
     // Initialize PID controller with pid_d_startup and PID_REVERSE directly
     pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d_startup, PID_P_ON_E, PID_REVERSE);
@@ -77,7 +77,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         // Refresh PID setpoint and minimum output from NVS in case it was changed via API
         pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
-        min_fan_pct = (double)nvs_config_get_u16(NVS_CONFIG_MIN_FAN_PCT, min_fan_pct);
+        min_fan_pct = (double)nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED, min_fan_pct);
 
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);

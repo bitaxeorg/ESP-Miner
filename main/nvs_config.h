@@ -31,7 +31,7 @@
 #define NVS_CONFIG_DISPLAY_TIMEOUT "displayTimeout"
 #define NVS_CONFIG_AUTO_FAN_SPEED "autofanspeed"
 #define NVS_CONFIG_FAN_SPEED "fanspeed"
-#define NVS_CONFIG_MIN_FAN_PCT "minfanpct"
+#define NVS_CONFIG_MIN_FAN_SPEED "minfanspeed"
 #define NVS_CONFIG_TEMP_TARGET "temptarget"
 #define NVS_CONFIG_BEST_DIFF "bestdiff"
 #define NVS_CONFIG_SELF_TEST "selftest"
