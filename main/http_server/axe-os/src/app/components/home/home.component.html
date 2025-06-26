@@ -248,8 +248,8 @@
                 <h5>Pool ({{ activePoolLabel }})</h5>
 
                 <div class="flex flex-nowrap">
-                    <div class="col-fixed-width">
-                        <span>URL:</span>
+                    <div class="col-fixed-width text-500">
+                        <span>URL</span>
                     </div>
                     <div>
                         <a [href]="quickLink$ | async" target="_blank" class="underline break-all">
@@ -259,8 +259,8 @@
                 </div>
 
                 <div class="flex flex-nowrap">
-                    <div class="col-fixed-width">
-                        <span>Port:</span>
+                    <div class="col-fixed-width text-500">
+                        <span>Port</span>
                     </div>
                     <div>
                         {{ activePoolPort }}
@@ -268,8 +268,8 @@
                 </div>
 
                 <div class="flex flex-nowrap ellipsis-magic" pTooltip="{{activePoolUser}}" tooltipPosition="top">
-                    <div class="col-fixed-width">
-                        <span>User:</span>
+                    <div class="col-fixed-width text-500">
+                        <span>User</span>
                     </div>
 
                     <span class="start">
@@ -281,8 +281,8 @@
                 </div>
 
                 <div class="flex flex-nowrap">
-                    <div class="col-fixed-width">
-                        <span>Time: <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Time it takes for the pool to respond to a share"></i></span>
+                    <div class="col-fixed-width text-500">
+                        <span class="white-space-nowrap">Time <i class="pi pi-info-circle text-xs px-1" pTooltip="Time it takes for the pool to respond to a share"></i></span>
                     </div>
                     <div>
                         {{ info.responseTime }} ms
