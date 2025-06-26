@@ -281,7 +281,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
     } else if (CHECK_FILE_EXTENSION(filepath, ".ico")) {
         type = "image/x-icon";
     } else if (CHECK_FILE_EXTENSION(filepath, ".svg")) {
-        type = "text/xml";
+        type = "image/svg+xml";
     } else if (CHECK_FILE_EXTENSION(filepath, ".pdf")) {
         type = "application/pdf";
     } else if (CHECK_FILE_EXTENSION(filepath, ".woff2")) {
@@ -518,8 +518,8 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "display"))) {
         nvs_config_set_string(NVS_CONFIG_DISPLAY, item->valuestring);
     }
-    if ((item = cJSON_GetObjectItem(root, "flipscreen")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FLIP_SCREEN, item->valueint);
+    if ((item = cJSON_GetObjectItem(root, "rotation")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_ROTATION, item->valueint);
     }
     if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
@@ -659,6 +659,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT));
     cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT));
+    cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
     cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
 
@@ -672,7 +673,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED, 0));
     cJSON_AddStringToObject(root, "display", display);
-    cJSON_AddNumberToObject(root, "flipscreen", nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1));
+    cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION, 0));
     cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
     cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1));
     
@@ -1188,14 +1189,6 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &wifi_scan_get_uri);
-
-    httpd_uri_t swarm_options_uri = {
-        .uri = "/api/swarm",
-        .method = HTTP_OPTIONS,
-        .handler = handle_options_request,
-        .user_ctx = NULL,
-    };
-    httpd_register_uri_handler(server, &swarm_options_uri);
 
     httpd_uri_t system_restart_uri = {
         .uri = "/api/system/restart", .method = HTTP_POST, 

@@ -17,6 +17,9 @@
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
           "options": {
+            "allowedCommonJsDependencies": [
+              "moment"
+            ],
             "outputPath": "dist/axe-os",
             "index": "src/index.html",
             "main": "src/main.ts",
@@ -73,10 +76,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "browserTarget": "axe-os:build:production"
+              "buildTarget": "axe-os:build:production"
             },
             "development": {
-              "browserTarget": "axe-os:build:development"
+              "buildTarget": "axe-os:build:development"
             }
           },
           "defaultConfiguration": "development"
@@ -84,7 +87,7 @@
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "axe-os:build"
+            "buildTarget": "axe-os:build"
           }
         },
         "test": {

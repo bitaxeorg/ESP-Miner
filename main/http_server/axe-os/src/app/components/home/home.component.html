@@ -1,7 +1,4 @@
-<ng-template #loading>
-    <h4>Loading...</h4>
-</ng-template>
-<ng-container *ngIf="info$ | async as info; else loading">
+<ng-container *ngIf="info$ | async as info">
     <!-- Temp warning alert -->
     <p-message *ngIf="info.overheat_mode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
         text="Bitaxe has overheated - See settings">
@@ -23,7 +20,7 @@
         text="Firmware ({{info.version}}) and Axe-OS ({{info.axeOSVersion}}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.">
     </p-message>
 
-    <div class="grid" *ngIf="info$ | async as info; else loading">
+    <div class="grid">
         <div class="col-12 md:col-6 xl:col-3">
             <div class="card mb-0">
                 <div class="flex justify-content-between mb-3">
@@ -247,7 +244,7 @@
         </div>
 
         <div class="col-12 md:col-6">
-            <div class="card" *ngIf="info$ | async as info; else loading">
+            <div class="card">
                 <h5>Pool ({{ activePoolLabel }})</h5>
 
                 <div class="flex flex-nowrap">
@@ -282,11 +279,20 @@
                         {{ activePoolUser.substring(activePoolUser.length - 20) }}
                     </span>
                 </div>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width">
+                        <span>Share Response Time:</span>
+                    </div>
+                    <div>
+                        {{ info.responseTime }} ms
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="col-12 md:col-6">
-            <div class="card" *ngIf="info$ | async as info; else loading">
+            <div class="card">
                 <h5>Uptime</h5>
                 {{info.uptimeSeconds | dateAgo}}
             </div>

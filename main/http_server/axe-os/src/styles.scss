@@ -1,9 +1,4 @@
 @font-face {
-    font-family: 'Angel Wish';
-    src: url(/assets/fonts/AngelWish.woff2) format('woff2');
-}
-
-@font-face {
     font-family: 'Nippo-Regular';
     src: url(/assets/fonts/Nippo-Regular.woff2) format('woff2');
     font-weight: 400;
@@ -68,10 +63,6 @@ p-chart>div {
     &:enabled:hover {
         background: var(--button-hover-bg);
         border-color: var(--button-hover-bg);
-    }
-
-    &:focus {
-        box-shadow: var(--button-focus-shadow);
     }
 }
 

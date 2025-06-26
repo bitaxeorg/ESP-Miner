@@ -41,20 +41,19 @@ bitaxetool --config ./config-401.cvs --firmware ./esp-miner-factory-401-v2.4.2.b
 ## AxeOS API
 The esp-miner UI is called AxeOS and provides an API to expose actions and information.
 
-For more details take a look at `main/http_server/http_server.c`.
+For more details take a look at [`main/http_server/openapi.yaml`](./main/http_server/openapi.yaml).
 
 Things that can be done are:
   
   - Get System Info
-  - Get Swarm Info
+  - Get System Statistics
   - Update Swarm
-  - Swarm Options
   - System Restart Action
   - Update System Settings Action
   - System Options
   - Update OTA Firmware
   - Update OTA WWW
-  - WebSocket
+  - Logs over WebSocket
 
 Some API examples in curl:
   ```bash
@@ -62,8 +61,8 @@ Some API examples in curl:
   curl http://YOUR-BITAXE-IP/api/system/info
   ```
   ```bash
-  # Get swarm information
-  curl http://YOUR-BITAXE-IP/api/swarm/info
+  # Get system statistics
+  curl http://YOUR-BITAXE-IP/api/system/statistics
   ```
   ```bash
   # System restart action
@@ -110,6 +109,8 @@ bitaxetool --config ./config-xxx.cvs --firmware ./esp-miner-merged.bin
 ```
 
 where xxx is the config file for your hardware version. You can see the list of available config files in the root of the repository.
+
+A custom board version is also possible with `config-custom.cvs`. A custom board needs to be based on an existing `devicemodel` and `asicmodel`.
 
 Note: if you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
 

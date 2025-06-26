@@ -22,7 +22,7 @@
 #define NVS_CONFIG_DEVICE_MODEL "devicemodel"
 #define NVS_CONFIG_BOARD_VERSION "boardversion"
 #define NVS_CONFIG_DISPLAY "display"
-#define NVS_CONFIG_FLIP_SCREEN "flipscreen"
+#define NVS_CONFIG_ROTATION "rotation"
 #define NVS_CONFIG_INVERT_SCREEN "invertscreen"
 #define NVS_CONFIG_DISPLAY_TIMEOUT "displayTimeout"
 #define NVS_CONFIG_AUTO_FAN_SPEED "autofanspeed"
@@ -38,6 +38,20 @@
 // Theme configuration
 #define NVS_CONFIG_THEME_SCHEME "themescheme"
 #define NVS_CONFIG_THEME_COLORS "themecolors"
+
+// Device config overrides
+#define NVS_CONFIG_PLUG_SENSE "plug_sense"
+#define NVS_CONFIG_ASIC_ENABLE "asic_enable"
+#define NVS_CONFIG_EMC2101 "EMC2101"
+#define NVS_CONFIG_EMC2103 "EMC2103"
+#define NVS_CONFIG_EMC_INTERNAL_TEMP "emc_int_temp"
+#define NVS_CONFIG_EMC_IDEALITY_FACTOR "emc_ideality_f"
+#define NVS_CONFIG_EMC_BETA_COMPENSATION "emc_beta_comp"
+#define NVS_CONFIG_EMC_TEMP_OFFSET "emc_temp_offset"
+#define NVS_CONFIG_DS4432U "DS4432U"
+#define NVS_CONFIG_INA260 "INA260"
+#define NVS_CONFIG_TPS546 "TPS546"
+#define NVS_CONFIG_POWER_CONSUMPTION_TARGET "power_cons_tgt"
 
 char * nvs_config_get_string(const char * key, const char * default_value);
 void nvs_config_set_string(const char * key, const char * default_value);

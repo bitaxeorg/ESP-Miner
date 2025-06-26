@@ -10,14 +10,64 @@
 #include "esp_ota_ops.h"
 #include "lwip/sockets.h"
 #include "utils.h"
+#include "esp_timer.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 #define BUFFER_SIZE 1024
 static const char * TAG = "stratum_api";
 
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
+static int last_parsed_request_id = -1;
+
+static RequestTiming request_timings[MAX_REQUEST_IDS];
+static bool initialized = false;
+
+static void init_request_timings() {
+    if (!initialized) {
+        for (int i = 0; i < MAX_REQUEST_IDS; i++) {
+            request_timings[i].timestamp_us = 0;
+            request_timings[i].tracking = false;
+        }
+        initialized = true;
+    }
+}
+
+static RequestTiming* get_request_timing(int request_id) {
+    if (request_id < 0) return NULL;
+    int index = request_id % MAX_REQUEST_IDS;
+    return &request_timings[index];
+}
+
+void STRATUM_V1_stamp_tx(int request_id)
+{
+    init_request_timings();
+    if (request_id >= 1) {
+        RequestTiming *timing = get_request_timing(request_id);
+        if (timing) {
+            timing->timestamp_us = esp_timer_get_time();
+            timing->tracking = true;
+        }
+    }
+}
+
+double STRATUM_V1_get_response_time_ms(int request_id)
+{
+    init_request_timings();
+    if (request_id < 0) return -1.0;
+    
+    RequestTiming *timing = get_request_timing(request_id);
+    if (!timing || !timing->tracking) {
+        return -1.0;
+    }
+    
+    double response_time = (esp_timer_get_time() - timing->timestamp_us) / 1000.0;
+    timing->tracking = false;
+    return response_time;
+}
 
 static void debug_stratum_tx(const char *);
 int _parse_stratum_subscribe_result_message(const char * result_json_str, char ** extranonce, int * extranonce2_len);
@@ -110,6 +160,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
     int64_t parsed_id = -1;
     if (id_json != NULL && cJSON_IsNumber(id_json)) {
         parsed_id = id_json->valueint;
+        last_parsed_request_id = parsed_id;
     }
     message->message_id = parsed_id;
 
@@ -375,6 +426,7 @@ int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * ve
 
 static void debug_stratum_tx(const char * msg)
 {
+    STRATUM_V1_stamp_tx(last_parsed_request_id);
     //remove the trailing newline
     char * newline = strchr(msg, '\n');
     if (newline != NULL) {

@@ -1,29 +1,37 @@
 #logs {
-    height: 500px;
+    height: calc(100svh - 4rem - 10rem - 4rem - 4px); // padding + height + border
     font-family: monospace;
     border: 1px solid #304562;
     overflow-y: scroll;
     overflow-x: hidden;
 
-    >div {
+    @media (min-width: 768px) {
+        height: calc(100vh - 4rem - 9rem - 4rem - 4px); // padding + height + border
+    }
+
+    > div {
         max-width: 100%;
         line-break: anywhere;
         font-family: 'Courier New', Courier, monospace;
     }
-
-    &.is-expanded {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        z-index: 999;
-        background: var(--surface-overlay);
-    }
 }
 
-.p-button-icon-only:focus {
-    box-shadow: none;
+.is-expanded {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 999;
+    background: var(--surface-overlay);
+
+    #logs {
+        height: calc(100svh - 4rem - 2rem - 4rem - 4px); // padding + height + border
+
+        @media (min-width: 768px) {
+            height: calc(100vh - 4rem - 4rem - 4px); // padding + height + border
+        }
+    }
 }
 
 .ansi-red { color: #ff0000; }
