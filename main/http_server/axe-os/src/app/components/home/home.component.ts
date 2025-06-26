@@ -70,7 +70,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.initializeChart();
     this.loadPreviousData();
 
-    // Subscribe to theme changes
     this.themeService.getThemeSettings()
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
@@ -137,7 +136,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.titleSubscription?.unsubscribe();
-          // Clear and reload previous data
           this.clearDataPoints();
           this.loadPreviousData();
         },
@@ -288,12 +286,12 @@ export class HomeComponent implements OnInit, OnDestroy {
           idxChartY2Data = 2;
         } else if (stats.chartY2Data === eChartLabel.none) {
           idxChartY2Data = -1;
-        } else if (idxChartY1Data < 3) { // no additional data for Y1
+        } else if (idxChartY1Data < 3) {
           idxChartY2Data = 3;
         }
 
         stats.statistics.forEach(element => {
-          element[idxHashrate] = element[idxHashrate] * 1000000000; // convert to H/s
+          element[idxHashrate] = element[idxHashrate] * 1000000000;
           switch (stats.chartY1Data) {
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
@@ -342,8 +340,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         return this.systemService.getInfo()
       }),
       map(info => {
-        info.hashRate = info.hashRate * 1000000000; // convert to H/s
-        info.expectedHashrate = info.expectedHashrate * 1000000000; // convert to H/s
+        info.hashRate = info.hashRate * 1000000000;
+        info.expectedHashrate = info.expectedHashrate * 1000000000;
         info.voltage = info.voltage / 1000;
         info.current = info.current / 1000;
         info.coreVoltageActual = info.coreVoltageActual / 1000;
