@@ -217,14 +217,14 @@ static void readAxeOSVersion(void) {
         axeOSVersion[n] = '\0';
         fclose(f);
 
-        ESP_LOGI(TAG, "Axe-OS version: %s", axeOSVersion);
+        ESP_LOGI(TAG, "AxeOS version: %s", axeOSVersion);
 
         if (strcmp(axeOSVersion, esp_app_get_description()->version) != 0) {
-            ESP_LOGE(TAG, "Firmware (%s) and Axe-OS (%s) versions do not match. Please make sure to update both www.bin and esp-miner.bin.", esp_app_get_description()->version, axeOSVersion);
+            ESP_LOGE(TAG, "Firmware (%s) and AxeOS (%s) versions do not match. Please make sure to update both www.bin and esp-miner.bin.", esp_app_get_description()->version, axeOSVersion);
         }
     } else {
         strcpy(axeOSVersion, "unknown");
-        ESP_LOGE(TAG, "Failed to open Axe-OS version.txt");
+        ESP_LOGE(TAG, "Failed to open AxeOS version.txt");
     }
 }
 

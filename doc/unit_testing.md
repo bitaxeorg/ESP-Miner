@@ -12,7 +12,7 @@ idf.py build
 ```
 
 ### Flashing
-**NOTE: Flashing the unit test binary will replace the existing firmware on the ESP32. For example, you will no longer have access to the Axe-OS web UI and must flash a release or build and flash a non-test binary to recover. Do not attempt to do this unless you are willing to spend time recovering (or have dedicated test devices)**
+**NOTE: Flashing the unit test binary will replace the existing firmware on the ESP32. For example, you will no longer have access to the AxeOS web UI and must flash a release or build and flash a non-test binary to recover. Do not attempt to do this unless you are willing to spend time recovering (or have dedicated test devices)**
 
 At the conclusion of the build, instructions are provided to flash it. To ensure esptool uses the correct serial port and has permission to do so, ensure the serial device of the esp32 is known (e.g. from `dmesg` output on connection) and ensure the user is in the `dialout` group.
 

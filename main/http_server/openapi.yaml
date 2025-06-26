@@ -279,7 +279,7 @@ components:
           description: Firmware version
         axeOSVersion:
           type: string
-          description: Axe-OS version
+          description: AxeOS version
         voltage:
           type: number
           description: Input voltage
