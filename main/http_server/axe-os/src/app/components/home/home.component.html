@@ -308,14 +308,14 @@
                             </ng-container>
                         </td>
                     </tr>
-                    <tr>
-                        <td>Maximum VR Temperature:</td>
-                        <td>
-                            <ng-container *ngIf="info.vrTempMax > 0; else noTemp">
+                    <ng-container *ngIf="info.vrTempMax > 0">
+                        <tr>
+                            <td>Maximum VR Temperature:</td>
+                            <td>
                                 {{info.vrTempMax}}&deg;C
-                            </ng-container>
-                        </td>
-                    </tr>
+                            </td>
+                        </tr>
+                    </ng-container>
                 </table>
             </div>
         </div>
