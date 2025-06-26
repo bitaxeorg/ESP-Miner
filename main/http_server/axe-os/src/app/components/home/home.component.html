@@ -301,7 +301,7 @@
                 </table>
                 <table>
                     <tr>
-                        <td>Maximum ASIC Temperature:</td>
+                        <td class="text-500 pr-2">Maximum ASIC Temperature</td>
                         <td>
                             <ng-container *ngIf="info.tempMax > 0; else noTemp">
                                 {{info.tempMax}}&deg;C
@@ -310,7 +310,7 @@
                     </tr>
                     <ng-container *ngIf="info.vrTempMax > 0">
                         <tr>
-                            <td>Maximum VR Temperature:</td>
+                            <td class="text-500 pr-2">Maximum VR Temperature</td>
                             <td>
                                 {{info.vrTempMax}}&deg;C
                             </td>
