@@ -132,6 +132,7 @@ components:
         - temp
         - uptimeSeconds
         - version
+        - axeOSVersion
         - voltage
         - vrTemp
         - wifiStatus
@@ -276,6 +277,9 @@ components:
         version:
           type: string
           description: Firmware version
+        axeOSVersion:
+          type: string
+          description: AxeOS version
         voltage:
           type: number
           description: Input voltage

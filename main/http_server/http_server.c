@@ -46,6 +46,8 @@
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
 
+static char axeOSVersion[32];
+
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
@@ -208,6 +210,24 @@ esp_err_t is_network_allowed(httpd_req_t * req)
     return ESP_FAIL;
 }
 
+static void readAxeOSVersion(void) {
+    FILE* f = fopen("/version.txt", "r");
+    if (f != NULL) {
+        size_t n = fread(axeOSVersion, 1, sizeof(axeOSVersion) - 1, f);
+        axeOSVersion[n] = '\0';
+        fclose(f);
+
+        ESP_LOGI(TAG, "AxeOS version: %s", axeOSVersion);
+
+        if (strcmp(axeOSVersion, esp_app_get_description()->version) != 0) {
+            ESP_LOGE(TAG, "Firmware (%s) and AxeOS (%s) versions do not match. Please make sure to update both www.bin and esp-miner.bin.", esp_app_get_description()->version, axeOSVersion);
+        }
+    } else {
+        strcpy(axeOSVersion, "unknown");
+        ESP_LOGE(TAG, "Failed to open AxeOS version.txt");
+    }
+}
+
 esp_err_t init_fs(void)
 {
     esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = NULL, .max_files = 5, .format_if_mount_failed = false};
@@ -231,6 +251,9 @@ esp_err_t init_fs(void)
     } else {
         ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
     }
+
+    readAxeOSVersion();
+
     return ESP_OK;
 }
 
@@ -358,7 +381,6 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
         ESP_LOGI(TAG, "Redirecting to root");
         return ESP_OK;
     }
-
     if (req->uri[strlen(req->uri) - 1] != '/') {
         httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
     }
@@ -642,6 +664,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
+    cJSON_AddStringToObject(root, "axeOSVersion", axeOSVersion);
+
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
@@ -878,6 +902,8 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     }
 
     httpd_resp_sendstr(req, "WWW update complete\n");
+
+    readAxeOSVersion();
 
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Finished...");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
