@@ -182,6 +182,9 @@ button.color-dot {
             font-size: small;
         }
     }
+    &--border-color-primary {
+        border-color: var(--primary-color);
+    }
 }
 
 .p-button-icon {

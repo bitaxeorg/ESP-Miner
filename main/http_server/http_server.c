@@ -59,7 +59,7 @@ static const char * STATS_LABEL_POWER = "Power";
 static const char * STATS_LABEL_CURRENT = "Current";
 static const char * STATS_LABEL_FAN_SPEED = "Fan Speed";
 static const char * STATS_LABEL_FAN_RPM = "Fan RPM";
-static const char * STATS_LABEL_WIFI_RSSI = "Wi-Fi Strength";
+static const char * STATS_LABEL_WIFI_RSSI = "Wi-Fi RSSI";
 static const char * STATS_LABEL_FREE_HEAP = "Free Heap";
 
 static const char * STATS_LABEL_TIMESTAMP = "Timestamp";

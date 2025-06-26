@@ -8,7 +8,7 @@ export enum eChartLabel {
     current = 'Current',
     fanSpeed = 'Fan Speed',
     fanRpm = 'Fan RPM',
-    wifiRssi = 'Wi-Fi Strength',
+    wifiRssi = 'Wi-Fi RSSI',
     freeHeap = 'Free Heap',
     none = 'None'
 }
