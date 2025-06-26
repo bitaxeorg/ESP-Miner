@@ -97,7 +97,9 @@ components:
         - coreVoltage
         - coreVoltageActual
         - current
+        - fallbackStratumExtranonceSubscribe
         - fallbackStratumPort
+        - fallbackStratumSuggestedDifficulty
         - fallbackStratumURL
         - fallbackStratumUser
         - fanrpm
@@ -125,8 +127,10 @@ components:
         - sharesRejectedReasons
         - smallCoreCount
         - ssid
-        - stratumDiff
+        - stratumDifficulty
+        - stratumExtranonceSubscribe
         - stratumPort
+        - stratumSuggestedDifficulty
         - stratumURL
         - stratumUser
         - temp
@@ -169,9 +173,15 @@ components:
         current:
           type: number
           description: Current draw in milliamps
+        fallbackStratumExtranonceSubscribe:
+          type: boolean
+          description: Enable fallback pool extranonce subscription
         fallbackStratumPort:
           type: number
           description: Fallback stratum server port
+        fallbackStratumSuggestedDifficulty:
+          type: number
+          description: Fallback pool suggested difficulty
         fallbackStratumURL:
           type: string
           description: Fallback stratum server URL
@@ -255,12 +265,18 @@ components:
         ssid:
           type: string
           description: Connected WiFi network SSID
-        stratumDiff:
+        stratumDifficulty:
           type: number
           description: Current stratum difficulty
+        stratumExtranonceSubscribe:
+          type: boolean
+          description: Enable pool extranonce subscription
         stratumPort:
           type: number
           description: Primary stratum server port
+        stratumSuggestedDifficulty:
+          type: number
+          description: Pool suggested difficulty
         stratumURL:
           type: string
           description: Primary stratum server URL

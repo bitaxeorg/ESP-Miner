@@ -47,7 +47,7 @@ export class PoolComponent implements OnInit {
             Validators.max(65535)
           ]],
           stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == 1, [Validators.required]],
-          stratumDifficulty: [info.stratumDifficulty, [Validators.required]],
+          stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
           stratumUser: [info.stratumUser, [Validators.required]],
           stratumPassword: ['*****', [Validators.required]],
 
@@ -61,7 +61,7 @@ export class PoolComponent implements OnInit {
             Validators.max(65535)
           ]],
           fallbackStratumExtranonceSubscribe: [info.fallbackStratumExtranonceSubscribe == 1, [Validators.required]],
-          fallbackStratumDifficulty: [info.fallbackStratumDifficulty, [Validators.required]],
+          fallbackStratumSuggestedDifficulty: [info.fallbackStratumSuggestedDifficulty, [Validators.required]],
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
           fallbackStratumPassword: ['*****', [Validators.required]]
         });
