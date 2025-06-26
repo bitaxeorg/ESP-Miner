@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Stratum V1 Protocol Test Tool with client.reconnect Trigger
+Stratum V1 Protocol Test Tool with Dynamic Personality Switching (Fixed)
 
-This tool models the Stratum V1 protocol as used for SHA256-based coins (e.g., Bitcoin).
-It simulates a minimalist pool that demonstrates core protocol behavior,
-and now includes a "reconnect storm" after 5 job notifications.
+Simulates a minimalist mining pool that alternates between MRR and Nicehash
+every reconnect cycle. Useful for firmware testing, extranonce logic validation,
+and edge-case handling across pool behaviors.
 """
 
 import asyncio
@@ -12,8 +12,12 @@ import json
 import time
 import os
 from datetime import datetime
+import random
 
 LOG_FILE = "stratum_log.txt"
+
+# Flip-flop personality via session index
+session_counter = 0  # Even = MRR, Odd = Nicehash
 
 def log(msg):
     timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
@@ -65,17 +69,32 @@ def generate_fake_job(job_id):
         ]
     }
 
+def random_extranonce(length):
+    return ''.join(random.choices("0123456789abcdef", k=length * 2))
+
 async def handle_client(reader, writer):
+    global session_counter
     peer = writer.get_extra_info("peername")
+    session_index = session_counter
+    personality = "mrr" if session_index % 2 == 0 else "nicehash"
+    session_counter += 1
+
     log(f"Client connected: {peer}")
+    log(f"--- {personality.upper()} personality active ---")
+
     job_task = None
     job_id_counter = 1
 
-    extranonce1 = "deadbeefcafebabe"
-    extranonce2_size = 8
-    version_mask = "ffffffff"
-    job_interval = 3
-    pool_id = "nicehash"
+    if personality == "mrr":
+        extranonce1 = "8000845a"
+        extranonce2_size = 4
+        version_mask = "1fffe000"
+        job_interval = 10
+    else:
+        extranonce1 = random_extranonce(5)
+        extranonce2_size = 3
+        version_mask = "1fffe000"
+        job_interval = 3
 
     async def send_msg(msg):
         try:
@@ -129,16 +148,6 @@ async def handle_client(reader, writer):
             params = msg.get("params", [])
 
             if method == "mining.configure":
-                mask = params[1].get("version-rolling.mask", "").lower()
-                if mask == "1fffe000":
-                    pool_id = "mrr"
-                    extranonce1 = "8000845a"
-                    extranonce2_size = 4
-                    version_mask = "1fffe000"
-                    job_interval = 10
-                    log("Detected MiningRigRentals personality (MRR)")
-                else:
-                    log("Defaulting to Nicehash personality")
                 await send_msg({
                     "id": msg_id,
                     "result": [params[0], {"version-rolling.mask": version_mask}],
@@ -179,10 +188,18 @@ async def handle_client(reader, writer):
                 await asyncio.sleep(0.2)
                 await send_msg(generate_fake_job(format(job_id_counter, "04x")))
                 job_id_counter += 1
-                job_task = asyncio.create_task(send_periodic_jobs())
 
-            elif method == "mining.suggest_difficulty":
-                log("Received suggest_difficulty (optional). No response needed.")
+                # Push extranonce update if we're in Nicehash mode
+                if personality == "nicehash":
+                    await asyncio.sleep(0.5)
+                    new_extra = random_extranonce(9)
+                    await send_msg({
+                        "id": None,
+                        "method": "mining.set_extranonce",
+                        "params": [new_extra, 3]
+                    })
+
+                job_task = asyncio.create_task(send_periodic_jobs())
 
             elif method == "mining.submit":
                 log(f"Share submitted: {params}")
@@ -207,6 +224,9 @@ async def handle_client(reader, writer):
                     })
                 break
 
+            elif method == "mining.suggest_difficulty":
+                log("Received suggest_difficulty (optional). No response needed.")
+
             else:
                 log(f"Unhandled method: {method}")
 
@@ -230,10 +250,9 @@ async def main():
     if os.path.exists(LOG_FILE):
         os.remove(LOG_FILE)
 
-    print(__doc__)  # Show docstring as banner on startup
-
-    log("Stratum V1 Protocol Test Tool (with reconnect)")
-    log("Simulating a minimalist pool with proper handshake and reconnect simulation.")
+    print(__doc__)
+    log("Stratum V1 Protocol Test Tool with Dynamic Personality Switching (Fixed)")
+    log("Simulating a minimalist pool that alternates between MRR and Nicehash.")
     log("")
     print_handshake_diagram()
 
