@@ -154,6 +154,8 @@ char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
 
 void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
 {
+    ESP_LOGI(TAG, "rx: %s", stratum_json); // debug incoming stratum messages
+
     cJSON * json = cJSON_Parse(stratum_json);
 
     cJSON * id_json = cJSON_GetObjectItem(json, "id");

@@ -314,7 +314,6 @@ void stratum_task(void * pvParameters)
                 GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
             }
 
-            ESP_LOGI(TAG, "rx: %s", line); // debug incoming stratum messages
             STRATUM_V1_parse(&stratum_api_v1_message, line);
             free(line);
 
