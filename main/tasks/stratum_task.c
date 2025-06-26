@@ -335,17 +335,18 @@ void stratum_task(void * pvParameters)
                 GLOBAL_STATE->new_set_mining_difficulty_msg = true;
             } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK ||
                     stratum_api_v1_message.method == STRATUM_RESULT_VERSION_MASK) {
-                // 1fffe000
                 ESP_LOGI(TAG, "Set version mask: %08lx", stratum_api_v1_message.version_mask);
+                char * old_version_mask = GLOBAL_STATE->version_mask;
                 GLOBAL_STATE->version_mask = stratum_api_v1_message.version_mask;
                 GLOBAL_STATE->new_stratum_version_rolling_msg = true;
-            } else if (stratum_api_v1_message.method == MINING_SET_EXTRANONCE) {
-                ESP_LOGI(TAG, "Set extranonce: %s", stratum_api_v1_message.extranonce_str);
+                free(old_version_mask);
+            } else if (stratum_api_v1_message.method == MINING_SET_EXTRANONCE ||
+                    stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
+                ESP_LOGI(TAG, "Set extranonce: %s, extranonce_2_len: %d", stratum_api_v1_message.extranonce_str, stratum_api_v1_message.extranonce_2_len);
+                char * old_extranonce_str = GLOBAL_STATE->extranonce_str;
                 GLOBAL_STATE->extranonce_str = stratum_api_v1_message.extranonce_str;
                 GLOBAL_STATE->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
-            } else if (stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
-                GLOBAL_STATE->extranonce_str = stratum_api_v1_message.extranonce_str;
-                GLOBAL_STATE->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
+                free(old_extranonce_str);
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
                 ESP_LOGE(TAG, "Pool requested client reconnect...");
                 stratum_close_connection(GLOBAL_STATE);
