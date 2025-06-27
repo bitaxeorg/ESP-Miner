@@ -54,7 +54,7 @@ static bool isFactoryTest = true;
 //local function prototypes
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
-static bool should_test(GlobalState * GLOBAL_STATE) {
+static bool should_test() {
     // Optionally hold the boot button
     if (gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0) { // LOW when pressed
         isFactoryTest = false;
@@ -259,7 +259,7 @@ bool self_test(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     // Should we run the self-test?
-    if (!should_test(GLOBAL_STATE)) return false;
+    if (!should_test()) return false;
 
     ESP_LOGI(TAG, "Running self-test");
 
@@ -480,8 +480,6 @@ bool self_test(void * pvParameters)
 static void tests_done(GlobalState * GLOBAL_STATE, bool result) 
 {
     VCORE_set_voltage(0.0f, GLOBAL_STATE);
-
-    GLOBAL_STATE->SELF_TEST_MODULE.result = result;
 
     if (result) {
         if (isFactoryTest) {

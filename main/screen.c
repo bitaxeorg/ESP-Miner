@@ -318,14 +318,14 @@ static void screen_update_cb(lv_timer_t * timer)
         }
     }
 
-    if (GLOBAL_STATE->SELF_TEST_MODULE.active) {
+    if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
         screen_show(SCR_SELF_TEST);
 
         SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
 
         lv_label_set_text(self_test_message_label, self_test->message);
 
-        if (self_test->finished && !self_test_finished) {
+        if (self_test->is_finished && !self_test_finished) {
             self_test_finished = true;
             lv_label_set_text(self_test_result_label, self_test->result);
             lv_label_set_text(self_test_finished_label, self_test->finished);
