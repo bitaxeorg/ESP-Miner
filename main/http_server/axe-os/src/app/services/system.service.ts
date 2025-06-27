@@ -169,6 +169,7 @@ export class SystemService {
       ASICModel: "BM1366",
       familyName: "Ultra",
       swarmColor: "purple",
+      asicCount: 1,
       defaultFrequency: 485,
       frequencyOptions: [400, 425, 450, 475, 485, 500, 525, 550, 575],
       defaultVoltage: 1200,

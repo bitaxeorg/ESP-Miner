@@ -177,7 +177,7 @@
     <div class="flex flex-wrap gap-2 mt-3 text-sm justify-content-center">
         <div *ngFor="let item of getFamilies" class="flex align-items-center gap-1">
             <span [class]="'text-' + item.swarmColor + '-500'">●</span>
-            <span>{{ item.familyName || 'Other' }} ({{item.ASICModel}})</span>
+            <span>{{ item.familyName || 'Other' }} ({{item.asicCount > 1 ? item.asicCount + 'x ' : ''}}{{item.ASICModel}})</span>
         </div>
     </div>
 

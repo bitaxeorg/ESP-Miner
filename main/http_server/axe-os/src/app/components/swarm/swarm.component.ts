@@ -143,7 +143,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     return from(ips).pipe(
       mergeMap(IP => forkJoin({
         info: this.httpClient.get(`http://${IP}/api/system/info`),
-        asic: this.httpClient.get(`http://${IP}/api/system/asic`)
+        asic: this.httpClient.get(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) // Return empty object if ASIC endpoint fails
       }).pipe(
         map(({ info, asic }) => {
           return { IP, ...info, ...asic };
@@ -314,6 +314,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   get getFamilies(): ISystemASIC[] {
     return this.swarm.filter((v, i, a) =>
-      a.findIndex(({ familyName }) => v.familyName === familyName) === i);
+      a.findIndex(({ familyName, ASICModel, asicCount }) => v.familyName === familyName && v.ASICModel === ASICModel && v.asicCount === asicCount) === i);
   }
 }
