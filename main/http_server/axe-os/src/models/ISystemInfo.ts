@@ -31,7 +31,6 @@ export interface ISystemInfo {
     sharesRejected: number,
     sharesRejectedReasons: ISharesRejectedStat[];
     uptimeSeconds: number,
-    asicCount: number,
     smallCoreCount: number,
     ASICModel: string,
     stratumURL: string,

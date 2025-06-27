@@ -89,7 +89,6 @@ components:
       required:
         - ASICModel
         - apEnabled
-        - asicCount
         - autofanspeed
         - bestDiff
         - bestSessionDiff
@@ -150,9 +149,6 @@ components:
         apEnabled:
           type: number
           description: Whether AP mode is enabled (0=no, 1=yes)
-        asicCount:
-          type: number
-          description: Number of ASICs detected
         autofanspeed:
           type: number
           description: Automatic fan speed control (0=manual, 1=auto)
@@ -526,6 +522,7 @@ paths:
                 required:
                   - ASICModel
                   - swarmColor
+                  - asicCount
                   - familyName
                   - defaultFrequency
                   - frequencyOptions
@@ -552,6 +549,9 @@ paths:
                     description: Swarm color
                     examples:
                       - "purple"
+                  asicCount:
+                    type: number
+                    description: Number of ASICs detected
                   defaultFrequency:
                     type: number
                     description: Default frequency for the ASIC model in MHz
