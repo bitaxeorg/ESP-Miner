@@ -477,38 +477,39 @@ bool self_test(void * pvParameters)
     return true;
 }
 
-static void tests_done(GlobalState * GLOBAL_STATE, bool result) 
+static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed) 
 {
     VCORE_set_voltage(0.0f, GLOBAL_STATE);
 
-    if (result) {
+    if (isTestPassed) {
         if (isFactoryTest) {
             ESP_LOGI(TAG, "Self-test flag cleared");
             nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
         }
-        ESP_LOGI(TAG, "Self-test Passed! -- Press RESET button to restart.");
-        GLOBAL_STATE->SELF_TEST_MODULE.result = "TESTS PASS!";
+        ESP_LOGI(TAG, "SELF-TEST PASS! -- Press RESET button to restart.");
+        GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST PASS!";
         GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart.";
-        GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
     } else {
-        GLOBAL_STATE->SELF_TEST_MODULE.result = "TESTS FAIL!";
+        // isTestFailed
+        GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST FAIL!";
         if (isFactoryTest) {
-            ESP_LOGI(TAG, "SELF-TEST FAIL -- Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.");
+            ESP_LOGI(TAG, "SELF-TEST FAIL! -- Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.");
             GLOBAL_STATE->SELF_TEST_MODULE.finished = "Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.";
+            GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
+            while (1) {
+                // Wait here forever until reset_self_test() gives the longPressSemaphore
+                if (xSemaphoreTake(longPressSemaphore, portMAX_DELAY) == pdTRUE) {
+                    nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
+                    //wait 100ms for nvs write to finish?
+                    vTaskDelay(100 / portTICK_PERIOD_MS);
+                    esp_restart();
+                }
+            }
         } else {
             ESP_LOGI(TAG, "SELF-TEST FAIL -- Press RESET button to restart.");
             GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart.";
         }
-
-        GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
-        while (1) {
-            // Wait here forever until reset_self_test() gives the longPressSemaphore
-            if (xSemaphoreTake(longPressSemaphore, portMAX_DELAY) == pdTRUE) {
-                nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
-                //wait 100ms for nvs write to finish?
-                vTaskDelay(100 / portTICK_PERIOD_MS);
-                esp_restart();
-            }
-        }
+        
     }
+    GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
 }
