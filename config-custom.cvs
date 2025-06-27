@@ -47,5 +47,5 @@ DS4432U,data,u16,0
 INA260,data,u16,0
 # TPS546 (0,1)
 TPS546,data,u16,1
-# Self Test Power Consumption Target (> 0)
+# Self-test Power Consumption Target (> 0)
 power_cons_tgt,data,u16,12

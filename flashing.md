@@ -17,4 +17,4 @@ You can flash [factory images](https://github.com/bitaxeorg/ESP-Miner/releases) 
 - Keep waiting until the console on ESP Tool says "Leaving..."
 - If you are _sure_ you have seen ESP Tool say "Leaving..." then you're bitaxe might restart.
 - If you bitaxe hasn't restarted, you can press the RESET button on the bitaxe
-- The self test should run. this can take a second. You'll need to press the RESET button on the bitaxe once the self test has passed.
+- The self-test should run. this can take a second. You'll need to press the RESET button on the bitaxe once the self-test has passed.

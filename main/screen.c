@@ -96,7 +96,7 @@ static lv_obj_t * create_scr_self_test() {
     lv_obj_t * scr = create_flex_screen(4);
 
     lv_obj_t *label1 = lv_label_create(scr);
-    lv_label_set_text(label1, "BITAXE SELF TEST");
+    lv_label_set_text(label1, "BITAXE SELF-TEST");
 
     self_test_message_label = lv_label_create(scr);
     self_test_result_label = lv_label_create(scr);
@@ -327,14 +327,8 @@ static void screen_update_cb(lv_timer_t * timer)
 
         if (self_test->finished && !self_test_finished) {
             self_test_finished = true;
-
-            if (self_test->result) {
-                lv_label_set_text(self_test_result_label, "TESTS PASS!");
-                lv_label_set_text(self_test_finished_label, "Press RESET button to start Bitaxe.");
-            } else {
-                lv_label_set_text(self_test_result_label, "TESTS FAIL!");
-                lv_label_set_text(self_test_finished_label, "Hold BOOT button for 2 seconds to cancel self test, or press RESET to run again.");
-            }
+            lv_label_set_text(self_test_result_label, self_test->result);
+            lv_label_set_text(self_test_finished_label, self_test->finished);
         }
 
         return;

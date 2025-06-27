@@ -75,10 +75,11 @@ typedef struct
 
 typedef struct
 {
-    bool active;
+    bool is_active;
+    bool is_finished;
     char *message;
-    bool result;
-    bool finished;
+    char *result;
+    char *finished;
 } SelfTestModule;
 
 typedef struct
