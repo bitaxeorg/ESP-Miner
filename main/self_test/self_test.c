@@ -261,7 +261,11 @@ bool self_test(void * pvParameters)
     // Should we run the self-test?
     if (!should_test()) return false;
 
-    ESP_LOGI(TAG, "Running self-test");
+    if (isFactoryTest) {
+        ESP_LOGI(TAG, "Running factory self-test");
+    } else {
+        ESP_LOGI(TAG, "Running manual self-test");
+    }
 
     GLOBAL_STATE->SELF_TEST_MODULE.is_active = true;
 
