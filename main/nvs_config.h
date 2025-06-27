@@ -65,5 +65,6 @@ int32_t nvs_config_get_i32(const char * key, const int32_t default_value);
 void nvs_config_set_i32(const char * key, const int32_t value);
 uint64_t nvs_config_get_u64(const char * key, const uint64_t default_value);
 void nvs_config_set_u64(const char * key, const uint64_t value);
+void nvs_config_commit(void);
 
 #endif // MAIN_NVS_CONFIG_H
