@@ -486,9 +486,9 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool result)
             ESP_LOGI(TAG, "Self-test flag cleared");
             nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
         }
-        ESP_LOGI(TAG, "Self-test Passed! -- Press RESET button to restart Bitaxe.");
+        ESP_LOGI(TAG, "Self-test Passed! -- Press RESET button to restart.");
         GLOBAL_STATE->SELF_TEST_MODULE.result = "TESTS PASS!";
-        GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart Bitaxe.";
+        GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart.";
         GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
     } else {
         GLOBAL_STATE->SELF_TEST_MODULE.result = "TESTS FAIL!";
@@ -496,8 +496,8 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool result)
             ESP_LOGI(TAG, "SELF-TEST FAIL -- Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.");
             GLOBAL_STATE->SELF_TEST_MODULE.finished = "Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.";
         } else {
-            ESP_LOGI(TAG, "SELF-TEST FAIL -- Press RESET button to restart Bitaxe.");
-            GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart Bitaxe.";
+            ESP_LOGI(TAG, "SELF-TEST FAIL -- Press RESET button to restart.");
+            GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart.";
         }
 
         GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
