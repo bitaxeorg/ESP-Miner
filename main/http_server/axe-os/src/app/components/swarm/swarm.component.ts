@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray } from 'rxjs';
+import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { SystemService } from 'src/app/services/system.service';
 import { ISystemASIC } from 'src/models/ISystemASIC';
@@ -11,6 +11,8 @@ import { ModalComponent } from '../modal/modal.component';
 const SWARM_DATA = 'SWARM_DATA'
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 const SWARM_SORTING = 'SWARM_SORTING'
+
+type SwarmDevice = { IP: string; [key: string]: any };
 
 @Component({
   selector: 'app-swarm',
@@ -113,16 +115,16 @@ export class SwarmComponent implements OnInit, OnDestroy {
     const broadcast = network | ~netmaskInt;
     return { start: network + 1, end: broadcast - 1 };
   }
-
+  
   scanNetwork() {
     this.scanning = true;
 
     const { start, end } = this.calculateIpRange(window.location.hostname, '255.255.255.0');
     const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
-    this.getAllDeviceInfo(ips).subscribe({
+    this.getAllDeviceInfo(ips, () => of(null)).subscribe({
       next: (result) => {
         // Filter out null items first
-        const validResults = result.filter((item): item is NonNullable<typeof item> => item !== null);
+        const validResults = result.filter((item): item is SwarmDevice => item !== null);
         // Merge new results with existing swarm entries
         const existingIps = new Set(this.swarm.map(item => item.IP));
         const newItems = validResults.filter(item => !existingIps.has(item.IP));
@@ -137,7 +139,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
-  private getAllDeviceInfo(ips: string[]) {
+  private getAllDeviceInfo(ips: string[], errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>) {
     return from(ips).pipe(
       mergeMap(IP => forkJoin({
         info: this.httpClient.get(`http://${IP}/api/system/info`),
@@ -147,23 +149,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
           return { IP, ...info, ...asic };
         }),
         timeout(5000),
-        catchError(error => {
-          const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
-          this.toastr.error('Failed to get info from ' + IP, errorMessage);
-          // Return existing device with zeroed stats instead of the previous state
-          const existingDevice = this.swarm.find(axeOs => axeOs.IP === IP);
-          return of({
-            ...existingDevice,
-            hashRate: 0,
-            sharesAccepted: 0,
-            power: 0,
-            voltage: 0,
-            temp: 0,
-            bestDiff: 0,
-            version: 0,
-            uptimeSeconds: 0,
-          });
-        })
+        catchError(error => errorHandler(error, IP))
       ),
         128
       ),
@@ -221,6 +207,23 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.calculateTotals();
   }
 
+  public refreshErrorHandler = (error: any, ip: string) => {
+    const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
+    this.toastr.error(`Failed to get info from ${ip}`, errorMessage);
+    const existingDevice = this.swarm.find(axeOs => axeOs.IP === ip);
+    return of({
+      ...existingDevice,
+      hashRate: 0,
+      sharesAccepted: 0,
+      power: 0,
+      voltage: 0,
+      temp: 0,
+      bestDiff: 0,
+      version: 0,
+      uptimeSeconds: 0,
+    });
+  };
+
   public refreshList() {
     if (this.scanning) {
       return;
@@ -230,7 +233,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     const ips = this.swarm.map(axeOs => axeOs.IP);
     this.isRefreshing = true;
 
-    this.getAllDeviceInfo(ips).subscribe({
+    this.getAllDeviceInfo(ips, this.refreshErrorHandler).subscribe({
       next: (result) => {
         this.swarm = result;
         this.sortSwarm();
@@ -242,10 +245,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
         this.isRefreshing = false;
       }
     });
-  }
-
-  private sortByIp(a: any, b: any): number {
-    return this.ipToInt(a.IP) - this.ipToInt(b.IP);
   }
 
   sortBy(field: string) {
