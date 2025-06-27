@@ -49,21 +49,21 @@
 static const char * TAG = "self_test";
 
 static SemaphoreHandle_t longPressSemaphore;
-static bool isFactoryTest = true;
+static bool isFactoryTest = false;
 
 //local function prototypes
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
 static bool should_test() {
-    // Optionally hold the boot button
-    if (gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0) { // LOW when pressed
-        isFactoryTest = false;
+    uint64_t is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0) < 1;
+    uint16_t is_self_test_flag_set = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
+    if (is_factory_flash && is_self_test_flag_set) {
+        isFactoryTest = true;
         return true;
     }
 
-    uint64_t is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0) < 1;
-    uint16_t is_self_test_flag_set = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
-    return is_factory_flash && is_self_test_flag_set;
+    // Optionally start self-test when boot button is pressed
+    return gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
 }
 
 static void reset_self_test() {
