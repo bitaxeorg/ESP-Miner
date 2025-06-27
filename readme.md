@@ -3,7 +3,7 @@
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/bitaxeorg/esp-miner/total)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/t/bitaxeorg/esp-miner)
 ![GitHub contributors](https://img.shields.io/github/contributors/bitaxeorg/esp-miner)
-
+![Alt](https://repobeats.axiom.co/api/embed/70889479b1e002c18a184b05bc5cbf2ed3718579.svg "Repobeats analytics image")
 
 # ESP-Miner
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/bitaxeorg/bitaxe)
