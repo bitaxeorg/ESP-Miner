@@ -4,15 +4,13 @@ import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms'
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
-import { SystemService } from 'src/app/services/system.service';
-import { ISystemASIC } from 'src/models/ISystemASIC';
 import { ModalComponent } from '../modal/modal.component';
 
-const SWARM_DATA = 'SWARM_DATA'
+const SWARM_DATA = 'SWARM_DATA';
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
-const SWARM_SORTING = 'SWARM_SORTING'
+const SWARM_SORTING = 'SWARM_SORTING';
 
-type SwarmDevice = { IP: string; [key: string]: any };
+type SwarmDevice = { IP: string; ASICModel: string; familyName: string; deviceModel: string; swarmColor: string; asicCount: number; [key: string]: any };
 
 @Component({
   selector: 'app-swarm',
@@ -35,8 +33,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalTime = 30;
   public refreshTimeSet = 30;
 
-  public totals: { hashRate: number, power: number, bestDiff: string } = { hashRate: 0, power: 0, bestDiff: '0' };
-
+  public totals: { hashRate: number; power: number; bestDiff: string } = { hashRate: 0, power: 0, bestDiff: '0' };
+  
   public isRefreshing = false;
 
   public refreshIntervalControl: FormControl;
@@ -46,7 +44,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   constructor(
     private fb: FormBuilder,
-    private systemService: SystemService,
     private toastr: ToastrService,
     private localStorageService: LocalStorageService,
     private httpClient: HttpClient
@@ -82,14 +79,14 @@ export class SwarmComponent implements OnInit, OnDestroy {
       this.scanNetwork();
     } else {
       this.swarm = swarmData;
-      this.refreshList();
+      this.refreshList(true);
     }
 
     this.refreshIntervalRef = window.setInterval(() => {
       if (!this.scanning && !this.isRefreshing) {
         this.refreshIntervalTime--;
         if (this.refreshIntervalTime <= 0) {
-          this.refreshList();
+          this.refreshList(false);
         }
       }
     }, 1000);
@@ -139,14 +136,15 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
-  private getAllDeviceInfo(ips: string[], errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>) {
+  private getAllDeviceInfo(ips: string[], errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>, fetchAsic: boolean = true) {
     return from(ips).pipe(
       mergeMap(IP => forkJoin({
         info: this.httpClient.get(`http://${IP}/api/system/info`),
-        asic: this.httpClient.get(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) // Return empty object if ASIC endpoint fails
+        asic: fetchAsic ? this.httpClient.get(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
       }).pipe(
         map(({ info, asic }) => {
-          return { IP, ...info, ...asic };
+          const existingDevice = this.swarm.find(device => device.IP === IP);
+            return {IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic};
         }),
         timeout(5000),
         catchError(error => errorHandler(error, IP))
@@ -166,11 +164,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const uri = `http://${IP}`;
-
     forkJoin({
-      info: this.systemService.getInfo(uri),
-      asic: this.systemService.getAsicSettings(uri)
+      info: this.httpClient.get<any>(`http://${IP}/api/system/info`),
+      asic: this.httpClient.get<any>(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) // Return empty object if ASIC endpoint fails
     }).subscribe(({ info, asic }) => {
       if (!info.ASICModel || !asic.ASICModel) {
         return;
@@ -189,7 +185,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public restart(axe: any) {
-    this.systemService.restart(`http://${axe.IP}`).pipe(
+    this.httpClient.get(`http://${axe.IP}/api/system/restart`).pipe(
       catchError(error => {
         this.toastr.error(`Failed to restart device at ${axe.IP}`, 'Error');
         return of(null);
@@ -202,7 +198,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public remove(axeOs: any) {
-    this.swarm = this.swarm.filter(axe => axe.IP != axeOs.IP);
+    this.swarm = this.swarm.filter(axe => axe.IP !== axeOs.IP);
     this.localStorageService.setObject(SWARM_DATA, this.swarm);
     this.calculateTotals();
   }
@@ -224,7 +220,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   };
 
-  public refreshList() {
+  public refreshList(fetchAsic: boolean = true) {
     if (this.scanning) {
       return;
     }
@@ -233,7 +229,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     const ips = this.swarm.map(axeOs => axeOs.IP);
     this.isRefreshing = true;
 
-    this.getAllDeviceInfo(ips, this.refreshErrorHandler).subscribe({
+    this.getAllDeviceInfo(ips, this.refreshErrorHandler, fetchAsic).subscribe({
       next: (result) => {
         this.swarm = result;
         this.sortSwarm();
@@ -312,8 +308,13 @@ export class SwarmComponent implements OnInit, OnDestroy {
       .reduce((max, curr) => this.compareBestDiff(max, curr), '0');
   }
 
-  get getFamilies(): ISystemASIC[] {
+  get getFamilies(): SwarmDevice[] {
     return this.swarm.filter((v, i, a) =>
-      a.findIndex(({ familyName, ASICModel, asicCount }) => v.familyName === familyName && v.ASICModel === ASICModel && v.asicCount === asicCount) === i);
+      a.findIndex(({ familyName, deviceModel, ASICModel, asicCount }) =>
+        (v.familyName || v.deviceModel) === (familyName || deviceModel) &&
+        v.ASICModel === ASICModel &&
+        v.asicCount === asicCount
+      ) === i
+    );
   }
 }
