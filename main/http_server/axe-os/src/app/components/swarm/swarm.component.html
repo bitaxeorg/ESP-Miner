@@ -113,63 +113,63 @@
             <th>Restart</th>
             <th>Remove</th>
         </tr>
-        <ng-container *ngFor="let device of swarm">
+        <ng-container *ngFor="let axe of swarm">
             <tr>
                 <td>
                     <a
-                       [ngClass]="'text-'+device.swarmColor+'-500'"
-                       [href]="'http://'+device.IP"
+                       [ngClass]="'text-'+axe.swarmColor+'-500'"
+                       [href]="'http://'+axe.IP"
                        target="_blank"
-                       [pTooltip]="device.deviceModel || 'Other'"
-                       tooltipPosition="top">{{device.IP}}</a>
+                       [pTooltip]="axe.deviceModel || 'Other'"
+                       tooltipPosition="top">{{axe.IP}}</a>
                 </td>
-                <td>{{device.hostname}}</td>
-                <td>{{device.hashRate * 1000000000 | hashSuffix}}</td>
+                <td>{{axe.hostname}}</td>
+                <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
                 <td>
                     <div class="w-min cursor-pointer"
                          pTooltip="Shares Accepted"
                          tooltipPosition="top">
-                        {{device.sharesAccepted | number: '1.0-0'}}
+                        {{axe.sharesAccepted | number: '1.0-0'}}
                     </div>
                     <div class="text-sm w-min cursor-pointer"
                          pTooltip="Shares Rejected"
                          tooltipPosition="top">
-                        {{device.sharesRejected | number: '1.0-0'}}
+                        {{axe.sharesRejected | number: '1.0-0'}}
                     </div>
                 </td>
                 <td>
                     <div class="w-min cursor-pointer"
                          pTooltip="Best Diff"
                          tooltipPosition="top">
-                        {{device.bestDiff}}
+                        {{axe.bestDiff}}
                     </div>
                     <div class="text-sm w-min cursor-pointer"
                          pTooltip="Best Session Diff"
                          tooltipPosition="top">
-                        {{device.bestSessionDiff}}
+                        {{axe.bestSessionDiff}}
                     </div>
                 </td>
-                <td>{{device.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
-                <td>{{device.power | number: '1.1-1'}} <small>W</small> </td>
+                <td>{{axe.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
+                <td>{{axe.power | number: '1.1-1'}} <small>W</small> </td>
                 <td>
                     <div
-                         [ngClass]="{'text-orange-500': device.temp > 68}"
+                         [ngClass]="{'text-orange-500': axe.temp > 68}"
                          pTooltip="ASIC Temperature"
                          tooltipPosition="top">
-                        {{device.temp | number: '1.0-1'}}°<small>C</small>
+                        {{axe.temp | number: '1.0-1'}}°<small>C</small>
                     </div>
                     <div class="text-sm w-min cursor-pointer"
-                         [ngClass]="{'text-orange-500': device.vrTemp > 90}"
-                         *ngIf="device.vrTemp"
+                         [ngClass]="{'text-orange-500': axe.vrTemp > 90}"
+                         *ngIf="axe.vrTemp"
                          pTooltip="Voltage Regulator Temperature"
                          tooltipPosition="top">
-                        {{device.vrTemp | number: '1.0-1'}}°<small>C</small>
+                        {{axe.vrTemp | number: '1.0-1'}}°<small>C</small>
                     </div>
                 </td>
-                <td>{{device.version}}</td>
-                <td><p-button icon="pi pi-pencil" pp-button (click)="edit(device)"></p-button></td>
-                <td><p-button icon="pi pi-sync" pp-button severity="danger" (click)="restart(device)"></p-button></td>
-                <td><p-button icon="pi pi-trash" pp-button severity="secondary" (click)="remove(device)"></p-button></td>
+                <td>{{axe.version}}</td>
+                <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
+                <td><p-button icon="pi pi-sync" pp-button severity="danger" (click)="restart(axe)"></p-button></td>
+                <td><p-button icon="pi pi-trash" pp-button severity="secondary" (click)="remove(axe)"></p-button></td>
             </tr>
         </ng-container>
     </table>
