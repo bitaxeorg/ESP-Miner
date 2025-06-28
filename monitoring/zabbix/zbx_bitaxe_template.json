@@ -1,0 +1,374 @@
+{
+    "zabbix_export": {
+        "version": "6.0",
+        "date": "2024-06-09T18:22:04Z",
+        "groups": [
+            {
+                "uuid": "53baaa77e61e45a48bf16240dd30bf05",
+                "name": "mining"
+            }
+        ],
+        "templates": [
+            {
+                "uuid": "ddc31e124b4a46d2acb1ca2ad1e54c47",
+                "template": "Bitaxe",
+                "name": "Bitaxe",
+                "description": "Template for Bitaxe family of devices running ESP-Miner.",
+                "groups": [
+                    {
+                        "name": "mining"
+                    }
+                ],
+                "items": [
+                    {
+                        "uuid": "972135bbc24f4b1ab6024cbf3d727970",
+                        "name": "bitaxe_api_system_info",
+                        "type": "HTTP_AGENT",
+                        "key": "bitaxe.api_system_info",
+                        "delay": "10m",
+                        "history": "7d",
+                        "trends": "0",
+                        "value_type": "TEXT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.body"
+                                ]
+                            }
+                        ],
+                        "url": "http://{HOST.IP}/api/system/info",
+                        "follow_redirects": "NO",
+                        "output_format": "JSON"
+                    },
+                    {
+                        "uuid": "bf402b4b03784595a50be42ed8f58dbf",
+                        "name": "bitaxe_asicmodel",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.asicmodel",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "value_type": "TEXT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.ASICModel"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        }
+                    },
+                    {
+                        "uuid": "268969afd6a042239069fc7b9e2af967",
+                        "name": "bitaxe_corevoltage",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.corevoltage",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "value_type": "FLOAT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.coreVoltage"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        }
+                    },
+                    {
+                        "uuid": "348120bad3834f6b8f7693b3d7aebb2b",
+                        "name": "bitaxe_corevoltageactual",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.corevoltageactual",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "value_type": "FLOAT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.coreVoltageActual"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        }
+                    },
+                    {
+                        "uuid": "fcfd24be860545cca0c113e81b74dd1d",
+                        "name": "bitaxe_current",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.current",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "value_type": "FLOAT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.current"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        }
+                    },
+                    {
+                        "uuid": "a8d0481f80f749858abd4c4f513d8c7a",
+                        "name": "bitaxe_fanspeedrpm",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.fanspeedrpm",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.fanSpeedRpm"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        },
+                        "triggers": [
+                            {
+                                "uuid": "7e12e36ebd7244d6b01827a08347fc76",
+                                "expression": "last(/Bitaxe/bitaxe.fanspeedrpm)<{$MINIMUM_FAN_SPEED_RPM}",
+                                "name": "Bitaxe Fan Speed Too Slow",
+                                "priority": "DISASTER",
+                                "description": "Detects if the fan is spinning too slowly."
+                            }
+                        ]
+                    },
+                    {
+                        "uuid": "24d4b5461ab6427195209458e10d6aa0",
+                        "name": "bitaxe_freeheap",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.freeheap",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.freeHeap"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        },
+                        "triggers": [
+                            {
+                                "uuid": "c72c89da64f343b48480c312db89a4df",
+                                "expression": "last(/Bitaxe/bitaxe.freeheap)<{$MINIMUM_FREE_HEAP}",
+                                "name": "Bitaxe Free Heap Too Low",
+                                "priority": "HIGH",
+                                "description": "Checks that the Bitaxe is not running out of available memory."
+                            }
+                        ]
+                    },
+                    {
+                        "uuid": "ddae861e129f4406b75c230165bfef82",
+                        "name": "bitaxe_hashrate",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.hashrate",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "value_type": "FLOAT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.hashRate"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        },
+                        "triggers": [
+                            {
+                                "uuid": "3967f82ef17b466487fd0c0cd68ee3ec",
+                                "expression": "last(/Bitaxe/bitaxe.hashrate)<{$MINIMUM_HASHRATE}",
+                                "name": "Bitaxe Hash Rate Drop",
+                                "priority": "HIGH",
+                                "description": "Detects unexpected drop in hash rate."
+                            }
+                        ]
+                    },
+                    {
+                        "uuid": "1f099f30b01d403f91278ac8b0951d60",
+                        "name": "bitaxe_sharesrejected",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.sharesrejected",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.sharesRejected"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        }
+                    },
+                    {
+                        "uuid": "0a1cb27cb1ac410c8bfcec948c1c8969",
+                        "name": "bitaxe_temperature",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.temperature",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.temp"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        },
+                        "triggers": [
+                            {
+                                "uuid": "6c343f4092fa49cfa0baf7bfe51769cf",
+                                "expression": "last(/Bitaxe/bitaxe.temperature)>={$MAX_TEMP}",
+                                "name": "Bitaxe Overheating",
+                                "priority": "DISASTER",
+                                "description": "The device has overheated beyond maximum temperature."
+                            },
+                            {
+                                "uuid": "8e37f4dd992945628d5ac77dddd642ae",
+                                "expression": "last(/Bitaxe/bitaxe.temperature)>={$THROTTLE_TEMP}",
+                                "name": "Bitaxe Temperature Throttling",
+                                "priority": "HIGH",
+                                "description": "The temperature is above the throttling point."
+                            }
+                        ]
+                    },
+                    {
+                        "uuid": "49f97fb331004ca596b94e55ae3fa6a7",
+                        "name": "bitaxe_uptime",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.uptime",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.uptimeSeconds"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        },
+                        "triggers": [
+                            {
+                                "uuid": "0ea366638e3747a6b81d9b24f9714d19",
+                                "expression": "monoinc(/Bitaxe/bitaxe.uptime,12m,\"strict\")=0",
+                                "name": "Bitaxe Device Restarted",
+                                "priority": "HIGH",
+                                "description": "Detects device restart"
+                            }
+                        ]
+                    },
+                    {
+                        "uuid": "828350e73d3946758a43205abecf2883",
+                        "name": "bitaxe_version",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.version",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "value_type": "TEXT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.version"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        }
+                    },
+                    {
+                        "uuid": "591a4f00a865406c8f4fd8410610d450",
+                        "name": "bitaxe_voltage",
+                        "type": "DEPENDENT",
+                        "key": "bitaxe.voltage",
+                        "delay": "0",
+                        "history": "7d",
+                        "trends": "0",
+                        "value_type": "FLOAT",
+                        "preprocessing": [
+                            {
+                                "type": "JSONPATH",
+                                "parameters": [
+                                    "$.voltage"
+                                ]
+                            }
+                        ],
+                        "master_item": {
+                            "key": "bitaxe.api_system_info"
+                        }
+                    }
+                ],
+                "macros": [
+                    {
+                        "macro": "{$MAX_TEMP}",
+                        "value": "90",
+                        "description": "Maximum temperature"
+                    },
+                    {
+                        "macro": "{$MINIMUM_FAN_SPEED_RPM}",
+                        "value": "1000",
+                        "description": "Minimum fan speed in RPM"
+                    },
+                    {
+                        "macro": "{$MINIMUM_FREE_HEAP}",
+                        "value": "25000",
+                        "description": "Minimum free heap memory in bytes"
+                    },
+                    {
+                        "macro": "{$MINIMUM_HASHRATE}",
+                        "value": "400",
+                        "description": "Minimum hashrate in GH/s"
+                    },
+                    {
+                        "macro": "{$THROTTLE_TEMP}",
+                        "value": "75",
+                        "description": "Throttle temperature"
+                    }
+                ]
+            }
+        ]
+    }
+}
