@@ -6,7 +6,10 @@ import { map, Observable, shareReplay, startWith } from 'rxjs';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
+import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
+
+const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 
 @Component({
   selector: 'app-update',
@@ -32,7 +35,8 @@ export class UpdateComponent {
     private systemService: SystemService,
     private toastrService: ToastrService,
     private loadingService: LoadingService,
-    private githubUpdateService: GithubUpdateService
+    private githubUpdateService: GithubUpdateService,
+    private localStorageService: LocalStorageService,
   ) {
     this.latestRelease$ = this.githubUpdateService.getReleases().pipe(map(releases => {
       return releases[0];
@@ -131,5 +135,24 @@ export class UpdateComponent {
       .replace(/\r\n\r\n/gim, '<br>'); // Breaks
 
     return toHTML.trim();
+  }
+
+  public handleReleaseCheck(): void {
+    if (this.localStorageService.getBool(IGNORE_RELEASE_CHECK_WARNING)) {
+      this.checkLatestRelease = true;
+    } else {
+      this.modalComponent.isVisible = true;
+    }
+  }
+
+  public continueReleaseCheck(skipWarning: boolean): void {
+    this.checkLatestRelease = true;
+    this.modalComponent.isVisible = false;
+
+    if (!skipWarning) {
+      return;
+    }
+
+    this.localStorageService.setBool(IGNORE_RELEASE_CHECK_WARNING, true);
   }
 }
