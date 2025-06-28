@@ -34,7 +34,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshTimeSet = 30;
 
   public totals: { hashRate: number; power: number; bestDiff: string } = { hashRate: 0, power: 0, bestDiff: '0' };
-  
+
   public isRefreshing = false;
 
   public refreshIntervalControl: FormControl;
