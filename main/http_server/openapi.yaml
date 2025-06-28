@@ -523,7 +523,7 @@ paths:
                   - ASICModel
                   - swarmColor
                   - asicCount
-                  - familyName
+                  - deviceModel
                   - defaultFrequency
                   - frequencyOptions
                   - defaultVoltage
@@ -539,9 +539,9 @@ paths:
                       - BM1397
                     examples:
                       - "BM1366"
-                  familyName:
+                  deviceModel:
                     type: string
-                    description: Board family name
+                    description: Device model name
                     examples:
                       - "Ultra"
                   swarmColor:

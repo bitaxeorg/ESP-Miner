@@ -5,12 +5,12 @@
                 <h2>System</h2>
                 <table>
                     <tr>
-                        <td>Model:</td>
+                        <td>Device Model:</td>
                         <td>
                             <span [class]="'text-' + asic.swarmColor + '-500'">
-                                {{asic.familyName || 'Other'}}
+                                {{asic.deviceModel || 'Other'}}
                             </span>
-                            ({{asic.ASICModel}})
+                            ({{asic.asicCount > 1 ? asic.asicCount + 'x ' : ''}}{{asic.ASICModel}})
                         </td>
                     </tr>
                     <tr>

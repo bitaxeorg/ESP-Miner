@@ -166,7 +166,7 @@ export class SystemService {
     // Mock data for development
     return of({
       ASICModel: "BM1366",
-      familyName: "Ultra",
+      deviceModel: "Ultra",
       swarmColor: "purple",
       asicCount: 1,
       defaultFrequency: 485,

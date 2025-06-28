@@ -10,7 +10,7 @@ const SWARM_DATA = 'SWARM_DATA';
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 const SWARM_SORTING = 'SWARM_SORTING';
 
-type SwarmDevice = { IP: string; ASICModel: string; familyName: string; deviceModel: string; swarmColor: string; asicCount: number; [key: string]: any };
+type SwarmDevice = { IP: string; ASICModel: string; deviceModel: string; swarmColor: string; asicCount: number; [key: string]: any };
 
 @Component({
   selector: 'app-swarm',
@@ -310,8 +310,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   get getFamilies(): SwarmDevice[] {
     return this.swarm.filter((v, i, a) =>
-      a.findIndex(({ familyName, deviceModel, ASICModel, asicCount }) =>
-        (v.familyName || v.deviceModel) === (familyName || deviceModel) &&
+      a.findIndex(({ deviceModel, ASICModel, asicCount }) =>
+        v.deviceModel === deviceModel &&
         v.ASICModel === ASICModel &&
         v.asicCount === asicCount
       ) === i
