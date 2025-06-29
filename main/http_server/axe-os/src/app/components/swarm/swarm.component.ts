@@ -144,7 +144,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
       }).pipe(
         map(({ info, asic }) => {
           const existingDevice = this.swarm.find(device => device.IP === IP);
-            return {IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic};
+          const result = { IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic };
+          return this.fallbackDeviceModel(result);
         }),
         timeout(5000),
         catchError(error => errorHandler(error, IP))
@@ -320,5 +321,39 @@ export class SwarmComponent implements OnInit, OnDestroy {
         v.asicCount === asicCount
       ) === i
     );
+  }
+
+  // Fallback logic to derive deviceModel and swarmColor, can be removed after some time
+  private fallbackDeviceModel(data: any): any {
+    if (data.deviceModel && data.swarmColor) return data;
+    const deviceModel = data.deviceModel || this.deriveDeviceModel(data);
+    const swarmColor = data.swarmColor || this.deriveSwarmColor(deviceModel);
+    return { ...data, deviceModel, swarmColor };
+  }
+
+  private deriveDeviceModel(data: any): string {
+    if (data.boardVersion && data.boardVersion.length > 1) {
+      if (data.boardVersion[0] == "1" || data.boardVersion == "2.2") return "Max";
+      if (data.boardVersion[0] == "2" || data.boardVersion == "0.11") return "Ultra";
+      if (data.boardVersion[0] == "3") return "UltraHex";
+      if (data.boardVersion[0] == "4") return "Supra";
+      if (data.boardVersion[0] == "6") return "Gamma";
+      if (data.boardVersion[0] == "7") return "GammaHex";
+      if (data.boardVersion[0] == "8") return "GammaTurbo";
+    }
+    return 'Other';
+  }
+
+  private deriveSwarmColor(deviceModel: string): string {
+    switch (deviceModel) {
+      case 'Max':        return 'red';
+      case 'Ultra':      return 'purple';
+      case 'Supra':      return 'blue';
+      case 'UltraHex':   return 'orange';
+      case 'Gamma':      return 'green';
+      case 'GammaHex':   return 'lime'; // New color?
+      case 'GammaTurbo': return 'cyan'; 
+      default:           return 'grey';
+    }
   }
 }
