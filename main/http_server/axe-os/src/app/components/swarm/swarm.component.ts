@@ -353,7 +353,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       case 'Gamma':      return 'green';
       case 'GammaHex':   return 'lime'; // New color?
       case 'GammaTurbo': return 'cyan'; 
-      default:           return 'grey';
+      default:           return 'gray';
     }
   }
 }
