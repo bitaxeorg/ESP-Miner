@@ -112,7 +112,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     const broadcast = network | ~netmaskInt;
     return { start: network + 1, end: broadcast - 1 };
   }
-  
+
   scanNetwork() {
     this.scanning = true;
 
@@ -185,13 +185,18 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public restart(axe: any) {
-    this.httpClient.get(`http://${axe.IP}/api/system/restart`).pipe(
+    this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}).pipe(
       catchError(error => {
-        this.toastr.error(`Failed to restart device at ${axe.IP}`, 'Error');
-        return of(null);
+        if (error.status === 0 || error.status === 200 || error.name === 'HttpErrorResponse') {
+          this.toastr.success(`Bitaxe at ${axe.IP} restarted`, 'Success');
+          return of('success');
+        } else {
+          this.toastr.error(`Failed to restart device at ${axe.IP}`, 'Error');
+          return of(null);
+        }
       })
     ).subscribe(res => {
-      if (res !== null) {
+      if (res !== null && res !== 'success') {
         this.toastr.success(`Bitaxe at ${axe.IP} restarted`, 'Success');
       }
     });
