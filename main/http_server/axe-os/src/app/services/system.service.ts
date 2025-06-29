@@ -73,6 +73,7 @@ export class SystemService {
         invertscreen: 0,
         displayTimeout: -1,
         autofanspeed: 1,
+        minFanSpeed: 25,
         fanspeed: 100,
         temptarget: 60,
         statsFrequency: 30,
