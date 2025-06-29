@@ -124,6 +124,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   private loadDeviceSettings(): void {
     const deviceUri = this.uri || '';
 
+
     // Fetch both system info and ASIC settings in parallel
     forkJoin({
       info: this.systemService.getInfo(deviceUri),
