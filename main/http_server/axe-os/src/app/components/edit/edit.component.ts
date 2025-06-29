@@ -98,7 +98,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   private saveOverclockSetting(enabled: number) {
-    this.systemService.updateSystem(this.uri, { overclockEnabled: enabled })
+    const deviceUri = this.uri || '';
+    this.systemService.updateSystem(deviceUri, { overclockEnabled: enabled })
       .subscribe({
         next: () => {
           console.log(`Overclock setting saved: ${enabled === 1 ? 'enabled' : 'disabled'}`);
@@ -121,14 +122,12 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   private loadDeviceSettings(): void {
-    if (!this.uri) {
-      return;
-    }
+    const deviceUri = this.uri || '';
 
     // Fetch both system info and ASIC settings in parallel
     forkJoin({
-      info: this.systemService.getInfo(this.uri),
-      asic: this.systemService.getAsicSettings(this.uri)
+      info: this.systemService.getInfo(deviceUri),
+      asic: this.systemService.getAsicSettings(deviceUri)
     })
     .pipe(
       this.loadingService.lockUIUntilComplete(),
@@ -220,7 +219,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       delete form.stratumPassword;
     }
 
-    this.systemService.updateSystem(this.uri, form)
+    const deviceUri = this.uri || '';
+    this.systemService.updateSystem(deviceUri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
