@@ -188,7 +188,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}).pipe(
       catchError(error => {
         if (error.status === 0 || error.status === 200 || error.name === 'HttpErrorResponse') {
-          this.toastr.success(`Bitaxe at ${axe.IP} restarted`, 'Success');
           return of('success');
         } else {
           this.toastr.error(`Failed to restart device at ${axe.IP}`, 'Error');
@@ -196,7 +195,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
         }
       })
     ).subscribe(res => {
-      if (res !== null && res !== 'success') {
+      if (res !== null && res == 'success') {
         this.toastr.success(`Bitaxe at ${axe.IP} restarted`, 'Success');
       }
     });
