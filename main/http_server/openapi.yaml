@@ -119,14 +119,15 @@ components:
         - nominalVoltage
         - overheat_mode
         - overclockEnabled
+        - poolDifficulty
         - power
+        - power_fault
         - runningPartition
         - sharesAccepted
         - sharesRejected
         - sharesRejectedReasons
         - smallCoreCount
         - ssid
-        - stratumDifficulty
         - stratumExtranonceSubscribe
         - stratumPort
         - stratumSuggestedDifficulty
@@ -236,6 +237,9 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
+        poolDifficulty:
+          type: number
+          description: Current pool difficulty
         power:
           type: number
           description: Power consumption in watts
@@ -262,9 +266,6 @@ components:
         ssid:
           type: string
           description: Connected WiFi network SSID
-        stratumDifficulty:
-          type: number
-          description: Current stratum difficulty
         stratumExtranonceSubscribe:
           type: boolean
           description: Enable pool extranonce subscription
