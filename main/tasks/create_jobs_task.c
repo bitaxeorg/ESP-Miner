@@ -21,7 +21,7 @@ void create_jobs_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
-    uint32_t difficulty = GLOBAL_STATE->stratum_difficulty;
+    uint32_t difficulty = GLOBAL_STATE->pool_difficulty;
     while (1)
     {
         mining_notify *mining_notification = (mining_notify *)queue_dequeue(&GLOBAL_STATE->stratum_queue);
@@ -35,8 +35,8 @@ void create_jobs_task(void *pvParameters)
 
         if (GLOBAL_STATE->new_set_mining_difficulty_msg)
         {
-            ESP_LOGI(TAG, "New pool difficulty %lu", GLOBAL_STATE->stratum_difficulty);
-            difficulty = GLOBAL_STATE->stratum_difficulty;
+            ESP_LOGI(TAG, "New pool difficulty %lu", GLOBAL_STATE->pool_difficulty);
+            difficulty = GLOBAL_STATE->pool_difficulty;
             GLOBAL_STATE->new_set_mining_difficulty_msg = false;
         }
 
