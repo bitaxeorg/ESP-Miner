@@ -729,20 +729,20 @@ float TPS546_get_vout(void)
     }
 }
 
-esp_err_t TPS546_check_status(GlobalState * global_state) {
+esp_err_t TPS546_check_status(GlobalState * GLOBAL_STATE) {
 
+    SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;
     uint16_t status;
-    SystemModule * sys_module = &global_state->SYSTEM_MODULE;
 
     ESP_RETURN_ON_ERROR(smb_read_word(PMBUS_STATUS_WORD, &status), TAG, "Failed to read STATUS_WORD");
     //determine if this is a fault we care about
     if (status & (TPS546_STATUS_OFF | TPS546_STATUS_VOUT_OV | TPS546_STATUS_IOUT_OC | TPS546_STATUS_VIN_UV | TPS546_STATUS_TEMP)) {
-        if (sys_module->power_fault == 0) {
+        if (SYSTEM_MODULE->power_fault == 0) {
             ESP_RETURN_ON_ERROR(TPS546_parse_status(status), TAG, "Failed to parse STATUS_WORD");
-            sys_module->power_fault = 1;
+            SYSTEM_MODULE->power_fault = 1;
         }
     } else {
-        sys_module->power_fault = 0;
+        SYSTEM_MODULE->power_fault = 0;
     }
     return ESP_OK;
 }

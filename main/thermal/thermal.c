@@ -4,21 +4,21 @@
 
 static const char * TAG = "thermal";
 
-esp_err_t Thermal_init(DeviceConfig device_config)
+esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG)
 {
-    if (device_config.EMC2101) {
-        ESP_LOGI(TAG, "Initializing EMC2101 (Temperature offset: %dC)", device_config.emc_temp_offset);
+    if (DEVICE_CONFIG->EMC2101) {
+        ESP_LOGI(TAG, "Initializing EMC2101 (Temperature offset: %dC)", DEVICE_CONFIG->emc_temp_offset);
         esp_err_t res = EMC2101_init();
         // TODO: Improve this check.
-        if (device_config.emc_ideality_factor != 0x00) {
-            ESP_LOGI(TAG, "EMC2101 configuration: Ideality Factor: %02x, Beta Compensation: %02x", device_config.emc_ideality_factor, device_config.emc_beta_compensation);
-            EMC2101_set_ideality_factor(device_config.emc_ideality_factor);
-            EMC2101_set_beta_compensation(device_config.emc_beta_compensation);
+        if (DEVICE_CONFIG->emc_ideality_factor != 0x00) {
+            ESP_LOGI(TAG, "EMC2101 configuration: Ideality Factor: %02x, Beta Compensation: %02x", DEVICE_CONFIG->emc_ideality_factor, DEVICE_CONFIG->emc_beta_compensation);
+            EMC2101_set_ideality_factor(DEVICE_CONFIG->emc_ideality_factor);
+            EMC2101_set_beta_compensation(DEVICE_CONFIG->emc_beta_compensation);
         }
         return res;
     }
-    if (device_config.EMC2103) {
-        ESP_LOGI(TAG, "Initializing EMC2103 (Temperature offset: %dC)", device_config.emc_temp_offset);
+    if (DEVICE_CONFIG->EMC2103) {
+        ESP_LOGI(TAG, "Initializing EMC2103 (Temperature offset: %dC)", DEVICE_CONFIG->emc_temp_offset);
         return EMC2103_init();
     }
 
@@ -26,23 +26,23 @@ esp_err_t Thermal_init(DeviceConfig device_config)
 }
 
 //percent is a float between 0.0 and 1.0
-esp_err_t Thermal_set_fan_percent(DeviceConfig device_config, float percent)
+esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent)
 {
-    if (device_config.EMC2101) {
+    if (DEVICE_CONFIG->EMC2101) {
         EMC2101_set_fan_speed(percent);
     }
-    if (device_config.EMC2103) {
+    if (DEVICE_CONFIG->EMC2103) {
         EMC2103_set_fan_speed(percent);
     }
     return ESP_OK;
 }
 
-uint16_t Thermal_get_fan_speed(DeviceConfig device_config) 
+uint16_t Thermal_get_fan_speed(DeviceConfig * DEVICE_CONFIG) 
 {
-    if (device_config.EMC2101) {
+    if (DEVICE_CONFIG->EMC2101) {
         return EMC2101_get_fan_speed();
     }
-    if (device_config.EMC2103) {
+    if (DEVICE_CONFIG->EMC2103) {
         return EMC2103_get_fan_speed();
     }
     return 0;

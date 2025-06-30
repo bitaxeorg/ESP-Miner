@@ -46,6 +46,9 @@
 //Test Power Consumption
 #define POWER_CONSUMPTION_MARGIN 3              //+/- watts
 
+//Test Difficulty
+#define DIFFICULTY 8
+
 static const char * TAG = "self_test";
 
 static SemaphoreHandle_t longPressSemaphore;
@@ -79,7 +82,7 @@ static void display_msg(char * msg, GlobalState * GLOBAL_STATE)
 
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 {
-    uint16_t fan_speed = Thermal_get_fan_speed(GLOBAL_STATE->DEVICE_CONFIG);
+    uint16_t fan_speed = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
     ESP_LOGI(TAG, "fanSpeed: %d", fan_speed);
     if (fan_speed > FAN_SPEED_TARGET_MIN) {
         return ESP_OK;
@@ -170,7 +173,7 @@ esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
 esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
     ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
 
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
     
     return ESP_OK;
 }
@@ -329,6 +332,8 @@ bool self_test(void * pvParameters)
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
 
+    GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
+
     uint8_t chips_detected = ASIC_init(GLOBAL_STATE);
     uint8_t chips_expected = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, chips_expected);
@@ -406,11 +411,6 @@ bool self_test(void * pvParameters)
 
     bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
 
-    uint8_t difficulty_mask = 8;
-
-    //(*GLOBAL_STATE->ASIC_functions.set_difficulty_mask_fn)(difficulty_mask);
-    ASIC_set_job_difficulty_mask(GLOBAL_STATE, difficulty_mask);
-
     ESP_LOGI(TAG, "Sending work");
 
     //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, &job);
@@ -427,7 +427,7 @@ bool self_test(void * pvParameters)
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
-            sum += difficulty_mask;
+            sum += DIFFICULTY;
             
             hash_rate = (sum * 4294967296) / (duration * 1000000000);
             ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
@@ -483,7 +483,7 @@ bool self_test(void * pvParameters)
 
 static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed) 
 {
-    VCORE_set_voltage(0.0f, GLOBAL_STATE);
+    VCORE_set_voltage(GLOBAL_STATE, 0.0f);
 
     if (isTestPassed) {
         if (isFactoryTest) {

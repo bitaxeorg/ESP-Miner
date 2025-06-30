@@ -84,7 +84,7 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t VCORE_set_voltage(float core_voltage, GlobalState * GLOBAL_STATE)
+esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
 {
     ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
  

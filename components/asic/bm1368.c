@@ -45,7 +45,6 @@
 #define CORE_REGISTER_CONTROL 0x3C
 #define PLL3_PARAMETER 0x68
 #define FAST_UART_CONFIGURATION 0x28
-#define TICKET_MASK 0x14
 #define MISC_CONTROL 0x18
 
 typedef struct __attribute__((__packed__))
@@ -230,7 +229,9 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 
-    BM1368_set_job_difficulty_mask(difficulty);
+    uint8_t difficulty_mask[6];
+    get_difficulty_mask(difficulty, difficulty_mask);
+    _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1368_SERIALTX_DEBUG);    
 
     do_frequency_ramp_up((float)frequency);
 
@@ -254,22 +255,6 @@ int BM1368_set_max_baud(void)
     unsigned char init8[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x28, 0x11, 0x30, 0x02, 0x00, 0x03};
     _send_simple(init8, 11);
     return 1000000;
-}
-
-void BM1368_set_job_difficulty_mask(int difficulty)
-{
-    unsigned char job_difficulty_mask[9] = {0x00, TICKET_MASK, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
-
-    difficulty = _largest_power_of_two(difficulty) - 1;
-
-    for (int i = 0; i < 4; i++) {
-        char value = (difficulty >> (8 * i)) & 0xFF;
-        job_difficulty_mask[5 - i] = _reverse_bits(value);
-    }
-
-    ESP_LOGI(TAG, "Setting job ASIC mask to %d", difficulty);
-
-    _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, BM1368_SERIALTX_DEBUG);
 }
 
 static uint8_t id = 0;

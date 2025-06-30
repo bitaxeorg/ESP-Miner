@@ -126,3 +126,22 @@ esp_err_t receive_work(uint8_t * buffer, int buffer_size)
 
     return ESP_OK;
 }
+
+void get_difficulty_mask(uint16_t difficulty, uint8_t *job_difficulty_mask)
+{
+    // The mask must be a power of 2 so there are no holes
+    // Correct:   {0b00000000, 0b00000000, 0b11111111, 0b11111111}
+    // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
+    difficulty = _largest_power_of_two(difficulty) - 1;
+
+    job_difficulty_mask[0] = 0x00;
+    job_difficulty_mask[1] = 0x14; // TICKET_MASK
+
+    // convert difficulty into char array
+    // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
+    // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
+    job_difficulty_mask[2] = _reverse_bits((difficulty >> 24) & 0xFF);
+    job_difficulty_mask[3] = _reverse_bits((difficulty >> 16) & 0xFF);
+    job_difficulty_mask[4] = _reverse_bits((difficulty >>  8) & 0xFF);
+    job_difficulty_mask[5] = _reverse_bits( difficulty        & 0xFF);
+}
