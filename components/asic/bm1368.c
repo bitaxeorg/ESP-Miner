@@ -256,7 +256,7 @@ int BM1368_set_max_baud(void)
     return 1000000;
 }
 
-void BM1368_set_job_difficulty_mask(int difficulty)
+void BM1368_set_job_difficulty_mask(uint16_t difficulty)
 {
     unsigned char job_difficulty_mask[9] = {0x00, TICKET_MASK, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
 

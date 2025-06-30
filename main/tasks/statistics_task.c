@@ -94,8 +94,10 @@ void statistics_task(void * pvParameters)
     ESP_LOGI(TAG, "Starting");
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-    SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
-    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;
+    PowerManagementModule * POWER_MANAGEMENT_MODULE = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    BoardConfig * BOARD_CONFIG = &GLOBAL_STATE->BOARD_CONFIG;
+
     struct StatisticsData statsData = {};
 
     TickType_t taskWakeTime = xTaskGetTickCount();
@@ -110,15 +112,15 @@ void statistics_task(void * pvParameters)
             get_wifi_current_rssi(&wifiRSSI);
 
             statsData.timestamp = currentTime;
-            statsData.hashrate = sys_module->current_hashrate;
-            statsData.chipTemperature = power_management->chip_temp_avg;
-            statsData.vrTemperature = power_management->vr_temp;
-            statsData.power = power_management->power;
-            statsData.voltage = power_management->voltage;
-            statsData.current = Power_get_current(GLOBAL_STATE);
-            statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
-            statsData.fanSpeed = power_management->fan_perc;
-            statsData.fanRPM = power_management->fan_rpm;
+            statsData.hashrate = SYSTEM_MODULE->current_hashrate;
+            statsData.chipTemperature = POWER_MANAGEMENT_MODULE->chip_temp_avg;
+            statsData.vrTemperature = POWER_MANAGEMENT_MODULE->vr_temp;
+            statsData.power = POWER_MANAGEMENT_MODULE->power;
+            statsData.voltage = POWER_MANAGEMENT_MODULE->voltage;
+            statsData.current = Power_get_current(BOARD_CONFIG);
+            statsData.coreVoltageActual = VCORE_get_voltage_mv(BOARD_CONFIG);
+            statsData.fanSpeed = POWER_MANAGEMENT_MODULE->fan_perc;
+            statsData.fanRPM = POWER_MANAGEMENT_MODULE->fan_rpm;
             statsData.wifiRSSI = wifiRSSI;
             statsData.freeHeap = esp_get_free_heap_size();
 

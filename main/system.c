@@ -96,15 +96,17 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     _suffix_string(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 }
 
-esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
-    
+esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE)
+{
+    BoardConfig * BOARD_CONFIG = &GLOBAL_STATE->BOARD_CONFIG;
+
     ESP_RETURN_ON_ERROR(gpio_install_isr_service(0), TAG, "Error installing ISR service");
 
     // Initialize the core voltage regulator
-    ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_init(BOARD_CONFIG), TAG, "VCORE init failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(BOARD_CONFIG, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
 
-    ESP_RETURN_ON_ERROR(Thermal_init(GLOBAL_STATE->DEVICE_CONFIG), TAG, "Thermal init failed!");
+    ESP_RETURN_ON_ERROR(Thermal_init(BOARD_CONFIG), TAG, "Thermal init failed!");
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
@@ -191,7 +193,7 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double found_diff, ui
     // Calculate the time difference in seconds with sub-second precision
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
 
-    module->historical_hashrate[module->historical_hashrate_rolling_index] = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
+    module->historical_hashrate[module->historical_hashrate_rolling_index] = GLOBAL_STATE->BOARD_CONFIG.device.asic.difficulty;
     module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time();
 
     module->historical_hashrate_rolling_index = (module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;

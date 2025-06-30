@@ -30,7 +30,7 @@
 #include "bm1368.h"
 #include "bm1370.h"
 #include "asic.h"
-#include "device_config.h"
+#include "board_config.h"
 #include "asic_reset.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
@@ -45,6 +45,9 @@
 
 //Test Power Consumption
 #define POWER_CONSUMPTION_MARGIN 3              //+/- watts
+
+//Test hash rate
+#define DIFFICULTY 8
 
 static const char * TAG = "self_test";
 
@@ -79,7 +82,7 @@ static void display_msg(char * msg, GlobalState * GLOBAL_STATE)
 
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 {
-    uint16_t fan_speed = Thermal_get_fan_speed(GLOBAL_STATE->DEVICE_CONFIG);
+    uint16_t fan_speed = Thermal_get_fan_speed(&GLOBAL_STATE->BOARD_CONFIG);
     ESP_LOGI(TAG, "fanSpeed: %d", fan_speed);
     if (fan_speed > FAN_SPEED_TARGET_MIN) {
         return ESP_OK;
@@ -115,7 +118,7 @@ static esp_err_t test_TPS546_power_consumption(int target_power, int margin)
 
 static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 {
-    uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
+    uint16_t core_voltage = VCORE_get_voltage_mv(&GLOBAL_STATE->BOARD_CONFIG);
     ESP_LOGI(TAG, "Voltage: %u", core_voltage);
 
     if (core_voltage > CORE_VOLTAGE_TARGET_MIN && core_voltage < CORE_VOLTAGE_TARGET_MAX) {
@@ -168,9 +171,9 @@ esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
 }
 
 esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
-    ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
+    ESP_RETURN_ON_ERROR(VCORE_init(&GLOBAL_STATE->BOARD_CONFIG), TAG, "VCORE init failed!");
 
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(&GLOBAL_STATE->BOARD_CONFIG, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
     
     return ESP_OK;
 }
@@ -188,7 +191,7 @@ esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
 esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
     
     //enable the voltage regulator GPIO on HW that supports it
-    if (GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
+    if (GLOBAL_STATE->BOARD_CONFIG.asic_enable) {
         gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
         gpio_set_level(GPIO_ASIC_ENABLE, 0);
     }
@@ -201,7 +204,7 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
     }
 
     // VCore regulator testing
-    if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {
+    if (GLOBAL_STATE->BOARD_CONFIG.DS4432U) {
         if (DS4432U_test() != ESP_OK) {
             ESP_LOGE(TAG, "DS4432 test failed!");
             display_msg("DS4432U:FAIL", GLOBAL_STATE);
@@ -216,19 +219,19 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
 
 esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
     
-    if (GLOBAL_STATE->DEVICE_CONFIG.EMC2101) {
+    if (GLOBAL_STATE->BOARD_CONFIG.EMC2101) {
         ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
         EMC2101_set_fan_speed(1);
 
-        if (GLOBAL_STATE->DEVICE_CONFIG.emc_ideality_factor != 0x00) {
-            EMC2101_set_ideality_factor(GLOBAL_STATE->DEVICE_CONFIG.emc_ideality_factor);
-            EMC2101_set_beta_compensation(GLOBAL_STATE->DEVICE_CONFIG.emc_beta_compensation);
+        if (GLOBAL_STATE->BOARD_CONFIG.emc_ideality_factor != 0x00) {
+            EMC2101_set_ideality_factor(GLOBAL_STATE->BOARD_CONFIG.emc_ideality_factor);
+            EMC2101_set_beta_compensation(GLOBAL_STATE->BOARD_CONFIG.emc_beta_compensation);
         }
     }
 
     // TODO: EMC2103
 
-    if (GLOBAL_STATE->DEVICE_CONFIG.INA260) {
+    if (GLOBAL_STATE->BOARD_CONFIG.INA260) {
         ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
     }
 
@@ -329,8 +332,11 @@ bool self_test(void * pvParameters)
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
 
+    // Set difficulty before ASIC_init
+    GLOBAL_STATE->BOARD_CONFIG.device.asic.difficulty = DIFFICULTY;
+
     uint8_t chips_detected = ASIC_init(GLOBAL_STATE);
-    uint8_t chips_expected = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    uint8_t chips_expected = GLOBAL_STATE->BOARD_CONFIG.device.asic_count;
     ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, chips_expected);
 
     if (chips_detected != chips_expected) {
@@ -351,7 +357,7 @@ bool self_test(void * pvParameters)
     }
 
     //setup and test hashrate
-    int baud = ASIC_set_max_baud(GLOBAL_STATE);
+    int baud = ASIC_set_max_baud(GLOBAL_STATE->BOARD_CONFIG.device.asic.id);
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     if (SERIAL_set_baud(baud) != ESP_OK) {
@@ -406,11 +412,6 @@ bool self_test(void * pvParameters)
 
     bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
 
-    uint8_t difficulty_mask = 8;
-
-    //(*GLOBAL_STATE->ASIC_functions.set_difficulty_mask_fn)(difficulty_mask);
-    ASIC_set_job_difficulty_mask(GLOBAL_STATE, difficulty_mask);
-
     ESP_LOGI(TAG, "Sending work");
 
     //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, &job);
@@ -427,7 +428,7 @@ bool self_test(void * pvParameters)
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
-            sum += difficulty_mask;
+            sum += DIFFICULTY;
             
             hash_rate = (sum * 4294967296) / (duration * 1000000000);
             ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
@@ -439,8 +440,8 @@ bool self_test(void * pvParameters)
     ESP_LOGI(TAG, "Hashrate: %f", hash_rate);
 
     float expected_hashrate_mhs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value 
-                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count 
-                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
+                                * GLOBAL_STATE->BOARD_CONFIG.device.asic.small_core_count 
+                                * GLOBAL_STATE->BOARD_CONFIG.device.asic.hashrate_test_percentage_target
                                 / 1000.0f;
 
     if (hash_rate < expected_hashrate_mhs) {
@@ -456,16 +457,16 @@ bool self_test(void * pvParameters)
     }
 
     // TODO: Maybe make a test equivalent for test values
-    if (GLOBAL_STATE->DEVICE_CONFIG.INA260) {
-        if (test_INA260_power_consumption(GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-            ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
+    if (GLOBAL_STATE->BOARD_CONFIG.INA260) {
+        if (test_INA260_power_consumption(GLOBAL_STATE->BOARD_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
+            ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float)GLOBAL_STATE->BOARD_CONFIG.power_consumption_target);
             display_msg("POWER:FAIL", GLOBAL_STATE);
             tests_done(GLOBAL_STATE, false);
         }
     }
-    if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
-        if (test_TPS546_power_consumption(GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-            ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
+    if (GLOBAL_STATE->BOARD_CONFIG.TPS546) {
+        if (test_TPS546_power_consumption(GLOBAL_STATE->BOARD_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
+            ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)GLOBAL_STATE->BOARD_CONFIG.power_consumption_target);
             display_msg("POWER:FAIL", GLOBAL_STATE);
             tests_done(GLOBAL_STATE, false);
         }
@@ -483,7 +484,7 @@ bool self_test(void * pvParameters)
 
 static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed) 
 {
-    VCORE_set_voltage(0.0f, GLOBAL_STATE);
+    VCORE_set_voltage(&GLOBAL_STATE->BOARD_CONFIG, 0.0f);
 
     if (isTestPassed) {
         if (isFactoryTest) {

@@ -349,7 +349,7 @@ int BM1370_set_max_baud(void)
 }
 
 
-void BM1370_set_job_difficulty_mask(int difficulty)
+void BM1370_set_job_difficulty_mask(uint16_t difficulty)
 {
     // Default mask of 256 diff
     unsigned char job_difficulty_mask[9] = {0x00, TICKET_MASK, 0b00000000, 0b00000000, 0b00000000, 0b11111111};

@@ -288,7 +288,7 @@ int BM1397_set_max_baud(void)
     return 3125000;
 }
 
-void BM1397_set_job_difficulty_mask(int difficulty)
+void BM1397_set_job_difficulty_mask(uint16_t difficulty)
 {
 
     // Default mask of 256 diff
@@ -364,6 +364,8 @@ void BM1397_send_work(void *pvParameters, bm_job *next_bm_job)
 
 task_result *BM1397_process_work(void *pvParameters)
 {
+    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+
     bm1397_asic_result_t asic_result = {0};
 
     if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
@@ -376,7 +378,6 @@ task_result *BM1397_process_work(void *pvParameters)
     uint8_t rx_job_id = asic_result.job_id & 0xfc;
     uint8_t rx_midstate_index = asic_result.job_id & 0x03;
 
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
     if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0)
     {
         ESP_LOGW(TAG, "Invalid job nonce found, id=%d", rx_job_id);

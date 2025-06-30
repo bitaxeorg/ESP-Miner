@@ -10,7 +10,7 @@
 #include "serial.h"
 #include "stratum_api.h"
 #include "work_queue.h"
-#include "device_config.h"
+#include "board_config.h"
 #include "display.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
@@ -88,7 +88,7 @@ typedef struct
     work_queue ASIC_jobs_queue;
 
     SystemModule SYSTEM_MODULE;
-    DeviceConfig DEVICE_CONFIG;
+    BoardConfig BOARD_CONFIG;
     DisplayConfig DISPLAY_CONFIG;
     AsicTaskModule ASIC_TASK_MODULE;
     PowerManagementModule POWER_MANAGEMENT_MODULE;
