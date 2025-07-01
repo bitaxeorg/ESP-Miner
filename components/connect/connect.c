@@ -235,15 +235,9 @@ esp_netif_t * wifi_init_softap(char * ap_ssid)
     snprintf(ap_ssid, 32, "Bitaxe_%02X%02X", mac[4], mac[5]);
 
     wifi_config_t wifi_ap_config;
-    memset(&wifi_ap_config, 0, sizeof(wifi_ap_config)); // Clear the structure
-    // The following line causes compilation failueres with newer esp-idf tools, and recent (v13+) C/C++ compilers
-    // This is due to the [-Werror=stringop-truncation] switch present in recent CMake files
-    // strncpy((char *) wifi_ap_config.ap.ssid, ap_ssid, sizeof(wifi_ap_config.ap.ssid));
-    // The reason is that strncpy doesn't guarantee null-termination when the source string length equals the destination size
-    // Fixed as follows:
-	strncpy((char *) wifi_ap_config.ap.ssid, ap_ssid, sizeof(wifi_ap_config.ap.ssid) - 1);
-	wifi_ap_config.ap.ssid[sizeof(wifi_ap_config.ap.ssid) - 1] = '\0';
-	// End fix
+    memset(&wifi_ap_config, 0, sizeof(wifi_ap_config));
+    strncpy((char *) wifi_ap_config.ap.ssid, ap_ssid, sizeof(wifi_ap_config.ap.ssid) - 1);
+    wifi_ap_config.ap.ssid[sizeof(wifi_ap_config.ap.ssid) - 1] = '\0';
     wifi_ap_config.ap.ssid_len = strlen(ap_ssid);
     wifi_ap_config.ap.channel = 1;
     wifi_ap_config.ap.max_connection = 10;
