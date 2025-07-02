@@ -5,16 +5,15 @@
 #include <stdint.h>
 #include "esp_log.h"
 #include "esp_http_server.h"
+#include "websocket.h"
 #include "http_server.h"
-
-#define MESSAGE_QUEUE_SIZE (128)
 
 static const char * TAG = "websocket";
 
 static QueueHandle_t log_queue = NULL;
-static int fd = -1;
+static int clients[MAX_WEBSOCKET_CLIENTS];
 
-int log_to_queue(const char * format, va_list args)
+int log_to_queue(const char *format, va_list args)
 {
     va_list args_copy;
     va_copy(args_copy, args);
@@ -24,8 +23,9 @@ int log_to_queue(const char * format, va_list args)
     va_end(args_copy);
 
     // Allocate the buffer dynamically
-    char * log_buffer = (char *) calloc(needed_size + 2, sizeof(char));  // +2 for potential \n and \0
+    char *log_buffer = (char *)calloc(needed_size + 2, sizeof(char)); // +2 for \n and \0
     if (log_buffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for log buffer");
         return 0;
     }
 
@@ -45,38 +45,117 @@ int log_to_queue(const char * format, va_list args)
     // Print to standard output
     printf("%s", log_buffer);
 
-    if (xQueueSendToBack(log_queue, (void*)&log_buffer, (TickType_t) 0) != pdPASS) {
-        if (log_buffer != NULL) {
-            free((void*)log_buffer);
-        }
+    // Send to queue for WebSocket broadcasting
+    if (xQueueSendToBack(log_queue, (void*)&log_buffer, (TickType_t)0) != pdPASS) {
+        ESP_LOGW(TAG, "Failed to send log to queue, freeing buffer");
+        free((void*)log_buffer);
     }
 
     return 0;
 }
 
-esp_err_t websocket_handler(httpd_req_t * req)
+static void init_clients(void)
+{
+    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
+        clients[i] = -1;
+    }
+}
+
+static esp_err_t add_client(int fd)
+{
+    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
+        if (clients[i] == -1) {
+            clients[i] = fd;
+            ESP_LOGI(TAG, "Added WebSocket client, fd: %d, slot: %d", fd, i);
+            return ESP_OK;
+        }
+    }
+    ESP_LOGE(TAG, "Max WebSocket clients reached, cannot add fd: %d", fd);
+    return ESP_FAIL;
+}
+
+static void remove_client(int fd)
+{
+    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
+        if (clients[i] == fd) {
+            clients[i] = -1;
+            ESP_LOGI(TAG, "Removed WebSocket client, fd: %d, slot: %d", fd, i);
+            return;
+        }
+    }
+}
+
+static int has_active_clients(void)
+{
+    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
+        if (clients[i] != -1) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void websocket_close_fn(httpd_handle_t hd, int fd)
+{
+    ESP_LOGI(TAG, "WebSocket client disconnected, fd: %d", fd);
+    remove_client(fd);
+    if (!has_active_clients()) {
+        esp_log_set_vprintf(vprintf);
+    }
+}
+
+esp_err_t websocket_handler(httpd_req_t *req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
     if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "Handshake done, the new connection was opened");
-        fd = httpd_req_to_sockfd(req);
-        esp_log_set_vprintf(log_to_queue);
+        int fd = httpd_req_to_sockfd(req);
+        ESP_LOGI(TAG, "WebSocket handshake done, new connection opened, fd: %d", fd);
+        esp_err_t ret = add_client(fd);
+        if (ret != ESP_OK) {
+            return httpd_resp_send_custom_err(req, "429 Too Many Requests", "Max WebSocket clients reached");
+        }
         return ESP_OK;
     }
+
+    httpd_ws_frame_t ws_pkt;
+    uint8_t buf[128] = {0};
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.payload = buf;
+    ws_pkt.len = 128;
+
+    esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 128);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "WebSocket frame receive failed: %s", esp_err_to_name(ret));
+        remove_client(httpd_req_to_sockfd(req));
+        if (!has_active_clients()) {
+            esp_log_set_vprintf(vprintf);
+        }
+        return ret;
+    }
+
+    if (ws_pkt.type == HTTPD_WS_TYPE_CLOSE) {
+        ESP_LOGI(TAG, "WebSocket close frame received, fd: %d", httpd_req_to_sockfd(req));
+        remove_client(httpd_req_to_sockfd(req));
+        if (!has_active_clients()) {
+            esp_log_set_vprintf(vprintf);
+        }
+        return ESP_OK;
+    }
+
     return ESP_OK;
 }
 
-void websocket_task(void * pvParameters)
+void websocket_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "websocket_task starting");
     log_queue = xQueueCreate(MESSAGE_QUEUE_SIZE, sizeof(char*));
+    httpd_handle_t https_handle = (httpd_handle_t)pvParameters;
+    init_clients();
 
-    httpd_handle_t server = pvParameters;
-    while (true)
-    {
+    while (true) {
         char *message;
         if (xQueueReceive(log_queue, &message, (TickType_t) portMAX_DELAY) != pdPASS) {
             if (message != NULL) {
@@ -86,28 +165,28 @@ void websocket_task(void * pvParameters)
             continue;
         }
 
-        if (fd == -1) {
+        if (!has_active_clients()) {
             free((void*)message);
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
         }
 
-        // Prepare the WebSocket frame
-        httpd_ws_frame_t ws_pkt;
-        memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-        ws_pkt.payload = (uint8_t *)message;
-        ws_pkt.len = strlen(message);
-        ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+        for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
+            int client_fd = clients[i];
+            if (client_fd != -1) {
+                httpd_ws_frame_t ws_pkt;
+                memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+                ws_pkt.payload = (uint8_t *)message;
+                ws_pkt.len = strlen(message);
+                ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
-        // Ensure server and fd are valid
-        if (fd >= 0) {
-            // Send the WebSocket frame asynchronously
-            if (httpd_ws_send_frame_async(server, fd, &ws_pkt) != ESP_OK) {
-                esp_log_set_vprintf(vprintf);
+                if (httpd_ws_send_frame_async(https_handle, client_fd, &ws_pkt) != ESP_OK) {
+                    ESP_LOGW(TAG, "Failed to send WebSocket frame to fd: %d", client_fd);
+                    remove_client(client_fd);
+                }
             }
         }
 
-        // Free the allocated buffer
         free((void*)message);
     }
 }
