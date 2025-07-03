@@ -16,7 +16,7 @@
 #include "nvs_device.h"
 #include "self_test.h"
 #include "asic.h"
-#include "device_config.h"
+#include "board_config.h"
 #include "connect.h"
 #include "asic_reset.h"
 
@@ -51,7 +51,7 @@ void app_main(void)
         return;
     }
 
-    if (device_config_init(&GLOBAL_STATE) != ESP_OK) {
+    if (board_config_init(&GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init device config");
         return;
     }
@@ -92,7 +92,7 @@ void app_main(void)
         return;
     }
 
-    SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
+    SERIAL_set_baud(ASIC_set_max_baud(GLOBAL_STATE.BOARD_CONFIG.device.asic.id));
     SERIAL_clear_buffer();
 
     GLOBAL_STATE.ASIC_initalized = true;

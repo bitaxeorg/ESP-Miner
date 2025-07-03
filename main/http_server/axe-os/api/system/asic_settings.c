@@ -35,28 +35,28 @@ esp_err_t GET_system_asic(httpd_req_t *req)
     cJSON *root = cJSON_CreateObject();
 
     // Add ASIC model to the JSON object
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
-    cJSON_AddStringToObject(root, "deviceModel", GLOBAL_STATE->DEVICE_CONFIG.family.name);
-    cJSON_AddStringToObject(root, "swarmColor", GLOBAL_STATE->DEVICE_CONFIG.family.swarm_color);
-    cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count);
+    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->BOARD_CONFIG.device.asic.name);
+    cJSON_AddStringToObject(root, "deviceModel", GLOBAL_STATE->BOARD_CONFIG.device.name);
+    cJSON_AddStringToObject(root, "swarmColor", GLOBAL_STATE->BOARD_CONFIG.device.swarm_color);
+    cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE->BOARD_CONFIG.device.asic_count);
 
-    cJSON_AddNumberToObject(root, "defaultFrequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_frequency_mhz);
+    cJSON_AddNumberToObject(root, "defaultFrequency", GLOBAL_STATE->BOARD_CONFIG.device.asic.default_frequency_mhz);
 
     // Create arrays for frequency and voltage options based on ASIC model
     cJSON *freqOptions = cJSON_CreateArray();
     size_t count = 0;
-    while (GLOBAL_STATE->DEVICE_CONFIG.family.asic.frequency_options[count] != 0) {
-        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(GLOBAL_STATE->DEVICE_CONFIG.family.asic.frequency_options[count]));
+    while (GLOBAL_STATE->BOARD_CONFIG.device.asic.frequency_options[count] != 0) {
+        cJSON_AddItemToArray(freqOptions, cJSON_CreateNumber(GLOBAL_STATE->BOARD_CONFIG.device.asic.frequency_options[count]));
         count++;
     }
     cJSON_AddItemToObject(root, "frequencyOptions", freqOptions);
 
-    cJSON_AddNumberToObject(root, "defaultVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv);
+    cJSON_AddNumberToObject(root, "defaultVoltage", GLOBAL_STATE->BOARD_CONFIG.device.asic.default_voltage_mv);
 
     cJSON *voltageOptions = cJSON_CreateArray();
     count = 0;
-    while (GLOBAL_STATE->DEVICE_CONFIG.family.asic.voltage_options[count] != 0) {
-        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(GLOBAL_STATE->DEVICE_CONFIG.family.asic.voltage_options[count]));
+    while (GLOBAL_STATE->BOARD_CONFIG.device.asic.voltage_options[count] != 0) {
+        cJSON_AddItemToArray(voltageOptions, cJSON_CreateNumber(GLOBAL_STATE->BOARD_CONFIG.device.asic.voltage_options[count]));
         count++;
     }
     cJSON_AddItemToObject(root, "voltageOptions", voltageOptions);

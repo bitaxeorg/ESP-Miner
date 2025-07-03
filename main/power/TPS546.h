@@ -183,7 +183,7 @@ esp_err_t TPS546_set_vout(float volts);
 void TPS546_show_voltage_settings(void);
 void TPS546_print_status(void);
 
-esp_err_t TPS546_check_status(GlobalState * global_state);
+esp_err_t TPS546_check_status(GlobalState * GLOBAL_STATE);
 esp_err_t TPS546_clear_faults(void);
 
 const char* TPS546_get_error_message(void); //Get the current TPS error message

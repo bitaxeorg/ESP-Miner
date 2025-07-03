@@ -12,7 +12,7 @@ SRCS
     "nvs_device.c"
     "lv_font_portfolio-6x8.c"
     "logo.c"
-    "device_config.c"
+    "board_config.c"
     "./http_server/http_server.c"
     "./http_server/theme_api.c"
     "./http_server/axe-os/api/system/asic_settings.c"

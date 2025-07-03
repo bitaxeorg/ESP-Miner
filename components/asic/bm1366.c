@@ -317,7 +317,7 @@ int BM1366_set_max_baud(void)
     return 1000000;
 }
 
-void BM1366_set_job_difficulty_mask(int difficulty)
+void BM1366_set_job_difficulty_mask(uint16_t difficulty)
 {
 
     // Default mask of 256 diff
