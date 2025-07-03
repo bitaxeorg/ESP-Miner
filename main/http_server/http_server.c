@@ -1035,9 +1035,10 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
-    config.max_open_sockets = 10;
+    config.max_open_sockets = 20;
     config.max_uri_handlers = 20;
     config.close_fn = websocket_close_fn;
+    config.lru_purge_enable = true;
 
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);

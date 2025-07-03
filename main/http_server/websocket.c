@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <unistd.h>
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "websocket.h"
@@ -61,12 +62,37 @@ static void init_clients(void)
     }
 }
 
+static bool is_empty(void)
+{
+    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
+        if (clients[i] != -1) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool is_full(void)
+{
+    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
+        if (clients[i] == -1) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static esp_err_t add_client(int fd)
 {
     for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
         if (clients[i] == -1) {
+            if (is_empty()) {
+                esp_log_set_vprintf(log_to_queue);
+            }
+
             clients[i] = fd;
             ESP_LOGI(TAG, "Added WebSocket client, fd: %d, slot: %d", fd, i);
+
             return ESP_OK;
         }
     }
@@ -80,28 +106,21 @@ static void remove_client(int fd)
         if (clients[i] == fd) {
             clients[i] = -1;
             ESP_LOGI(TAG, "Removed WebSocket client, fd: %d, slot: %d", fd, i);
+
+            if (is_empty()) {
+                esp_log_set_vprintf(vprintf);
+            }
+
             return;
         }
     }
-}
-
-static int has_active_clients(void)
-{
-    for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
-        if (clients[i] != -1) {
-            return 1;
-        }
-    }
-    return 0;
 }
 
 void websocket_close_fn(httpd_handle_t hd, int fd)
 {
     ESP_LOGI(TAG, "WebSocket client disconnected, fd: %d", fd);
     remove_client(fd);
-    if (!has_active_clients()) {
-        esp_log_set_vprintf(vprintf);
-    }
+    close(fd);
 }
 
 esp_err_t websocket_handler(httpd_req_t *req)
@@ -110,13 +129,40 @@ esp_err_t websocket_handler(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
-    if (req->method == HTTP_GET) {
+    if (is_full()) {
+        ESP_LOGE(TAG, "Max WebSocket clients reached");
+
+        return httpd_resp_send_custom_err(req, "429 Too Many Requests", "Max WebSocket clients reached");
+    }
+
+   if (req->method == HTTP_GET) {
+        if (is_full()) {
+            ESP_LOGE(TAG, "Max WebSocket clients reached, rejecting new connection");
+            esp_err_t ret = httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Max WebSocket clients reached");
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to send error response: %s", esp_err_to_name(ret));
+            }
+            int fd = httpd_req_to_sockfd(req);
+            if (fd >= 0) {
+                ESP_LOGI(TAG, "Closing fd: %d for rejected connection", fd);
+                httpd_sess_trigger_close(req->handle, fd);
+            }
+            return ret;
+        }
+
         int fd = httpd_req_to_sockfd(req);
-        ESP_LOGI(TAG, "WebSocket handshake done, new connection opened, fd: %d", fd);
         esp_err_t ret = add_client(fd);
         if (ret != ESP_OK) {
-            return httpd_resp_send_custom_err(req, "429 Too Many Requests", "Max WebSocket clients reached");
+            ESP_LOGE(TAG, "Unexpected failure adding client, fd: %d", fd);
+            ret = httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Max WebSocket clients reached");
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to send error response: %s", esp_err_to_name(ret));
+            }
+            ESP_LOGI(TAG, "Closing fd: %d for failed client addition", fd);
+            httpd_sess_trigger_close(req->handle, fd);
+            return ret;
         }
+        ESP_LOGI(TAG, "WebSocket handshake successful, fd: %d", fd);
         return ESP_OK;
     }
 
@@ -130,18 +176,12 @@ esp_err_t websocket_handler(httpd_req_t *req)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "WebSocket frame receive failed: %s", esp_err_to_name(ret));
         remove_client(httpd_req_to_sockfd(req));
-        if (!has_active_clients()) {
-            esp_log_set_vprintf(vprintf);
-        }
         return ret;
     }
 
     if (ws_pkt.type == HTTPD_WS_TYPE_CLOSE) {
         ESP_LOGI(TAG, "WebSocket close frame received, fd: %d", httpd_req_to_sockfd(req));
         remove_client(httpd_req_to_sockfd(req));
-        if (!has_active_clients()) {
-            esp_log_set_vprintf(vprintf);
-        }
         return ESP_OK;
     }
 
@@ -165,7 +205,7 @@ void websocket_task(void *pvParameters)
             continue;
         }
 
-        if (!has_active_clients()) {
+        if (is_empty()) {
             free((void*)message);
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
