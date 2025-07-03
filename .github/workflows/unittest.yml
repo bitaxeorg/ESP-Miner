@@ -38,3 +38,12 @@ jobs:
         with:
           name: test-results
           path: report.xml
+
+      - name: Check for test failures
+        if: always()
+        run: |
+          FAILURES=$(grep -oP 'failures="\K[0-9]+' report.xml || echo 0)
+          if [ "$FAILURES" -gt 0 ]; then
+            echo "::error ::Detected $FAILURES test failures."
+            exit 1
+          fi
