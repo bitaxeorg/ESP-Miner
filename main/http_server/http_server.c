@@ -1417,6 +1417,15 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
 
+    // This is for ACSOSv1.0.4 with wrong endpoint
+    httpd_uri_t update_post_ota_www_alt = {
+        .uri = "/api/system/upload-webapp", 
+        .method = HTTP_POST, 
+        .handler = POST_WWW_update, 
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &update_post_ota_www);
+
     /* URI handler for fetching recent logs */
     httpd_uri_t logs_recent_get_uri = {
         .uri = "/api/logs/recent", 
@@ -1452,6 +1461,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .is_websocket = true
     };
     httpd_register_uri_handler(server, &ws);
+
 
     if (enter_recovery) {
         /* Make default route serve Recovery */
