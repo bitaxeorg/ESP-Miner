@@ -62,7 +62,7 @@ export class SystemService {
         fallbackStratumSuggestedDifficulty: 1000,
         fallbackStratumExtranonceSubscribe: 0,
         responseTime: 10,
-        isUsingFallbackStratum: true,
+        isUsingFallbackStratum: false,
         frequency: 485,
         version: "2.0",
         axeOSVersion: "2.0",
