@@ -19,7 +19,9 @@ jobs:
       with:
         esp_idf_version: v5.4.2
         target: esp32s3
-        command: GITHUB_ACTIONS="true" idf.py build
+        command: |
+          GITHUB_ACTIONS="true" idf.py add-dependency "espressif/mdns^1.8.2"
+          GITHUB_ACTIONS="true" idf.py build
         path: 'test-ci'
     - name: Run tests and show result
       uses: bitaxeorg/esp32-qemu-test-action@main

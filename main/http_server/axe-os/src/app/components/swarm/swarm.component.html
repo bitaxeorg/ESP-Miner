@@ -4,11 +4,16 @@
         <div class="field grid p-fluid mb-0">
             <label htmlFor="ip" class="col-12 mb-2 md:col-4 md:mb-0">Manual Addition</label>
             <div class="col-12 md:col-8">
-                <p-inputGroup>
-                    <input pInputText id="manualAddIp" formControlName="manualAddIp" type="text" />
-                    <button pButton  [disabled]="form.invalid" (click)="add()">Add</button>
-                </p-inputGroup>
-
+                <div class="flex flex-column gap-2">
+                    <p-inputGroup>
+                        <input pInputText id="manualAddIp" formControlName="manualAddIp" type="text" placeholder="IP Address" />
+                        <button pButton [disabled]="form.invalid" (click)="add()">Add</button>
+                    </p-inputGroup>
+                    <input pInputText id="manualAddApiSecret" formControlName="manualAddApiSecret" type="text"
+                           placeholder="API Secret (optional for cross-origin)"
+                           minlength="12" maxlength="32" />
+                    <small class="text-muted">Leave API Secret empty for same-network devices, or provide 12-32 character secret for cross-origin access</small>
+                </div>
             </div>
         </div>
 
