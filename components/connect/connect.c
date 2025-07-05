@@ -11,6 +11,7 @@
 #include "lwip/sys.h"
 #include "nvs_flash.h"
 #include "esp_wifi_types_generic.h"
+#include "mdns.h"
 
 #include "connect.h"
 #include "global_state.h"
@@ -61,6 +62,7 @@ static int clients_connected_to_ap = 0;
 static const char *get_wifi_reason_string(int reason);
 static void wifi_softap_on(void);
 static void wifi_softap_off(void);
+static void mdns_init_hostname(void);
 
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
@@ -204,7 +206,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         if (event_id == WIFI_EVENT_AP_STACONNECTED) {
             clients_connected_to_ap += 1;
         }
-        
+
         if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
             clients_connected_to_ap -= 1;
         }
@@ -222,6 +224,8 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         ESP_LOGI(TAG, "Connected to SSID: %s", GLOBAL_STATE->SYSTEM_MODULE.ssid);
 
         wifi_softap_off();
+
+        mdns_init_hostname();
     }
 }
 
@@ -473,4 +477,43 @@ static const char *get_wifi_reason_string(int reason) {
         }
     }
     return "Unknown error";
+}
+
+static void mdns_init_hostname(void) {
+    char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
+
+    ESP_LOGI(TAG, "Starting mDNS service");
+    esp_err_t err = mdns_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "mDNS initialization failed: %s", esp_err_to_name(err));
+        free(hostname);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Setting mDNS hostname to: %s", hostname);
+    err = mdns_hostname_set(hostname);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set mDNS hostname: %s", esp_err_to_name(err));
+        free(hostname);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Setting mDNS instance name to: %s", hostname);
+    err = mdns_instance_name_set(hostname);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set mDNS instance name: %s", esp_err_to_name(err));
+        free(hostname);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Adding mDNS service: _http._tcp on port 80");
+    err = mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add mDNS HTTP service: %s", esp_err_to_name(err));
+        free(hostname);
+        return;
+    }
+
+    ESP_LOGI(TAG, "mDNS service started successfully");
+    free(hostname);
 }
