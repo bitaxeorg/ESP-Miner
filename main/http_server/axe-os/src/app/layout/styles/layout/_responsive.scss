@@ -33,7 +33,7 @@
 
         &.layout-static {
             .layout-main-container {
-                margin-left: 250px;
+                margin-left: calc(var(--sidebar-width) + 2rem);
             }
 
             &.layout-static-inactive {

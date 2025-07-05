@@ -5,6 +5,8 @@ import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 
+type PoolType = 'stratum' | 'fallbackStratum';
+
 @Component({
   selector: 'app-pool',
   templateUrl: './pool.component.html',
@@ -13,6 +15,9 @@ import { SystemService } from 'src/app/services/system.service';
 export class PoolComponent implements OnInit {
   public form!: FormGroup;
   public savedChanges: boolean = false;
+
+  public pools: PoolType[] = ['stratum', 'fallbackStratum'];
+  public showPassword = {'stratum': false, 'fallbackStratum': false};
 
   @Input() uri = '';
 
@@ -39,8 +44,13 @@ export class PoolComponent implements OnInit {
             Validators.required,
             Validators.pattern(/^[^:]*$/),
             Validators.min(0),
-            Validators.max(65353)
+            Validators.max(65535)
           ]],
+          stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == 1, [Validators.required]],
+          stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
+          stratumUser: [info.stratumUser, [Validators.required]],
+          stratumPassword: ['*****', [Validators.required]],
+
           fallbackStratumURL: [info.fallbackStratumURL, [
             Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
           ]],
@@ -48,12 +58,12 @@ export class PoolComponent implements OnInit {
             Validators.required,
             Validators.pattern(/^[^:]*$/),
             Validators.min(0),
-            Validators.max(65353)
+            Validators.max(65535)
           ]],
-          stratumUser: [info.stratumUser, [Validators.required]],
-          stratumPassword: ['*****', [Validators.required]],
+          fallbackStratumExtranonceSubscribe: [info.fallbackStratumExtranonceSubscribe == 1, [Validators.required]],
+          fallbackStratumSuggestedDifficulty: [info.fallbackStratumSuggestedDifficulty, [Validators.required]],
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
-          fallbackStratumPassword: ['password', [Validators.required]]
+          fallbackStratumPassword: ['*****', [Validators.required]]
         });
       });
   }
@@ -64,12 +74,16 @@ export class PoolComponent implements OnInit {
     if (form.stratumPassword === '*****') {
       delete form.stratumPassword;
     }
+    if (form.fallbackStratumPassword === '*****') {
+      delete form.fallbackStratumPassword;
+    }
 
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
           const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
+          this.toastr.warning('You must restart this device after saving for changes to take effect', 'Warning');
           this.toastr.success(successMessage, 'Success!');
           this.savedChanges = true;
         },
@@ -79,16 +93,6 @@ export class PoolComponent implements OnInit {
           this.savedChanges = false;
         }
       });
-  }
-
-  showStratumPassword: boolean = false;
-  toggleStratumPasswordVisibility() {
-    this.showStratumPassword = !this.showStratumPassword;
-  }
-
-  showFallbackStratumPassword: boolean = false;
-  toggleFallbackStratumPasswordVisibility() {
-    this.showFallbackStratumPassword = !this.showFallbackStratumPassword;
   }
 
   public restart() {

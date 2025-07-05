@@ -17,8 +17,9 @@
 <div class="flex flex-column sm:flex-row gap-4 justify-content-between">
     <div class="flex gap-1 sm:gap-3 text-sm md:text-base">
         <button pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
-        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing">
-            {{isRefreshing ? 'Refreshing...' : 'Refresh List (' + refreshIntervalTime + ')'}}
+        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing" class="refresh-button">
+          <span aria-hidden="true">Refresh List (30)</span>
+          <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh List (' + refreshIntervalTime + ')' }}</span>
         </button>
     </div>
     <div class="flex align-items-center gap-2">
@@ -34,47 +35,84 @@
 </div>
 
 <div class="flex flex-column sm:flex-row w-full gap-2 xl:gap-4 mt-4 mb-4">
-    <div class="card mb-0 w-full text-center p-4">
-        Total Hash Rate: <span class="text-primary">{{totals.hashRate * 1000000000 | hashSuffix}}</span>
-    </div>
-    <div class="card mb-0 w-full text-center p-4">
-        Total Power: <span class="text-primary">{{totals.power | number: '1.1-1'}} <small>W</small></span>
-    </div>
-    <div class="card mb-0 w-full text-center p-4">
-        Best Diff: <span class="text-primary">{{totals.bestDiff}}</span>
+    <div class="card mb-0 w-full text-center p-4 min-w-max flex sm:flex-column xl:flex-row justify-content-center gap-1"
+        *ngFor="let metric of [
+            {
+                label: 'Total Devices',
+                value: swarm.length
+            },
+            {
+                label: 'Total Hash Rate',
+                value: totals.hashRate * 1000000000 | hashSuffix
+            },
+            {
+                label: 'Total Power',
+                value: (totals.power | number: '1.1-1')  + ' W'
+            },
+            {
+                label: 'Best Diff',
+                value: totals.bestDiff
+            }
+        ]"
+    >
+        {{metric.label}}: <span class="text-primary">{{metric.value}}</span>
     </div>
 </div>
 
 <div class="table-container">
     <table cellspacing="0" cellpadding="0" class="text-sm md:text-base">
         <tr>
-            <th>
-                <div class="flex items-center cursor-pointer select-none h-full" (click)="sortBy('IP')">
-                    <span class="flex-1">IP</span>
+            <th *ngFor="let field of [
+                {
+                    name: 'IP',
+                    label: 'IP'
+                },
+                {
+                    name: 'hostname',
+                    label: 'Hostname'
+                },
+                {
+                    name: 'hashRate',
+                    label: 'Hash Rate'
+                },
+                {
+                    name: 'sharesAccepted',
+                    label: 'Shares'
+                },
+                {
+                    name: 'bestDiff',
+                    label: 'Best Diff'
+                },
+                {
+                    name: 'uptimeSeconds',
+                    label: 'Uptime'
+                },
+                {
+                    name: 'power',
+                    label: 'Power'
+                },
+                {
+                    name: 'temp',
+                    label: 'Temp'
+                },
+                {
+                    name: 'poolDifficulty',
+                    label: 'Pool Diff'
+                },
+                {
+                    name: 'version',
+                    label: 'Version'
+                },
+            ]">
+                <div class="flex align-items-center cursor-pointer select-none h-full" (click)="sortBy(field.name)">
+                    <span class="flex-1">{{field.label}}</span>
                     <i class="pi text-xs flex items-center" [ngClass]="{
-                        'pi-sort-alt': sortField !== 'IP',
-                        'pi-sort-amount-up-alt': sortField === 'IP' && sortDirection === 'asc',
-                        'pi-sort-amount-down': sortField === 'IP' && sortDirection === 'desc'
+                        'pi-sort-alt': sortField !== field.name,
+                        'pi-sort-amount-up-alt': sortField === field.name && sortDirection === 'asc',
+                        'pi-sort-amount-down': sortField === field.name && sortDirection === 'desc'
                     }"></i>
                 </div>
             </th>
-            <th>
-                <div class="flex items-center cursor-pointer select-none h-full" (click)="sortBy('hostname')">
-                    <span class="flex-1">Hostname</span>
-                    <i class="pi text-xs flex items-center" [ngClass]="{
-                        'pi-sort-alt': sortField !== 'hostname',
-                        'pi-sort-amount-up-alt': sortField === 'hostname' && sortDirection === 'asc',
-                        'pi-sort-amount-down': sortField === 'hostname' && sortDirection === 'desc'
-                    }"></i>
-                </div>
-            </th>
-            <th>Hash Rate</th>
-            <th>Uptime</th>
-            <th>Shares</th>
-            <th>Power</th>
-            <th>Temp</th>
-            <th>Best Diff</th>
-            <th>Version</th>
             <th>Edit</th>
             <th>Restart</th>
             <th>Remove</th>
@@ -83,22 +121,14 @@
             <tr>
                 <td>
                     <a
-                       [ngClass]="[
-                            axe.asicCount > 1 ? 'text-orange-500' :
-                            axe.ASICModel === 'BM1397' ? 'text-red-500' :
-                            axe.ASICModel === 'BM1366' ? 'text-purple-500' :
-                            axe.ASICModel === 'BM1368' ? 'text-blue-500' :
-                            axe.ASICModel === 'BM1370' ? 'text-green-500' :
-                            ''
-                       ]"
+                       [ngClass]="'text-'+axe.swarmColor+'-500'"
                        [href]="'http://'+axe.IP"
                        target="_blank"
-                       [pTooltip]="axe.ASICModel"
+                       [pTooltip]="axe.deviceModel || 'Other'"
                        tooltipPosition="top">{{axe.IP}}</a>
                 </td>
                 <td>{{axe.hostname}}</td>
                 <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
-                <td>{{axe.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
                 <td>
                     <div class="w-min cursor-pointer"
                          pTooltip="Shares Accepted"
@@ -111,9 +141,25 @@
                         {{axe.sharesRejected | number: '1.0-0'}}
                     </div>
                 </td>
+                <td>
+                    <div class="w-min cursor-pointer"
+                         pTooltip="Best Diff"
+                         tooltipPosition="top">
+                        {{axe.bestDiff}}
+                    </div>
+                    <div class="text-sm w-min cursor-pointer"
+                         pTooltip="Best Session Diff"
+                         tooltipPosition="top">
+                        {{axe.bestSessionDiff}}
+                    </div>
+                </td>
+                <td>{{axe.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
                 <td>{{axe.power | number: '1.1-1'}} <small>W</small> </td>
                 <td>
-                    <div [ngClass]="{'text-orange-500': axe.temp > 68}">
+                    <div
+                         [ngClass]="{'text-orange-500': axe.temp > 68}"
+                         pTooltip="ASIC Temperature"
+                         tooltipPosition="top">
                         {{axe.temp | number: '1.0-1'}}°<small>C</small>
                     </div>
                     <div class="text-sm w-min cursor-pointer"
@@ -124,14 +170,7 @@
                         {{axe.vrTemp | number: '1.0-1'}}°<small>C</small>
                     </div>
                 </td>
-                <td>
-                    <div>{{axe.bestDiff}}</div>
-                    <div class="text-sm w-min cursor-pointer"
-                         pTooltip="Best Session Diff"
-                         tooltipPosition="top">
-                        {{axe.bestSessionDiff}}
-                    </div>
-                </td>
+                <td>{{axe.poolDifficulty || axe.stratumDiff}}</td>
                 <td>{{axe.version}}</td>
                 <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
                 <td><p-button icon="pi pi-sync" pp-button severity="danger" (click)="restart(axe)"></p-button></td>
@@ -141,33 +180,14 @@
     </table>
 
     <div class="flex flex-wrap gap-2 mt-3 text-sm justify-content-center">
-        <div class="flex align-items-center gap-1" [style.opacity]="hasModel('BM1397')">
-            <span class="text-red-500">●</span>
-            <span>BM1397 (Max)</span>
-        </div>
-        <div class="flex align-items-center gap-1" [style.opacity]="hasModel('BM1366')">
-            <span class="text-purple-500">●</span>
-            <span>BM1366 (Ultra)</span>
-        </div>
-        <div class="flex align-items-center gap-1" [style.opacity]="hasModel('BM1368')">
-            <span class="text-blue-500">●</span>
-            <span>BM1368 (Supra)</span>
-        </div>
-        <div class="flex align-items-center gap-1" [style.opacity]="hasModel('BM1370')">
-            <span class="text-green-500">●</span>
-            <span>BM1370 (Gamma)</span>
-        </div>
-        <div class="flex align-items-center gap-1" [style.opacity]="hasMultipleChips()">
-            <span class="text-orange-500">●</span>
-            <span>Multiple Chip Device</span>
+        <div *ngFor="let item of getFamilies" class="flex align-items-center gap-1">
+            <span [class]="'text-' + item.swarmColor + '-500'">●</span>
+            <span>{{ item.deviceModel || 'Other' }} ({{item.asicCount > 1 ? item.asicCount + 'x ' : ''}}{{item.ASICModel}})</span>
         </div>
     </div>
 
 </div>
 
-<div class="modal-backdrop" *ngIf="showEdit" (click)="showEdit = false"></div>
-<div class="modal card" *ngIf="showEdit">
-    <div class="close" (click)="showEdit = false">&#10006;</div>
-    <h1>{{selectedAxeOs.IP}}</h1>
-    <app-edit [uri]="'http://' + selectedAxeOs.IP"></app-edit>
-</div>
+<app-modal [headline]="selectedAxeOs?.IP">
+    <app-edit *ngIf="selectedAxeOs" [uri]="'http://' + selectedAxeOs.IP"></app-edit>
+</app-modal>

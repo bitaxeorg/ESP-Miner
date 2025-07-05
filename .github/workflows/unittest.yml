@@ -1,5 +1,11 @@
 name: Unit Test
 on: [push, pull_request]
+
+permissions:
+  checks: write
+  pull-requests: write
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -11,7 +17,7 @@ jobs:
     - name: esp-idf build
       uses: espressif/esp-idf-ci-action@v1
       with:
-        esp_idf_version: v5.4
+        esp_idf_version: v5.4.2
         target: esp32s3
         command: GITHUB_ACTIONS="true" idf.py build
         path: 'test-ci'

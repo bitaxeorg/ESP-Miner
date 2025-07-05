@@ -1,15 +1,58 @@
 #loading {
-    background-color: rgba(0, 0, 0, 0.5);
-    top: 0;
+    background-color: var(--maskbg);
+    left: calc(4rem + var(--sidebar-width));
+
     bottom: 0;
-    left: 0;
-    right: 0;
     position: fixed;
     z-index: 99999999999999999999;
+
+    --padding: 2rem;
+
+    @media (max-width: 768px) {
+        --padding: 1rem;
+    }
+
+    left: var(--padding);
+    right: var(--padding);
+    top: calc(var(--topbar-height) + var(--padding));
+    padding-bottom: calc(var(--topbar-height) + var(--padding));
+
+    ::ng-deep .menuIsVisible & {
+        @media screen and (min-width: 992px) {
+            left: calc(var(--padding) * 2 + var(--sidebar-width));
+        }
+    }
 }
 
-#loading-text {
-    text-align: center;
-    margin-top: 40vh;
-    font-size: 20pt;
+figure {
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+}
+
+.icon-bitaxe {
+    width: 41px;
+    height: 60px;
+}
+.icon-fan {
+    width: 32px;
+    height: 32px;
+    margin: 24px 0 0;
+    position: absolute;
+
+    animation: rotation 1s infinite linear;
+    transform-box: fill-box;
+    transform-origin: center;
+    will-change: transform;
+}
+
+@keyframes rotation {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }

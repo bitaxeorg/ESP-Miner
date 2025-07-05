@@ -1,17 +1,22 @@
 <ng-container *ngIf="form != null">
     <form [formGroup]="form">
-        <ng-container *ngIf="!settingsUnlocked && restrictedModels.includes(ASICModel)">
+
+        <p-message *ngIf="settingsUnlocked" severity="warn" styleClass="w-full mb-3 py-4 border-round-xl"
+            text="Custom settings can cause damage & system instability. Only modify these settings if you understand the risks of running outside designed parameters.">
+        </p-message>
+
+        <ng-container *ngIf="!settingsUnlocked">
             <div class="field grid p-fluid">
                 <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
                 <div class="col-12 md:col-10">
-                    <p-dropdown [options]="getDropdownFrequency()" optionLabel="name" optionValue="value"
+                    <p-dropdown [options]="dropdownFrequency" optionLabel="name" optionValue="value"
                         formControlName="frequency"></p-dropdown>
                 </div>
             </div>
 
             <div class="field grid p-fluid">
                 <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="coreVoltage">Core Voltage</label>
-                <p-dropdown class="col-12 md:col-10" [options]="getCoreVoltage()" optionLabel="name"
+                <p-dropdown class="col-12 md:col-10" [options]="dropdownVoltage" optionLabel="name"
                     optionValue="value" formControlName="coreVoltage"></p-dropdown>
             </div>
         </ng-container>
@@ -44,21 +49,6 @@
             </small>
         </div>
 
-        <div class="col-12 md:col-4">
-            <div class="field-checkbox">
-                <p-checkbox name="flipscreen" formControlName="flipscreen" inputId="flipscreen"
-                    [binary]="true"></p-checkbox>
-                <label for="flipscreen">Flip Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Rotates the LCD screen by 180 degrees"></i></label>
-            </div>
-        </div>
-
-        <div class="col-12">
-            <div class="field-checkbox">
-                <p-checkbox name="invertfanpolarity" formControlName="invertfanpolarity" inputId="invertfanpolarity"
-                    [binary]="true"></p-checkbox>
-                <label for="invertfanpolarity">Invert Fan Polarity <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Inverting the polarity of the fan PWM signal"></i></label>
-            </div>
-        </div>
         <div class="col-12">
             <div class="field-checkbox">
                 <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed"
@@ -66,6 +56,13 @@
                 <label for="autofanspeed">Automatic Fan Control</label>
             </div>
         </div>
+
+        <div *ngIf="form.controls['autofanspeed'].value == true">
+          <div class="col-12" *ngIf="form.controls['autofanspeed'].value == true">
+              <label>Target Temperature {{form.controls['temptarget'].value}}°C</label>
+              <p-slider [min]="35" [max]="66" formControlName="temptarget"></p-slider>
+          </div>
+      </div>
 
         <div *ngIf="form.controls['autofanspeed'].value != true">
             <div class="col-12" *ngIf="form.controls['autofanspeed'].value != true">
@@ -78,16 +75,77 @@
             </div>
         </div>
 
-        <div class="mt-2">
+        <h3 class="mt-5">Display</h3>
+
+        <div class="field grid p-fluid">
+            <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="display">Display</label>
+            <div class="col-12 md:col-10">
+                <p-dropdown [options]="displays" formControlName="display"></p-dropdown>
+            </div>
+        </div>
+
+        <div class="field grid p-fluid">
+            <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="rotation">Rotation</label>
+            <div class="col-12 md:col-10">
+                <p-dropdown [options]="rotations" formControlName="rotation"></p-dropdown>
+            </div>
+        </div>
+
+        <div class="col-12 md:col-4">
+            <div class="field-checkbox">
+                <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen"
+                    [binary]="true"></p-checkbox>
+                <label for="invertscreen">Invert Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Inverts the colors"></i></label>
+            </div>
+        </div>
+
+        <div class="field grid p-fluid">
+            <label htmlFor="displayTimeoutControl" class="col-12 md:col-2 hidden md:flex mb-2 md:mb-0 relative" style="top: -5px;">
+                Display Sleep
+            </label>
+            <div class="col-12 md:col-10">
+                <label class="block mb-2">
+                    <ng-container *ngIf="this.form.controls['displayTimeout'].value == 0">
+                        Display always off
+                    </ng-container>
+                    <ng-container *ngIf="this.form.controls['displayTimeout'].value > 0">
+                        Display timeout: {{this.form.controls['displayTimeout'].value * 60 | dateAgo}}
+                    </ng-container>
+                    <ng-container *ngIf="this.form.controls['displayTimeout'].value == -1">
+                        Display always on
+                    </ng-container>
+                </label>
+                <p-slider [min]="0" [max]="displayTimeoutMaxSteps" [step]="1" [formControl]="displayTimeoutControl"></p-slider>
+                <input type="hidden" formControlName="displayTimeout" />
+            </div>
+        </div>
+
+        <h3 class="mt-5">Statistics</h3>
+
+        <div class="flex flex-column mb-5 gap-3">
+            <div>
+                <label class="block mb-2">
+                    <ng-container *ngIf="this.form.controls['statsFrequency'].value == 0">
+                        Data logging disabled
+                    </ng-container>
+                    <ng-container *ngIf="this.form.controls['statsFrequency'].value > 0">
+                        Log data every {{form.controls['statsFrequency'].value | dateAgo: {strict: true} }} for {{(form.controls['statsFrequency'].value * 720) | dateAgo}}
+                    </ng-container>
+                </label>
+                <p-slider [min]="0" [max]="statsFrequencyMaxSteps" [step]="1" [formControl]="statsFrequencyControl"></p-slider>
+                <input type="hidden" formControlName="statsFrequency" />
+            </div>
+        </div>
+
+        <div class="flex mt-5 gap-3">
             <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-                class="btn btn-primary mr-2">Save</button>
-            <b style="line-height: 34px;">You must restart this device after saving for changes to take effect.</b>
-        </div>
+                class="btn btn-primary">Save</button>
 
-        <div class="mt-2">
             <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
-        </div>
 
+            <button *ngIf="settingsUnlocked" pButton pButton="p-button-danger" (click)="toggleOverclockMode(false)"
+                class="p-button-danger" pTooltip="Return to safe preset values only">Disable Overclock Mode</button>
+        </div>
 
     </form>
 </ng-container>

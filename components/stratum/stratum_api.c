@@ -10,14 +10,64 @@
 #include "esp_ota_ops.h"
 #include "lwip/sockets.h"
 #include "utils.h"
+#include "esp_timer.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 #define BUFFER_SIZE 1024
 static const char * TAG = "stratum_api";
 
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
+static int last_parsed_request_id = -1;
+
+static RequestTiming request_timings[MAX_REQUEST_IDS];
+static bool initialized = false;
+
+static void init_request_timings() {
+    if (!initialized) {
+        for (int i = 0; i < MAX_REQUEST_IDS; i++) {
+            request_timings[i].timestamp_us = 0;
+            request_timings[i].tracking = false;
+        }
+        initialized = true;
+    }
+}
+
+static RequestTiming* get_request_timing(int request_id) {
+    if (request_id < 0) return NULL;
+    int index = request_id % MAX_REQUEST_IDS;
+    return &request_timings[index];
+}
+
+void STRATUM_V1_stamp_tx(int request_id)
+{
+    init_request_timings();
+    if (request_id >= 1) {
+        RequestTiming *timing = get_request_timing(request_id);
+        if (timing) {
+            timing->timestamp_us = esp_timer_get_time();
+            timing->tracking = true;
+        }
+    }
+}
+
+double STRATUM_V1_get_response_time_ms(int request_id)
+{
+    init_request_timings();
+    if (request_id < 0) return -1.0;
+    
+    RequestTiming *timing = get_request_timing(request_id);
+    if (!timing || !timing->tracking) {
+        return -1.0;
+    }
+    
+    double response_time = (esp_timer_get_time() - timing->timestamp_us) / 1000.0;
+    timing->tracking = false;
+    return response_time;
+}
 
 static void debug_stratum_tx(const char *);
 int _parse_stratum_subscribe_result_message(const char * result_json_str, char ** extranonce, int * extranonce2_len);
@@ -104,6 +154,8 @@ char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
 
 void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
 {
+    ESP_LOGI(TAG, "rx: %s", stratum_json); // debug incoming stratum messages
+
     cJSON * json = cJSON_Parse(stratum_json);
 
     cJSON * id_json = cJSON_GetObjectItem(json, "id");
@@ -111,6 +163,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
     if (id_json != NULL && cJSON_IsNumber(id_json)) {
         parsed_id = id_json->valueint;
     }
+    last_parsed_request_id = parsed_id;
     message->message_id = parsed_id;
 
     cJSON * method_json = cJSON_GetObjectItem(json, "method");
@@ -124,6 +177,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             result = MINING_SET_DIFFICULTY;
         } else if (strcmp("mining.set_version_mask", method_json->valuestring) == 0) {
             result = MINING_SET_VERSION_MASK;
+        } else if (strcmp("mining.set_extranonce", method_json->valuestring) == 0) {
+            result = MINING_SET_EXTRANONCE;
         } else if (strcmp("client.reconnect", method_json->valuestring) == 0) {
             result = CLIENT_RECONNECT;
         } else {
@@ -137,12 +192,15 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         cJSON * error_json = cJSON_GetObjectItem(json, "error");
         cJSON * reject_reason_json = cJSON_GetObjectItem(json, "reject-reason");
 
-        //if the result is null, then it's a fail
+        // if the result is null, then it's a fail
         if (result_json == NULL) {
             message->response_success = false;
-
-        //if it's an error, then it's a fail
-        } else if (!cJSON_IsNull(error_json)) {
+            message->error_str = strdup("unknown");
+            
+        // if it's an error, then it's a fail
+        } else if (error_json != NULL && !cJSON_IsNull(error_json)) {
+            message->response_success = false;
+            message->error_str = strdup("unknown");
             if (parsed_id < 5) {
                 result = STRATUM_RESULT_SETUP;
             } else {
@@ -157,9 +215,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                     }
                 }
             }
-            message->response_success = false;
 
-        //if the result is a boolean, then parse it
+        // if the result is a boolean, then parse it
         } else if (cJSON_IsBool(result_json)) {
             if (parsed_id < 5) {
                 result = STRATUM_RESULT_SETUP;
@@ -170,6 +227,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 message->response_success = true;
             } else {
                 message->response_success = false;
+                message->error_str = strdup("unknown");
                 if (cJSON_IsString(reject_reason_json)) {
                     message->error_str = strdup(cJSON_GetStringValue(reject_reason_json));
                 }                
@@ -193,21 +251,14 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 message->response_success = false;
                 goto done;
             }
-            message->extranonce_str = malloc(strlen(extranonce_json->valuestring) + 1);
-            strcpy(message->extranonce_str, extranonce_json->valuestring);
+            message->extranonce_str = strdup(extranonce_json->valuestring);
             message->response_success = true;
-
-            //print the extranonce_str
-            ESP_LOGI(TAG, "extranonce_str: %s", message->extranonce_str);
-            ESP_LOGI(TAG, "extranonce_2_len: %d", message->extranonce_2_len);
-
         //if the id is STRATUM_ID_CONFIGURE parse it
         } else if (parsed_id == STRATUM_ID_CONFIGURE) {
             cJSON * mask = cJSON_GetObjectItem(result_json, "version-rolling.mask");
             if (mask != NULL) {
                 result = STRATUM_RESULT_VERSION_MASK;
                 message->version_mask = strtoul(mask->valuestring, NULL, 16);
-                ESP_LOGI(TAG, "Set version mask: %08lx", message->version_mask);
             } else {
                 ESP_LOGI(TAG, "error setting version mask: %s", stratum_json);
             }
@@ -253,13 +304,17 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
     } else if (message->method == MINING_SET_DIFFICULTY) {
         cJSON * params = cJSON_GetObjectItem(json, "params");
         uint32_t difficulty = cJSON_GetArrayItem(params, 0)->valueint;
-
         message->new_difficulty = difficulty;
     } else if (message->method == MINING_SET_VERSION_MASK) {
-
         cJSON * params = cJSON_GetObjectItem(json, "params");
         uint32_t version_mask = strtoul(cJSON_GetArrayItem(params, 0)->valuestring, NULL, 16);
         message->version_mask = version_mask;
+    } else if (message->method == MINING_SET_EXTRANONCE) {
+        cJSON * params = cJSON_GetObjectItem(json, "params");
+        char * extranonce_str = cJSON_GetArrayItem(params, 0)->valuestring;
+        uint32_t extranonce_2_len = cJSON_GetArrayItem(params, 1)->valueint;
+        message->extranonce_str = strdup(extranonce_str);
+        message->extranonce_2_len = extranonce_2_len;
     }
     done:
     cJSON_Delete(json);
@@ -300,15 +355,14 @@ int _parse_stratum_subscribe_result_message(const char * result_json_str, char *
         ESP_LOGE(TAG, "Unable parse extranonce: %s", result->valuestring);
         return -1;
     }
-    *extranonce = malloc(strlen(extranonce_json->valuestring) + 1);
-    strcpy(*extranonce, extranonce_json->valuestring);
+    *extranonce = strdup(extranonce_json->valuestring);
 
     cJSON_Delete(root);
 
     return 0;
 }
 
-int STRATUM_V1_subscribe(int socket, int send_uid, char * model)
+int STRATUM_V1_subscribe(int socket, int send_uid, const char * model)
 {
     // Subscribe
     char subscribe_msg[BUFFER_SIZE];
@@ -329,7 +383,16 @@ int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty)
     return write(socket, difficulty_msg, strlen(difficulty_msg));
 }
 
-int STRATUM_V1_authenticate(int socket, int send_uid, const char * username, const char * pass)
+int STRATUM_V1_extranonce_subscribe(int socket, int send_uid)
+{
+    char extranonce_msg[BUFFER_SIZE];
+    sprintf(extranonce_msg, "{\"id\": %d, \"method\": \"mining.extranonce.subscribe\", \"params\": []}\n", send_uid);
+    debug_stratum_tx(extranonce_msg);
+
+    return write(socket, extranonce_msg, strlen(extranonce_msg));
+}
+
+int STRATUM_V1_authorize(int socket, int send_uid, const char * username, const char * pass)
 {
     char authorize_msg[BUFFER_SIZE];
     sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"%s\"]}\n", send_uid, username,
@@ -372,6 +435,7 @@ int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * ve
 
 static void debug_stratum_tx(const char * msg)
 {
+    STRATUM_V1_stamp_tx(last_parsed_request_id);
     //remove the trailing newline
     char * newline = strchr(msg, '\n');
     if (newline != NULL) {

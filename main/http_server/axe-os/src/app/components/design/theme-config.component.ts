@@ -14,10 +14,9 @@ interface ThemeOption {
   selector: 'app-theme-config',
   template: `
     <div class="card">
-      <h5>Theme Configuration</h5>
       <div class="grid">
         <div class="col-12">
-          <h6>Color Scheme</h6>
+          <h5>Color Scheme</h5>
           <div class="flex gap-3">
             <div class="flex align-items-center">
               <p-radioButton name="colorScheme" [value]="'dark'" [(ngModel)]="selectedScheme"
@@ -32,14 +31,15 @@ interface ThemeOption {
           </div>
         </div>
 
-        <div class="col-12">
-          <h6>Theme Colors</h6>
+        <div class="col-12 mt-4">
+          <h5>Theme Colors</h5>
           <div class="grid gap-2">
-            <div *ngFor="let theme of themes" class="col-2">
+            <div *ngFor="let theme of themes" class="col-2 theme-color">
               <button pButton [class]="'p-button-rounded p-button-text color-dot'"
                       [style.backgroundColor]="theme.primaryColor"
                       style="width: 2rem; height: 2rem; border: none;"
                       (click)="changeTheme(theme)">
+                <i *ngIf="theme.primaryColor === currentColor" class="pi pi-check selected-icon"></i>
               </button>
               <div class="text-sm mt-1">{{theme.name}}</div>
             </div>
@@ -47,10 +47,12 @@ interface ThemeOption {
         </div>
       </div>
     </div>
-  `
+  `,
+  styleUrls: ['./design-component.scss']
 })
 export class ThemeConfigComponent implements OnInit {
   selectedScheme: string;
+  currentColor: string = '';
   themes: ThemeOption[] = [
     {
       name: 'Orange',
@@ -225,8 +227,16 @@ export class ThemeConfigComponent implements OnInit {
     // Load saved theme settings from NVS
     this.themeService.getThemeSettings().subscribe(
       settings => {
-        if (settings && settings.accentColors) {
-          this.applyThemeColors(settings.accentColors);
+        if (settings) {
+          // Apply saved color scheme
+          if (settings.colorScheme) {
+            this.selectedScheme = settings.colorScheme;
+          }
+          // Apply accent colors if they exist
+          if (settings.accentColors) {
+            this.applyThemeColors(settings.accentColors);
+            this.currentColor = settings.accentColors['--primary-color'];
+          }
         }
       },
       error => console.error('Error loading theme settings:', error)
@@ -244,18 +254,25 @@ export class ThemeConfigComponent implements OnInit {
     const config = { ...this.layoutService.config() };
     config.colorScheme = scheme;
     this.layoutService.config.set(config);
+    // Save color scheme to NVS
+    this.themeService.saveThemeSettings({
+      colorScheme: scheme
+    }).subscribe(
+      () => { },
+      error => console.error('Error saving theme settings:', error)
+    );
   }
 
   changeTheme(theme: ThemeOption) {
     // Update CSS variables
     this.applyThemeColors(theme.accentColors);
+    this.currentColor = theme.primaryColor;
     // Save theme settings to NVS
     this.themeService.saveThemeSettings({
       colorScheme: this.selectedScheme,
-      theme: this.layoutService.config().theme,
       accentColors: theme.accentColors
     }).subscribe(
-      () => {},
+      () => { },
       error => console.error('Error saving theme settings:', error)
     );
   }

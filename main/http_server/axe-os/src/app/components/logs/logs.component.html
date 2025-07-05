@@ -1,59 +1,49 @@
-<div class="grid">
-    <div class="col-12 lg:col-6">
-        <div class="card">
-            <h5>Overview</h5>
-            <table *ngIf="info$ | async as info">
-                <tr>
-                    <td>Model:</td>
-                    <td>{{info.ASICModel}}</td>
-                </tr>
-                <tr>
-                    <td>Uptime:</td>
-                    <td>{{info.uptimeSeconds | dateAgo}}</td>
-                </tr>
-                <tr>
-                    <td>Wi-Fi Status:</td>
-                    <td>{{info.wifiStatus}}</td>
-                </tr>
-                <tr>
-                    <td>MAC Address:</td>
-                    <td>{{info.macAddr}}</td>
-                </tr>
-                <tr>
-                    <td>Free Heap Memory:</td>
-                    <td>{{info.freeHeap}}</td>
-                </tr>
-                <tr>
-                    <td>Version:</td>
-                    <td>{{info.version}}</td>
-                </tr>
-                <tr>
-                    <td>ESP-IDF Version:</td>
-                    <td>{{info.idfVersion}}</td>
-                </tr>
-                <tr>
-                    <td>Board Version:</td>
-                    <td>{{info.boardVersion}}</td>
-                </tr>
-            </table>
-        </div>
 
-    </div>
-
-    <div class="col-12">
-        <div class="card">
-            <h2>Realtime Logs <button pButton (click)="toggleLogs()" style="margin-left: 15px;"
-                    class="btn btn-secondary">{{showLogs
-                    ? 'Hide': 'Show'}}
-                    Logs</button>
-
-                <button pButton style="margin-left: 15px;" class="btn btn-secondary" (click)="stopScroll = !stopScroll"
-                    *ngIf="showLogs">{{stopScroll ? 'Start' : 'Stop'}} Scrolling</button>
+<div *ngIf="form != null" class="card" [ngClass]="{'is-expanded': isExpanded}">
+    <form [formGroup]="form">
+        <div class="flex justify-content-between flex-column md:align-items-center md:flex-row mb-3">
+            <h2 class="mb-0 h-3rem">
+                Realtime Logs
             </h2>
 
-            <div *ngIf="showLogs" id="logs" #scrollContainer>
-                <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
-            </div>
+            <nav class="flex gap-3 w-full md:w-6">
+                <span class="w-full p-input-icon-left">
+                    <i class="pi pi-filter"></i>
+                    <input
+                        pInputText
+                        type="text"
+                        class="w-full"
+                        autocomplete="off"
+                        placeholder="Case-sensitive filter"
+                        id="filter"
+                        formControlName="filter"/>
+                </span>
+                <p-button
+                    pp-button
+                    icon="pi pi-{{stopScroll ? 'play' : 'pause'}}"
+                    (click)="stopScroll = !stopScroll"
+                    pTooltip="{{stopScroll ? 'Start' : 'Stop'}} Scrolling"
+                    tooltipPosition="left">
+                </p-button>
+                <p-button
+                    pp-button
+                    icon="pi pi-trash"
+                    (click)="clearLogs()"
+                    pTooltip="Clear Logs"
+                    tooltipPosition="left">
+                </p-button>
+                <p-button
+                    pp-button
+                    icon="pi pi-window-{{isExpanded ? 'minimize' : 'maximize'}}"
+                    (click)="isExpanded = !isExpanded"
+                    pTooltip="{{isExpanded ? 'Minimize' : 'Maximize'}} Logs"
+                    tooltipPosition="left">
+                </p-button>
+            </nav>
         </div>
-    </div>
+
+        <div id="logs" #scrollContainer>
+            <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
+        </div>
+    </form>
 </div>

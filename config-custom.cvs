@@ -1,0 +1,55 @@
+key,type,encoding,value
+main,namespace,,
+hostname,data,string,bitaxe
+wifissid,data,string,
+wifipass,data,string,
+stratumurl,data,string,public-pool.io
+stratumport,data,u16,21496
+stratumuser,data,string,bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq.bitaxe
+stratumpass,data,string,x
+stratumdiff,data,u16,1000
+stratumxnsub,data,u16,0
+fbstratumurl,data,string,solo.ckpool.org
+fbstratumport,data,u16,3333
+fbstratumuser,data,string,bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq.bitaxe
+fbstratumpass,data,string,x
+fbstratumdiff,data,u16,1000
+fbstratumxnsum,data,u16,0
+asicfrequency,data,u16,485
+asicvoltage,data,u16,1200
+rotation,data,u16,0
+autofanspeed,data,u16,1
+fanspeed,data,u16,100
+selftest,data,u16,1
+overheat_mode,data,u16,0
+# Custom Firmware Board overrides
+# Custom board version
+boardversion,data,string,207
+# Family (Max, Ultra, Supra, Gamma, Gamma_Turbo)
+devicemodel,data,string,ultra
+# ASIC (BM1397, BM1366, BM1368, BM1370)
+asicmodel,data,string,BM1366
+# PLUG_SENSE (0,1)
+plug_sense,data,u16,0
+# ASIC_ENABLE (0,1)
+asic_enable,data,u16,0
+# EMC2101 (0,1)
+EMC2101,data,u16,1
+# EMC2103 (0,1)
+EMC2103,data,u16,0
+# EMC Internal Temperature Sensor (0,1)
+emc_int_temp,data,u16,0
+# EMC Ideality Factor (0,8-55, See EMC2102.h)
+emc_ideality_f,data,u16,0
+# EMC Beta Compensation (0-8, See EMC2102.h)
+emc_beta_comp,data,u16,0
+# EMC Temperature Offset
+emc_temp_offset,data,i32,0
+# DS4432U (0,1)
+DS4432U,data,u16,0
+# INA260 (0,1)
+INA260,data,u16,0
+# TPS546 (0,1)
+TPS546,data,u16,1
+# Self-test Power Consumption Target (> 0)
+power_cons_tgt,data,u16,12

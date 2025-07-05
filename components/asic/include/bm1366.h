@@ -2,26 +2,12 @@
 #define BM1366_H_
 
 #include "common.h"
-#include "driver/gpio.h"
 #include "mining.h"
-
-#define ASIC_BM1366_JOB_FREQUENCY_MS 2000
-
-#define CRC5_MASK 0x1F
-#define BM1366_ASIC_DIFFICULTY 256
 
 #define BM1366_SERIALTX_DEBUG false
 #define BM1366_SERIALRX_DEBUG false
 #define BM1366_DEBUG_WORK false //causes insane amount of debug output
 #define BM1366_DEBUG_JOBS false //causes insane amount of debug output
-
-static const uint64_t BM1366_CORE_COUNT = 112;
-static const uint64_t BM1366_SMALL_CORE_COUNT = 894;
-
-typedef struct
-{
-    float frequency;
-} bm1366Module;
 
 typedef struct __attribute__((__packed__))
 {
@@ -35,13 +21,14 @@ typedef struct __attribute__((__packed__))
     uint8_t version[4];
 } BM1366_job;
 
-uint8_t BM1366_init(uint64_t frequency, uint16_t asic_count);
+uint8_t BM1366_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty);
 void BM1366_send_work(void * GLOBAL_STATE, bm_job * next_bm_job);
 void BM1366_set_job_difficulty_mask(int);
 void BM1366_set_version_mask(uint32_t version_mask);
 int BM1366_set_max_baud(void);
 int BM1366_set_default_baud(void);
 void BM1366_send_hash_frequency(float frequency);
-task_result * BM1366_proccess_work(void * GLOBAL_STATE);
+bool BM1366_set_frequency(float target_freq);
+task_result * BM1366_process_work(void * GLOBAL_STATE);
 
 #endif /* BM1366_H_ */

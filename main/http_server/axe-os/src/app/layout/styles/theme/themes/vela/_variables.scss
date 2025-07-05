@@ -126,7 +126,7 @@ $passwordStrongBg: #c5e1a5 !default;
 
 //button
 $buttonPadding: 0.5rem 1rem !default;
-$buttonIconOnlyWidth: 2.357rem !default;
+$buttonIconOnlyWidth: 2.5rem !default;
 $buttonIconOnlyPadding: 0.5rem 0 !default;
 $buttonBg: $primaryColor !default;
 $buttonTextColor: $primaryTextColor !default;
@@ -951,5 +951,7 @@ $imagePreviewActionIconBorderRadius: 50% !default;
     --highlight-bg: #{$highlightBg};
     --highlight-text-color: #{$highlightTextColor};
     --focus-ring: #{$focusShadow};
+    --sidebar-width: 250px;
+    --topbar-height: 5.5rem;
     color-scheme: light dark;
 }

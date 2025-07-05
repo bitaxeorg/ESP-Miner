@@ -1,0 +1,63 @@
+<div class="card">
+    <h2>Update</h2>
+
+    <div class="grid">
+        <div class="col-12 xl:col-4">
+            <div class="card h-full">
+                <h5>Current Version: {{(info$ | async)?.version}}</h5>
+
+                <ng-container *ngIf="checkLatestRelease == false; else afterCheck">
+                    <h3>Latest Release: <p-button (onClick)="checkLatestRelease = true">Check</p-button></h3>
+                    <small>Clicking this button will connect to GitHub to check for the latest release, both files are required.</small>
+                </ng-container>
+
+                <ng-template #afterCheck>
+                    <ng-container *ngIf="latestRelease$ | async as latestRelease">
+                        <h3>Latest Release:
+                            <a style="text-decoration: underline;" target="_blank"
+                            [href]="latestRelease.html_url">{{latestRelease.name}}</a></h3>
+
+                        <div *ngFor="let asset of latestRelease.assets">
+                            <div *ngIf="asset.name == 'esp-miner.bin'">
+                                <a style="text-decoration: underline;" target="_blank"
+                                    [href]="asset.browser_download_url">esp-miner.bin</a>
+                            </div>
+                            <div *ngIf="asset.name == 'www.bin'">
+                                <a style="text-decoration: underline;" target="_blank"
+                                    [href]="asset.browser_download_url">www.bin</a>
+                            </div>
+                        </div>
+
+                        <a class="text-500 underline block mt-3 cursor-pointer" (click)="modalComponent.isVisible = true">
+                            Release Notes
+                        </a>
+
+                        <app-modal [headline]="latestRelease.name">
+                            <div [innerHTML]="simpleMarkdownParser(latestRelease.body)"></div>
+                        </app-modal>
+                    </ng-container>
+                </ng-template>
+            </div>
+        </div>
+        <div class="col-12 lg:col-6 xl:col-4">
+            <div class="card h-full">
+                <h3>Update AxeOS <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}}%</span></h3>
+
+                <p-fileUpload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
+                    [auto]="true" chooseLabel="Browse"></p-fileUpload>
+
+                <small>(www.bin)</small>
+            </div>
+        </div>
+        <div class="col-12 lg:col-6 xl:col-4">
+            <div class="card h-full">
+                <h3>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}}%</span></h3>
+                <p-fileUpload #firmwareUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaUpdate($event)"
+                    [auto]="true" chooseLabel="Browse"></p-fileUpload>
+
+                <small>(esp-miner.bin)</small>
+            </div>
+
+        </div>
+    </div>
+</div>

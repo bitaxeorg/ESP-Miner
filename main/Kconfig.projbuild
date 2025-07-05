@@ -6,31 +6,31 @@ menu "Bitaxe Configuration"
             int "Boot button GPIO pin"
             default 0
             help
-                GPIO pin connected to the LED.
+                GPIO pin connected to the BOOT button.
 
         config GPIO_ASIC_RESET
             int "ASIC reset GPIO pin"
             default 1
             help
-                GPIO pin connected to the Button.
+                GPIO pin for ASIC_RESET (RST_N), reset input to ASIC.
 
         config GPIO_ASIC_ENABLE
             int "ASIC enable GPIO pin"
             default 10
             help
-                GPIO pin for I2C data line (SDA).
+                GPIO pin for ASIC_ENABLE (POWER_EN), enable for core power supply.
 
         config GPIO_PLUG_SENSE
             int "Barrel plug sense GPIO pin"
             default 12
             help
-                GPIO pin for I2C clock line (SCL).
+                GPIO pin for DC barrel (PLUG_SENSE), sense pin of DC power jack socket.
 
         config GPIO_I2C_SDA
             int "I2C SDA Pin"
             default 47
             help
-                GPIO pin for I2C clock line (SCL).
+                GPIO pin for I2C clock line (SDA).
             
         config GPIO_I2C_SCL
             int "I2C SCL Pin"
@@ -70,6 +70,12 @@ menu "Stratum Configuration"
         help
             The stratum server port to connect to.
 
+    config EXTRANONCE_SUBSCRIBE
+        bool "Pool extranonce subscribe"
+        default n
+        help
+            Enable stratum extranonce subscribe.
+
     config FALLBACK_STRATUM_URL
         string "Fallback Stratum Address"
         default "solo.ckpool.org"
@@ -82,6 +88,12 @@ menu "Stratum Configuration"
         default 3333
         help
             The stratum server port to connect to if the primary fails.
+
+    config FALLBACK_EXTRANONCE_SUBSCRIBE
+        bool "Fallback pool extranonce subscribe"
+        default n
+        help
+            Enable fallback pool extranonce subscribe.
 
     config STRATUM_USER
         string "Stratum username"
@@ -113,5 +125,12 @@ menu "Stratum Configuration"
         default 1000
         help
             A starting difficulty to use with the pool.
+
+    config FALLBACK_STRATUM_DIFFICULTY
+        int "Fallback stratum default difficulty"
+        range 0 4294967296
+        default 1000
+        help
+            A starting difficulty to use with the fallback pool.
 
 endmenu

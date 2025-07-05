@@ -12,28 +12,34 @@ SRCS
     "nvs_device.c"
     "lv_font_portfolio-6x8.c"
     "logo.c"
+    "device_config.c"
     "./http_server/http_server.c"
     "./http_server/theme_api.c"
+    "./http_server/axe-os/api/system/asic_settings.c"
     "./self_test/self_test.c"
     "./tasks/stratum_task.c"
     "./tasks/create_jobs_task.c"
     "./tasks/asic_task.c"
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
+    "./tasks/statistics_task.c"
     "./thermal/EMC2101.c"
     "./thermal/EMC2103.c"
     "./thermal/TMP1075.c"
     "./thermal/thermal.c"
+    "./thermal/PID.c"
     "./power/TPS546.c"
     "./power/DS4432U.c"
     "./power/INA260.c"
     "./power/power.c"
     "./power/vcore.c"
+    "./power/asic_reset.c"
 
 INCLUDE_DIRS
     "."
     "tasks"
     "http_server"
+    "http_server/axe-os/api/system"
     "self_test"
     "../components/asic/include"
     "../components/connect/include"
@@ -63,7 +69,7 @@ EMBED_FILES "http_server/recovery_page.html"
 )
 
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_INCLUDE_SIMPLE=1" APPEND)
-idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH= ${CMAKE_SOURCE_DIR}/main/lv_conf.h" APPEND)
+idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH=\"${CMAKE_SOURCE_DIR}/main/lv_conf.h\"" APPEND)
 
 set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/axe-os")
 

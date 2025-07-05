@@ -1,11 +1,11 @@
 .layout-sidebar {
     position: fixed;
-    width: 250px;
-    height: calc(100vh - 9rem);
+    width: var(--sidebar-width);
+    height: calc(100vh - 9.5rem);
     z-index: 999;
     overflow-y: auto;
     user-select: none;
-    top: 7rem;
+    top: calc(var(--topbar-height) + 2rem);
     left: 2rem;
     transition: transform $transitionDuration, left $transitionDuration;
     background-color: var(--surface-overlay);
@@ -25,7 +25,8 @@
             text-transform: uppercase;
             font-weight: 700;
             color: var(--surface-900);
-            margin: .75rem 0;
+            margin: .5rem 0;
+            line-height: 1.3rem;
         }
 
         >a {
@@ -132,13 +133,4 @@
             }
         }
     }
-}
-
-#restart {
-    display: inline-block;
-}
-
-#restart-container {
-    margin: 2rem 1rem;
-    display: flex;
 }

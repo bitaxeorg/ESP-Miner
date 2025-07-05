@@ -7,18 +7,18 @@ th {
     text-align: left;
     background-color: #1f2d40;
     padding: 0;
-    
+
     > div {
         height: 100%;
         padding: 0.5rem 1rem;
         gap: 0.75rem;
     }
-    
+
     .pi {
         opacity: 0.7;
         height: 1em;
         line-height: 1;
-        
+
         &.pi-sort-amount-up-alt,
         &.pi-sort-amount-down {
             opacity: 1;
@@ -36,7 +36,7 @@ td {
 }
 
 th > div {
-    min-width: 100px; 
+    min-width: 100px;
     padding-right: 0.5rem;
 }
 
@@ -44,51 +44,32 @@ a {
     color: white;
 }
 
-.modal-backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    position: fixed;
-    z-index: 9;
-}
-
-.modal {
-    position: fixed;
-    max-height: 70vh;
-    width: 50vw;
-    z-index: 999;
-    top: 0;
-    left: 0;
-    margin: 12vh 25vw;
-    padding: 50px;
-    overflow-y: auto;
-}
-
-.close {
-    position: absolute;
-    right: 20px;
-    top: 20px;
-    cursor: pointer;
-}
-
 .table-container {
     width: 100%;
     overflow-x: auto;
     margin: 0;
-    
+
     table {
         min-width: 100%;
         white-space: nowrap;
-        
-        th, td {
-            padding: 0.75rem;
-            text-align: left;
 
-            @media (max-width: 1150px) {
-                padding: 0.5rem;
-            }
+        th, td {
+            padding: 0.5rem;
+            text-align: left;
         }
     }
+}
+
+.refresh-button {
+  display: grid;
+  place-items: center;
+
+  > span:first-child {
+    visibility: hidden;
+    grid-area: 1 / 1;
+  }
+
+  > span:last-child {
+    grid-area: 1 / 1;
+  }
 }

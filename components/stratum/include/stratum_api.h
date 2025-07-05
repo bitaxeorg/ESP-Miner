@@ -4,11 +4,14 @@
 #include "cJSON.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/time.h>
+
 
 #define MAX_MERKLE_BRANCHES 32
 #define HASH_SIZE 32
 #define COINBASE_SIZE 100
 #define COINBASE2_SIZE 128
+#define MAX_REQUEST_IDS 1024
 
 typedef enum
 {
@@ -16,6 +19,7 @@ typedef enum
     MINING_NOTIFY,
     MINING_SET_DIFFICULTY,
     MINING_SET_VERSION_MASK,
+    MINING_SET_EXTRANONCE,
     STRATUM_RESULT,
     STRATUM_RESULT_SETUP,
     STRATUM_RESULT_VERSION_MASK,
@@ -35,10 +39,8 @@ typedef struct
     uint8_t *merkle_branches;
     size_t n_merkle_branches;
     uint32_t version;
-    uint32_t version_mask;
     uint32_t target;
     uint32_t ntime;
-    uint32_t difficulty;
 } mining_notify;
 
 typedef struct
@@ -62,24 +64,36 @@ typedef struct
     char * error_str;
 } StratumApiV1Message;
 
+typedef struct {
+    int64_t timestamp_us;
+    bool tracking;
+} RequestTiming;
+
+
 void STRATUM_V1_initialize_buffer();
 
 char *STRATUM_V1_receive_jsonrpc_line(int sockfd);
 
-int STRATUM_V1_subscribe(int socket, int send_uid, char * model);
+int STRATUM_V1_subscribe(int socket, int send_uid, const char * model);
 
 void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
 
+void STRATUM_V1_stamp_tx(int request_id);
+
 void STRATUM_V1_free_mining_notify(mining_notify *params);
 
-int STRATUM_V1_authenticate(int socket, int send_uid, const char *username, const char *pass);
+int STRATUM_V1_authorize(int socket, int send_uid, const char *username, const char *pass);
 
 int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * version_mask);
 
 int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty);
 
+int STRATUM_V1_extranonce_subscribe(int socket, int send_uid);
+
 int STRATUM_V1_submit_share(int socket, int send_uid, const char *username, const char *jobid,
                             const char *extranonce_2, const uint32_t ntime, const uint32_t nonce,
                             const uint32_t version);
+
+double STRATUM_V1_get_response_time_ms(int request_id);
 
 #endif // STRATUM_API_H

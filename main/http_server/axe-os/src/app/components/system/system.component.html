@@ -1,0 +1,67 @@
+<div class="grid" *ngIf="info$ | async as info">
+    <ng-container *ngIf="asic$ | async as asic">
+        <div class="col-12 lg:col-6">
+            <div class="card">
+                <h2>System</h2>
+                <table>
+                    <tr>
+                        <td>Device Model:</td>
+                        <td>
+                            <span [class]="'text-' + asic.swarmColor + '-500'">
+                                {{asic.deviceModel || 'Other'}}
+                            </span>
+                            ({{asic.asicCount > 1 ? asic.asicCount + 'x ' : ''}}{{asic.ASICModel}})
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Uptime:</td>
+                        <td>{{info.uptimeSeconds | dateAgo}}</td>
+                    </tr>
+                    <tr>
+                        <td>Wi-Fi Status:</td>
+                        <td>{{info.wifiStatus}}</td>
+                    </tr>
+                    <tr>
+                        <td>Wi-Fi RSSI:</td>
+                        <td class="inline" [ngClass]="{
+                            'text-green-500': info.wifiRSSI > -50,
+                            'text-blue-500': info.wifiRSSI <= -50 && info.wifiRSSI > -60,
+                            'text-orange-500': info.wifiRSSI <= -60 && info.wifiRSSI > -70,
+                            'text-red-500': info.wifiRSSI <= -70
+                        }" pTooltip="{{
+                            info.wifiRSSI > -50 ? 'Excellent' :
+                            (info.wifiRSSI <= -50 && info.wifiRSSI > -60 ? 'Good' :
+                            (info.wifiRSSI <= -60 && info.wifiRSSI > -70 ? 'Fair' : 'Weak'))
+                        }}" tooltipPosition="bottom">
+                            {{info.wifiRSSI}} dBm
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>MAC Address:</td>
+                        <td>{{info.macAddr}}</td>
+                    </tr>
+                    <tr>
+                        <td>Free Heap Memory:</td>
+                        <td>{{info.freeHeap}}</td>
+                    </tr>
+                    <tr>
+                        <td>Firmware Version:</td>
+                        <td>{{info.version}}</td>
+                    </tr>
+                    <tr>
+                        <td>AxeOS Version:</td>
+                        <td>{{info.axeOSVersion}}</td>
+                    </tr>
+                    <tr>
+                        <td>ESP-IDF Version:</td>
+                        <td>{{info.idfVersion}}</td>
+                    </tr>
+                    <tr>
+                        <td>Board Version:</td>
+                        <td>{{info.boardVersion}}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </ng-container>
+</div>

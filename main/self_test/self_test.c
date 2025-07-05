@@ -2,7 +2,7 @@
 
 // #include "freertos/event_groups.h"
 // #include "freertos/timers.h"
-// #include "driver/gpio.h"
+#include "driver/gpio.h"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -22,13 +22,18 @@
 #include "utils.h"
 #include "TPS546.h"
 #include "esp_psram.h"
+#include "power.h"
+#include "thermal.h"
 
+#include "bm1397.h"
+#include "bm1366.h"
+#include "bm1368.h"
+#include "bm1370.h"
 #include "asic.h"
+#include "device_config.h"
+#include "asic_reset.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
-
-#define TESTS_FAILED 0
-#define TESTS_PASSED 1
 
 /////Test Constants/////
 //Test Fan Speed
@@ -39,38 +44,32 @@
 #define CORE_VOLTAGE_TARGET_MAX 1300 //mV
 
 //Test Power Consumption
-#define POWER_CONSUMPTION_TARGET_SUB_402 12     //watts
-#define POWER_CONSUMPTION_TARGET_402 5          //watts
-#define POWER_CONSUMPTION_TARGET_GAMMA 11       //watts
 #define POWER_CONSUMPTION_MARGIN 3              //+/- watts
-
-//test hashrate
-#define HASHRATE_TARGET_GAMMA 900 //GH/s
-#define HASHRATE_TARGET_SUPRA 500 //GH/s
-// #define HASHRATE_TARGET_ULTRA 1000 //GH/s
-// #define HASHRATE_TARGET_MAX 2000 //GH/s
 
 static const char * TAG = "self_test";
 
-SemaphoreHandle_t BootSemaphore;
+static SemaphoreHandle_t longPressSemaphore;
+static bool isFactoryTest = false;
 
 //local function prototypes
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
-bool should_test(GlobalState * GLOBAL_STATE) {
-    bool is_max = GLOBAL_STATE->asic_model == ASIC_BM1397;
-    uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
-    uint16_t should_self_test = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
-    if (should_self_test == 1 && !is_max && best_diff < 1) {
+static bool should_test() {
+    uint64_t is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0) < 1;
+    uint16_t is_self_test_flag_set = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
+    if (is_factory_flash && is_self_test_flag_set) {
+        isFactoryTest = true;
         return true;
     }
-    return false;
+
+    // Optionally start self-test when boot button is pressed
+    return gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
 }
 
 static void reset_self_test() {
     ESP_LOGI(TAG, "Long press detected...");
     // Give the semaphore back
-    xSemaphoreGive(BootSemaphore);
+    xSemaphoreGive(longPressSemaphore);
 }
 
 static void display_msg(char * msg, GlobalState * GLOBAL_STATE) 
@@ -80,16 +79,7 @@ static void display_msg(char * msg, GlobalState * GLOBAL_STATE)
 
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 {
-    uint16_t fan_speed = 0;
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
-            fan_speed = EMC2101_get_fan_speed();
-            break;
-        default:
-    }
+    uint16_t fan_speed = Thermal_get_fan_speed(GLOBAL_STATE->DEVICE_CONFIG);
     ESP_LOGI(TAG, "fanSpeed: %d", fan_speed);
     if (fan_speed > FAN_SPEED_TARGET_MIN) {
         return ESP_OK;
@@ -117,7 +107,7 @@ static esp_err_t test_TPS546_power_consumption(int target_power, int margin)
     float current = TPS546_get_iout();
     float power = voltage * current;
     ESP_LOGI(TAG, "Power: %f, Voltage: %f, Current %f", power, voltage, current);
-    if (power > target_power -margin && power < target_power +margin) {
+    if (power < target_power +margin) {
         return ESP_OK;
     }
     return ESP_FAIL;
@@ -139,24 +129,15 @@ static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 
 esp_err_t test_display(GlobalState * GLOBAL_STATE) {
     // Display testing
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
-            if (display_init(GLOBAL_STATE) != ESP_OK) {
-                display_msg("DISPLAY:FAIL", GLOBAL_STATE);
-                return ESP_FAIL;
-            }
+    if (display_init(GLOBAL_STATE) != ESP_OK) {
+        display_msg("DISPLAY:FAIL", GLOBAL_STATE);
+        return ESP_FAIL;
+    }
 
-            if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
-                ESP_LOGI(TAG, "DISPLAY init success!");
-            } else {
-                ESP_LOGW(TAG, "DISPLAY not found!");
-            }
-
-            break;
-        default:
+    if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
+        ESP_LOGI(TAG, "DISPLAY init success!");
+    } else {
+        ESP_LOGW(TAG, "DISPLAY not found!");
     }
 
     return ESP_OK;
@@ -164,41 +145,24 @@ esp_err_t test_display(GlobalState * GLOBAL_STATE) {
 
 esp_err_t test_input(GlobalState * GLOBAL_STATE) {
     // Input testing
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
-            if (input_init(NULL, reset_self_test) != ESP_OK) {
-                display_msg("INPUT:FAIL", GLOBAL_STATE);
-                return ESP_FAIL;
-            }
-            
-            ESP_LOGI(TAG, "INPUT init success!");
-            break;
-        default:
+    if (input_init(NULL, reset_self_test) != ESP_OK) {
+        display_msg("INPUT:FAIL", GLOBAL_STATE);
+        return ESP_FAIL;
     }
+            
+    ESP_LOGI(TAG, "INPUT init success!");
 
     return ESP_OK;
 }
 
 esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
     // Screen testing
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
-            if (screen_start(GLOBAL_STATE) != ESP_OK) {
-                display_msg("SCREEN:FAIL", GLOBAL_STATE);
-                return ESP_FAIL;
-            }
-
-            ESP_LOGI(TAG, "SCREEN start success!");
-            
-            break;
-        default:
+    if (screen_start(GLOBAL_STATE) != ESP_OK) {
+        display_msg("SCREEN:FAIL", GLOBAL_STATE);
+        return ESP_FAIL;
     }
+
+    ESP_LOGI(TAG, "SCREEN start success!");
 
     return ESP_OK;
 }
@@ -211,45 +175,39 @@ esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
+esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
+    //check for faults on the voltage regulator
+    ESP_RETURN_ON_ERROR(VCORE_check_fault(GLOBAL_STATE), TAG, "VCORE check fault failed!");
+
+    if (GLOBAL_STATE->SYSTEM_MODULE.power_fault) {
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
 esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
     
     //enable the voltage regulator GPIO on HW that supports it
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-            // turn ASIC on
-            gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
-            gpio_set_level(GPIO_ASIC_ENABLE, 0);
-            break;
-        case DEVICE_GAMMA:
-        default:
+    if (GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
+        gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
+        gpio_set_level(GPIO_ASIC_ENABLE, 0);
     }
 
     if (init_voltage_regulator(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "VCORE init failed!");
         display_msg("VCORE:FAIL", GLOBAL_STATE);
-        //tests_done(GLOBAL_STATE, TESTS_FAILED);
+        //tests_done(GLOBAL_STATE, false);
         return ESP_FAIL;
     }
 
     // VCore regulator testing
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-            if (GLOBAL_STATE->board_version < 402){
-                if (DS4432U_test() != ESP_OK) {
-                    ESP_LOGE(TAG, "DS4432 test failed!");
-                    display_msg("DS4432U:FAIL", GLOBAL_STATE);
-                    //tests_done(GLOBAL_STATE, TESTS_FAILED);
-                    return ESP_FAIL;
-                }
-            }
-            break;
-        case DEVICE_GAMMA:
-            break;
-        default:
+    if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {
+        if (DS4432U_test() != ESP_OK) {
+            ESP_LOGE(TAG, "DS4432 test failed!");
+            display_msg("DS4432U:FAIL", GLOBAL_STATE);
+            //tests_done(GLOBAL_STATE, false);
+            return ESP_FAIL;
+        }
     }
 
     ESP_LOGI(TAG, "Voltage Regulator test success!");
@@ -258,35 +216,20 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
 
 esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
     
-    //Init the EMC2101 fan and temperature monitoring
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-            ESP_RETURN_ON_ERROR(EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1)), TAG, "EMC2101 init failed!");
-            EMC2101_set_fan_speed(1);
-            break;
-        case DEVICE_GAMMA:
-            ESP_RETURN_ON_ERROR(EMC2101_init(nvs_config_get_u16(NVS_CONFIG_INVERT_FAN_POLARITY, 1)), TAG, "EMC2101 init failed!");
-            EMC2101_set_fan_speed(1);
-            EMC2101_set_ideality_factor(EMC2101_IDEALITY_1_0319);
-            EMC2101_set_beta_compensation(EMC2101_BETA_11);
-            break;
-        default:
+    if (GLOBAL_STATE->DEVICE_CONFIG.EMC2101) {
+        ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
+        EMC2101_set_fan_speed(1);
+
+        if (GLOBAL_STATE->DEVICE_CONFIG.emc_ideality_factor != 0x00) {
+            EMC2101_set_ideality_factor(GLOBAL_STATE->DEVICE_CONFIG.emc_ideality_factor);
+            EMC2101_set_beta_compensation(GLOBAL_STATE->DEVICE_CONFIG.emc_beta_compensation);
+        }
     }
 
-    //initialize the INA260, if we have one.
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-            if (GLOBAL_STATE->board_version < 402) {
-                // Initialize the LED controller
-                ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
-            }
-            break;
-        case DEVICE_GAMMA:
-        default:
+    // TODO: EMC2103
+
+    if (GLOBAL_STATE->DEVICE_CONFIG.INA260) {
+        ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
     }
 
     ESP_LOGI(TAG, "Peripherals init success!");
@@ -309,75 +252,102 @@ esp_err_t test_psram(GlobalState * GLOBAL_STATE){
  * diagnostic tests to ensure the system is functioning correctly.
  *
  * @param pvParameters Pointer to the parameters passed to the task (if any).
+ * @return true if the self-test was run, false if it was skipped.
  */
-void self_test(void * pvParameters)
+bool self_test(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
-    ESP_LOGI(TAG, "Running Self Tests");
+    // Should we run the self-test?
+    if (!should_test()) return false;
 
-    GLOBAL_STATE->SELF_TEST_MODULE.active = true;
+    if (isFactoryTest) {
+        ESP_LOGI(TAG, "Running factory self-test");
+    } else {
+        ESP_LOGI(TAG, "Running manual self-test");
+    }
+
+    GLOBAL_STATE->SELF_TEST_MODULE.is_active = true;
 
     // Create a binary semaphore
-    BootSemaphore = xSemaphoreCreateBinary();
+    longPressSemaphore = xSemaphoreCreateBinary();
 
-    if (BootSemaphore == NULL) {
+    gpio_install_isr_service(0);
+
+    if (longPressSemaphore == NULL) {
         ESP_LOGE(TAG, "Failed to create semaphore");
-        return;
+        return true;
     }
 
     //Run PSRAM test
     if(test_psram(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "NO PSRAM on device!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
     }
 
     //Run display tests
     if (test_display(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Display test failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
     }
 
     //Run input tests
     if (test_input(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Input test failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
     }
 
     //Run screen tests
     if (test_screen(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Screen test failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
     }
 
     //Init peripherals EMC2101 and INA260 (if present)
     if (test_init_peripherals(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Peripherals init failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
     }
 
     //Voltage Regulator Testing
     if (test_voltage_regulator(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Voltage Regulator test failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
+    }
+
+    if (asic_reset() != ESP_OK) {
+        ESP_LOGE(TAG, "ASIC reset failed!");
+        tests_done(GLOBAL_STATE, false);
     }
 
     //test for number of ASICs
     if (SERIAL_init() != ESP_OK) {
         ESP_LOGE(TAG, "SERIAL init failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
     }
 
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
+
     uint8_t chips_detected = ASIC_init(GLOBAL_STATE);
-    uint8_t chips_expected = ASIC_get_asic_count(GLOBAL_STATE);
+    uint8_t chips_expected = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, chips_expected);
 
     if (chips_detected != chips_expected) {
-        ESP_LOGE(TAG, "SELF TEST FAIL, %d of %d CHIPS DETECTED", chips_detected, chips_expected);
+        ESP_LOGE(TAG, "SELF-TEST FAIL, %d of %d CHIPS DETECTED", chips_detected, chips_expected);
         char error_buf[20];
         snprintf(error_buf, 20, "ASIC:FAIL %d CHIPS", chips_detected);
         display_msg(error_buf, GLOBAL_STATE);
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
+    }
+
+    //test for voltage regulator faults
+    if (test_vreg_faults(GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "VCORE check fault failed!");
+        char error_buf[20];
+        snprintf(error_buf, 20, "VCORE:PWR FAULT");
+        display_msg(error_buf, GLOBAL_STATE);
+        tests_done(GLOBAL_STATE, false);
     }
 
     //setup and test hashrate
@@ -386,7 +356,7 @@ void self_test(void * pvParameters)
 
     if (SERIAL_set_baud(baud) != ESP_OK) {
         ESP_LOGE(TAG, "SERIAL set baud failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
     }
 
     GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
@@ -403,10 +373,8 @@ void self_test(void * pvParameters)
     notify_message.job_id = 0;
     notify_message.prev_block_hash = "0c859545a3498373a57452fac22eb7113df2a465000543520000000000000000";
     notify_message.version = 0x20000004;
-    notify_message.version_mask = 0x1fffe000;
     notify_message.target = 0x1705ae3a;
     notify_message.ntime = 0x647025b5;
-    notify_message.difficulty = 1000000;
 
     const char * coinbase_tx = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfab"
                                "e6d6d5cbab26a2599e92916edec"
@@ -436,7 +404,7 @@ void self_test(void * pvParameters)
 
     char * merkle_root = calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles);
 
-    bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000);
+    bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
 
     uint8_t difficulty_mask = 8;
 
@@ -448,117 +416,105 @@ void self_test(void * pvParameters)
     //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, &job);
     ASIC_send_work(GLOBAL_STATE, &job);
     
-     double start = esp_timer_get_time();
-     double sum = 0;
-     double duration = 0;
-     double hash_rate = 0;
+    double start = esp_timer_get_time();
+    double sum = 0;
+    double duration = 0;
+    double hash_rate = 0;
+    double hashtest_timeout = 5;
 
-    while(duration < 3){
-        task_result * asic_result = ASIC_proccess_work(GLOBAL_STATE);
+    while (duration < hashtest_timeout) {
+        task_result * asic_result = ASIC_process_work(GLOBAL_STATE);
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
             sum += difficulty_mask;
-            duration = (double) (esp_timer_get_time() - start) / 1000000;
+            
             hash_rate = (sum * 4294967296) / (duration * 1000000000);
             ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
             ESP_LOGI(TAG, "%f Gh/s  , duration %f",hash_rate, duration);
         }
+        duration = (double) (esp_timer_get_time() - start) / 1000000;
     }
 
     ESP_LOGI(TAG, "Hashrate: %f", hash_rate);
 
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-            break;
-        case DEVICE_SUPRA:
-            if(hash_rate < HASHRATE_TARGET_SUPRA){
-                display_msg("HASHRATE:FAIL", GLOBAL_STATE);
-                tests_done(GLOBAL_STATE, TESTS_FAILED);
-            }
-            break;
-        case DEVICE_GAMMA:
-            if(hash_rate < HASHRATE_TARGET_GAMMA){
-                display_msg("HASHRATE:FAIL", GLOBAL_STATE);
-                tests_done(GLOBAL_STATE, TESTS_FAILED);
-            }
-            break;
-        default:
+    float expected_hashrate_mhs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value 
+                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count 
+                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
+                                / 1000.0f;
+
+    if (hash_rate < expected_hashrate_mhs) {
+        display_msg("HASHRATE:FAIL", GLOBAL_STATE);
+        tests_done(GLOBAL_STATE, false);
     }
 
     free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
     free(GLOBAL_STATE->valid_jobs);
 
     if (test_core_voltage(GLOBAL_STATE) != ESP_OK) {
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
     }
 
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-            if(GLOBAL_STATE->board_version >= 402 && GLOBAL_STATE->board_version <= 499){
-                if (test_TPS546_power_consumption(POWER_CONSUMPTION_TARGET_402, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-                    ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)POWER_CONSUMPTION_TARGET_402);
-                    display_msg("POWER:FAIL", GLOBAL_STATE);
-                    tests_done(GLOBAL_STATE, TESTS_FAILED);
-                }
-            } else {
-                if (test_INA260_power_consumption(POWER_CONSUMPTION_TARGET_SUB_402, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-                    ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float)POWER_CONSUMPTION_TARGET_SUB_402);
-                    display_msg("POWER:FAIL", GLOBAL_STATE);
-                    tests_done(GLOBAL_STATE, TESTS_FAILED);
-                }
-            }
-            break;
-        case DEVICE_GAMMA:
-                if (test_TPS546_power_consumption(POWER_CONSUMPTION_TARGET_GAMMA, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-                    ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)POWER_CONSUMPTION_TARGET_GAMMA);
-                    display_msg("POWER:FAIL", GLOBAL_STATE);
-                    tests_done(GLOBAL_STATE, TESTS_FAILED);
-                }
-            break;
-        default:
+    // TODO: Maybe make a test equivalent for test values
+    if (GLOBAL_STATE->DEVICE_CONFIG.INA260) {
+        if (test_INA260_power_consumption(GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
+            ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
+            display_msg("POWER:FAIL", GLOBAL_STATE);
+            tests_done(GLOBAL_STATE, false);
+        }
+    }
+    if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
+        if (test_TPS546_power_consumption(GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
+            ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
+            display_msg("POWER:FAIL", GLOBAL_STATE);
+            tests_done(GLOBAL_STATE, false);
+        }
     }
 
     if (test_fan_sense(GLOBAL_STATE) != ESP_OK) {     
         ESP_LOGE(TAG, "Fan test failed!"); 
-        tests_done(GLOBAL_STATE, TESTS_FAILED);
+        tests_done(GLOBAL_STATE, false);
     }
 
-    tests_done(GLOBAL_STATE, TESTS_PASSED);
+    tests_done(GLOBAL_STATE, true);
 
-    return;  
+    return true;
 }
 
-static void tests_done(GlobalState * GLOBAL_STATE, bool test_result) 
+static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed) 
 {
-    switch (GLOBAL_STATE->device_model) {
-        case DEVICE_MAX:
-        case DEVICE_ULTRA:
-        case DEVICE_SUPRA:
-        case DEVICE_GAMMA:
-            GLOBAL_STATE->SELF_TEST_MODULE.result = test_result;
-            GLOBAL_STATE->SELF_TEST_MODULE.finished = true;
-            break;
-        default:
-    }
+    VCORE_set_voltage(0.0f, GLOBAL_STATE);
 
-    if (test_result == TESTS_FAILED) {
-        ESP_LOGI(TAG, "SELF TESTS FAIL -- Press RESET to continue");  
-        while (1) {
-            // Wait here forever until reset_self_test() gives the BootSemaphore
-            if (xSemaphoreTake(BootSemaphore, portMAX_DELAY) == pdTRUE) {
-                nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
-                //wait 100ms for nvs write to finish?
-                vTaskDelay(100 / portTICK_PERIOD_MS);
-                esp_restart();
-            }
+    if (isTestPassed) {
+        if (isFactoryTest) {
+            ESP_LOGI(TAG, "Self-test flag cleared");
+            nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
         }
+        ESP_LOGI(TAG, "SELF-TEST PASS! -- Press RESET button to restart.");
+        GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST PASS!";
+        GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart.";
     } else {
-        nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
-        ESP_LOGI(TAG, "Self Tests Passed!!!");
+        // isTestFailed
+        GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST FAIL!";
+        if (isFactoryTest) {
+            ESP_LOGI(TAG, "SELF-TEST FAIL! -- Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.");
+            GLOBAL_STATE->SELF_TEST_MODULE.finished = "Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.";
+            GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
+            while (1) {
+                // Wait here forever until reset_self_test() gives the longPressSemaphore
+                if (xSemaphoreTake(longPressSemaphore, portMAX_DELAY) == pdTRUE) {
+                    ESP_LOGI(TAG, "Self-test flag cleared");
+                    nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
+                    // flush all pending NVS writes
+                    nvs_config_commit();
+                    esp_restart();
+                }
+            }
+        } else {
+            ESP_LOGI(TAG, "SELF-TEST FAIL -- Press RESET button to restart.");
+            GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart.";
+        }
+        
     }
-
+    GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
 }

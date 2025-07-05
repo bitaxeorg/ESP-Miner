@@ -1,63 +1,60 @@
-import { AfterViewChecked, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
-import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap } from 'rxjs';
-import { SystemService } from 'src/app/services/system.service';
+import { AfterViewChecked, Component, Input, OnInit, ElementRef, OnDestroy, ViewChild, HostListener } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { WebsocketService } from 'src/app/services/web-socket.service';
-import { ISystemInfo } from 'src/models/ISystemInfo';
 
 @Component({
   selector: 'app-logs',
   templateUrl: './logs.component.html',
   styleUrl: './logs.component.scss'
 })
-export class LogsComponent implements OnDestroy, AfterViewChecked {
+export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
 
-  @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
-  public info$: Observable<ISystemInfo>;
+  public form!: FormGroup;
 
   public logs: { className: string, text: string }[] = [];
 
   private websocketSubscription?: Subscription;
 
-  public showLogs = false;
-
   public stopScroll: boolean = false;
 
-  constructor(
-    private websocketService: WebsocketService,
-    private systemService: SystemService
-  ) {
+  public isExpanded: boolean = false;
 
+  @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
-    this.info$ = interval(5000).pipe(
-      startWith(() => this.systemService.getInfo()),
-      switchMap(() => {
-        return this.systemService.getInfo()
-      }),
-      map(info => {
-        info.power = parseFloat(info.power.toFixed(1))
-        info.voltage = parseFloat((info.voltage / 1000).toFixed(1));
-        info.current = parseFloat((info.current / 1000).toFixed(1));
-        info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
-        info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
-        return info;
-      }),
-      shareReplay({ refCount: true, bufferSize: 1 })
-    );
-
-
+  @HostListener('document:keydown.esc', ['$event'])
+  onEscKey() {
+    if (this.isExpanded) {
+      this.isExpanded = false;
+    }
   }
+
+  @Input() uri = '';
+
+  constructor(
+    private fb: FormBuilder,
+    private websocketService: WebsocketService,
+  ) {}
+
+  ngOnInit(): void {
+    this.subscribeLogs();
+
+    this.form = this.fb.group({
+      filter: ["", [Validators.required]]
+    });
+  }
+
   ngOnDestroy(): void {
     this.websocketSubscription?.unsubscribe();
+    this.clearLogs();
   }
-  public toggleLogs() {
-    this.showLogs = !this.showLogs;
 
-    if (this.showLogs) {
-      this.websocketSubscription = this.websocketService.ws$.subscribe({
+  private subscribeLogs() {
+    this.websocketSubscription = this.websocketService.ws$.subscribe({
         next: (val) => {
           const matches = val.matchAll(/\[(\d+;\d+)m(.*?)(?=\[|\n|$)/g);
           let className = 'ansi-white'; // default color
-          
+
           for (const match of matches) {
             const colorCode = match[1].split(';')[1];
             switch (colorCode) {
@@ -70,17 +67,23 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
               case '37': className = 'ansi-white'; break;
             }
           }
-          
-          this.logs.push({ className, text: val });
-          
+
+          // Get current filter value from form
+          const currentFilter = this.form?.get('filter')?.value;
+
+          if (!currentFilter || val.includes(currentFilter)) {
+            this.logs.push({ className, text: val });
+          }
+
           if (this.logs.length > 256) {
             this.logs.shift();
           }
         }
       })
-    } else {
-      this.websocketSubscription?.unsubscribe();
-    }
+  }
+
+  public clearLogs() {
+    this.logs.length = 0;
   }
 
   ngAfterViewChecked(): void {

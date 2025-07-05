@@ -1,17 +1,10 @@
 @font-face {
-    font-family: 'Angel Wish';
-    src: url(./assets/fonts/AngelWish.ttf) format('truetype');
-}
-
-@font-face {
     font-family: 'Nippo-Regular';
-    src: url(./assets/fonts/Nippo-Regular.woff2) format('woff2'),
-         url(./assets/fonts/Nippo-Regular.woff) format('woff'),
-         url(./assets/fonts/Nippo-Regular.ttf) format('truetype');
+    src: url(/assets/fonts/Nippo-Regular.woff2) format('woff2');
     font-weight: 400;
     font-display: swap;
     font-style: normal;
-  }
+}
 
 * {
     font-family: 'Nippo-Regular';
@@ -20,7 +13,7 @@
 @import "app/layout/styles/layout/layout.scss";
 @import "app/layout/styles/theme/themes/vela/bitaxe/theme.scss";
 
-@import "../node_modules/primeicons/primeicons.css";
+@import "app/layout/styles/modules/primeicons.css";
 @import "../node_modules/primeng/resources/primeng.min.css";
 
 @import "../node_modules/primeflex/primeflex.min.css";
@@ -70,10 +63,6 @@ p-chart>div {
     &:enabled:hover {
         background: var(--button-hover-bg);
         border-color: var(--button-hover-bg);
-    }
-
-    &:focus {
-        box-shadow: var(--button-focus-shadow);
     }
 }
 
@@ -128,6 +117,10 @@ button.color-dot {
     .p-progressbar-value {
         background: var(--progressbar-value-bg);
     }
+
+    &--thin {
+        height: 6px !important;
+    }
 }
 
 /* Dropdown Theme*/
@@ -160,4 +153,8 @@ button.color-dot {
             }
         }
     }
+}
+
+.p-button-icon {
+    font-size: 1.2rem;
 }

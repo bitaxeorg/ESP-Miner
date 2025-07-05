@@ -222,12 +222,7 @@ void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *de
     mbedtls_sha256_update(&midstate, data, 64);
 
     // memcpy(dest, midstate.state, 32);
-#ifdef CONFIG_MBEDTLS_HARDWARE_SHA
      flip32bytes(dest, midstate.state);
-#else
-     memcpy(dest, midstate.MBEDTLS_PRIVATE(state), 32);
-#endif
-
 }
 
 void swap_endian_words(const char *hex_words, uint8_t *output)
