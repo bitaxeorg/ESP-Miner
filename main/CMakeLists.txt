@@ -54,6 +54,7 @@ PRIV_REQUIRES
     "esp_adc"
     "esp_app_format"
     "esp_event"
+    "esp_http_client"
     "esp_http_server"
     "esp_netif"
     "esp_psram"

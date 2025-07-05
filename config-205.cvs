@@ -1,6 +1,7 @@
 key,type,encoding,value
 main,namespace,,
 hostname,data,string,bitaxe
+apisecret,data,string,
 wifissid,data,string,
 wifipass,data,string,
 stratumurl,data,string,public-pool.io
