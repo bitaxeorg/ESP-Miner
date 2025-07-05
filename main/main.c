@@ -19,6 +19,7 @@
 #include "device_config.h"
 #include "connect.h"
 #include "asic_reset.h"
+#include "voltage_monitor.h"
 
 static GlobalState GLOBAL_STATE;
 
@@ -65,6 +66,11 @@ void app_main(void)
     wifi_init(&GLOBAL_STATE);
 
     SYSTEM_init_peripherals(&GLOBAL_STATE);
+
+    // Initialize voltage monitoring (optional feature)
+    voltage_monitor_init();
+    ESP_LOGI(TAG, "Voltage monitor %s", voltage_monitor_is_present() ? "active" : "not detected");
+
 
     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL);
 

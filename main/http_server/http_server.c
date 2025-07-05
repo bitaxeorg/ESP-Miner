@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/param.h>
 
+#include "voltage_monitor.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
@@ -1119,6 +1120,25 @@ void websocket_log_handler()
     }
 }
 
+// Add new endpoint for voltage monitoring
+static esp_err_t GET_voltage_status(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    
+    char *voltage_json = voltage_monitor_get_json_status();
+    if (voltage_json) {
+        httpd_resp_send(req, voltage_json, strlen(voltage_json));
+        free(voltage_json);
+    } else {
+        const char *error = "{\"error\":\"Failed to get voltage status\"}";
+        httpd_resp_send(req, error, strlen(error));
+    }
+    
+    return ESP_OK;
+}
+
+
+
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -1157,6 +1177,13 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &recovery_explicit_get_uri);
+	
+	static const httpd_uri_t voltage_status_uri = {
+			.uri = "/api/voltage",
+			.method = HTTP_GET,
+			.handler = GET_voltage_status,
+	};
+    httpd_register_uri_handler(server, &voltage_status_uri);
     
     // Register theme API endpoints
     ESP_ERROR_CHECK(register_theme_api_endpoints(server, rest_context));
@@ -1261,6 +1288,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .is_websocket = true
     };
     httpd_register_uri_handler(server, &ws);
+
 
     if (enter_recovery) {
         /* Make default route serve Recovery */
