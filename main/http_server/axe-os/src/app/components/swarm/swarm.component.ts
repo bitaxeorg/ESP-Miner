@@ -50,7 +50,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
   ) {
 
     this.form = this.fb.group({
-      manualAddIp: [null, [Validators.required, Validators.pattern('(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')]]
+      manualAddIp: [null, [Validators.required, Validators.pattern('(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')]],
+      manualAddApiSecret: ['', [Validators.minLength(12), Validators.maxLength(32)]]
     });
 
     const storedRefreshTime = this.localStorageService.getNumber(SWARM_REFRESH_TIME) ?? 30;
@@ -116,40 +117,119 @@ export class SwarmComponent implements OnInit, OnDestroy {
   scanNetwork() {
     this.scanning = true;
 
-    const { start, end } = this.calculateIpRange(window.location.hostname, '255.255.255.0');
-    const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
-    this.getAllDeviceInfo(ips, () => of(null)).subscribe({
-      next: (result) => {
-        // Filter out null items first
-        const validResults = result.filter((item): item is SwarmDevice => item !== null);
-        // Merge new results with existing swarm entries
-        const existingIps = new Set(this.swarm.map(item => item.IP));
-        const newItems = validResults.filter(item => !existingIps.has(item.IP));
-        this.swarm = [...this.swarm, ...newItems];
-        this.sortSwarm();
-        this.localStorageService.setObject(SWARM_DATA, this.swarm);
-        this.calculateTotals();
+    // Get current device IP info to determine subnet
+    this.httpClient.get<any>('/api/system/info').subscribe({
+      next: (deviceInfo) => {
+        if (!deviceInfo.currentIP || !deviceInfo.netmask) {
+          this.toastr.error('Unable to get network information', 'Scan Error');
+          this.scanning = false;
+          return;
+        }
+
+        // Calculate IP range from current IP and netmask
+        const ipRange = this.calculateIpRange(deviceInfo.currentIP, deviceInfo.netmask);
+        const ipsToScan: string[] = [];
+
+        // Generate list of IPs to scan
+        for (let addr = ipRange.start; addr <= ipRange.end; addr++) {
+          const ip = this.intToIp(addr);
+          if (ip !== deviceInfo.currentIP) { // Skip our own IP
+            ipsToScan.push(ip);
+          }
+        }
+
+        // Split IPs into chunks for parallel processing (4 concurrent requests)
+        const chunkSize = Math.ceil(ipsToScan.length / 4);
+        const chunks: string[][] = [];
+        for (let i = 0; i < ipsToScan.length; i += chunkSize) {
+          chunks.push(ipsToScan.slice(i, i + chunkSize));
+        }
+
+        // Process chunks in parallel
+        const scanPromises = chunks.map(chunk => this.scanIpChunk(chunk));
+
+        Promise.allSettled(scanPromises).then(results => {
+          const foundDevices: any[] = [];
+
+          results.forEach(result => {
+            if (result.status === 'fulfilled') {
+              foundDevices.push(...result.value);
+            }
+          });
+
+          // Merge new results with existing swarm entries
+          const existingIps = new Set(this.swarm.map(item => item.IP));
+          const newItems = foundDevices.filter(device => !existingIps.has(device.IP));
+
+          // Add new devices to swarm
+          this.swarm = [...this.swarm, ...newItems];
+          this.sortSwarm();
+          this.localStorageService.setObject(SWARM_DATA, this.swarm);
+          this.calculateTotals();
+
+          this.toastr.success(`Found ${newItems.length} new device(s)`, 'Network Scan Complete');
+          this.scanning = false;
+        });
       },
-      complete: () => {
+      error: (error) => {
+        this.toastr.error(`Failed to get device info: ${error.message || 'Unknown error'}`, 'Scan Error');
         this.scanning = false;
       }
     });
   }
 
-  private getAllDeviceInfo(ips: string[], errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>, fetchAsic: boolean = true) {
-    return from(ips).pipe(
-      mergeMap(IP => forkJoin({
-        info: this.httpClient.get(`http://${IP}/api/system/info`),
-        asic: fetchAsic ? this.httpClient.get(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
-      }).pipe(
-        map(({ info, asic }) => {
-          const existingDevice = this.swarm.find(device => device.IP === IP);
-          const result = { IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic };
-          return this.fallbackDeviceModel(result);
+  private scanIpChunk(ips: string[]): Promise<any[]> {
+    const scanPromises = ips.map(ip =>
+      this.httpClient.get<any>(`/api/system/network/scan?ip=${ip}`).pipe(
+        timeout(400), // 400ms timeout to match backend
+        map(response => {
+          if (response.status === 'found' && response.ASICModel) {
+            return response;
+          }
+          return null;
         }),
-        timeout(5000),
-        catchError(error => errorHandler(error, IP))
-      ),
+        catchError(() => of(null))
+      ).toPromise()
+    );
+
+    return Promise.allSettled(scanPromises).then(results =>
+      results
+        .filter(result => result.status === 'fulfilled' && result.value !== null)
+        .map((result: any) => result.value)
+    );
+  }
+
+  private getHttpOptionsForDevice(device: any): { headers: any } {
+    const headers: any = {
+      'X-Requested-With': 'XMLHttpRequest'
+    };
+
+    // Check if device has an API secret stored
+    const apiSecret = device?.apiSecret;
+    if (apiSecret && apiSecret.trim() !== '') {
+      headers['Authorization'] = `Bearer ${apiSecret}`;
+    }
+
+    return { headers };
+  }
+
+  private getAllDeviceInfo(errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>, fetchAsic: boolean = true) {
+    return from(this.swarm).pipe(
+      mergeMap(device => {
+        const httpOptions = this.getHttpOptionsForDevice(device);
+
+        return forkJoin({
+          info: this.httpClient.get(`http://${device.IP}/api/system/info`, httpOptions),
+          asic: fetchAsic ? this.httpClient.get(`http://${device.IP}/api/system/asic`, httpOptions).pipe(catchError(() => of({}))) : of({})
+        }).pipe(
+          map(({ info, asic }) => {
+            const result = { ...device, ...info, ...asic };
+            return this.fallbackDeviceModel(result);
+          }),
+          timeout(5000),
+          catchError(error => errorHandler(error, device.IP))
+        );
+      },
         128
       ),
       toArray()
@@ -158,6 +238,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public add() {
     const IP = this.form.value.manualAddIp;
+    const apiSecret = this.form.value.manualAddApiSecret;
 
     // Check if IP already exists
     if (this.swarm.some(item => item.IP === IP)) {
@@ -165,18 +246,33 @@ export class SwarmComponent implements OnInit, OnDestroy {
       return;
     }
 
-    forkJoin({
-      info: this.httpClient.get<any>(`http://${IP}/api/system/info`),
-      asic: this.httpClient.get<any>(`http://${IP}/api/system/asic`).pipe(catchError(() => of({})))
-    }).subscribe(({ info, asic }) => {
-      if (!info.ASICModel || !asic.ASICModel) {
-        return;
-      }
+    // Create temporary device object for header generation
+    const httpOptions = this.getHttpOptionsForDevice({ IP, apiSecret });
 
-      this.swarm.push({ IP, ...asic, ...info });
-      this.sortSwarm();
-      this.localStorageService.setObject(SWARM_DATA, this.swarm);
-      this.calculateTotals();
+    forkJoin({
+      info: this.httpClient.get<any>(`http://${IP}/api/system/info`, httpOptions),
+      asic: this.httpClient.get<any>(`http://${IP}/api/system/asic`, httpOptions).pipe(catchError(() => of({})))
+    }).subscribe({
+      next: ({ info, asic }) => {
+        if (!info.ASICModel || !asic.ASICModel) {
+          return;
+        }
+
+        // Store the API secret with the device for future requests
+        const deviceData = { IP, ...asic, ...info };
+        if (apiSecret && apiSecret.trim() !== '') {
+          deviceData.apiSecret = apiSecret;
+        }
+
+        this.swarm.push(deviceData);
+        this.sortSwarm();
+        this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotals();
+        this.toastr.success(`Device at ${IP} added successfully`, 'Success');
+      },
+      error: (error) => {
+        this.toastr.error(`Failed to add device at ${IP}: ${error.message || 'Unknown error'}`, 'Error');
+      }
     });
   }
 
@@ -186,7 +282,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public restart(axe: any) {
-    this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}).pipe(
+    this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}, this.getHttpOptionsForDevice(axe)).pipe(
       catchError(error => {
         if (error.status === 0 || error.status === 200 || error.name === 'HttpErrorResponse') {
           return of('success');
@@ -232,10 +328,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
 
     this.refreshIntervalTime = this.refreshTimeSet;
-    const ips = this.swarm.map(axeOs => axeOs.IP);
     this.isRefreshing = true;
 
-    this.getAllDeviceInfo(ips, this.refreshErrorHandler, fetchAsic).subscribe({
+    this.getAllDeviceInfo(this.refreshErrorHandler, fetchAsic).subscribe({
       next: (result) => {
         this.swarm = result;
         this.sortSwarm();
@@ -354,6 +449,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       case 'Supra':      return 'blue';
       case 'UltraHex':   return 'orange';
       case 'Gamma':      return 'green';
+      case 'GammaHex':   return 'lime'; // New color?
       case 'GammaTurbo': return 'cyan';
       default:           return 'gray';
     }

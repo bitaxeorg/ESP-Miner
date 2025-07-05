@@ -26,6 +26,7 @@
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
+#include "esp_http_client.h"
 
 #include "cJSON.h"
 #include "global_state.h"
@@ -48,6 +49,106 @@ static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
 
 static char axeOSVersion[32];
+
+/* Handler for single IP scan endpoint */
+static esp_err_t GET_network_scan(httpd_req_t *req)
+{
+    if (is_request_authorized(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    // Get IP parameter from query string
+    char ip_param[16] = {0};
+    if (httpd_req_get_url_query_str(req, ip_param, sizeof(ip_param)) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing IP parameter");
+        return ESP_OK;
+    }
+
+    char target_ip[16] = {0};
+    if (httpd_query_key_value(ip_param, "ip", target_ip, sizeof(target_ip)) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid IP parameter");
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+
+    // Simple HTTP client check for /api/system/info
+    esp_http_client_config_t config = {
+        .url = "",  // Will be set below
+        .timeout_ms = 200,
+        .disable_auto_redirect = true,
+    };
+
+    char url[64];
+    snprintf(url, sizeof(url), "http://%s/api/system/info", target_ip);
+    config.url = url;
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_err_t err = esp_http_client_perform(client);
+
+    if (err == ESP_OK) {
+        int status_code = esp_http_client_get_status_code(client);
+        if (status_code == 200) {
+            // Device found - get response data
+            int content_length = esp_http_client_get_content_length(client);
+            if (content_length > 0 && content_length < 4096) {
+                char *buffer = malloc(content_length + 1);
+                if (buffer) {
+                    esp_http_client_read_response(client, buffer, content_length);
+                    buffer[content_length] = '\0';
+
+                    // Parse JSON response
+                    cJSON *device_info = cJSON_Parse(buffer);
+                    if (device_info) {
+                        // Add IP to the response and merge with root
+                        cJSON_AddStringToObject(device_info, "IP", target_ip);
+                        cJSON_AddStringToObject(root, "status", "found");
+
+                        // Copy all fields from device_info to root
+                        cJSON *item = device_info->child;
+                        while (item) {
+                            cJSON *next = item->next;
+                            cJSON_DetachItemFromObject(device_info, item->string);
+                            cJSON_AddItemToObject(root, item->string, item);
+                            item = next;
+                        }
+                        ESP_LOGI(TAG, "Found device at %s", target_ip);
+                    } else {
+                        cJSON_AddStringToObject(root, "status", "invalid_response");
+                    }
+                    free(buffer);
+                    cJSON_Delete(device_info);
+                } else {
+                    cJSON_AddStringToObject(root, "status", "memory_error");
+                }
+            } else {
+                cJSON_AddStringToObject(root, "status", "invalid_content");
+            }
+        } else {
+            cJSON_AddStringToObject(root, "status", "not_found");
+            cJSON_AddNumberToObject(root, "status_code", status_code);
+        }
+    } else {
+        cJSON_AddStringToObject(root, "status", "connection_failed");
+    }
+
+    esp_http_client_cleanup(client);
+
+    const char *response = cJSON_Print(root);
+    httpd_resp_sendstr(req, response);
+
+    free((void *)response);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
 
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
@@ -113,102 +214,120 @@ typedef struct rest_server_context
 
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
-static esp_err_t ip_in_private_range(uint32_t address) {
-    uint32_t ip_address = ntohl(address);
-
-    // 10.0.0.0 - 10.255.255.255 (Class A)
-    if ((ip_address >= 0x0A000000) && (ip_address <= 0x0AFFFFFF)) {
-        return ESP_OK;
+static bool is_cross_origin_request(httpd_req_t * req)
+{
+    // Get the Host header (server's hostname/IP)
+    char host[128] = {0};
+    if (httpd_req_get_hdr_value_str(req, "Host", host, sizeof(host)) != ESP_OK) {
+        ESP_LOGD(CORS_TAG, "No Host header found");
+        return false;
     }
 
-    // 172.16.0.0 - 172.31.255.255 (Class B)
-    if ((ip_address >= 0xAC100000) && (ip_address <= 0xAC1FFFFF)) {
-        return ESP_OK;
+    // Get the Origin header (client's origin)
+    char origin[128] = {0};
+    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) != ESP_OK) {
+        ESP_LOGD(CORS_TAG, "No Origin header found - not a cross-origin request");
+        return false;
     }
 
-    // 192.168.0.0 - 192.168.255.255 (Class C)
-    if ((ip_address >= 0xC0A80000) && (ip_address <= 0xC0A8FFFF)) {
-        return ESP_OK;
+    // Extract hostname from origin (remove protocol)
+    char *origin_host = origin;
+    if (strncmp(origin, "http://", 7) == 0) {
+        origin_host = origin + 7;
+    } else if (strncmp(origin, "https://", 8) == 0) {
+        origin_host = origin + 8;
     }
 
-    return ESP_FAIL;
+    // Remove path from origin host if present
+    char *path_start = strchr(origin_host, '/');
+    if (path_start) {
+        *path_start = '\0';
+    }
+
+    // Compare host headers - if different, it's cross-origin
+    bool is_cross_origin = strcmp(host, origin_host) != 0;
+
+    ESP_LOGD(CORS_TAG, "Host: %s, Origin: %s, Cross-origin: %s",
+             host, origin_host, is_cross_origin ? "yes" : "no");
+
+    return is_cross_origin;
 }
 
-static uint32_t extract_origin_ip_addr(char *origin)
+static bool constant_time_compare(const char *a, const char *b)
 {
-    char ip_str[16];
-    uint32_t origin_ip_addr = 0;
+    volatile uint8_t result = 0;
+    size_t i = 0;
 
-    // Find the start of the IP address in the Origin header
-    const char *prefix = "http://";
-    char *ip_start = strstr(origin, prefix);
-    if (ip_start) {
-        ip_start += strlen(prefix); // Move past "http://"
-
-        // Extract the IP address portion (up to the next '/')
-        char *ip_end = strchr(ip_start, '/');
-        size_t ip_len = ip_end ? (size_t)(ip_end - ip_start) : strlen(ip_start);
-        if (ip_len < sizeof(ip_str)) {
-            strncpy(ip_str, ip_start, ip_len);
-            ip_str[ip_len] = '\0'; // Null-terminate the string
-
-            // Convert the IP address string to uint32_t
-            origin_ip_addr = inet_addr(ip_str);
-            if (origin_ip_addr == INADDR_NONE) {
-                ESP_LOGW(CORS_TAG, "Invalid IP address: %s", ip_str);
-            } else {
-                ESP_LOGD(CORS_TAG, "Extracted IP address %lu", origin_ip_addr);
-            }
-        } else {
-            ESP_LOGW(CORS_TAG, "IP address string is too long: %s", ip_start);
-        }
+    // Compare characters until we reach the end of both strings
+    while (a[i] != '\0' || b[i] != '\0') {
+        result |= a[i] ^ b[i];
+        i++;
     }
 
-    return origin_ip_addr;
+    return result == 0;
 }
 
-esp_err_t is_network_allowed(httpd_req_t * req)
+esp_err_t is_request_authorized(httpd_req_t * req)
 {
+    // Always allow requests in AP mode
     if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
-        ESP_LOGI(CORS_TAG, "Device in AP mode. Allowing CORS.");
+        ESP_LOGI(CORS_TAG, "Device in AP mode. Allowing request.");
         return ESP_OK;
     }
 
-    int sockfd = httpd_req_to_sockfd(req);
-    char ipstr[INET6_ADDRSTRLEN];
-    struct sockaddr_in6 addr;   // esp_http_server uses IPv6 addressing
-    socklen_t addr_size = sizeof(addr);
+    // If it's not a cross-origin request, allow it
+    if (!is_cross_origin_request(req)) {
+        ESP_LOGD(CORS_TAG, "Same-origin request - allowing");
+        return ESP_OK;
+    }
 
-    if (getpeername(sockfd, (struct sockaddr *)&addr, &addr_size) < 0) {
-        ESP_LOGE(CORS_TAG, "Error getting client IP");
+    // For cross-origin requests, require X-Requested-With header
+    ESP_LOGI(CORS_TAG, "Cross-origin request detected - checking requirements");
+
+    char x_requested_with[64] = {0};
+    if (httpd_req_get_hdr_value_str(req, "X-Requested-With", x_requested_with, sizeof(x_requested_with)) != ESP_OK) {
+        ESP_LOGW(CORS_TAG, "Cross-origin request blocked - missing X-Requested-With header");
         return ESP_FAIL;
     }
 
-    uint32_t request_ip_addr = addr.sin6_addr.un.u32_addr[3];
+    char * configured_secret = nvs_config_get_string(NVS_CONFIG_API_SECRET, "");
 
-    // // Convert to IPv6 string
-    // inet_ntop(AF_INET, &addr.sin6_addr, ipstr, sizeof(ipstr));
-
-    // Convert to IPv4 string
-    inet_ntop(AF_INET, &request_ip_addr, ipstr, sizeof(ipstr));
-
-    // Attempt to get the Origin header.
-    char origin[128];
-    uint32_t origin_ip_addr;
-    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK) {
-        ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
-        origin_ip_addr = extract_origin_ip_addr(origin);
-    } else {
-        ESP_LOGD(CORS_TAG, "No origin header found.");
-        origin_ip_addr = request_ip_addr;
+    // If no API secret is configured, deny cross-origin requests
+    if (strlen(configured_secret) == 0) {
+        ESP_LOGW(CORS_TAG, "Cross-origin request blocked - no API secret configured");
+        free(configured_secret);
+        return ESP_FAIL;
     }
 
-    if (ip_in_private_range(origin_ip_addr) == ESP_OK && ip_in_private_range(request_ip_addr) == ESP_OK) {
-        return ESP_OK;
+    // Get the Authorization header and check for Bearer token
+    char auth_header[128] = {0};
+    if (httpd_req_get_hdr_value_str(req, "Authorization", auth_header, sizeof(auth_header)) != ESP_OK) {
+        ESP_LOGW(CORS_TAG, "Cross-origin request blocked - no Authorization header");
+        free(configured_secret);
+        return ESP_FAIL;
     }
 
-    ESP_LOGI(CORS_TAG, "Client is NOT in the private ip ranges or same range as server.");
-    return ESP_FAIL;
+    // Check if it starts with "Bearer "
+    const char *bearer_prefix = "Bearer ";
+    if (strncmp(auth_header, bearer_prefix, strlen(bearer_prefix)) != 0) {
+        ESP_LOGW(CORS_TAG, "Cross-origin request blocked - Authorization header must use Bearer scheme");
+        free(configured_secret);
+        return ESP_FAIL;
+    }
+
+    // Extract the token
+    char *provided_secret = auth_header + strlen(bearer_prefix);
+
+    // Compare secrets using constant-time comparison
+    if (!constant_time_compare(configured_secret, provided_secret)) {
+        ESP_LOGW(CORS_TAG, "Cross-origin request blocked - invalid API secret");
+        free(configured_secret);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(CORS_TAG, "Cross-origin request authorized with valid API secret");
+    free(configured_secret);
+    return ESP_OK;
 }
 
 static void readAxeOSVersion(void) {
@@ -306,7 +425,7 @@ esp_err_t set_cors_headers(httpd_req_t * req)
         return ESP_FAIL;
     }
 
-    err = httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    err = httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
     if (err != ESP_OK) {
         return ESP_FAIL;
     }
@@ -317,7 +436,7 @@ esp_err_t set_cors_headers(httpd_req_t * req)
 /* Recovery handler */
 static esp_err_t rest_recovery_handler(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -332,7 +451,7 @@ static esp_err_t rest_recovery_handler(httpd_req_t * req)
 /* Send a 404 as JSON for unhandled api routes */
 static esp_err_t rest_api_common_handler(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -418,7 +537,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
 
 static esp_err_t handle_options_request(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -437,7 +556,7 @@ static esp_err_t handle_options_request(httpd_req_t * req)
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
 
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -519,6 +638,9 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "hostname"))) {
         nvs_config_set_string(NVS_CONFIG_HOSTNAME, item->valuestring);
     }
+    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "apiSecret"))) {
+        nvs_config_set_string(NVS_CONFIG_API_SECRET, item->valuestring);
+    }
     if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
     }
@@ -563,7 +685,7 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
 static esp_err_t POST_restart(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -593,7 +715,7 @@ static esp_err_t POST_restart(httpd_req_t * req)
 /* Simple handler for getting system handler */
 static esp_err_t GET_system_info(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -607,6 +729,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
     char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
+    char * apiSecret = nvs_config_get_string(NVS_CONFIG_API_SECRET, "");
     char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
     char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
@@ -619,6 +742,18 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     esp_wifi_get_mac(WIFI_IF_STA, mac);
     char formattedMac[18];
     snprintf(formattedMac, sizeof(formattedMac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    // Get current IP and netmask information
+    char currentIP[16] = "0.0.0.0";
+    char netmask[16] = "0.0.0.0";
+    esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif) {
+        esp_netif_ip_info_t ip_info;
+        if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
+            strcpy(currentIP, inet_ntoa(ip_info.ip));
+            strcpy(netmask, inet_ntoa(ip_info.netmask));
+        }
+    }
 
     int8_t wifi_rssi = -90;
     get_wifi_current_rssi(&wifi_rssi);
@@ -647,7 +782,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "frequency", frequency);
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
+    cJSON_AddStringToObject(root, "currentIP", currentIP);
+    cJSON_AddStringToObject(root, "netmask", netmask);
     cJSON_AddStringToObject(root, "hostname", hostname);
+    cJSON_AddStringToObject(root, "apiSecret", apiSecret);
     cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
     cJSON_AddNumberToObject(root, "wifiRSSI", wifi_rssi);
     cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
@@ -707,6 +845,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     free(ssid);
     free(hostname);
+    free(apiSecret);
     free(stratumURL);
     free(fallbackStratumURL);
     free(stratumUser);
@@ -800,7 +939,7 @@ int create_json_statistics_dashboard(cJSON * root)
 
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -829,7 +968,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
 
 static esp_err_t GET_system_statistics_dashboard(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -858,7 +997,7 @@ static esp_err_t GET_system_statistics_dashboard(httpd_req_t * req)
 
 esp_err_t POST_WWW_update(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -933,7 +1072,7 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
  */
 esp_err_t POST_OTA_update(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -1069,7 +1208,7 @@ void send_log_to_websocket(char *message)
  */
 esp_err_t echo_handler(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (is_request_authorized(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
@@ -1205,6 +1344,15 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &wifi_scan_get_uri);
+
+    /* URI handler for network scan */
+    httpd_uri_t network_scan_get_uri = {
+        .uri = "/api/system/network/scan",
+        .method = HTTP_GET,
+        .handler = GET_network_scan,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &network_scan_get_uri);
 
     httpd_uri_t system_restart_uri = {
         .uri = "/api/system/restart", .method = HTTP_POST, 

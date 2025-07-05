@@ -39,6 +39,8 @@ export class SystemService {
         coreVoltage: 1200,
         coreVoltageActual: 1200,
         hostname: "Bitaxe",
+        currentIP: "0.0.0.0",
+        netmask: "255.255.255.255",
         macAddr: "2C:54:91:88:C9:E3",
         ssid: "default",
         wifiPass: "password",
@@ -78,6 +80,7 @@ export class SystemService {
         temptarget: 60,
         statsFrequency: 30,
         fanrpm: 0,
+        apiSecret: "devapisecret",
 
         boardtemp1: 30,
         boardtemp2: 40,
