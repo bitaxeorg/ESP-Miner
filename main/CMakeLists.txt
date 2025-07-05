@@ -64,6 +64,7 @@ PRIV_REQUIRES
     "spiffs"
     "vfs"
     "esp_driver_i2c"
+    "mdns"
 
 EMBED_FILES "http_server/recovery_page.html"
 )
