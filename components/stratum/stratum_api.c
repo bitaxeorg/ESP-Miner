@@ -162,8 +162,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
     int64_t parsed_id = -1;
     if (id_json != NULL && cJSON_IsNumber(id_json)) {
         parsed_id = id_json->valueint;
-        last_parsed_request_id = parsed_id;
     }
+    last_parsed_request_id = parsed_id;
     message->message_id = parsed_id;
 
     cJSON * method_json = cJSON_GetObjectItem(json, "method");
