@@ -26,7 +26,7 @@ This fork includes comprehensive voltage monitoring that displays:
 3. Access AxeOS and click the hamburger menu (☰)
 4. Select "ASIC Monitor" to view real-time voltage data
 
-For detailed voltage monitoring documentation, see [docs/VOLTAGE_MONITORING.md](docs/VOLTAGE_MONITORING.md)
+For detailed voltage monitoring documentation, see [doc/VOLTAGE_MONITORING.md](doc/VOLTAGE_MONITORING.md)
 
 ---
 
