@@ -1,0 +1,17 @@
+{
+  "name": "esp-miner-mock-server",
+  "version": "1.0.0",
+  "description": "Mock server for ESP-Miner voltage monitoring UI testing",
+  "main": "voltage-monitor-mock.js",
+  "scripts": {
+    "start": "node voltage-monitor-mock.js",
+    "dev": "nodemon voltage-monitor-mock.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

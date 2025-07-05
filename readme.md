@@ -5,8 +5,32 @@
 ![GitHub contributors](https://img.shields.io/github/contributors/bitaxeorg/esp-miner)
 ![Alt](https://repobeats.axiom.co/api/embed/70889479b1e002c18a184b05bc5cbf2ed3718579.svg "Repobeats analytics image")
 
-# ESP-Miner
+# ESP-Miner with Voltage Monitoring
+
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/bitaxeorg/bitaxe)
+
+**This fork adds voltage monitoring capabilities** to the original ESP-Miner, allowing real-time monitoring of individual ASIC voltages through the AxeOS UI.
+
+## 🆕 Voltage Monitoring Feature
+
+This fork includes comprehensive voltage monitoring that displays:
+- **Per-ASIC voltage readings** with color-coded health status
+- **Chain-level statistics** including min/max/average voltages
+- **Integrated frequency and hash rate data** for each ASIC
+- **Real-time updates** with 5-second auto-refresh
+- **Hardware auto-detection** for ADS1115 ADC
+
+### Quick Start
+1. Connect ADS1115 voltage monitoring hardware to your Bitaxe
+2. Flash this firmware version
+3. Access AxeOS and click the hamburger menu (☰)
+4. Select "ASIC Monitor" to view real-time voltage data
+
+For detailed voltage monitoring documentation, see [docs/VOLTAGE_MONITORING.md](docs/VOLTAGE_MONITORING.md)
+
+---
+
+## Original ESP-Miner Documentation
 
 If you are looking for premade images to load on your Bitaxe, check out the [latest release](https://github.com/bitaxeorg/ESP-Miner/releases/latest) page. Maybe you want [instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md) for loading factory images.
 
@@ -47,6 +71,7 @@ Things that can be done are:
   
   - Get System Info
   - Get System Statistics
+  - Get Voltage Monitoring Data (NEW)
   - Update Swarm
   - System Restart Action
   - Update System Settings Action
@@ -63,6 +88,10 @@ Some API examples in curl:
   ```bash
   # Get system statistics
   curl http://YOUR-BITAXE-IP/api/system/statistics
+  ```
+  ```bash
+  # Get voltage monitoring data (NEW)
+  curl http://YOUR-BITAXE-IP/api/voltage
   ```
   ```bash
   # System restart action
@@ -100,6 +129,18 @@ Note: the merge_bin.sh script is a custom script that merges the bootloader, par
 
 Note: if using VSCode, you may have to configure the settings.json file to match your esp hardware version. For example, if your bitaxe has something other than an esp32-s3, you will need to change the version in the `.vscode/settings.json` file.
 
+#### Building the AxeOS UI
+
+To build the AxeOS web interface with voltage monitoring:
+
+```bash
+cd main/http_server/axe-os
+npm install
+npm run build
+```
+
+The built files will be placed in the `main/http_server/www` directory and included in the firmware build.
+
 ### Flashing
 
 With the bitaxe connected to your computer via USB, run:
@@ -114,6 +155,27 @@ A custom board version is also possible with `config-custom.cvs`. A custom board
 
 Note: if you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
 
+### Testing Voltage Monitoring Without Hardware
+
+For development and testing of the voltage monitoring UI without actual hardware:
+
+```bash
+cd mock-server
+npm install
+npm start -- --chains 2 --asics 12
+```
+
+This will start a mock API server that simulates voltage data. See [mock-server/README.md](mock-server/README.md) for details.
+
 ## Attributions
 
 The display font is Portfolio 6x8 from https://int10h.org/oldschool-pc-fonts/ by VileR.
+
+## Fork Information
+
+This is a fork of [bitaxeorg/ESP-Miner](https://github.com/bitaxeorg/ESP-Miner) maintained by [@ahmedalalousi](https://github.com/ahmedalalousi).
+
+**Branch:** `feature/voltage-monitoring-advanced`  
+**Added Features:** Real-time ASIC voltage monitoring via ADS1115 ADC with AxeOS UI integration
+
+For issues specific to voltage monitoring, please use this fork's [issue tracker](https://github.com/ahmedalalousi/ESP-Miner/issues).
