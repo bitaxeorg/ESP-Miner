@@ -5,6 +5,8 @@ SRCS
     "bm1366.c"
     "bm1397.c"
     "serial.c"
+    # Add voltage monitoring hardware support
+    "voltage_monitor.c"
     "crc.c"
     "common.c"
     "asic.c"

@@ -6,6 +6,7 @@
 #include "bm1366.h"
 #include "bm1368.h"
 #include "bm1370.h"
+#include "voltage_monitor.h"
 
 #include "asic.h"
 #include "device_config.h"
@@ -28,6 +29,10 @@ uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
         case BM1370:
             return BM1370_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
         default:
+    }
+	// Log voltage monitoring status after init
+	if (voltage_monitor_is_present()) {
+        ESP_LOGI(TAG, "Voltage monitoring active - optimal frequencies available");
     }
     return ESP_OK;
 }
@@ -119,6 +124,22 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
 bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency)
 {
     ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
+
+	    // Check voltage monitoring suggestions if available
+    if (voltage_monitor_is_present()) {
+        // For now, check chain 0 as example
+        // In future, this could be per-chain
+        uint16_t suggested_freq = voltage_monitor_suggest_frequency(0);
+        ESP_LOGW(TAG, "Voltage monitor suggests %d MHz for optimal operation", suggested_freq);
+
+        if (target_frequency > suggested_freq) {
+            ESP_LOGW(TAG, "Target frequency %.2f MHz exceeds suggested %.0f MHz based on voltage",
+                     target_frequency, (float)suggested_freq);
+            // Could optionally limit frequency here
+            // target_frequency = suggested_freq;
+        }
+    }
+
     bool success = false;
     
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
@@ -136,6 +157,10 @@ bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency)
             ESP_LOGE(TAG, "Frequency transition not implemented for BM1397");
             success = false;
             break;
+    }
+
+    if (voltage_monitor_is_present()) {
+        ESP_LOGI(TAG, "Voltage monitoring active - optimal frequencies available");
     }
     
     if (success) {
