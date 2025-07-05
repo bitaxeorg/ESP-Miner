@@ -2,10 +2,10 @@
   <ng-template pTemplate="header">
     <div class="card-header">
       <i class="pi pi-bolt"></i>
-      <span>Voltage Monitor</span>
+      <span>ASIC Monitor</span>
     </div>
   </ng-template>
-  
+
   <div *ngIf="isLoading" class="loading-spinner">
     <p-progressSpinner strokeWidth="4" animationDuration=".5s"></p-progressSpinner>
   </div>
@@ -15,63 +15,79 @@
     {{ error }}
   </div>
 
-  <div *ngIf="!isLoading && !error && voltageStatus">
+  <div *ngIf="!isLoading && !error && combinedData">
     <div class="status-info">
-      <p>
-        <strong>Status:</strong> 
-        <span [class.enabled]="voltageStatus.enabled">
-          {{ voltageStatus.enabled ? 'Enabled' : 'Disabled' }}
+      <div class="status-item">
+        <strong>Status:</strong>
+        <span [class.enabled]="combinedData.enabled">
+          {{ combinedData.enabled ? 'Enabled' : 'Disabled' }}
         </span>
-      </p>
-      <p>
-        <strong>Hardware:</strong> 
-        <span [class.present]="voltageStatus.hardware_present">
-          {{ voltageStatus.hardware_present ? 'Detected' : 'Not Detected' }}
+      </div>
+      <div class="status-item">
+        <strong>Hardware:</strong>
+        <span [class.present]="combinedData.hardware_present">
+          {{ combinedData.hardware_present ? 'Detected' : 'Not Detected' }}
         </span>
-      </p>
-      <p *ngIf="voltageStatus.hardware_present">
-        <strong>Scan Interval:</strong> {{ voltageStatus.scan_interval_ms }}ms
-      </p>
+      </div>
+      <div class="status-item" *ngIf="combinedData.hardware_present">
+        <strong>Scan Interval:</strong> {{ combinedData.scan_interval_ms }}ms
+      </div>
     </div>
 
-    <div *ngIf="voltageStatus.hardware_present && voltageStatus.chains" class="chains-container">
-      <h3>Chain Voltages</h3>
-      
-      <p-accordion>
-        <p-accordionTab *ngFor="let chain of voltageStatus.chains">
-          <ng-template pTemplate="header">
-            <span class="chain-header">
-              <span class="chain-title">Chain {{ chain.chain_id }}</span>
-              <span class="chain-info">
-                {{ chain.average_voltage.toFixed(2) }}V avg | 
-                {{ chain.suggested_frequency }} MHz suggested
-                <i *ngIf="chain.failed_asics > 0" class="pi pi-exclamation-triangle warning-icon"></i>
-              </span>
+    <div *ngIf="combinedData.hardware_present && combinedData.chains" class="chains-container">
+      <div *ngFor="let chain of combinedData.chains" class="chain-row">
+        <div class="chain-header">
+          <h3>Chain {{ chain.chain_id }}</h3>
+          <div class="chain-stats">
+            <span class="stat-item">
+              <i class="pi pi-bolt"></i> {{ chain.average_voltage.toFixed(2) }}V avg
             </span>
-          </ng-template>
-          
-          <div class="chain-details">
-            <div class="voltage-stats">
-              <p><strong>Total Voltage:</strong> {{ chain.total_voltage.toFixed(2) }}V</p>
-              <p><strong>Min Voltage:</strong> {{ chain.min_voltage.toFixed(2) }}V</p>
-              <p><strong>Max Voltage:</strong> {{ chain.max_voltage.toFixed(2) }}V</p>
-              <p><strong>Failed ASICs:</strong> {{ chain.failed_asics }}</p>
-            </div>
-            
-            <div class="asics-grid">
-              <div *ngFor="let asic of chain.asics" 
-                   class="asic-voltage"
-                   [class.invalid]="!asic.valid">
-                <span class="asic-id">ASIC {{ asic.id }}</span>
-                <span class="asic-value">{{ asic.voltage.toFixed(3) }}V</span>
+            <span class="stat-item">
+              <i class="pi pi-chart-line"></i> {{ chain.average_frequency.toFixed(0) }} MHz avg
+            </span>
+            <span class="stat-item">
+              <i class="pi pi-server"></i> {{ (chain.total_hashrate / 1000).toFixed(2) }} TH/s
+            </span>
+            <span class="stat-item healthy">
+              <i class="pi pi-check-circle"></i> {{ chain.healthy_asics }}
+            </span>
+            <span class="stat-item degraded" *ngIf="chain.degraded_asics > 0">
+              <i class="pi pi-exclamation-circle"></i> {{ chain.degraded_asics }}
+            </span>
+            <span class="stat-item fault" *ngIf="chain.failed_asics > 0">
+              <i class="pi pi-times-circle"></i> {{ chain.failed_asics }}
+            </span>
+          </div>
+        </div>
+        
+        <div class="asics-grid">
+          <div *ngFor="let asic of chain.asics"
+               class="asic-box"
+               [class.healthy]="asic.status === 'healthy'"
+               [class.degraded]="asic.status === 'degraded'"
+               [class.fault]="asic.status === 'fault'"
+               [class.invalid]="!asic.valid">
+            <div class="asic-header">ASIC {{ asic.id }}</div>
+            <div class="asic-data">
+              <div class="data-item">
+                <i class="pi pi-bolt"></i>
+                <span>{{ asic.voltage.toFixed(2) }}V</span>
+              </div>
+              <div class="data-item">
+                <i class="pi pi-chart-line"></i>
+                <span>{{ asic.frequency }} MHz</span>
+              </div>
+              <div class="data-item">
+                <i class="pi pi-server"></i>
+                <span>{{ asic.hashrate.toFixed(1) }} GH/s</span>
               </div>
             </div>
           </div>
-        </p-accordionTab>
-      </p-accordion>
+        </div>
+      </div>
     </div>
 
-    <div *ngIf="!voltageStatus.hardware_present" class="no-hardware">
+    <div *ngIf="!combinedData.hardware_present" class="no-hardware">
       <i class="pi pi-info-circle"></i>
       <p>Voltage monitoring hardware not detected. Connect ADS1115 to enable monitoring.</p>
     </div>

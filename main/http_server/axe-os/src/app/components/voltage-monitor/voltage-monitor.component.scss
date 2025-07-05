@@ -32,11 +32,14 @@
   }
 
   .status-info {
+    display: flex;
+    gap: 2rem;
     margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: var(--surface-50);
+    border-radius: var(--border-radius);
     
-    p {
-      margin: 0.5rem 0;
-      
+    .status-item {
       strong {
         margin-right: 0.5rem;
       }
@@ -46,95 +49,123 @@
         font-weight: 600;
       }
       
-      .enabled:not(.enabled) {
-        color: var(--red-600);
-      }
-      
       .present {
         color: var(--green-600);
-      }
-      
-      .present:not(.present) {
-        color: var(--orange-600);
       }
     }
   }
 
   .chains-container {
-    h3 {
-      margin-bottom: 1rem;
-      color: var(--text-color);
-    }
-
-    .chain-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-      
-      .chain-title {
-        font-weight: 600;
-      }
-      
-      .chain-info {
-        font-size: 0.875rem;
-        color: var(--text-color-secondary);
-        
-        .warning-icon {
-          margin-left: 0.5rem;
-          color: var(--orange-500);
-        }
-      }
-    }
-
-    .chain-details {
+    .chain-row {
+      margin-bottom: 2rem;
       padding: 1rem;
+      background-color: var(--surface-50);
+      border-radius: var(--border-radius);
       
-      .voltage-stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 0.75rem;
-        margin-bottom: 1.5rem;
+      .chain-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--surface-200);
         
-        p {
+        h3 {
           margin: 0;
-          padding: 0.5rem;
-          background-color: var(--surface-50);
-          border-radius: var(--border-radius);
+          color: var(--text-color);
+        }
+        
+        .chain-stats {
+          display: flex;
+          gap: 1.5rem;
+          
+          .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.875rem;
+            
+            .pi {
+              font-size: 0.75rem;
+            }
+            
+            &.healthy {
+              color: var(--green-600);
+            }
+            
+            &.degraded {
+              color: var(--orange-600);
+            }
+            
+            &.fault {
+              color: var(--red-600);
+            }
+          }
         }
       }
       
       .asics-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        gap: 0.5rem;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 0.75rem;
         
-        .asic-voltage {
+        .asic-box {
           padding: 0.75rem;
-          background-color: var(--surface-100);
           border-radius: var(--border-radius);
           text-align: center;
           transition: all 0.2s;
+          color: white;
+          font-weight: bold;
           
-          &:hover {
-            background-color: var(--surface-200);
+          &.healthy {
+            background-color: var(--green-500);
+            
+            &:hover {
+              background-color: var(--green-600);
+            }
+          }
+          
+          &.degraded {
+            background-color: var(--orange-500);
+            
+            &:hover {
+              background-color: var(--orange-600);
+            }
+          }
+          
+          &.fault {
+            background-color: var(--red-500);
+            
+            &:hover {
+              background-color: var(--red-600);
+            }
           }
           
           &.invalid {
-            background-color: var(--red-100);
-            color: var(--red-700);
+            background-color: var(--gray-500);
+            opacity: 0.7;
           }
           
-          .asic-id {
-            display: block;
+          .asic-header {
             font-size: 0.75rem;
-            color: var(--text-color-secondary);
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
+            opacity: 0.9;
           }
           
-          .asic-value {
-            font-weight: 600;
-            font-size: 0.875rem;
+          .asic-data {
+            .data-item {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 0.25rem;
+              margin: 0.25rem 0;
+              font-size: 0.875rem;
+              
+              .pi {
+                font-size: 0.75rem;
+                opacity: 0.8;
+              }
+            }
           }
         }
       }
