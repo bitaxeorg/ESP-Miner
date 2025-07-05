@@ -22,6 +22,9 @@ import { NetworkComponent } from './components/network/network.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
 import { ThemeConfigComponent } from './components/design/theme-config.component';
+
+import { VoltageMonitorComponent } from './components/voltage-monitor/voltage-monitor.component';
+
 import { DesignComponent } from './components/design/design.component';
 import { AppLayoutModule } from './layout/app.layout.module';
 import { ANSIPipe } from './pipes/ansi.pipe';
@@ -33,6 +36,8 @@ import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { DynamicDialogModule, DialogService as PrimeDialogService } from 'primeng/dynamicdialog';
 import { DialogService, DialogListComponent } from './services/dialog.service';
+
+import { VoltageService } from './services/voltage.service';
 
 const components = [
   AppComponent,
@@ -60,7 +65,8 @@ const components = [
     ThemeConfigComponent,
     DesignComponent,
     PoolComponent,
-    DialogListComponent
+    DialogListComponent,
+    VoltageMonitorComponent
   ],
   imports: [
     BrowserModule,
@@ -83,7 +89,8 @@ const components = [
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },
     DialogService,
-    PrimeDialogService
+    PrimeDialogService,
+    VoltageService
   ],
   bootstrap: [AppComponent]
 })

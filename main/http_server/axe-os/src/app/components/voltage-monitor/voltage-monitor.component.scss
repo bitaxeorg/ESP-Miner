@@ -1,0 +1,161 @@
+.voltage-monitor-card {
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    
+    .pi {
+      color: var(--primary-color);
+    }
+  }
+
+  .loading-spinner {
+    display: flex;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  .error-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--red-500);
+    padding: 1rem;
+    background-color: var(--red-50);
+    border-radius: var(--border-radius);
+    
+    .pi {
+      font-size: 1.25rem;
+    }
+  }
+
+  .status-info {
+    margin-bottom: 1.5rem;
+    
+    p {
+      margin: 0.5rem 0;
+      
+      strong {
+        margin-right: 0.5rem;
+      }
+      
+      .enabled {
+        color: var(--green-600);
+        font-weight: 600;
+      }
+      
+      .enabled:not(.enabled) {
+        color: var(--red-600);
+      }
+      
+      .present {
+        color: var(--green-600);
+      }
+      
+      .present:not(.present) {
+        color: var(--orange-600);
+      }
+    }
+  }
+
+  .chains-container {
+    h3 {
+      margin-bottom: 1rem;
+      color: var(--text-color);
+    }
+
+    .chain-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      
+      .chain-title {
+        font-weight: 600;
+      }
+      
+      .chain-info {
+        font-size: 0.875rem;
+        color: var(--text-color-secondary);
+        
+        .warning-icon {
+          margin-left: 0.5rem;
+          color: var(--orange-500);
+        }
+      }
+    }
+
+    .chain-details {
+      padding: 1rem;
+      
+      .voltage-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+        
+        p {
+          margin: 0;
+          padding: 0.5rem;
+          background-color: var(--surface-50);
+          border-radius: var(--border-radius);
+        }
+      }
+      
+      .asics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 0.5rem;
+        
+        .asic-voltage {
+          padding: 0.75rem;
+          background-color: var(--surface-100);
+          border-radius: var(--border-radius);
+          text-align: center;
+          transition: all 0.2s;
+          
+          &:hover {
+            background-color: var(--surface-200);
+          }
+          
+          &.invalid {
+            background-color: var(--red-100);
+            color: var(--red-700);
+          }
+          
+          .asic-id {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-color-secondary);
+            margin-bottom: 0.25rem;
+          }
+          
+          .asic-value {
+            font-weight: 600;
+            font-size: 0.875rem;
+          }
+        }
+      }
+    }
+  }
+
+  .no-hardware {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    background-color: var(--surface-100);
+    border-radius: var(--border-radius);
+    color: var(--text-color-secondary);
+    
+    .pi {
+      font-size: 1.5rem;
+    }
+    
+    p {
+      margin: 0;
+    }
+  }
+}

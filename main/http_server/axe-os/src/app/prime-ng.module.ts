@@ -11,6 +11,11 @@ import { InputTextModule } from 'primeng/inputtext';
 import { SidebarModule } from 'primeng/sidebar';
 import { SliderModule } from 'primeng/slider';
 
+import { CardModule } from 'primeng/card';
+import { AccordionModule } from 'primeng/accordion';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { PanelModule } from 'primeng/panel';
+
 const primeNgModules = [
     SidebarModule,
     InputTextModule,
@@ -22,7 +27,11 @@ const primeNgModules = [
     ChartModule,
     InputGroupModule,
     InputGroupAddonModule,
-    RadioButtonModule
+    RadioButtonModule,
+    CardModule,           // Add this
+    AccordionModule,      // Add this
+    ProgressSpinnerModule,// Add this
+    PanelModule          // Add this
 ];
 
 @NgModule({
