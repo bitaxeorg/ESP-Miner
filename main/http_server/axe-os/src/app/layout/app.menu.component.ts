@@ -32,6 +32,9 @@ export class AppMenuComponent implements OnInit {
                     { label: 'Logs', icon: 'pi pi-fw pi-list', routerLink: ['logs'] },
                     { label: 'System', icon: 'pi pi-fw pi-wave-pulse', routerLink: ['system'] },
                     { separator: true },
+		    // Add system monitor to main menu
+		    { label: 'ASIC Monitor', icon: 'pi pi-fw pi-bolt', routerLink: ['monitor'] },
+		    { separator: true },
 
                     { label: 'Pool', icon: 'pi pi-fw pi-server', routerLink: ['pool'] },
                     { label: 'Network', icon: 'pi pi-fw pi-wifi', routerLink: ['network'] },

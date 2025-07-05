@@ -10,6 +10,9 @@ import { NetworkComponent } from './components/network/network.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
 import { DesignComponent } from './components/design/design.component';
 import { PoolComponent } from './components/pool/pool.component';
+
+import { VoltageMonitorComponent } from './components/voltage-monitor/voltage-monitor.component';
+
 import { AppLayoutComponent } from './layout/app.layout.component';
 import { ApModeGuard } from './guards/ap-mode.guard';
 
@@ -76,6 +79,10 @@ const routes: Routes = [
         path: 'pool',
         component: PoolComponent,
         title: `${TITLE_PREFIX} Pool`,
+      },
+      {
+	path: 'monitor',
+	component: VoltageMonitorComponent
       }
     ]
   },

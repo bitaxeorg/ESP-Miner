@@ -71,6 +71,11 @@ typedef struct
     char firmware_update_filename[20];
     char firmware_update_status[20];
     char * asic_status;
+    // Voltage monitoring
+    /* bool voltage_monitor_active;
+    float *chain_voltages;  // Array of voltages per chain
+	uint16_t *suggested_frequencies;  // Suggested freq per chain */
+
 } SystemModule;
 
 typedef struct
@@ -115,6 +120,8 @@ typedef struct
 
     bool ASIC_initalized;
     bool psram_is_available;
+	// Add voltage monitoring state
+	/* bool voltage_monitoring_enabled; */
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */

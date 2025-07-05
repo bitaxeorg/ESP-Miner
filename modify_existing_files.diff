@@ -1,0 +1,560 @@
+diff --git a/main/main.c b/main/main.c
+index 1234567..8901234 100644
+--- a/main/main.c
++++ b/main/main.c
+@@ -18,6 +18,7 @@
+ #include "device_config.h"
+ #include "connect.h"
+ #include "asic_reset.h"
++#include "voltage_monitor.h"
+ 
+ static GlobalState GLOBAL_STATE;
+ 
+@@ -58,6 +59,10 @@ void app_main(void)
+ 
+     SYSTEM_init_peripherals(&GLOBAL_STATE);
+ 
++    // Initialize voltage monitoring (optional feature)
++    voltage_monitor_init();
++    ESP_LOGI(TAG, "Voltage monitor %s", voltage_monitor_is_present() ? "active" : "not detected");
++
+     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+ 
+     //start the API for AxeOS
+
+diff --git a/main/global_state.h b/main/global_state.h
+index 2345678..3456789 100644
+--- a/main/global_state.h
++++ b/main/global_state.h
+@@ -21,6 +21,11 @@ typedef struct
+     uint16_t shares_rejected;
+     int screen_page;
+     
++    // Voltage monitoring
++    bool voltage_monitor_active;
++    float *chain_voltages;  // Array of voltages per chain
++    uint16_t *suggested_frequencies;  // Suggested freq per chain
++    
+     /* ... rest of existing fields ... */
+ } SystemModule;
+ 
+@@ -35,6 +40,9 @@ typedef struct
+     work_queue stratum_queue;
+     work_queue ASIC_jobs_queue;
+     
++    // Add voltage monitoring state
++    bool voltage_monitoring_enabled;
++    
+     /* ... rest of existing fields ... */
+ } GlobalState;
+
+diff --git a/main/http_server.c b/main/http_server.c
+index 4567890..8901234 100644
+--- a/main/http_server.c
++++ b/main/http_server.c
+@@ -5,6 +5,7 @@
+ #include "esp_http_server.h"
+ #include "esp_log.h"
+ #include "esp_vfs.h"
++#include "voltage_monitor.h"
+ #include "cJSON.h"
+ 
+ /* ... existing includes ... */
+@@ -123,6 +124,414 @@ static esp_err_t GET_status(httpd_req_t *req)
+     return ESP_OK;
+ }
+ 
++/*
++ * Example JSON response from GET /api/voltage:
++ * {
++ *   "enabled": true,
++ *   "hardware_present": true,
++ *   "scan_interval_ms": 5000,
++ *   "chains": [
++ *     {
++ *       "chain_id": 0,
++ *       "total_voltage": 14.4,
++ *       "average_voltage": 1.2,
++ *       "min_voltage": 1.18,
++ *       "max_voltage": 1.22,
++ *       "failed_asics": 0,
++ *       "suggested_frequency": 490,
++ *       "asics": [
++ *         {
++ *           "id": 0,
++ *           "voltage": 1.21,
++ *           "valid": true
++ *         },
++ *         {
++ *           "id": 1,
++ *           "voltage": 1.19,
++ *           "valid": true
++ *         }
++ *       ]
++ *     }
++ *   ]
++ * }
++ */
++// Add new endpoint for voltage monitoring
++static esp_err_t GET_voltage_status(httpd_req_t *req)
++{
++    httpd_resp_set_type(req, "application/json");
++    
++    char *voltage_json = voltage_monitor_get_json_status();
++    if (voltage_json) {
++        httpd_resp_send(req, voltage_json, strlen(voltage_json));
++        free(voltage_json);
++    } else {
++        const char *error = "{\"error\":\"Failed to get voltage status\"}";
++        httpd_resp_send(req, error, strlen(error));
++    }
++    
++    return ESP_OK;
++}
++
++/*
++ * POST /api/voltage/set
++ * Set voltage for a specific chain
++ * Body: {
++ *   "chain_id": 0,
++ *   "voltage_mv": 1200
++ * }
++ */
++static esp_err_t POST_set_voltage(httpd_req_t *req)
++{
++    char buf[256];
++    int ret, remaining = req->content_len;
++    
++    if (remaining > sizeof(buf) - 1) {
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Content too long");
++        return ESP_FAIL;
++    }
++    
++    ret = httpd_req_recv(req, buf, remaining);
++    if (ret <= 0) {
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive data");
++        return ESP_FAIL;
++    }
++    buf[ret] = '\0';
++    
++    cJSON *root = cJSON_Parse(buf);
++    if (!root) {
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
++        return ESP_FAIL;
++    }
++    
++    cJSON *chain_id_json = cJSON_GetObjectItem(root, "chain_id");
++    cJSON *voltage_json = cJSON_GetObjectItem(root, "voltage_mv");
++    
++    if (!cJSON_IsNumber(chain_id_json) || !cJSON_IsNumber(voltage_json)) {
++        cJSON_Delete(root);
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing required fields");
++        return ESP_FAIL;
++    }
++    
++    uint8_t chain_id = (uint8_t)chain_id_json->valueint;
++    float voltage_mv = (float)voltage_json->valuedouble;
++    
++    esp_err_t err = voltage_monitor_set_chain_voltage(chain_id, voltage_mv);
++    
++    cJSON *response = cJSON_CreateObject();
++    cJSON_AddBoolToObject(response, "success", err == ESP_OK);
++    cJSON_AddStringToObject(response, "message", 
++                          err == ESP_OK ? "Voltage set successfully" : "Failed to set voltage");
++    cJSON_AddNumberToObject(response, "chain_id", chain_id);
++    cJSON_AddNumberToObject(response, "voltage_mv", voltage_mv);
++    
++    char *response_str = cJSON_Print(response);
++    httpd_resp_set_type(req, "application/json");
++    httpd_resp_send(req, response_str, strlen(response_str));
++    
++    free(response_str);
++    cJSON_Delete(response);
++    cJSON_Delete(root);
++    
++    return ESP_OK;
++}
++
++/*
++ * POST /api/frequency/set
++ * Set frequency for a specific chain or all chains
++ * Body: {
++ *   "chain_id": 0,  // or -1 for all chains
++ *   "frequency_mhz": 490
++ * }
++ */
++static esp_err_t POST_set_frequency(httpd_req_t *req)
++{
++    char buf[256];
++    int ret, remaining = req->content_len;
++    
++    if (remaining > sizeof(buf) - 1) {
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Content too long");
++        return ESP_FAIL;
++    }
++    
++    ret = httpd_req_recv(req, buf, remaining);
++    if (ret <= 0) {
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive data");
++        return ESP_FAIL;
++    }
++    buf[ret] = '\0';
++    
++    cJSON *root = cJSON_Parse(buf);
++    if (!root) {
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
++        return ESP_FAIL;
++    }
++    
++    cJSON *chain_id_json = cJSON_GetObjectItem(root, "chain_id");
++    cJSON *frequency_json = cJSON_GetObjectItem(root, "frequency_mhz");
++    
++    if (!cJSON_IsNumber(chain_id_json) || !cJSON_IsNumber(frequency_json)) {
++        cJSON_Delete(root);
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing required fields");
++        return ESP_FAIL;
++    }
++    
++    int8_t chain_id = (int8_t)chain_id_json->valueint;
++    uint16_t frequency_mhz = (uint16_t)frequency_json->valueint;
++    
++    esp_err_t err = ESP_OK;
++    cJSON *response = cJSON_CreateObject();
++    
++    if (chain_id == -1) {
++        // Set frequency for all chains
++        cJSON *results = cJSON_CreateArray();
++        for (int i = 0; i < MAX_CHAINS_PER_BOARD; i++) {
++            esp_err_t chain_err = voltage_monitor_set_chain_frequency(i, frequency_mhz);
++            cJSON *chain_result = cJSON_CreateObject();
++            cJSON_AddNumberToObject(chain_result, "chain_id", i);
++            cJSON_AddBoolToObject(chain_result, "success", chain_err == ESP_OK);
++            cJSON_AddItemToArray(results, chain_result);
++            if (chain_err != ESP_OK) err = chain_err;
++        }
++        cJSON_AddItemToObject(response, "results", results);
++    } else {
++        // Set frequency for specific chain
++        err = voltage_monitor_set_chain_frequency(chain_id, frequency_mhz);
++        cJSON_AddNumberToObject(response, "chain_id", chain_id);
++    }
++    
++    cJSON_AddBoolToObject(response, "success", err == ESP_OK);
++    cJSON_AddStringToObject(response, "message", 
++                          err == ESP_OK ? "Frequency set successfully" : "Failed to set frequency");
++    cJSON_AddNumberToObject(response, "frequency_mhz", frequency_mhz);
++    
++    char *response_str = cJSON_Print(response);
++    httpd_resp_set_type(req, "application/json");
++    httpd_resp_send(req, response_str, strlen(response_str));
++    
++    free(response_str);
++    cJSON_Delete(response);
++    cJSON_Delete(root);
++    
++    return ESP_OK;
++}
++
++/*
++ * POST /api/diagnostic/run
++ * Run diagnostic on board, chain, or specific ASIC
++ * Body: {
++ *   "type": "asic|chain|board",
++ *   "chain_id": 0,
++ *   "asic_id": 5  // optional, only for type="asic"
++ * }
++ * 
++ * Response for ASIC diagnostic:
++ * {
++ *   "success": true,
++ *   "type": "asic",
++ *   "result": {
++ *     "chain_id": 0,
++ *     "asic_id": 5,
++ *     "status": "ok|low_voltage|high_voltage|open_circuit|short_circuit",
++ *     "voltage_actual": 1.18,
++ *     "voltage_expected": 1.20,
++ *     "hash_errors": 0,
++ *     "temperature": 65.5,
++ *     "is_bypassed": false,
++ *     "error_message": "",
++ *     "recommendations": [
++ *       "Voltage slightly low but within tolerance"
++ *     ]
++ *   }
++ * }
++ * 
++ * Response for chain diagnostic:
++ * {
++ *   "success": true,
++ *   "type": "chain",
++ *   "result": {
++ *     "chain_id": 0,
++ *     "total_asics": 12,
++ *     "healthy_asics": 11,
++ *     "bypassed_asics": 1,
++ *     "total_voltage": 14.2,
++ *     "average_hashrate": 0.68,
++ *     "asics": [
++ *       {
++ *         "asic_id": 0,
++ *         "status": "ok",
++ *         "voltage": 1.20
++ *       },
++ *       ...
++ *     ],
++ *     "recommendations": [
++ *       "ASIC 5 showing low voltage - consider bypass",
++ *       "Chain efficiency at 91.7% - within normal range"
++ *     ]
++ *   }
++ * }
++ */
++static esp_err_t POST_run_diagnostic(httpd_req_t *req)
++{
++    char buf[512];
++    int ret, remaining = req->content_len;
++    
++    if (remaining > sizeof(buf) - 1) {
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Content too long");
++        return ESP_FAIL;
++    }
++    
++    ret = httpd_req_recv(req, buf, remaining);
++    if (ret <= 0) {
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive data");
++        return ESP_FAIL;
++    }
++    buf[ret] = '\0';
++    
++    cJSON *root = cJSON_Parse(buf);
++    if (!root) {
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
++        return ESP_FAIL;
++    }
++    
++    cJSON *type_json = cJSON_GetObjectItem(root, "type");
++    cJSON *chain_id_json = cJSON_GetObjectItem(root, "chain_id");
++    
++    if (!cJSON_IsString(type_json) || !cJSON_IsNumber(chain_id_json)) {
++        cJSON_Delete(root);
++        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing required fields");
++        return ESP_FAIL;
++    }
++    
++    const char *type = type_json->valuestring;
++    uint8_t chain_id = (uint8_t)chain_id_json->valueint;
++    
++    cJSON *response = cJSON_CreateObject();
++    cJSON_AddStringToObject(response, "type", type);
++    
++    if (strcmp(type, "asic") == 0) {
++        // ASIC diagnostic
++        cJSON *asic_id_json = cJSON_GetObjectItem(root, "asic_id");
++        if (!cJSON_IsNumber(asic_id_json)) {
++            cJSON_Delete(root);
++            cJSON_Delete(response);
++            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing asic_id for ASIC diagnostic");
++            return ESP_FAIL;
++        }
++        
++        uint8_t asic_id = (uint8_t)asic_id_json->valueint;
++        asic_diagnostic_t diag_result;
++        
++        esp_err_t err = voltage_monitor_run_diagnostic(chain_id, asic_id, &diag_result);
++        
++        cJSON_AddBoolToObject(response, "success", err == ESP_OK);
++        
++        if (err == ESP_OK) {
++            cJSON *result = cJSON_CreateObject();
++            cJSON_AddNumberToObject(result, "chain_id", diag_result.chain_id);
++            cJSON_AddNumberToObject(result, "asic_id", diag_result.asic_id);
++            
++            const char *status_str[] = {"ok", "low_voltage", "high_voltage", "open_circuit", "short_circuit"};
++            cJSON_AddStringToObject(result, "status", status_str[diag_result.status]);
++            
++            cJSON_AddNumberToObject(result, "voltage_actual", diag_result.voltage_actual);
++            cJSON_AddNumberToObject(result, "voltage_expected", diag_result.voltage_expected);
++            cJSON_AddNumberToObject(result, "hash_errors", diag_result.hash_errors);
++            cJSON_AddNumberToObject(result, "temperature", diag_result.temperature);
++            cJSON_AddBoolToObject(result, "is_bypassed", diag_result.is_bypassed);
++            cJSON_AddStringToObject(result, "error_message", diag_result.error_message);
++            
++            // Add recommendations based on status
++            cJSON *recommendations = cJSON_CreateArray();
++            if (diag_result.status == ASIC_STATUS_LOW_VOLTAGE) {
++                cJSON_AddItemToArray(recommendations, 
++                    cJSON_CreateString("Consider increasing chain voltage or reducing frequency"));
++            } else if (diag_result.status == ASIC_STATUS_HIGH_VOLTAGE) {
++                cJSON_AddItemToArray(recommendations, 
++                    cJSON_CreateString("Reduce chain voltage to prevent ASIC damage"));
++            } else if (diag_result.status == ASIC_STATUS_OPEN_CIRCUIT) {
++                cJSON_AddItemToArray(recommendations, 
++                    cJSON_CreateString("ASIC failure detected - enable bypass"));
++            }
++            cJSON_AddItemToObject(result, "recommendations", recommendations);
++            
++            cJSON_AddItemToObject(response, "result", result);
++        }
++        
++    } else if (strcmp(type, "chain") == 0) {
++        // Chain diagnostic
++        chain_diagnostic_t *chain_diag = malloc(sizeof(chain_diagnostic_t));
++        chain_diag->asic_diagnostics = malloc(sizeof(asic_diagnostic_t) * MAX_ASICS_PER_CHAIN);
++        
++        esp_err_t err = voltage_monitor_run_chain_diagnostic(chain_id, chain_diag);
++        
++        cJSON_AddBoolToObject(response, "success", err == ESP_OK);
++        
++        if (err == ESP_OK) {
++            cJSON *result = cJSON_CreateObject();
++            cJSON_AddNumberToObject(result, "chain_id", chain_diag->chain_id);
++            cJSON_AddNumberToObject(result, "total_asics", chain_diag->total_asics);
++            cJSON_AddNumberToObject(result, "healthy_asics", chain_diag->healthy_asics);
++            cJSON_AddNumberToObject(result, "bypassed_asics", chain_diag->bypassed_asics);
++            cJSON_AddNumberToObject(result, "total_voltage", chain_diag->total_voltage);
++            cJSON_AddNumberToObject(result, "average_hashrate", chain_diag->average_hashrate);
++            
++            cJSON *asics = cJSON_CreateArray();
++            for (int i = 0; i < chain_diag->total_asics; i++) {
++                cJSON *asic = cJSON_CreateObject();
++                cJSON_AddNumberToObject(asic, "asic_id", i);
++                
++                const char *status_str[] = {"ok", "low_voltage", "high_voltage", "open_circuit", "short_circuit"};
++                cJSON_AddStringToObject(asic, "status", status_str[chain_diag->asic_diagnostics[i].status]);
++                cJSON_AddNumberToObject(asic, "voltage", chain_diag->asic_diagnostics[i].voltage_actual);
++                
++                cJSON_AddItemToArray(asics, asic);
++            }
++            cJSON_AddItemToObject(result, "asics", asics);
++            
++            // Add chain-level recommendations
++            cJSON *recommendations = cJSON_CreateArray();
++            float efficiency = (float)chain_diag->healthy_asics / chain_diag->total_asics * 100;
++            
++            char rec_buf[256];
++            snprintf(rec_buf, sizeof(rec_buf), "Chain efficiency at %.1f%%", efficiency);
++            cJSON_AddItemToArray(recommendations, cJSON_CreateString(rec_buf));
++            
++            if (chain_diag->bypassed_asics > 0) {
++                snprintf(rec_buf, sizeof(rec_buf), "%d ASICs bypassed - consider chain replacement if >10%%", 
++                        chain_diag->bypassed_asics);
++                cJSON_AddItemToArray(recommendations, cJSON_CreateString(rec_buf));
++            }
++            
++            cJSON_AddItemToObject(result, "recommendations", recommendations);
++            cJSON_AddItemToObject(response, "result", result);
++        }
++        
++        voltage_monitor_free_diagnostic_result(chain_diag);
++        
++    } else if (strcmp(type, "board") == 0) {
++        // Board diagnostic - run all chains
++        cJSON *chains = cJSON_CreateArray();
++        bool all_success = true;
++        
++        for (int c = 0; c < MAX_CHAINS_PER_BOARD; c++) {
++            chain_diagnostic_t *chain_diag = malloc(sizeof(chain_diagnostic_t));
++            chain_diag->asic_diagnostics = malloc(sizeof(asic_diagnostic_t) * MAX_ASICS_PER_CHAIN);
++            
++            esp_err_t err = voltage_monitor_run_chain_diagnostic(c, chain_diag);
++            if (err != ESP_OK) {
++                all_success = false;
++            } else {
++                cJSON *chain_summary = cJSON_CreateObject();
++                cJSON_AddNumberToObject(chain_summary, "chain_id", c);
++                cJSON_AddNumberToObject(chain_summary, "healthy_asics", chain_diag->healthy_asics);
++                cJSON_AddNumberToObject(chain_summary, "total_asics", chain_diag->total_asics);
++                cJSON_AddNumberToObject(chain_summary, "efficiency", 
++                                      (float)chain_diag->healthy_asics / chain_diag->total_asics * 100);
++                cJSON_AddItemToArray(chains, chain_summary);
++            }
++            
++            voltage_monitor_free_diagnostic_result(chain_diag);
++        }
++        
++        cJSON_AddBoolToObject(response, "success", all_success);
++        cJSON_AddItemToObject(response, "chains", chains);
++    }
++    
++    char *response_str = cJSON_Print(response);
++    httpd_resp_set_type(req, "application/json");
++    httpd_resp_send(req, response_str, strlen(response_str));
++    
++    free(response_str);
++    cJSON_Delete(response);
++    cJSON_Delete(root);
++    
++    return ESP_OK;
++}
++
++static const httpd_uri_t voltage_status_uri = {
++    .uri = "/api/voltage",
++    .method = HTTP_GET,
++    .handler = GET_voltage_status,
++};
++
++static const httpd_uri_t set_voltage_uri = {
++    .uri = "/api/voltage/set",
++    .method = HTTP_POST,
++    .handler = POST_set_voltage,
++};
++
++static const httpd_uri_t set_frequency_uri = {
++    .uri = "/api/frequency/set", 
++    .method = HTTP_POST,
++    .handler = POST_set_frequency,
++};
++
++static const httpd_uri_t run_diagnostic_uri = {
++    .uri = "/api/diagnostic/run",
++    .method = HTTP_POST,
++    .handler = POST_run_diagnostic,
++};
++
+ /* ... existing code ... */
+ 
+ void start_rest_server(void *pvParameters)
+@@ -140,6 +563,10 @@ void start_rest_server(void *pvParameters)
+     httpd_register_uri_handler(server, &GET_status_uri);
+     httpd_register_uri_handler(server, &POST_restart_uri);
+     httpd_register_uri_handler(server, &POST_update_settings_uri);
++    httpd_register_uri_handler(server, &voltage_status_uri);
++    httpd_register_uri_handler(server, &set_voltage_uri);
++    httpd_register_uri_handler(server, &set_frequency_uri);
++    httpd_register_uri_handler(server, &run_diagnostic_uri);
+     
+     /* ... register other existing handlers ... */
+ }
+
+diff --git a/components/asic/asic_task.c b/components/asic/asic_task.c
+index 8901234..9876543 100644
+--- a/components/asic/asic_task.c
++++ b/components/asic/asic_task.c
+@@ -7,6 +7,7 @@
+ #include "serial.h"
+ #include "system.h"
+ #include "work_queue.h"
++#include "voltage_monitor.h"
+ 
+ static const char *TAG = "ASIC_task";
+ 
+@@ -123,6 +124,18 @@ void ASIC_task(void *pvParameters)
+             }
+             BM1368_set_default_baud();
+             BM1368_send_hash_frequency(frequency);
++            
++            // If voltage monitoring is available, use suggested frequencies
++            if (voltage_monitor_is_present()) {
++                // For now, apply same frequency to all chains
++                // In future, can set per-chain frequencies
++                uint16_t suggested_freq = voltage_monitor_suggest_frequency(0);
++                if (suggested_freq != frequency) {
++                    ESP_LOGI(TAG, "Voltage monitor suggests %d MHz (currently %d MHz)", 
++                            suggested_freq, frequency);
++                    // TODO: Implement per-chain frequency setting
++                }
++            }
+         }
+ 
+         queue_clear(&GLOBAL_STATE->stratum_queue);
