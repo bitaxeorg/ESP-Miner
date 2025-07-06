@@ -10,7 +10,10 @@
     "build": "ng build --configuration=production && gzipper compress --verbose --gzip --gzip-level 9 ./dist/axe-os && node only-gzip.js && node generate-version.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "bundle-report": "ng build --configuration=production --stats-json && webpack-bundle-analyzer dist/axe-os/stats.json"
+    "bundle-report": "ng build --configuration=production --stats-json && webpack-bundle-analyzer dist/axe-os/stats.json",
+    "start": "ng serve --proxy-config proxy.conf.json",
+    "serve": "ng serve --proxy-config proxy.conf.json"
+
   },
   "private": true,
   "dependencies": {
