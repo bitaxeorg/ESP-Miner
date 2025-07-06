@@ -911,7 +911,7 @@ export async function fetchErrorLogs(limit?: number): Promise<{
       params.append("limit", limit.toString());
     }
 
-    const url = `/api/logs/errors${params.toString() ? `?${params.toString()}` : ""}`;
+    const url = `/api/logs/error${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -931,6 +931,47 @@ export async function fetchErrorLogs(limit?: number): Promise<{
       errors: [],
       count: 0,
       totalErrors: 0,
+    };
+  }
+}
+
+/**
+ * Fetch critical logs
+ * @param limit - Maximum number of critical events to return (default: all critical events)
+ * @returns Array of critical log events with additional metadata
+ */
+export async function fetchCriticalLogs(limit?: number): Promise<{
+  critical: LogEvent[];
+  count: number;
+  totalCritical: number;
+  lastCritical?: number;
+}> {
+  try {
+    const params = new URLSearchParams();
+    if (limit !== undefined) {
+      params.append("limit", limit.toString());
+    }
+
+    const url = `/api/logs/critical${params.toString() ? `?${params.toString()}` : ""}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      critical: data.critical || [],
+      count: data.count || 0,
+      totalCritical: data.totalCritical || 0,
+      lastCritical: data.lastCritical,
+    };
+  } catch (error) {
+    console.error("Failed to fetch critical logs:", error);
+    return {
+      critical: [],
+      count: 0,
+      totalCritical: 0,
     };
   }
 }

@@ -4,21 +4,19 @@ import { Switch } from "../../components/Switch";
 import { Terminal } from "../../components/Terminal";
 import { PageHeading } from "../../components/PageHeading";
 import { Tabs } from "../../components/Tabs";
-import { fetchRecentLogs, fetchErrorLogs, LogEvent } from "../../utils/api";
+import { fetchRecentLogs, fetchErrorLogs, fetchCriticalLogs, LogEvent } from "../../utils/api";
 import { Container } from "../../components/Container";
 
 type LogLevel = 'all' | 'info' | 'warn' | 'error' | 'critical';
 
 export function LogsPage() {
   const [logs, setLogs] = useState<string[]>([]);
-  const [allLogs, setAllLogs] = useState<LogEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [logLevel, setLogLevel] = useState<LogLevel>('all');
   const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
   const [errorInfo, setErrorInfo] = useState<{
-    totalErrors: number;
-    lastError?: number;
+    totalCount: number;
+    lastEvent?: number;
   } | null>(null);
 
   // Auto-refresh interval (10 seconds)
@@ -36,17 +34,12 @@ export function LogsPage() {
         clearInterval(intervalId);
       }
     };
-  }, [autoRefresh]);
+  }, [autoRefresh, logLevel]);
 
-  // Initial fetch on mount
+  // Initial fetch on mount and when log level changes
   useEffect(() => {
     fetchLogs();
-  }, []);
-
-  // Filter logs when log level changes
-  useEffect(() => {
-    filterLogs();
-  }, [logLevel, allLogs]);
+  }, [logLevel]);
 
   // Format log event to display string
   function formatLogEvent(event: LogEvent): string {
@@ -57,52 +50,84 @@ export function LogsPage() {
     let logLine = `[${timestamp}] [${levelBadge}] [${typeBadge}] ${event.message}`;
 
     // Add additional data if present
-    if (event.data && Object.keys(event.data).length > 0) {
-      const dataStr = JSON.stringify(event.data, null, 0);
-      logLine += ` | Data: ${dataStr}`;
+    if (event.data) {
+      let dataStr = "";
+
+      if (typeof event.data === 'string') {
+        // Data is already a string, use it directly
+        dataStr = event.data;
+      } else if (typeof event.data === 'object' && Object.keys(event.data).length > 0) {
+        // Data is an object, stringify it
+        dataStr = JSON.stringify(event.data, null, 0);
+      }
+
+      if (dataStr) {
+        logLine += ` | Data: ${dataStr}`;
+      }
     }
 
     return logLine;
   }
 
-  // Filter logs based on selected level
-  function filterLogs() {
-    let filteredLogs = allLogs;
-
-    if (logLevel !== 'all') {
-      filteredLogs = allLogs.filter(log =>
-        log.level.toLowerCase() === logLevel.toLowerCase()
-      );
-    }
-
-    const formattedLogs = filteredLogs.map(formatLogEvent);
-    setLogs(formattedLogs);
-
-    // Update error info for error level
-    if (logLevel === 'error') {
-      const errorLogs = filteredLogs;
-      setErrorInfo({
-        totalErrors: errorLogs.length,
-        lastError: errorLogs.length > 0 ? errorLogs[0].timestamp : undefined,
-      });
-    } else {
-      setErrorInfo(null);
-    }
-  }
-
-  // Fetch logs from API
+  // Fetch logs from appropriate API based on log level
   async function fetchLogs() {
-    setIsLoading(true);
-
     try {
-      const response = await fetchRecentLogs(500); // Fetch more logs for better filtering
-      setAllLogs(response.events);
+      let response;
+      let events: LogEvent[] = [];
+      let totalCount = 0;
+      let lastEvent: number | undefined;
+
+      switch (logLevel) {
+        case 'error':
+          response = await fetchErrorLogs(100);
+          events = response.errors;
+          totalCount = response.totalErrors;
+          lastEvent = response.lastError;
+          break;
+
+        case 'critical':
+          response = await fetchCriticalLogs(100);
+          events = response.critical;
+          totalCount = response.totalCritical;
+          lastEvent = response.lastCritical;
+          break;
+
+        case 'all':
+        case 'info':
+        case 'warn':
+        default:
+          response = await fetchRecentLogs(100);
+          events = response.events;
+
+          // Filter for specific levels if not 'all'
+          if (logLevel === 'info') {
+            events = events.filter(log => log.level.toLowerCase() === 'info');
+          } else if (logLevel === 'warn') {
+            events = events.filter(log => log.level.toLowerCase() === 'warning');
+          }
+
+          totalCount = events.length;
+          lastEvent = events.length > 0 ? events[0].timestamp : undefined;
+          break;
+      }
+
+      const formattedLogs = events.map(formatLogEvent);
+      setLogs(formattedLogs);
       setLastFetchTime(new Date());
+
+      // Update info for error and critical levels
+      if (logLevel === 'error' || logLevel === 'critical') {
+        setErrorInfo({
+          totalCount,
+          lastEvent,
+        });
+      } else {
+        setErrorInfo(null);
+      }
+
     } catch (error) {
       console.error('Failed to fetch logs:', error);
       setLogs(prev => [...prev, `Error fetching logs: ${error instanceof Error ? error.message : 'Unknown error'}`]);
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -114,7 +139,6 @@ export function LogsPage() {
   // Clear logs
   function clearLogs() {
     setLogs([]);
-    setAllLogs([]);
     setErrorInfo(null);
   }
 
@@ -156,10 +180,10 @@ export function LogsPage() {
 
       {errorInfo && (
         <div className='text-sm text-gray-400 mb-1'>
-          Total Errors: {errorInfo.totalErrors}
-          {errorInfo.lastError && (
+          Total {logLevel === 'error' ? 'Errors' : 'Critical Events'}: {errorInfo.totalCount}
+          {errorInfo.lastEvent && (
             <span className='ml-2'>
-              | Last Error: {new Date(errorInfo.lastError * 1000).toLocaleString()}
+              | Last {logLevel === 'error' ? 'Error' : 'Critical Event'}: {new Date(errorInfo.lastEvent * 1000).toLocaleString()}
             </span>
           )}
         </div>
