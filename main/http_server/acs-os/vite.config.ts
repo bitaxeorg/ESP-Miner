@@ -48,7 +48,7 @@ export default defineConfig(({ mode }) => {
                   "sec-fetch-site",
                   "sec-fetch-mode",
                   "sec-fetch-dest",
-                  "cookie",
+                  "origin",
                   "referer",
                 ];
 
@@ -58,6 +58,8 @@ export default defineConfig(({ mode }) => {
 
                 // Simplify User-Agent to reduce header size
                 proxyReq.setHeader("user-agent", "BitaxeUI/1.0");
+                // Set origin to the ESP32's address for proper authentication
+                proxyReq.setHeader("origin", API_TARGET);
 
                 console.log("Sending Request to Target:", req.method, req.url);
                 console.log("Request Headers:", Object.keys(proxyReq.getHeaders()));
