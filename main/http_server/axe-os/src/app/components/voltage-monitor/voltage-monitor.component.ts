@@ -38,6 +38,8 @@ type ViewMode = 'single-column' | 'multi-column' | 'collapsible' | 'tree';
   styleUrls: ['./voltage-monitor.component.scss']
 })
 export class VoltageMonitorComponent implements OnInit, OnDestroy {
+	private treeData: any[] = [];
+
   voltageStatus: VoltageMonitorStatus | null = null;
   systemInfo: ISystemInfo | null = null;
   combinedData: { 
@@ -48,6 +50,14 @@ export class VoltageMonitorComponent implements OnInit, OnDestroy {
   } | null = null;
   isLoading = true;
   error: string | null = null;
+
+	viewOptions = [
+    { label: 'Single', value: 'single-column', icon: 'pi pi-bars' },
+    { label: 'Multi', value: 'multi-column', icon: 'pi pi-th-large' },
+    { label: 'Collapsible', value: 'collapsible', icon: 'pi pi-list' },
+    { label: 'Tree', value: 'tree', icon: 'pi pi-sitemap' }
+  ];
+
   private destroy$ = new Subject<void>();
   private refreshInterval = 5000; // 5 seconds
   
@@ -82,8 +92,11 @@ export class VoltageMonitorComponent implements OnInit, OnDestroy {
 
   setView(view: ViewMode): void {
     this.currentView = view;
-    // Save preference
     localStorage.setItem('voltage-monitor-view', view);
+    // Clear tree cache when switching views
+    if (view !== 'tree') {
+      this.treeData = [];
+    }
   }
 
   toggleChain(chainId: number): void {
@@ -102,6 +115,18 @@ export class VoltageMonitorComponent implements OnInit, OnDestroy {
         chain.expanded = this.allExpanded;
       });
     }
+  }
+
+  onNodeExpand(event: any): void {
+    console.log('Node expand attempt:', event);
+  }
+
+  onNodeCollapse(event: any): void {
+    console.log('Node collapse attempt:', event);
+  }
+
+  onNodeSelect(event: any): void {
+    console.log('Node selected:', event);
   }
 
   private loadData(): void {
@@ -195,105 +220,99 @@ export class VoltageMonitorComponent implements OnInit, OnDestroy {
       chains
     };
   }
-  // Add this method to the component class
-  /* getTreeData(): any[] {
-  if (!this.combinedData || !this.combinedData.chains) {
-    return [];
-  }
-
-  return this.combinedData.chains.map(chain => ({
-    label: `Chain ${chain.chain_id}`,
-    data: `${chain.average_voltage.toFixed(2)}V | ${chain.average_frequency}MHz`,
-    expandedIcon: 'pi pi-folder-open',
-    collapsedIcon: 'pi pi-folder',
-    children: [
-      {
-        label: 'Statistics',
-        expandedIcon: 'pi pi-chart-bar',
-        collapsedIcon: 'pi pi-chart-bar',
-        children: [
-          { label: `Average Voltage: ${chain.average_voltage.toFixed(2)}V`, icon: 'pi pi-bolt' },
-          { label: `Healthy ASICs: ${chain.healthy_asics}`, icon: 'pi pi-check-circle' },
-          { label: `Failed ASICs: ${chain.failed_asics}`, icon: 'pi pi-times-circle' }
-        ]
-      },
-      {
-        label: `ASICs (${chain.asics.length})`,
-        expandedIcon: 'pi pi-microchip',
-        collapsedIcon: 'pi pi-microchip',
-        children: chain.asics.map(asic => ({
-          label: `ASIC ${asic.id}: ${asic.voltage.toFixed(2)}V`,
-          icon: asic.status === 'healthy' ? 'pi pi-check' :
-                asic.status === 'degraded' ? 'pi pi-exclamation-triangle' :
-                'pi pi-times',
-          styleClass: asic.status === 'healthy' ? 'text-green-600' :
-                     asic.status === 'degraded' ? 'text-orange-600' :
-                     'text-red-600'
-        }))
-      }
-    ]
-  }));
-} */
-/* getTreeData(): any[] {
-  if (!this.combinedData || !this.combinedData.chains) {
-    return [];
-  }
-
-  return [{
-    label: 'All Chains',
-    expanded: true,
-    children: this.combinedData.chains.map(chain => ({
-      label: `Chain ${chain.chain_id}`,
-      expanded: false,
-      children: [
-        { label: `Voltage: ${chain.average_voltage.toFixed(2)}V` },
-        { label: `Healthy ASICs: ${chain.healthy_asics}` }
-      ]
-    }))
-  }];
-} */
-
 getTreeData(): any[] {
-  if (!this.combinedData || !this.combinedData.chains) {
-    return [];
-  }
-
-  return [{
-    label: 'All Chains',
-    expanded: true,
-    expandedIcon: 'pi pi-folder-open',
-    collapsedIcon: 'pi pi-folder',
-    children: this.combinedData.chains.map(chain => ({
-      label: `Chain ${chain.chain_id}`,
-      expanded: false,
+  // Only rebuild if we don't have cached data
+  if (this.treeData.length === 0 && this.combinedData && this.combinedData.chains) {
+    console.log('Building tree data...');
+    this.treeData = [{
+      label: 'All Chains',
+      expanded: true,
       expandedIcon: 'pi pi-folder-open',
       collapsedIcon: 'pi pi-folder',
-      children: [
-        {
-          label: `Average Voltage: ${chain.average_voltage.toFixed(2)}V`,
-          icon: 'pi pi-bolt',
-          leaf: true
-        },
-        {
-          label: `Healthy ASICs: ${chain.healthy_asics}`,
-          icon: 'pi pi-check-circle',
-          styleClass: 'text-green-600',
-          leaf: true
-        },
-        {
-          label: `Degraded ASICs: ${chain.degraded_asics}`,
-          icon: 'pi pi-exclamation-circle',
-          styleClass: 'text-orange-600',
-          leaf: true
-        },
-        {
-          label: `Failed ASICs: ${chain.failed_asics}`,
-          icon: 'pi pi-times-circle',
-          styleClass: 'text-red-600',
-          leaf: true
-        }
-      ]
-    }))
-  }];
+      children: this.combinedData.chains.map(chain => ({
+        label: `Chain ${chain.chain_id}`,
+        expanded: false,
+        expandedIcon: 'pi pi-folder-open',
+        collapsedIcon: 'pi pi-folder',
+        children: [
+          {
+            label: 'Statistics',
+            icon: 'pi pi-chart-bar',
+            expanded: false,
+            children: [
+              {
+                label: `Average Voltage: ${chain.average_voltage.toFixed(2)}V`,
+                icon: 'pi pi-bolt',
+                leaf: true
+              },
+              {
+                label: `Total Hashrate: ${(chain.total_hashrate / 1000).toFixed(2)} TH/s`,
+                icon: 'pi pi-server',
+                leaf: true
+              },
+              {
+                label: `Healthy ASICs: ${chain.healthy_asics}`,
+                icon: 'pi pi-check-circle',
+                styleClass: 'text-green-600',
+                leaf: true
+              },
+              {
+                label: `Degraded ASICs: ${chain.degraded_asics}`,
+                icon: 'pi pi-exclamation-circle',
+                styleClass: 'text-orange-600',
+                leaf: true
+              },
+              {
+                label: `Failed ASICs: ${chain.failed_asics}`,
+                icon: 'pi pi-times-circle',
+                styleClass: 'text-red-600',
+                leaf: true
+              }
+            ]
+          },
+          {
+            label: `ASICs (${chain.asics.length})`,
+            icon: 'pi pi-microchip',
+            expanded: false,
+            children: chain.asics.map(asic => ({
+              label: `ASIC ${asic.id}`,
+              expanded: false,
+              icon: asic.status === 'healthy' ? 'pi pi-check' : 
+                    asic.status === 'degraded' ? 'pi pi-exclamation-triangle' : 
+                    'pi pi-times',
+              styleClass: asic.status === 'healthy' ? 'text-green-600' : 
+                         asic.status === 'degraded' ? 'text-orange-600' : 
+                         'text-red-600',
+              children: [
+                {
+                  label: `Voltage: ${asic.voltage.toFixed(3)}V`,
+                  icon: 'pi pi-bolt',
+                  leaf: true
+                },
+                {
+                  label: `Frequency: ${asic.frequency} MHz`,
+                  icon: 'pi pi-chart-line',
+                  leaf: true
+                },
+                {
+                  label: `Hashrate: ${asic.hashrate.toFixed(1)} GH/s`,
+                  icon: 'pi pi-server',
+                  leaf: true
+                },
+                {
+                  label: `Status: ${asic.status}`,
+                  styleClass: asic.status === 'healthy' ? 'text-green-600' : 
+                             asic.status === 'degraded' ? 'text-orange-600' : 
+                             'text-red-600',
+                  leaf: true
+                }
+              ]
+            }))
+          }
+        ]
+      }))
+    }];
+  }
+  return this.treeData;
 }
 }

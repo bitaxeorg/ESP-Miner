@@ -17,6 +17,7 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { PanelModule } from 'primeng/panel';
 
 import { TreeModule } from 'primeng/tree';
+import { SelectButtonModule } from 'primeng/selectbutton';
 
 const primeNgModules = [
     SidebarModule,
@@ -35,6 +36,7 @@ const primeNgModules = [
     ProgressSpinnerModule,
     PanelModule,
     TreeModule,
+    SelectButtonModule,
     AccordionModule
 ];
 

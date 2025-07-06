@@ -35,41 +35,28 @@
     </div>
 
     <!-- View Controls -->
-    <div class="view-controls" *ngIf="combinedData.hardware_present && combinedData.chains">
-      <button pButton type="button" 
-              [label]="'Single Column'" 
-              [class.p-button-outlined]="currentView !== 'single-column'"
-              (click)="setView('single-column')"
-              class="p-button-sm mr-2">
-      </button>
-      <button pButton type="button" 
-              [label]="'Multi Column'" 
-              [class.p-button-outlined]="currentView !== 'multi-column'"
-              (click)="setView('multi-column')"
-              class="p-button-sm mr-2">
-      </button>
-      <button pButton type="button" 
-              [label]="'Collapsible'" 
-              [class.p-button-outlined]="currentView !== 'collapsible'"
-              (click)="setView('collapsible')"
-              class="p-button-sm mr-2">
-      </button>
-      <button pButton type="button" 
-              [label]="'Tree View'" 
-              [class.p-button-outlined]="currentView !== 'tree'"
-              (click)="setView('tree')"
-              class="p-button-sm mr-2">
-      </button>
-      
-      <!-- Expand/Collapse All for collapsible view -->
-      <button *ngIf="currentView === 'collapsible'" 
-              pButton type="button" 
-              [label]="allExpanded ? 'Collapse All' : 'Expand All'" 
-              icon="pi pi-angle-double-down"
-              (click)="toggleAllChains()"
-              class="p-button-sm p-button-secondary ml-auto">
-      </button>
-    </div>
+<!-- Replace the entire view-controls div with this -->
+<div class="view-controls" *ngIf="combinedData.hardware_present && combinedData.chains">
+  <p-selectButton [options]="viewOptions" 
+                  [(ngModel)]="currentView"
+                  (onChange)="setView($event.value)"
+                  optionLabel="label" 
+                  optionValue="value">
+    <ng-template let-item>
+      <i [class]="item.icon"></i>
+      <span class="ml-2">{{item.label}}</span>
+    </ng-template>
+  </p-selectButton>
+  
+  <!-- Expand/Collapse All for collapsible view -->
+  <button *ngIf="currentView === 'collapsible'" 
+          pButton type="button" 
+          [label]="allExpanded ? 'Collapse All' : 'Expand All'" 
+          icon="pi pi-angle-double-down"
+          (click)="toggleAllChains()"
+          class="p-button-sm p-button-secondary ml-3">
+  </button>
+</div>
 
     <!-- Single Column View (Original) -->
     <div *ngIf="currentView === 'single-column' && combinedData.hardware_present && combinedData.chains" 
@@ -239,12 +226,13 @@
     <!-- Tree View -->
 <div *ngIf="currentView === 'tree' && combinedData.hardware_present && combinedData.chains" 
      class="chains-container single-column">
-  <p-tree [value]="getTreeData()" 
-          styleClass="voltage-tree"
-          [propagateSelectionUp]="false"
-          [propagateSelectionDown]="false"
-          selectionMode="single">
-  </p-tree>
+
+<p-tree [value]="getTreeData()" 
+        (onNodeExpand)="onNodeExpand($event)"
+        (onNodeCollapse)="onNodeCollapse($event)"
+        (onNodeSelect)="onNodeSelect($event)">
+</p-tree>
+
 </div>
     <div *ngIf="!combinedData.hardware_present" class="no-hardware">
       <i class="pi pi-info-circle"></i>
