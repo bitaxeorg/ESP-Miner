@@ -1,17 +1,41 @@
-git commit -m "Implement multi-view layouts - single, multi-column, collapsible working. Tree view pending fixes"
+gh pr create \
+  --repo bitaxeorg/ESP-Miner \
+  --base master \
+  --head ahmedalalousi:voltage-monitor-layouts \
+  --title "Add voltage monitoring with multi-view layouts" \
+  --body "## Description
+This PR finalises the voltage monitoring capabilities with multiple view options for the AxeOS UI.
 
-# Push to the remote branch
-git push origin voltage-monitor-layouts
-Verify the push:
-bash# Check the log to confirm your commit
-git log --oneline -3
+## Features Added
+- **Single Column View**: Original layout with colored ASIC status boxes
+- **Multi-Column View**: Chains displayed in responsive grid layout  
+- **Collapsible View**: Accordion-style expandable chains
+- **Tree View**: Fully hierarchical and comprehensive view now fully functional
+- **View control**: now uses PrimeNG segmented button control
 
-# Check the remote branch status
-git branch -vv
-After pushing, you'll have a safe checkpoint of:
+## Visual Changes
+- ASICs displayed as colored boxes:
+  - Green: Healthy (1.1V - 1.4V)
+  - Amber: Degraded (0.8V - 1.1V or >1.4V)
+  - Red: Fault (<0.8V or invalid)
+- Each ASIC shows voltage, frequency, and hash rate
+- Real-time updates every 5 seconds
 
-✅ Single column view working with colored boxes
-✅ Multi-column view with proper grid layout
-✅ Collapsible/accordion view working
-✅ Tree view displaying now working and fully interactive
-✅ View control now uses PrimeNG segmented button control
+## Implementation Details
+- Uses existing voltage monitoring API endpoints
+- Integrates with system data for frequency/hashrate
+- Saves user's preferred view in localStorage
+- Responsive design for different screen sizes
+
+## Testing
+- Tested with mock server (included in `/mock-server`)
+- Supports variable number of chains and ASICs
+- No hardware required for UI development
+
+## Known Issues
+- None
+
+## Related
+- Builds on PR #[previous PR number if any]
+- Requires voltage monitoring firmware support
+"
