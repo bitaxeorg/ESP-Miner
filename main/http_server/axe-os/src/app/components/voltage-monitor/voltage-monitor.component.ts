@@ -26,7 +26,11 @@ interface CombinedChainData {
   healthy_asics: number;
   degraded_asics: number;
   failed_asics: number;
+  // Add for collapsible view
+  expanded?: boolean;
 }
+
+type ViewMode = 'single-column' | 'multi-column' | 'collapsible' | 'tree';
 
 @Component({
   selector: 'app-voltage-monitor',
@@ -46,6 +50,10 @@ export class VoltageMonitorComponent implements OnInit, OnDestroy {
   error: string | null = null;
   private destroy$ = new Subject<void>();
   private refreshInterval = 5000; // 5 seconds
+  
+  // View controls
+  currentView: ViewMode = 'single-column';
+  allExpanded = false;
 
   constructor(
     private voltageService: VoltageService,
@@ -53,6 +61,12 @@ export class VoltageMonitorComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    // Load saved view preference
+    const savedView = localStorage.getItem('voltage-monitor-view');
+    if (savedView) {
+      this.currentView = savedView as ViewMode;
+    }
+    
     this.loadData();
     
     // Auto-refresh every 5 seconds
@@ -64,6 +78,30 @@ export class VoltageMonitorComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  setView(view: ViewMode): void {
+    this.currentView = view;
+    // Save preference
+    localStorage.setItem('voltage-monitor-view', view);
+  }
+
+  toggleChain(chainId: number): void {
+    if (this.combinedData && this.combinedData.chains) {
+      const chain = this.combinedData.chains.find(c => c.chain_id === chainId);
+      if (chain) {
+        chain.expanded = !chain.expanded;
+      }
+    }
+  }
+
+  toggleAllChains(): void {
+    if (this.combinedData && this.combinedData.chains) {
+      this.allExpanded = !this.allExpanded;
+      this.combinedData.chains.forEach(chain => {
+        chain.expanded = this.allExpanded;
+      });
+    }
   }
 
   private loadData(): void {
@@ -131,6 +169,9 @@ export class VoltageMonitorComponent implements OnInit, OnDestroy {
       const avgFrequency = chain.suggested_frequency || systemFrequency;
       const totalHashrate = combinedAsics.reduce((sum, a) => sum + a.hashrate, 0);
 
+      // Preserve expanded state if it exists
+      const existingChain = this.combinedData?.chains?.find(c => c.chain_id === chain.chain_id);
+      
       return {
         chain_id: chain.chain_id,
         asics: combinedAsics,
@@ -142,7 +183,8 @@ export class VoltageMonitorComponent implements OnInit, OnDestroy {
         total_hashrate: totalHashrate,
         healthy_asics: healthyAsics,
         degraded_asics: degradedAsics,
-        failed_asics: failedAsics
+        failed_asics: failedAsics,
+        expanded: existingChain?.expanded ?? false
       };
     });
 
@@ -153,4 +195,105 @@ export class VoltageMonitorComponent implements OnInit, OnDestroy {
       chains
     };
   }
+  // Add this method to the component class
+  /* getTreeData(): any[] {
+  if (!this.combinedData || !this.combinedData.chains) {
+    return [];
+  }
+
+  return this.combinedData.chains.map(chain => ({
+    label: `Chain ${chain.chain_id}`,
+    data: `${chain.average_voltage.toFixed(2)}V | ${chain.average_frequency}MHz`,
+    expandedIcon: 'pi pi-folder-open',
+    collapsedIcon: 'pi pi-folder',
+    children: [
+      {
+        label: 'Statistics',
+        expandedIcon: 'pi pi-chart-bar',
+        collapsedIcon: 'pi pi-chart-bar',
+        children: [
+          { label: `Average Voltage: ${chain.average_voltage.toFixed(2)}V`, icon: 'pi pi-bolt' },
+          { label: `Healthy ASICs: ${chain.healthy_asics}`, icon: 'pi pi-check-circle' },
+          { label: `Failed ASICs: ${chain.failed_asics}`, icon: 'pi pi-times-circle' }
+        ]
+      },
+      {
+        label: `ASICs (${chain.asics.length})`,
+        expandedIcon: 'pi pi-microchip',
+        collapsedIcon: 'pi pi-microchip',
+        children: chain.asics.map(asic => ({
+          label: `ASIC ${asic.id}: ${asic.voltage.toFixed(2)}V`,
+          icon: asic.status === 'healthy' ? 'pi pi-check' :
+                asic.status === 'degraded' ? 'pi pi-exclamation-triangle' :
+                'pi pi-times',
+          styleClass: asic.status === 'healthy' ? 'text-green-600' :
+                     asic.status === 'degraded' ? 'text-orange-600' :
+                     'text-red-600'
+        }))
+      }
+    ]
+  }));
+} */
+/* getTreeData(): any[] {
+  if (!this.combinedData || !this.combinedData.chains) {
+    return [];
+  }
+
+  return [{
+    label: 'All Chains',
+    expanded: true,
+    children: this.combinedData.chains.map(chain => ({
+      label: `Chain ${chain.chain_id}`,
+      expanded: false,
+      children: [
+        { label: `Voltage: ${chain.average_voltage.toFixed(2)}V` },
+        { label: `Healthy ASICs: ${chain.healthy_asics}` }
+      ]
+    }))
+  }];
+} */
+
+getTreeData(): any[] {
+  if (!this.combinedData || !this.combinedData.chains) {
+    return [];
+  }
+
+  return [{
+    label: 'All Chains',
+    expanded: true,
+    expandedIcon: 'pi pi-folder-open',
+    collapsedIcon: 'pi pi-folder',
+    children: this.combinedData.chains.map(chain => ({
+      label: `Chain ${chain.chain_id}`,
+      expanded: false,
+      expandedIcon: 'pi pi-folder-open',
+      collapsedIcon: 'pi pi-folder',
+      children: [
+        {
+          label: `Average Voltage: ${chain.average_voltage.toFixed(2)}V`,
+          icon: 'pi pi-bolt',
+          leaf: true
+        },
+        {
+          label: `Healthy ASICs: ${chain.healthy_asics}`,
+          icon: 'pi pi-check-circle',
+          styleClass: 'text-green-600',
+          leaf: true
+        },
+        {
+          label: `Degraded ASICs: ${chain.degraded_asics}`,
+          icon: 'pi pi-exclamation-circle',
+          styleClass: 'text-orange-600',
+          leaf: true
+        },
+        {
+          label: `Failed ASICs: ${chain.failed_asics}`,
+          icon: 'pi pi-times-circle',
+          styleClass: 'text-red-600',
+          leaf: true
+        }
+      ]
+    }))
+  }];
+}
 }

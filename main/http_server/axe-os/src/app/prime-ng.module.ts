@@ -16,6 +16,8 @@ import { AccordionModule } from 'primeng/accordion';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { PanelModule } from 'primeng/panel';
 
+import { TreeModule } from 'primeng/tree';
+
 const primeNgModules = [
     SidebarModule,
     InputTextModule,
@@ -28,10 +30,12 @@ const primeNgModules = [
     InputGroupModule,
     InputGroupAddonModule,
     RadioButtonModule,
-    CardModule,           // Add this
-    AccordionModule,      // Add this
-    ProgressSpinnerModule,// Add this
-    PanelModule          // Add this
+    CardModule,
+    AccordionModule,
+    ProgressSpinnerModule,
+    PanelModule,
+    TreeModule,
+    AccordionModule
 ];
 
 @NgModule({
