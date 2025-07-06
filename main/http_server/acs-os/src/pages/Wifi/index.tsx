@@ -1,6 +1,7 @@
 import { useState, useEffect } from "preact/hooks";
 import { Button } from "../../components/Button";
 import { setSSID, getSystemInfo, scanWifiNetworks, WifiNetwork } from "../../utils/api";
+import { logger } from "../../utils/logger";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
 import { PageHeading } from "../../components/PageHeading";
@@ -54,7 +55,7 @@ export function WifiPage() {
         setSelectedNetworkType("other");
       }
     } catch (error) {
-      console.error("Failed to scan networks:", error);
+      logger.error("Failed to scan networks:", error);
       showToast("Failed to scan for networks", "error");
       setSelectedNetworkType("other");
     } finally {
@@ -74,7 +75,7 @@ export function WifiPage() {
           hostname: systemInfo.hostname || "",
         });
       } catch (error) {
-        console.error("Failed to fetch WiFi status:", error);
+        logger.error("Failed to fetch WiFi status:", error);
       }
     };
 
@@ -93,7 +94,7 @@ export function WifiPage() {
         hostname: systemInfo.hostname || "",
       });
     } catch (error) {
-      console.error("Failed to refresh WiFi status:", error);
+      logger.error("Failed to refresh WiFi status:", error);
     }
   };
 
@@ -163,7 +164,7 @@ export function WifiPage() {
         showToast(result.message, "error");
       }
     } catch (error) {
-      console.error("Failed to set SSID:", error);
+      logger.error("Failed to set SSID:", error);
       showToast(error instanceof Error ? error.message : "Failed to configure Wi-Fi", "error");
     } finally {
       setLoading(false);
@@ -255,7 +256,7 @@ export function WifiPage() {
                     id='network-select'
                     value={selectedNetworkType === "available" ? selectedSSID : "other"}
                     onChange={handleNetworkSelection}
-                    className='w-full p-2 border border-slate-700 rounded-md bg-[var(--input-bg)] mb-2'
+                    className='w-full p-2 pr-8 border border-slate-700 rounded-md bg-[var(--input-bg)] mb-2'
                     disabled={loading || scanning}
                   >
                     {availableNetworks.map((network) => (

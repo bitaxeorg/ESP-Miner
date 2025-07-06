@@ -1,5 +1,6 @@
 import { SystemInfo } from "./types/systemInfo";
 import { formatRelativeTime } from "./formatters";
+import { logger } from "./logger";
 
 // Re-export SystemInfo type for convenience
 export type { SystemInfo };
@@ -34,7 +35,7 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 
     return systemInfo;
   } catch (error) {
-    console.error("Failed to fetch system info:", error);
+    logger.apiError("fetch system info", error);
     throw error;
   }
 }
@@ -65,7 +66,7 @@ export async function fetchMiners(): Promise<SystemInfo[]> {
     // In a multi-miner setup, this would be expanded to query multiple miners
     return [enhancedMinerInfo];
   } catch (error) {
-    console.error("Failed to fetch miners:", error);
+    logger.apiError("fetch miners", error);
     // Return an empty array on error
     return [];
   }
@@ -76,13 +77,11 @@ export async function fetchMiners(): Promise<SystemInfo[]> {
  * @param stratumURL - The primary stratum URL
  * @param stratumPort - The primary stratum port
  * @param stratumPassword - Optional password for primary pool
- * @param stratumUser - Optional BTC address for primary pool
+ * @param stratumUser - The stratum user (BTC address for predefined pools, worker name for custom pools)
  * @param fallbackStratumURL - Optional fallback stratum URL
  * @param fallbackStratumPort - Optional fallback stratum port
  * @param fallbackStratumPassword - Optional password for fallback pool
- * @param fallbackStratumUser - Optional BTC address for fallback pool
- * @param stratumWorkerName - Optional worker name for primary pool
- * @param fallbackStratumWorkerName - Optional worker name for fallback pool
+ * @param fallbackStratumUser - The fallback stratum user (BTC address for predefined pools, worker name for custom pools)
  * @returns The response from the API or a success message
  */
 export async function updatePoolInfo(
@@ -93,9 +92,7 @@ export async function updatePoolInfo(
   fallbackStratumURL?: string,
   fallbackStratumPort?: number | null,
   fallbackStratumPassword?: string,
-  fallbackStratumUser?: string,
-  stratumWorkerName?: string,
-  fallbackStratumWorkerName?: string
+  fallbackStratumUser?: string
 ): Promise<any> {
   try {
     const payload: any = {
@@ -128,14 +125,6 @@ export async function updatePoolInfo(
       payload.fallbackStratumUser = fallbackStratumUser;
     }
 
-    if (stratumWorkerName) {
-      payload.stratumWorkerName = stratumWorkerName;
-    }
-
-    if (fallbackStratumWorkerName) {
-      payload.fallbackStratumWorkerName = fallbackStratumWorkerName;
-    }
-
     const response = await fetch("/api/system", {
       method: "PATCH",
       headers: {
@@ -154,19 +143,19 @@ export async function updatePoolInfo(
     if (text.trim()) {
       try {
         const result = JSON.parse(text);
-        console.log("Pool info update response:", result);
+        logger.apiResponse("pool info update", result);
         return result;
       } catch {
-        console.log("Response is not JSON:", text);
+        logger.debug("Response is not JSON", { text });
         return { success: true, message: "Pool information updated successfully" };
       }
     }
 
     // For empty responses with 200 status
-    console.log("Pool info update successful (empty response)");
+    logger.debug("Pool info update successful (empty response)");
     return { success: true, message: "Pool information updated successfully" };
   } catch (error) {
-    console.error("Failed to update pool info:", error);
+    logger.apiError("update pool info", error);
     throw error;
   }
 }
@@ -184,7 +173,7 @@ export async function updateFirmware(): Promise<{ success: boolean; message: str
     }
     const firmwareBlob = await firmwareResponse.blob();
 
-    console.log("Firmware blob:", firmwareBlob);
+    logger.debug("Firmware blob size", { size: firmwareBlob.size, type: firmwareBlob.type });
 
     // Then, send the firmware blob to the OTA endpoint
     const response = await fetch("/api/system/OTA", {
@@ -200,10 +189,10 @@ export async function updateFirmware(): Promise<{ success: boolean; message: str
     }
 
     const result = await response.json();
-    console.log("Firmware update response:", result);
+    logger.apiResponse("firmware update", result);
     return { success: true, message: result.message || "Firmware update initiated successfully" };
   } catch (error) {
-    console.error("Failed to update firmware:", error);
+    logger.apiError("update firmware", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred",
@@ -232,10 +221,10 @@ export async function uploadFirmware(file: File): Promise<{ success: boolean; me
     }
 
     const result = await response.json();
-    console.log("Firmware upload response:", result);
+    logger.apiResponse("firmware upload", result);
     return { success: true, message: result.message || "Firmware uploaded successfully" };
   } catch (error) {
-    console.error("Failed to upload firmware:", error);
+    logger.apiError("upload firmware", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred",
@@ -257,18 +246,18 @@ export async function waitForFirmwareUpdate(
 ): Promise<{ success: boolean; currentVersion?: string; message: string }> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`Polling attempt ${attempt}/${maxRetries}...`);
+      logger.debug(`Polling attempt ${attempt}/${maxRetries}...`);
 
       // Try to get system info
       const systemInfo = await getSystemInfo();
 
       if (systemInfo && systemInfo.version) {
         // Device is back online
-        console.log(`Device online with version: ${systemInfo.version}`);
+        logger.debug(`Device online with version: ${systemInfo.version}`);
 
         // If we have an expected version, check if it matches
         if (expectedVersion && systemInfo.version !== expectedVersion) {
-          console.log(`Version mismatch: expected ${expectedVersion}, got ${systemInfo.version}`);
+          logger.debug(`Version mismatch: expected ${expectedVersion}, got ${systemInfo.version}`);
           // Continue polling if version doesn't match
         } else {
           return {
@@ -279,7 +268,7 @@ export async function waitForFirmwareUpdate(
         }
       }
     } catch (error) {
-      console.log(
+      logger.debug(
         `Attempt ${attempt} failed:`,
         error instanceof Error ? error.message : "Unknown error"
       );
@@ -318,10 +307,10 @@ export async function restartSystem(): Promise<string> {
     }
 
     const result = await response.text();
-    console.log("System restart response:", result);
+    logger.apiResponse("system restart", result);
     return result;
   } catch (error) {
-    console.error("Failed to restart system:", error);
+    logger.apiError("restart system", error);
     throw error;
   }
 }
@@ -347,10 +336,10 @@ export async function uploadWebApp(file: File): Promise<{ success: boolean; mess
     }
 
     const result = await response.json();
-    console.log("Web app upload response:", result);
+    logger.apiResponse("web app upload", result);
     return { success: true, message: result.message || "Web app uploaded successfully" };
   } catch (error) {
-    console.error("Failed to upload web app:", error);
+    logger.apiError("upload web app", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred",
@@ -390,8 +379,8 @@ export async function scanWifiNetworks(): Promise<{
       throw new Error(`API error: ${response.status}`);
     }
 
+    logger.debug("WiFi scan response received", { status: response.status });
     const result: WifiScanResponse = await response.json();
-    console.log("WiFi scan response:", result);
 
     return {
       success: true,
@@ -399,7 +388,7 @@ export async function scanWifiNetworks(): Promise<{
       message: "WiFi networks scanned successfully"
     };
   } catch (error) {
-    console.error("Failed to scan WiFi networks:", error);
+    logger.apiError("scan WiFi networks", error);
     return {
       success: false,
       networks: [],
@@ -426,10 +415,10 @@ export async function setSSID(
     }
 
     const result = await response.json();
-    console.log("SSID set response:", result);
+    logger.apiResponse("SSID set", result);
     return { success: true, message: result.message || "SSID set successfully" };
   } catch (error) {
-    console.error("Failed to set SSID:", error);
+    logger.apiError("set SSID", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred",
@@ -475,19 +464,19 @@ export async function updateFanSettings(
     if (text.trim()) {
       try {
         const result = JSON.parse(text);
-        console.log("Fan settings update response:", result);
+        logger.apiResponse("fan settings update", result);
         return result;
       } catch {
-        console.log("Response is not JSON:", text);
+        logger.debug("Response is not JSON", { text });
         return { success: true, message: "Fan settings updated successfully" };
       }
     }
 
     // For empty responses with 200 status
-    console.log("Fan settings update successful (empty response)");
+    logger.debug("Fan settings update successful (empty response)");
     return { success: true, message: "Fan settings updated successfully" };
   } catch (error) {
-    console.error("Failed to update fan settings:", error);
+    logger.apiError("update fan settings", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred",
@@ -529,19 +518,19 @@ export async function updateASICSettings(
     if (text.trim()) {
       try {
         const result = JSON.parse(text);
-        console.log("ASIC settings update response:", result);
+        logger.apiResponse("ASIC settings update", result);
         return result;
       } catch {
-        console.log("Response is not JSON:", text);
+        logger.debug("Response is not JSON", { text });
         return { success: true, message: "ASIC settings updated successfully" };
       }
     }
 
     // For empty responses with 200 status
-    console.log("ASIC settings update successful (empty response)");
+    logger.debug("ASIC settings update successful (empty response)");
     return { success: true, message: "ASIC settings updated successfully" };
   } catch (error) {
-    console.error("Failed to update ASIC settings:", error);
+    logger.apiError("update ASIC settings", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred",
@@ -580,10 +569,10 @@ export async function updatePresetSettings(
     if (text.trim()) {
       try {
         const result = JSON.parse(text);
-        console.log("Preset settings update response:", result);
+        logger.apiResponse("preset settings update", result);
         return result;
       } catch {
-        console.log("Response is not JSON:", text);
+        logger.debug("Response is not JSON", { text });
         return {
           status: "success",
           message: `${presetName} mode applied successfully`,
@@ -594,7 +583,7 @@ export async function updatePresetSettings(
     }
 
     // For empty responses with 200 status
-    console.log("Preset settings update successful (empty response)");
+    logger.debug("Preset settings update successful (empty response)");
     return {
       status: "success",
       message: `${presetName} mode applied successfully`,
@@ -602,7 +591,7 @@ export async function updatePresetSettings(
       timestamps: [],
     };
   } catch (error) {
-    console.error("Failed to update preset settings:", error);
+    logger.apiError("update preset settings", error);
     return {
       status: "error",
       message: error instanceof Error ? error.message : "Unknown error occurred",
@@ -643,19 +632,19 @@ export async function updateYouTubeUrl(
     if (text.trim()) {
       try {
         const result = JSON.parse(text);
-        console.log("YouTube URL update response:", result);
+        logger.apiResponse("YouTube URL update", result);
         return result;
       } catch {
-        console.log("Response is not JSON:", text);
+        logger.debug("Response is not JSON", { text });
         return { success: true, message: "YouTube URL updated successfully" };
       }
     }
 
     // For empty responses with 200 status
-    console.log("YouTube URL update successful (empty response)");
+    logger.debug("YouTube URL update successful (empty response)");
     return { success: true, message: "YouTube URL updated successfully" };
   } catch (error) {
-    console.error("Failed to update YouTube URL:", error);
+    logger.apiError("update YouTube URL", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error occurred",
@@ -698,10 +687,10 @@ export async function fetchLatestRelease(): Promise<GitHubRelease> {
     }
 
     const release = await response.json();
-    console.log("Latest release:", release.tag_name);
+    logger.debug("Latest release:", release.tag_name);
     return release;
   } catch (error) {
-    console.error("Failed to fetch latest release:", error);
+    logger.apiError("fetch latest release", error);
     throw error;
   }
 }
@@ -720,7 +709,7 @@ export function isNewerVersion(current: string, latest: string): boolean {
   const cleanCurrent = cleanVersionString(current);
   const cleanLatest = cleanVersionString(latest);
 
-  console.log("Version comparison:", {
+  logger.debug("Version comparison:", {
     original: { current, latest },
     cleaned: { current: cleanCurrent, latest: cleanLatest },
     areEqual: cleanCurrent === cleanLatest,
@@ -898,7 +887,7 @@ export async function fetchRecentLogs(limit?: number): Promise<{
       count: data.count || 0,
     };
   } catch (error) {
-    console.error("Failed to fetch recent logs:", error);
+    logger.apiError("fetch recent logs", error);
     return {
       events: [],
       count: 0,
@@ -923,7 +912,7 @@ export async function fetchErrorLogs(limit?: number): Promise<{
       params.append("limit", limit.toString());
     }
 
-    const url = `/api/logs/errors${params.toString() ? `?${params.toString()}` : ""}`;
+    const url = `/api/logs/error${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -938,11 +927,52 @@ export async function fetchErrorLogs(limit?: number): Promise<{
       lastError: data.lastError,
     };
   } catch (error) {
-    console.error("Failed to fetch error logs:", error);
+    logger.apiError("fetch error logs", error);
     return {
       errors: [],
       count: 0,
       totalErrors: 0,
+    };
+  }
+}
+
+/**
+ * Fetch critical logs
+ * @param limit - Maximum number of critical events to return (default: all critical events)
+ * @returns Array of critical log events with additional metadata
+ */
+export async function fetchCriticalLogs(limit?: number): Promise<{
+  critical: LogEvent[];
+  count: number;
+  totalCritical: number;
+  lastCritical?: number;
+}> {
+  try {
+    const params = new URLSearchParams();
+    if (limit !== undefined) {
+      params.append("limit", limit.toString());
+    }
+
+    const url = `/api/logs/critical${params.toString() ? `?${params.toString()}` : ""}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      critical: data.critical || [],
+      count: data.count || 0,
+      totalCritical: data.totalCritical || 0,
+      lastCritical: data.lastCritical,
+    };
+  } catch (error) {
+    logger.apiError("fetch critical logs", error);
+    return {
+      critical: [],
+      count: 0,
+      totalCritical: 0,
     };
   }
 }
@@ -1033,7 +1063,7 @@ export async function validateYouTubeChannel(url: string): Promise<{
       };
     }
   } catch (error) {
-    console.error("YouTube validation error:", error);
+    logger.apiError("YouTube validation", error);
     return {
       isValid: false,
       error: error instanceof Error ? error.message : "Failed to validate YouTube channel"
@@ -1090,7 +1120,7 @@ export async function getUploadsPlaylistId(channelId: string): Promise<{
       return { success: false, error: "Channel not found" };
     }
   } catch (error) {
-    console.error("Failed to get uploads playlist ID:", error);
+    logger.apiError("get uploads playlist ID", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to get uploads playlist ID"
@@ -1147,7 +1177,7 @@ export async function fetchLatestVideos(uploadsPlaylistId: string): Promise<{
       return { success: false, error: "No videos found" };
     }
   } catch (error) {
-    console.error("Failed to fetch latest videos:", error);
+    logger.apiError("fetch latest videos", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to fetch latest videos"
@@ -1215,7 +1245,7 @@ export async function fetchYouTubeStats(channelId: string): Promise<{
       };
     }
   } catch (error) {
-    console.error("YouTube stats fetch error:", error);
+    logger.apiError("fetch YouTube stats", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to fetch YouTube stats"
@@ -1254,7 +1284,7 @@ export async function postYouTubeStatsToESP(data: {
     const result = await response.json();
     return { success: true, message: result.message || "Stats posted successfully" };
   } catch (error) {
-    console.error("Failed to post YouTube stats to ESP:", error);
+    logger.apiError("post YouTube stats to ESP", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to post stats to ESP"

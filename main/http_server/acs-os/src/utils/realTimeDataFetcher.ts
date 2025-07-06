@@ -1,6 +1,7 @@
 import { ChartDataPoint } from "../components/Chart/config";
 import { Time } from "lightweight-charts";
 import { getSystemInfo } from "./api";
+import { logger } from "./logger";
 import { SystemInfo } from "./types/systemInfo";
 
 export type DataField =
@@ -36,7 +37,7 @@ export class RealTimeDataFetcher {
         value: Number(value.toFixed(2)),
       };
     } catch (error) {
-      console.error("Failed to fetch system info:", error);
+      logger.error("Failed to fetch system info:", error);
       return null;
     }
   }
@@ -55,7 +56,7 @@ export class RealTimeDataFetcher {
         value: Number(currentValue.toFixed(2)),
       }];
     } catch (error) {
-      console.error("Failed to get initial data:", error);
+      logger.error("Failed to get initial data:", error);
 
       // If API fails, return empty array - chart will wait for real-time data
       return [];

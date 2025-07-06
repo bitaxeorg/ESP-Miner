@@ -1,9 +1,10 @@
-import { useState } from "preact/hooks";
+import { useState, useEffect } from "preact/hooks";
 import { ActionCard } from "../../components/ActionCard";
 import { Button } from "../../components/Button";
 import { Container } from "../../components/Container";
 import { PageHeading } from "../../components/PageHeading";
-import { updatePresetSettings, updateYouTubeUrl, validateYouTubeChannel } from "../../utils/api";
+import { updatePresetSettings, updateYouTubeUrl, validateYouTubeChannel, getSystemInfo, SystemInfo } from "../../utils/api";
+import { logger } from "../../utils/logger";
 import { useToast } from "../../context/ToastContext";
 import { Volume2, BarChart3, Zap } from "lucide-preact";
 
@@ -39,11 +40,47 @@ const modeCards: ModeCard[] = [
 
 export function Settings() {
   const { showToast } = useToast();
-  const [selectedMode, setSelectedMode] = useState<PresetMode | null>(null);
+    const [selectedMode, setSelectedMode] = useState<PresetMode | null>(null);
+  const [currentMode, setCurrentMode] = useState<PresetMode | null>(null);
   const [loading, setLoading] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [youtubeLoading, setYoutubeLoading] = useState(false);
   const [validatedChannelId, setValidatedChannelId] = useState<string>("");
+  const [fetchingInfo, setFetchingInfo] = useState(true);
+
+  // Helper function to get the current preset from SystemInfo
+  const getCurrentPreset = (info: SystemInfo): PresetMode | null => {
+    // Support both current and future key names
+    const presetValue = info.autotune_preset || (info as any).autotunePreset;
+    if (presetValue && typeof presetValue === 'string') {
+      const preset = presetValue.toLowerCase() as PresetMode;
+      if (['quiet', 'balanced', 'turbo'].includes(preset)) {
+        return preset;
+      }
+    }
+    return null;
+  };
+
+  // Fetch system info on component mount
+  useEffect(() => {
+    const fetchSystemInfo = async () => {
+      try {
+        setFetchingInfo(true);
+        const info = await getSystemInfo();
+
+        const currentPreset = getCurrentPreset(info);
+        setCurrentMode(currentPreset);
+        setSelectedMode(currentPreset); // Initialize selected mode to current
+      } catch (error) {
+        logger.error("Failed to fetch system info:", error);
+        showToast("Failed to load current settings", "error");
+      } finally {
+        setFetchingInfo(false);
+      }
+    };
+
+    fetchSystemInfo();
+  }, [showToast]);
 
   const handleModeSelect = (mode: PresetMode) => {
     setSelectedMode(mode);
@@ -76,11 +113,12 @@ export function Settings() {
 
       if (result.status === "success") {
         showToast(result.message, "success");
+        setCurrentMode(selectedMode); // Update current mode after successful save
       } else {
         showToast(result.message, "error");
       }
     } catch (error) {
-      console.error("Failed to save preset settings:", error);
+      logger.error("Failed to save preset settings:", error);
       showToast("Failed to save settings", "error");
     } finally {
       setLoading(false);
@@ -146,11 +184,26 @@ export function Settings() {
           description='Adjust your device for quiet operation, balanced performance, or maximum hashing power—just tap and save.'
         >
           <div className='space-y-6'>
+            {/* Current Setting Display */}
+            {!fetchingInfo && currentMode && (
+              <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                  <span className="text-blue-100 text-sm">
+                    Currently using: <span className="font-semibold text-white">
+                      {currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} Mode
+                    </span>
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Mode Selection Cards */}
             <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
               {modeCards.map((mode) => {
                 const Icon = mode.icon;
                 const isSelected = selectedMode === mode.id;
+                const isCurrent = currentMode === mode.id;
 
                 return (
                   <div
@@ -198,6 +251,16 @@ export function Settings() {
                       </p>
                     </div>
 
+                    {/* Current mode indicator */}
+                    {isCurrent && (
+                      <div className='absolute top-2 left-2'>
+                        <div className='flex items-center gap-1'>
+                          <div className='w-2 h-2 bg-green-500 rounded-full' />
+                          <span className='text-xs text-green-400 font-medium'>Current</span>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Selected indicator */}
                     {isSelected && (
                       <div className='absolute top-2 right-2'>
@@ -213,10 +276,10 @@ export function Settings() {
             <div className='flex justify-start pt-4'>
               <Button
                 onClick={handleSave}
-                disabled={loading || !selectedMode}
+                disabled={loading || !selectedMode || fetchingInfo}
                 className='bg-blue-600 hover:bg-blue-700 px-8 py-3'
               >
-                {loading ? "Saving..." : "Save Settings"}
+                {loading ? "Saving..." : fetchingInfo ? "Loading..." : "Save Settings"}
               </Button>
             </div>
           </div>

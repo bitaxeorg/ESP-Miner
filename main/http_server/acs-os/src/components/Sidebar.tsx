@@ -2,6 +2,7 @@ import { ComponentChildren } from "preact";
 import { useState, useContext, useEffect } from "preact/hooks";
 import { useTheme } from "../context/ThemeContext";
 import { getSystemInfo } from "../utils/api";
+import { logger } from "../utils/logger";
 import {
   Activity,
   Layers,
@@ -149,7 +150,7 @@ export function Sidebar({ children }: SidebarProps) {
         const systemInfo = await getSystemInfo();
         setIsWifiConnected(systemInfo.wifiStatus === "Connected!");
       } catch (error) {
-        console.error("Failed to fetch WiFi status:", error);
+        logger.error("Failed to fetch WiFi status:", error);
         setIsWifiConnected(false);
       }
     };
