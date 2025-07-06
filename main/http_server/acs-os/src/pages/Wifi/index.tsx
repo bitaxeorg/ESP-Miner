@@ -255,7 +255,7 @@ export function WifiPage() {
                     id='network-select'
                     value={selectedNetworkType === "available" ? selectedSSID : "other"}
                     onChange={handleNetworkSelection}
-                    className='w-full p-2 border border-slate-700 rounded-md bg-[var(--input-bg)] mb-2'
+                    className='w-full p-2 pr-8 border border-slate-700 rounded-md bg-[var(--input-bg)] mb-2'
                     disabled={loading || scanning}
                   >
                     {availableNetworks.map((network) => (

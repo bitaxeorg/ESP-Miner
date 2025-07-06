@@ -378,8 +378,8 @@ export async function scanWifiNetworks(): Promise<{
       throw new Error(`API error: ${response.status}`);
     }
 
+    console.log("WiFi scan response:", response);
     const result: WifiScanResponse = await response.json();
-    console.log("WiFi scan response:", result);
 
     return {
       success: true,

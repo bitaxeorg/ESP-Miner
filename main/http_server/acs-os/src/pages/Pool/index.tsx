@@ -340,7 +340,7 @@ export function PoolsPage() {
                     name='stratumOption'
                     value={formData.stratumOption}
                     onChange={handleStratumOptionChange}
-                    className='w-full p-2 border border-slate-700 rounded-md bg-[var(--input-bg)]'
+                    className='w-full p-2 pr-8 border border-slate-700 rounded-md bg-[var(--input-bg)]'
                     required
                   >
                     {POOL_OPTIONS.map((option) => (
@@ -488,7 +488,7 @@ export function PoolsPage() {
                     name='fallbackOption'
                     value={formData.fallbackOption}
                     onChange={handleFallbackOptionChange}
-                    className='w-full p-2 border border-slate-700 rounded-md bg-[var(--input-bg)]'
+                    className='w-full p-2 pr-8 border border-slate-700 rounded-md bg-[var(--input-bg)]'
                   >
                     <option value=''>Select a fallback pool</option>
                     {POOL_OPTIONS.map((option) => (
