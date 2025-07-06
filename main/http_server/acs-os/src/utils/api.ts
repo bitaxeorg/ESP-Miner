@@ -76,13 +76,11 @@ export async function fetchMiners(): Promise<SystemInfo[]> {
  * @param stratumURL - The primary stratum URL
  * @param stratumPort - The primary stratum port
  * @param stratumPassword - Optional password for primary pool
- * @param stratumUser - Optional BTC address for primary pool
+ * @param stratumUser - The stratum user (BTC address for predefined pools, worker name for custom pools)
  * @param fallbackStratumURL - Optional fallback stratum URL
  * @param fallbackStratumPort - Optional fallback stratum port
  * @param fallbackStratumPassword - Optional password for fallback pool
- * @param fallbackStratumUser - Optional BTC address for fallback pool
- * @param stratumWorkerName - Optional worker name for primary pool
- * @param fallbackStratumWorkerName - Optional worker name for fallback pool
+ * @param fallbackStratumUser - The fallback stratum user (BTC address for predefined pools, worker name for custom pools)
  * @returns The response from the API or a success message
  */
 export async function updatePoolInfo(
@@ -93,9 +91,7 @@ export async function updatePoolInfo(
   fallbackStratumURL?: string,
   fallbackStratumPort?: number | null,
   fallbackStratumPassword?: string,
-  fallbackStratumUser?: string,
-  stratumWorkerName?: string,
-  fallbackStratumWorkerName?: string
+  fallbackStratumUser?: string
 ): Promise<any> {
   try {
     const payload: any = {
@@ -126,14 +122,6 @@ export async function updatePoolInfo(
 
     if (fallbackStratumUser) {
       payload.fallbackStratumUser = fallbackStratumUser;
-    }
-
-    if (stratumWorkerName) {
-      payload.stratumWorkerName = stratumWorkerName;
-    }
-
-    if (fallbackStratumWorkerName) {
-      payload.fallbackStratumWorkerName = fallbackStratumWorkerName;
     }
 
     const response = await fetch("/api/system", {
