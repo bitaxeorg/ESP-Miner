@@ -565,20 +565,20 @@ export function PoolsPage() {
                   <div>
                     <label
                       className='block text-sm font-medium mb-1 text-left'
-                      htmlFor='fallbackSubAccount'
+                      htmlFor='fallbackAccountName'
                     >
                       Account Name
                     </label>
-                                          <input
-                        type='text'
-                        id='fallbackAccountName'
-                        name='fallbackAccountName'
-                        value={formData.fallbackPool.accountName}
-                        onChange={handleInputChange("fallbackPool", "accountName")}
-                        className='w-full p-2 border border-slate-700 rounded-md bg-[var(--input-bg)]'
-                        placeholder='Enter account name'
-                        required
-                      />
+                    <input
+                      type='text'
+                      id='fallbackAccountName'
+                      name='fallbackAccountName'
+                      value={formData.fallbackPool.accountName}
+                      onChange={handleInputChange("fallbackPool", "accountName")}
+                      className='w-full p-2 border border-slate-700 rounded-md bg-[var(--input-bg)]'
+                      placeholder='Enter account name'
+                      required
+                    />
                   </div>
                   <div>
                     <label
