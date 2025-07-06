@@ -5,6 +5,7 @@ import { Terminal } from "../../components/Terminal";
 import { PageHeading } from "../../components/PageHeading";
 import { Tabs } from "../../components/Tabs";
 import { fetchRecentLogs, fetchErrorLogs, fetchCriticalLogs, LogEvent } from "../../utils/api";
+import { logger } from "../../utils/logger";
 import { Container } from "../../components/Container";
 
 type LogLevel = 'all' | 'info' | 'warn' | 'error' | 'critical';
@@ -126,7 +127,7 @@ export function LogsPage() {
       }
 
     } catch (error) {
-      console.error('Failed to fetch logs:', error);
+      logger.error('Failed to fetch logs:', error);
       setLogs(prev => [...prev, `Error fetching logs: ${error instanceof Error ? error.message : 'Unknown error'}`]);
     }
   }

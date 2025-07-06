@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "preact/hooks";
 import Chart from "./Chart";
 import { ChartDataPoint } from "./config";
 import { RealTimeDataFetcher } from "../../utils/realTimeDataFetcher";
+import { logger } from "../../utils/logger";
 
 interface RealTimeApiChartProps {
   title: string;
@@ -55,7 +56,7 @@ const RealTimeApiChart = ({
         }));
       }
     } catch (err) {
-      console.warn('Failed to save chart data to localStorage:', err);
+      logger.warn('Failed to save chart data to localStorage:', err);
     }
   }, [getStorageKey]);
 
@@ -74,7 +75,7 @@ const RealTimeApiChart = ({
         }
       }
     } catch (err) {
-      console.warn('Failed to load chart data from localStorage:', err);
+      logger.warn('Failed to load chart data from localStorage:', err);
     }
     return [];
   }, [getStorageKey]);
@@ -138,7 +139,7 @@ const RealTimeApiChart = ({
         setData(initialData);
       } catch (err) {
         setError("Failed to load initial data");
-        console.error("Failed to initialize chart data:", err);
+        logger.error("Failed to initialize chart data:", err);
       } finally {
         setIsLoading(false);
       }
@@ -170,7 +171,7 @@ const RealTimeApiChart = ({
             setError(null);
           }
         } catch (err) {
-          console.error("Failed to fetch new data point:", err);
+          logger.error("Failed to fetch new data point:", err);
           setError("Failed to fetch data");
         }
       }, updateInterval);
@@ -227,14 +228,14 @@ const RealTimeApiChart = ({
                 setError(null);
               }
             } catch (err) {
-              console.error("Failed to fetch new data point:", err);
+              logger.error("Failed to fetch new data point:", err);
               setError("Failed to fetch data");
             }
           }, updateInterval);
         }, 200);
       }
     } catch (err) {
-      console.error("Failed to change configuration:", err);
+      logger.error("Failed to change configuration:", err);
       setError("Failed to update configuration");
     } finally {
       setIsConfigChanging(false);

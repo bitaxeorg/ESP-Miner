@@ -4,6 +4,7 @@ import { Button } from "../../components/Button";
 import { Container } from "../../components/Container";
 import { PageHeading } from "../../components/PageHeading";
 import { updatePresetSettings, updateYouTubeUrl, validateYouTubeChannel, getSystemInfo, SystemInfo } from "../../utils/api";
+import { logger } from "../../utils/logger";
 import { useToast } from "../../context/ToastContext";
 import { Volume2, BarChart3, Zap } from "lucide-preact";
 
@@ -71,7 +72,7 @@ export function Settings() {
         setCurrentMode(currentPreset);
         setSelectedMode(currentPreset); // Initialize selected mode to current
       } catch (error) {
-        console.error("Failed to fetch system info:", error);
+        logger.error("Failed to fetch system info:", error);
         showToast("Failed to load current settings", "error");
       } finally {
         setFetchingInfo(false);
@@ -117,7 +118,7 @@ export function Settings() {
         showToast(result.message, "error");
       }
     } catch (error) {
-      console.error("Failed to save preset settings:", error);
+      logger.error("Failed to save preset settings:", error);
       showToast("Failed to save settings", "error");
     } finally {
       setLoading(false);

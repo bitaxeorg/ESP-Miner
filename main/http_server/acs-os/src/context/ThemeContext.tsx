@@ -2,6 +2,7 @@ import { createContext } from "preact";
 import { useState, useContext } from "preact/hooks";
 import { ComponentChildren } from "preact";
 import { defaultAssets } from "../utils/themeConfig";
+import { logger } from "../utils/logger";
 
 interface ThemeData {
   themeName: string;
@@ -53,19 +54,19 @@ export function ThemeProvider({ children }: { children: ComponentChildren }) {
   // DISABLED: FETCH CURRENT THEME
   const fetchTheme = async () => {
     // Theme functionality temporarily disabled
-    console.warn("Theme functionality is temporarily disabled");
+    logger.warn("Theme functionality is temporarily disabled");
   };
 
   // DISABLED: LIST THEMES
   const fetchThemes = async () => {
     // Theme functionality temporarily disabled
-    console.warn("Theme functionality is temporarily disabled");
+    logger.warn("Theme functionality is temporarily disabled");
   };
 
   // DISABLED: APPLY THEME
   const applyTheme = async (themeName: string) => {
     // Theme functionality temporarily disabled
-    console.warn("Theme functionality is temporarily disabled - cannot apply theme:", themeName);
+    logger.warn("Theme functionality is temporarily disabled - cannot apply theme:", themeName);
   };
 
   // Get the default logo (static)

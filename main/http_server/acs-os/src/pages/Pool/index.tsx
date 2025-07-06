@@ -1,6 +1,7 @@
 import { useState, useEffect } from "preact/hooks";
 import { Button } from "../../components/Button";
 import { getSystemInfo, updatePoolInfo, restartSystem } from "../../utils/api";
+import { logger } from "../../utils/logger";
 import { useToast } from "../../context/ToastContext";
 import { Container } from "../../components/Container";
 import { PageHeading } from "../../components/PageHeading";
@@ -141,7 +142,7 @@ export function PoolsPage() {
           fallbackOption: fallbackPoolData.option,
         });
       } catch (error) {
-        console.error("Failed to load settings:", error);
+        logger.error("Failed to load settings:", error);
         showToast("Failed to load current settings", "error");
       }
     };
@@ -301,7 +302,7 @@ export function PoolsPage() {
       await restartSystem();
       showToast("System is restarting...", "info");
     } catch (error) {
-      console.error("Failed to update settings or restart:", error);
+      logger.error("Failed to update settings or restart:", error);
       showToast(
         error instanceof Error ? error.message : "Failed to update settings or restart",
         "error"
