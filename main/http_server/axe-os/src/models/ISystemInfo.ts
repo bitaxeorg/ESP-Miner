@@ -43,6 +43,7 @@ export interface ISystemInfo {
     fallbackStratumUser: string,
     fallbackStratumSuggestedDifficulty: number,
     fallbackStratumExtranonceSubscribe: number,
+    poolDifficulty: number,
     responseTime: number,
     isUsingFallbackStratum: boolean,
     frequency: number,
