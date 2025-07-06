@@ -56,7 +56,7 @@ p-chart>div {
     }
 }
 
-.p-button {
+.p-button:not(.p-button-secondary) {
     background: var(--button-bg);
     border: 1px solid var(--button-bg);
 
