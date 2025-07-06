@@ -76,6 +76,15 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: resolve(__dirname, "dist/acs-os"),
       assetsInlineLimit: 0, // Disable inlining assets
+      // Production optimizations
+      minify: isProd ? 'terser' : false,
+      terserOptions: isProd ? {
+        compress: {
+          // Remove console statements in production (except console.error and console.warn)
+          drop_console: ['log', 'debug', 'info'],
+          drop_debugger: true,
+        },
+      } : {},
     },
     publicDir: resolve(__dirname, "public"), // Ensure public directory is explicitly set
     server: {

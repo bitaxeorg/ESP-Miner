@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "preact/hooks";
 import RealTimeApiChart from "../../components/Chart/RealTimeApiChart";
 import { getSystemInfo, SystemInfo } from "../../utils/api";
+import { logger } from "../../utils/logger";
 import {
   createHashrateDataFetcher,
   createTemperatureDataFetcher,
@@ -43,7 +44,7 @@ const ChartContent = () => {
         setError(null);
       } catch (err) {
         setError("Failed to load system information");
-        console.error(err);
+        logger.error("Failed to load system information", err);
       } finally {
         setLoading(false);
       }

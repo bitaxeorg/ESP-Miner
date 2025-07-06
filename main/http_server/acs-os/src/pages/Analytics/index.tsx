@@ -1,5 +1,6 @@
 import { useState, useEffect } from "preact/hooks";
 import { getSystemInfo, SystemInfo } from "../../utils/api";
+import { logger } from "../../utils/logger";
 import { formatUptime } from "../../utils/formatters";
 import { DataSection } from "../../components/DataSection";
 import { Tabs } from "../../components/Tabs";
@@ -46,7 +47,7 @@ export function AnalyticsPage() {
         setError(null);
       } catch (err) {
         setError("Failed to load system information");
-        console.error(err);
+        logger.error("Failed to load system information", err);
       } finally {
         setLoading(false);
       }

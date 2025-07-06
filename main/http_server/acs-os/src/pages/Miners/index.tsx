@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { fetchMiners, SystemInfo } from "../../utils/api";
+import { logger } from "../../utils/logger";
 import { formatUptime } from "../../utils/formatters";
 import {
   Table,
@@ -34,7 +35,7 @@ export function Miners() {
         setError(null);
       } catch (err) {
         setError("Failed to load miner data. Please check your connection.");
-        console.error(err);
+        logger.error("Failed to load miner data", err);
       } finally {
         setIsLoading(false);
       }

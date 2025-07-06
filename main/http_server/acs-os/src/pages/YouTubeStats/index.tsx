@@ -4,6 +4,7 @@ import { PageHeading } from "../../components/PageHeading";
 import { ActionCard } from "../../components/ActionCard";
 import { Button } from "../../components/Button";
 import { fetchYouTubeStats, postYouTubeStatsToESP, getUploadsPlaylistId, fetchLatestVideos } from "../../utils/api";
+import { logger } from "../../utils/logger";
 import { useToast } from "../../context/ToastContext";
 
 interface YouTubeStats {
@@ -65,7 +66,7 @@ export function YouTubeStatsPage() {
   // Initialize page with cached data and auto-fetch
   useEffect(() => {
     const now = new Date();
-    const lastReset = localStorage.getItem('youtube_quota_reset');
+    const lastReset = window.localStorage.getItem('youtube_quota_reset');
     const today = now.toDateString();
 
     // Reset quota counter daily
@@ -144,7 +145,7 @@ export function YouTubeStatsPage() {
         setStats(null);
       }
     } catch (error) {
-      console.error("Failed to fetch YouTube stats:", error);
+      logger.error("Failed to fetch YouTube stats:", error);
       showToast("Failed to fetch YouTube stats", "error");
       setStats(null);
     } finally {
@@ -172,7 +173,7 @@ export function YouTubeStatsPage() {
         showToast(result.error || "Failed to get playlist ID", "error");
       }
     } catch (error) {
-      console.error("Failed to get playlist ID:", error);
+      logger.error("Failed to get playlist ID:", error);
       showToast("Failed to get playlist ID", "error");
     }
   };

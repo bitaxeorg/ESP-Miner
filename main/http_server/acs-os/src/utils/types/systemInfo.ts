@@ -34,8 +34,6 @@ export interface SystemInfo {
   fallbackStratumUser: string;
   stratumPassword?: string;
   fallbackStratumPassword?: string;
-  stratumWorkerName?: string;
-  fallbackStratumWorkerName?: string;
   version: string;
   idfVersion: string;
   boardVersion: string;
