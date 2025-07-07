@@ -26,7 +26,8 @@
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
-#include "esp_http_client.h"
+#include "mdns.h"
+#include <arpa/inet.h>
 
 #include "cJSON.h"
 #include "global_state.h"
@@ -50,7 +51,7 @@ static const char * CORS_TAG = "CORS";
 
 static char axeOSVersion[32];
 
-/* Handler for single IP scan endpoint */
+/* Handler for mDNS network scan endpoint - discovers all _bitaxe._tcp services */
 static esp_err_t GET_network_scan(httpd_req_t *req)
 {
     if (is_request_authorized(req) != ESP_OK) {
@@ -65,82 +66,61 @@ static esp_err_t GET_network_scan(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // Get IP parameter from query string
-    char ip_param[16] = {0};
-    if (httpd_req_get_url_query_str(req, ip_param, sizeof(ip_param)) != ESP_OK) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing IP parameter");
+    // Use mDNS to discover _bitaxe._tcp services
+    ESP_LOGI(TAG, "Starting mDNS query for _bitaxe._tcp services");
+
+    cJSON *root = cJSON_CreateArray();
+
+    mdns_result_t *results = NULL;
+    esp_err_t err = mdns_query_ptr("_bitaxe", "_tcp", 3000, 20, &results);
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "mDNS query failed: %s", esp_err_to_name(err));
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "mDNS query failed");
         return ESP_OK;
     }
 
-    char target_ip[16] = {0};
-    if (httpd_query_key_value(ip_param, "ip", target_ip, sizeof(target_ip)) != ESP_OK) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid IP parameter");
-        return ESP_OK;
-    }
-
-    cJSON *root = cJSON_CreateObject();
-
-    // Simple HTTP client check for /api/system/info
-    esp_http_client_config_t config = {
-        .url = "",  // Will be set below
-        .timeout_ms = 200,
-        .disable_auto_redirect = true,
-    };
-
-    char url[64];
-    snprintf(url, sizeof(url), "http://%s/api/system/info", target_ip);
-    config.url = url;
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_err_t err = esp_http_client_perform(client);
-
-    if (err == ESP_OK) {
-        int status_code = esp_http_client_get_status_code(client);
-        if (status_code == 200) {
-            // Device found - get response data
-            int content_length = esp_http_client_get_content_length(client);
-            if (content_length > 0 && content_length < 4096) {
-                char *buffer = malloc(content_length + 1);
-                if (buffer) {
-                    esp_http_client_read_response(client, buffer, content_length);
-                    buffer[content_length] = '\0';
-
-                    // Parse JSON response
-                    cJSON *device_info = cJSON_Parse(buffer);
-                    if (device_info) {
-                        // Add IP to the response and merge with root
-                        cJSON_AddStringToObject(device_info, "IP", target_ip);
-                        cJSON_AddStringToObject(root, "status", "found");
-
-                        // Copy all fields from device_info to root
-                        cJSON *item = device_info->child;
-                        while (item) {
-                            cJSON *next = item->next;
-                            cJSON_DetachItemFromObject(device_info, item->string);
-                            cJSON_AddItemToObject(root, item->string, item);
-                            item = next;
-                        }
-                        ESP_LOGI(TAG, "Found device at %s", target_ip);
-                    } else {
-                        cJSON_AddStringToObject(root, "status", "invalid_response");
-                    }
-                    free(buffer);
-                    cJSON_Delete(device_info);
-                } else {
-                    cJSON_AddStringToObject(root, "status", "memory_error");
-                }
-            } else {
-                cJSON_AddStringToObject(root, "status", "invalid_content");
-            }
-        } else {
-            cJSON_AddStringToObject(root, "status", "not_found");
-            cJSON_AddNumberToObject(root, "status_code", status_code);
-        }
+    if (!results) {
+        ESP_LOGI(TAG, "No _bitaxe._tcp services found");
     } else {
-        cJSON_AddStringToObject(root, "status", "connection_failed");
-    }
+        mdns_result_t *r = results;
+        while (r) {
+            cJSON *device = cJSON_CreateObject();
 
-    esp_http_client_cleanup(client);
+            // Get IP address
+            if (r->addr) {
+                char ip_str[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &r->addr->addr.u_addr.ip4, ip_str, sizeof(ip_str));
+                cJSON_AddStringToObject(device, "IP", ip_str);
+
+                // Add hostname if available
+                if (r->hostname) {
+                    cJSON_AddStringToObject(device, "hostname", r->hostname);
+                }
+
+                // Add instance name if available
+                if (r->instance_name) {
+                    cJSON_AddStringToObject(device, "instance", r->instance_name);
+                }
+
+                // Extract apiSecret from TXT records
+                if (r->txt && r->txt_count > 0) {
+                    for (size_t i = 0; i < r->txt_count; i++) {
+                        if (strcmp(r->txt[i].key, "apiSecret") == 0 && r->txt[i].value) {
+                            cJSON_AddStringToObject(device, "apiSecret", r->txt[i].value);
+                            break;
+                        }
+                    }
+                }
+
+                cJSON_AddItemToArray(root, device);
+            }
+
+            r = r->next;
+        }
+        mdns_query_results_free(results);
+    }
 
     const char *response = cJSON_Print(root);
     httpd_resp_sendstr(req, response);
@@ -154,10 +134,10 @@ static esp_err_t GET_network_scan(httpd_req_t *req)
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/json");
-    
+
     // Give some time for the connected flag to take effect
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    
+
     wifi_ap_record_simple_t ap_records[20];
     uint16_t ap_count = 0;
 
@@ -790,7 +770,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON *error_array = cJSON_CreateArray();
     cJSON_AddItemToObject(root, "sharesRejectedReasons", error_array);
-    
+
     for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
         cJSON *error_obj = cJSON_CreateObject();
         cJSON_AddStringToObject(error_obj, "message", GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].message);
@@ -826,7 +806,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION, 0));
     cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
     cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1));
-    
+
     cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1));
 
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
@@ -1079,7 +1059,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
         return ESP_OK;
     }
-    
+
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "esp-miner.bin");
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
@@ -1257,7 +1237,7 @@ void websocket_log_handler()
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
-    
+
     // Initialize the ASIC API with the global state
     asic_api_init(GLOBAL_STATE);
     const char * base_path = "";
@@ -1292,7 +1272,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &recovery_explicit_get_uri);
-    
+
     // Register theme API endpoints
     ESP_ERROR_CHECK(register_theme_api_endpoints(server, rest_context));
 

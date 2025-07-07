@@ -192,12 +192,12 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             ESP_LOGI(TAG, "Retrying Wi-Fi connection...");
             esp_wifi_connect();
         }
-        
+
         if (event_id == WIFI_EVENT_AP_START) {
             ESP_LOGI(TAG, "Configuration Access Point enabled");
             GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = true;
         }
-                
+
         if (event_id == WIFI_EVENT_AP_STOP) {
             ESP_LOGI(TAG, "Configuration Access Point disabled");
             GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = false;
@@ -513,6 +513,24 @@ static void mdns_init_hostname(void) {
         free(hostname);
         return;
     }
+
+    // Add _bitaxe._tcp service with apiSecret as TXT record
+    char * api_secret = nvs_config_get_string(NVS_CONFIG_API_SECRET, "");
+
+    ESP_LOGI(TAG, "Adding mDNS service: _bitaxe._tcp on port 80");
+
+    mdns_txt_item_t bitaxe_txt_data[1];
+    bitaxe_txt_data[0].key = "apiSecret";
+    bitaxe_txt_data[0].value = api_secret;
+
+    err = mdns_service_add(NULL, "_bitaxe", "_tcp", 80, bitaxe_txt_data, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add mDNS _bitaxe._tcp service: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGI(TAG, "mDNS _bitaxe._tcp service added successfully");
+    }
+
+    free(api_secret);
 
     ESP_LOGI(TAG, "mDNS service started successfully");
     free(hostname);

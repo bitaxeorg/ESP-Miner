@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable, range, filter } from 'rxjs';
+import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
 
@@ -100,79 +100,77 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.form.reset();
   }
 
-  private ipToInt(ip: string): number {
-    return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
-  }
-
-  private intToIp(int: number): string {
-    return `${(int >>> 24) & 255}.${(int >>> 16) & 255}.${(int >>> 8) & 255}.${int & 255}`;
-  }
-
-  private calculateIpRange(ip: string, netmask: string): { start: number, end: number } {
-    const ipInt = this.ipToInt(ip);
-    const netmaskInt = this.ipToInt(netmask);
-    const network = ipInt & netmaskInt;
-    const broadcast = network | ~netmaskInt;
-    return { start: network + 1, end: broadcast - 1 };
-  }
 
   scanNetwork() {
     this.scanning = true;
 
-    // Get current device IP info to determine subnet
-    this.httpClient.get<any>('/api/system/info').subscribe({
-      next: (deviceInfo) => {
-        if (!deviceInfo.currentIP || !deviceInfo.netmask) {
-          this.toastr.error('Unable to get network information', 'Scan Error');
+    // Call the mDNS scan endpoint
+    this.httpClient.get<any[]>('/api/system/network/scan').subscribe({
+      next: (foundDevices) => {
+        if (!Array.isArray(foundDevices)) {
+          this.toastr.error('Invalid response from scan endpoint', 'Scan Error');
           this.scanning = false;
           return;
         }
 
-        // Calculate IP range from current IP and netmask
-        const ipRange = this.calculateIpRange(deviceInfo.currentIP, deviceInfo.netmask);
+        // Filter out devices we already have - check both IP and currentIP
+        const existingIps = new Set([...this.swarm.map(item => item.IP), ...this.swarm.map(item => item.currentIP)]);
+        const existingHostnames = new Set(this.swarm.map(item => item.hostname).filter(h => h));
 
-        // Generate list of IPs to scan using RxJS range
-        range(ipRange.start, ipRange.end - ipRange.start + 1).pipe(
-          map(addr => this.intToIp(addr)),
-          filter(ip => ip !== deviceInfo.currentIP), // Skip our own IP
-          mergeMap(ip =>
-            this.httpClient.get<any>(`/api/system/network/scan?ip=${ip}`).pipe(
-              timeout(2000),
-              map(response => {
-                if (response.status === 'found' && response.ASICModel) {
-                  return response;
-                }
-                return null;
-              }),
-              catchError(() => of(null))
-            ),
-            4
-          ),
-          toArray(), // Collect all results into an array
-          map(results => results.filter(result => result !== null))
-        ).subscribe({
-          next: (foundDevices) => {
-            // Merge new results with existing swarm entries
-            const existingIps = new Set(this.swarm.map(item => item.currentIP || item.IP));
-            const newItems = foundDevices.filter(device => !existingIps.has(device.IP));
+        const newDevices = foundDevices.filter(device => {
+          // Check if device IP matches any existing IP or currentIP
+          const ipNotExists = !existingIps.has(device.IP);
+          const hostnameNotExists = !device.hostname || !existingHostnames.has(device.hostname);
+          return ipNotExists && hostnameNotExists;
+        });
+
+        if (newDevices.length === 0) {
+          this.toastr.info('No new devices found', 'Network Scan Complete');
+          this.scanning = false;
+          return;
+        }
+
+        // Fetch device info for each discovered device
+        const deviceInfoRequests = newDevices.map(device => {
+          const httpOptions = this.getHttpOptionsForDevice(device);
+
+          return forkJoin({
+            info: this.httpClient.get<any>(`http://${device.IP}/api/system/info`, httpOptions),
+            asic: this.httpClient.get<any>(`http://${device.IP}/api/system/asic`, httpOptions).pipe(catchError(() => of({})))
+          }).pipe(
+            map(({ info, asic }) => {
+              // Merge mDNS data with fetched info
+              return { ...device, ...info, ...asic };
+            }),
+            timeout(5000),
+            catchError(error => {
+              this.toastr.error(`Failed to get info from ${device.IP}`, 'Device Error');
+              return of(null);
+            })
+          );
+        });
+
+        forkJoin(deviceInfoRequests).subscribe({
+          next: (devices) => {
+            const validDevices = devices.filter(d => d !== null && d.ASICModel);
 
             // Add new devices to swarm
-            this.swarm = [...this.swarm, ...newItems];
+            this.swarm = [...this.swarm, ...validDevices];
             this.sortSwarm();
             this.localStorageService.setObject(SWARM_DATA, this.swarm);
             this.calculateTotals();
 
-            this.toastr.success(`Found ${newItems.length} new device(s)`, 'Network Scan Complete');
+            this.toastr.success(`Found ${validDevices.length} new device(s)`, 'Network Scan Complete');
             this.scanning = false;
           },
           error: (error) => {
-            this.toastr.error(`Scan failed: ${error.message || 'Unknown error'}`, 'Scan Error');
+            this.toastr.error(`Failed to fetch device information: ${error.message || 'Unknown error'}`, 'Scan Error');
             this.scanning = false;
           }
         });
       },
       error: (error) => {
-        this.toastr.error(`Failed to get device info: ${error.message || 'Unknown error'}`, 'Scan Error');
+        this.toastr.error(`Scan failed: ${error.message || 'Unknown error'}`, 'Scan Error');
         this.scanning = false;
       }
     });
