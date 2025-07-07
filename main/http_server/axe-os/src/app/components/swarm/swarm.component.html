@@ -198,5 +198,5 @@
 </div>
 
 <app-modal [headline]="selectedAxeOs?.IP">
-    <app-edit *ngIf="selectedAxeOs" [uri]="'http://' + selectedAxeOs.IP"></app-edit>
+    <app-edit *ngIf="selectedAxeOs" [uri]="'http://' + selectedAxeOs.IP" [apiSecret]="selectedAxeOs.apiSecret"></app-edit>
 </app-modal>

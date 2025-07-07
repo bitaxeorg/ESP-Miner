@@ -16,9 +16,22 @@ export class SystemService {
     private httpClient: HttpClient
   ) { }
 
-  public getInfo(uri: string = ''): Observable<ISystemInfo> {
+  private getHttpOptions(apiSecret?: string): { headers?: any } {
+    if (!apiSecret || apiSecret.trim() === '') {
+      return {};
+    }
+
+    return {
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Authorization': `Bearer ${apiSecret}`
+      }
+    };
+  }
+
+  public getInfo(uri: string = '', apiSecret?: string): Observable<ISystemInfo> {
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/info`) as Observable<ISystemInfo>;
+      return this.httpClient.get(`${uri}/api/system/info`, this.getHttpOptions(apiSecret)) as Observable<ISystemInfo>;
     }
 
     // Mock data for development
@@ -89,9 +102,9 @@ export class SystemService {
     ).pipe(delay(1000));
   }
 
-  public getStatistics(uri: string = ''): Observable<ISystemStatistics> {
+  public getStatistics(uri: string = '', apiSecret?: string): Observable<ISystemStatistics> {
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/statistics/dashboard`) as Observable<ISystemStatistics>;
+      return this.httpClient.get(`${uri}/api/system/statistics/dashboard`, this.getHttpOptions(apiSecret)) as Observable<ISystemStatistics>;
     }
 
     // Mock data for development
@@ -112,33 +125,38 @@ export class SystemService {
     }).pipe(delay(1000));
   }
 
-  public restart(uri: string = '') {
-    return this.httpClient.post(`${uri}/api/system/restart`, {}, {responseType: 'text'});
+  public restart(uri: string = '', apiSecret?: string) {
+    const options = { ...this.getHttpOptions(apiSecret), responseType: 'text' as 'text' };
+    return this.httpClient.post(`${uri}/api/system/restart`, {}, options);
   }
 
-  public updateSystem(uri: string = '', update: any) {
+  public updateSystem(uri: string = '', update: any, apiSecret?: string) {
     if (environment.production) {
-      return this.httpClient.patch(`${uri}/api/system`, update);
+      return this.httpClient.patch(`${uri}/api/system`, update, this.getHttpOptions(apiSecret));
     } else {
       return of(true);
     }
   }
 
 
-  private otaUpdate(file: File | Blob, url: string) {
+  private otaUpdate(file: File | Blob, url: string, apiSecret?: string) {
     return new Observable<HttpEvent<string>>((subscriber) => {
       const reader = new FileReader();
 
       reader.onload = (event: any) => {
         const fileContent = event.target.result;
 
+        const httpOptions = this.getHttpOptions(apiSecret);
+        const headers = {
+          'Content-Type': 'application/octet-stream',
+          ...(httpOptions.headers || {})
+        };
+
         return this.httpClient.post(url, fileContent, {
           reportProgress: true,
           observe: 'events',
           responseType: 'text', // Specify the response type
-          headers: {
-            'Content-Type': 'application/octet-stream', // Set the content type
-          },
+          headers: headers,
         }).subscribe({
           next: (event) => {
             subscriber.next(event);
@@ -155,16 +173,16 @@ export class SystemService {
     });
   }
 
-  public performOTAUpdate(file: File | Blob) {
-    return this.otaUpdate(file, `/api/system/OTA`);
+  public performOTAUpdate(file: File | Blob, apiSecret?: string) {
+    return this.otaUpdate(file, `/api/system/OTA`, apiSecret);
   }
-  public performWWWOTAUpdate(file: File | Blob) {
-    return this.otaUpdate(file, `/api/system/OTAWWW`);
+  public performWWWOTAUpdate(file: File | Blob, apiSecret?: string) {
+    return this.otaUpdate(file, `/api/system/OTAWWW`, apiSecret);
   }
 
-  public getAsicSettings(uri: string = ''): Observable<ISystemASIC> {
+  public getAsicSettings(uri: string = '', apiSecret?: string): Observable<ISystemASIC> {
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/asic`) as Observable<ISystemASIC>;
+      return this.httpClient.get(`${uri}/api/system/asic`, this.getHttpOptions(apiSecret)) as Observable<ISystemASIC>;
     }
 
     // Mock data for development
@@ -180,11 +198,11 @@ export class SystemService {
     }).pipe(delay(1000));
   }
 
-  public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
-    return this.httpClient.get(`${uri}/api/swarm/info`) as Observable<{ ip: string }[]>;
+  public getSwarmInfo(uri: string = '', apiSecret?: string): Observable<{ ip: string }[]> {
+    return this.httpClient.get(`${uri}/api/swarm/info`, this.getHttpOptions(apiSecret)) as Observable<{ ip: string }[]>;
   }
 
-  public updateSwarm(uri: string = '', swarmConfig: any) {
-    return this.httpClient.patch(`${uri}/api/swarm`, swarmConfig);
+  public updateSwarm(uri: string = '', swarmConfig: any, apiSecret?: string) {
+    return this.httpClient.patch(`${uri}/api/swarm`, swarmConfig, this.getHttpOptions(apiSecret));
   }
 }
