@@ -24,6 +24,15 @@
 
         <ul *ngIf="isDesktop()" class="hidden lg:flex ml-auto list-none p-0 gap-4">
             <li>
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
+                    pTooltip="Sensitive data {{sensitiveDataHidden ? 'hidden' : 'visible'}}"
+                    (click)="toggleSensitiveData()"
+                >
+                    <i class="pi pi-{{sensitiveDataHidden ? 'eye-slash' : 'eye'}} block" style="font-size: 1.4rem;"></i>
+                </a>
+            </li>
+            <li>
                 <a routerLink="network"
                     class="block py-2"
                     tooltipPosition="bottom"
