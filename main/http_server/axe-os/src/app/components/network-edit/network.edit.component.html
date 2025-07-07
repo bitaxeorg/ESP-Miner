@@ -41,11 +41,12 @@
                 <div class="p-inputgroup">
                     <input pInputText id="apiSecret" formControlName="apiSecret" type="text"
                            placeholder="12-32 character secret (optional)" minlength="12" maxlength="32" />
-                    <button pButton type="button" icon="pi pi-refresh"
-                            class="p-button-outlined p-button-secondary"
-                            (click)="generateApiSecret()"
-                            pTooltip="Generate random API secret">
-                    </button>
+                    <p-button
+                        icon="pi pi-refresh"
+                        pp-button
+                        (click)="generateApiSecret()"
+                        pTooltip="Generate random API secret"
+                        tooltipPosition="left"></p-button>
                 </div>
                 <small class="block mt-1">Optional 12-32 character string for API authentication</small>
             </div>
