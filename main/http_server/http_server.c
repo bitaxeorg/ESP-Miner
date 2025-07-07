@@ -1296,38 +1296,47 @@ esp_err_t start_rest_server(void * pvParameters)
     // Register theme API endpoints
     ESP_ERROR_CHECK(register_theme_api_endpoints(server, rest_context));
 
+    /* Respond with * for all CORS preflight requests - all API routes require authentication for cross-origin requests */
+    httpd_uri_t api_options_uri = {
+        .uri = "/api/*",
+        .method = HTTP_OPTIONS,
+        .handler = handle_options_request,
+        .user_ctx = NULL,
+    };
+    httpd_register_uri_handler(server, &api_options_uri);
+
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
-        .uri = "/api/system/info", 
-        .method = HTTP_GET, 
-        .handler = GET_system_info, 
+        .uri = "/api/system/info",
+        .method = HTTP_GET,
+        .handler = GET_system_info,
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_info_get_uri);
 
     /* URI handler for fetching system asic values */
     httpd_uri_t system_asic_get_uri = {
-        .uri = "/api/system/asic", 
-        .method = HTTP_GET, 
-        .handler = GET_system_asic, 
+        .uri = "/api/system/asic",
+        .method = HTTP_GET,
+        .handler = GET_system_asic,
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_asic_get_uri);
 
     /* URI handler for fetching system statistic values */
     httpd_uri_t system_statistics_get_uri = {
-        .uri = "/api/system/statistics", 
-        .method = HTTP_GET, 
-        .handler = GET_system_statistics, 
+        .uri = "/api/system/statistics",
+        .method = HTTP_GET,
+        .handler = GET_system_statistics,
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_statistics_get_uri);
 
     /* URI handler for fetching system statistic values for dashboard */
     httpd_uri_t system_statistics_dashboard_get_uri = {
-        .uri = "/api/system/statistics/dashboard", 
-        .method = HTTP_GET, 
-        .handler = GET_system_statistics_dashboard, 
+        .uri = "/api/system/statistics/dashboard",
+        .method = HTTP_GET,
+        .handler = GET_system_statistics_dashboard,
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_statistics_dashboard_get_uri);
@@ -1351,57 +1360,41 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &network_scan_get_uri);
 
     httpd_uri_t system_restart_uri = {
-        .uri = "/api/system/restart", .method = HTTP_POST, 
-        .handler = POST_restart, 
+        .uri = "/api/system/restart", .method = HTTP_POST,
+        .handler = POST_restart,
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_restart_uri);
 
-    httpd_uri_t system_restart_options_uri = {
-        .uri = "/api/system/restart", 
-        .method = HTTP_OPTIONS, 
-        .handler = handle_options_request, 
-        .user_ctx = NULL
-    };
-    httpd_register_uri_handler(server, &system_restart_options_uri);
-
     httpd_uri_t update_system_settings_uri = {
-        .uri = "/api/system", 
-        .method = HTTP_PATCH, 
-        .handler = PATCH_update_settings, 
+        .uri = "/api/system",
+        .method = HTTP_PATCH,
+        .handler = PATCH_update_settings,
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &update_system_settings_uri);
 
-    httpd_uri_t system_options_uri = {
-        .uri = "/api/system",
-        .method = HTTP_OPTIONS,
-        .handler = handle_options_request,
-        .user_ctx = NULL,
-    };
-    httpd_register_uri_handler(server, &system_options_uri);
-
     httpd_uri_t update_post_ota_firmware = {
-        .uri = "/api/system/OTA", 
-        .method = HTTP_POST, 
-        .handler = POST_OTA_update, 
+        .uri = "/api/system/OTA",
+        .method = HTTP_POST,
+        .handler = POST_OTA_update,
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &update_post_ota_firmware);
 
     httpd_uri_t update_post_ota_www = {
-        .uri = "/api/system/OTAWWW", 
-        .method = HTTP_POST, 
-        .handler = POST_WWW_update, 
+        .uri = "/api/system/OTAWWW",
+        .method = HTTP_POST,
+        .handler = POST_WWW_update,
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
 
     httpd_uri_t ws = {
-        .uri = "/api/ws", 
-        .method = HTTP_GET, 
-        .handler = echo_handler, 
-        .user_ctx = NULL, 
+        .uri = "/api/ws",
+        .method = HTTP_GET,
+        .handler = echo_handler,
+        .user_ctx = NULL,
         .is_websocket = true
     };
     httpd_register_uri_handler(server, &ws);
@@ -1409,8 +1402,8 @@ esp_err_t start_rest_server(void * pvParameters)
     if (enter_recovery) {
         /* Make default route serve Recovery */
         httpd_uri_t recovery_implicit_get_uri = {
-            .uri = "/*", .method = HTTP_GET, 
-            .handler = rest_recovery_handler, 
+            .uri = "/*", .method = HTTP_GET,
+            .handler = rest_recovery_handler,
             .user_ctx = rest_context
         };
         httpd_register_uri_handler(server, &recovery_implicit_get_uri);
@@ -1425,9 +1418,9 @@ esp_err_t start_rest_server(void * pvParameters)
         httpd_register_uri_handler(server, &api_common_uri);
         /* URI handler for getting web server files */
         httpd_uri_t common_get_uri = {
-            .uri = "/*", 
-            .method = HTTP_GET, 
-            .handler = rest_common_get_handler, 
+            .uri = "/*",
+            .method = HTTP_GET,
+            .handler = rest_common_get_handler,
             .user_ctx = rest_context
         };
         httpd_register_uri_handler(server, &common_get_uri);
