@@ -1427,7 +1427,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .handler = POST_WWW_update, 
         .user_ctx = NULL
     };
-    httpd_register_uri_handler(server, &update_post_ota_www);
+    httpd_register_uri_handler(server, &update_post_ota_www_alt);
 
     /* URI handler for fetching recent logs */
     httpd_uri_t logs_recent_get_uri = {
