@@ -569,6 +569,9 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "autotune")) != NULL) {
         cJSON_AddNumberToObject(updated_settings, "autotune", item->valueint);
     }
+    if ((item = cJSON_GetObjectItem(root, "autotunePreset")) != NULL) {
+        cJSON_AddStringToObject(updated_settings, "autotunePreset", item->valuestring);
+    }
     if ((item = cJSON_GetObjectItem(root, "presetName")) != NULL && item->valuestring != NULL) {
         cJSON_AddStringToObject(updated_settings, "presetName", item->valuestring);
         cJSON_AddBoolToObject(updated_settings, "presetApplied", apply_preset(GLOBAL_STATE->device_model, item->valuestring));
@@ -787,7 +790,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     strncpy(nvs_string_buffer, autotune_preset_temp, MAX_NVS_STRING_SIZE - 1);
     nvs_string_buffer[MAX_NVS_STRING_SIZE - 1] = '\0';
     free((char*)autotune_preset_temp);
-    cJSON_AddStringToObject(root, "autotune_preset", nvs_string_buffer);
+    cJSON_AddStringToObject(root, "autotunePreset", nvs_string_buffer);
     
     const char* serial_temp = nvs_config_get_string(NVS_CONFIG_SERIAL_NUMBER, "");
     strncpy(nvs_string_buffer, serial_temp, MAX_NVS_STRING_SIZE - 1);
@@ -1417,6 +1420,15 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
 
+    // This is for ACSOSv1.0.4 with wrong endpoint
+    httpd_uri_t update_post_ota_www_alt = {
+        .uri = "/api/system/upload-webapp", 
+        .method = HTTP_POST, 
+        .handler = POST_WWW_update, 
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &update_post_ota_www);
+
     /* URI handler for fetching recent logs */
     httpd_uri_t logs_recent_get_uri = {
         .uri = "/api/logs/recent", 
@@ -1452,6 +1464,7 @@ esp_err_t start_rest_server(void * pvParameters)
         .is_websocket = true
     };
     httpd_register_uri_handler(server, &ws);
+
 
     if (enter_recovery) {
         /* Make default route serve Recovery */
