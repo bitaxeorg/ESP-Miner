@@ -537,10 +537,6 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
 
 static esp_err_t handle_options_request(httpd_req_t * req)
 {
-    if (is_request_authorized(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-    }
-
     // Set CORS headers for OPTIONS request
     if (set_cors_headers(req) != ESP_OK) {
         httpd_resp_send_500(req);
