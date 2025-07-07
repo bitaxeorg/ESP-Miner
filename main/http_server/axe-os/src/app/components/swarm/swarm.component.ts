@@ -178,13 +178,12 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
 
   private getHttpOptionsForDevice(device: any): { headers: any } {
-    const headers: any = {
-      'X-Requested-With': 'XMLHttpRequest'
-    };
+    const headers: any = {};
 
     // Check if device has an API secret stored
     const apiSecret = device?.apiSecret;
     if (apiSecret && apiSecret.trim() !== '') {
+      headers['X-Requested-With'] = 'XMLHttpRequest'; // NOTE: This should eventually *always* be sent.
       headers['Authorization'] = `Bearer ${apiSecret}`;
     }
 
