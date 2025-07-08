@@ -104,19 +104,35 @@ export class SwarmComponent implements OnInit, OnDestroy {
   scanNetwork() {
     this.scanning = true;
 
-    // Call the mDNS scan endpoint
-    this.httpClient.get<any[]>('/api/system/network/scan').subscribe({
-      next: (foundDevices) => {
+    forkJoin({
+      currentDevice: this.httpClient.get<any>('/api/system/info').pipe(
+        mergeMap(info =>
+          this.httpClient.get<any>('/api/system/asic').pipe(
+            map(asic => ({ ...info, ...asic })),
+            catchError(() => of(info))
+          )
+        )
+      ),
+      foundDevices: this.httpClient.get<any[]>('/api/system/network/scan')
+    }).subscribe({
+      next: ({ currentDevice, foundDevices }) => {
         if (!Array.isArray(foundDevices)) {
-          this.toastr.error('Invalid response from scan endpoint', 'Scan Error');
-          this.scanning = false;
-          return;
+          foundDevices = [];
+        }
+
+        // Check if current device should be added to swarm
+        const existingIps = new Set([...this.swarm.map(item => item.IP), ...this.swarm.map(item => item.currentIP)]);
+        const existingHostnames = new Set(this.swarm.map(item => item.hostname));
+
+        const currentDeviceExists = existingIps.has(currentDevice.currentIP) || (currentDevice.hostname && existingHostnames.has(currentDevice.hostname));
+
+        // If current device is not in swarm, add it to the list of devices to process
+        if (!currentDeviceExists && currentDevice.ASICModel) {
+          currentDevice.IP = window.location.host;
+          foundDevices.unshift(currentDevice);
         }
 
         // Filter out devices we already have - check both IP and currentIP
-        const existingIps = new Set([...this.swarm.map(item => item.IP), ...this.swarm.map(item => item.currentIP)]);
-        const existingHostnames = new Set(this.swarm.map(item => item.hostname).filter(h => h));
-
         const newDevices = foundDevices.filter(device => {
           // Check if device IP matches any existing IP or currentIP
           const ipNotExists = !existingIps.has(device.IP);
