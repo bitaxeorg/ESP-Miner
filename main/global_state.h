@@ -1,17 +1,17 @@
 #ifndef GLOBAL_STATE_H_
 #define GLOBAL_STATE_H_
 
-#include <stdbool.h>
-#include <stdint.h>
 #include "asic_task.h"
 #include "common.h"
-#include "power_management_task.h"
-#include "statistics_task.h"
-#include "serial.h"
-#include "stratum_api.h"
-#include "work_queue.h"
 #include "device_config.h"
 #include "display.h"
+#include "power_management_task.h"
+#include "serial.h"
+#include "statistics_task.h"
+#include "stratum_api.h"
+#include "work_queue.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
@@ -19,7 +19,8 @@
 #define HISTORY_LENGTH 100
 #define DIFF_STRING_SIZE 10
 
-typedef struct {
+typedef struct
+{
     char message[64];
     uint32_t count;
 } RejectedReasonStat;
@@ -77,7 +78,7 @@ typedef struct
 {
     bool is_active;
     bool is_finished;
-    char *message;
+    char * message;
     char *result;
     char *finished;
 } SelfTestModule;
@@ -86,14 +87,6 @@ typedef struct
 {
     work_queue stratum_queue;
     work_queue ASIC_jobs_queue;
-
-    SystemModule SYSTEM_MODULE;
-    DeviceConfig DEVICE_CONFIG;
-    DisplayConfig DISPLAY_CONFIG;
-    AsicTaskModule ASIC_TASK_MODULE;
-    PowerManagementModule POWER_MANAGEMENT_MODULE;
-    SelfTestModule SELF_TEST_MODULE;
-    StatisticsModule STATISTICS_MODULE;
 
     char * extranonce_str;
     int extranonce_2_len;
@@ -116,5 +109,14 @@ typedef struct
     bool ASIC_initalized;
     bool psram_is_available;
 } GlobalState;
+
+extern GlobalState GLOBAL_STATE;
+extern SystemModule SYSTEM_MODULE;
+extern PowerManagementModule POWER_MANAGEMENT_MODULE;
+extern DeviceConfig DEVICE_CONFIG;
+extern DisplayConfig DISPLAY_CONFIG;
+extern AsicTaskModule ASIC_TASK_MODULE;
+extern SelfTestModule SELF_TEST_MODULE;
+extern StatisticsModule STATISTICS_MODULE;
 
 #endif /* GLOBAL_STATE_H_ */

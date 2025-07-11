@@ -137,7 +137,6 @@ esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
 
 static void event_handler(void * arg, esp_event_base_t event_base, int32_t event_id, void * event_data)
 {
-    GlobalState *GLOBAL_STATE = (GlobalState *)arg;
     if (event_base == WIFI_EVENT)
     {
         if (event_id == WIFI_EVENT_SCAN_DONE) {
@@ -156,13 +155,13 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
         if (event_id == WIFI_EVENT_STA_START) {
             ESP_LOGI(TAG, "Connecting...");
-            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connecting...");
+            strcpy(SYSTEM_MODULE.wifi_status, "Connecting...");
             esp_wifi_connect();
         }
 
         if (event_id == WIFI_EVENT_STA_CONNECTED) {
             ESP_LOGI(TAG, "Connected!");
-            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
+            strcpy(SYSTEM_MODULE.wifi_status, "Connected!");
         }
 
         if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
@@ -176,12 +175,12 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
             if (clients_connected_to_ap > 0) {
                 ESP_LOGI(TAG, "Client(s) connected to AP, not retrying...");
-                sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Config AP connected!");
+                sprintf(SYSTEM_MODULE.wifi_status, "Config AP connected!");
                 return;
             }
 
-            sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
-            ESP_LOGI(TAG, "Wi-Fi status: %s", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
+            sprintf(SYSTEM_MODULE.wifi_status, "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
+            ESP_LOGI(TAG, "Wi-Fi status: %s", SYSTEM_MODULE.wifi_status);
 
             // Wait a little
             vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -193,12 +192,12 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         
         if (event_id == WIFI_EVENT_AP_START) {
             ESP_LOGI(TAG, "Configuration Access Point enabled");
-            GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = true;
+            SYSTEM_MODULE.ap_enabled = true;
         }
                 
         if (event_id == WIFI_EVENT_AP_STOP) {
             ESP_LOGI(TAG, "Configuration Access Point disabled");
-            GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = false;
+            SYSTEM_MODULE.ap_enabled = false;
         }
 
         if (event_id == WIFI_EVENT_AP_STACONNECTED) {
@@ -212,14 +211,14 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t * event = (ip_event_got_ip_t *) event_data;
-        snprintf(GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str, IP4ADDR_STRLEN_MAX, IPSTR, IP2STR(&event->ip_info.ip));
+        snprintf(SYSTEM_MODULE.ip_addr_str, IP4ADDR_STRLEN_MAX, IPSTR, IP2STR(&event->ip_info.ip));
 
-        ESP_LOGI(TAG, "IP Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str);
+        ESP_LOGI(TAG, "IP Address: %s", SYSTEM_MODULE.ip_addr_str);
         s_retry_num = 0;
 
-        GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
+        SYSTEM_MODULE.is_connected = true;
 
-        ESP_LOGI(TAG, "Connected to SSID: %s", GLOBAL_STATE->SYSTEM_MODULE.ssid);
+        ESP_LOGI(TAG, "Connected to SSID: %s", SYSTEM_MODULE.ssid);
 
         wifi_softap_off();
     }
@@ -326,12 +325,11 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
 
 void wifi_init(void * pvParameters)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
     // copy the wifi ssid to the global state
-    strncpy(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid));
-    GLOBAL_STATE->SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid)-1] = 0;
+    strncpy(SYSTEM_MODULE.ssid, wifi_ssid, sizeof(SYSTEM_MODULE.ssid));
+    SYSTEM_MODULE.ssid[sizeof(SYSTEM_MODULE.ssid)-1] = 0;
 
     free(wifi_ssid);
 
@@ -340,8 +338,8 @@ void wifi_init(void * pvParameters)
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, GLOBAL_STATE, &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, GLOBAL_STATE, &instance_got_ip));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &instance_got_ip));
 
     /* Initialize Wi-Fi */
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -350,10 +348,10 @@ void wifi_init(void * pvParameters)
     wifi_softap_on();
 
     /* Initialize AP */
-    wifi_init_softap(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid);
+    wifi_init_softap(SYSTEM_MODULE.ap_ssid);
 
     /* Skip connection if SSID is null */
-    if (strlen(GLOBAL_STATE->SYSTEM_MODULE.ssid) == 0) {
+    if (strlen(SYSTEM_MODULE.ssid) == 0) {
         ESP_LOGI(TAG, "No WiFi SSID provided, skipping connection");
 
         /* Start WiFi */
@@ -369,7 +367,7 @@ void wifi_init(void * pvParameters)
 
         /* Initialize STA */
         ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-        esp_netif_t * esp_netif_sta = wifi_init_sta(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_pass);
+        esp_netif_t * esp_netif_sta = wifi_init_sta(SYSTEM_MODULE.ssid, wifi_pass);
 
         free(wifi_pass);
 

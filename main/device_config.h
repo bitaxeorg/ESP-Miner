@@ -126,6 +126,6 @@ static const DeviceConfig default_configs[] = {
     { .board_version = "800",  .family = FAMILY_GAMMA_TURBO, .EMC2103 = true,                                                             .emc_temp_offset = -10, .TPS546 = true,                                                           .power_consumption_target = 12, },
 };
 
-esp_err_t device_config_init(void * pvParameters);
+esp_err_t device_config_init();
 
 #endif /* DEVICE_CONFIG_H_ */

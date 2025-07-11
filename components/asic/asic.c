@@ -14,42 +14,42 @@ static const double NONCE_SPACE = 4294967296.0; //  2^32
 
 static const char *TAG = "asic";
 
-uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
+uint8_t ASIC_init()
 {
-    ESP_LOGI(TAG, "Initializing %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+    ESP_LOGI(TAG, "Initializing %s", DEVICE_CONFIG.family.asic.name);
+    switch (DEVICE_CONFIG.family.asic.id) {
 
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            return BM1397_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1397_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1366:
-            return BM1366_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1366_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1368:
-            return BM1368_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1368_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1370:
-            return BM1370_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1370_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         default:
     }
     return ESP_OK;
 }
 
-task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
+task_result * ASIC_process_work()
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    switch (DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            return BM1397_process_work(GLOBAL_STATE);
+            return BM1397_process_work();
         case BM1366:
-            return BM1366_process_work(GLOBAL_STATE);
+            return BM1366_process_work();
         case BM1368:
-            return BM1368_process_work(GLOBAL_STATE);
+            return BM1368_process_work();
         case BM1370:
-            return BM1370_process_work(GLOBAL_STATE);
+            return BM1370_process_work();
     }
     return NULL;
 }
 
-int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
+int ASIC_set_max_baud()
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    switch (DEVICE_CONFIG.family.asic.id) {
         case BM1397:
             return BM1397_set_max_baud();
         case BM1366:
@@ -62,27 +62,27 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
     return 0;
 }
 
-void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job)
+void ASIC_send_work(void * next_job)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    switch (DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            BM1397_send_work(GLOBAL_STATE, next_job);
+            BM1397_send_work(next_job);
             break;
         case BM1366:
-            BM1366_send_work(GLOBAL_STATE, next_job);
+            BM1366_send_work(next_job);
             break;
         case BM1368:
-            BM1368_send_work(GLOBAL_STATE, next_job);
+            BM1368_send_work(next_job);
             break;
         case BM1370:
-            BM1370_send_work(GLOBAL_STATE, next_job);
+            BM1370_send_work(next_job);
             break;
     }
 }
 
-void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
+void ASIC_set_version_mask(uint32_t mask)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    switch (DEVICE_CONFIG.family.asic.id) {
         case BM1397:
             BM1397_set_version_mask(mask);
             break;
@@ -98,12 +98,12 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
     }
 }
 
-bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency)
+bool ASIC_set_frequency(float target_frequency)
 {
-    ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
+    //ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
     bool success = false;
     
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    switch (DEVICE_CONFIG.family.asic.id) {
         case BM1366:
             success = BM1366_set_frequency(target_frequency);
             break;
@@ -129,12 +129,12 @@ bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency)
     return success;
 }
 
-double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
+double ASIC_get_asic_job_frequency_ms()
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    switch (DEVICE_CONFIG.family.asic.id) {
         case BM1397:
             // no version-rolling so same Nonce Space is splitted between Small Cores
-            return (NONCE_SPACE / (double) (GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * 1000)) / (double) GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+            return (NONCE_SPACE / (double) (POWER_MANAGEMENT_MODULE.frequency_value * DEVICE_CONFIG.family.asic.small_core_count * 1000)) / (double) DEVICE_CONFIG.family.asic_count;
         case BM1366:
             return 2000;
         case BM1368:

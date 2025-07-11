@@ -14,12 +14,11 @@ static const char *TAG = "asic_result";
 
 void ASIC_result_task(void *pvParameters)
 {
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
     while (1)
     {
-        //task_result *asic_result = (*GLOBAL_STATE->ASIC_functions.receive_result_fn)(GLOBAL_STATE);
-        task_result *asic_result = ASIC_process_work(GLOBAL_STATE);
+        //task_result *asic_result = (*GLOBAL_STATE.ASIC_functions.receive_result_fn)(GLOBAL_STATE);
+        task_result *asic_result = ASIC_process_work();
 
         if (asic_result == NULL)
         {
@@ -28,13 +27,13 @@ void ASIC_result_task(void *pvParameters)
 
         uint8_t job_id = asic_result->job_id;
 
-        if (GLOBAL_STATE->valid_jobs[job_id] == 0)
+        if (GLOBAL_STATE.valid_jobs[job_id] == 0)
         {
             ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
             continue;
         }
 
-        bm_job *active_job = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id];
+        bm_job *active_job = ASIC_TASK_MODULE.active_jobs[job_id];
         // check the nonce difficulty
         double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
 
@@ -43,10 +42,10 @@ void ASIC_result_task(void *pvParameters)
 
         if (nonce_diff >= active_job->pool_diff)
         {
-            char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+            char * user = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_user : SYSTEM_MODULE.pool_user;
             int ret = STRATUM_V1_submit_share(
-                GLOBAL_STATE->sock,
-                GLOBAL_STATE->send_uid++,
+                GLOBAL_STATE.sock,
+                GLOBAL_STATE.send_uid++,
                 user,
                 active_job->jobid,
                 active_job->extranonce2,
@@ -60,6 +59,6 @@ void ASIC_result_task(void *pvParameters)
             }
         }
 
-        SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, job_id);
+        SYSTEM_notify_found_nonce(nonce_diff, job_id);
     }
 }

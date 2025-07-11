@@ -12,8 +12,10 @@ struct StatisticsData
     float vrTemperature;
     float power;
     float voltage;
+    uint16_t frequency;
     float current;
     int16_t coreVoltageActual;
+    int16_t coreVoltage;
     uint16_t fanSpeed;
     uint16_t fanRPM;
     int8_t wifiRSSI;
@@ -31,7 +33,7 @@ StatisticsNodePtr addStatisticData(StatisticsNodePtr data);
 
 StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr dataOut);
 
-void statistics_init(void * pvParameters);
+void statistics_init();
 void statistics_task(void * pvParameters);
 
 #endif // STATISTICS_TASK_H_
