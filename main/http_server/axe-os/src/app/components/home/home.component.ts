@@ -11,12 +11,18 @@ import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
 
+type Message = {
+  severity: 'error' | 'warn' | 'success' | 'info';
+  text: string;
+}
+
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent {
+  public messages: Message[] = [];
 
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
@@ -288,7 +294,8 @@ export class HomeComponent {
     this.info$.pipe(
       first()
     ).subscribe({
-      next: () => {
+      next: (info) => {
+        this.updateMessages(info);
         this.loadingService.loading$.next(false)
       }
     });
@@ -347,5 +354,49 @@ export class HomeComponent {
     });
 
     return this.calculateAverage(efficiencies);
+  }
+
+  public updateMessages(info: ISystemInfo) {
+    if (info.overheat_mode) {
+      this.messages.push({
+        severity: 'error',
+        text: 'Bitaxe has overheated - See settings'
+      });
+    }
+
+    if (!info.frequency || info.frequency < 400) {
+      this.messages.push({
+        severity: 'warn',
+        text: 'Bitaxe frequency is set low - See settings'
+      });
+    }
+
+    if (info.power_fault) {
+      this.messages.push({
+        severity: 'error',
+        text: `${info.power_fault} Check your Power Supply.`
+      });
+    }
+
+    if (info.isUsingFallbackStratum) {
+      this.messages.push({
+        severity: 'warn',
+        text: 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Bitaxe.'
+      });
+    }
+
+    if (info.version !== info.axeOSVersion) {
+      this.messages.push({
+        severity: 'warn',
+        text: `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`
+      });
+    }
+
+    if (window.location.hostname.toLowerCase().includes(info.hostname.toLowerCase())) {
+      this.messages.push({
+        severity: 'warn',
+        text: 'To avoid unexpected issues, AxeOS should be accessed using its IP address instead of the hostname.'
+      });
+    }
   }
 }
