@@ -26,6 +26,7 @@ export class NetworkEditComponent implements OnInit {
   public form!: FormGroup;
   public savedChanges: boolean = false;
   public scanning: boolean = false;
+  public isInCaptivePortalMode: boolean = false;
 
   @Input() uri = '';
 
@@ -43,13 +44,50 @@ export class NetworkEditComponent implements OnInit {
     this.systemService.getInfo(this.uri)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
+        // Check if we're in captive portal mode (no SSID configured)
+        this.isInCaptivePortalMode = !info.ssid || info.ssid.trim() === '';
+
+        // Generate suggested hostname from MAC address (bitaxe-xxxx pattern)
+        const suggestedHostname = this.generateSuggestedHostname(info.macAddr);
+        const hostname = this.isInCaptivePortalMode ? suggestedHostname : info.hostname;
+
         this.form = this.fb.group({
-          hostname: [info.hostname, [Validators.required]],
+          hostname: [hostname, [Validators.required]],
           ssid: [info.ssid, [Validators.required]],
           wifiPass: ['*****'],
+          apiSecret: [info.apiSecret || '', [Validators.minLength(12), Validators.maxLength(32)]],
         });
         this.formSubject.next(this.form);
       });
+  }
+
+  private generateSuggestedHostname(macAddr: string): string {
+    if (!macAddr) return 'bitaxe';
+
+    // Extract last 4 characters (2 bytes) from MAC address
+    // MAC format is XX:XX:XX:XX:XX:XX, so get last 2 pairs
+    const macParts = macAddr.split(':');
+    if (macParts.length >= 6) {
+      const lastTwoBytes = macParts[4] + macParts[5];
+      return `bitaxe-${lastTwoBytes.toLowerCase()}`;
+    }
+
+    return 'bitaxe';
+  }
+
+  public generateApiSecret(): void {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 24; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    this.form.patchValue({ apiSecret: result });
+    this.form.markAsDirty();
+  }
+
+  public getHostnameUrl(): string {
+    const hostname = this.form?.get('hostname')?.value || 'bitaxe';
+    return `http://${hostname}.local`;
   }
 
 
@@ -67,6 +105,11 @@ export class NetworkEditComponent implements OnInit {
     // Trim SSID to remove any leading/trailing whitespace
     if (form.ssid) {
       form.ssid = form.ssid.trim();
+    }
+
+    // Handle API secret - remove if empty
+    if (form.apiSecret && form.apiSecret.trim() === '') {
+      form.apiSecret = '';
     }
 
     this.systemService.updateSystem(this.uri, form)
