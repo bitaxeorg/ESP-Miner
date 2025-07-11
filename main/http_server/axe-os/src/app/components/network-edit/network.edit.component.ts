@@ -73,12 +73,12 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.warning('You must restart this device after saving for changes to take effect', 'Warning');
-          this.toastr.success('Success!', 'Saved network settings');
+          this.toastr.warning('You must restart this device after saving for changes to take effect.');
+          this.toastr.success('Saved network settings');
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error.', `Could not save. ${err.message}`);
+          this.toastr.error(`Could not save. ${err.message}`);
           this.savedChanges = false;
         }
       });
@@ -131,7 +131,7 @@ export class NetworkEditComponent implements OnInit {
             });
         },
         error: (err) => {
-          this.toastr.error('Failed to scan Wi-Fi networks', 'Error');
+          this.toastr.error('Failed to scan Wi-Fi networks');
         }
       });
   }
@@ -141,10 +141,10 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.success('Success!', 'Bitaxe restarted');
+          this.toastr.success('Device restarted');
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error', `Could not restart. ${err.message}`);
+          this.toastr.error(`Could not restart. ${err.message}`);
         }
       });
   }
