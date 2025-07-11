@@ -1,5 +1,9 @@
 import { Injectable } from '@angular/core';
 
+type Pool =
+  | { search: string; url: string }
+  | { regex: RegExp; url: string };
+
 @Injectable({
     providedIn: 'root'
 })
@@ -14,33 +18,32 @@ export class QuicklinkService {
      * @returns A URL to the pool's user stats page, or undefined if no matching pool is found
      */
     public getQuickLink(stratumURL: string, stratumUser: string): string | undefined {
-        const address = stratumUser.split('.')[0];
+        const user = stratumUser.split('.')[0];
 
-        if (stratumURL.includes('public-pool.io')) {
-            return `https://web.public-pool.io/#/app/${address}`;
-        } else if (stratumURL.includes('ocean.xyz')) {
-            return `https://ocean.xyz/stats/${address}`;
-        } else if (/^eusolo[46]?.ckpool.org/.test(stratumURL)) {
-            return `https://eusolostats.ckpool.org/users/${address}`;
-        } else if (/^solo[46]?.ckpool.org/.test(stratumURL)) {
-            return `https://solostats.ckpool.org/users/${address}`;
-        } else if (stratumURL.includes('pool.noderunners.network')) {
-            return `https://noderunners.network/en/pool/user/${address}`;
-        } else if (stratumURL.includes('satoshiradio.nl')) {
-            return `https://pool.satoshiradio.nl/user/${address}`;
-        } else if (stratumURL.includes('solohash.co.uk')) {
-            return `https://solohash.co.uk/user/${address}`;
-        } else if (stratumURL.includes('nerdminer.de')) {
-            return `https://pool.nerdminer.de/#/app/${address}`;
-        } else if (stratumURL.includes('solomining.de')) {
-            return `https://pool.solomining.de/#/app/${address}`;
-        } else if (stratumURL.includes('yourdevice.ch')) {
-            return `https://blitzpool.yourdevice.ch/#/app/${address}`;
-        } else if (stratumURL.includes('solo.stratum.braiins.com')) {
-            return `https://solo.braiins.com/stats/${address}`;
-        } else if (stratumURL.includes('parasite.wtf')) {
-            return `https://parasite.space/user/${address}`;
+        const pools: Pool[] = [
+          {search: 'public-pool.io', url: `https://web.public-pool.io/#/app/${user}`},
+          {search: 'nerdminer.de', url: `https://pool.nerdminer.de/#/app/${user}`},
+          {search: 'solomining.de', url: `https://pool.solomining.de/#/app/${user}`},
+          {search: 'yourdevice.ch', url: `https://blitzpool.yourdevice.ch/#/app/${user}`},
+          {search: 'ocean.xyz', url: `https://ocean.xyz/stats/${user}`},
+          {search: 'pool.noderunners.network', url: `https://noderunners.network/en/pool/user/${user}`},
+          {search: 'satoshiradio.nl', url: `https://pool.satoshiradio.nl/user/${user}`},
+          {search: 'solohash.co.uk', url: `https://solohash.co.uk/user/${user}`},
+          {search: 'solo.stratum.braiins.com', url: `https://solo.braiins.com/stats/${user}`},
+          {search: 'parasite.wtf', url: `https://parasite.space/user/${user}`},
+          {regex: /^(eu|au)?solo[46]?.ckpool\.org/, url: `https://$1solostats.ckpool.org/users/${user}`},
+        ];
+
+        for (const pool of pools) {
+          if ('search' in pool && stratumURL.includes(pool.search)) {
+            return pool.url;
+          }
+          if ('regex' in pool) {
+            const match = pool.regex.exec(stratumURL)!;
+            return pool.url.replace(/\$(\d+)/g, (_, group) => match[+group] ?? '');
+          }
         }
+
         return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
     }
 }
