@@ -16,6 +16,7 @@
 #include "nvs_device.h"
 #include "self_test.h"
 #include "asic.h"
+#include "bap/bap.h"
 #include "device_config.h"
 #include "connect.h"
 #include "asic_reset.h"
@@ -85,6 +86,23 @@ void app_main(void)
     }
 
     SERIAL_init();
+
+    // Initialize BAP interface
+    esp_err_t bap_ret = BAP_init();
+    if (bap_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize BAP interface: %d", bap_ret);
+        // Continue anyway, as BAP is not critical for core functionality
+    } else {
+        ESP_LOGI(TAG, "BAP interface initialized successfully");
+        
+        // Start the BAP subscription task
+        bap_ret = BAP_start_subscription_task(&GLOBAL_STATE);
+        if (bap_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to start BAP subscription task: %d", bap_ret);
+        } else {
+            ESP_LOGI(TAG, "BAP subscription task started successfully");
+        }
+    }
 
     if (ASIC_init(&GLOBAL_STATE) == 0) {
         GLOBAL_STATE.SYSTEM_MODULE.asic_status = "Chip count 0";

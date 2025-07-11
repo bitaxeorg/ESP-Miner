@@ -1,0 +1,692 @@
+#include <string.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <stdlib.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/uart.h"
+#include "esp_log.h"
+#include "esp_err.h"
+#include "esp_timer.h"
+
+#include "bap.h"
+#include "device_config.h"
+
+#define BAP_MAX_MESSAGE_LEN 256
+#define BAP_UART_NUM UART_NUM_2
+#define BAP_BUF_SIZE 1024
+
+#define GPIO_BAP_RX CONFIG_GPIO_BAP_RX
+#define GPIO_BAP_TX CONFIG_GPIO_BAP_TX
+
+static const char *TAG = "BAP";
+
+static bap_subscription_t subscriptions[BAP_PARAM_UNKNOWN] = {0};
+static GlobalState *global_state = NULL;
+static TaskHandle_t uart_receive_task_handle = NULL;
+static TaskHandle_t subscription_task_handle = NULL;
+static SemaphoreHandle_t subscription_mutex = NULL;
+
+static bap_command_handler_t handlers[BAP_CMD_UNKNOWN + 1] = {0};
+
+static const char *parameter_strings[] = {
+    "systemInfo",
+    "hashrate",
+    "temperature",
+    "power",
+    "voltage",
+    "current",
+    "shares"
+};
+
+bap_parameter_t BAP_parameter_from_string(const char *param_str) {
+    for (int i = 0; i < BAP_PARAM_UNKNOWN; ++i) {
+        if (strcmp(param_str, parameter_strings[i]) == 0) {
+            return (bap_parameter_t)i;
+        }
+    }
+    return BAP_PARAM_UNKNOWN;
+}
+
+const char* BAP_parameter_to_string(bap_parameter_t param) {
+    if (param >= 0 && param < BAP_PARAM_UNKNOWN) {
+        return parameter_strings[param];
+    }
+    return "unknown";
+}
+
+static const char *command_strings[] = {
+    "REQ", "RES", "SUB", "UNSUB", "SET", "ACK", "ERR", "CMD", "STA", "LOG"
+};
+
+bap_command_t BAP_command_from_string(const char *cmd_str) {
+    for (int i = 0; i < BAP_CMD_UNKNOWN; ++i) {
+        if (strcmp(cmd_str, command_strings[i]) == 0) {
+            return (bap_command_t)i;
+        }
+    }
+    return BAP_CMD_UNKNOWN;
+}
+
+const char* BAP_command_to_string(bap_command_t cmd) {
+    if (cmd >= 0 && cmd < BAP_CMD_UNKNOWN) {
+        return command_strings[cmd];
+    }
+    return "UNK";
+}
+
+uint8_t BAP_calculate_checksum(const char *sentence_body) {
+    uint8_t checksum = 0;
+    ESP_LOGI(TAG, "Calculating checksum for: %s", sentence_body);
+    
+    while (*sentence_body) {
+        ESP_LOGD(TAG, "XOR: 0x%02X ^ 0x%02X = 0x%02X",
+                checksum, (uint8_t)(*sentence_body),
+                checksum ^ (uint8_t)(*sentence_body));
+        checksum ^= (uint8_t)(*sentence_body++);
+    }
+    
+    ESP_LOGI(TAG, "Final checksum: 0x%02X", checksum);
+    return checksum;
+}
+
+void BAP_send_message(bap_command_t cmd, const char *parameter, const char *value) {
+    char message[BAP_MAX_MESSAGE_LEN];
+    char sentence_body[BAP_MAX_MESSAGE_LEN];
+    int len;
+
+    if (value && strlen(value) > 0) {
+        snprintf(sentence_body, sizeof(sentence_body), "BAP,%s,%s,%s",
+                 BAP_command_to_string(cmd), parameter, value);
+    } else {
+        snprintf(sentence_body, sizeof(sentence_body), "BAP,%s,%s",
+                 BAP_command_to_string(cmd), parameter);
+    }
+
+    uint8_t checksum = BAP_calculate_checksum(sentence_body);
+
+    len = snprintf(message, sizeof(message), "$%s*%02X\r\n", sentence_body, checksum);
+
+    uart_write_bytes(BAP_UART_NUM, message, len);
+    
+    // debugging
+    ESP_LOGI(TAG, "Sent: %s", message);
+}
+
+void BAP_register_handler(bap_command_t cmd, bap_command_handler_t handler) {
+    if (cmd >= 0 && cmd <= BAP_CMD_UNKNOWN) {
+        handlers[cmd] = handler;
+    }
+}
+
+void BAP_parse_message(const char *message) {
+    if (!message) {
+        ESP_LOGE(TAG, "Parse message: NULL message");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Parsing message: %s", message);
+    
+    size_t len = strlen(message);
+    if (len < 5) { // At minimum need $BAP,X
+        ESP_LOGE(TAG, "Parse message: Too short (%d chars)", len);
+        return; // Too short to be valid
+    }
+
+    // Check start character
+    if (message[0] != '$') {
+        ESP_LOGE(TAG, "Parse message: Doesn't start with $");
+        return;
+    }
+
+    // Find '*' for checksum if present
+    const char *asterisk = strchr(message, '*');
+    char sentence_body[BAP_MAX_MESSAGE_LEN];
+    
+    if (asterisk) {
+        // Checksum is present, validate it
+        // Extract checksum from message
+        if ((asterisk - message) + 3 > len) {
+            ESP_LOGE(TAG, "Parse message: Not enough room for checksum");
+            return; // Not enough room for checksum + \r\n
+        }
+
+        uint8_t received_checksum = 0;
+        sscanf(asterisk + 1, "%2hhX", &received_checksum);
+
+        // Calculate checksum over sentence body (between '$' and '*')
+        size_t body_len = asterisk - (message + 1);
+        if (body_len >= sizeof(sentence_body)) {
+            ESP_LOGE(TAG, "Parse message: Body too long");
+            return;
+        }
+
+        strncpy(sentence_body, message + 1, body_len);
+        sentence_body[body_len] = '\0';
+
+        uint8_t calc_checksum = BAP_calculate_checksum(sentence_body);
+        
+        if (calc_checksum != received_checksum) {
+            ESP_LOGE(TAG, "Parse message: Checksum mismatch (received: 0x%02X, calculated: 0x%02X)",
+                     received_checksum, calc_checksum);
+            
+            // Check if this is a subscription command - be lenient with checksums for SUB commands
+            if (strstr(sentence_body, "BAP,SUB,") == sentence_body) {
+                ESP_LOGI(TAG, "Subscription command - ignoring checksum mismatch");
+            } else {
+                ESP_LOGE(TAG, "Non-subscription command with invalid checksum, rejecting");
+                return;
+            }
+        }
+    } else {
+        // No checksum, just use the body after $ until end or newline
+        size_t body_len = len - 1; // Skip the $
+        
+        // Find end of message (CR or LF)
+        for (size_t i = 1; i < len; i++) {
+            if (message[i] == '\r' || message[i] == '\n') {
+                body_len = i - 1;
+                break;
+            }
+        }
+        
+        if (body_len >= sizeof(sentence_body)) {
+            ESP_LOGE(TAG, "Parse message: Body too long");
+            return;
+        }
+        
+        strncpy(sentence_body, message + 1, body_len);
+        sentence_body[body_len] = '\0';
+        
+        // Only allow subscription commands without checksum
+        if (strstr(sentence_body, "BAP,SUB,") == sentence_body ||
+            strstr(sentence_body, "BAP,UNSUB,") == sentence_body) {
+            ESP_LOGI(TAG, "Subscription command without checksum, accepted");
+        } else {
+            ESP_LOGE(TAG, "Non-subscription command without checksum, rejecting");
+            return;
+        }
+    }
+
+    // Make a copy of sentence_body for tokenization (strtok_r modifies the string)
+    char tokenize_body[BAP_MAX_MESSAGE_LEN];
+    strcpy(tokenize_body, sentence_body);
+    
+    // Tokenize sentence_body: "BAP,CMD,PARAM[,VALUE]"
+    char *saveptr;
+    char *talker = strtok_r(tokenize_body, ",", &saveptr);
+    if (!talker || strcmp(talker, "BAP") != 0) {
+        ESP_LOGE(TAG, "Parse message: Invalid talker ID: %s", talker ? talker : "NULL");
+        return;
+    }
+
+    char *cmd_str = strtok_r(NULL, ",", &saveptr);
+    if (!cmd_str) {
+        ESP_LOGE(TAG, "Parse message: No command");
+        return;
+    }
+
+    char *parameter = strtok_r(NULL, ",", &saveptr);
+    if (!parameter) {
+        ESP_LOGE(TAG, "Parse message: No parameter");
+        return;
+    }
+
+    char *value = strtok_r(NULL, ",", &saveptr); // May be NULL
+
+    bap_command_t cmd = BAP_command_from_string(cmd_str);
+
+    if (cmd == BAP_CMD_UNKNOWN) {
+        ESP_LOGE(TAG, "Parse message: Unknown command: %s", cmd_str);
+        return;
+    }
+
+    if (handlers[cmd]) {
+        ESP_LOGI(TAG, "Calling handler for command: %s with parameter: %s", cmd_str, parameter);
+        handlers[cmd](parameter, value);
+    } else {
+        ESP_LOGE(TAG, "No handler registered for command: %s", cmd_str);
+    }
+}
+
+void BAP_send_test_message(GlobalState *state) {
+    const char *test_message = "BAP UART Interface Initialized\r\n";
+    esp_err_t ret = uart_write_bytes(BAP_UART_NUM, test_message, strlen(test_message));
+    if (ret < 0) {
+        ESP_LOGE(TAG, "Failed to send test message: %d", ret);
+    } else {
+        ESP_LOGI(TAG, "Init message sent: %s", test_message);
+    }
+
+    if (state) {
+        char device_info[128];
+        int len = snprintf(device_info, sizeof(device_info),
+                          "Device: %s, ASIC: %s\r\n",
+                          state->DEVICE_CONFIG.family.name,
+                          state->DEVICE_CONFIG.family.asic.name);
+        ret = uart_write_bytes(BAP_UART_NUM, device_info, len);
+        if (ret < 0) {
+            ESP_LOGE(TAG, "Failed to send device info: %d", ret);
+        }
+        
+        // Send initial hashrate if available
+        if (state->SYSTEM_MODULE.current_hashrate > 0) {
+            char hashrate_msg[64];
+            len = snprintf(hashrate_msg, sizeof(hashrate_msg), "Initial Hashrate: %.2f\r\n",
+                          state->SYSTEM_MODULE.current_hashrate);
+            ret = uart_write_bytes(BAP_UART_NUM, hashrate_msg, len);
+            if (ret < 0) {
+                ESP_LOGE(TAG, "Failed to send hashrate message: %d", ret);
+            } else {
+                ESP_LOGI(TAG, "Hashrate message sent: %s", hashrate_msg);
+            }
+        }
+    }
+}
+
+void BAP_handle_subscription(const char *parameter, const char *value) {
+    ESP_LOGI(TAG, "Handling subscription request for parameter: %s", parameter);
+    
+    if (!parameter) {
+        ESP_LOGE(TAG, "Invalid subscription parameter");
+        return;
+    }
+
+    bap_parameter_t param = BAP_parameter_from_string(parameter);
+    ESP_LOGI(TAG, "Parameter ID: %d (from string: %s)", param, parameter);
+    
+    if (param == BAP_PARAM_UNKNOWN) {
+        ESP_LOGE(TAG, "Unknown subscription parameter: %s", parameter);
+        return;
+    }
+
+    // Take the mutex to protect the subscriptions array
+    if (subscription_mutex != NULL && xSemaphoreTake(subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // Activate the subscription
+        subscriptions[param].active = true;
+        subscriptions[param].last_update = 0;
+        subscriptions[param].update_interval_ms = 5000; // will be reduced later if it's safe to do so
+
+        // If value is provided, it's the update interval
+        if (value) {
+            int interval = atoi(value);
+            if (interval > 0) {
+                subscriptions[param].update_interval_ms = interval;
+            }
+        }
+
+        ESP_LOGI(TAG, "Subscription activated for %s with interval %lu ms",
+                 parameter_strings[param], subscriptions[param].update_interval_ms);
+
+        ESP_LOGI(TAG, "Current subscription status:");
+        for (int i = 0; i < BAP_PARAM_UNKNOWN; i++) {
+            ESP_LOGI(TAG, "  %s: active=%d, interval=%lu ms",
+                     parameter_strings[i], subscriptions[i].active,
+                     subscriptions[i].update_interval_ms);
+        }
+
+        // acknowledgment
+        BAP_send_message(BAP_CMD_ACK, parameter, "subscribed");
+
+        xSemaphoreGive(subscription_mutex);
+    } else {
+        ESP_LOGE(TAG, "Failed to take subscription mutex");
+    }
+}
+
+void BAP_handle_unsubscription(const char *parameter, const char *value) {
+    ESP_LOGI(TAG, "Handling unsubscription request for parameter: %s", parameter);
+    
+    if (!parameter) {
+        ESP_LOGE(TAG, "Invalid unsubscription parameter");
+        return;
+    }
+
+    bap_parameter_t param = BAP_parameter_from_string(parameter);
+    if (param == BAP_PARAM_UNKNOWN) {
+        ESP_LOGE(TAG, "Unknown unsubscription parameter: %s", parameter);
+        return;
+    }
+
+    // Take the mutex to protect the subscriptions array
+    if (subscription_mutex != NULL && xSemaphoreTake(subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // Deactivate the subscription
+        subscriptions[param].active = false;
+        
+        ESP_LOGI(TAG, "Subscription deactivated for %s", parameter_strings[param]);
+
+        // acknowledgment
+        BAP_send_message(BAP_CMD_ACK, parameter, "unsubscribed");
+
+        xSemaphoreGive(subscription_mutex);
+    } else {
+        ESP_LOGE(TAG, "Failed to take subscription mutex");
+    }
+}
+
+void BAP_handle_request(const char *parameter, const char *value) {
+    ESP_LOGI(TAG, "Handling request for parameter: %s", parameter);
+    
+    if (!parameter) {
+        ESP_LOGE(TAG, "Invalid request parameter");
+        return;
+    }
+
+    bap_parameter_t param = BAP_parameter_from_string(parameter);
+    if (param == BAP_PARAM_UNKNOWN) {
+        ESP_LOGE(TAG, "Unknown request parameter: %s", parameter);
+        return;
+    }
+
+    if (!global_state) {
+        ESP_LOGE(TAG, "Global state not available for request");
+        return;
+    }
+
+    BAP_send_request(param, global_state);
+}
+
+void BAP_send_request(bap_parameter_t param, GlobalState *state) {
+    if (!state) {
+        ESP_LOGE(TAG, "Invalid global state for request");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Sending request response for %s", BAP_parameter_to_string(param));
+
+    switch (param) {
+        case BAP_PARAM_SYSTEM_INFO:
+            BAP_send_message(BAP_CMD_RES, "deviceModel", state->DEVICE_CONFIG.family.name);
+            BAP_send_message(BAP_CMD_RES, "asicModel", state->DEVICE_CONFIG.family.asic.name);
+            break;
+            
+        default:
+            ESP_LOGE(TAG, "Unsupported request parameter: %d", param);
+            break;
+    }
+}
+
+static void uart_receive_task(void *pvParameters) {
+    uint8_t *data = (uint8_t *) malloc(BAP_BUF_SIZE);
+    if (!data) {
+        ESP_LOGE(TAG, "Failed to allocate memory for UART receive buffer");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    char message[BAP_MAX_MESSAGE_LEN + 1]; // +1 for null terminator
+    size_t message_len = 0;
+    bool in_message = false;
+
+    while (1) {
+        // Read data from UART
+        int len = uart_read_bytes(BAP_UART_NUM, data, BAP_BUF_SIZE, pdMS_TO_TICKS(100));
+        
+        if (len > 0) {
+            ESP_LOGD(TAG, "Received %d bytes from UART", len);
+            
+            for (int i = 0; i < len; i++) {
+                char c = (char)data[i];
+                
+                if (c == '$') {
+                    ESP_LOGI(TAG, "Start of message detected");
+                    in_message = true;
+                    message_len = 0;
+                    message[message_len++] = c;
+                }
+                // End of message (accept either \r, \n, or both as line ending)
+                else if ((c == '\n' || c == '\r') && in_message) {
+                    // Only process if we have more than just the $ character
+                    if (message_len > 1 && message_len < BAP_MAX_MESSAGE_LEN) {
+                        // Add the current character
+                        message[message_len++] = c;
+                        message[message_len] = '\0';
+                        
+                        // Process the message regardless of checksum presence
+                        ESP_LOGI(TAG, "Received complete message: %s", message);
+                        BAP_parse_message(message);
+                        
+                        // If we got \r, wait for possible \n to follow before resetting
+                        if (c == '\r') {
+                            // Continue collecting, don't reset in_message yet
+                            ESP_LOGD(TAG, "Got CR, waiting for possible LF");
+                        } else {
+                            // Got \n, reset message state
+                            in_message = false;
+                        }
+                    } else if (message_len >= BAP_MAX_MESSAGE_LEN) {
+                        ESP_LOGE(TAG, "Message too long, discarding");
+                        in_message = false;
+                    }
+                }
+                // Add character to message
+                else if (in_message && message_len < BAP_MAX_MESSAGE_LEN) {
+                    message[message_len++] = c;
+                    ESP_LOGD(TAG, "Added to message: %c, len now %d", c, message_len);
+                }
+            }
+        }
+    }
+
+    free(data);
+    vTaskDelete(NULL);
+}
+
+esp_err_t BAP_start_uart_receive_task(void) {
+    // Register the subscription, unsubscription, and request handlers
+    BAP_register_handler(BAP_CMD_SUB, BAP_handle_subscription);
+    BAP_register_handler(BAP_CMD_UNSUB, BAP_handle_unsubscription);
+    BAP_register_handler(BAP_CMD_REQ, BAP_handle_request);
+    
+    // mutex for subscription access
+    subscription_mutex = xSemaphoreCreateMutex();
+    if (subscription_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create subscription mutex");
+        return ESP_FAIL;
+    }
+    
+    // UART receive task
+    BaseType_t ret = xTaskCreate(uart_receive_task, "bap_uart_rx", 8192, NULL, 10, &uart_receive_task_handle);
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create UART receive task");
+        return ESP_FAIL;
+    }
+    
+    ESP_LOGI(TAG, "UART receive task started");
+    return ESP_OK;
+}
+
+void BAP_send_subscription_update(GlobalState *state) {
+    static uint32_t last_debug_time = 0;
+    
+    if (!state) {
+        ESP_LOGE(TAG, "Invalid global state");
+        return;
+    }
+
+    uint32_t current_time = esp_timer_get_time() / 1000; // Convert to milliseconds
+    
+    // Print debug info every 10 seconds
+    if (current_time - last_debug_time > 10000) {
+        ESP_LOGI(TAG, "Subscription status (debug every 10s):");
+        last_debug_time = current_time;
+        
+        // Print subscription status
+        if (subscription_mutex != NULL && xSemaphoreTake(subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            for (int i = 0; i < BAP_PARAM_UNKNOWN; i++) {
+                ESP_LOGI(TAG, "  %s: active=%d, interval=%lu ms, last update=%lu ms ago",
+                         parameter_strings[i], subscriptions[i].active,
+                         subscriptions[i].update_interval_ms,
+                         current_time - subscriptions[i].last_update);
+            }
+            xSemaphoreGive(subscription_mutex);
+        }
+    }
+
+    if (subscription_mutex != NULL && xSemaphoreTake(subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        bool has_updates = false;
+
+        for (int i = 0; i < BAP_PARAM_UNKNOWN; i++) {
+            if (subscriptions[i].active &&
+                (current_time - subscriptions[i].last_update >= subscriptions[i].update_interval_ms)) {
+                
+                ESP_LOGI(TAG, "Sending update for %s", parameter_strings[i]);
+                
+                subscriptions[i].last_update = current_time;
+                
+                switch (i) {   
+                    case BAP_PARAM_HASHRATE:
+                        {
+                            char hashrate_str[32];
+                            snprintf(hashrate_str, sizeof(hashrate_str), "%.2f", state->SYSTEM_MODULE.current_hashrate);
+                            BAP_send_message(BAP_CMD_RES, "hashrate", hashrate_str);
+                        }
+                        break;
+                        
+                    case BAP_PARAM_TEMPERATURE:
+                        {
+                            char temp_str[32];
+                            snprintf(temp_str, sizeof(temp_str), "%f", state->POWER_MANAGEMENT_MODULE.chip_temp_avg);
+                            BAP_send_message(BAP_CMD_RES, "chipTemp", temp_str);
+                            
+                            snprintf(temp_str, sizeof(temp_str), "%f", state->POWER_MANAGEMENT_MODULE.vr_temp);
+                            BAP_send_message(BAP_CMD_RES, "vrTemp", temp_str);
+                        }
+                        break;
+                        
+                    case BAP_PARAM_POWER:
+                        {
+                            char power_str[32];
+                            snprintf(power_str, sizeof(power_str), "%.2f", state->POWER_MANAGEMENT_MODULE.power);
+                            BAP_send_message(BAP_CMD_RES, "power", power_str);
+                        }
+                        break;
+                        
+                    case BAP_PARAM_VOLTAGE:
+                        {
+                            char voltage_str[32];
+                            snprintf(voltage_str, sizeof(voltage_str), "%.2f", state->POWER_MANAGEMENT_MODULE.voltage);
+                            BAP_send_message(BAP_CMD_RES, "voltage", voltage_str);
+                        }
+                        break;
+                        
+                    case BAP_PARAM_CURRENT:
+                        {
+                            char current_str[32];
+                            snprintf(current_str, sizeof(current_str), "%.2f", state->POWER_MANAGEMENT_MODULE.current);
+                            BAP_send_message(BAP_CMD_RES, "current", current_str);
+                        }
+                        break;
+                        
+                    case BAP_PARAM_SHARES:
+                        {
+                            char shares_str[32];
+                            snprintf(shares_str, sizeof(shares_str), "%llu", state->SYSTEM_MODULE.shares_accepted);
+                            BAP_send_message(BAP_CMD_RES, "sharesAccepted", shares_str);
+                            
+                            snprintf(shares_str, sizeof(shares_str), "%llu", state->SYSTEM_MODULE.shares_rejected);
+                            BAP_send_message(BAP_CMD_RES, "sharesRejected", shares_str);
+                        }
+                        break;
+                        
+                    default:
+                        break;
+                }
+                
+                has_updates = true;
+            }
+        }
+        
+        xSemaphoreGive(subscription_mutex);
+    } else {
+        ESP_LOGE(TAG, "Failed to take subscription mutex");
+    }
+}
+
+static void subscription_update_task(void *pvParameters) {
+    GlobalState *state = (GlobalState *)pvParameters;
+    
+    while (1) {
+        BAP_send_subscription_update(state);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+    
+    vTaskDelete(NULL);
+}
+
+esp_err_t BAP_start_subscription_task(GlobalState *state) {
+    if (!state) {
+        ESP_LOGE(TAG, "Invalid global state");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    global_state = state;
+    
+    BaseType_t ret = xTaskCreate(subscription_update_task, "bap_sub_update", 4096, state, 5, &subscription_task_handle);
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create subscription update task");
+        return ESP_FAIL;
+    }
+    
+    ESP_LOGI(TAG, "Subscription update task started");
+    return ESP_OK;
+}
+
+esp_err_t BAP_init(void) {
+    ESP_LOGI(TAG, "Initializing BAP UART interface");
+    
+    memset(handlers, 0, sizeof(handlers));
+    
+    memset(subscriptions, 0, sizeof(subscriptions));
+    
+    // Check if GPIO pins are valid (ESP32-S3 has 48 GPIO pins, 0-47)
+    if (GPIO_BAP_TX > 47 || GPIO_BAP_RX > 47) {
+        ESP_LOGE(TAG, "Invalid GPIO pins: TX=%d, RX=%d", GPIO_BAP_TX, GPIO_BAP_RX);
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // UART parameters
+    uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .rx_flow_ctrl_thresh = 122,
+    };
+    
+    // Configure UART parameters
+    esp_err_t ret = uart_param_config(BAP_UART_NUM, &uart_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure UART parameters: %d", ret);
+        return ret;
+    }
+    
+    // Set UART pins (TX: GPIO_BAP_TX, RX: GPIO_BAP_RX)
+    ret = uart_set_pin(BAP_UART_NUM, GPIO_BAP_TX, GPIO_BAP_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set UART pins: %d", ret);
+        return ret;
+    }
+    
+    // Install UART driver
+    ret = uart_driver_install(BAP_UART_NUM, BAP_BUF_SIZE, BAP_BUF_SIZE, 0, NULL, 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to install UART driver: %d", ret);
+        return ret;
+    }
+    
+    ESP_LOGI(TAG, "BAP UART interface initialized successfully");
+    
+    // Send a test message
+    BAP_send_test_message(global_state);
+    
+    BAP_start_subscription_task(global_state);
+    ret = BAP_start_uart_receive_task();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start UART receive task");
+        return ret;
+    }
+    
+    return ESP_OK;
+}
