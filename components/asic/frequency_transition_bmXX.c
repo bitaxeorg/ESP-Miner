@@ -4,53 +4,48 @@
 #include "freertos/task.h"
 #include <math.h>
 
+#define EPSILON 0.0001f
+#define STEP_SIZE 6.25 // MHz step size
+
 static const char * TAG = "frequency_transition";
 
-static float current_frequency = 56.25;
+static float current_frequency = 50; // Mhz
 
-bool do_frequency_transition(float target_frequency, set_hash_frequency_fn set_frequency_fn, int asic_type) {
-    if (set_frequency_fn == NULL) {
-        ESP_LOGE(TAG, "Invalid function pointer provided");
-        return false;
+void do_frequency_transition(float target_frequency, set_hash_frequency_fn set_frequency_fn)
+{
+    if (fabs(current_frequency - target_frequency) < EPSILON) {
+        return;
     }
 
-    float step = 6.25;
-    float current = current_frequency;
-    float target = target_frequency;
+    if (fabs(target_frequency - current_frequency) < STEP_SIZE) {
+        current_frequency = target_frequency;
+        set_frequency_fn(current_frequency);
+        return;
+    }
 
-    float direction = (target > current) ? step : -step;
+    ESP_LOGI(TAG, "Ramping up frequency from %g MHz to %g MHz", current_frequency, target_frequency);
 
-    // If current frequency is not a multiple of step, adjust to the nearest multiple
-    if (fmod(current, step) != 0) {
-        float next_dividable;
-        if (direction > 0) {
-            next_dividable = ceil(current / step) * step;
-        } else {
-            next_dividable = floor(current / step) * step;
+    int current_step = (target_frequency > current_frequency) ? (int)floor(current_frequency / STEP_SIZE) : (int)ceil(current_frequency / STEP_SIZE);
+    int target_step = (target_frequency > current_frequency) ? (int)floor(target_frequency / STEP_SIZE) : (int)ceil(target_frequency / STEP_SIZE);
+
+    if (current_step != target_step) {
+        int signum = (target_frequency > current_frequency) ? 1 : -1;
+        
+        while ((signum > 0 && current_step < target_step) ||
+               (signum < 0 && current_step > target_step)) {
+            current_step += signum;
+
+            current_frequency = current_step * STEP_SIZE;
+            set_frequency_fn(current_frequency);
+            
+            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
-        current = next_dividable;
-        
-        // Call the provided hash frequency function
-        set_frequency_fn(current);
-        
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-
-    // Gradually adjust frequency in steps until target is reached
-    while ((direction > 0 && current < target) || (direction < 0 && current > target)) {
-        float next_step = fmin(fabs(direction), fabs(target - current));
-        current += direction > 0 ? next_step : -next_step;
-        
-        // Call the provided hash frequency function
-        set_frequency_fn(current);
-        
-        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
     
-    // Set the final target frequency
-    set_frequency_fn(target);
-    current_frequency = target;
+    if (fabs(current_frequency - target_frequency) > EPSILON) {
+        current_frequency = target_frequency;
+        set_frequency_fn(current_frequency);
+    }
     
-    ESP_LOGI(TAG, "Successfully transitioned ASIC type %d to %.2f MHz", asic_type, target);
-    return true;
+    ESP_LOGI(TAG, "Successfully transitioned to %g MHz", target_frequency);
 }
