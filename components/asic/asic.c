@@ -1,14 +1,12 @@
 #include <string.h>
-
 #include <esp_log.h>
-
 #include "bm1397.h"
 #include "bm1366.h"
 #include "bm1368.h"
 #include "bm1370.h"
-#include "global_state.h"
 #include "asic.h"
 #include "device_config.h"
+#include "power_management_task.h"
 
 static const double NONCE_SPACE = 4294967296.0; //  2^32
 

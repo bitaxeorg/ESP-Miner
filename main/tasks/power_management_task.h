@@ -18,4 +18,6 @@ typedef struct
 
 void POWER_MANAGEMENT_task(void * pvParameters);
 
+extern PowerManagementModule POWER_MANAGEMENT_MODULE;
+
 #endif

@@ -127,5 +127,6 @@ static const DeviceConfig default_configs[] = {
 };
 
 esp_err_t device_config_init();
+extern DeviceConfig DEVICE_CONFIG;
 
 #endif /* DEVICE_CONFIG_H_ */

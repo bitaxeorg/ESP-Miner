@@ -14,6 +14,7 @@
 #include "utils.h"
 #include "crc.h"
 #include "mining.h"
+#include "asic_task.h"
 #include "global_state.h"
 
 #define BM1397_CHIP_ID 0x1397
@@ -335,7 +336,7 @@ void BM1397_send_work(bm_job *next_bm_job)
     _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job_packet), BM1397_DEBUG_WORK);
 }
 
-task_result *BM1397_process_work(void *pvParameters)
+task_result *BM1397_process_work()
 {
     bm1397_asic_result_t asic_result = {0};
 

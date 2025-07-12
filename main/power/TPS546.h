@@ -181,6 +181,7 @@ float TPS546_get_iout(void);
 float TPS546_get_vout(void);
 esp_err_t TPS546_set_vout(float volts);
 void TPS546_show_voltage_settings(void);
+//not used
 void TPS546_print_status(void);
 
 esp_err_t TPS546_check_status();

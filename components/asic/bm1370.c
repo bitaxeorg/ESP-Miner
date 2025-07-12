@@ -1,6 +1,7 @@
 #include "bm1370.h"
 
 #include "crc.h"
+#include "asic_task.h"
 #include "global_state.h"
 #include "serial.h"
 #include "utils.h"
@@ -395,7 +396,7 @@ void BM1370_send_work(bm_job * next_bm_job)
     _send_BM1370((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *) &job, sizeof(BM1370_job), BM1370_DEBUG_WORK);
 }
 
-task_result * BM1370_process_work(void * pvParameters)
+task_result * BM1370_process_work()
 {
     bm1370_asic_result_t asic_result = {0};
 

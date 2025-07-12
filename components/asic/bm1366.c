@@ -1,10 +1,10 @@
 #include "bm1366.h"
 
 #include "crc.h"
-#include "global_state.h"
 #include "serial.h"
 #include "utils.h"
-
+#include "asic_task.h"
+#include "global_state.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"

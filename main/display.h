@@ -27,4 +27,6 @@ static const DisplayConfig display_configs[] = {
 esp_err_t display_init(void * pvParameters);
 esp_err_t display_on(bool display_on);
 
+extern DisplayConfig DISPLAY_CONFIG;
+
 #endif /* DISPLAY_H_ */

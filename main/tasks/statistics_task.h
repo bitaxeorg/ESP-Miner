@@ -35,5 +35,5 @@ StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr 
 
 void statistics_init();
 void statistics_task(void * pvParameters);
-
+extern StatisticsModule STATISTICS_MODULE;
 #endif // STATISTICS_TASK_H_
