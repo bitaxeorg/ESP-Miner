@@ -30,6 +30,7 @@
 #include "vcore.h"
 #include "thermal.h"
 
+
 static const char * TAG = "system";
 
 static void _suffix_string(uint64_t, char *, size_t, int);
@@ -37,94 +38,91 @@ static void _suffix_string(uint64_t, char *, size_t, int);
 //local function prototypes
 static esp_err_t ensure_overheat_mode_config();
 
-static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id);
+static void _check_for_best_diff( double diff, uint8_t job_id);
 static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 
-void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
+void SYSTEM_init_system()
 {
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
-    module->duration_start = 0;
-    module->historical_hashrate_rolling_index = 0;
-    module->historical_hashrate_init = 0;
-    module->current_hashrate = 0;
-    module->screen_page = 0;
-    module->shares_accepted = 0;
-    module->shares_rejected = 0;
-    module->best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
-    module->best_session_nonce_diff = 0;
-    module->start_time = esp_timer_get_time();
-    module->lastClockSync = 0;
-    module->FOUND_BLOCK = false;
+    SYSTEM_MODULE.duration_start = 0;
+    SYSTEM_MODULE.historical_hashrate_rolling_index = 0;
+    SYSTEM_MODULE.historical_hashrate_init = 0;
+    SYSTEM_MODULE.current_hashrate = 0;
+    SYSTEM_MODULE.screen_page = 0;
+    SYSTEM_MODULE.shares_accepted = 0;
+    SYSTEM_MODULE.shares_rejected = 0;
+    SYSTEM_MODULE.best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
+    SYSTEM_MODULE.best_session_nonce_diff = 0;
+    SYSTEM_MODULE.start_time = esp_timer_get_time();
+    SYSTEM_MODULE.lastClockSync = 0;
+    SYSTEM_MODULE.FOUND_BLOCK = false;
     
     // set the pool url
-    module->pool_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
-    module->fallback_pool_url = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
+    SYSTEM_MODULE.pool_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
+    SYSTEM_MODULE.fallback_pool_url = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
 
     // set the pool port
-    module->pool_port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT);
-    module->fallback_pool_port = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT);
+    SYSTEM_MODULE.pool_port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT);
+    SYSTEM_MODULE.fallback_pool_port = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT);
 
     // set the pool user
-    module->pool_user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
-    module->fallback_pool_user = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
+    SYSTEM_MODULE.pool_user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
+    SYSTEM_MODULE.fallback_pool_user = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
 
     // set the pool password
-    module->pool_pass = nvs_config_get_string(NVS_CONFIG_STRATUM_PASS, CONFIG_STRATUM_PW);
-    module->fallback_pool_pass = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, CONFIG_FALLBACK_STRATUM_PW);
+    SYSTEM_MODULE.pool_pass = nvs_config_get_string(NVS_CONFIG_STRATUM_PASS, CONFIG_STRATUM_PW);
+    SYSTEM_MODULE.fallback_pool_pass = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, CONFIG_FALLBACK_STRATUM_PW);
 
     // set the pool difficulty
-    module->pool_difficulty = nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY, CONFIG_STRATUM_DIFFICULTY);
-    module->fallback_pool_difficulty = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, CONFIG_FALLBACK_STRATUM_DIFFICULTY);
+    SYSTEM_MODULE.pool_difficulty = nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY, CONFIG_STRATUM_DIFFICULTY);
+    SYSTEM_MODULE.fallback_pool_difficulty = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, CONFIG_FALLBACK_STRATUM_DIFFICULTY);
 
     // set the pool extranonce subscribe
-    module->pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, STRATUM_EXTRANONCE_SUBSCRIBE);
-    module->fallback_pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
+    SYSTEM_MODULE.pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, STRATUM_EXTRANONCE_SUBSCRIBE);
+    SYSTEM_MODULE.fallback_pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
 
     // set fallback to false.
-    module->is_using_fallback = false;
+    SYSTEM_MODULE.is_using_fallback = false;
 
     // Initialize overheat_mode
-    module->overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-    ESP_LOGI(TAG, "Initial overheat_mode value: %d", module->overheat_mode);
+    SYSTEM_MODULE.overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+    ESP_LOGI(TAG, "Initial overheat_mode value: %d", SYSTEM_MODULE.overheat_mode);
 
     //Initialize power_fault fault mode
-    module->power_fault = 0;
+    SYSTEM_MODULE.power_fault = 0;
 
     // set the best diff string
-    _suffix_string(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
-    _suffix_string(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
+    _suffix_string(SYSTEM_MODULE.best_nonce_diff, SYSTEM_MODULE.best_diff_string, DIFF_STRING_SIZE, 0);
+    _suffix_string(SYSTEM_MODULE.best_session_nonce_diff, SYSTEM_MODULE.best_session_diff_string, DIFF_STRING_SIZE, 0);
 }
 
-esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
+esp_err_t SYSTEM_init_peripherals() {
     
     ESP_RETURN_ON_ERROR(gpio_install_isr_service(0), TAG, "Error installing ISR service");
 
     // Initialize the core voltage regulator
-    ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_init(NULL), TAG, "VCORE init failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
 
-    ESP_RETURN_ON_ERROR(Thermal_init(&GLOBAL_STATE->DEVICE_CONFIG), TAG, "Thermal init failed!");
+    ESP_RETURN_ON_ERROR(Thermal_init(DEVICE_CONFIG), TAG, "Thermal init failed!");
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
     // Ensure overheat_mode config exists
     ESP_RETURN_ON_ERROR(ensure_overheat_mode_config(), TAG, "Failed to ensure overheat_mode config");
 
-    ESP_RETURN_ON_ERROR(display_init(GLOBAL_STATE), TAG, "Display init failed!");
+    ESP_RETURN_ON_ERROR(display_init(NULL), TAG, "Display init failed!");
 
     ESP_RETURN_ON_ERROR(input_init(screen_next, toggle_wifi_softap), TAG, "Input init failed!");
 
-    ESP_RETURN_ON_ERROR(screen_start(GLOBAL_STATE), TAG, "Screen start failed!");
+    ESP_RETURN_ON_ERROR(screen_start(NULL), TAG, "Screen start failed!");
 
     return ESP_OK;
 }
 
-void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
+void SYSTEM_notify_accepted_share()
 {
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    module->shares_accepted++;
+    SYSTEM_MODULE.shares_accepted++;
 }
 
 static int compare_rejected_reason_stats(const void *a, const void *b) {
@@ -133,98 +131,91 @@ static int compare_rejected_reason_stats(const void *a, const void *b) {
     return (eb->count > ea->count) - (ea->count > eb->count);
 }
 
-void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
+void SYSTEM_notify_rejected_share(char * error_msg)
 {
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
-    module->shares_rejected++;
+    SYSTEM_MODULE.shares_rejected++;
 
-    for (int i = 0; i < module->rejected_reason_stats_count; i++) {
-        if (strncmp(module->rejected_reason_stats[i].message, error_msg, sizeof(module->rejected_reason_stats[i].message) - 1) == 0) {
-            module->rejected_reason_stats[i].count++;
+    for (int i = 0; i < SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+        if (strncmp(SYSTEM_MODULE.rejected_reason_stats[i].message, error_msg, sizeof(SYSTEM_MODULE.rejected_reason_stats[i].message) - 1) == 0) {
+            SYSTEM_MODULE.rejected_reason_stats[i].count++;
             return;
         }
     }
 
-    if (module->rejected_reason_stats_count < sizeof(module->rejected_reason_stats)) {
-        strncpy(module->rejected_reason_stats[module->rejected_reason_stats_count].message, 
+    if (SYSTEM_MODULE.rejected_reason_stats_count < sizeof(SYSTEM_MODULE.rejected_reason_stats)) {
+        strncpy(SYSTEM_MODULE.rejected_reason_stats[SYSTEM_MODULE.rejected_reason_stats_count].message, 
                 error_msg, 
-                sizeof(module->rejected_reason_stats[module->rejected_reason_stats_count].message) - 1);
-        module->rejected_reason_stats[module->rejected_reason_stats_count].message[sizeof(module->rejected_reason_stats[module->rejected_reason_stats_count].message) - 1] = '\0'; // Ensure null termination
-        module->rejected_reason_stats[module->rejected_reason_stats_count].count = 1;
-        module->rejected_reason_stats_count++;
+                sizeof(SYSTEM_MODULE.rejected_reason_stats[SYSTEM_MODULE.rejected_reason_stats_count].message) - 1);
+        SYSTEM_MODULE.rejected_reason_stats[SYSTEM_MODULE.rejected_reason_stats_count].message[sizeof(SYSTEM_MODULE.rejected_reason_stats[SYSTEM_MODULE.rejected_reason_stats_count].message) - 1] = '\0'; // Ensure null termination
+        SYSTEM_MODULE.rejected_reason_stats[SYSTEM_MODULE.rejected_reason_stats_count].count = 1;
+        SYSTEM_MODULE.rejected_reason_stats_count++;
     }
 
-    if (module->rejected_reason_stats_count > 1) {
-        qsort(module->rejected_reason_stats, module->rejected_reason_stats_count, 
-            sizeof(module->rejected_reason_stats[0]), compare_rejected_reason_stats);
+    if (SYSTEM_MODULE.rejected_reason_stats_count > 1) {
+        qsort(SYSTEM_MODULE.rejected_reason_stats, SYSTEM_MODULE.rejected_reason_stats_count, 
+            sizeof(SYSTEM_MODULE.rejected_reason_stats[0]), compare_rejected_reason_stats);
     }    
 }
 
-void SYSTEM_notify_mining_started(GlobalState * GLOBAL_STATE)
+void SYSTEM_notify_mining_started()
 {
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    module->duration_start = esp_timer_get_time();
+    SYSTEM_MODULE.duration_start = esp_timer_get_time();
 }
 
-void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
+void SYSTEM_notify_new_ntime( uint32_t ntime)
 {
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
     // Hourly clock sync
-    if (module->lastClockSync + (60 * 60) > ntime) {
+    if (SYSTEM_MODULE.lastClockSync + (60 * 60) > ntime) {
         return;
     }
     ESP_LOGI(TAG, "Syncing clock");
-    module->lastClockSync = ntime;
+    SYSTEM_MODULE.lastClockSync = ntime;
     struct timeval tv;
     tv.tv_sec = ntime;
     tv.tv_usec = 0;
     settimeofday(&tv, NULL);
 }
 
-void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double found_diff, uint8_t job_id)
+void SYSTEM_notify_found_nonce(double found_diff, uint8_t job_id)
 {
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
     // Calculate the time difference in seconds with sub-second precision
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
 
-    module->historical_hashrate[module->historical_hashrate_rolling_index] = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
-    module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time();
+    SYSTEM_MODULE.historical_hashrate[SYSTEM_MODULE.historical_hashrate_rolling_index] = DEVICE_CONFIG.family.asic.difficulty;
+    SYSTEM_MODULE.historical_hashrate_time_stamps[SYSTEM_MODULE.historical_hashrate_rolling_index] = esp_timer_get_time();
 
-    module->historical_hashrate_rolling_index = (module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
+    SYSTEM_MODULE.historical_hashrate_rolling_index = (SYSTEM_MODULE.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
 
     // ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration,
     // historical_hashrate[historical_hashrate_rolling_index]);
 
-    if (module->historical_hashrate_init < HISTORY_LENGTH) {
-        module->historical_hashrate_init++;
+    if (SYSTEM_MODULE.historical_hashrate_init < HISTORY_LENGTH) {
+        SYSTEM_MODULE.historical_hashrate_init++;
     } else {
-        module->duration_start =
-            module->historical_hashrate_time_stamps[(module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
+        SYSTEM_MODULE.duration_start =
+            SYSTEM_MODULE.historical_hashrate_time_stamps[(SYSTEM_MODULE.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
     }
     double sum = 0;
-    for (int i = 0; i < module->historical_hashrate_init; i++) {
-        sum += module->historical_hashrate[i];
+    for (int i = 0; i < SYSTEM_MODULE.historical_hashrate_init; i++) {
+        sum += SYSTEM_MODULE.historical_hashrate[i];
     }
 
-    double duration = (double) (esp_timer_get_time() - module->duration_start) / 1000000;
+    double duration = (double) (esp_timer_get_time() - SYSTEM_MODULE.duration_start) / 1000000;
 
     double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
-    if (module->historical_hashrate_init < HISTORY_LENGTH) {
-        module->current_hashrate = rolling_rate;
+    if (SYSTEM_MODULE.historical_hashrate_init < HISTORY_LENGTH) {
+        SYSTEM_MODULE.current_hashrate = rolling_rate;
     } else {
         // More smoothing
-        module->current_hashrate = ((module->current_hashrate * 9) + rolling_rate) / 10;
+        SYSTEM_MODULE.current_hashrate = ((SYSTEM_MODULE.current_hashrate * 9) + rolling_rate) / 10;
     }
 
-
+    
     // logArrayContents(historical_hashrate, HISTORY_LENGTH);
     // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
 
-    _check_for_best_diff(GLOBAL_STATE, found_diff, job_id);
+    _check_for_best_diff(found_diff, job_id);
 }
 
 static double _calculate_network_difficulty(uint32_t nBits)
@@ -239,30 +230,28 @@ static double _calculate_network_difficulty(uint32_t nBits)
     return difficulty;
 }
 
-static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id)
+static void _check_for_best_diff( double diff, uint8_t job_id)
 {
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    if ((uint64_t) diff > module->best_session_nonce_diff) {
-        module->best_session_nonce_diff = (uint64_t) diff;
-        _suffix_string((uint64_t) diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
+    if ((uint64_t) diff > SYSTEM_MODULE.best_session_nonce_diff) {
+        SYSTEM_MODULE.best_session_nonce_diff = (uint64_t) diff;
+        _suffix_string((uint64_t) diff, SYSTEM_MODULE.best_session_diff_string, DIFF_STRING_SIZE, 0);
     }
 
-    double network_diff = _calculate_network_difficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
+    double network_diff = _calculate_network_difficulty(ASIC_TASK_MODULE.active_jobs[job_id]->target);
     if (diff > network_diff) {
-        module->FOUND_BLOCK = true;
+        SYSTEM_MODULE.FOUND_BLOCK = true;
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
     }
 
-    if ((uint64_t) diff <= module->best_nonce_diff) {
+    if ((uint64_t) diff <= SYSTEM_MODULE.best_nonce_diff) {
         return;
     }
-    module->best_nonce_diff = (uint64_t) diff;
+    SYSTEM_MODULE.best_nonce_diff = (uint64_t) diff;
 
-    nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, module->best_nonce_diff);
+    nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, SYSTEM_MODULE.best_nonce_diff);
 
     // make the best_nonce_diff into a string
-    _suffix_string((uint64_t) diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
+    _suffix_string((uint64_t) diff, SYSTEM_MODULE.best_diff_string, DIFF_STRING_SIZE, 0);
 
     ESP_LOGI(TAG, "Network diff: %f", network_diff);
 }

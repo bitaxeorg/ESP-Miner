@@ -3,6 +3,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include <pthread.h>
 #include "mining.h"
 typedef struct
 {
@@ -12,8 +13,12 @@ typedef struct
     bm_job **active_jobs;
     //semaphone
     SemaphoreHandle_t semaphore;
+    pthread_mutex_t valid_jobs_lock;
+    uint8_t * valid_jobs;
 } AsicTaskModule;
 
 void ASIC_task(void *pvParameters);
+
+extern AsicTaskModule ASIC_TASK_MODULE;
 
 #endif /* ASIC_TASK_H_ */
