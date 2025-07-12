@@ -132,17 +132,17 @@ void BM1397_set_version_mask(uint32_t version_mask) {
 }
 
 // borrowed from cgminer driver-gekko.c calc_gsf_freq()
-void BM1397_send_hash_frequency(double frequency)
+void BM1397_send_hash_frequency(float frequency)
 {
     unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; // prefreq - pll0_divider
 
     // default 200Mhz if it fails
     unsigned char freqbuf[9] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x25}; // freqbuf - pll0_parameter
 
-    double deffreq = 200.0;
+    float deffreq = 200.0;
 
-    double fa, fb, fc1, fc2, newf;
-    double f1, basef, famax = 0x104, famin = 0x10;
+    float fa, fb, fc1, fc2, newf;
+    float f1, basef, famax = 0x104, famin = 0x10;
     int i;
 
     // bound the frequency setting

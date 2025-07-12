@@ -2,7 +2,6 @@
 #define ASIC_H
 
 #include <esp_err.h>
-#include "global_state.h"
 #include "common.h"
 
 uint8_t ASIC_init();

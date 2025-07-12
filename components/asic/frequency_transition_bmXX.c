@@ -8,21 +8,21 @@ static const char * TAG = "frequency_transition";
 
 static float current_frequency = 56.25;
 
-bool do_frequency_transition(double target_frequency, set_hash_frequency_fn set_frequency_fn, int asic_type) {
+bool do_frequency_transition(float target_frequency, set_hash_frequency_fn set_frequency_fn, int asic_type) {
     if (set_frequency_fn == NULL) {
         ESP_LOGE(TAG, "Invalid function pointer provided");
         return false;
     }
 
-    double step = 6.25;
-    double current = current_frequency;
-    double target = target_frequency;
+    float step = 6.25;
+    float current = current_frequency;
+    float target = target_frequency;
 
-    double direction = (target > current) ? step : -step;
+    float direction = (target > current) ? step : -step;
 
     // If current frequency is not a multiple of step, adjust to the nearest multiple
     if (fmod(current, step) != 0) {
-        double next_dividable;
+        float next_dividable;
         if (direction > 0) {
             next_dividable = ceil(current / step) * step;
         } else {
@@ -38,7 +38,7 @@ bool do_frequency_transition(double target_frequency, set_hash_frequency_fn set_
 
     // Gradually adjust frequency in steps until target is reached
     while ((direction > 0 && current < target) || (direction < 0 && current > target)) {
-        double next_step = fmin(fabs(direction), fabs(target - current));
+        float next_step = fmin(fabs(direction), fabs(target - current));
         current += direction > 0 ? next_step : -next_step;
         
         // Call the provided hash frequency function

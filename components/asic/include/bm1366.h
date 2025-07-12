@@ -26,8 +26,8 @@ void BM1366_send_work(bm_job * next_bm_job);
 void BM1366_set_version_mask(uint32_t version_mask);
 int BM1366_set_max_baud(void);
 int BM1366_set_default_baud(void);
-void BM1366_send_hash_frequency(double frequency);
-bool BM1366_set_frequency(double target_freq);
+void BM1366_send_hash_frequency(float frequency);
+bool BM1366_set_frequency(float target_freq);
 task_result * BM1366_process_work();
 
 #endif /* BM1366_H_ */
