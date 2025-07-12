@@ -15,7 +15,6 @@
 #include "crc.h"
 #include "mining.h"
 #include "asic_task.h"
-#include "global_state.h"
 
 #define BM1397_CHIP_ID 0x1397
 #define BM1397_CHIP_ID_RESPONSE_LENGTH 9
@@ -325,9 +324,9 @@ void BM1397_send_work(bm_job *next_bm_job)
 
     ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
 
-    pthread_mutex_lock(&GLOBAL_STATE.valid_jobs_lock);
-    GLOBAL_STATE.valid_jobs[job.job_id] = 1;
-    pthread_mutex_unlock(&GLOBAL_STATE.valid_jobs_lock);
+    pthread_mutex_lock(&ASIC_TASK_MODULE.valid_jobs_lock);
+    ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
+    pthread_mutex_unlock(&ASIC_TASK_MODULE.valid_jobs_lock);
 
     #if BM1397_DEBUG_JOBS
     ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
@@ -351,7 +350,7 @@ task_result *BM1397_process_work()
     uint8_t rx_midstate_index = asic_result.job_id & 0x03;
 
     
-    if (GLOBAL_STATE.valid_jobs[rx_job_id] == 0)
+    if (ASIC_TASK_MODULE.valid_jobs[rx_job_id] == 0)
     {
         ESP_LOGW(TAG, "Invalid job nonce found, id=%d", rx_job_id);
         return NULL;

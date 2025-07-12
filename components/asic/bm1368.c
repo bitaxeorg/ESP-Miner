@@ -2,7 +2,6 @@
 
 #include "crc.h"
 #include "asic_task.h"
-#include "global_state.h"
 #include "serial.h"
 #include "utils.h"
 
@@ -280,9 +279,9 @@ void BM1368_send_work(bm_job * next_bm_job)
 
     ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
 
-    pthread_mutex_lock(&GLOBAL_STATE.valid_jobs_lock);
-    GLOBAL_STATE.valid_jobs[job.job_id] = 1;
-    pthread_mutex_unlock(&GLOBAL_STATE.valid_jobs_lock);
+    pthread_mutex_lock(&ASIC_TASK_MODULE.valid_jobs_lock);
+    ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
+    pthread_mutex_unlock(&ASIC_TASK_MODULE.valid_jobs_lock);
 
     #if BM1368_DEBUG_JOBS
     ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
@@ -306,7 +305,7 @@ task_result * BM1368_process_work()
     ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
 
 
-    if (GLOBAL_STATE.valid_jobs[job_id] == 0) {
+    if (ASIC_TASK_MODULE.valid_jobs[job_id] == 0) {
         ESP_LOGW(TAG, "Invalid job found, 0x%02X", job_id);
         return NULL;
     }

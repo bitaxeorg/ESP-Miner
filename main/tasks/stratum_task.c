@@ -50,12 +50,12 @@ void cleanQueue() {
     GLOBAL_STATE.abandon_work = 1;
     queue_clear(&GLOBAL_STATE.stratum_queue);
 
-    pthread_mutex_lock(&GLOBAL_STATE.valid_jobs_lock);
+    pthread_mutex_lock(&ASIC_TASK_MODULE.valid_jobs_lock);
     ASIC_jobs_queue_clear(&GLOBAL_STATE.ASIC_jobs_queue);
     for (int i = 0; i < 128; i = i + 4) {
-        GLOBAL_STATE.valid_jobs[i] = 0;
+        ASIC_TASK_MODULE.valid_jobs[i] = 0;
     }
-    pthread_mutex_unlock(&GLOBAL_STATE.valid_jobs_lock);
+    pthread_mutex_unlock(&ASIC_TASK_MODULE.valid_jobs_lock);
 }
 
 void stratum_reset_uid()

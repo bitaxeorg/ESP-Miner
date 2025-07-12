@@ -21,11 +21,11 @@ void ASIC_task(void *pvParameters)
     ASIC_TASK_MODULE.semaphore = xSemaphoreCreateBinary();
 
     ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
-    GLOBAL_STATE.valid_jobs = malloc(sizeof(uint8_t) * 128);
+    ASIC_TASK_MODULE.valid_jobs = malloc(sizeof(uint8_t) * 128);
     for (int i = 0; i < 128; i++)
     {
         ASIC_TASK_MODULE.active_jobs[i] = NULL;
-        GLOBAL_STATE.valid_jobs[i] = 0;
+        ASIC_TASK_MODULE.valid_jobs[i] = 0;
     }
 
     double asic_job_frequency_ms = ASIC_get_asic_job_frequency_ms();

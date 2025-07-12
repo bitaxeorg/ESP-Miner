@@ -364,11 +364,11 @@ bool self_test()
     }
 
     ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
-    GLOBAL_STATE.valid_jobs = malloc(sizeof(uint8_t) * 128);
+    ASIC_TASK_MODULE.valid_jobs = malloc(sizeof(uint8_t) * 128);
 
     for (int i = 0; i < 128; i++) {
         ASIC_TASK_MODULE.active_jobs[i] = NULL;
-        GLOBAL_STATE.valid_jobs[i] = 0;
+        ASIC_TASK_MODULE.valid_jobs[i] = 0;
     }
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -451,7 +451,7 @@ bool self_test()
     }
 
     free(ASIC_TASK_MODULE.active_jobs);
-    free(GLOBAL_STATE.valid_jobs);
+    free(ASIC_TASK_MODULE.valid_jobs);
 
     if (test_core_voltage() != ESP_OK) {
         tests_done(false);
