@@ -8,9 +8,11 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_timer.h"
+#include "nvs_config.h"
 
 #include "bap.h"
 #include "device_config.h"
+#include "asic.h"
 
 #define BAP_MAX_MESSAGE_LEN 256
 #define BAP_UART_NUM UART_NUM_2
@@ -36,7 +38,8 @@ static const char *parameter_strings[] = {
     "power",
     "voltage",
     "current",
-    "shares"
+    "shares",
+    "frequency"
 };
 
 bap_parameter_t BAP_parameter_from_string(const char *param_str) {
@@ -406,6 +409,62 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
     }
 }
 
+void BAP_handle_settings(const char *parameter, const char *value) {
+    ESP_LOGI(TAG, "Handling settings change for parameter: %s, value: %s",
+             parameter ? parameter : "NULL", value ? value : "NULL");
+    
+    if (!parameter || !value) {
+        ESP_LOGE(TAG, "Invalid settings parameters");
+        BAP_send_message(BAP_CMD_ERR, parameter ? parameter : "unknown", "missing_parameter");
+        return;
+    }
+
+    if (!global_state) {
+        ESP_LOGE(TAG, "Global state not available for settings");
+        BAP_send_message(BAP_CMD_ERR, parameter, "system_not_ready");
+        return;
+    }
+
+    bap_parameter_t param = BAP_parameter_from_string(parameter);
+    
+    switch (param) {
+        case BAP_PARAM_FREQUENCY:
+            {
+                float target_frequency = atof(value);
+                
+                if (target_frequency < 100.0f || target_frequency > 800.0f) {
+                    ESP_LOGE(TAG, "Invalid frequency value: %.2f MHz (valid range: 100-800 MHz)", target_frequency);
+                    BAP_send_message(BAP_CMD_ERR, parameter, "invalid_range");
+                    return;
+                }
+                
+                ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
+                
+                bool success = ASIC_set_frequency(global_state, target_frequency);
+                
+                if (success) {
+                    ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
+                    
+                    global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
+                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, target_frequency);
+                    
+                    char freq_str[32];
+                    snprintf(freq_str, sizeof(freq_str), "%.2f", target_frequency);
+                    BAP_send_message(BAP_CMD_ACK, parameter, freq_str);
+                } else {
+                    ESP_LOGE(TAG, "Failed to set frequency to %.2f MHz", target_frequency);
+                    BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
+                }
+            }
+            break;
+            
+        default:
+            ESP_LOGE(TAG, "Unsupported settings parameter: %s", parameter);
+            BAP_send_message(BAP_CMD_ERR, parameter, "unsupported_parameter");
+            break;
+    }
+}
+
 static void uart_receive_task(void *pvParameters) {
     uint8_t *data = (uint8_t *) malloc(BAP_BUF_SIZE);
     if (!data) {
@@ -477,6 +536,7 @@ esp_err_t BAP_start_uart_receive_task(void) {
     BAP_register_handler(BAP_CMD_SUB, BAP_handle_subscription);
     BAP_register_handler(BAP_CMD_UNSUB, BAP_handle_unsubscription);
     BAP_register_handler(BAP_CMD_REQ, BAP_handle_request);
+    BAP_register_handler(BAP_CMD_SET, BAP_handle_settings);
     
     // mutex for subscription access
     subscription_mutex = xSemaphoreCreateMutex();

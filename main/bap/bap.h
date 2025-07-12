@@ -34,6 +34,7 @@ typedef enum {
     BAP_PARAM_VOLTAGE,
     BAP_PARAM_CURRENT,
     BAP_PARAM_SHARES,
+    BAP_PARAM_FREQUENCY,
     BAP_PARAM_UNKNOWN
 } bap_parameter_t;
 
@@ -69,5 +70,8 @@ const char* BAP_parameter_to_string(bap_parameter_t param);
 // Request Functions
 void BAP_handle_request(const char *parameter, const char *value);
 void BAP_send_request(bap_parameter_t param, GlobalState *state);
+
+// Settings Functions
+void BAP_handle_settings(const char *parameter, const char *value);
 
 #endif /* BAP_H_ */
