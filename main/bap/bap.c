@@ -259,7 +259,7 @@ void BAP_send_init_message(GlobalState *state) {
     const char *init_message = "BAP UART Interface Initialized\r\n";
     esp_err_t ret = uart_write_bytes(BAP_UART_NUM, init_message, strlen(init_message));
     if (ret < 0) {
-        ESP_LOGE(TAG, "Failed to send test message: %d", ret);
+        ESP_LOGE(TAG, "Failed to send init message: %d", ret);
     } else {
         ESP_LOGI(TAG, "Init message sent: %s", init_message);
     }
