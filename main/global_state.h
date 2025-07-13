@@ -24,16 +24,6 @@ typedef struct
 } RejectedReasonStat;
 
 
-
-typedef struct
-{
-    bool is_active;
-    bool is_finished;
-    char * message;
-    char *result;
-    char *finished;
-} SelfTestModule;
-
 typedef struct
 {
     work_queue stratum_queue;
@@ -60,6 +50,6 @@ typedef struct
 
 extern GlobalState GLOBAL_STATE;
 
-extern SelfTestModule SELF_TEST_MODULE;
+
 
 #endif /* GLOBAL_STATE_H_ */

@@ -12,6 +12,7 @@
 #include "nvs_config.h"
 #include <string.h>
 #include "system_module.h"
+#include "self_test_module.h"
 
 typedef enum
 {

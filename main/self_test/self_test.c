@@ -36,6 +36,7 @@
 #include "asic_task.h"
 #include "global_state.h"
 #include "system_module.h"
+#include "self_test_module.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
