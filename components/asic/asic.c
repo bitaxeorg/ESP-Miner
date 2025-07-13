@@ -62,24 +62,6 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
     return 0;
 }
 
-void ASIC_set_job_difficulty_mask(GlobalState * GLOBAL_STATE, uint8_t mask)
-{
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
-        case BM1397:
-            BM1397_set_job_difficulty_mask(mask);
-            break;
-        case BM1366:
-            BM1366_set_job_difficulty_mask(mask);
-            break;
-        case BM1368:
-            BM1368_set_job_difficulty_mask(mask);
-            break;
-        case BM1370:
-            BM1370_set_job_difficulty_mask(mask);
-            break;
-    }
-}
-
 void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {

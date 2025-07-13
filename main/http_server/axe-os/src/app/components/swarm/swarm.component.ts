@@ -222,6 +222,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       bestDiff: 0,
       version: 0,
       uptimeSeconds: 0,
+      poolDifficulty: 0,
     });
   };
 
@@ -269,6 +270,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
   private sortSwarm() {
     this.swarm.sort((a, b) => {
       let comparison = 0;
+      const fieldType = typeof a[this.sortField];
+
       if (this.sortField === 'IP') {
         // Split IP into octets and compare numerically
         const aOctets = a[this.sortField].split('.').map(Number);
@@ -279,9 +282,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
             break;
           }
         }
-      } else if (typeof a[this.sortField] === 'number') {
+      } else if (fieldType === 'number') {
         comparison = a[this.sortField] - b[this.sortField];
-      } else {
+      } else if (fieldType === 'string') {
         comparison = a[this.sortField].localeCompare(b[this.sortField], undefined, { numeric: true });
       }
       return this.sortDirection === 'asc' ? comparison : -comparison;
@@ -325,10 +328,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   // Fallback logic to derive deviceModel and swarmColor, can be removed after some time
   private fallbackDeviceModel(data: any): any {
-    if (data.deviceModel && data.swarmColor) return data;
+    if (data.deviceModel && data.swarmColor && data.poolDifficulty) return data;
     const deviceModel = data.deviceModel || this.deriveDeviceModel(data);
     const swarmColor = data.swarmColor || this.deriveSwarmColor(deviceModel);
-    return { ...data, deviceModel, swarmColor };
+    const poolDifficulty = data.poolDifficulty || data.stratumDiff;
+    return { ...data, deviceModel, swarmColor, poolDifficulty };
   }
 
   private deriveDeviceModel(data: any): string {
@@ -338,7 +342,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
       if (data.boardVersion[0] == "3") return "UltraHex";
       if (data.boardVersion[0] == "4") return "Supra";
       if (data.boardVersion[0] == "6") return "Gamma";
-      if (data.boardVersion[0] == "7") return "GammaHex";
       if (data.boardVersion[0] == "8") return "GammaTurbo";
     }
     return 'Other';
@@ -351,8 +354,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       case 'Supra':      return 'blue';
       case 'UltraHex':   return 'orange';
       case 'Gamma':      return 'green';
-      case 'GammaHex':   return 'lime'; // New color?
-      case 'GammaTurbo': return 'cyan'; 
+      case 'GammaTurbo': return 'cyan';
       default:           return 'gray';
     }
   }

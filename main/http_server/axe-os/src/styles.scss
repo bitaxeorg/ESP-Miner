@@ -56,7 +56,7 @@ p-chart>div {
     }
 }
 
-.p-button {
+.p-button:not(.p-button-secondary) {
     background: var(--button-bg);
     border: 1px solid var(--button-bg);
 
@@ -157,4 +157,33 @@ button.color-dot {
 
 .p-button-icon {
     font-size: 1.2rem;
+}
+
+.p-dialog {
+    @extend .card;
+    margin: 1rem;
+
+    &-header,
+    &-content {
+        padding: 0;
+        margin: 0;
+        background: none;
+    }
+
+    &-header {
+        margin: 0 0 2rem;
+    }
+
+    &-header-icon {
+        @extend .p-button;
+        width: 2.2rem;
+        height: 2.2rem;
+        color: #fff;
+        border-radius: 0;
+    }
+
+    &-title {
+        @extend h2;
+        margin: 0;
+    }
 }

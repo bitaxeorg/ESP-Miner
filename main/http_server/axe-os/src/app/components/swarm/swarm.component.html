@@ -170,7 +170,7 @@
                         {{axe.vrTemp | number: '1.0-1'}}°<small>C</small>
                     </div>
                 </td>
-                <td>{{axe.poolDifficulty || axe.stratumDiff}}</td>
+                <td>{{axe.poolDifficulty}}</td>
                 <td>{{axe.version}}</td>
                 <td><p-button icon="pi pi-pencil" pp-button (click)="edit(axe)"></p-button></td>
                 <td><p-button icon="pi pi-sync" pp-button severity="danger" (click)="restart(axe)"></p-button></td>

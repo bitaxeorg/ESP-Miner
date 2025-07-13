@@ -4,6 +4,7 @@ import { DialogService as PrimeDialogService, DynamicDialogConfig } from 'primen
 
 interface DialogOption {
   label: string;
+  rssi: number;
   value: string;
 }
 
@@ -18,7 +19,7 @@ export class DialogService {
 
     const ref = this.primeDialogService.open(DialogListComponent, {
       header: title,
-      width: '400px',
+      width: '500px',
       data: {
         options: options,
         onSelect: (value: string) => {
@@ -38,18 +39,16 @@ export class DialogService {
 
 @Component({
   template: `
-    <style>
-      ::ng-deep .p-button:focus {
-        box-shadow: none !important;
-        background-color: var(--primary-color) !important;
-      }
-    </style>
     <div class="flex flex-column gap-2">
       <p-button *ngFor="let option of config.data.options"
         [label]="option.label"
         (onClick)="config.data.onSelect(option.value)"
-        styleClass="w-full text-left"
-      ></p-button>
+        styleClass="w-full text-left flex align-items-baseline"
+        pTooltip="{{option.label}} ({{option.rssi}}dBm)"
+        tooltipPosition="bottom"
+      >
+        <wifi-icon [rssi]="option.rssi" class="flex-order-2" />
+      </p-button>
     </div>
   `
 })

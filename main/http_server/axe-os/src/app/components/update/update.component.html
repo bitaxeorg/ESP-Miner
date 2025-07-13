@@ -7,15 +7,34 @@
                 <h5>Current Version: {{(info$ | async)?.version}}</h5>
 
                 <ng-container *ngIf="checkLatestRelease == false; else afterCheck">
-                    <h3>Latest Release: <p-button (onClick)="checkLatestRelease = true">Check</p-button></h3>
-                    <small>Clicking this button will connect to GitHub to check for the latest release, both files are required.</small>
+                    <h3>Latest Release: <p-button (onClick)="handleReleaseCheck()">Check</p-button></h3>
+
+                    <app-modal [headline]="'Privacy Warning'">
+                        <p>
+                            Please note, this will connect to <strong>github.com</strong> to check for the latest release.
+                        </p>
+                        <p class="flex gap-2">
+                            <p-checkbox
+                                [binary]="true"
+                                inputId="ignoreWarning"
+                                #ignoreWarning></p-checkbox>
+                            <label for="ignoreWarning">Don't show again</label>
+                        </p>
+                        <div class="flex gap-3 mt-5">
+                            <p-button (onClick)="continueReleaseCheck(ignoreWarning.model)">Continue</p-button>
+                            <p-button styleClass="p-button-secondary" (onClick)="modalComponent.isVisible = false">Cancel</p-button>
+                        </div>
+                    </app-modal>
                 </ng-container>
 
                 <ng-template #afterCheck>
                     <ng-container *ngIf="latestRelease$ | async as latestRelease">
                         <h3>Latest Release:
                             <a style="text-decoration: underline;" target="_blank"
-                            [href]="latestRelease.html_url">{{latestRelease.name}}</a></h3>
+                            [href]="latestRelease.html_url">{{latestRelease.name}}</a>
+                        </h3>
+
+                        <div class="text-orange-500 mb-3">Download both files for update!</div>
 
                         <div *ngFor="let asset of latestRelease.assets">
                             <div *ngIf="asset.name == 'esp-miner.bin'">

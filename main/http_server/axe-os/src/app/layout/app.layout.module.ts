@@ -19,6 +19,7 @@ import { AppMenuitemComponent } from './app.menuitem.component';
 import { AppSidebarComponent } from './app.sidebar.component';
 import { AppTopBarComponent } from './app.topbar.component';
 import { LoadingComponent } from '../components/loading/loading.component';
+import { WifiIconComponent } from '../components/wifi-icon/wifi-icon.component';
 
 @NgModule({
     declarations: [
@@ -29,6 +30,7 @@ import { LoadingComponent } from '../components/loading/loading.component';
         AppSidebarComponent,
         AppLayoutComponent,
         LoadingComponent,
+        WifiIconComponent,
     ],
     imports: [
         BrowserModule,
@@ -45,6 +47,6 @@ import { LoadingComponent } from '../components/loading/loading.component';
         PrimeNGModule,
         TooltipModule,
     ],
-    exports: [AppLayoutComponent]
+    exports: [AppLayoutComponent, WifiIconComponent]
 })
 export class AppLayoutModule { }

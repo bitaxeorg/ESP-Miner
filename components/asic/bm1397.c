@@ -44,7 +44,6 @@
 #define CORE_REGISTER_CONTROL 0x3C
 #define PLL3_PARAMETER 0x68
 #define FAST_UART_CONFIGURATION 0x28
-#define TICKET_MASK 0x14
 #define MISC_CONTROL 0x18
 
 typedef struct __attribute__((__packed__))
@@ -253,7 +252,10 @@ uint8_t BM1397_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty
     unsigned char init4[9] = {0x00, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x80, 0x74}; // init4 - init_4_?
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, BM1397_SERIALTX_DEBUG);
 
-    BM1397_set_job_difficulty_mask(difficulty);
+    //set difficulty mask
+    uint8_t difficulty_mask[6];
+    get_difficulty_mask(difficulty, difficulty_mask);
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1397_SERIALTX_DEBUG);
 
     unsigned char init5[9] = {0x00, PLL3_PARAMETER, 0xC0, 0x70, 0x01, 0x11}; // init5 - pll3_parameter
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init5, 6, BM1397_SERIALTX_DEBUG);
@@ -286,35 +288,6 @@ int BM1397_set_max_baud(void)
     ; // baudrate - misc_control
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, BM1397_SERIALTX_DEBUG);
     return 3125000;
-}
-
-void BM1397_set_job_difficulty_mask(int difficulty)
-{
-
-    // Default mask of 256 diff
-    unsigned char job_difficulty_mask[9] = {0x00, TICKET_MASK, 0b00000000, 0b00000000, 0b00000000, 0b11111111};
-
-    // The mask must be a power of 2 so there are no holes
-    // Correct:  {0b00000000, 0b00000000, 0b11111111, 0b11111111}
-    // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
-    difficulty = _largest_power_of_two(difficulty) - 1; // (difficulty - 1) if it is a pow 2 then step down to second largest for more hashrate sampling
-
-    // convert difficulty into char array
-    // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
-    // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
-    for (int i = 0; i < 4; i++)
-    {
-        char value = (difficulty >> (8 * i)) & 0xFF;
-        // The char is read in backwards to the register so we need to reverse them
-        // So a mask of 512 looks like 0b00000000 00000000 00000001 1111111
-        // and not 0b00000000 00000000 10000000 1111111
-
-        job_difficulty_mask[5 - i] = _reverse_bits(value);
-    }
-
-    ESP_LOGI(TAG, "Setting job ASIC mask to %d", difficulty);
-
-    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), job_difficulty_mask, 6, BM1397_SERIALTX_DEBUG);
 }
 
 static uint8_t id = 0;

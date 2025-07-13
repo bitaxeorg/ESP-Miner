@@ -1,0 +1,9 @@
+<figure class="wifi-icon"
+    [ngClass]="{
+        'wifi-icon--excellent': rssi > -50,
+        'wifi-icon--good': rssi <= -50 && rssi > -60,
+        'wifi-icon--fair': rssi <= -60 && rssi > -70,
+        'wifi-icon--weak': rssi <= -70
+    }">
+    <i *ngFor="let item of [1, 2, 3, 4]"></i>
+</figure>

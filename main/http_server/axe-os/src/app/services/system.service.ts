@@ -61,6 +61,7 @@ export class SystemService {
         fallbackStratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         fallbackStratumSuggestedDifficulty: 1000,
         fallbackStratumExtranonceSubscribe: 0,
+        poolDifficulty: 1000,
         responseTime: 10,
         isUsingFallbackStratum: true,
         frequency: 485,
