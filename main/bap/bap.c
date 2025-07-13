@@ -39,7 +39,10 @@ static const char *parameter_strings[] = {
     "voltage",
     "current",
     "shares",
-    "frequency"
+    "frequency",
+    "asic_voltage",
+    "ssid",
+    "password"
 };
 
 bap_parameter_t BAP_parameter_from_string(const char *param_str) {
@@ -455,6 +458,27 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     ESP_LOGE(TAG, "Failed to set frequency to %.2f MHz", target_frequency);
                     BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
                 }
+            }
+            break;
+
+        case BAP_PARAM_ASIC_VOLTAGE:
+            {
+                uint16_t target_voltage_mv = (uint16_t)atoi(value);
+
+                if (target_voltage_mv < 700 || target_voltage_mv > 1400) {
+                    ESP_LOGE(TAG, "Invalid voltage value: %d mV (valid range: 700-1400 mV)", target_voltage_mv);
+                    BAP_send_message(BAP_CMD_ERR, parameter, "invalid_range");
+                    return;
+                }
+
+                ESP_LOGI(TAG, "Setting ASIC voltage to %d mV", target_voltage_mv);
+
+                nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, target_voltage_mv);
+                ESP_LOGI(TAG, "Voltage successfully set to %d mV", target_voltage_mv);
+
+                char voltage_str[32];
+                snprintf(voltage_str, sizeof(voltage_str), "%d", target_voltage_mv);
+                BAP_send_message(BAP_CMD_ACK, parameter, voltage_str);
             }
             break;
             
