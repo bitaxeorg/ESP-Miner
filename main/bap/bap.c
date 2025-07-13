@@ -255,38 +255,13 @@ void BAP_parse_message(const char *message) {
     }
 }
 
-void BAP_send_test_message(GlobalState *state) {
-    const char *test_message = "BAP UART Interface Initialized\r\n";
-    esp_err_t ret = uart_write_bytes(BAP_UART_NUM, test_message, strlen(test_message));
+void BAP_send_init_message(GlobalState *state) {
+    const char *init_message = "BAP UART Interface Initialized\r\n";
+    esp_err_t ret = uart_write_bytes(BAP_UART_NUM, init_message, strlen(init_message));
     if (ret < 0) {
         ESP_LOGE(TAG, "Failed to send test message: %d", ret);
     } else {
-        ESP_LOGI(TAG, "Init message sent: %s", test_message);
-    }
-
-    if (state) {
-        char device_info[128];
-        int len = snprintf(device_info, sizeof(device_info),
-                          "Device: %s, ASIC: %s\r\n",
-                          state->DEVICE_CONFIG.family.name,
-                          state->DEVICE_CONFIG.family.asic.name);
-        ret = uart_write_bytes(BAP_UART_NUM, device_info, len);
-        if (ret < 0) {
-            ESP_LOGE(TAG, "Failed to send device info: %d", ret);
-        }
-        
-        // Send initial hashrate if available
-        if (state->SYSTEM_MODULE.current_hashrate > 0) {
-            char hashrate_msg[64];
-            len = snprintf(hashrate_msg, sizeof(hashrate_msg), "Initial Hashrate: %.2f\r\n",
-                          state->SYSTEM_MODULE.current_hashrate);
-            ret = uart_write_bytes(BAP_UART_NUM, hashrate_msg, len);
-            if (ret < 0) {
-                ESP_LOGE(TAG, "Failed to send hashrate message: %d", ret);
-            } else {
-                ESP_LOGI(TAG, "Hashrate message sent: %s", hashrate_msg);
-            }
-        }
+        ESP_LOGI(TAG, "Init message sent: %s", init_message);
     }
 }
 
@@ -757,8 +732,7 @@ esp_err_t BAP_init(void) {
     
     ESP_LOGI(TAG, "BAP UART interface initialized successfully");
     
-    // Send a test message
-    BAP_send_test_message(global_state);
+    BAP_send_init_message(global_state);
     
     BAP_start_subscription_task(global_state);
     ret = BAP_start_uart_receive_task();

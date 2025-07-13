@@ -53,7 +53,7 @@ typedef void (*bap_command_handler_t)(const char *parameter, const char *value);
 
 // API Functions
 esp_err_t BAP_init(void);
-void BAP_send_test_message(GlobalState *state);
+void BAP_send_init_message(GlobalState *state);
 void BAP_parse_message(const char *message);
 void BAP_send_message(bap_command_t cmd, const char *parameter, const char *value);
 void BAP_register_handler(bap_command_t cmd, bap_command_handler_t handler);
