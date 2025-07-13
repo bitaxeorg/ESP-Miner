@@ -100,7 +100,10 @@ void app_main(void)
 
     SERIAL_init();
 
-    if (ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value) == 0) {
+    if (ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value,
+        DEVICE_CONFIG.family.asic.id,
+        DEVICE_CONFIG.family.asic_count,
+        DEVICE_CONFIG.family.asic.difficulty) == 0) {
         SYSTEM_MODULE.asic_status = "Chip count 0";
         ESP_LOGE(TAG, "Chip count 0");
         return;

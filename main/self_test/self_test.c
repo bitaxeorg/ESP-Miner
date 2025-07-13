@@ -7,47 +7,47 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 
-#include "i2c_bitaxe.h"
 #include "DS4432U.h"
 #include "EMC2101.h"
 #include "INA260.h"
+#include "TPS546.h"
 #include "adc.h"
+#include "display.h"
+#include "esp_psram.h"
 #include "global_state.h"
+#include "i2c_bitaxe.h"
+#include "input.h"
 #include "nvs_config.h"
 #include "nvs_flash.h"
-#include "display.h"
-#include "screen.h"
-#include "input.h"
-#include "vcore.h"
-#include "utils.h"
-#include "TPS546.h"
-#include "esp_psram.h"
 #include "power.h"
+#include "screen.h"
 #include "thermal.h"
+#include "utils.h"
+#include "vcore.h"
 
-#include "bm1397.h"
+#include "asic.h"
+#include "asic_reset.h"
 #include "bm1366.h"
 #include "bm1368.h"
 #include "bm1370.h"
-#include "asic.h"
+#include "bm1397.h"
 #include "device_config.h"
-#include "asic_reset.h"
 #include "global_state.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
 /////Test Constants/////
-//Test Fan Speed
-#define FAN_SPEED_TARGET_MIN 1000 //RPM
+// Test Fan Speed
+#define FAN_SPEED_TARGET_MIN 1000 // RPM
 
-//Test Core Voltage
-#define CORE_VOLTAGE_TARGET_MIN 1000 //mV
-#define CORE_VOLTAGE_TARGET_MAX 1300 //mV
+// Test Core Voltage
+#define CORE_VOLTAGE_TARGET_MIN 1000 // mV
+#define CORE_VOLTAGE_TARGET_MAX 1300 // mV
 
-//Test Power Consumption
-#define POWER_CONSUMPTION_MARGIN 3              //+/- watts
+// Test Power Consumption
+#define POWER_CONSUMPTION_MARGIN 3 //+/- watts
 
-//Test Difficulty
+// Test Difficulty
 #define DIFFICULTY 8
 
 static const char * TAG = "self_test";
@@ -55,10 +55,11 @@ static const char * TAG = "self_test";
 static SemaphoreHandle_t longPressSemaphore;
 static bool isFactoryTest = false;
 
-//local function prototypes
+// local function prototypes
 static void tests_done(bool test_result);
 
-static bool should_test() {
+static bool should_test()
+{
     uint64_t is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0) < 1;
     uint16_t is_self_test_flag_set = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
     if (is_factory_flash && is_self_test_flag_set) {
@@ -70,13 +71,14 @@ static bool should_test() {
     return gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
 }
 
-static void reset_self_test() {
+static void reset_self_test()
+{
     ESP_LOGI(TAG, "Long press detected...");
     // Give the semaphore back
     xSemaphoreGive(longPressSemaphore);
 }
 
-static void display_msg(char * msg) 
+static void display_msg(char * msg)
 {
     SELF_TEST_MODULE.message = msg;
 }
@@ -89,9 +91,9 @@ static esp_err_t test_fan_sense()
         return ESP_OK;
     }
 
-    //fan test failed
+    // fan test failed
     ESP_LOGE(TAG, "FAN test failed!");
-    display_msg("FAN:WARN");  
+    display_msg("FAN:WARN");
     return ESP_FAIL;
 }
 
@@ -99,7 +101,7 @@ static esp_err_t test_INA260_power_consumption(int target_power, int margin)
 {
     float power = INA260_read_power() / 1000;
     ESP_LOGI(TAG, "Power: %f", power);
-    if (power > target_power -margin && power < target_power +margin) {
+    if (power > target_power - margin && power < target_power + margin) {
         return ESP_OK;
     }
     return ESP_FAIL;
@@ -111,7 +113,7 @@ static esp_err_t test_TPS546_power_consumption(int target_power, int margin)
     float current = TPS546_get_iout();
     float power = voltage * current;
     ESP_LOGI(TAG, "Power: %f, Voltage: %f, Current %f", power, voltage, current);
-    if (power < target_power +margin) {
+    if (power < target_power + margin) {
         return ESP_OK;
     }
     return ESP_FAIL;
@@ -125,20 +127,21 @@ static esp_err_t test_core_voltage()
     if (core_voltage > CORE_VOLTAGE_TARGET_MIN && core_voltage < CORE_VOLTAGE_TARGET_MAX) {
         return ESP_OK;
     }
-    //tests failed
+    // tests failed
     ESP_LOGE(TAG, "Core Voltage TEST FAIL, INCORRECT CORE VOLTAGE");
     display_msg("VCORE:FAIL");
     return ESP_FAIL;
 }
 
-esp_err_t test_display() {
+esp_err_t test_display()
+{
     // Display testing
-        if (display_init(&GLOBAL_STATE) != ESP_OK) {
-            display_msg("DISPLAY:FAIL");
+    if (display_init(&GLOBAL_STATE) != ESP_OK) {
+        display_msg("DISPLAY:FAIL");
         return ESP_FAIL;
     }
 
-        if (SYSTEM_MODULE.is_screen_active) {
+    if (SYSTEM_MODULE.is_screen_active) {
         ESP_LOGI(TAG, "DISPLAY init success!");
     } else {
         ESP_LOGW(TAG, "DISPLAY not found!");
@@ -147,22 +150,24 @@ esp_err_t test_display() {
     return ESP_OK;
 }
 
-esp_err_t test_input() {
+esp_err_t test_input()
+{
     // Input testing
     if (input_init(NULL, reset_self_test) != ESP_OK) {
         display_msg("INPUT:FAIL");
         return ESP_FAIL;
     }
-            
+
     ESP_LOGI(TAG, "INPUT init success!");
 
     return ESP_OK;
 }
 
-esp_err_t test_screen() {
+esp_err_t test_screen()
+{
     // Screen testing
-        if (screen_start(&GLOBAL_STATE) != ESP_OK) {
-            display_msg("SCREEN:FAIL");
+    if (screen_start(&GLOBAL_STATE) != ESP_OK) {
+        display_msg("SCREEN:FAIL");
         return ESP_FAIL;
     }
 
@@ -171,16 +176,19 @@ esp_err_t test_screen() {
     return ESP_OK;
 }
 
-esp_err_t init_voltage_regulator() {
+esp_err_t init_voltage_regulator()
+{
     ESP_RETURN_ON_ERROR(VCORE_init(), TAG, "VCORE init failed!");
 
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
-    
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG,
+                        "VCORE set voltage failed!");
+
     return ESP_OK;
 }
 
-esp_err_t test_vreg_faults() {
-    //check for faults on the voltage regulator
+esp_err_t test_vreg_faults()
+{
+    // check for faults on the voltage regulator
     ESP_RETURN_ON_ERROR(VCORE_check_fault(), TAG, "VCORE check fault failed!");
 
     if (SYSTEM_MODULE.power_fault) {
@@ -189,9 +197,10 @@ esp_err_t test_vreg_faults() {
     return ESP_OK;
 }
 
-esp_err_t test_voltage_regulator() {
-    
-    //enable the voltage regulator GPIO on HW that supports it
+esp_err_t test_voltage_regulator()
+{
+
+    // enable the voltage regulator GPIO on HW that supports it
     if (DEVICE_CONFIG.asic_enable) {
         gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
         gpio_set_level(GPIO_ASIC_ENABLE, 0);
@@ -200,7 +209,7 @@ esp_err_t test_voltage_regulator() {
     if (init_voltage_regulator() != ESP_OK) {
         ESP_LOGE(TAG, "VCORE init failed!");
         display_msg("VCORE:FAIL");
-        //tests_done(TESTS_FAILED);
+        // tests_done(TESTS_FAILED);
         return ESP_FAIL;
     }
 
@@ -209,7 +218,7 @@ esp_err_t test_voltage_regulator() {
         if (DS4432U_test() != ESP_OK) {
             ESP_LOGE(TAG, "DS4432 test failed!");
             display_msg("DS4432U:FAIL");
-            //tests_done(TESTS_FAILED);
+            // tests_done(TESTS_FAILED);
             return ESP_FAIL;
         }
     }
@@ -218,8 +227,9 @@ esp_err_t test_voltage_regulator() {
     return ESP_OK;
 }
 
-esp_err_t test_init_peripherals() {
-    
+esp_err_t test_init_peripherals()
+{
+
     if (DEVICE_CONFIG.EMC2101) {
         ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
         EMC2101_set_fan_speed(1);
@@ -240,8 +250,9 @@ esp_err_t test_init_peripherals() {
     return ESP_OK;
 }
 
-esp_err_t test_psram(){
-    if(!esp_psram_is_initialized()) {
+esp_err_t test_psram()
+{
+    if (!esp_psram_is_initialized()) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32!");
         display_msg("PSRAM:FAIL");
         return ESP_FAIL;
@@ -252,7 +263,7 @@ esp_err_t test_psram(){
 /**
  * @brief Perform a self-test of the system.
  *
- * This function is intended to be run as a task and will execute a series of 
+ * This function is intended to be run as a task and will execute a series of
  * diagnostic tests to ensure the system is functioning correctly.
  *
  * @return true if the self-test was run, false if it was skipped.
@@ -261,7 +272,8 @@ bool self_test()
 {
 
     // Should we run the self-test?
-    if (!should_test()) return true;
+    if (!should_test())
+        return true;
 
     if (isFactoryTest) {
         ESP_LOGI(TAG, "Running factory self-test");
@@ -281,37 +293,37 @@ bool self_test()
         return false;
     }
 
-    //Run PSRAM test
-    if(test_psram() != ESP_OK) {
+    // Run PSRAM test
+    if (test_psram() != ESP_OK) {
         ESP_LOGE(TAG, "NO PSRAM on device!");
         tests_done(false);
     }
 
-    //Run display tests
+    // Run display tests
     if (test_display() != ESP_OK) {
         ESP_LOGE(TAG, "Display test failed!");
         tests_done(false);
     }
 
-    //Run input tests
+    // Run input tests
     if (test_input() != ESP_OK) {
         ESP_LOGE(TAG, "Input test failed!");
         tests_done(false);
     }
 
-    //Run screen tests
+    // Run screen tests
     if (test_screen() != ESP_OK) {
         ESP_LOGE(TAG, "Screen test failed!");
         tests_done(false);
     }
 
-    //Init peripherals EMC2101 and INA260 (if present)
+    // Init peripherals EMC2101 and INA260 (if present)
     if (test_init_peripherals() != ESP_OK) {
         ESP_LOGE(TAG, "Peripherals init failed!");
         tests_done(false);
     }
 
-    //Voltage Regulator Testing
+    // Voltage Regulator Testing
     if (test_voltage_regulator() != ESP_OK) {
         ESP_LOGE(TAG, "Voltage Regulator test failed!");
         tests_done(false);
@@ -322,15 +334,19 @@ bool self_test()
         tests_done(false);
     }
 
-    //test for number of ASICs
+    // test for number of ASICs
     if (SERIAL_init() != ESP_OK) {
         ESP_LOGE(TAG, "SERIAL init failed!");
         tests_done(false);
     }
 
     POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)POWER_MANAGEMENT_MODULE.frequency_value);
-    uint8_t chips_detected = ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value);
+    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float) POWER_MANAGEMENT_MODULE.frequency_value);
+    uint8_t chips_detected =
+        ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value, 
+                    DEVICE_CONFIG.family.asic.id, 
+                    DEVICE_CONFIG.family.asic_count,
+                    DEVICE_CONFIG.family.asic.difficulty);
     uint8_t chips_expected = DEVICE_CONFIG.family.asic_count;
 
     DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
@@ -345,7 +361,7 @@ bool self_test()
         tests_done(false);
     }
 
-    //test for voltage regulator faults
+    // test for voltage regulator faults
     if (test_vreg_faults() != ESP_OK) {
         ESP_LOGE(TAG, "VCORE check fault failed!");
         char error_buf[20];
@@ -354,7 +370,7 @@ bool self_test()
         tests_done(false);
     }
 
-    //setup and test hashrate
+    // setup and test hashrate
     int baud = ASIC_set_max_baud();
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
@@ -414,14 +430,12 @@ bool self_test()
 
     //(*GLOBAL_STATE.ASIC_functions.send_work_fn)(&job);
     ASIC_send_work(&job);
-    
+
     double start = esp_timer_get_time();
     double sum = 0;
     double duration = 0;
     double hash_rate = 0;
     double hashtest_timeout = 30;
-
-    
 
     while (duration < hashtest_timeout) {
         task_result * asic_result = ASIC_process_work();
@@ -429,21 +443,18 @@ bool self_test()
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
             sum += DIFFICULTY;
-            
+
             hash_rate = (sum * 4294967296) / (duration * 1000000000);
             ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
-            ESP_LOGI(TAG, "%f Gh/s  , duration %f",hash_rate, duration);
+            ESP_LOGI(TAG, "%f Gh/s  , duration %f", hash_rate, duration);
         }
         duration = (double) (esp_timer_get_time() - start) / 1000000;
     }
 
-    
     ESP_LOGI(TAG, "Hashrate: %f", hash_rate);
 
-    float expected_hashrate_mhs = POWER_MANAGEMENT_MODULE.frequency_value 
-                                * DEVICE_CONFIG.family.asic.small_core_count 
-                                * DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
-                                / 1000.0f;
+    float expected_hashrate_mhs = POWER_MANAGEMENT_MODULE.frequency_value * DEVICE_CONFIG.family.asic.small_core_count *
+                                  DEVICE_CONFIG.family.asic.hashrate_test_percentage_target / 1000.0f;
 
     if (hash_rate < expected_hashrate_mhs) {
         display_msg("HASHRATE:FAIL");
@@ -460,21 +471,21 @@ bool self_test()
     // TODO: Maybe make a test equivalent for test values
     if (DEVICE_CONFIG.INA260) {
         if (test_INA260_power_consumption(DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-            ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float)DEVICE_CONFIG.power_consumption_target);
+            ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float) DEVICE_CONFIG.power_consumption_target);
             display_msg("POWER:FAIL");
             tests_done(false);
         }
     }
     if (DEVICE_CONFIG.TPS546) {
         if (test_TPS546_power_consumption(DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-            ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)DEVICE_CONFIG.power_consumption_target);
+            ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float) DEVICE_CONFIG.power_consumption_target);
             display_msg("POWER:FAIL");
             tests_done(false);
         }
     }
 
-    if (test_fan_sense() != ESP_OK) {     
-        ESP_LOGE(TAG, "Fan test failed!"); 
+    if (test_fan_sense() != ESP_OK) {
+        ESP_LOGE(TAG, "Fan test failed!");
         tests_done(false);
     }
 
@@ -483,7 +494,7 @@ bool self_test()
     return true;
 }
 
-static void tests_done(bool test_result) 
+static void tests_done(bool test_result)
 {
     VCORE_set_voltage(0.0f);
 
@@ -499,8 +510,11 @@ static void tests_done(bool test_result)
         // isTestFailed
         SELF_TEST_MODULE.result = "SELF-TEST FAIL!";
         if (isFactoryTest) {
-            ESP_LOGI(TAG, "SELF-TEST FAIL! -- Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.");
-            SELF_TEST_MODULE.finished = "Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.";
+            ESP_LOGI(
+                TAG,
+                "SELF-TEST FAIL! -- Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.");
+            SELF_TEST_MODULE.finished =
+                "Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.";
             SELF_TEST_MODULE.is_finished = true;
             while (1) {
                 // Wait here forever until reset_self_test() gives the longPressSemaphore
@@ -516,7 +530,6 @@ static void tests_done(bool test_result)
             ESP_LOGI(TAG, "SELF-TEST FAIL -- Press RESET button to restart.");
             SELF_TEST_MODULE.finished = "Press RESET button to restart.";
         }
-        
     }
     SELF_TEST_MODULE.is_finished = true;
 }

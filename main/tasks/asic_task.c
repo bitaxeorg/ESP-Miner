@@ -12,6 +12,20 @@
 static const char *TAG = "asic_task";
 
 // static bm_job ** active_jobs; is required to keep track of the active jobs since the
+const double NONCE_SPACE = 4294967296.0; //  2^32
+
+double ASIC_get_asic_job_frequency_ms(float frequency)
+{
+    switch (DEVICE_CONFIG.family.asic.id) {
+        case BM1397:
+            // no version-rolling so same Nonce Space is splitted between Small Cores
+            return (NONCE_SPACE / (double) (frequency * DEVICE_CONFIG.family.asic.small_core_count * 1000)) / (double) DEVICE_CONFIG.family.asic_count;
+        case BM1366:
+            return 2000;
+        default:
+            return 500;
+    }
+}
 
 void ASIC_task(void *pvParameters)
 {
