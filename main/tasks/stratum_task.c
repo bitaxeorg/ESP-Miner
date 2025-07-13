@@ -13,6 +13,8 @@
 #include <sys/time.h>
 #include "esp_timer.h"
 #include <stdbool.h>
+#include "asic_task.h"
+#include "system_module.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5

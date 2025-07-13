@@ -6,8 +6,9 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
+#include "asic_task.h"
 #include "asic.h"
+#include "power_management_task.h"
 
 static const char *TAG = "asic_task";
 

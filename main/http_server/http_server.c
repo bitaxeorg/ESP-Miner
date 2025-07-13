@@ -40,6 +40,8 @@
 #include "theme_api.h" // Add theme API include
 #include "vcore.h"
 #include "system.h"
+#include "power_management_task.h"
+#include "system_module.h"
 
 #define JSON_ALL_STATS_ELEMENT_SIZE 120
 #define JSON_DASHBOARD_STATS_ELEMENT_SIZE 60

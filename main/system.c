@@ -29,6 +29,8 @@
 #include "screen.h"
 #include "vcore.h"
 #include "thermal.h"
+#include "asic_task.h"
+#include "system_module.h"
 
 
 static const char * TAG = "system";

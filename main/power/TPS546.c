@@ -10,6 +10,7 @@
 
 #include "i2c_bitaxe.h"
 #include "TPS546.h"
+#include "system_module.h"
 
 //#define DEBUG_TPS546_MEAS 1 //uncomment to debug TPS546 measurements
 //#define DEBUG_TPS546_STATUS 1 //uncomment to debug TPS546 status bits

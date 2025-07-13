@@ -10,6 +10,8 @@
 #include "power.h"
 #include "connect.h"
 #include "vcore.h"
+#include "power_management_task.h"
+#include "system_module.h"
 
 #define DEFAULT_POLL_RATE 5000
 

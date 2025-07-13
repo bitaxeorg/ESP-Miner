@@ -32,7 +32,10 @@
 #include "bm1370.h"
 #include "bm1397.h"
 #include "device_config.h"
+#include "power_management_task.h"
+#include "asic_task.h"
 #include "global_state.h"
+#include "system_module.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 

@@ -19,6 +19,8 @@
 #include "statistics_task.h"
 #include "stratum_task.h"
 #include "system.h"
+#include "power_management_task.h"
+#include "system_module.h"
 
 GlobalState GLOBAL_STATE = {
     .extranonce_str = NULL, .extranonce_2_len = 0, .abandon_work = 0, .version_mask = 0, .ASIC_initalized = false};

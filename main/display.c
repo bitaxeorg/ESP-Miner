@@ -18,6 +18,7 @@
 #include "driver/i2c_types.h"
 #include "esp_lcd_panel_ssd1306.h"
 #include "esp_lcd_sh1107.h"
+#include "system_module.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
