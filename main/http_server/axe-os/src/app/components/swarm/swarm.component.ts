@@ -42,6 +42,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public sortField: string = '';
   public sortDirection: 'asc' | 'desc' = 'asc';
 
+  public showManualAddition: boolean = false;
+
   constructor(
     private fb: FormBuilder,
     private toastr: ToastrService,
@@ -50,7 +52,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
   ) {
 
     this.form = this.fb.group({
-      manualAddIp: [null, [Validators.required, Validators.pattern('(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')]]
+      manualAddIp: [null, [Validators.required, Validators.pattern('^(?:(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?\\.)*[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?)$')]],
+      manualAddApiSecret: ['', [Validators.minLength(12), Validators.maxLength(32)]]
     });
 
     const storedRefreshTime = this.localStorageService.getNumber(SWARM_REFRESH_TIME) ?? 30;
@@ -97,59 +100,129 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.form.reset();
   }
 
-  private ipToInt(ip: string): number {
-    return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
-  }
-
-  private intToIp(int: number): string {
-    return `${(int >>> 24) & 255}.${(int >>> 16) & 255}.${(int >>> 8) & 255}.${int & 255}`;
-  }
-
-  private calculateIpRange(ip: string, netmask: string): { start: number, end: number } {
-    const ipInt = this.ipToInt(ip);
-    const netmaskInt = this.ipToInt(netmask);
-    const network = ipInt & netmaskInt;
-    const broadcast = network | ~netmaskInt;
-    return { start: network + 1, end: broadcast - 1 };
-  }
 
   scanNetwork() {
     this.scanning = true;
 
-    const { start, end } = this.calculateIpRange(window.location.hostname, '255.255.255.0');
-    const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
-    this.getAllDeviceInfo(ips, () => of(null)).subscribe({
-      next: (result) => {
-        // Filter out null items first
-        const validResults = result.filter((item): item is SwarmDevice => item !== null);
-        // Merge new results with existing swarm entries
-        const existingIps = new Set(this.swarm.map(item => item.IP));
-        const newItems = validResults.filter(item => !existingIps.has(item.IP));
-        this.swarm = [...this.swarm, ...newItems];
-        this.sortSwarm();
-        this.localStorageService.setObject(SWARM_DATA, this.swarm);
-        this.calculateTotals();
+    forkJoin({
+      currentDevice: this.httpClient.get<any>('/api/system/info').pipe(
+        mergeMap(info =>
+          this.httpClient.get<any>('/api/system/asic').pipe(
+            map(asic => ({ ...info, ...asic })),
+            catchError(() => of(info))
+          )
+        )
+      ),
+      foundDevices: this.httpClient.get<any[]>('/api/system/network/scan')
+    }).subscribe({
+      next: ({ currentDevice, foundDevices }) => {
+        if (!Array.isArray(foundDevices)) {
+          foundDevices = [];
+        }
+
+        // Check if current device should be added to swarm
+        const existingIps = new Set([...this.swarm.map(item => item.IP), ...this.swarm.map(item => item.currentIP)]);
+        const existingHostnames = new Set(this.swarm.map(item => item.hostname));
+
+        const currentDeviceExists = existingIps.has(currentDevice.currentIP) || (currentDevice.hostname && existingHostnames.has(currentDevice.hostname));
+
+        // If current device is not in swarm, add it to the list of devices to process
+        if (!currentDeviceExists && currentDevice.ASICModel) {
+          currentDevice.IP = window.location.host;
+          foundDevices.unshift(currentDevice);
+        }
+
+        // Filter out devices we already have - check both IP and currentIP
+        const newDevices = foundDevices.filter(device => {
+          // Check if device IP matches any existing IP or currentIP
+          const ipNotExists = !existingIps.has(device.IP);
+          const hostnameNotExists = !device.hostname || !existingHostnames.has(device.hostname);
+          return ipNotExists && hostnameNotExists;
+        });
+
+        if (newDevices.length === 0) {
+          this.toastr.info('No new devices found', 'Network Scan Complete');
+          this.scanning = false;
+          return;
+        }
+
+        // Fetch device info for each discovered device
+        const deviceInfoRequests = newDevices.map(device => {
+          const httpOptions = this.getHttpOptionsForDevice(device);
+
+          return forkJoin({
+            info: this.httpClient.get<any>(`http://${device.IP}/api/system/info`, httpOptions),
+            asic: this.httpClient.get<any>(`http://${device.IP}/api/system/asic`, httpOptions).pipe(catchError(() => of({})))
+          }).pipe(
+            map(({ info, asic }) => {
+              // Merge mDNS data with fetched info
+              return { ...device, ...info, ...asic };
+            }),
+            timeout(5000),
+            catchError(error => {
+              this.toastr.error(`Failed to get info from ${device.IP}`, 'Device Error');
+              return of(null);
+            })
+          );
+        });
+
+        forkJoin(deviceInfoRequests).subscribe({
+          next: (devices) => {
+            const validDevices = devices.filter(d => d !== null && d.ASICModel);
+
+            // Add new devices to swarm
+            this.swarm = [...this.swarm, ...validDevices];
+            this.sortSwarm();
+            this.localStorageService.setObject(SWARM_DATA, this.swarm);
+            this.calculateTotals();
+
+            this.toastr.success(`Found ${validDevices.length} new device(s)`, 'Network Scan Complete');
+            this.scanning = false;
+          },
+          error: (error) => {
+            this.toastr.error(`Failed to fetch device information: ${error.message || 'Unknown error'}`, 'Scan Error');
+            this.scanning = false;
+          }
+        });
       },
-      complete: () => {
+      error: (error) => {
+        this.toastr.error(`Scan failed: ${error.message || 'Unknown error'}`, 'Scan Error');
         this.scanning = false;
       }
     });
   }
 
-  private getAllDeviceInfo(ips: string[], errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>, fetchAsic: boolean = true) {
-    return from(ips).pipe(
-      mergeMap(IP => forkJoin({
-        info: this.httpClient.get(`http://${IP}/api/system/info`),
-        asic: fetchAsic ? this.httpClient.get(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
-      }).pipe(
-        map(({ info, asic }) => {
-          const existingDevice = this.swarm.find(device => device.IP === IP);
-          const result = { IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic };
-          return this.fallbackDeviceModel(result);
-        }),
-        timeout(5000),
-        catchError(error => errorHandler(error, IP))
-      ),
+
+  private getHttpOptionsForDevice(device: any): { headers: any } {
+    const headers: any = {};
+
+    // Check if device has an API secret stored
+    const apiSecret = device?.apiSecret;
+    if (apiSecret && apiSecret.trim() !== '') {
+      headers['X-Requested-With'] = 'XMLHttpRequest'; // NOTE: This should eventually *always* be sent.
+      headers['Authorization'] = `Bearer ${apiSecret}`;
+    }
+
+    return { headers };
+  }
+
+  private getAllDeviceInfo(errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>, fetchAsic: boolean = true) {
+    return from(this.swarm).pipe(
+      mergeMap(device => {
+        const httpOptions = this.getHttpOptionsForDevice(device);
+
+        return forkJoin({
+          info: this.httpClient.get(`http://${device.IP}/api/system/info`, httpOptions),
+          asic: fetchAsic ? this.httpClient.get(`http://${device.IP}/api/system/asic`, httpOptions).pipe(catchError(() => of({}))) : of({})
+        }).pipe(
+          map(({ info, asic }) => {
+            const result = { ...device, ...info, ...asic };
+            return this.fallbackDeviceModel(result);
+          }),
+          timeout(5000),
+          catchError(error => errorHandler(error, device.IP))
+        );
+      },
         128
       ),
       toArray()
@@ -158,25 +231,47 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public add() {
     const IP = this.form.value.manualAddIp;
+    const apiSecret = this.form.value.manualAddApiSecret;
 
     // Check if IP already exists
-    if (this.swarm.some(item => item.IP === IP)) {
+    if (this.swarm.some(item => item.IP === IP || item.currentIP === IP)) {
       this.toastr.warning('This IP address already exists in the swarm', 'Duplicate Entry');
       return;
     }
 
-    forkJoin({
-      info: this.httpClient.get<any>(`http://${IP}/api/system/info`),
-      asic: this.httpClient.get<any>(`http://${IP}/api/system/asic`).pipe(catchError(() => of({})))
-    }).subscribe(({ info, asic }) => {
-      if (!info.ASICModel || !asic.ASICModel) {
-        return;
-      }
+    // Create temporary device object for header generation
+    const httpOptions = this.getHttpOptionsForDevice({ IP, apiSecret });
 
-      this.swarm.push({ IP, ...asic, ...info });
-      this.sortSwarm();
-      this.localStorageService.setObject(SWARM_DATA, this.swarm);
-      this.calculateTotals();
+    forkJoin({
+      info: this.httpClient.get<any>(`http://${IP}/api/system/info`, httpOptions),
+      asic: this.httpClient.get<any>(`http://${IP}/api/system/asic`, httpOptions).pipe(catchError(() => of({})))
+    }).subscribe({
+      next: ({ info, asic }) => {
+        if (!info.ASICModel || !asic.ASICModel) {
+          return;
+        }
+
+        // Store the API secret with the device for future requests
+        const deviceData = { IP, ...asic, ...info };
+        if (apiSecret && apiSecret.trim() !== '') {
+          deviceData.apiSecret = apiSecret;
+        }
+
+        // Prevent an edge case where users already have a Bitaxe in the Swarm as an IP, but attempt to then add via other names
+        if (this.swarm.some(item => item.IP === info.currentIP || item.currentIP === info.currentIP)) {
+          this.toastr.warning('This IP address already exists in the swarm', 'Duplicate Entry');
+          return;
+        }
+
+        this.swarm.push(deviceData);
+        this.sortSwarm();
+        this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotals();
+        this.toastr.success(`Device at ${IP} added successfully`, 'Success');
+      },
+      error: (error) => {
+        this.toastr.error(`Failed to add device at ${IP}: ${error.message || 'Unknown error'}`, 'Error');
+      }
     });
   }
 
@@ -186,7 +281,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public restart(axe: any) {
-    this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}).pipe(
+    this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}, this.getHttpOptionsForDevice(axe)).pipe(
       catchError(error => {
         if (error.status === 0 || error.status === 200 || error.name === 'HttpErrorResponse') {
           return of('success');
@@ -232,10 +327,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
 
     this.refreshIntervalTime = this.refreshTimeSet;
-    const ips = this.swarm.map(axeOs => axeOs.IP);
     this.isRefreshing = true;
 
-    this.getAllDeviceInfo(ips, this.refreshErrorHandler, fetchAsic).subscribe({
+    this.getAllDeviceInfo(this.refreshErrorHandler, fetchAsic).subscribe({
       next: (result) => {
         this.swarm = result;
         this.sortSwarm();
@@ -273,14 +367,29 @@ export class SwarmComponent implements OnInit, OnDestroy {
       const fieldType = typeof a[this.sortField];
 
       if (this.sortField === 'IP') {
-        // Split IP into octets and compare numerically
-        const aOctets = a[this.sortField].split('.').map(Number);
-        const bOctets = b[this.sortField].split('.').map(Number);
-        for (let i = 0; i < 4; i++) {
-          if (aOctets[i] !== bOctets[i]) {
-            comparison = aOctets[i] - bOctets[i];
-            break;
+        // Check if both are valid IP addresses (4 octets with numeric values)
+        const aIsIP = /^(\d{1,3}\.){3}\d{1,3}$/.test(a[this.sortField]);
+        const bIsIP = /^(\d{1,3}\.){3}\d{1,3}$/.test(b[this.sortField]);
+
+        if (aIsIP && bIsIP) {
+          // Both are IPs - split into octets and compare numerically
+          const aOctets = a[this.sortField].split('.').map(Number);
+          const bOctets = b[this.sortField].split('.').map(Number);
+          for (let i = 0; i < 4; i++) {
+            if (aOctets[i] !== bOctets[i]) {
+              comparison = aOctets[i] - bOctets[i];
+              break;
+            }
           }
+        } else if (aIsIP && !bIsIP) {
+          // IP addresses come before hostnames
+          comparison = -1;
+        } else if (!aIsIP && bIsIP) {
+          // Hostnames come after IP addresses
+          comparison = 1;
+        } else {
+          // Both are hostnames - use locale compare
+          comparison = a[this.sortField].localeCompare(b[this.sortField], undefined, { numeric: true });
         }
       } else if (fieldType === 'number') {
         comparison = a[this.sortField] - b[this.sortField];
@@ -354,6 +463,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       case 'Supra':      return 'blue';
       case 'UltraHex':   return 'orange';
       case 'Gamma':      return 'green';
+      case 'GammaHex':   return 'lime'; // New color?
       case 'GammaTurbo': return 'cyan';
       default:           return 'gray';
     }

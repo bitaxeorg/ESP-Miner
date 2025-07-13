@@ -11,6 +11,7 @@
 #include "lwip/sys.h"
 #include "nvs_flash.h"
 #include "esp_wifi_types_generic.h"
+#include "mdns.h"
 
 #include "connect.h"
 #include "global_state.h"
@@ -61,6 +62,7 @@ static int clients_connected_to_ap = 0;
 static const char *get_wifi_reason_string(int reason);
 static void wifi_softap_on(void);
 static void wifi_softap_off(void);
+static void mdns_init_hostname(void);
 
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
@@ -190,12 +192,12 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             ESP_LOGI(TAG, "Retrying Wi-Fi connection...");
             esp_wifi_connect();
         }
-        
+
         if (event_id == WIFI_EVENT_AP_START) {
             ESP_LOGI(TAG, "Configuration Access Point enabled");
             GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = true;
         }
-                
+
         if (event_id == WIFI_EVENT_AP_STOP) {
             ESP_LOGI(TAG, "Configuration Access Point disabled");
             GLOBAL_STATE->SYSTEM_MODULE.ap_enabled = false;
@@ -204,7 +206,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         if (event_id == WIFI_EVENT_AP_STACONNECTED) {
             clients_connected_to_ap += 1;
         }
-        
+
         if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
             clients_connected_to_ap -= 1;
         }
@@ -222,6 +224,8 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         ESP_LOGI(TAG, "Connected to SSID: %s", GLOBAL_STATE->SYSTEM_MODULE.ssid);
 
         wifi_softap_off();
+
+        mdns_init_hostname();
     }
 }
 
@@ -230,8 +234,8 @@ esp_netif_t * wifi_init_softap(char * ap_ssid)
     esp_netif_t * esp_netif_ap = esp_netif_create_default_wifi_ap();
 
     uint8_t mac[6];
-    esp_wifi_get_mac(ESP_IF_WIFI_AP, mac);
-    // Format the last 4 bytes of the MAC address as a hexadecimal string
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    // Format the last 4 bytes of the Station MAC address as a hexadecimal string
     snprintf(ap_ssid, 32, "Bitaxe_%02X%02X", mac[4], mac[5]);
 
     wifi_config_t wifi_ap_config;
@@ -473,4 +477,61 @@ static const char *get_wifi_reason_string(int reason) {
         }
     }
     return "Unknown error";
+}
+
+static void mdns_init_hostname(void) {
+    char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
+
+    ESP_LOGI(TAG, "Starting mDNS service");
+    esp_err_t err = mdns_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "mDNS initialization failed: %s", esp_err_to_name(err));
+        free(hostname);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Setting mDNS hostname to: %s", hostname);
+    err = mdns_hostname_set(hostname);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set mDNS hostname: %s", esp_err_to_name(err));
+        free(hostname);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Setting mDNS instance name to: %s", hostname);
+    err = mdns_instance_name_set(hostname);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set mDNS instance name: %s", esp_err_to_name(err));
+        free(hostname);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Adding mDNS service: _http._tcp on port 80");
+    err = mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add mDNS HTTP service: %s", esp_err_to_name(err));
+        free(hostname);
+        return;
+    }
+
+    // Add _bitaxe._tcp service with apiSecret as TXT record
+    char * api_secret = nvs_config_get_string(NVS_CONFIG_API_SECRET, "");
+
+    ESP_LOGI(TAG, "Adding mDNS service: _bitaxe._tcp on port 80");
+
+    mdns_txt_item_t bitaxe_txt_data[1];
+    bitaxe_txt_data[0].key = "apiSecret";
+    bitaxe_txt_data[0].value = api_secret;
+
+    err = mdns_service_add(NULL, "_bitaxe", "_tcp", 80, bitaxe_txt_data, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add mDNS _bitaxe._tcp service: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGI(TAG, "mDNS _bitaxe._tcp service added successfully");
+    }
+
+    free(api_secret);
+
+    ESP_LOGI(TAG, "mDNS service started successfully");
+    free(hostname);
 }

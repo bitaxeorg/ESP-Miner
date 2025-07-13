@@ -31,6 +31,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public settingsUnlocked: boolean = false;
 
   @Input() uri = '';
+  @Input() apiSecret?: string;
 
   // Store frequency and voltage options from API
   public defaultFrequency: number = 0;
@@ -99,7 +100,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   private saveOverclockSetting(enabled: number) {
     const deviceUri = this.uri || '';
-    this.systemService.updateSystem(deviceUri, { overclockEnabled: enabled })
+    this.systemService.updateSystem(deviceUri, { overclockEnabled: enabled }, this.apiSecret)
       .subscribe({
         next: () => {
           console.log(`Overclock setting saved: ${enabled === 1 ? 'enabled' : 'disabled'}`);
@@ -127,8 +128,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
     // Fetch both system info and ASIC settings in parallel
     forkJoin({
-      info: this.systemService.getInfo(deviceUri),
-      asic: this.systemService.getAsicSettings(deviceUri)
+      info: this.systemService.getInfo(deviceUri, this.apiSecret),
+      asic: this.systemService.getAsicSettings(deviceUri, this.apiSecret)
     })
     .pipe(
       this.loadingService.lockUIUntilComplete(),
@@ -221,7 +222,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     }
 
     const deviceUri = this.uri || '';
-    this.systemService.updateSystem(deviceUri, form)
+    this.systemService.updateSystem(deviceUri, form, this.apiSecret)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
@@ -260,7 +261,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   public restart() {
-    this.systemService.restart(this.uri)
+    this.systemService.restart(this.uri, this.apiSecret)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
@@ -344,4 +345,5 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     return !! Object.entries(this.form.controls)
       .filter(([field, control]) => control.dirty && !this.noRestartFields.includes(field)).length
   }
+
 }

@@ -4,6 +4,10 @@
             <label htmlFor="hostname" class="col-12 md:col-2 md:m-0">Hostname</label>
             <div class="col-12 md:col-10">
                 <input pInputText id="hostname" type="text" formControlName="hostname" />
+                <small *ngIf="isInCaptivePortalMode" class="block mt-1">
+                    After restart, your bitaxe will be reachable at:
+                    <a [href]="getHostnameUrl()" target="_system" class="text-primary underline">{{getHostnameUrl()}}</a>
+                </small>
             </div>
         </div>
         <div class="field grid p-fluid">
@@ -28,6 +32,23 @@
                 <input pInputText id="wifiPass" formControlName="wifiPass"
                     [type]="showWifiPassword ? 'text' : 'password'"
                     placeholder="Enter Wi-Fi password" />
+            </div>
+        </div>
+
+        <div class="field grid p-fluid">
+            <label htmlFor="apiSecret" class="col-12 mb-2 md:col-2 md:mb-0">API Secret:</label>
+            <div class="col-12 md:col-10">
+                <div class="p-inputgroup">
+                    <input pInputText id="apiSecret" formControlName="apiSecret" type="text"
+                           placeholder="12-32 character secret (optional)" minlength="12" maxlength="32" />
+                    <p-button
+                        icon="pi pi-refresh"
+                        pp-button
+                        (click)="generateApiSecret()"
+                        pTooltip="Generate random API secret"
+                        tooltipPosition="left"></p-button>
+                </div>
+                <small class="block mt-1">Optional 12-32 character string for API authentication</small>
             </div>
         </div>
 
