@@ -3,30 +3,25 @@
 #include "esp_psram.h"
 #include "nvs_flash.h"
 
+#include "adc.h"
+#include "asic.h"
+#include "asic_reset.h"
 #include "asic_result_task.h"
 #include "asic_task.h"
+#include "connect.h"
 #include "create_jobs_task.h"
-#include "statistics_task.h"
-#include "system.h"
+#include "device_config.h"
 #include "http_server.h"
-#include "serial.h"
-#include "stratum_task.h"
 #include "i2c_bitaxe.h"
-#include "adc.h"
 #include "nvs_device.h"
 #include "self_test.h"
-#include "asic.h"
-#include "device_config.h"
-#include "connect.h"
-#include "asic_reset.h"
+#include "serial.h"
+#include "statistics_task.h"
+#include "stratum_task.h"
+#include "system.h"
 
 GlobalState GLOBAL_STATE = {
-    .extranonce_str = NULL, 
-    .extranonce_2_len = 0, 
-    .abandon_work = 0, 
-    .version_mask = 0,
-    .ASIC_initalized = false
-};
+    .extranonce_str = NULL, .extranonce_2_len = 0, .abandon_work = 0, .version_mask = 0, .ASIC_initalized = false};
 SystemModule SYSTEM_MODULE;
 PowerManagementModule POWER_MANAGEMENT_MODULE;
 DeviceConfig DEVICE_CONFIG;
@@ -34,7 +29,6 @@ DisplayConfig DISPLAY_CONFIG;
 AsicTaskModule ASIC_TASK_MODULE;
 SelfTestModule SELF_TEST_MODULE;
 StatisticsModule STATISTICS_MODULE;
-
 
 static const char * TAG = "bitaxe";
 
@@ -53,14 +47,14 @@ void app_main(void)
     ESP_ERROR_CHECK(i2c_bitaxe_init());
     ESP_LOGI(TAG, "I2C initialized successfully");
 
-    //wait for I2C to init
+    // wait for I2C to init
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    //Init ADC
+    // Init ADC
     ADC_init();
 
-    //initialize the ESP32 NVS
-    if (NVSDevice_init() != ESP_OK){
+    // initialize the ESP32 NVS
+    if (NVSDevice_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init NVS");
         return;
     }
@@ -70,8 +64,9 @@ void app_main(void)
         return;
     }
 
-    if (self_test()) return;
-    
+    if (!self_test())
+        return;
+
     SYSTEM_init_system();
     statistics_init();
 
@@ -80,9 +75,7 @@ void app_main(void)
 
     SYSTEM_init_peripherals();
 
-    xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, NULL,10, NULL);
-
-    //start the API for AxeOS
+    // start the API for AxeOS
     start_rest_server();
 
     while (!SYSTEM_MODULE.is_connected) {
@@ -100,10 +93,10 @@ void app_main(void)
 
     SERIAL_init();
 
-    if (ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value,
-        DEVICE_CONFIG.family.asic.id,
-        DEVICE_CONFIG.family.asic_count,
-        DEVICE_CONFIG.family.asic.difficulty) == 0) {
+    ESP_LOGE(TAG, "ASIC_init id:%i count:%i diff:%i", DEVICE_CONFIG.family.asic.id, DEVICE_CONFIG.family.asic_count,
+             DEVICE_CONFIG.family.asic.difficulty);
+    if (ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic.id, DEVICE_CONFIG.family.asic_count,
+                  DEVICE_CONFIG.family.asic.difficulty) == 0) {
         SYSTEM_MODULE.asic_status = "Chip count 0";
         ESP_LOGE(TAG, "Chip count 0");
         return;
@@ -113,7 +106,7 @@ void app_main(void)
     SERIAL_clear_buffer();
 
     GLOBAL_STATE.ASIC_initalized = true;
-
+    xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, NULL, 10, NULL);
     xTaskCreate(stratum_task, "stratum admin", 8192, NULL, 5, NULL);
     xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, NULL, 10, NULL);
