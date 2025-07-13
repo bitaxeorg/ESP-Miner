@@ -344,7 +344,6 @@ bool self_test()
     ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float) POWER_MANAGEMENT_MODULE.frequency_value);
     uint8_t chips_detected =
         ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value, 
-                    DEVICE_CONFIG.family.asic.id, 
                     DEVICE_CONFIG.family.asic_count,
                     DEVICE_CONFIG.family.asic.difficulty);
     uint8_t chips_expected = DEVICE_CONFIG.family.asic_count;

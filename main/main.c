@@ -63,7 +63,7 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to init device config");
         return;
     }
-
+    ASIC_init_methods(DEVICE_CONFIG.family.asic.id);
     if (!self_test())
         return;
 
@@ -75,6 +75,7 @@ void app_main(void)
 
     SYSTEM_init_peripherals();
 
+    xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, NULL,10, NULL);
     // start the API for AxeOS
     start_rest_server();
 
@@ -95,7 +96,7 @@ void app_main(void)
 
     ESP_LOGE(TAG, "ASIC_init id:%i count:%i diff:%i", DEVICE_CONFIG.family.asic.id, DEVICE_CONFIG.family.asic_count,
              DEVICE_CONFIG.family.asic.difficulty);
-    if (ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic.id, DEVICE_CONFIG.family.asic_count,
+    if (ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count,
                   DEVICE_CONFIG.family.asic.difficulty) == 0) {
         SYSTEM_MODULE.asic_status = "Chip count 0";
         ESP_LOGE(TAG, "Chip count 0");
@@ -106,7 +107,6 @@ void app_main(void)
     SERIAL_clear_buffer();
 
     GLOBAL_STATE.ASIC_initalized = true;
-    xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, NULL, 10, NULL);
     xTaskCreate(stratum_task, "stratum admin", 8192, NULL, 5, NULL);
     xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, NULL, 10, NULL);
