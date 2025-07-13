@@ -723,13 +723,11 @@ esp_err_t BAP_init(void) {
     
     memset(subscriptions, 0, sizeof(subscriptions));
     
-    // Check if GPIO pins are valid (ESP32-S3 has 48 GPIO pins, 0-47)
     if (GPIO_BAP_TX > 47 || GPIO_BAP_RX > 47) {
         ESP_LOGE(TAG, "Invalid GPIO pins: TX=%d, RX=%d", GPIO_BAP_TX, GPIO_BAP_RX);
         return ESP_ERR_INVALID_ARG;
     }
     
-    // UART parameters
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -739,21 +737,18 @@ esp_err_t BAP_init(void) {
         .rx_flow_ctrl_thresh = 122,
     };
     
-    // Configure UART parameters
     esp_err_t ret = uart_param_config(BAP_UART_NUM, &uart_config);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to configure UART parameters: %d", ret);
         return ret;
     }
     
-    // Set UART pins (TX: GPIO_BAP_TX, RX: GPIO_BAP_RX)
     ret = uart_set_pin(BAP_UART_NUM, GPIO_BAP_TX, GPIO_BAP_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to set UART pins: %d", ret);
         return ret;
     }
     
-    // Install UART driver
     ret = uart_driver_install(BAP_UART_NUM, BAP_BUF_SIZE, BAP_BUF_SIZE, 0, NULL, 0);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to install UART driver: %d", ret);
