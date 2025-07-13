@@ -6,25 +6,25 @@
 #include "bm1370.h"
 #include "asic.h"
 #include "device_config.h"
-#include "power_management_task.h"
+
 
 static const double NONCE_SPACE = 4294967296.0; //  2^32
 
 static const char *TAG = "asic";
 
-uint8_t ASIC_init()
+uint8_t ASIC_init(float frequency)
 {
     ESP_LOGI(TAG, "Initializing %s", DEVICE_CONFIG.family.asic.name);
     switch (DEVICE_CONFIG.family.asic.id) {
 
         case BM1397:
-            return BM1397_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
+            return BM1397_init(frequency, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1366:
-            return BM1366_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
+            return BM1366_init(frequency, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1368:
-            return BM1368_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
+            return BM1368_init(frequency, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1370:
-            return BM1370_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
+            return BM1370_init(frequency, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         default:
     }
     return ESP_OK;
@@ -127,12 +127,12 @@ bool ASIC_set_frequency(float target_frequency)
     return success;
 }
 
-double ASIC_get_asic_job_frequency_ms()
+double ASIC_get_asic_job_frequency_ms(float frequency)
 {
     switch (DEVICE_CONFIG.family.asic.id) {
         case BM1397:
             // no version-rolling so same Nonce Space is splitted between Small Cores
-            return (NONCE_SPACE / (double) (POWER_MANAGEMENT_MODULE.frequency_value * DEVICE_CONFIG.family.asic.small_core_count * 1000)) / (double) DEVICE_CONFIG.family.asic_count;
+            return (NONCE_SPACE / (double) (frequency * DEVICE_CONFIG.family.asic.small_core_count * 1000)) / (double) DEVICE_CONFIG.family.asic_count;
         case BM1366:
             return 2000;
         case BM1368:

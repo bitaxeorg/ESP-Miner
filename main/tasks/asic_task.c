@@ -28,7 +28,7 @@ void ASIC_task(void *pvParameters)
         ASIC_TASK_MODULE.valid_jobs[i] = 0;
     }
 
-    double asic_job_frequency_ms = ASIC_get_asic_job_frequency_ms();
+    double asic_job_frequency_ms = ASIC_get_asic_job_frequency_ms(POWER_MANAGEMENT_MODULE.frequency_value);
 
     ESP_LOGI(TAG, "ASIC Job Interval: %.2f ms", asic_job_frequency_ms);
     SYSTEM_notify_mining_started();

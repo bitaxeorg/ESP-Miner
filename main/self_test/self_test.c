@@ -330,7 +330,7 @@ bool self_test()
 
     POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
     ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float)POWER_MANAGEMENT_MODULE.frequency_value);
-    uint8_t chips_detected = ASIC_init();
+    uint8_t chips_detected = ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value);
     uint8_t chips_expected = DEVICE_CONFIG.family.asic_count;
 
     DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
