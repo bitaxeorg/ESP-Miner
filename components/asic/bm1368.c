@@ -1,7 +1,7 @@
 #include "bm1368.h"
 
 #include "crc.h"
-#include "asic_task.h"
+#include "asic_task_module.h"
 #include "serial.h"
 #include "utils.h"
 

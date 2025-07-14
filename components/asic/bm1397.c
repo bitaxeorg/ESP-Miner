@@ -14,7 +14,7 @@
 #include "utils.h"
 #include "crc.h"
 #include "mining.h"
-#include "asic_task.h"
+#include "asic_task_module.h"
 
 #define BM1397_CHIP_ID 0x1397
 #define BM1397_CHIP_ID_RESPONSE_LENGTH 9

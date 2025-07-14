@@ -8,7 +8,7 @@
 #include "string.h"
 #include "work_queue.h"
 #include "freertos/FreeRTOS.h"
-#include "asic_task.h"
+#include "asic_task_module.h"
 #include "asic.h"
 #include "mining_module.h"
 #include "pool_module.h"

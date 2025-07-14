@@ -11,6 +11,7 @@
 #include "power_management_module.h"
 #include "mining_module.h"
 #include "device_config.h"
+#include "asic_task_module.h"
 
 static const char *TAG = "asic_task";
 

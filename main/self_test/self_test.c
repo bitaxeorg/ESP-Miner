@@ -33,7 +33,7 @@
 #include "bm1397.h"
 #include "device_config.h"
 #include "power_management_module.h"
-#include "asic_task.h"
+#include "asic_task_module.h"
 #include "serial.h"
 #include "self_test_module.h"
 #include "state_module.h"

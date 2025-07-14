@@ -29,7 +29,7 @@
 #include "screen.h"
 #include "vcore.h"
 #include "thermal.h"
-#include "asic_task.h"
+#include "asic_task_module.h"
 #include "system_module.h"
 #include "device_config.h"
 #include "pool_module.h"

@@ -7,7 +7,7 @@
 #include "utils.h"
 #include "stratum_task.h"
 #include "asic.h"
-#include "asic_task.h"
+#include "asic_task_module.h"
 #include "pool_module.h"
 
 static const char *TAG = "asic_result";
