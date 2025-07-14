@@ -3,6 +3,12 @@
 
 typedef struct
 {
+    char message[64];
+    uint32_t count;
+} RejectedReasonStat;
+
+typedef struct
+{
     double duration_start;
     int historical_hashrate_rolling_index;
     double historical_hashrate_time_stamps[HISTORY_LENGTH];
