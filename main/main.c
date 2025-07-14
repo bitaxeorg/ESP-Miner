@@ -1,8 +1,5 @@
-#include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
-#include "nvs_flash.h"
-
 #include "adc.h"
 #include "asic.h"
 #include "asic_reset.h"
