@@ -46,8 +46,8 @@ void ASIC_result_task(void *pvParameters)
         {
             char * user = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_user : SYSTEM_MODULE.pool_user;
             int ret = STRATUM_V1_submit_share(
-                GLOBAL_STATE.sock,
-                GLOBAL_STATE.send_uid++,
+                MINING_MODULE.sock,
+                MINING_MODULE.send_uid++,
                 user,
                 active_job->jobid,
                 active_job->extranonce2,

@@ -9,6 +9,7 @@
 #include "asic_task.h"
 #include "asic.h"
 #include "power_management_task.h"
+#include "mining_module.h"
 
 static const char *TAG = "asic_task";
 
@@ -51,7 +52,7 @@ void ASIC_task(void *pvParameters)
 
     while (1)
     {
-        bm_job *next_bm_job = (bm_job *)queue_dequeue(&GLOBAL_STATE.ASIC_jobs_queue);
+        bm_job *next_bm_job = (bm_job *)queue_dequeue(&MINING_MODULE.ASIC_jobs_queue);
 
         //(*GLOBAL_STATE.ASIC_functions.send_work_fn)(next_bm_job); // send the job to the ASIC
         ASIC_send_work(next_bm_job);

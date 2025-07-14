@@ -20,26 +20,10 @@
 
 typedef struct
 {
-    work_queue stratum_queue;
-    work_queue ASIC_jobs_queue;
 
-    char * extranonce_str;
-    int extranonce_2_len;
-    int abandon_work;
+    
 
-    uint32_t pool_difficulty;
-    bool new_set_mining_difficulty_msg;
-    uint32_t version_mask;
-    bool new_stratum_version_rolling_msg;
 
-    int sock;
-
-    // A message ID that must be unique per request that expects a response.
-    // For requests not expecting a response (called notifications), this is null.
-    int send_uid;
-
-    bool ASIC_initalized;
-    bool psram_is_available;
 } GlobalState;
 
 extern GlobalState GLOBAL_STATE;
