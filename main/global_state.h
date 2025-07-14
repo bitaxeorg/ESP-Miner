@@ -11,11 +11,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define STRATUM_USER CONFIG_STRATUM_USER
-#define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
 
-#define HISTORY_LENGTH 100
-#define DIFF_STRING_SIZE 10
+
+
+
 
 
 typedef struct

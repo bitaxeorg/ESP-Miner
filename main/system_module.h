@@ -1,6 +1,9 @@
 #ifndef SYSTEM_MODULE_H_
 #define SYSTEM_MODULE_H_
 
+#define HISTORY_LENGTH 100
+#define DIFF_STRING_SIZE 10
+
 typedef struct
 {
     char message[64];
