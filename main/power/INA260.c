@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include "esp_log.h"
 
 #include "i2c_bitaxe.h"
 #include "INA260.h"

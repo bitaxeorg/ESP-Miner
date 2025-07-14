@@ -1,7 +1,8 @@
 #ifndef INA260_H_
 #define INA260_H_
 
-#include "i2c_bitaxe.h"
+#include "esp_err.h"
+#include <stdbool.h>
 
 #define INA260_I2CADDR_DEFAULT 0x40 ///< INA260 default i2c address
 #define INA260_REG_CONFIG 0x00      ///< Configuration register

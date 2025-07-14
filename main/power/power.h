@@ -1,9 +1,6 @@
 #ifndef POWER_H
 #define POWER_H
 
-#include <esp_err.h>
-
-
 float Power_get_current();
 float Power_get_power();
 float Power_get_input_voltage();

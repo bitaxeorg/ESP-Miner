@@ -1,8 +1,6 @@
 #ifndef WORK_QUEUE_H
 #define WORK_QUEUE_H
 
-#include <pthread.h>
-#include "mining.h"
 #include "mining_module.h"
 
 

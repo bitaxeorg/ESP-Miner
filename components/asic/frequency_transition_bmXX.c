@@ -1,7 +1,6 @@
 #include "frequency_transition_bmXX.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include <math.h>
 
 static const char * TAG = "frequency_transition";

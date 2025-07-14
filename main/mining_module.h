@@ -1,5 +1,8 @@
 #pragma once
 
+#include <pthread.h>
+#include <stdbool.h>
+#include <stdint.h>
 //seems to be unused. get set from Kconfig
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
