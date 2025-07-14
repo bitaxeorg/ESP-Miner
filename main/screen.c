@@ -6,14 +6,13 @@
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
 #include "esp_timer.h"
-#include "power_management_task.h"
-
 #include "lvgl.h"
 #include "nvs_config.h"
 #include <string.h>
 #include "system_module.h"
 #include "self_test_module.h"
 #include "device_config.h"
+#include "power_management_module.h"
 
 typedef enum
 {

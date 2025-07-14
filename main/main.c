@@ -19,6 +19,7 @@
 #include "statistics_task.h"
 #include "stratum_task.h"
 #include "system.h"
+#include "power_management_module.h"
 #include "power_management_task.h"
 #include "system_module.h"
 #include "self_test_module.h"

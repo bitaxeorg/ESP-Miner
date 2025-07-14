@@ -8,7 +8,7 @@
 #include "freertos/task.h"
 #include "asic_task.h"
 #include "asic.h"
-#include "power_management_task.h"
+#include "power_management_module.h"
 #include "mining_module.h"
 #include "device_config.h"
 
