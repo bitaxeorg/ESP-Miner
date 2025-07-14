@@ -13,6 +13,9 @@
 #include "self_test_module.h"
 #include "device_config.h"
 #include "power_management_module.h"
+#include "wifi_module.h"
+#include "pool_module.h"
+#include "state_module.h"
 
 typedef enum
 {
@@ -163,7 +166,7 @@ static lv_obj_t * create_scr_configure()
     lv_label_set_text(label2, "Wi-Fi (for setup):");
 
     lv_obj_t * label3 = lv_label_create(scr);
-    lv_label_set_text(label3, SYSTEM_MODULE.ap_ssid);
+    lv_label_set_text(label3, WIFI_MODULE.ap_ssid);
 
     return scr;
 }
@@ -190,7 +193,7 @@ static lv_obj_t * create_scr_connection()
     lv_obj_t * label1 = lv_label_create(scr);
     lv_obj_set_width(label1, LV_HOR_RES);
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text_fmt(label1, "Wi-Fi: %s", SYSTEM_MODULE.ssid);
+    lv_label_set_text_fmt(label1, "Wi-Fi: %s", WIFI_MODULE.ssid);
 
     wifi_status_label = lv_label_create(scr);
     lv_obj_set_width(wifi_status_label, LV_HOR_RES);
@@ -200,7 +203,7 @@ static lv_obj_t * create_scr_connection()
     lv_label_set_text(label3, "Wi-Fi (for setup):");
 
     lv_obj_t * label4 = lv_label_create(scr);
-    lv_label_set_text(label4, SYSTEM_MODULE.ap_ssid);
+    lv_label_set_text(label4, WIFI_MODULE.ap_ssid);
 
     return scr;
 }
@@ -332,7 +335,7 @@ static void screen_update_cb(lv_timer_t * timer)
             display_on(true);
         }
     }
-    if (SYSTEM_MODULE.is_connected) {
+    if (WIFI_MODULE.is_connected) {
 
         if (SELF_TEST_MODULE.is_active) {
             screen_show(SCR_SELF_TEST);
@@ -348,39 +351,39 @@ static void screen_update_cb(lv_timer_t * timer)
             return;
         }
 
-        if (SYSTEM_MODULE.is_firmware_update) {
-            if (strcmp(SYSTEM_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
-                lv_label_set_text(firmware_update_scr_filename_label, SYSTEM_MODULE.firmware_update_filename);
+        if (STATE_MODULE.is_firmware_update) {
+            if (strcmp(STATE_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
+                lv_label_set_text(firmware_update_scr_filename_label, STATE_MODULE.firmware_update_filename);
             }
-            if (strcmp(SYSTEM_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
-                lv_label_set_text(firmware_update_scr_status_label, SYSTEM_MODULE.firmware_update_status);
+            if (strcmp(STATE_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
+                lv_label_set_text(firmware_update_scr_status_label, STATE_MODULE.firmware_update_status);
             }
             screen_show(SCR_FIRMWARE_UPDATE);
             return;
         }
 
-        if (SYSTEM_MODULE.asic_status) {
-            lv_label_set_text(asic_status_label, SYSTEM_MODULE.asic_status);
+        if (STATE_MODULE.asic_status) {
+            lv_label_set_text(asic_status_label, STATE_MODULE.asic_status);
             screen_show(SCR_ASIC_STATUS);
             return;
         }
 
-        if (SYSTEM_MODULE.overheat_mode == 1) {
-            if (strcmp(SYSTEM_MODULE.ip_addr_str, lv_label_get_text(ip_addr_scr_overheat_label)) != 0) {
-                lv_label_set_text(ip_addr_scr_overheat_label, SYSTEM_MODULE.ip_addr_str);
+        if (STATE_MODULE.overheat_mode == 1) {
+            if (strcmp(WIFI_MODULE.ip_addr_str, lv_label_get_text(ip_addr_scr_overheat_label)) != 0) {
+                lv_label_set_text(ip_addr_scr_overheat_label, WIFI_MODULE.ip_addr_str);
             }
             screen_show(SCR_OVERHEAT);
             return;
         }
 
-        if (SYSTEM_MODULE.ssid[0] == '\0') {
+        if (WIFI_MODULE.ssid[0] == '\0') {
             screen_show(SCR_CONFIGURE);
             return;
         }
 
-        if (SYSTEM_MODULE.ap_enabled) {
-            if (strcmp(SYSTEM_MODULE.wifi_status, lv_label_get_text(wifi_status_label)) != 0) {
-                lv_label_set_text(wifi_status_label, SYSTEM_MODULE.wifi_status);
+        if (WIFI_MODULE.ap_enabled) {
+            if (strcmp(WIFI_MODULE.wifi_status, lv_label_get_text(wifi_status_label)) != 0) {
+                lv_label_set_text(wifi_status_label, WIFI_MODULE.wifi_status);
             }
             screen_show(SCR_CONNECTION);
             current_screen_time_ms = 0;
@@ -391,13 +394,13 @@ static void screen_update_cb(lv_timer_t * timer)
 
         current_screen_time_ms += SCREEN_UPDATE_MS;
 
-        char * pool_url = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_url : SYSTEM_MODULE.pool_url;
+        char * pool_url = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_url : POOL_MODULE.pool_url;
         if (strcmp(lv_label_get_text(mining_url_scr_urls_label), pool_url) != 0) {
             lv_label_set_text(mining_url_scr_urls_label, pool_url);
         }
 
-        if (strcmp(lv_label_get_text(ip_addr_scr_urls_label), SYSTEM_MODULE.ip_addr_str) != 0) {
-            lv_label_set_text(ip_addr_scr_urls_label, SYSTEM_MODULE.ip_addr_str);
+        if (strcmp(lv_label_get_text(ip_addr_scr_urls_label), WIFI_MODULE.ip_addr_str) != 0) {
+            lv_label_set_text(ip_addr_scr_urls_label, WIFI_MODULE.ip_addr_str);
         }
 
         if (current_hashrate != SYSTEM_MODULE.current_hashrate) {
@@ -413,7 +416,7 @@ static void screen_update_cb(lv_timer_t * timer)
         }
         current_hashrate = SYSTEM_MODULE.current_hashrate;
 
-        if (SYSTEM_MODULE.FOUND_BLOCK && !found_block) {
+        if (STATE_MODULE.FOUND_BLOCK && !found_block) {
             found_block = true;
 
             lv_obj_set_width(difficulty_label, LV_HOR_RES);
@@ -437,7 +440,7 @@ static void screen_update_cb(lv_timer_t * timer)
 
     // Update WiFi RSSI periodically
     int8_t rssi_value = -128;
-    if (SYSTEM_MODULE.is_connected) {
+    if (WIFI_MODULE.is_connected) {
         get_wifi_current_rssi(&rssi_value);
     }
 
@@ -529,7 +532,7 @@ esp_err_t screen_start()
     // screen_chars = lv_display_get_horizontal_resolution(NULL) / 6;
     screen_lines = lv_display_get_vertical_resolution(NULL) / 8;
 
-    if (SYSTEM_MODULE.is_screen_active) {
+    if (STATE_MODULE.is_screen_active) {
 
         screens[SCR_SELF_TEST] = create_scr_self_test();
         screens[SCR_OVERHEAT] = create_scr_overheat();

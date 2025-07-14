@@ -24,6 +24,9 @@
 #include "device_config.h"
 #include "display.h"
 #include "work_queue.h"
+#include "wifi_module.h"
+#include "pool_module.h"
+#include "state_module.h"
 
 SystemModule SYSTEM_MODULE;
 PowerManagementModule POWER_MANAGEMENT_MODULE;
@@ -33,6 +36,9 @@ AsicTaskModule ASIC_TASK_MODULE;
 SelfTestModule SELF_TEST_MODULE;
 StatisticsModule STATISTICS_MODULE;
 mining_queues MINING_MODULE;
+WifiSettings WIFI_MODULE;
+PoolModule POOL_MODULE;
+StateModule STATE_MODULE;
 
 static const char * TAG = "bitaxe";
 
@@ -42,9 +48,9 @@ void app_main(void)
 
     if (!esp_psram_is_initialized()) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32 device!");
-        SYSTEM_MODULE.psram_is_available = false;
+        STATE_MODULE.psram_is_available = false;
     } else {
-        SYSTEM_MODULE.psram_is_available = true;
+        STATE_MODULE.psram_is_available = true;
     }
 
     // Init I2C
@@ -83,7 +89,7 @@ void app_main(void)
     // start the API for AxeOS
     start_rest_server();
 
-    while (!SYSTEM_MODULE.is_connected) {
+    while (!WIFI_MODULE.is_connected) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
@@ -91,7 +97,7 @@ void app_main(void)
     queue_init(&MINING_MODULE.ASIC_jobs_queue);
 
     if (asic_reset() != ESP_OK) {
-        SYSTEM_MODULE.asic_status = "ASIC reset failed";
+        STATE_MODULE.asic_status = "ASIC reset failed";
         ESP_LOGE(TAG, "ASIC reset failed!");
         return;
     }
@@ -102,7 +108,7 @@ void app_main(void)
              DEVICE_CONFIG.family.asic.difficulty);
     if (ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count,
                   DEVICE_CONFIG.family.asic.difficulty) == 0) {
-        SYSTEM_MODULE.asic_status = "Chip count 0";
+        STATE_MODULE.asic_status = "Chip count 0";
         ESP_LOGE(TAG, "Chip count 0");
         return;
     }
@@ -110,7 +116,7 @@ void app_main(void)
     SERIAL_set_baud(ASIC_set_max_baud());
     SERIAL_clear_buffer();
 
-    SYSTEM_MODULE.ASIC_initalized = true;
+    STATE_MODULE.ASIC_initalized = true;
     xTaskCreate(stratum_task, "stratum admin", 8192, NULL, 5, NULL);
     xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, NULL, 10, NULL);

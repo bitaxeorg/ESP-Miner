@@ -9,6 +9,7 @@
 #include "asic.h"
 #include "asic_task.h"
 #include "system_module.h"
+#include "pool_module.h"
 
 static const char *TAG = "asic_result";
 
@@ -42,7 +43,7 @@ void ASIC_result_task(void *pvParameters)
 
         if (nonce_diff >= active_job->pool_diff)
         {
-            char * user = SYSTEM_MODULE.is_using_fallback ? SYSTEM_MODULE.fallback_pool_user : SYSTEM_MODULE.pool_user;
+            char * user = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
             int ret = STRATUM_V1_submit_share(
                 MINING_MODULE.sock,
                 MINING_MODULE.send_uid++,

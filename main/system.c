@@ -32,6 +32,8 @@
 #include "asic_task.h"
 #include "system_module.h"
 #include "device_config.h"
+#include "pool_module.h"
+#include "state_module.h"
 
 
 static const char * TAG = "system";
@@ -57,42 +59,42 @@ void SYSTEM_init_system()
     SYSTEM_MODULE.best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     SYSTEM_MODULE.best_session_nonce_diff = 0;
     SYSTEM_MODULE.start_time = esp_timer_get_time();
-    SYSTEM_MODULE.lastClockSync = 0;
-    SYSTEM_MODULE.FOUND_BLOCK = false;
+    STATE_MODULE.lastClockSync = 0;
+    STATE_MODULE.FOUND_BLOCK = false;
     
     // set the pool url
-    SYSTEM_MODULE.pool_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
-    SYSTEM_MODULE.fallback_pool_url = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
+    POOL_MODULE.pool_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
+    POOL_MODULE.fallback_pool_url = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
 
     // set the pool port
-    SYSTEM_MODULE.pool_port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT);
-    SYSTEM_MODULE.fallback_pool_port = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT);
+    POOL_MODULE.pool_port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT);
+    POOL_MODULE.fallback_pool_port = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT);
 
     // set the pool user
-    SYSTEM_MODULE.pool_user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
-    SYSTEM_MODULE.fallback_pool_user = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
+    POOL_MODULE.pool_user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
+    POOL_MODULE.fallback_pool_user = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
 
     // set the pool password
-    SYSTEM_MODULE.pool_pass = nvs_config_get_string(NVS_CONFIG_STRATUM_PASS, CONFIG_STRATUM_PW);
-    SYSTEM_MODULE.fallback_pool_pass = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, CONFIG_FALLBACK_STRATUM_PW);
+    POOL_MODULE.pool_pass = nvs_config_get_string(NVS_CONFIG_STRATUM_PASS, CONFIG_STRATUM_PW);
+    POOL_MODULE.fallback_pool_pass = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, CONFIG_FALLBACK_STRATUM_PW);
 
     // set the pool difficulty
-    SYSTEM_MODULE.pool_difficulty = nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY, CONFIG_STRATUM_DIFFICULTY);
-    SYSTEM_MODULE.fallback_pool_difficulty = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, CONFIG_FALLBACK_STRATUM_DIFFICULTY);
+    POOL_MODULE.pool_difficulty = nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY, CONFIG_STRATUM_DIFFICULTY);
+    POOL_MODULE.fallback_pool_difficulty = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, CONFIG_FALLBACK_STRATUM_DIFFICULTY);
 
     // set the pool extranonce subscribe
-    SYSTEM_MODULE.pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, STRATUM_EXTRANONCE_SUBSCRIBE);
-    SYSTEM_MODULE.fallback_pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
+    POOL_MODULE.pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, STRATUM_EXTRANONCE_SUBSCRIBE);
+    POOL_MODULE.fallback_pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
 
     // set fallback to false.
-    SYSTEM_MODULE.is_using_fallback = false;
+    POOL_MODULE.is_using_fallback = false;
 
     // Initialize overheat_mode
-    SYSTEM_MODULE.overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-    ESP_LOGI(TAG, "Initial overheat_mode value: %d", SYSTEM_MODULE.overheat_mode);
+    STATE_MODULE.overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+    ESP_LOGI(TAG, "Initial overheat_mode value: %d", STATE_MODULE.overheat_mode);
 
     //Initialize power_fault fault mode
-    SYSTEM_MODULE.power_fault = 0;
+    STATE_MODULE.power_fault = 0;
 
     // set the best diff string
     _suffix_string(SYSTEM_MODULE.best_nonce_diff, SYSTEM_MODULE.best_diff_string, DIFF_STRING_SIZE, 0);
@@ -169,11 +171,11 @@ void SYSTEM_notify_mining_started()
 void SYSTEM_notify_new_ntime( uint32_t ntime)
 {
     // Hourly clock sync
-    if (SYSTEM_MODULE.lastClockSync + (60 * 60) > ntime) {
+    if (STATE_MODULE.lastClockSync + (60 * 60) > ntime) {
         return;
     }
     ESP_LOGI(TAG, "Syncing clock");
-    SYSTEM_MODULE.lastClockSync = ntime;
+    STATE_MODULE.lastClockSync = ntime;
     struct timeval tv;
     tv.tv_sec = ntime;
     tv.tv_usec = 0;
@@ -242,7 +244,7 @@ static void _check_for_best_diff( double diff, uint8_t job_id)
 
     double network_diff = _calculate_network_difficulty(ASIC_TASK_MODULE.active_jobs[job_id]->target);
     if (diff > network_diff) {
-        SYSTEM_MODULE.FOUND_BLOCK = true;
+        STATE_MODULE.FOUND_BLOCK = true;
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
     }
 

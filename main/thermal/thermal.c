@@ -1,7 +1,8 @@
 #include "thermal.h"
-#include "system_module.h"
+
 #include "esp_log.h"
 #include "device_config.h"
+#include "state_module.h"
 
 static const char * TAG = "thermal";
 
@@ -55,7 +56,7 @@ uint16_t Thermal_get_fan_speed()
 
 float Thermal_get_chip_temp()
 {
-    if (!SYSTEM_MODULE.ASIC_initalized) {
+    if (!STATE_MODULE.ASIC_initalized) {
         return -1;
     }
     int8_t temp_offset = DEVICE_CONFIG.emc_temp_offset;

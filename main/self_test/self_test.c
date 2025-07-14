@@ -37,6 +37,7 @@
 #include "serial.h"
 #include "system_module.h"
 #include "self_test_module.h"
+#include "state_module.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
@@ -145,7 +146,7 @@ esp_err_t test_display()
         return ESP_FAIL;
     }
 
-    if (SYSTEM_MODULE.is_screen_active) {
+    if (STATE_MODULE.is_screen_active) {
         ESP_LOGI(TAG, "DISPLAY init success!");
     } else {
         ESP_LOGW(TAG, "DISPLAY not found!");
@@ -195,7 +196,7 @@ esp_err_t test_vreg_faults()
     // check for faults on the voltage regulator
     ESP_RETURN_ON_ERROR(VCORE_check_fault(), TAG, "VCORE check fault failed!");
 
-    if (SYSTEM_MODULE.power_fault) {
+    if (STATE_MODULE.power_fault) {
         return ESP_FAIL;
     }
     return ESP_OK;

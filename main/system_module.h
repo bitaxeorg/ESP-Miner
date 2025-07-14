@@ -10,58 +10,66 @@ typedef struct
     uint32_t count;
 } RejectedReasonStat;
 
+
+
 typedef struct
 {
+    // The starting time for a certain period of mining activity.
     double duration_start;
+
+    // The index to keep track of the rolling historical hashrate data.
     int historical_hashrate_rolling_index;
+
+    // An array to store timestamps corresponding to historical hashrate values.
     double historical_hashrate_time_stamps[HISTORY_LENGTH];
+
+    // An array to store historical hashrate values over a defined period.
     double historical_hashrate[HISTORY_LENGTH];
+
+    // A flag indicating if the historical hashrate data is initialized.
     int historical_hashrate_init;
+
+    // The current calculated hashrate of the system at this moment.
     double current_hashrate;
+
+    // The average hashrate over a defined period of time.
     double avg_hashrate;
+
+    // The hashrate without accounting for errors or invalid data points.
     double hashrate_no_error;
+
+    // The hashrate accounting for errors or invalid data points.
     double hashrate_error;
+
+    // The starting timestamp of the mining session.
     int64_t start_time;
+
+    // A count of shares that have been accepted by the pool.
     uint64_t shares_accepted;
+
+    // A count of shares that have been rejected by the pool.
     uint64_t shares_rejected;
+
+    // An array to store statistics about reasons for share rejections.
     RejectedReasonStat rejected_reason_stats[10];
+
+    // The number of different rejection reason statistics recorded.
     int rejected_reason_stats_count;
+
+    // A variable indicating which screen page is currently active or being displayed.
     int screen_page;
+
+    // The difficulty (nonce) for the best solution found during mining.
     uint64_t best_nonce_diff;
+
+    // A string representing the difficulty of the best nonce in readable format.
     char best_diff_string[DIFF_STRING_SIZE];
+
+    // The difficulty (nonce) for the best solution found in this session.
     uint64_t best_session_nonce_diff;
+
+    // A string representing the difficulty of the best session nonce in readable format.
     char best_session_diff_string[DIFF_STRING_SIZE];
-    bool FOUND_BLOCK;
-    char ssid[32];
-    char wifi_status[256];
-    char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
-    char ap_ssid[32];
-    bool ap_enabled;
-    bool is_connected;
-    char * pool_url;
-    char * fallback_pool_url;
-    uint16_t pool_port;
-    uint16_t fallback_pool_port;
-    char * pool_user;
-    char * fallback_pool_user;
-    char * pool_pass;
-    char * fallback_pool_pass;
-    uint16_t pool_difficulty;
-    uint16_t fallback_pool_difficulty;
-    bool pool_extranonce_subscribe;
-    bool fallback_pool_extranonce_subscribe;
-    double response_time;
-    bool is_using_fallback;
-    uint16_t overheat_mode;
-    uint16_t power_fault;
-    uint32_t lastClockSync;
-    bool is_screen_active;
-    bool is_firmware_update;
-    char firmware_update_filename[20];
-    char firmware_update_status[20];
-    char * asic_status;
-    bool ASIC_initalized;
-    bool psram_is_available;
 } SystemModule;
 
 extern SystemModule SYSTEM_MODULE;

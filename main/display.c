@@ -20,6 +20,7 @@
 #include "esp_lcd_sh1107.h"
 #include "system_module.h"
 #include "display.h"
+#include "state_module.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -199,10 +200,10 @@ esp_err_t display_init()
         // Only turn on the screen when it has been cleared
         ESP_RETURN_ON_ERROR(display_on(true), TAG, "Display on failed");
 
-        SYSTEM_MODULE.is_screen_active = true;
+        STATE_MODULE.is_screen_active = true;
     } else {
         ESP_LOGW(TAG, "No display found or panel init failed. Screen not active.");
-        SYSTEM_MODULE.is_screen_active = false;
+        STATE_MODULE.is_screen_active = false;
     }
 
     ESP_LOGI(TAG, "Display init success!");
