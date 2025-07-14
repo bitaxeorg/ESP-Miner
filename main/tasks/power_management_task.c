@@ -15,7 +15,6 @@
 #include "vcore.h"
 #include <string.h>
 #include "power_management_task.h"
-#include "system_module.h"
 #include "device_config.h"
 #include "power_management_module.h"
 #include "wifi_module.h"

@@ -13,7 +13,6 @@
 #include "esp_wifi_types_generic.h"
 #include "connect.h"
 #include "nvs_config.h"
-#include "system_module.h"
 #include "wifi_module.h"
 
 // Maximum number of access points to scan

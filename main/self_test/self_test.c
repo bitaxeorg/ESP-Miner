@@ -35,7 +35,6 @@
 #include "power_management_module.h"
 #include "asic_task.h"
 #include "serial.h"
-#include "system_module.h"
 #include "self_test_module.h"
 #include "state_module.h"
 

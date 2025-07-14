@@ -9,7 +9,6 @@
 #include "work_queue.h"
 #include "freertos/FreeRTOS.h"
 #include "asic_task.h"
-#include "system_module.h"
 #include "asic.h"
 #include "mining_module.h"
 #include "pool_module.h"
