@@ -31,6 +31,7 @@
 #include "thermal.h"
 #include "asic_task.h"
 #include "system_module.h"
+#include "device_config.h"
 
 
 static const char * TAG = "system";

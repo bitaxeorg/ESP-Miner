@@ -57,7 +57,7 @@ void ASIC_result_task(void *pvParameters)
 
             if (ret < 0) {
                 ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
-                stratum_close_connection(GLOBAL_STATE);
+                stratum_close_connection();
             }
         }
 

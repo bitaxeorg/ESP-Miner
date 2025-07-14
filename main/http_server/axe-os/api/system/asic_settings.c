@@ -2,7 +2,7 @@
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "cJSON.h"
-#include "global_state.h"
+#include "device_config.h"
 #include "asic.h"
 
 // static const char *TAG = "asic_settings";

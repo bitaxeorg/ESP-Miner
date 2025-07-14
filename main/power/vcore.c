@@ -8,6 +8,7 @@
 #include "TPS546.h"
 #include "INA260.h"
 #include "driver/gpio.h"
+#include "device_config.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_PLUG_SENSE  CONFIG_GPIO_PLUG_SENSE

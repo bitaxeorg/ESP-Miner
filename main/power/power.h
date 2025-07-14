@@ -2,7 +2,7 @@
 #define POWER_H
 
 #include <esp_err.h>
-#include "global_state.h"
+
 
 float Power_get_current();
 float Power_get_power();

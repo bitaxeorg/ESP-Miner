@@ -5,7 +5,7 @@
 #include <esp_err.h>
 #include <stdbool.h>
 
-#include "global_state.h"
+
 
 #define TPS546_I2CADDR         0x24  // TPS546 i2c address
 #define TPS546_I2CADDR_ALERT   0x0C  // TPS546 SMBus Alert address

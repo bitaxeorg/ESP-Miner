@@ -14,7 +14,7 @@
 #include "adc.h"
 #include "display.h"
 #include "esp_psram.h"
-#include "global_state.h"
+
 #include "i2c_bitaxe.h"
 #include "input.h"
 #include "nvs_config.h"
@@ -34,7 +34,7 @@
 #include "device_config.h"
 #include "power_management_task.h"
 #include "asic_task.h"
-#include "global_state.h"
+#include "serial.h"
 #include "system_module.h"
 #include "self_test_module.h"
 
@@ -140,7 +140,7 @@ static esp_err_t test_core_voltage()
 esp_err_t test_display()
 {
     // Display testing
-    if (display_init(&GLOBAL_STATE) != ESP_OK) {
+    if (display_init() != ESP_OK) {
         display_msg("DISPLAY:FAIL");
         return ESP_FAIL;
     }
@@ -170,7 +170,7 @@ esp_err_t test_input()
 esp_err_t test_screen()
 {
     // Screen testing
-    if (screen_start(&GLOBAL_STATE) != ESP_OK) {
+    if (screen_start() != ESP_OK) {
         display_msg("SCREEN:FAIL");
         return ESP_FAIL;
     }

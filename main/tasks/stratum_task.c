@@ -1,7 +1,7 @@
 #include "esp_log.h"
 #include "connect.h"
 #include "system.h"
-#include "global_state.h"
+
 #include "lwip/dns.h"
 #include <lwip/tcpip.h>
 #include "nvs_config.h"
@@ -16,6 +16,7 @@
 #include "asic_task.h"
 #include "system_module.h"
 #include "mining_module.h"
+#include "device_config.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
@@ -78,7 +79,7 @@ void stratum_close_connection()
     ESP_LOGE(TAG, "Shutting down socket and restarting...");
     shutdown(MINING_MODULE.sock, SHUT_RDWR);
     close(MINING_MODULE.sock);
-    cleanQueue(GLOBAL_STATE);
+    cleanQueue();
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
@@ -164,7 +165,7 @@ void stratum_primary_heartbeat()
         if (strstr(recv_buffer, "mining.notify") != NULL) {
             ESP_LOGI(TAG, "Heartbeat successful and in fallback mode. Switching back to primary.");
             SYSTEM_MODULE.is_using_fallback = false;
-            stratum_close_connection(GLOBAL_STATE);
+            stratum_close_connection();
             continue;
         }
 
@@ -279,8 +280,8 @@ void stratum_task(void * pvParameters)
             ESP_LOGE(TAG, "Fail to setsockopt SO_RCVTIMEO ");
         }
 
-        stratum_reset_uid(GLOBAL_STATE);
-        cleanQueue(GLOBAL_STATE);
+        stratum_reset_uid();
+        cleanQueue();
 
         ///// Start Stratum Action
         // mining.configure - ID: 1
@@ -305,7 +306,7 @@ void stratum_task(void * pvParameters)
             if (!line) {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
                 retry_attempts++;
-                stratum_close_connection(GLOBAL_STATE);
+                stratum_close_connection();
                 break;
             }
 
@@ -322,7 +323,7 @@ void stratum_task(void * pvParameters)
                 SYSTEM_notify_new_ntime(stratum_api_v1_message.mining_notification->ntime);
                 if (stratum_api_v1_message.should_abandon_work &&
                     (MINING_MODULE.stratum_queue.count > 0 || MINING_MODULE.ASIC_jobs_queue.count > 0)) {
-                    cleanQueue(GLOBAL_STATE);
+                    cleanQueue();
                 }
                 if (MINING_MODULE.stratum_queue.count == QUEUE_SIZE) {
                     mining_notify * next_notify_json_str = (mining_notify *) queue_dequeue(&MINING_MODULE.stratum_queue);
@@ -347,7 +348,7 @@ void stratum_task(void * pvParameters)
                 free(old_extranonce_str);
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
                 ESP_LOGE(TAG, "Pool requested client reconnect...");
-                stratum_close_connection(GLOBAL_STATE);
+                stratum_close_connection();
                 break;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
                 if (stratum_api_v1_message.response_success) {

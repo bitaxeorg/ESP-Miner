@@ -2,7 +2,7 @@
 #define SYSTEM_H_
 
 #include "esp_err.h"
-#include "global_state.h"
+
 
 void SYSTEM_init_system();
 esp_err_t SYSTEM_init_peripherals();

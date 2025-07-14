@@ -32,7 +32,7 @@
 #include "axe-os/api/system/asic_settings.h"
 #include "cJSON.h"
 #include "connect.h"
-#include "global_state.h"
+
 #include "http_server.h"
 #include "nvs_config.h"
 #include "power.h"
@@ -42,6 +42,7 @@
 #include "system.h"
 #include "power_management_task.h"
 #include "system_module.h"
+#include "device_config.h"
 
 #define JSON_ALL_STATS_ELEMENT_SIZE 120
 #define JSON_DASHBOARD_STATS_ELEMENT_SIZE 60

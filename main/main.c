@@ -23,9 +23,10 @@
 #include "system_module.h"
 #include "self_test_module.h"
 #include "mining_module.h"
+#include "device_config.h"
+#include "display.h"
+#include "work_queue.h"
 
-GlobalState GLOBAL_STATE = {
-    };
 SystemModule SYSTEM_MODULE;
 PowerManagementModule POWER_MANAGEMENT_MODULE;
 DeviceConfig DEVICE_CONFIG;

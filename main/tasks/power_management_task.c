@@ -5,7 +5,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "global_state.h"
+
 #include "math.h"
 #include "mining.h"
 #include "nvs_config.h"
@@ -16,6 +16,7 @@
 #include <string.h>
 #include "power_management_task.h"
 #include "system_module.h"
+#include "device_config.h"
 
 
 #define MAX_TEMP 90.0

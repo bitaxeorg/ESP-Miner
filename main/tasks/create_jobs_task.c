@@ -3,7 +3,7 @@
 
 #include "esp_log.h"
 #include "esp_system.h"
-#include "global_state.h"
+
 #include "mining.h"
 #include "string.h"
 #include "work_queue.h"

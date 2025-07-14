@@ -1,6 +1,7 @@
 #include "thermal.h"
 #include "system_module.h"
 #include "esp_log.h"
+#include "device_config.h"
 
 static const char * TAG = "thermal";
 

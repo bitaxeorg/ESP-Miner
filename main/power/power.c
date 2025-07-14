@@ -3,6 +3,7 @@
 #include "DS4432U.h"
 
 #include "power.h"
+#include "device_config.h"
 
 float Power_get_current()
 {

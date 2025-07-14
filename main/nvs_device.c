@@ -8,7 +8,7 @@
 #include "nvs_device.h"
 
 #include "connect.h"
-#include "global_state.h"
+
 
 esp_err_t NVSDevice_init(void) {
     esp_err_t err = nvs_flash_init();

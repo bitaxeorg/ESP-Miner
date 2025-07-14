@@ -11,7 +11,7 @@
 #include "lvgl.h"
 #include "lvgl__lvgl/src/themes/lv_theme_private.h"
 #include "esp_lvgl_port.h"
-#include "global_state.h"
+
 #include "nvs_config.h"
 #include "i2c_bitaxe.h"
 #include "driver/i2c_master.h"
@@ -19,6 +19,7 @@
 #include "esp_lcd_panel_ssd1306.h"
 #include "esp_lcd_sh1107.h"
 #include "system_module.h"
+#include "display.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -66,7 +67,7 @@ static esp_err_t read_display_config()
     return ESP_FAIL;
 }
 
-esp_err_t display_init(void * pvParameters)
+esp_err_t display_init()
 {
     ESP_RETURN_ON_ERROR(read_display_config(), TAG, "Failed to read display config");
 

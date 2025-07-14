@@ -6,7 +6,7 @@
 
 #include "EMC2101.h"
 #include "EMC2103.h"
-#include "global_state.h"
+
 
 esp_err_t Thermal_init();
 esp_err_t Thermal_set_fan_percent(float percent);

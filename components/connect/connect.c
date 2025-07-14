@@ -12,7 +12,6 @@
 #include "nvs_flash.h"
 #include "esp_wifi_types_generic.h"
 #include "connect.h"
-#include "global_state.h"
 #include "nvs_config.h"
 #include "system_module.h"
 

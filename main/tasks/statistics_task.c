@@ -5,7 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "statistics_task.h"
-#include "global_state.h"
+
 #include "nvs_config.h"
 #include "power.h"
 #include "connect.h"
