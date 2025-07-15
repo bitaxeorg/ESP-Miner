@@ -456,6 +456,37 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 BAP_send_message(BAP_CMD_ACK, parameter, voltage_str);
             }
             break;
+
+        case BAP_PARAM_SSID:
+            {
+                if (nvs_config_set_string(NVS_CONFIG_WIFI_SSID, value) == ESP_OK) {
+                    ESP_LOGI(TAG, "WiFi SSID set to: %s", value);
+                    BAP_send_message(BAP_CMD_ACK, parameter, value);
+                } else {
+                    ESP_LOGE(TAG, "Failed to set WiFi SSID");
+                    BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
+                }
+            }
+            break;
+        
+        // needs some refinement on how to actually handle the restart and implement a wifi
+        // handler for restarting only if a save command has been sent
+        case BAP_PARAM_PASSWORD:
+            {
+                if (nvs_config_set_string(NVS_CONFIG_WIFI_PASS, value) == ESP_OK) {
+                    ESP_LOGI(TAG, "WiFi password set");
+                    BAP_send_message(BAP_CMD_ACK, parameter, "password_set");
+                    vTaskDelay(pdMS_TO_TICKS(100)); // Give some time for the message to be sent
+                    ESP_LOGI(TAG, "Restarting to apply new WiFi settings");
+                    BAP_send_message(BAP_CMD_STA, "status", "restarting");
+                    vTaskDelay(pdMS_TO_TICKS(1000)); // Give some time for the message to be sent
+                    // Restart the system to apply new WiFi settings
+                    esp_restart(); // Restart to apply new WiFi settings
+                } else {
+                    ESP_LOGE(TAG, "Failed to set WiFi password");
+                    BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
+                }
+            }
             
         default:
             ESP_LOGE(TAG, "Unsupported settings parameter: %s", parameter);
