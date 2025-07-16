@@ -162,6 +162,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           coreVoltage: [info.coreVoltage, [Validators.required]],
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
+          minfanspeed: [info.minFanSpeed, [Validators.required]],
           fanspeed: [info.fanspeed, [Validators.required]],
           temptarget: [info.temptarget, [Validators.required]],
           overheat_mode: [info.overheat_mode, [Validators.required]],
@@ -227,14 +228,14 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
         next: () => {
           const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
           if (this.isRestartRequired) {
-            this.toastr.warning('You must restart this device after saving for changes to take effect', 'Warning');
+            this.toastr.warning('You must restart this device after saving for changes to take effect.');
           }
-          this.toastr.success(successMessage, 'Success!');
+          this.toastr.success(successMessage);
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Could not save settings for ${this.uri}. ${err.message}` : `Could not save settings. ${err.message}`;
-          this.toastr.error(errorMessage, 'Error');
+          this.toastr.error(errorMessage);
           this.savedChanges = false;
         }
       });
@@ -264,12 +265,12 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Bitaxe at ${this.uri} restarted` : 'Bitaxe restarted';
-          this.toastr.success(successMessage, 'Success');
+          const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
+          this.toastr.success(successMessage);
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
-          this.toastr.error(errorMessage, 'Error');
+          this.toastr.error(errorMessage);
         }
       });
   }
