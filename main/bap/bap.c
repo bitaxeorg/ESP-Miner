@@ -459,12 +459,22 @@ void BAP_handle_settings(const char *parameter, const char *value) {
 
         case BAP_PARAM_SSID:
             {
-                if (nvs_config_set_string(NVS_CONFIG_WIFI_SSID, value) == ESP_OK) {
+                char *current_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, "myssid");
+
+                if (current_ssid && strcmp(current_ssid, value) == 0) {
+                    ESP_LOGI(TAG, "WiFi SSID is already set to: %s", value);
+                    BAP_send_message(BAP_CMD_ACK, parameter, value);
+                    free(current_ssid);
+                    return;
+                } else if (!current_ssid || strcmp(current_ssid, value) != 0) {
+                    nvs_config_set_string(NVS_CONFIG_WIFI_SSID, value);
                     ESP_LOGI(TAG, "WiFi SSID set to: %s", value);
                     BAP_send_message(BAP_CMD_ACK, parameter, value);
+                    if (current_ssid) free(current_ssid);
                 } else {
                     ESP_LOGE(TAG, "Failed to set WiFi SSID");
                     BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
+                    if (current_ssid) free(current_ssid);
                 }
             }
             break;
@@ -472,8 +482,16 @@ void BAP_handle_settings(const char *parameter, const char *value) {
         // needs some refinement on how to actually handle the restart and implement a wifi
         // handler for restarting only if a save command has been sent
         case BAP_PARAM_PASSWORD:
-            {
-                if (nvs_config_set_string(NVS_CONFIG_WIFI_PASS, value) == ESP_OK) {
+            {   
+                char *current_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, "mypass");
+
+                if (current_pass && strcmp(current_pass, value) == 0) {
+                    ESP_LOGI(TAG, "WiFi password is already set");
+                    BAP_send_message(BAP_CMD_ACK, parameter, "password_already_set");
+                    free(current_pass);
+                    return;
+                } else if (!current_pass || strcmp(current_pass, value) != 0) {
+                    nvs_config_set_string(NVS_CONFIG_WIFI_PASS, value);
                     ESP_LOGI(TAG, "WiFi password set");
                     BAP_send_message(BAP_CMD_ACK, parameter, "password_set");
                     vTaskDelay(pdMS_TO_TICKS(100)); // Give some time for the message to be sent
@@ -482,6 +500,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     vTaskDelay(pdMS_TO_TICKS(1000)); // Give some time for the message to be sent
                     // Restart the system to apply new WiFi settings
                     esp_restart(); // Restart to apply new WiFi settings
+                    // !TODO: Implement a proper WiFi handler to restart only if a save command has been sent
                 } else {
                     ESP_LOGE(TAG, "Failed to set WiFi password");
                     BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
