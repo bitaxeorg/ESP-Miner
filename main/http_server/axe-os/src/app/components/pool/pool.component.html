@@ -35,7 +35,9 @@
                     </div>
                 </div>
                 <div class="field grid p-fluid">
-                    <label [htmlFor]="pool + 'SuggestedDifficulty'" class="col-12 md:col-2 md:mb-0">Suggested Difficulty</label>
+                    <label [htmlFor]="pool + 'SuggestedDifficulty'" class="col-12 md:col-2 md:mb-0">Suggested Difficulty
+                        <i class="pi pi-info-circle text-xs px-1" pTooltip="Used to indicate a preference for share difficulty to the pool. Servers are not required to honour this request, even if they support the stratum method."></i>
+                    </label>
                     <div class="col-12 md:col-10">
                         <input pInputText [id]="pool + 'SuggestedDifficulty'" [formControlName]="pool + 'SuggestedDifficulty'" type="number" />
                     </div>
@@ -48,7 +50,7 @@
                     <label [htmlFor]="pool + 'ExtranonceSubscribe'" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">
                         Enable Extranonce <span class="white-space-nowrap">
                             Subscribe
-                            <i class="pi pi-info-circle text-xs px-1" pTooltip="Required by some pools, check the pool documentation."></i>
+                            <i class="pi pi-info-circle text-xs px-1" pTooltip="Indicates to the server that the client supports the mining.set_extranonce method. Required by some pools, check the pool documentation."></i>
                         </span>
                     </label>
                 </div>
