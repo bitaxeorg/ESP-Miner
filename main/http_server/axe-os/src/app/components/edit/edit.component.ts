@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, FormControl, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { forkJoin, startWith, Subject, takeUntil, pairwise } from 'rxjs';
+import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { ActivatedRoute } from '@angular/router';
@@ -20,7 +20,10 @@ const STATS_FREQUENCY_STEPS = [0, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 *
   templateUrl: './edit.component.html',
   styleUrls: ['./edit.component.scss']
 })
+
 export class EditComponent implements OnInit, OnDestroy, OnChanges {
+  private formSubject = new BehaviorSubject<FormGroup | null>(null);
+  public form$: Observable<FormGroup | null> = this.formSubject.asObservable();
 
   public form!: FormGroup;
 
@@ -172,6 +175,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
             Validators.max(this.statsFrequencyMaxValue)
           ]]
         });
+
+        this.formSubject.next(this.form);
 
       this.form.controls['autofanspeed'].valueChanges.pipe(
         startWith(this.form.controls['autofanspeed'].value),

@@ -15,6 +15,10 @@
     }
 }
 
+.field-checkbox > label {
+    line-height: unset;
+}
+
 .p-toast {
     &.p-toast-top-right,
     &.p-toast-top-left,
