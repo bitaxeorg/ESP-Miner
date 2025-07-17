@@ -39,6 +39,12 @@ void create_jobs_task(void * pvParameters)
             difficulty = POOL_MODULE.pool_difficulty;
         }
 
+        if (MINING_MODULE.new_stratum_version_rolling_msg) {
+            ESP_LOGI(TAG, "Set chip version rolls %i", (int)(MINING_MODULE.version_mask >> 13));
+            ASIC_set_version_mask(MINING_MODULE.version_mask);
+            MINING_MODULE.new_stratum_version_rolling_msg = false;
+        }
+
         uint32_t extranonce_2 = 0;
         while (MINING_MODULE.stratum_queue.count < 1 && MINING_MODULE.abandon_work == 0) {
             if (should_generate_more_work()) {
