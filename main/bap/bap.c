@@ -379,6 +379,11 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
         case BAP_PARAM_SYSTEM_INFO:
             BAP_send_message(BAP_CMD_RES, "deviceModel", state->DEVICE_CONFIG.family.name);
             BAP_send_message(BAP_CMD_RES, "asicModel", state->DEVICE_CONFIG.family.asic.name);
+            char port_str[6];
+            snprintf(port_str, sizeof(port_str),"%u", state->SYSTEM_MODULE.pool_port);
+            BAP_send_message(BAP_CMD_RES, "pool", state->SYSTEM_MODULE.pool_url);
+            BAP_send_message(BAP_CMD_RES, "poolPort", port_str);
+            BAP_send_message(BAP_CMD_RES, "poolUser", state->SYSTEM_MODULE.pool_user);
             break;
             
         default:
