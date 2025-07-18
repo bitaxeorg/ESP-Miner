@@ -36,6 +36,7 @@
 #include "asic.h"
 #include "TPS546.h"
 #include "statistics_task.h"
+#include "auto_tune.h"
 #include "theme_api.h"  // Add theme API include
 #include "axe-os/api/system/asic_settings.h"
 #include "http_server.h"
@@ -1123,6 +1124,117 @@ void websocket_log_handler()
     }
 }
 
+esp_err_t GET_autotune_info(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    httpd_resp_set_type(req, "application/json");
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_POWER_LIMIT, AUTO_TUNE.power_limit);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_FAN_LIMIT, AUTO_TUNE.fan_limit);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_STEP_VOLT, AUTO_TUNE.step_volt);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_STEP_FREQ_RAMPUP, AUTO_TUNE.step_freq_rampup);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_STEP_FREQ, AUTO_TUNE.step_freq);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_AUTOTUNE_STEP_FREQ, AUTO_TUNE.autotune_step_frequency);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, AUTO_TUNE.max_voltage_asic);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, AUTO_TUNE.max_frequency_asic);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, AUTO_TUNE.max_asic_temperatur);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, AUTO_TUNE.auto_tune_hashrate);
+
+    const char *response = cJSON_Print(root);
+    httpd_resp_sendstr(req, response);
+    free((void *)response);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+esp_err_t POST_autotune_update(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    int total_len = req->content_len;
+    char buf[512];
+    int received = 0, cur_len = 0;
+    if (total_len >= sizeof(buf)) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_OK;
+    }
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len - cur_len);
+        if (received <= 0) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive data");
+            return ESP_OK;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
+    cJSON *item;
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_POWER_LIMIT)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.power_limit = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_POWER_LIMIT, (uint16_t)AUTO_TUNE.power_limit);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_FAN_LIMIT)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.fan_limit = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_FAN_LIMIT, (uint16_t)AUTO_TUNE.fan_limit);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_STEP_VOLT)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.step_volt = item->valuedouble;
+        // Optionally store in NVS if you add a key
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_STEP_FREQ_RAMPUP)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.step_freq_rampup = item->valuedouble;
+        // Optionally store in NVS if you add a key
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_STEP_FREQ)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.step_freq = item->valuedouble;
+        // Optionally store in NVS if you add a key
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_AUTOTUNE_STEP_FREQ)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.autotune_step_frequency = item->valuedouble;
+        // Optionally store in NVS if you add a key
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_voltage_asic = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, (uint16_t)AUTO_TUNE.max_voltage_asic);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_frequency_asic = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, (uint16_t)AUTO_TUNE.max_frequency_asic);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_asic_temperatur = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, (uint16_t)AUTO_TUNE.max_asic_temperatur);
+    }
+
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_AUTO_TUNE_ENABLE)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.auto_tune_hashrate = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, (uint16_t)AUTO_TUNE.auto_tune_hashrate);
+    }
+
+    cJSON_Delete(root);
+
+    httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
+    return ESP_OK;
+}
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -1256,6 +1368,22 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
+
+    httpd_uri_t autotune_get_uri = {
+        .uri = "/api/system/autotune",
+        .method = HTTP_GET,
+        .handler = GET_autotune_info,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &autotune_get_uri);
+
+    httpd_uri_t autotune_post_uri = {
+        .uri = "/api/system/autotune",
+        .method = HTTP_POST,
+        .handler = POST_autotune_update,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &autotune_post_uri);
 
     httpd_uri_t ws = {
         .uri = "/api/ws", 

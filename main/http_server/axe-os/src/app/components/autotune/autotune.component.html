@@ -1,0 +1,35 @@
+<ng-container>
+    <div class="card">
+        <form [formGroup]="autotuneForm" (ngSubmit)="updateAutotune()" *ngIf="autotuneForm">
+            <h3>Autotune Settings</h3>
+            <div class="form-check mb-3">
+                <label for="auto_tune_hashrate">Auto Tune Hashrate</label>
+                <input type="checkbox" id="auto_tune_hashrate" formControlName="auto_tune_hashrate" />
+            </div>
+            <div class="row">
+                <div class="col">
+                    <label>Power Limit</label>
+                    <input type="number" class="form-control" formControlName="power_limit">
+                </div>
+                <div class="col">
+                    <label>Fan Limit</label>
+                    <input type="number" class="form-control" formControlName="fan_limit">
+                </div>
+                <div class="col">
+                    <label>Max Voltage ASIC</label>
+                    <input type="number" class="form-control" formControlName="max_voltage_asic">
+                </div>
+                <div class="col">
+                    <label>Max Frequency ASIC</label>
+                    <input type="number" class="form-control" formControlName="max_frequency_asic">
+                </div>
+                <div class="col">
+                    <label>Max ASIC Temperatur</label>
+                    <input type="number" class="form-control" formControlName="max_asic_temperatur">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary" [disabled]="!autotuneForm.valid">Save Autotune
+                Settings</button>
+        </form>
+    </div>
+</ng-container>
