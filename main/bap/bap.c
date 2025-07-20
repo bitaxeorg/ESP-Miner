@@ -283,9 +283,12 @@ void BAP_handle_subscription(const char *parameter, const char *value) {
 
     // Take the mutex to protect the subscriptions array
     if (subscription_mutex != NULL && xSemaphoreTake(subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        // Activate the subscription
+        uint32_t current_time = esp_timer_get_time() / 1000;
+        
+        // Activate the subscription and set subscribe timestamp
         subscriptions[param].active = true;
-        subscriptions[param].last_update = 0;
+        subscriptions[param].last_subscribe = current_time;
+        subscriptions[param].last_response = 0;
         subscriptions[param].update_interval_ms = 5000; // will be reduced later if it's safe to do so
 
         // If value is provided, it's the update interval
@@ -611,42 +614,33 @@ esp_err_t BAP_start_uart_receive_task(void) {
 }
 
 void BAP_send_subscription_update(GlobalState *state) {
-    static uint32_t last_debug_time = 0;
-    
     if (!state) {
         ESP_LOGE(TAG, "Invalid global state");
         return;
     }
 
     uint32_t current_time = esp_timer_get_time() / 1000; // Convert to milliseconds
-    
-    // Print debug info every 10 seconds
-    if (current_time - last_debug_time > 10000) {
-        ESP_LOGI(TAG, "Subscription status (debug every 10s):");
-        last_debug_time = current_time;
-        
-        // Print subscription status
-        if (subscription_mutex != NULL && xSemaphoreTake(subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            for (int i = 0; i < BAP_PARAM_UNKNOWN; i++) {
-                ESP_LOGI(TAG, "  %s: active=%d, interval=%lu ms, last update=%lu ms ago",
-                         parameter_strings[i], subscriptions[i].active,
-                         subscriptions[i].update_interval_ms,
-                         current_time - subscriptions[i].last_update);
-            }
-            xSemaphoreGive(subscription_mutex);
-        }
-    }
 
     if (subscription_mutex != NULL && xSemaphoreTake(subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        bool has_updates = false;
+        const uint32_t SUBSCRIPTION_TIMEOUT_MS = 5 * 60 * 1000;
 
         for (int i = 0; i < BAP_PARAM_UNKNOWN; i++) {
+            // Check for subscription timeout (5 minutes without refresh)
             if (subscriptions[i].active &&
-                (current_time - subscriptions[i].last_update >= subscriptions[i].update_interval_ms)) {
+                (current_time - subscriptions[i].last_subscribe > SUBSCRIPTION_TIMEOUT_MS)) {
+                ESP_LOGW(TAG, "Subscription for %s timed out after 5 minutes, deactivating",
+                         parameter_strings[i]);
+                subscriptions[i].active = false;
+                BAP_send_message(BAP_CMD_STA, parameter_strings[i], "subscription_timeout");
+                continue;
+            }
+            
+            if (subscriptions[i].active &&
+                (current_time - subscriptions[i].last_response >= subscriptions[i].update_interval_ms)) {
                 
                 ESP_LOGI(TAG, "Sending update for %s", parameter_strings[i]);
                 
-                subscriptions[i].last_update = current_time;
+                subscriptions[i].last_response = current_time;
                 
                 switch (i) {   
                     case BAP_PARAM_HASHRATE:
@@ -707,7 +701,6 @@ void BAP_send_subscription_update(GlobalState *state) {
                         break;
                 }
                 
-                has_updates = true;
             }
         }
         

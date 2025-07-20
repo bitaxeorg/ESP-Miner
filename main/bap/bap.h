@@ -44,8 +44,9 @@ typedef enum {
 // Subscription status
 typedef struct {
     bool active;
-    uint32_t last_update;
+    uint32_t last_response;         // When last subscription message was sent
     uint32_t update_interval_ms;
+    uint32_t last_subscribe;        // When subscription was last subscritpion renewed
 } bap_subscription_t;
 
 // Callback Type
