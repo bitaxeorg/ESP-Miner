@@ -18,10 +18,19 @@
 #define BAP_UART_NUM UART_NUM_2
 #define BAP_BUF_SIZE 1024
 
+#define UART_SEND_QUEUE_SIZE 10
+#define UART_SEND_QUEUE_ITEM_SIZE sizeof(bap_message_t)
+#define UART_SEND_TIMEOUT_MS 1000
+#define UART_BUFFER_THRESHOLD (BAP_BUF_SIZE / 2)
+
 #define GPIO_BAP_RX CONFIG_GPIO_BAP_RX
 #define GPIO_BAP_TX CONFIG_GPIO_BAP_TX
 
 static const char *TAG = "BAP";
+
+static QueueHandle_t uart_send_queue = NULL;
+static TaskHandle_t uart_send_task_handle = NULL;
+static SemaphoreHandle_t uart_send_mutex = NULL;
 
 static bap_subscription_t subscriptions[BAP_PARAM_UNKNOWN] = {0};
 static GlobalState *global_state = NULL;
@@ -113,10 +122,49 @@ void BAP_send_message(bap_command_t cmd, const char *parameter, const char *valu
 
     len = snprintf(message, sizeof(message), "$%s*%02X\r\n", sentence_body, checksum);
 
-    uart_write_bytes(BAP_UART_NUM, message, len);
+    if (uart_send_mutex != NULL && xSemaphoreTake(uart_send_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        uart_write_bytes(BAP_UART_NUM, message, len);
+        xSemaphoreGive(uart_send_mutex);
+        
+        // debugging
+        ESP_LOGI(TAG, "Sent: %s", message);
+    } else {
+        ESP_LOGW(TAG, "Failed to take UART mutex for immediate send, message dropped");
+    }
+}
+
+void BAP_send_message_with_queue(bap_command_t cmd, const char *parameter, const char *value) {
+    char message[BAP_MAX_MESSAGE_LEN];
+    char sentence_body[BAP_MAX_MESSAGE_LEN];
+    int len;
+    bap_message_t msg;
+
+    if (value && strlen(value) > 0) {
+        snprintf(sentence_body, sizeof(sentence_body), "BAP,%s,%s,%s",
+                 BAP_command_to_string(cmd), parameter, value);
+    } else {
+        snprintf(sentence_body, sizeof(sentence_body), "BAP,%s,%s",
+                 BAP_command_to_string(cmd), parameter);
+    }
+
+    uint8_t checksum = BAP_calculate_checksum(sentence_body);
+
+    len = snprintf(message, sizeof(message), "$%s*%02X\r\n", sentence_body, checksum);
+
+    msg.message = malloc(len + 1);
+    if (msg.message == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for message");
+        return;
+    }
     
-    // debugging
-    ESP_LOGI(TAG, "Sent: %s", message);
+    strncpy(msg.message, message, len);
+    msg.message[len] = '\0';
+    msg.length = len;
+
+    if (xQueueSend(uart_send_queue, &msg, UART_SEND_TIMEOUT_MS / portTICK_PERIOD_MS) != pdTRUE) {
+        ESP_LOGW(TAG, "Failed to queue message, dropping");
+        free(msg.message);
+    }
 }
 
 void BAP_register_handler(bap_command_t cmd, bap_command_handler_t handler) {
@@ -588,27 +636,64 @@ static void uart_receive_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
+static void uart_send_task(void *pvParameters) {
+    bap_message_t msg;
+    while (1) {
+        if (xQueueReceive(uart_send_queue, &msg, portMAX_DELAY) == pdTRUE) {
+            bool message_sent = false;
+            
+            if (uart_send_mutex != NULL && xSemaphoreTake(uart_send_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                size_t available;
+                esp_err_t ret = uart_get_buffered_data_len(BAP_UART_NUM, &available);
+                if (ret != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to get UART buffer status");
+                    xSemaphoreGive(uart_send_mutex);
+                    message_sent = true;
+                } else if (available > UART_BUFFER_THRESHOLD) {
+                    ESP_LOGW(TAG, "UART buffer threshold exceeded (%zu bytes), dropping message", available);
+                    xSemaphoreGive(uart_send_mutex);
+                    message_sent = true;
+                } else {
+                    int bytes_sent = uart_write_bytes(BAP_UART_NUM, msg.message, msg.length);
+                    if (bytes_sent == msg.length) {
+                        message_sent = true;
+                    } else {
+                        ESP_LOGW(TAG, "UART send failed or partial: %d of %d bytes", bytes_sent, msg.length);
+                        message_sent = true;
+                    }
+                    xSemaphoreGive(uart_send_mutex);
+                }
+            } else {
+                ESP_LOGW(TAG, "Failed to take UART send mutex, dropping message");
+                message_sent = true;
+            }
+
+            if (msg.message) {
+                free(msg.message);
+                msg.message = NULL;
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
+}
+
 esp_err_t BAP_start_uart_receive_task(void) {
     // Register the subscription, unsubscription, and request handlers
     BAP_register_handler(BAP_CMD_SUB, BAP_handle_subscription);
     BAP_register_handler(BAP_CMD_UNSUB, BAP_handle_unsubscription);
     BAP_register_handler(BAP_CMD_REQ, BAP_handle_request);
     BAP_register_handler(BAP_CMD_SET, BAP_handle_settings);
-    
-    // mutex for subscription access
-    subscription_mutex = xSemaphoreCreateMutex();
-    if (subscription_mutex == NULL) {
-        ESP_LOGE(TAG, "Failed to create subscription mutex");
-        return ESP_FAIL;
-    }
-    
-    // UART receive task
-    BaseType_t ret = xTaskCreate(uart_receive_task, "bap_uart_rx", 8192, NULL, 10, &uart_receive_task_handle);
-    if (ret != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create UART receive task");
-        return ESP_FAIL;
-    }
-    
+
+    xTaskCreate(
+        uart_receive_task,
+        "uart_receive_ta",
+        4096,
+        NULL,
+        5,
+        &uart_receive_task_handle
+    );
+
     ESP_LOGI(TAG, "UART receive task started");
     return ESP_OK;
 }
@@ -631,7 +716,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                 ESP_LOGW(TAG, "Subscription for %s timed out after 5 minutes, deactivating",
                          parameter_strings[i]);
                 subscriptions[i].active = false;
-                BAP_send_message(BAP_CMD_STA, parameter_strings[i], "subscription_timeout");
+                BAP_send_message_with_queue(BAP_CMD_STA, parameter_strings[i], "subscription_timeout");
                 continue;
             }
             
@@ -647,7 +732,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char hashrate_str[32];
                             snprintf(hashrate_str, sizeof(hashrate_str), "%.2f", state->SYSTEM_MODULE.current_hashrate);
-                            BAP_send_message(BAP_CMD_RES, "hashrate", hashrate_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "hashrate", hashrate_str);
                         }
                         break;
                         
@@ -655,10 +740,10 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char temp_str[32];
                             snprintf(temp_str, sizeof(temp_str), "%f", state->POWER_MANAGEMENT_MODULE.chip_temp_avg);
-                            BAP_send_message(BAP_CMD_RES, "chipTemp", temp_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "chipTemp", temp_str);
                             
                             snprintf(temp_str, sizeof(temp_str), "%f", state->POWER_MANAGEMENT_MODULE.vr_temp);
-                            BAP_send_message(BAP_CMD_RES, "vrTemp", temp_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "vrTemp", temp_str);
                         }
                         break;
                         
@@ -666,7 +751,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char power_str[32];
                             snprintf(power_str, sizeof(power_str), "%.2f", state->POWER_MANAGEMENT_MODULE.power);
-                            BAP_send_message(BAP_CMD_RES, "power", power_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "power", power_str);
                         }
                         break;
                         
@@ -674,7 +759,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char voltage_str[32];
                             snprintf(voltage_str, sizeof(voltage_str), "%.2f", state->POWER_MANAGEMENT_MODULE.voltage);
-                            BAP_send_message(BAP_CMD_RES, "voltage", voltage_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "voltage", voltage_str);
                         }
                         break;
                         
@@ -682,7 +767,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char current_str[32];
                             snprintf(current_str, sizeof(current_str), "%.2f", state->POWER_MANAGEMENT_MODULE.current);
-                            BAP_send_message(BAP_CMD_RES, "current", current_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "current", current_str);
                         }
                         break;
                         
@@ -690,10 +775,10 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char shares_str[32];
                             snprintf(shares_str, sizeof(shares_str), "%llu", state->SYSTEM_MODULE.shares_accepted);
-                            BAP_send_message(BAP_CMD_RES, "sharesAccepted", shares_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "sharesAccepted", shares_str);
                             
                             snprintf(shares_str, sizeof(shares_str), "%llu", state->SYSTEM_MODULE.shares_rejected);
-                            BAP_send_message(BAP_CMD_RES, "sharesRejected", shares_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "sharesRejected", shares_str);
                         }
                         break;
                         
@@ -729,12 +814,15 @@ esp_err_t BAP_start_subscription_task(GlobalState *state) {
     
     global_state = state;
     
-    BaseType_t ret = xTaskCreate(subscription_update_task, "bap_sub_update", 4096, state, 5, &subscription_task_handle);
-    if (ret != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create subscription update task");
-        return ESP_FAIL;
-    }
-    
+    xTaskCreate(
+        subscription_update_task,
+        "subscription_up",
+        4096,
+        state,
+        5,
+        &subscription_task_handle
+    );
+
     ESP_LOGI(TAG, "Subscription update task started");
     return ESP_OK;
 }
@@ -751,6 +839,27 @@ esp_err_t BAP_init(void) {
         return ESP_ERR_INVALID_ARG;
     }
     
+    subscription_mutex = xSemaphoreCreateMutex();
+    if (subscription_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create subscription mutex");
+        return ESP_ERR_NO_MEM;
+    }
+    
+    uart_send_mutex = xSemaphoreCreateMutex();
+    if (uart_send_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create UART send mutex");
+        vSemaphoreDelete(subscription_mutex);
+        return ESP_ERR_NO_MEM;
+    }
+
+    uart_send_queue = xQueueCreate(UART_SEND_QUEUE_SIZE, UART_SEND_QUEUE_ITEM_SIZE);
+    if (uart_send_queue == NULL) {
+        ESP_LOGE(TAG, "Failed to create UART send queue");
+        vSemaphoreDelete(subscription_mutex);
+        vSemaphoreDelete(uart_send_mutex);
+        return ESP_ERR_NO_MEM;
+    }
+    
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -763,31 +872,50 @@ esp_err_t BAP_init(void) {
     esp_err_t ret = uart_param_config(BAP_UART_NUM, &uart_config);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to configure UART parameters: %d", ret);
+        vSemaphoreDelete(subscription_mutex);
+        vSemaphoreDelete(uart_send_mutex);
+        vQueueDelete(uart_send_queue);
         return ret;
     }
     
     ret = uart_set_pin(BAP_UART_NUM, GPIO_BAP_TX, GPIO_BAP_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to set UART pins: %d", ret);
+        vSemaphoreDelete(subscription_mutex);
+        vSemaphoreDelete(uart_send_mutex);
+        vQueueDelete(uart_send_queue);
         return ret;
     }
     
     ret = uart_driver_install(BAP_UART_NUM, BAP_BUF_SIZE, BAP_BUF_SIZE, 0, NULL, 0);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to install UART driver: %d", ret);
+        vSemaphoreDelete(subscription_mutex);
+        vSemaphoreDelete(uart_send_mutex);
+        vQueueDelete(uart_send_queue);
         return ret;
     }
     
     ESP_LOGI(TAG, "BAP UART interface initialized successfully");
     
+    xTaskCreate(
+        uart_send_task,
+        "uart_send_task",
+        3072,
+        NULL,
+        5,
+        &uart_send_task_handle
+    );
+    
     BAP_send_init_message(global_state);
     
-    BAP_start_subscription_task(global_state);
     ret = BAP_start_uart_receive_task();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start UART receive task");
         return ret;
     }
     
+    BAP_start_subscription_task(global_state);
+
     return ESP_OK;
 }

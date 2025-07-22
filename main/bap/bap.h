@@ -9,6 +9,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "global_state.h"
+#include "driver/uart.h"
 
 // BAP Command Types
 typedef enum {
@@ -49,33 +50,34 @@ typedef struct {
     uint32_t last_subscribe;        // When subscription was last subscritpion renewed
 } bap_subscription_t;
 
+// Message queue structure
+typedef struct {
+    char *message;
+    size_t length;
+} bap_message_t;
+
 // Callback Type
 typedef void (*bap_command_handler_t)(const char *parameter, const char *value);
 
-// API Functions
+// Function declarations
 esp_err_t BAP_init(void);
-void BAP_send_init_message(GlobalState *state);
-void BAP_parse_message(const char *message);
 void BAP_send_message(bap_command_t cmd, const char *parameter, const char *value);
+void BAP_send_message_with_queue(bap_command_t cmd, const char *parameter, const char *value);
 void BAP_register_handler(bap_command_t cmd, bap_command_handler_t handler);
-uint8_t BAP_calculate_checksum(const char *sentence_body);
-bap_command_t BAP_command_from_string(const char *cmd_str);
-const char* BAP_command_to_string(bap_command_t cmd);
-
-// Subscription Functions
+void BAP_parse_message(const char *message);
+void BAP_send_init_message(GlobalState *state);
 void BAP_handle_subscription(const char *parameter, const char *value);
 void BAP_handle_unsubscription(const char *parameter, const char *value);
+void BAP_handle_request(const char *parameter, const char *value);
+void BAP_send_request(bap_parameter_t param, GlobalState *state);
+void BAP_handle_settings(const char *parameter, const char *value);
 void BAP_send_subscription_update(GlobalState *state);
 esp_err_t BAP_start_uart_receive_task(void);
 esp_err_t BAP_start_subscription_task(GlobalState *state);
+uint8_t BAP_calculate_checksum(const char *sentence_body);
+bap_command_t BAP_command_from_string(const char *cmd_str);
+const char* BAP_command_to_string(bap_command_t cmd);
 bap_parameter_t BAP_parameter_from_string(const char *param_str);
 const char* BAP_parameter_to_string(bap_parameter_t param);
-
-// Request Functions
-void BAP_handle_request(const char *parameter, const char *value);
-void BAP_send_request(bap_parameter_t param, GlobalState *state);
-
-// Settings Functions
-void BAP_handle_settings(const char *parameter, const char *value);
 
 #endif /* BAP_H_ */
