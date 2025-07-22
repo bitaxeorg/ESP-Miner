@@ -40,6 +40,9 @@ static SemaphoreHandle_t subscription_mutex = NULL;
 
 static bap_command_handler_t handlers[BAP_CMD_UNKNOWN + 1] = {0};
 
+static char last_processed_message[BAP_MAX_MESSAGE_LEN] = {0};
+static uint32_t last_message_time = 0;
+
 static const char *parameter_strings[] = {
     "systemInfo",
     "hashrate",
@@ -178,6 +181,17 @@ void BAP_parse_message(const char *message) {
         ESP_LOGE(TAG, "Parse message: NULL message");
         return;
     }
+
+    uint32_t current_time = esp_timer_get_time() / 1000;
+    if (strcmp(message, last_processed_message) == 0 &&
+        (current_time - last_message_time) < 1000) {
+        ESP_LOGW(TAG, "Duplicate message detected, ignoring: %s", message);
+        return;
+    }
+
+    strncpy(last_processed_message, message, sizeof(last_processed_message) - 1);
+    last_processed_message[sizeof(last_processed_message) - 1] = '\0';
+    last_message_time = current_time;
 
     ESP_LOGI(TAG, "Parsing message: %s", message);
     
@@ -593,7 +607,10 @@ static void uart_receive_task(void *pvParameters) {
                 char c = (char)data[i];
                 
                 if (c == '$') {
-                    ESP_LOGI(TAG, "Start of message detected");
+                    // Only log if we're not already in a message to reduce spam
+                    if (!in_message) {
+                        ESP_LOGI(TAG, "Start of message detected");
+                    }
                     in_message = true;
                     message_len = 0;
                     message[message_len++] = c;
