@@ -30,7 +30,7 @@
                  [style]="{'width': '150px'}"
                  [formControl]="refreshIntervalControl">
         </p-slider>
-        <span class="text-sm md:text-base">{{refreshTimeSet}}s</span>
+        <span class="text-sm md:text-base">{{refreshTimeSet}} s</span>
     </div>
 </div>
 
@@ -42,7 +42,7 @@
                 value: swarm.length
             },
             {
-                label: 'Total Hash Rate',
+                label: 'Total Hashrate',
                 value: totals.hashRate * 1000000000 | hashSuffix
             },
             {
@@ -73,7 +73,7 @@
                 },
                 {
                     name: 'hashRate',
-                    label: 'Hash Rate'
+                    label: 'Hashrate'
                 },
                 {
                     name: 'sharesAccepted',
@@ -160,14 +160,14 @@
                          [ngClass]="{'text-orange-500': axe.temp > 68}"
                          pTooltip="ASIC Temperature"
                          tooltipPosition="top">
-                        {{axe.temp | number: '1.0-1'}}°<small>C</small>
+                        {{axe.temp | number: '1.0-1'}} °<small>C</small>
                     </div>
                     <div class="text-sm w-min cursor-pointer"
                          [ngClass]="{'text-orange-500': axe.vrTemp > 90}"
                          *ngIf="axe.vrTemp"
                          pTooltip="Voltage Regulator Temperature"
                          tooltipPosition="top">
-                        {{axe.vrTemp | number: '1.0-1'}}°<small>C</small>
+                        {{axe.vrTemp | number: '1.0-1'}} °<small>C</small>
                     </div>
                 </td>
                 <td>{{axe.poolDifficulty}}</td>
