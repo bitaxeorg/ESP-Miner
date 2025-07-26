@@ -293,8 +293,17 @@
 
         <div class="col-12 md:col-6">
             <div class="card">
-                <h5>Uptime</h5>
-                {{info.uptimeSeconds | dateAgo}}
+                <h5>Runtime</h5>
+                <table>
+                    <tr>
+                        <td class="text-500 pr-2 vertical-align-top white-space-nowrap">Device Uptime</td>
+                        <td>{{info.uptimeSeconds | dateAgo}}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-500 pr-2 vertical-align-top white-space-nowrap">Pool Difficulty</td>
+                        <td>{{info.poolDifficulty}}</td>
+                    </tr>
+                </table>
             </div>
         </div>
 
