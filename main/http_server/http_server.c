@@ -36,6 +36,7 @@
 #include "asic.h"
 #include "TPS546.h"
 #include "statistics_task.h"
+#include "auto_tune.h"
 #include "theme_api.h"  // Add theme API include
 #include "axe-os/api/system/asic_settings.h"
 #include "http_server.h"
@@ -615,7 +616,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)");
-    uint16_t frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    uint16_t frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
     float expected_hashrate = frequency * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
 
     uint8_t mac[6];
@@ -645,7 +646,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
 
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
-    cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
+    cJSON_AddNumberToObject(root, "coreVoltage",  GLOBAL_STATE->POWER_MANAGEMENT_MODULE.core_voltage);
     cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "frequency", frequency);
     cJSON_AddStringToObject(root, "ssid", ssid);
@@ -730,13 +731,13 @@ int create_json_statistics_all(cJSON * root)
 
     if (root) {
         // create array for all statistics
-        const char *label[12] = {
+        const char *label[14] = {
             "hashRate", "temp", "vrTemp", "power", "voltage",
             "current", "coreVoltageActual", "fanspeed", "fanrpm",
-            "wifiRSSI", "freeHeap", "timestamp"
+            "wifiRSSI", "freeHeap", "timestamp", "frequency", "core_voltage"
         };
 
-        cJSON * statsLabelArray = cJSON_CreateStringArray(label, 12);
+        cJSON * statsLabelArray = cJSON_CreateStringArray(label, 14);
         cJSON_AddItemToObject(root, "labels", statsLabelArray);
         prebuffer++;
 
@@ -762,6 +763,8 @@ int create_json_statistics_all(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.frequency));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.core_voltage));
 
                 cJSON_AddItemToArray(statsArray, valueArray);
                 prebuffer++;
@@ -792,6 +795,8 @@ int create_json_statistics_dashboard(cJSON * root)
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
                 cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.frequency));
+                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage));
 
                 cJSON_AddItemToArray(statsArray, valueArray);
                 prebuffer++;
@@ -1123,6 +1128,120 @@ void websocket_log_handler()
     }
 }
 
+esp_err_t GET_autotune_info(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    httpd_resp_set_type(req, "application/json");
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_POWER_LIMIT, AUTO_TUNE.power_limit);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_FAN_LIMIT, AUTO_TUNE.fan_limit);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_STEP_VOLT, AUTO_TUNE.step_volt);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_STEP_FREQ_RAMPUP, AUTO_TUNE.step_freq_rampup);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_STEP_FREQ, AUTO_TUNE.step_freq);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_AUTOTUNE_STEP_FREQ, AUTO_TUNE.autotune_step_frequency);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, AUTO_TUNE.max_voltage_asic);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, AUTO_TUNE.max_frequency_asic);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, AUTO_TUNE.max_asic_temperatur);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, AUTO_TUNE.auto_tune_hashrate);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT, AUTO_TUNE.overshot_power_limit);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT, AUTO_TUNE.overshot_fanspeed);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_VF_RATIO_MAX, AUTO_TUNE.vf_ratio_max);
+    cJSON_AddNumberToObject(root, NVS_CONFIG_KEY_VF_RATIO_MIN, AUTO_TUNE.vf_ratio_min);
+
+    const char *response = cJSON_Print(root);
+    httpd_resp_sendstr(req, response);
+    free((void *)response);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+esp_err_t POST_autotune_update(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    int total_len = req->content_len;
+    char buf[512];
+    int received = 0, cur_len = 0;
+    if (total_len >= sizeof(buf)) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_OK;
+    }
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len - cur_len);
+        if (received <= 0) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive data");
+            return ESP_OK;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
+    cJSON *item;
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_POWER_LIMIT)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.power_limit = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_POWER_LIMIT, (uint16_t)AUTO_TUNE.power_limit);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_FAN_LIMIT)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.fan_limit = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_FAN_LIMIT, (uint16_t)AUTO_TUNE.fan_limit);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_voltage_asic = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, (uint16_t)AUTO_TUNE.max_voltage_asic);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_frequency_asic = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, (uint16_t)AUTO_TUNE.max_frequency_asic);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_asic_temperatur = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_ASIC_TEMPERATUR, (uint16_t)AUTO_TUNE.max_asic_temperatur);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_AUTO_TUNE_ENABLE)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.auto_tune_hashrate = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, (uint16_t)AUTO_TUNE.auto_tune_hashrate);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.overshot_power_limit = item->valuedouble;
+        nvs_config_set_u64(NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT, AUTO_TUNE.overshot_power_limit);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.overshot_fanspeed = (uint16_t)item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT, (uint16_t)AUTO_TUNE.overshot_fanspeed);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_VF_RATIO_MAX)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.vf_ratio_max = item->valuedouble;
+        nvs_config_set_u64(NVS_CONFIG_KEY_VF_RATIO_MAX, AUTO_TUNE.vf_ratio_max);
+    }
+    if ((item = cJSON_GetObjectItem(root, NVS_CONFIG_KEY_VF_RATIO_MIN)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.vf_ratio_min = item->valuedouble;
+        nvs_config_set_u64(NVS_CONFIG_KEY_VF_RATIO_MIN, AUTO_TUNE.vf_ratio_min);
+    }
+
+    cJSON_Delete(root);
+
+    httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
+    return ESP_OK;
+}
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -1256,6 +1375,22 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
+
+    httpd_uri_t autotune_get_uri = {
+        .uri = "/api/system/autotune",
+        .method = HTTP_GET,
+        .handler = GET_autotune_info,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &autotune_get_uri);
+
+    httpd_uri_t autotune_post_uri = {
+        .uri = "/api/system/autotune",
+        .method = HTTP_POST,
+        .handler = POST_autotune_update,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &autotune_post_uri);
 
     httpd_uri_t ws = {
         .uri = "/api/ws", 

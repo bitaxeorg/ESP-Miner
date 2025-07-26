@@ -1,0 +1,125 @@
+<ng-container>
+    <div class="card">
+        <form [formGroup]="autotuneForm" (ngSubmit)="updateAutotune()" *ngIf="autotuneForm">
+            <h3>Autotune Settings</h3>
+            <div class="card">
+                <!-- Auto Tune Hashrate -->
+                <div class="field grid p-fluid">
+                    <label for="auto_tune_hashrate" class="col-12 md:col-2 md:m-0">Auto Tune Hashrate
+                        <i class="pi pi-info-circle text-xs px-1"
+                            pTooltip="Enables automatic tuning of hashrate based on system conditions."></i>
+                    </label>
+                    <div class="col-12 md:col-10">
+                        <p-checkbox type="checkbox" id="auto_tune_hashrate" formControlName="auto_tune_hashrate" [binary]="true"/>
+                    </div>
+                </div>
+
+                <!-- Power Limit -->
+                <div class="field grid p-fluid">
+                    <label for="power_limit" class="col-12 md:col-2 md:m-0">Power Limit
+                        <i class="pi pi-info-circle text-xs px-1"
+                            pTooltip="Sets the maximum power limit in watts. Prevents power consumption from exceeding this threshold."></i>
+                    </label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText type="number" id="power_limit" class="form-control" formControlName="power_limit">
+                    </div>
+                </div>
+
+                <!-- Fan Limit -->
+                <div class="field grid p-fluid">
+                    <label for="fan_limit" class="col-12 md:col-2 md:m-0">Fan Limit
+                        <i class="pi pi-info-circle text-xs px-1"
+                            pTooltip="Sets the maximum fan speed limit in percent. Ensures fans do not exceed this speed to control noise and wear."></i>
+                    </label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText type="number" id="fan_limit" class="form-control" formControlName="fan_limit">
+                    </div>
+                </div>
+
+                <!-- Overshot Power Limit -->
+                <div class="field grid p-fluid">
+                    <label for="overshot_power_limit" class="col-12 md:col-2 md:m-0">Overshot Power Limit
+                        <i class="pi pi-info-circle text-xs px-1"
+                            pTooltip="Maximum allowed power overshoot in watts. Provides a buffer for temporary spikes above the power limit."></i>
+                    </label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText type="number" id="overshot_power_limit" class="form-control"
+                            formControlName="overshot_power_limit">
+                    </div>
+                </div>
+
+                <!-- Overshot Fanspeed -->
+                <div class="field grid p-fluid">
+                    <label for="overshot_fanspeed" class="col-12 md:col-2 md:m-0">Overshot Fanspeed
+                        <i class="pi pi-info-circle text-xs px-1"
+                            pTooltip="Maximum allowed fan speed overshoot in percent. Provides a buffer for temporary spikes above the fan limit."></i>
+                    </label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText type="number" id="overshot_fanspeed" class="form-control"
+                            formControlName="overshot_fanspeed">
+                    </div>
+                </div>
+
+                <!-- Max Voltage ASIC -->
+                <div class="field grid p-fluid">
+                    <label for="max_voltage_asic" class="col-12 md:col-2 md:m-0">Max Voltage ASIC
+                        <i class="pi pi-info-circle text-xs px-1"
+                            pTooltip="Maximum voltage for the ASIC in millivolts. Prevents over-voltage conditions that could damage hardware."></i>
+                    </label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText type="number" id="max_voltage_asic" class="form-control"
+                            formControlName="max_voltage_asic">
+                    </div>
+                </div>
+
+                <!-- Max Frequency ASIC -->
+                <div class="field grid p-fluid">
+                    <label for="max_frequency_asic" class="col-12 md:col-2 md:m-0">Max Frequency ASIC
+                        <i class="pi pi-info-circle text-xs px-1"
+                            pTooltip="Maximum frequency for the ASIC in megahertz. Prevents overclocking beyond safe limits."></i>
+                    </label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText type="number" id="max_frequency_asic" class="form-control"
+                            formControlName="max_frequency_asic">
+                    </div>
+                </div>
+
+                <!-- Max ASIC Temperature -->
+                <div class="field grid p-fluid">
+                    <label for="max_asic_temperatur" class="col-12 md:col-2 md:m-0">Max ASIC Temperature
+                        <i class="pi pi-info-circle text-xs px-1"
+                            pTooltip="Maximum temperature for the ASIC in degrees Celsius. Ensures thermal safety to prevent hardware damage."></i>
+                    </label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText type="number" id="max_asic_temperatur" class="form-control"
+                            formControlName="max_asic_temperatur">
+                    </div>
+                </div>
+
+                <!-- Max V/F Ratio -->
+                <div class="field grid p-fluid">
+                    <label for="vf_ratio_max" class="col-12 md:col-2 md:m-0">Max V/F Ratio
+                        <i class="pi pi-info-circle text-xs px-1"
+                            pTooltip="Sets the maximum allowable Voltage/Frequency ratio. This ratio is crucial for determining efficiency and power delivery to ASICs. A higher ratio can lead to overheating, while a lower one might not provide enough power."></i>
+                    </label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText type="number" id="vf_ratio_max" class="form-control" formControlName="vf_ratio_max">
+                    </div>
+                </div>
+
+                <!-- Min V/F Ratio -->
+                <div class="field grid p-fluid">
+                    <label for="vf_ratio_min" class="col-12 md:col-2 md:m-0">Min V/F Ratio
+                        <i class="pi pi-info-circle text-xs px-1"
+                            pTooltip="Sets the minimum allowable Voltage/Frequency ratio. This ratio affects energy efficiency and chip performance. Setting this too low could cause insufficient power supply, leading to performance degradation or system instability."></i>
+                    </label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText type="number" id="vf_ratio_min" class="form-control" formControlName="vf_ratio_min">
+                    </div>
+                </div>
+            </div>
+
+            <button pButton [disabled]="!autotuneForm.valid" (click)="updateAutotune()">Save Autotune Settings</button>
+        </form>
+    </div>
+</ng-container>

@@ -185,4 +185,12 @@ export class SystemService {
   public updateSwarm(uri: string = '', swarmConfig: any) {
     return this.httpClient.patch(`${uri}/api/swarm`, swarmConfig);
   }
+
+  public getAutotune() {
+    return this.httpClient.get<any>('/api/system/autotune');
+  }
+
+  public updateAutotune(data: any) {
+    return this.httpClient.post('/api/system/autotune', data);
+  }
 }
