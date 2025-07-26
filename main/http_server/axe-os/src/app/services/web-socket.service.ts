@@ -14,6 +14,4 @@ export class WebsocketService {
       deserializer: (e: MessageEvent) => { return e.data }
     });
   }
-
-
 }
