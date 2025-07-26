@@ -15,7 +15,7 @@ typedef struct {
 } wifi_ap_record_simple_t;
 
 void toggle_wifi_softap(void);
-void wifi_init(void * GLOBAL_STATE);
+void wifi_init();
 esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count);
 esp_err_t get_wifi_current_rssi(int8_t *rssi);
 
