@@ -110,16 +110,30 @@ bm_job construct_bm_job(mining_notify *params, const char *merkle_root, const ui
     return new_job;
 }
 
-char *extranonce_2_generate(uint32_t extranonce_2, uint32_t length)
+char *extranonce_2_generate(uint64_t extranonce_2, uint32_t length)
 {
-    char *extranonce_2_str = malloc(length * 2 + 1);
-    memset(extranonce_2_str, '0', length * 2);
-    extranonce_2_str[length * 2] = '\0';
-    bin2hex((uint8_t *)&extranonce_2, length, extranonce_2_str, length * 2 + 1);
-    if (length > 4)
-    {
-        extranonce_2_str[8] = '0';
+    // Allocate buffer to hold the extranonce_2 value in bytes
+    uint8_t *extranonce_2_bytes = calloc(length, 1);
+    if (extranonce_2_bytes == NULL) {
+        return NULL;
     }
+    
+    // Copy the extranonce_2 value into the buffer, handling endianness
+    // Copy up to the size of uint64_t or the requested length, whichever is smaller
+    size_t copy_len = (length < sizeof(uint64_t)) ? length : sizeof(uint64_t);
+    memcpy(extranonce_2_bytes, &extranonce_2, copy_len);
+    
+    // Allocate the output string
+    char *extranonce_2_str = malloc(length * 2 + 1);
+    if (extranonce_2_str == NULL) {
+        free(extranonce_2_bytes);
+        return NULL;
+    }
+    
+    // Convert the bytes to hex string
+    bin2hex(extranonce_2_bytes, length, extranonce_2_str, length * 2 + 1);
+    
+    free(extranonce_2_bytes);
     return extranonce_2_str;
 }
 
