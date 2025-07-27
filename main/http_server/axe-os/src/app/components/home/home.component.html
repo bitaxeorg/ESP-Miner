@@ -288,6 +288,15 @@
                         {{ info.responseTime }} ms
                     </div>
                 </div>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width text-500">
+                        <span>Difficulty</span>
+                    </div>
+                    <div>
+                        {{ info.poolDifficulty }}
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -297,6 +306,5 @@
                 {{info.uptimeSeconds | dateAgo}}
             </div>
         </div>
-
     </div>
 </ng-container>
