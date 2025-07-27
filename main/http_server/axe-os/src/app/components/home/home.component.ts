@@ -279,6 +279,7 @@ export class HomeComponent {
         info.coreVoltageActual = parseFloat((info.coreVoltageActual / 1000).toFixed(2));
         info.coreVoltage = parseFloat((info.coreVoltage / 1000).toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
+        info.temp2 = parseFloat(info.temp2.toFixed(1));
 
         return info;
       }),
@@ -307,7 +308,7 @@ export class HomeComponent {
           this.pageDefaultTitle,
           info.hostname,
           (info.hashRate ? HashSuffixPipe.transform(info.hashRate * 1000000000) : false),
-          (info.temp ? `${info.temp}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
+          (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
           (!info.power_fault ? `${info.power} W` : false),
           (info.bestDiff ? info.bestDiff : false),
         ].filter(Boolean).join(' • ')

@@ -13,5 +13,6 @@ esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent);
 uint16_t Thermal_get_fan_speed(DeviceConfig * DEVICE_CONFIG);
 
 float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE);
+EMC2103_temps_t Thermal_get_chip_temps(GlobalState * GLOBAL_STATE);
 
 #endif // THERMAL_H

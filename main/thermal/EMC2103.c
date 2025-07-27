@@ -184,3 +184,69 @@ float EMC2103_get_external_temp(void)
 
     return temp1;
 }
+
+/**
+ * @brief Get both external temperatures in Celsius.
+ *
+ * @return EMC2103_temps_t Structure containing both temp1 and temp2 in Celsius.
+ */
+EMC2103_temps_t EMC2103_get_external_temps(void)
+{
+    EMC2103_temps_t temps = {0.0f, 0.0f};
+    uint8_t temp_msb = 0, temp_lsb = 0;
+    uint16_t reading;
+    esp_err_t err;
+
+    // Read temperature 1
+    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP1_MSB, &temp_msb, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read external temperature 1 MSB: %s", esp_err_to_name(err));
+        return temps;
+    }
+    
+    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP1_LSB, &temp_lsb, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read external temperature 1 LSB: %s", esp_err_to_name(err));
+        return temps;
+    }
+
+    // Process temperature 1
+    reading = (temp_msb << 8) | temp_lsb;
+    if (reading == EMC2103_TEMP_DIODE_FAULT) {
+        ESP_LOGE(TAG, "EMC2103 TEMP_DIODE1_FAULT: %04X", reading);
+    }
+    reading >>= 5;
+    int16_t signed_reading = (int16_t)reading;
+    if (signed_reading & 0x0400) {
+        signed_reading |= 0xF800;
+    }
+    temps.temp1 = (float)signed_reading / 8.0;
+
+    // Read temperature 2
+    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP2_MSB, &temp_msb, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read external temperature 2 MSB: %s", esp_err_to_name(err));
+        return temps; // Return with only temp1 valid
+    }
+    
+    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP2_LSB, &temp_lsb, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read external temperature 2 LSB: %s", esp_err_to_name(err));
+        return temps; // Return with only temp1 valid
+    }
+
+    reading = (temp_msb << 8) | temp_lsb;
+    if (reading == EMC2103_TEMP_DIODE_FAULT) {
+        ESP_LOGE(TAG, "EMC2103 TEMP_DIODE2_FAULT: %04X", reading);
+    }
+    reading >>= 5;
+    signed_reading = (int16_t)reading;
+    if (signed_reading & 0x0400) {
+        signed_reading |= 0xF800;
+    }
+    temps.temp2 = (float)signed_reading / 8.0;
+
+    ESP_LOGI(TAG, "Temp1: %.2f Temp2: %.2f", temps.temp1, temps.temp2);
+
+    return temps;
+}
