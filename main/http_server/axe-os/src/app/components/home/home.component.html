@@ -1,3 +1,5 @@
+<ng-template #noTemp>--</ng-template>
+
 <ng-container *ngIf="info$ | async as info">
     <!-- Temp warning alert -->
     <p-message *ngIf="info.overheat_mode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
@@ -204,7 +206,6 @@
                     <h6 class="flex justify-content-between mb-1">
                         ASIC Temperature 1
                         <span>
-                            <ng-template #noTemp>--</ng-template>
                             <ng-container *ngIf="info.temp > 0; else noTemp">
                                 {{info.temp}} &deg;C
                             </ng-container>
@@ -223,8 +224,7 @@
                     <h6 class="flex justify-content-between mb-1">
                         ASIC Temperature 2
                         <span>
-                            <ng-template #noTemp2>--</ng-template>
-                            <ng-container *ngIf="info.temp2 > 0; else noTemp2">
+                            <ng-container *ngIf="info.temp2 > 0; else noTemp">
                                 {{info.temp2}} &deg;C
                             </ng-container>
                         </span>
