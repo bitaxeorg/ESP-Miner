@@ -204,7 +204,12 @@
 
                 <div class="mb-3">
                     <h6 class="flex justify-content-between mb-1">
-                        ASIC Temperature 1
+                        <ng-container *ngIf="info.temp2 > -1; else singleTemp">
+                            ASIC Temperature 1
+                        </ng-container>
+                        <ng-template #singleTemp>
+                            ASIC Temperature
+                        </ng-template>
                         <span>
                             <ng-container *ngIf="info.temp > 0; else noTemp">
                                 {{info.temp}} &deg;C
