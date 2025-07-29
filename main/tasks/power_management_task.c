@@ -90,7 +90,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->chip_temp_avg = temps.temp1;
             power_management->chip_temp2_avg = temps.temp2;
         } else {
-            power_management->chip_temp2_avg = -1; // Invalid for non-EMC2103 devices
+            power_management->chip_temp2_avg = 0.0f; // Not used for non-EMC2103 devices
         }
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
