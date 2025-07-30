@@ -70,6 +70,8 @@ HashHistory HASH_HISTORY;
 // Timestamp of the last clock synchronization event.
 uint32_t lastClockSync;
 
+// The difficulty (nonce) for the best solution found during mining.
+uint64_t best_nonce_diff;
 void SYSTEM_init_system()
 {
 
@@ -77,11 +79,10 @@ void SYSTEM_init_system()
     HASH_HISTORY.historical_hashrate_rolling_index = 0;
     HASH_HISTORY.historical_hashrate_init = 0;
     SYSTEM_MODULE.current_hashrate = 0;
-    SYSTEM_MODULE.screen_page = 0;
     SYSTEM_MODULE.shares_accepted = 0;
     SYSTEM_MODULE.shares_rejected = 0;
-    SYSTEM_MODULE.best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     SYSTEM_MODULE.best_session_nonce_diff = 0;
+    best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     SYSTEM_MODULE.start_time = esp_timer_get_time();
     lastClockSync = 0;
     STATE_MODULE.FOUND_BLOCK = false;
@@ -121,8 +122,8 @@ void SYSTEM_init_system()
     STATE_MODULE.power_fault = 0;
 
     // set the best diff string
-    _suffix_string(SYSTEM_MODULE.best_nonce_diff, SYSTEM_MODULE.best_diff_string, DIFF_STRING_SIZE, 0);
     _suffix_string(SYSTEM_MODULE.best_session_nonce_diff, SYSTEM_MODULE.best_session_diff_string, DIFF_STRING_SIZE, 0);
+    _suffix_string(best_nonce_diff, SYSTEM_MODULE.best_diff_string, DIFF_STRING_SIZE, 0);
 }
 
 esp_err_t SYSTEM_init_peripherals() {
@@ -272,12 +273,12 @@ static void _check_for_best_diff( double diff, uint8_t job_id)
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
     }
 
-    if ((uint64_t) diff <= SYSTEM_MODULE.best_nonce_diff) {
+    if ((uint64_t) diff <= best_nonce_diff) {
         return;
     }
-    SYSTEM_MODULE.best_nonce_diff = (uint64_t) diff;
+    best_nonce_diff = (uint64_t) diff;
 
-    nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, SYSTEM_MODULE.best_nonce_diff);
+    nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, best_nonce_diff);
 
     // make the best_nonce_diff into a string
     _suffix_string((uint64_t) diff, SYSTEM_MODULE.best_diff_string, DIFF_STRING_SIZE, 0);

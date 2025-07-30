@@ -34,12 +34,6 @@ typedef struct
     // The number of different rejection reason statistics recorded.
     int rejected_reason_stats_count;
 
-    // A variable indicating which screen page is currently active or being displayed.
-    int screen_page;
-
-    // The difficulty (nonce) for the best solution found during mining.
-    uint64_t best_nonce_diff;
-
     // A string representing the difficulty of the best nonce in readable format.
     char best_diff_string[DIFF_STRING_SIZE];
 
