@@ -12,8 +12,7 @@ typedef struct
     // Status information about power faults encountered by the device.
     uint16_t power_fault;
 
-    // Timestamp of the last clock synchronization event.
-    uint32_t lastClockSync;
+ 
 
     // A flag indicating whether the screen is currently active.
     bool is_screen_active;

@@ -62,8 +62,13 @@ typedef struct
 
     // A flag indicating if the historical hashrate data is initialized.
     int historical_hashrate_init;
+
+    
 } HashHistory;
 HashHistory HASH_HISTORY;
+
+// Timestamp of the last clock synchronization event.
+uint32_t lastClockSync;
 
 void SYSTEM_init_system()
 {
@@ -78,7 +83,7 @@ void SYSTEM_init_system()
     SYSTEM_MODULE.best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     SYSTEM_MODULE.best_session_nonce_diff = 0;
     SYSTEM_MODULE.start_time = esp_timer_get_time();
-    STATE_MODULE.lastClockSync = 0;
+    lastClockSync = 0;
     STATE_MODULE.FOUND_BLOCK = false;
     
     // set the pool url
@@ -190,11 +195,11 @@ void SYSTEM_notify_mining_started()
 void SYSTEM_notify_new_ntime( uint32_t ntime)
 {
     // Hourly clock sync
-    if (STATE_MODULE.lastClockSync + (60 * 60) > ntime) {
+    if (lastClockSync + (60 * 60) > ntime) {
         return;
     }
     ESP_LOGI(TAG, "Syncing clock");
-    STATE_MODULE.lastClockSync = ntime;
+    lastClockSync = ntime;
     struct timeval tv;
     tv.tv_sec = ntime;
     tv.tv_usec = 0;
