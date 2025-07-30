@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MINING_MODULE_H_
+#define MINING_MODULE_H_
 
 #include <pthread.h>
 #include <stdbool.h>
@@ -91,3 +92,4 @@ typedef struct{
 }mining_queues;
 
 extern mining_queues MINING_MODULE;
+#endif

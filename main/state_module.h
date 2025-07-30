@@ -1,4 +1,5 @@
-#pragma once
+#ifndef STATE_MODULE_H_
+#define STATE_MODULE_H_
 
 typedef struct
 {
@@ -37,3 +38,4 @@ typedef struct
 }StateModule;
 
 extern StateModule STATE_MODULE;
+#endif

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ASIC_TASK_MODULE_H_
+#define ASIC_TASK_MODULE_H_
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -17,3 +18,4 @@ typedef struct
 } AsicTaskModule;
 
 extern AsicTaskModule ASIC_TASK_MODULE;
+#endif

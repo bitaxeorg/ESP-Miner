@@ -1,4 +1,5 @@
-#pragma once
+#ifndef POOL_MODULE_H_
+#define POOL_MODULE_H_
 
 typedef struct
 {
@@ -46,3 +47,4 @@ typedef struct
 }PoolModule;
 
 extern PoolModule POOL_MODULE;
+#endif

@@ -1,5 +1,5 @@
-#pragma once
-
+#ifndef POWER_MANAGMENT_MODULE_H_
+#define POWER_MANAGMENT_MODULE_H_
 /**
  * @brief Structure representing a Power Management Module
  */
@@ -28,3 +28,5 @@ typedef struct
 } PowerManagementModule;
 
 extern PowerManagementModule POWER_MANAGEMENT_MODULE;
+
+#endif

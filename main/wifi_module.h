@@ -1,4 +1,5 @@
-#pragma once
+#ifndef WIFI_MODULE_H_
+#define WIFI_MODULE_H_
 
 typedef struct
 {
@@ -22,3 +23,4 @@ typedef struct
 }WifiSettings;
 
 extern WifiSettings WIFI_MODULE;
+#endif
