@@ -15,6 +15,7 @@
 #include "crc.h"
 #include "mining.h"
 #include "global_state.h"
+#include "pll.h"
 
 #define BM1397_CHIP_ID 0x1397
 #define BM1397_CHIP_ID_RESPONSE_LENGTH 9
@@ -25,15 +26,10 @@
 #define GROUP_SINGLE 0x00
 #define GROUP_ALL 0x10
 
-#define CMD_JOB 0x01
-
 #define CMD_SETADDRESS 0x00
 #define CMD_WRITE 0x01
 #define CMD_READ 0x02
 #define CMD_INACTIVE 0x03
-
-#define RESPONSE_CMD 0x00
-#define RESPONSE_JOB 0x80
 
 #define SLEEP_TIME 20
 #define FREQ_MULT 25.0
@@ -134,6 +130,11 @@ void BM1397_set_version_mask(uint32_t version_mask) {
 // borrowed from cgminer driver-gekko.c calc_gsf_freq()
 void BM1397_send_hash_frequency(float frequency)
 {
+    uint8_t fb_divider, refdiv, postdiv1, postdiv2;
+    float actual_freq;
+    pll_get_parameters(frequency, 60, 200, &fb_divider, &refdiv, &postdiv1, &postdiv2, &actual_freq);
+    ESP_LOGI(TAG, "Test PLL settings: %g MHz (fb_divider: %d, refdiv: %d, postdiv1: %d, postdiv2: %d)", actual_freq, fb_divider, refdiv, postdiv1, postdiv2);
+
     unsigned char prefreq1[9] = {0x00, 0x70, 0x0F, 0x0F, 0x0F, 0x00}; // prefreq - pll0_divider
 
     // default 200Mhz if it fails
@@ -202,6 +203,8 @@ void BM1397_send_hash_frequency(float frequency)
         freqbuf[5] = (((unsigned char)fc1 & 0x7) << 4) + ((unsigned char)fc2 & 0x7);
         
         newf = basef / ((float)fb * (float)fc1 * (float)fc2);
+
+        ESP_LOGI(TAG, "Calculated PLL settings: %g MHz (fb: %d, fa: %d, fc1: %d, fc2: %d)", newf, (int)fb, (int) fb, (int)fc1, (int)fc2);
     }
 
     for (i = 0; i < 2; i++)
@@ -217,10 +220,10 @@ void BM1397_send_hash_frequency(float frequency)
 
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
-    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", frequency, newf);
+    ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", frequency, newf);
 }
 
-uint8_t BM1397_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
+uint8_t BM1397_init(float frequency, uint16_t asic_count, uint16_t difficulty)
 {
     // send the init command
     _send_read_address();
