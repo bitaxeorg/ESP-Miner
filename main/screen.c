@@ -327,108 +327,107 @@ static void screen_update_cb(lv_timer_t * timer)
             display_on(true);
         }
     }
-    if (WIFI_MODULE.is_connected) {
 
-        if (SELF_TEST_MODULE.is_active) {
-            screen_show(SCR_SELF_TEST);
+    if (SELF_TEST_MODULE.is_active) {
+        screen_show(SCR_SELF_TEST);
 
-            lv_label_set_text(self_test_message_label, SELF_TEST_MODULE.message);
+        lv_label_set_text(self_test_message_label, SELF_TEST_MODULE.message);
 
-            if (SELF_TEST_MODULE.is_finished && !self_test_finished) {
-                self_test_finished = true;
-                lv_label_set_text(self_test_result_label, SELF_TEST_MODULE.result);
-                lv_label_set_text(self_test_finished_label, SELF_TEST_MODULE.finished);
-            }
-
-            return;
+        if (SELF_TEST_MODULE.is_finished && !self_test_finished) {
+            self_test_finished = true;
+            lv_label_set_text(self_test_result_label, SELF_TEST_MODULE.result);
+            lv_label_set_text(self_test_finished_label, SELF_TEST_MODULE.finished);
         }
 
-        if (STATE_MODULE.is_firmware_update) {
-            if (strcmp(STATE_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
-                lv_label_set_text(firmware_update_scr_filename_label, STATE_MODULE.firmware_update_filename);
-            }
-            if (strcmp(STATE_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
-                lv_label_set_text(firmware_update_scr_status_label, STATE_MODULE.firmware_update_status);
-            }
-            screen_show(SCR_FIRMWARE_UPDATE);
-            return;
-        }
-
-        if (STATE_MODULE.asic_status) {
-            lv_label_set_text(asic_status_label, STATE_MODULE.asic_status);
-            screen_show(SCR_ASIC_STATUS);
-            return;
-        }
-
-        if (STATE_MODULE.overheat_mode == 1) {
-            if (strcmp(WIFI_MODULE.ip_addr_str, lv_label_get_text(ip_addr_scr_overheat_label)) != 0) {
-                lv_label_set_text(ip_addr_scr_overheat_label, WIFI_MODULE.ip_addr_str);
-            }
-            screen_show(SCR_OVERHEAT);
-            return;
-        }
-
-        if (WIFI_MODULE.ssid[0] == '\0') {
-            screen_show(SCR_CONFIGURE);
-            return;
-        }
-
-        if (WIFI_MODULE.ap_enabled) {
-            if (strcmp(WIFI_MODULE.wifi_status, lv_label_get_text(wifi_status_label)) != 0) {
-                lv_label_set_text(wifi_status_label, WIFI_MODULE.wifi_status);
-            }
-            screen_show(SCR_CONNECTION);
-            current_screen_time_ms = 0;
-            return;
-        }
-
-        // Carousel
-
-        current_screen_time_ms += SCREEN_UPDATE_MS;
-
-        char * pool_url = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_url : POOL_MODULE.pool_url;
-        if (strcmp(lv_label_get_text(mining_url_scr_urls_label), pool_url) != 0) {
-            lv_label_set_text(mining_url_scr_urls_label, pool_url);
-        }
-
-        if (strcmp(lv_label_get_text(ip_addr_scr_urls_label), WIFI_MODULE.ip_addr_str) != 0) {
-            lv_label_set_text(ip_addr_scr_urls_label, WIFI_MODULE.ip_addr_str);
-        }
-
-        if (current_hashrate != SYSTEM_MODULE.current_hashrate) {
-            lv_label_set_text_fmt(hashrate_label, "Gh/s: %.2f", SYSTEM_MODULE.current_hashrate);
-        }
-
-        if (current_power != POWER_MANAGEMENT_MODULE.power || current_hashrate != SYSTEM_MODULE.current_hashrate) {
-            if (POWER_MANAGEMENT_MODULE.power > 0 && SYSTEM_MODULE.current_hashrate > 0) {
-                float efficiency = POWER_MANAGEMENT_MODULE.power / (SYSTEM_MODULE.current_hashrate / 1000.0);
-                lv_label_set_text_fmt(efficiency_label, "J/Th: %.2f", efficiency);
-            }
-            current_power = POWER_MANAGEMENT_MODULE.power;
-        }
-        current_hashrate = SYSTEM_MODULE.current_hashrate;
-
-        if (STATE_MODULE.FOUND_BLOCK && !found_block) {
-            found_block = true;
-
-            lv_obj_set_width(difficulty_label, LV_HOR_RES);
-            lv_label_set_long_mode(difficulty_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-            lv_label_set_text_fmt(difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", SYSTEM_MODULE.best_session_diff_string);
-
-            screen_show(SCR_STATS);
-            lv_display_trigger_activity(NULL);
-        } else {
-            if (current_difficulty != SYSTEM_MODULE.best_session_nonce_diff) {
-                lv_label_set_text_fmt(difficulty_label, "Best: %s/%s", SYSTEM_MODULE.best_session_diff_string, SYSTEM_MODULE.best_diff_string);
-                current_difficulty = SYSTEM_MODULE.best_session_nonce_diff;
-            }
-        }
-
-        if (current_chip_temp != POWER_MANAGEMENT_MODULE.chip_temp_avg && POWER_MANAGEMENT_MODULE.chip_temp_avg > 0) {
-            lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", POWER_MANAGEMENT_MODULE.chip_temp_avg);
-        }
-        current_chip_temp = POWER_MANAGEMENT_MODULE.chip_temp_avg;
+        return;
     }
+
+    if (STATE_MODULE.is_firmware_update) {
+        if (strcmp(STATE_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_filename_label, STATE_MODULE.firmware_update_filename);
+        }
+        if (strcmp(STATE_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_status_label, STATE_MODULE.firmware_update_status);
+        }
+        screen_show(SCR_FIRMWARE_UPDATE);
+        return;
+    }
+
+    if (STATE_MODULE.asic_status) {
+        lv_label_set_text(asic_status_label, STATE_MODULE.asic_status);
+        screen_show(SCR_ASIC_STATUS);
+        return;
+    }
+
+    if (STATE_MODULE.overheat_mode == 1) {
+        if (strcmp(WIFI_MODULE.ip_addr_str, lv_label_get_text(ip_addr_scr_overheat_label)) != 0) {
+            lv_label_set_text(ip_addr_scr_overheat_label, WIFI_MODULE.ip_addr_str);
+        }
+        screen_show(SCR_OVERHEAT);
+        return;
+    }
+
+    if (WIFI_MODULE.ssid[0] == '\0') {
+        screen_show(SCR_CONFIGURE);
+        return;
+    }
+
+    if (WIFI_MODULE.ap_enabled) {
+        if (strcmp(WIFI_MODULE.wifi_status, lv_label_get_text(wifi_status_label)) != 0) {
+            lv_label_set_text(wifi_status_label, WIFI_MODULE.wifi_status);
+        }
+        screen_show(SCR_CONNECTION);
+        current_screen_time_ms = 0;
+        return;
+    }
+
+    // Carousel
+
+    current_screen_time_ms += SCREEN_UPDATE_MS;
+
+    char * pool_url = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_url : POOL_MODULE.pool_url;
+    if (strcmp(lv_label_get_text(mining_url_scr_urls_label), pool_url) != 0) {
+        lv_label_set_text(mining_url_scr_urls_label, pool_url);
+    }
+
+    if (strcmp(lv_label_get_text(ip_addr_scr_urls_label), WIFI_MODULE.ip_addr_str) != 0) {
+        lv_label_set_text(ip_addr_scr_urls_label, WIFI_MODULE.ip_addr_str);
+    }
+
+    if (current_hashrate != SYSTEM_MODULE.current_hashrate) {
+        lv_label_set_text_fmt(hashrate_label, "Gh/s: %.2f", SYSTEM_MODULE.current_hashrate);
+    }
+
+    if (current_power != POWER_MANAGEMENT_MODULE.power || current_hashrate != SYSTEM_MODULE.current_hashrate) {
+        if (POWER_MANAGEMENT_MODULE.power > 0 && SYSTEM_MODULE.current_hashrate > 0) {
+            float efficiency = POWER_MANAGEMENT_MODULE.power / (SYSTEM_MODULE.current_hashrate / 1000.0);
+            lv_label_set_text_fmt(efficiency_label, "J/Th: %.2f", efficiency);
+        }
+        current_power = POWER_MANAGEMENT_MODULE.power;
+    }
+    current_hashrate = SYSTEM_MODULE.current_hashrate;
+
+    if (STATE_MODULE.FOUND_BLOCK && !found_block) {
+        found_block = true;
+
+        lv_obj_set_width(difficulty_label, LV_HOR_RES);
+        lv_label_set_long_mode(difficulty_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+        lv_label_set_text_fmt(difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", SYSTEM_MODULE.best_session_diff_string);
+
+        screen_show(SCR_STATS);
+        lv_display_trigger_activity(NULL);
+    } else {
+        if (current_difficulty != SYSTEM_MODULE.best_session_nonce_diff) {
+            lv_label_set_text_fmt(difficulty_label, "Best: %s/%s", SYSTEM_MODULE.best_session_diff_string, SYSTEM_MODULE.best_diff_string);
+            current_difficulty = SYSTEM_MODULE.best_session_nonce_diff;
+        }
+    }
+
+    if (current_chip_temp != POWER_MANAGEMENT_MODULE.chip_temp_avg && POWER_MANAGEMENT_MODULE.chip_temp_avg > 0) {
+        lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", POWER_MANAGEMENT_MODULE.chip_temp_avg);
+    }
+    current_chip_temp = POWER_MANAGEMENT_MODULE.chip_temp_avg;
+    
 
     // Update WiFi RSSI periodically
     int8_t rssi_value = -128;
