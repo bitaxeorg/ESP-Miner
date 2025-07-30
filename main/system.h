@@ -4,6 +4,7 @@
 #include "esp_err.h"
 
 
+
 void SYSTEM_init_system();
 esp_err_t SYSTEM_init_peripherals();
 #ifdef CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE

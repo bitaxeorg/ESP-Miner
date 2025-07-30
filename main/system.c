@@ -46,12 +46,31 @@ static esp_err_t ensure_overheat_mode_config();
 static void _check_for_best_diff( double diff, uint8_t job_id);
 static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 
+typedef struct
+{
+    // The starting time for a certain period of mining activity.
+    double duration_start;
+
+    // The index to keep track of the rolling historical hashrate data.
+    int historical_hashrate_rolling_index;
+
+    // An array to store timestamps corresponding to historical hashrate values.
+    double historical_hashrate_time_stamps[HISTORY_LENGTH];
+
+    // An array to store historical hashrate values over a defined period.
+    double historical_hashrate[HISTORY_LENGTH];
+
+    // A flag indicating if the historical hashrate data is initialized.
+    int historical_hashrate_init;
+} HashHistory;
+HashHistory HASH_HISTORY;
+
 void SYSTEM_init_system()
 {
 
-    SYSTEM_MODULE.duration_start = 0;
-    SYSTEM_MODULE.historical_hashrate_rolling_index = 0;
-    SYSTEM_MODULE.historical_hashrate_init = 0;
+    HASH_HISTORY.duration_start = 0;
+    HASH_HISTORY.historical_hashrate_rolling_index = 0;
+    HASH_HISTORY.historical_hashrate_init = 0;
     SYSTEM_MODULE.current_hashrate = 0;
     SYSTEM_MODULE.screen_page = 0;
     SYSTEM_MODULE.shares_accepted = 0;
@@ -165,7 +184,7 @@ void SYSTEM_notify_rejected_share(char * error_msg)
 
 void SYSTEM_notify_mining_started()
 {
-    SYSTEM_MODULE.duration_start = esp_timer_get_time();
+    HASH_HISTORY.duration_start = esp_timer_get_time();
 }
 
 void SYSTEM_notify_new_ntime( uint32_t ntime)
@@ -187,29 +206,29 @@ void SYSTEM_notify_found_nonce(double found_diff, uint8_t job_id)
     // Calculate the time difference in seconds with sub-second precision
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
 
-    SYSTEM_MODULE.historical_hashrate[SYSTEM_MODULE.historical_hashrate_rolling_index] = DEVICE_CONFIG.family.asic.difficulty;
-    SYSTEM_MODULE.historical_hashrate_time_stamps[SYSTEM_MODULE.historical_hashrate_rolling_index] = esp_timer_get_time();
+    HASH_HISTORY.historical_hashrate[HASH_HISTORY.historical_hashrate_rolling_index] = DEVICE_CONFIG.family.asic.difficulty;
+    HASH_HISTORY.historical_hashrate_time_stamps[HASH_HISTORY.historical_hashrate_rolling_index] = esp_timer_get_time();
 
-    SYSTEM_MODULE.historical_hashrate_rolling_index = (SYSTEM_MODULE.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
+    HASH_HISTORY.historical_hashrate_rolling_index = (HASH_HISTORY.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
 
     // ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration,
     // historical_hashrate[historical_hashrate_rolling_index]);
 
-    if (SYSTEM_MODULE.historical_hashrate_init < HISTORY_LENGTH) {
-        SYSTEM_MODULE.historical_hashrate_init++;
+    if (HASH_HISTORY.historical_hashrate_init < HISTORY_LENGTH) {
+        HASH_HISTORY.historical_hashrate_init++;
     } else {
-        SYSTEM_MODULE.duration_start =
-            SYSTEM_MODULE.historical_hashrate_time_stamps[(SYSTEM_MODULE.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
+        HASH_HISTORY.duration_start =
+            HASH_HISTORY.historical_hashrate_time_stamps[(HASH_HISTORY.historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
     }
     double sum = 0;
-    for (int i = 0; i < SYSTEM_MODULE.historical_hashrate_init; i++) {
-        sum += SYSTEM_MODULE.historical_hashrate[i];
+    for (int i = 0; i < HASH_HISTORY.historical_hashrate_init; i++) {
+        sum += HASH_HISTORY.historical_hashrate[i];
     }
 
-    double duration = (double) (esp_timer_get_time() - SYSTEM_MODULE.duration_start) / 1000000;
+    double duration = (double) (esp_timer_get_time() - HASH_HISTORY.duration_start) / 1000000;
 
     double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
-    if (SYSTEM_MODULE.historical_hashrate_init < HISTORY_LENGTH) {
+    if (HASH_HISTORY.historical_hashrate_init < HISTORY_LENGTH) {
         SYSTEM_MODULE.current_hashrate = rolling_rate;
     } else {
         // More smoothing

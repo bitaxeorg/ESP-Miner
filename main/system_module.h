@@ -14,32 +14,10 @@ typedef struct
 
 typedef struct
 {
-    // The starting time for a certain period of mining activity.
-    double duration_start;
-
-    // The index to keep track of the rolling historical hashrate data.
-    int historical_hashrate_rolling_index;
-
-    // An array to store timestamps corresponding to historical hashrate values.
-    double historical_hashrate_time_stamps[HISTORY_LENGTH];
-
-    // An array to store historical hashrate values over a defined period.
-    double historical_hashrate[HISTORY_LENGTH];
-
-    // A flag indicating if the historical hashrate data is initialized.
-    int historical_hashrate_init;
+    
 
     // The current calculated hashrate of the system at this moment.
     double current_hashrate;
-
-    // The average hashrate over a defined period of time.
-    double avg_hashrate;
-
-    // The hashrate without accounting for errors or invalid data points.
-    double hashrate_no_error;
-
-    // The hashrate accounting for errors or invalid data points.
-    double hashrate_error;
 
     // The starting timestamp of the mining session.
     int64_t start_time;
