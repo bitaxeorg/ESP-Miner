@@ -232,7 +232,7 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
 
 void BAP_handle_settings(const char *parameter, const char *value) {
     //ESP_LOGI(TAG, "Handling settings change for parameter: %s, value: %s",
-             parameter ? parameter : "NULL", value ? value : "NULL");
+    //         parameter ? parameter : "NULL", value ? value : "NULL");
     
     if (!parameter || !value) {
         ESP_LOGE(TAG, "Invalid settings parameters");
