@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "frequency_transition_bmXX.h"
+#include "pll.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -26,25 +27,11 @@
 #define GROUP_SINGLE 0x00
 #define GROUP_ALL 0x10
 
-#define CMD_JOB 0x01
-
 #define CMD_SETADDRESS 0x00
 #define CMD_WRITE 0x01
 #define CMD_READ 0x02
 #define CMD_INACTIVE 0x03
 
-#define RESPONSE_CMD 0x00
-#define RESPONSE_JOB 0x80
-
-#define SLEEP_TIME 20
-#define FREQ_MULT 25.0
-
-#define CLOCK_ORDER_CONTROL_0 0x80
-#define CLOCK_ORDER_CONTROL_1 0x84
-#define ORDERED_CLOCK_ENABLE 0x20
-#define CORE_REGISTER_CONTROL 0x3C
-#define PLL3_PARAMETER 0x68
-#define FAST_UART_CONFIGURATION 0x28
 #define MISC_CONTROL 0x18
 
 typedef struct __attribute__((__packed__))
@@ -60,8 +47,6 @@ typedef struct __attribute__((__packed__))
 static const char * TAG = "bm1368";
 
 static task_result result;
-
-static float current_frequency = 56.25;
 
 static void _send_BM1368(uint8_t header, uint8_t * data, uint8_t data_len, bool debug)
 {
@@ -119,66 +104,23 @@ void BM1368_set_version_mask(uint32_t version_mask)
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, version_cmd, 6, BM1368_SERIALTX_DEBUG);
 }
 
-void BM1368_send_hash_frequency(float target_freq) {
-    float max_diff = 0.001;
-    uint8_t freqbuf[6] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41};
-    uint8_t postdiv_min = 255;
-    uint8_t postdiv2_min = 255;
-    float best_freq = 0;
-    uint8_t best_refdiv = 0, best_fbdiv = 0, best_postdiv1 = 0, best_postdiv2 = 0;
-    bool found = false;
+void BM1368_send_hash_frequency(float target_freq) 
+{
+    uint8_t fb_divider, refdiv, postdiv1, postdiv2;
+    float new_freq;
+    
+    pll_get_parameters(target_freq, 144, 235, &fb_divider, &refdiv, &postdiv1, &postdiv2, &new_freq);
 
-    for (uint8_t refdiv = 2; refdiv > 0; refdiv--) {
-        for (uint8_t postdiv1 = 7; postdiv1 > 0; postdiv1--) {
-            for (uint8_t postdiv2 = 7; postdiv2 > 0; postdiv2--) {
-                uint16_t fb_divider = round(target_freq / 25.0 * (refdiv * postdiv2 * postdiv1));
-                float newf = 25.0 * fb_divider / (refdiv * postdiv2 * postdiv1);
-
-                if (fb_divider >= 144 && fb_divider <= 235 &&
-                    fabs(target_freq - newf) < max_diff &&
-                    postdiv1 >= postdiv2 &&
-                    postdiv1 * postdiv2 < postdiv_min &&
-                    postdiv2 <= postdiv2_min) {
-
-                    postdiv2_min = postdiv2;
-                    postdiv_min = postdiv1 * postdiv2;
-                    best_freq = newf;
-                    best_refdiv = refdiv;
-                    best_fbdiv = fb_divider;
-                    best_postdiv1 = postdiv1;
-                    best_postdiv2 = postdiv2;
-                    found = true;
-                }
-            }
-        }
-    }
-
-    if (!found) {
-        ESP_LOGE(TAG, "Didn't find PLL settings for target frequency %.2f", target_freq);
-        return;
-    }
-
-    freqbuf[2] = (best_fbdiv * 25 / best_refdiv >= 2400) ? 0x50 : 0x40;
-    freqbuf[3] = best_fbdiv;
-    freqbuf[4] = best_refdiv;
-    freqbuf[5] = (((best_postdiv1 - 1) & 0xf) << 4) | ((best_postdiv2 - 1) & 0xf);
+    uint8_t vdo_scale = (fb_divider * FREQ_MULT / refdiv >= 2400) ? 0x50 : 0x40;
+    uint8_t postdiv = (((postdiv1 - 1) & 0xf) << 4) | ((postdiv2 - 1) & 0xf);
+    uint8_t freqbuf[6] = {0x00, 0x08, vdo_scale, fb_divider, refdiv, postdiv};
 
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, freqbuf, sizeof(freqbuf), BM1368_SERIALTX_DEBUG);
 
-    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", target_freq, best_freq);
-    current_frequency = target_freq;
+    ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, new_freq);
 }
 
-bool BM1368_set_frequency(float target_freq) {
-    return do_frequency_transition(target_freq, BM1368_send_hash_frequency, 1368);
-}
-
-static void do_frequency_ramp_up(float target_frequency) {
-    ESP_LOGI(TAG, "Ramping up frequency from %.2f MHz to %.2f MHz", current_frequency, target_frequency);
-    do_frequency_transition(target_frequency, BM1368_send_hash_frequency, 1368);
-}
-
-uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
+uint8_t BM1368_init(float frequency, uint16_t asic_count, uint16_t difficulty)
 {
     // set version mask
     for (int i = 0; i < 4; i++) {
@@ -233,7 +175,7 @@ uint8_t BM1368_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty
     get_difficulty_mask(difficulty, difficulty_mask);
     _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1368_SERIALTX_DEBUG);    
 
-    do_frequency_ramp_up((float)frequency);
+    do_frequency_transition(frequency, BM1368_send_hash_frequency);
 
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, (uint8_t[]){0x00, 0x10, 0x00, 0x00, 0x15, 0xa4}, 6, false);
     BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);

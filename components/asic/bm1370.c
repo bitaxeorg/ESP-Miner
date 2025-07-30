@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "frequency_transition_bmXX.h"
+#include "pll.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -26,25 +27,11 @@
 #define GROUP_SINGLE 0x00
 #define GROUP_ALL 0x10
 
-#define CMD_JOB 0x01
-
 #define CMD_SETADDRESS 0x00
 #define CMD_WRITE 0x01
 #define CMD_READ 0x02
 #define CMD_INACTIVE 0x03
 
-#define RESPONSE_CMD 0x00
-#define RESPONSE_JOB 0x80
-
-#define SLEEP_TIME 20
-#define FREQ_MULT 25.0
-
-#define CLOCK_ORDER_CONTROL_0 0x80
-#define CLOCK_ORDER_CONTROL_1 0x84
-#define ORDERED_CLOCK_ENABLE 0x20
-#define CORE_REGISTER_CONTROL 0x3C
-#define PLL3_PARAMETER 0x68
-#define FAST_UART_CONFIGURATION 0x28
 #define MISC_CONTROL 0x18
 
 typedef struct __attribute__((__packed__))
@@ -138,79 +125,23 @@ void BM1370_set_version_mask(uint32_t version_mask)
     _send_BM1370(TYPE_CMD | GROUP_ALL | CMD_WRITE, version_cmd, 6, BM1370_SERIALTX_DEBUG);
 }
 
-void BM1370_send_hash_frequency(float target_freq) {
-    // default 200Mhz if it fails
-    unsigned char freqbuf[6] = {0x00, 0x08, 0x40, 0xA0, 0x02, 0x41}; // freqbuf - pll0_parameter
-    float newf = 200.0;
+void BM1370_send_hash_frequency(float target_freq) 
+{
+    uint8_t fb_divider, refdiv, postdiv1, postdiv2;
+    float frequency;
 
-    uint8_t fb_divider = 0;
-    uint8_t post_divider1 = 0, post_divider2 = 0;
-    uint8_t ref_divider = 0;
-    float min_difference = 10;
-    float max_diff = 1.0;
-
-    // refdiver is 2 or 1
-    // postdivider 2 is 1 to 7
-    // postdivider 1 is 1 to 7 and greater than or equal to postdivider 2
-    // fbdiv is 0xa0 to 0xef
-    for (uint8_t refdiv_loop = 2; refdiv_loop > 0 && fb_divider == 0; refdiv_loop--) {
-        for (uint8_t postdiv1_loop = 7; postdiv1_loop > 0 && fb_divider == 0; postdiv1_loop--) {
-            for (uint8_t postdiv2_loop = 7; postdiv2_loop > 0 && fb_divider == 0; postdiv2_loop--) {
-                if (postdiv1_loop >= postdiv2_loop) {
-                    int temp_fb_divider = round(((float) (postdiv1_loop * postdiv2_loop * target_freq * refdiv_loop) / 25.0));
-
-                    if (temp_fb_divider >= 0xa0 && temp_fb_divider <= 0xef) {
-                        float temp_freq = 25.0 * (float) temp_fb_divider / (float) (refdiv_loop * postdiv2_loop * postdiv1_loop);
-                        float freq_diff = fabs(target_freq - temp_freq);
-
-                        if (freq_diff < min_difference && freq_diff < max_diff) {
-                            fb_divider = temp_fb_divider;
-                            post_divider1 = postdiv1_loop;
-                            post_divider2 = postdiv2_loop;
-                            ref_divider = refdiv_loop;
-                            min_difference = freq_diff;
-                            newf = temp_freq;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (fb_divider == 0) {
-        ESP_LOGE(TAG, "Failed to find PLL settings for target frequency %.2f", target_freq);
-        return;
-    }
-
-    freqbuf[3] = fb_divider;
-    freqbuf[4] = ref_divider;
-    freqbuf[5] = (((post_divider1 - 1) & 0xf) << 4) + ((post_divider2 - 1) & 0xf);
-
-    if (fb_divider * 25 / (float) ref_divider >= 2400) {
-        freqbuf[2] = 0x50;
-    }
+    pll_get_parameters(target_freq, 160, 239, &fb_divider, &refdiv, &postdiv1, &postdiv2, &frequency);
+    
+    uint8_t vdo_scale = (fb_divider * FREQ_MULT / refdiv >= 2400) ? 0x50 : 0x40;
+    uint8_t postdiv = (((postdiv1 - 1) & 0xf) << 4) | ((postdiv2 - 1) & 0xf);
+    uint8_t freqbuf[6] = {0x00, 0x08, vdo_scale, fb_divider, refdiv, postdiv};
 
     _send_BM1370(TYPE_CMD | GROUP_ALL | CMD_WRITE, freqbuf, 6, BM1370_SERIALTX_DEBUG);
 
-    ESP_LOGI(TAG, "Setting Frequency to %.2fMHz (%.2f)", target_freq, newf);
+    ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
 }
 
-static void do_frequency_ramp_up(float target_frequency) {
-    if (target_frequency == 0) {
-        ESP_LOGI(TAG, "Skipping frequency ramp");
-        return;
-    }
-    
-    ESP_LOGI(TAG, "Ramping up frequency from 56.25 MHz to %.2f MHz", target_frequency);
-    do_frequency_transition(target_frequency, BM1370_send_hash_frequency, 1370);
-}
-
-// Add a public function for external use
-bool BM1370_set_frequency(float target_freq) {
-    return do_frequency_transition(target_freq, BM1370_send_hash_frequency, 1370);
-}
-
-uint8_t BM1370_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty)
+uint8_t BM1370_init(float frequency, uint16_t asic_count, uint16_t difficulty)
 {
     // set version mask
     for (int i = 0; i < 3; i++) {
@@ -305,7 +236,7 @@ uint8_t BM1370_init(uint64_t frequency, uint16_t asic_count, uint16_t difficulty
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x3C, 0x80, 0x00, 0x8D, 0xEE}, 6, BM1370_SERIALTX_DEBUG);
 
     //ramp up the hash frequency
-    do_frequency_ramp_up(frequency);
+    do_frequency_transition(frequency, BM1370_send_hash_frequency);
 
     //register 10 is still a bit of a mystery. discussion: https://github.com/bitaxeorg/ESP-Miner/pull/167
 
