@@ -42,21 +42,11 @@ void ASIC_result_task(void *pvParameters)
 
         if (nonce_diff >= active_job->pool_diff)
         {
-            char * user = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
-            int ret = STRATUM_V1_submit_share(
-                MINING_MODULE.sock,
-                MINING_MODULE.send_uid++,
-                user,
-                active_job->jobid,
+            stratum_submit_share(active_job->jobid,
                 active_job->extranonce2,
                 active_job->ntime,
                 asic_result->nonce,
                 asic_result->rolled_version ^ active_job->version);
-
-            if (ret < 0) {
-                ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
-                stratum_close_connection();
-            }
         }
 
         SYSTEM_notify_found_nonce(nonce_diff, job_id);

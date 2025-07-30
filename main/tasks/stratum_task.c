@@ -31,6 +31,13 @@ static StratumApiV1Message stratum_api_v1_message = {};
 static const char * primary_stratum_url;
 static uint16_t primary_stratum_port;
 
+ //maybe need a stratum module
+int sock;
+
+// A message ID that must be unique per request that expects a response.
+// For requests not expecting a response (called notifications), this is null.
+int send_uid;
+
 struct timeval tcp_snd_timeout = {
     .tv_sec = 5,
     .tv_usec = 0
@@ -66,22 +73,42 @@ void cleanQueue() {
 void stratum_reset_uid()
 {
     ESP_LOGI(TAG, "Resetting stratum uid");
-    MINING_MODULE.send_uid = 1;
+    send_uid = 1;
 }
 
 
 void stratum_close_connection()
 {
-    if (MINING_MODULE.sock < 0) {
+    if (sock < 0) {
         ESP_LOGE(TAG, "Socket already shutdown, not shutting down again..");
         return;
     }
 
     ESP_LOGE(TAG, "Shutting down socket and restarting...");
-    shutdown(MINING_MODULE.sock, SHUT_RDWR);
-    close(MINING_MODULE.sock);
+    shutdown(sock, SHUT_RDWR);
+    close(sock);
     cleanQueue();
     vTaskDelay(1000 / portTICK_PERIOD_MS);
+}
+
+int stratum_submit_share(char * jobid, char * extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version)
+{
+    char * user = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
+    int ret = STRATUM_V1_submit_share(
+        sock,
+        send_uid++,
+        user,
+        jobid,
+        extranonce2,
+        ntime,
+        nonce,
+        version);
+
+    if (ret < 0) {
+        ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
+        stratum_close_connection();
+    }
+    return ret;
 }
 
 void stratum_primary_heartbeat()
@@ -246,9 +273,9 @@ void stratum_task(void * pvParameters)
         dest_addr.sin_family = AF_INET;
         dest_addr.sin_port = htons(port);
 
-        MINING_MODULE.sock = socket(addr_family, SOCK_STREAM, ip_protocol);
+        sock = socket(addr_family, SOCK_STREAM, ip_protocol);
         vTaskDelay(300 / portTICK_PERIOD_MS);
-        if (MINING_MODULE.sock < 0) {
+        if (sock < 0) {
             ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
             if (++retry_critical_attempts > MAX_CRITICAL_RETRY_ATTEMPTS) {
                 ESP_LOGE(TAG, "Max retry attempts reached, restarting...");
@@ -260,24 +287,24 @@ void stratum_task(void * pvParameters)
         retry_critical_attempts = 0;
 
         ESP_LOGI(TAG, "Socket created, connecting to %s:%d", host_ip, port);
-        int err = connect(MINING_MODULE.sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
         if (err != 0)
         {
             retry_attempts++;
             ESP_LOGE(TAG, "Socket unable to connect to %s:%d (errno %d: %s)", stratum_url, port, errno, strerror(errno));
             // close the socket
-            shutdown(MINING_MODULE.sock, SHUT_RDWR);
-            close(MINING_MODULE.sock);
+            shutdown(sock, SHUT_RDWR);
+            close(sock);
             // instead of restarting, retry this every 5 seconds
             vTaskDelay(5000 / portTICK_PERIOD_MS);
             continue;
         }
 
-        if (setsockopt(MINING_MODULE.sock, SOL_SOCKET, SO_SNDTIMEO, &tcp_snd_timeout, sizeof(tcp_snd_timeout)) != 0) {
+        if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tcp_snd_timeout, sizeof(tcp_snd_timeout)) != 0) {
             ESP_LOGE(TAG, "Fail to setsockopt SO_SNDTIMEO");
         }
 
-        if (setsockopt(MINING_MODULE.sock, SOL_SOCKET, SO_RCVTIMEO , &tcp_rcv_timeout, sizeof(tcp_rcv_timeout)) != 0) {
+        if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO , &tcp_rcv_timeout, sizeof(tcp_rcv_timeout)) != 0) {
             ESP_LOGE(TAG, "Fail to setsockopt SO_RCVTIMEO ");
         }
 
@@ -286,24 +313,24 @@ void stratum_task(void * pvParameters)
 
         ///// Start Stratum Action
         // mining.configure - ID: 1
-        STRATUM_V1_configure_version_rolling(MINING_MODULE.sock, MINING_MODULE.send_uid++, &MINING_MODULE.version_mask);
+        STRATUM_V1_configure_version_rolling(sock, send_uid++, &MINING_MODULE.version_mask);
 
         // mining.subscribe - ID: 2
-        STRATUM_V1_subscribe(MINING_MODULE.sock, MINING_MODULE.send_uid++, DEVICE_CONFIG.family.asic.name);
+        STRATUM_V1_subscribe(sock, send_uid++, DEVICE_CONFIG.family.asic.name);
 
         char * username = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
         char * password = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_pass : POOL_MODULE.pool_pass;
 
-        int authorize_message_id = MINING_MODULE.send_uid++;
+        int authorize_message_id = send_uid++;
         //mining.authorize - ID: 3
-        STRATUM_V1_authorize(MINING_MODULE.sock, authorize_message_id, username, password);
+        STRATUM_V1_authorize(sock, authorize_message_id, username, password);
         STRATUM_V1_stamp_tx(authorize_message_id);
 
         // Everything is set up, lets make sure we don't abandon work unnecessarily.
         MINING_MODULE.abandon_work = 0;
 
         while (1) {
-            char * line = STRATUM_V1_receive_jsonrpc_line(MINING_MODULE.sock);
+            char * line = STRATUM_V1_receive_jsonrpc_line(sock);
             if (!line) {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
                 retry_attempts++;
@@ -365,10 +392,10 @@ void stratum_task(void * pvParameters)
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "setup message accepted");
                     if (stratum_api_v1_message.message_id == authorize_message_id) {
-                        STRATUM_V1_suggest_difficulty(MINING_MODULE.sock, MINING_MODULE.send_uid++, difficulty);
+                        STRATUM_V1_suggest_difficulty(sock, send_uid++, difficulty);
                     }
                     if (extranonce_subscribe) {
-                        STRATUM_V1_extranonce_subscribe(MINING_MODULE.sock, MINING_MODULE.send_uid++);
+                        STRATUM_V1_extranonce_subscribe(sock, send_uid++);
                     }
                 } else {
                     ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);
