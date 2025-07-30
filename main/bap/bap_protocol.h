@@ -46,6 +46,8 @@ typedef enum {
     BAP_PARAM_ASIC_VOLTAGE,
     BAP_PARAM_SSID,
     BAP_PARAM_PASSWORD,
+    BAP_PARAM_FAN_SPEED,
+    BAP_PARAM_AUTO_FAN_SPEED,
     BAP_PARAM_UNKNOWN
 } bap_parameter_t;
 

@@ -346,6 +346,36 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 }
             }
             break;
+
+        case BAP_PARAM_FAN_SPEED:
+            {
+                uint16_t fan_speed = (uint16_t)atoi(value);
+
+                if (fan_speed < 0 || fan_speed > 100) {
+                    ESP_LOGE(TAG, "Invalid fan speed value: %d%% (valid range: 0-100%%)", fan_speed);
+                    BAP_send_message(BAP_CMD_ERR, parameter, "invalid_range");
+                    return;
+                }
+                //ESP_LOGI(TAG, "Setting fan speed to %d%%", fan_speed);
+                nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
+                nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, fan_speed);
+            }
+            break;
+        case BAP_PARAM_AUTO_FAN_SPEED:
+            {
+                uint16_t auto_fan_speed = (uint16_t)atoi(value);
+
+                if (auto_fan_speed < 0 || auto_fan_speed > 1) {
+                    ESP_LOGE(TAG, "Invalid auto fan speed value: %d (valid range: 0-1)", auto_fan_speed);
+                    BAP_send_message(BAP_CMD_ERR, parameter, "invalid_range");
+                    return;
+                }
+                //ESP_LOGI(TAG, "Setting auto fan speed to %d", auto_fan_speed);
+                nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, auto_fan_speed);
+                BAP_send_message(BAP_CMD_ACK, parameter, "auto_fan_speed_set");
+                return;
+            }
+            break;
             
         default:
             ESP_LOGE(TAG, "Unsupported settings parameter: %s", parameter);
