@@ -41,17 +41,17 @@
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
 /////Test Constants/////
-// Test Fan Speed
-#define FAN_SPEED_TARGET_MIN 1000 // RPM
+//Test Fan Speed
+#define FAN_SPEED_TARGET_MIN 1000 //RPM
 
-// Test Core Voltage
-#define CORE_VOLTAGE_TARGET_MIN 1000 // mV
-#define CORE_VOLTAGE_TARGET_MAX 1300 // mV
+//Test Core Voltage
+#define CORE_VOLTAGE_TARGET_MIN 1000 //mV
+#define CORE_VOLTAGE_TARGET_MAX 1300 //mV
 
-// Test Power Consumption
-#define POWER_CONSUMPTION_MARGIN 3 //+/- watts
+//Test Power Consumption
+#define POWER_CONSUMPTION_MARGIN 3              //+/- watts
 
-// Test Difficulty
+//Test Difficulty
 #define DIFFICULTY 8
 
 static const char * TAG = "self_test";
@@ -75,8 +75,7 @@ static bool should_test()
     return gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
 }
 
-static void reset_self_test()
-{
+static void reset_self_test() {
     ESP_LOGI(TAG, "Long press detected...");
     // Give the semaphore back
     xSemaphoreGive(longPressSemaphore);
@@ -95,7 +94,7 @@ static esp_err_t test_fan_sense()
         return ESP_OK;
     }
 
-    // fan test failed
+    //fan test failed
     ESP_LOGE(TAG, "FAN test failed!");
     display_msg("FAN:WARN");
     return ESP_FAIL;
@@ -105,7 +104,7 @@ static esp_err_t test_INA260_power_consumption(int target_power, int margin)
 {
     float power = INA260_read_power() / 1000;
     ESP_LOGI(TAG, "Power: %f", power);
-    if (power > target_power - margin && power < target_power + margin) {
+    if (power > target_power -margin && power < target_power +margin) {
         return ESP_OK;
     }
     return ESP_FAIL;
@@ -117,7 +116,7 @@ static esp_err_t test_TPS546_power_consumption(int target_power, int margin)
     float current = TPS546_get_iout();
     float power = voltage * current;
     ESP_LOGI(TAG, "Power: %f, Voltage: %f, Current %f", power, voltage, current);
-    if (power < target_power + margin) {
+    if (power < target_power +margin) {
         return ESP_OK;
     }
     return ESP_FAIL;
@@ -131,7 +130,7 @@ static esp_err_t test_core_voltage()
     if (core_voltage > CORE_VOLTAGE_TARGET_MIN && core_voltage < CORE_VOLTAGE_TARGET_MAX) {
         return ESP_OK;
     }
-    // tests failed
+    //tests failed
     ESP_LOGE(TAG, "Core Voltage TEST FAIL, INCORRECT CORE VOLTAGE");
     display_msg("VCORE:FAIL");
     return ESP_FAIL;
@@ -161,7 +160,7 @@ esp_err_t test_input()
         display_msg("INPUT:FAIL");
         return ESP_FAIL;
     }
-
+            
     ESP_LOGI(TAG, "INPUT init success!");
 
     return ESP_OK;
@@ -267,17 +266,17 @@ esp_err_t test_psram()
 /**
  * @brief Perform a self-test of the system.
  *
- * This function is intended to be run as a task and will execute a series of
+ * This function is intended to be run as a task and will execute a series of 
  * diagnostic tests to ensure the system is functioning correctly.
  *
+ * @param pvParameters Pointer to the parameters passed to the task (if any).
  * @return true if the self-test was run, false if it was skipped.
  */
 bool self_test()
 {
 
     // Should we run the self-test?
-    if (!should_test())
-        return true;
+    if (!should_test()) return false;
 
     if (isFactoryTest) {
         ESP_LOGI(TAG, "Running factory self-test");
@@ -297,38 +296,38 @@ bool self_test()
         return false;
     }
 
-    // Run PSRAM test
     if (test_psram() != ESP_OK) {
+    //Run PSRAM test
         ESP_LOGE(TAG, "NO PSRAM on device!");
         tests_done(false);
     }
 
-    // Run display tests
     if (test_display() != ESP_OK) {
+    //Run display tests
         ESP_LOGE(TAG, "Display test failed!");
         tests_done(false);
     }
 
-    // Run input tests
     if (test_input() != ESP_OK) {
+    //Run input tests
         ESP_LOGE(TAG, "Input test failed!");
         tests_done(false);
     }
 
-    // Run screen tests
     if (test_screen() != ESP_OK) {
+    //Run screen tests
         ESP_LOGE(TAG, "Screen test failed!");
         tests_done(false);
     }
 
-    // Init peripherals EMC2101 and INA260 (if present)
     if (test_init_peripherals() != ESP_OK) {
+    //Init peripherals EMC2101 and INA260 (if present)
         ESP_LOGE(TAG, "Peripherals init failed!");
         tests_done(false);
     }
 
-    // Voltage Regulator Testing
     if (test_voltage_regulator() != ESP_OK) {
+    //Voltage Regulator Testing
         ESP_LOGE(TAG, "Voltage Regulator test failed!");
         tests_done(false);
     }
@@ -338,7 +337,7 @@ bool self_test()
         tests_done(false);
     }
 
-    // test for number of ASICs
+    //test for number of ASICs
     if (SERIAL_init() != ESP_OK) {
         ESP_LOGE(TAG, "SERIAL init failed!");
         tests_done(false);
@@ -364,8 +363,8 @@ bool self_test()
         tests_done(false);
     }
 
-    // test for voltage regulator faults
     if (test_vreg_faults() != ESP_OK) {
+    //test for voltage regulator faults
         ESP_LOGE(TAG, "VCORE check fault failed!");
         char error_buf[20];
         snprintf(error_buf, 20, "VCORE:PWR FAULT");
@@ -373,8 +372,8 @@ bool self_test()
         tests_done(false);
     }
 
-    // setup and test hashrate
     int baud = ASIC_set_max_baud();
+    //setup and test hashrate
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     if (SERIAL_set_baud(baud) != ESP_OK) {
@@ -438,7 +437,7 @@ bool self_test()
     double sum = 0;
     double duration = 0;
     double hash_rate = 0;
-    double hashtest_timeout = 30;
+    double hashtest_timeout = 5;
 
     while (duration < hashtest_timeout) {
         task_result * asic_result = ASIC_process_work();
@@ -447,9 +446,10 @@ bool self_test()
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
             sum += DIFFICULTY;
 
+            
             hash_rate = (sum * 4294967296) / (duration * 1000000000);
             ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
-            ESP_LOGI(TAG, "%f Gh/s  , duration %f", hash_rate, duration);
+            ESP_LOGI(TAG, "%f Gh/s  , duration %f",hash_rate, duration);
         }
         duration = (double) (esp_timer_get_time() - start) / 1000000;
     }

@@ -58,14 +58,14 @@ void app_main(void)
     ESP_ERROR_CHECK(i2c_bitaxe_init());
     ESP_LOGI(TAG, "I2C initialized successfully");
 
-    // wait for I2C to init
+    //wait for I2C to init
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    // Init ADC
+    //Init ADC
     ADC_init();
 
-    // initialize the ESP32 NVS
-    if (NVSDevice_init() != ESP_OK) {
+    //initialize the ESP32 NVS
+    if (NVSDevice_init() != ESP_OK){
         ESP_LOGE(TAG, "Failed to init NVS");
         return;
     }
