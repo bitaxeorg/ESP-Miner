@@ -106,7 +106,7 @@ esp_err_t SYSTEM_init_peripherals() {
     ESP_RETURN_ON_ERROR(gpio_install_isr_service(0), TAG, "Error installing ISR service");
 
     // Initialize the core voltage regulator
-    ESP_RETURN_ON_ERROR(VCORE_init(NULL), TAG, "VCORE init failed!");
+    ESP_RETURN_ON_ERROR(VCORE_init(), TAG, "VCORE init failed!");
     ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
 
     ESP_RETURN_ON_ERROR(Thermal_init(DEVICE_CONFIG), TAG, "Thermal init failed!");
@@ -116,11 +116,11 @@ esp_err_t SYSTEM_init_peripherals() {
     // Ensure overheat_mode config exists
     ESP_RETURN_ON_ERROR(ensure_overheat_mode_config(), TAG, "Failed to ensure overheat_mode config");
 
-    ESP_RETURN_ON_ERROR(display_init(NULL), TAG, "Display init failed!");
+    ESP_RETURN_ON_ERROR(display_init(), TAG, "Display init failed!");
 
     ESP_RETURN_ON_ERROR(input_init(screen_next, toggle_wifi_softap), TAG, "Input init failed!");
 
-    ESP_RETURN_ON_ERROR(screen_start(NULL), TAG, "Screen start failed!");
+    ESP_RETURN_ON_ERROR(screen_start(), TAG, "Screen start failed!");
 
     return ESP_OK;
 }
