@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include "esp_err.h"
-#include "global_state.h"
+
 
 esp_err_t NVSDevice_init(void);
 
