@@ -16,6 +16,7 @@
 #include "device_config.h"
 #include "bap_uart.h"
 #include "bap_protocol.h"
+#include "bap.h"
 
 #define BAP_UART_NUM UART_NUM_2
 #define BAP_BUF_SIZE 1024
@@ -29,9 +30,7 @@
 
 static const char *TAG = "BAP_UART";
 
-static QueueHandle_t uart_send_queue = NULL;
 static TaskHandle_t uart_send_task_handle = NULL;
-static SemaphoreHandle_t uart_send_mutex = NULL;
 static TaskHandle_t uart_receive_task_handle = NULL;
 
 static void uart_receive_task(void *pvParameters);
@@ -56,9 +55,9 @@ void BAP_send_message(bap_command_t cmd, const char *parameter, const char *valu
 
     len = snprintf(message, sizeof(message), "$%s*%02X\r\n", sentence_body, checksum);
 
-    if (uart_send_mutex != NULL && xSemaphoreTake(uart_send_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (bap_uart_send_mutex != NULL && xSemaphoreTake(bap_uart_send_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         uart_write_bytes(BAP_UART_NUM, message, len);
-        xSemaphoreGive(uart_send_mutex);
+        xSemaphoreGive(bap_uart_send_mutex);
         
         ESP_LOGI(TAG, "Sent: %s", message);
     } else {
@@ -94,7 +93,7 @@ void BAP_send_message_with_queue(bap_command_t cmd, const char *parameter, const
     msg.message[len] = '\0';
     msg.length = len;
 
-    if (xQueueSend(uart_send_queue, &msg, UART_SEND_TIMEOUT_MS / portTICK_PERIOD_MS) != pdTRUE) {
+    if (xQueueSend(bap_uart_send_queue, &msg, UART_SEND_TIMEOUT_MS / portTICK_PERIOD_MS) != pdTRUE) {
         ESP_LOGW(TAG, "Failed to queue message, dropping");
         free(msg.message);
     }
@@ -172,19 +171,19 @@ static void uart_receive_task(void *pvParameters) {
 static void uart_send_task(void *pvParameters) {
     bap_message_t msg;
     while (1) {
-        if (xQueueReceive(uart_send_queue, &msg, portMAX_DELAY) == pdTRUE) {
+        if (xQueueReceive(bap_uart_send_queue, &msg, portMAX_DELAY) == pdTRUE) {
             bool message_sent = false;
             
-            if (uart_send_mutex != NULL && xSemaphoreTake(uart_send_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            if (bap_uart_send_mutex != NULL && xSemaphoreTake(bap_uart_send_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 size_t available;
                 esp_err_t ret = uart_get_buffered_data_len(BAP_UART_NUM, &available);
                 if (ret != ESP_OK) {
                     ESP_LOGE(TAG, "Failed to get UART buffer status");
-                    xSemaphoreGive(uart_send_mutex);
+                    xSemaphoreGive(bap_uart_send_mutex);
                     message_sent = true;
                 } else if (available > UART_BUFFER_THRESHOLD) {
                     ESP_LOGW(TAG, "UART buffer threshold exceeded (%zu bytes), dropping message", available);
-                    xSemaphoreGive(uart_send_mutex);
+                    xSemaphoreGive(bap_uart_send_mutex);
                     message_sent = true;
                 } else {
                     int bytes_sent = uart_write_bytes(BAP_UART_NUM, msg.message, msg.length);
@@ -194,7 +193,7 @@ static void uart_send_task(void *pvParameters) {
                         ESP_LOGW(TAG, "UART send failed or partial: %d of %d bytes", bytes_sent, msg.length);
                         message_sent = true;
                     }
-                    xSemaphoreGive(uart_send_mutex);
+                    xSemaphoreGive(bap_uart_send_mutex);
                 }
             } else {
                 ESP_LOGW(TAG, "Failed to take UART send mutex, dropping message");
@@ -233,19 +232,6 @@ esp_err_t BAP_uart_init(void) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    uart_send_mutex = xSemaphoreCreateMutex();
-    if (uart_send_mutex == NULL) {
-        ESP_LOGE(TAG, "Failed to create UART send mutex");
-        return ESP_ERR_NO_MEM;
-    }
-
-    uart_send_queue = xQueueCreate(UART_SEND_QUEUE_SIZE, UART_SEND_QUEUE_ITEM_SIZE);
-    if (uart_send_queue == NULL) {
-        ESP_LOGE(TAG, "Failed to create UART send queue");
-        vSemaphoreDelete(uart_send_mutex);
-        return ESP_ERR_NO_MEM;
-    }
-    
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -258,30 +244,24 @@ esp_err_t BAP_uart_init(void) {
     esp_err_t ret = uart_param_config(BAP_UART_NUM, &uart_config);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to configure UART parameters: %d", ret);
-        vSemaphoreDelete(uart_send_mutex);
-        vQueueDelete(uart_send_queue);
         return ret;
     }
     
     ret = uart_set_pin(BAP_UART_NUM, GPIO_BAP_TX, GPIO_BAP_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to set UART pins: %d", ret);
-        vSemaphoreDelete(uart_send_mutex);
-        vQueueDelete(uart_send_queue);
         return ret;
     }
     
     ret = uart_driver_install(BAP_UART_NUM, BAP_BUF_SIZE, BAP_BUF_SIZE, 0, NULL, 0);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to install UART driver: %d", ret);
-        vSemaphoreDelete(uart_send_mutex);
-        vQueueDelete(uart_send_queue);
         return ret;
     }
     
     ESP_LOGI(TAG, "BAP UART interface initialized successfully");
     
-    xTaskCreate(
+    BaseType_t task_result = xTaskCreate(
         uart_send_task,
         "uart_send_task",
         3072,
@@ -290,5 +270,11 @@ esp_err_t BAP_uart_init(void) {
         &uart_send_task_handle
     );
     
+    if (task_result != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create uart_send_task");
+        return ESP_ERR_NO_MEM;
+    }
+    
+    ESP_LOGI(TAG, "UART send task created successfully");
     return ESP_OK;
 }

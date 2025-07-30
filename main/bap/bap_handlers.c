@@ -16,12 +16,12 @@
 #include "bap_protocol.h"
 #include "bap_uart.h"
 #include "bap_subscription.h"
+#include "bap.h"
 #include "asic.h"
 
 static const char *TAG = "BAP_HANDLERS";
 
 static bap_command_handler_t handlers[BAP_CMD_UNKNOWN + 1] = {0};
-static GlobalState *global_state = NULL;
 static char last_processed_message[BAP_MAX_MESSAGE_LEN] = {0};
 static uint32_t last_message_time = 0;
 
@@ -197,12 +197,12 @@ void BAP_handle_request(const char *parameter, const char *value) {
         return;
     }
 
-    if (!global_state) {
+    if (!bap_global_state) {
         ESP_LOGE(TAG, "Global state not available for request");
         return;
     }
 
-    BAP_send_request(param, global_state);
+    BAP_send_request(param, bap_global_state);
 }
 
 void BAP_send_request(bap_parameter_t param, GlobalState *state) {
@@ -240,7 +240,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
         return;
     }
 
-    if (!global_state) {
+    if (!bap_global_state) {
         ESP_LOGE(TAG, "Global state not available for settings");
         BAP_send_message(BAP_CMD_ERR, parameter, "system_not_ready");
         return;
@@ -261,12 +261,12 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 
                 //ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
                 
-                bool success = ASIC_set_frequency(global_state, target_frequency);
+                bool success = ASIC_set_frequency(bap_global_state, target_frequency);
                 
                 if (success) {
                     //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
                     
-                    global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
+                    bap_global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
                     nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, target_frequency);
                     
                     char freq_str[32];
@@ -355,8 +355,6 @@ void BAP_handle_settings(const char *parameter, const char *value) {
 }
 
 esp_err_t BAP_handlers_init(GlobalState *state) {
-    global_state = state;
-    
     // Clear all handlers
     memset(handlers, 0, sizeof(handlers));
     

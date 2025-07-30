@@ -16,12 +16,12 @@
 #include "bap_subscription.h"
 #include "bap_protocol.h"
 #include "bap_uart.h"
+#include "bap.h"
 
 static const char *TAG = "BAP_SUBSCRIPTION";
 
 static bap_subscription_t subscriptions[BAP_PARAM_UNKNOWN] = {0};
 static TaskHandle_t subscription_task_handle = NULL;
-static SemaphoreHandle_t subscription_mutex = NULL;
 
 static void subscription_update_task(void *pvParameters);
 
@@ -29,12 +29,6 @@ esp_err_t BAP_subscription_init(void) {
     //ESP_LOGI(TAG, "Initializing BAP subscription management");
     
     memset(subscriptions, 0, sizeof(subscriptions));
-    
-    subscription_mutex = xSemaphoreCreateMutex();
-    if (subscription_mutex == NULL) {
-        ESP_LOGE(TAG, "Failed to create subscription mutex");
-        return ESP_ERR_NO_MEM;
-    }
     
     //ESP_LOGI(TAG, "BAP subscription management initialized");
     return ESP_OK;
@@ -57,7 +51,7 @@ void BAP_subscription_handle_subscribe(const char *parameter, const char *value)
     }
 
     // Take the mutex to protect the subscriptions array
-    if (subscription_mutex != NULL && xSemaphoreTake(subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (bap_subscription_mutex != NULL && xSemaphoreTake(bap_subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         uint32_t current_time = esp_timer_get_time() / 1000;
         
         subscriptions[param].active = true;
@@ -85,7 +79,7 @@ void BAP_subscription_handle_subscribe(const char *parameter, const char *value)
 
         BAP_send_message(BAP_CMD_ACK, parameter, "subscribed");
 
-        xSemaphoreGive(subscription_mutex);
+        xSemaphoreGive(bap_subscription_mutex);
     } else {
         ESP_LOGE(TAG, "Failed to take subscription mutex");
     }
@@ -105,14 +99,14 @@ void BAP_subscription_handle_unsubscribe(const char *parameter, const char *valu
         return;
     }
 
-    if (subscription_mutex != NULL && xSemaphoreTake(subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (bap_subscription_mutex != NULL && xSemaphoreTake(bap_subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         subscriptions[param].active = false;
         
         //ESP_LOGI(TAG, "Subscription deactivated for %s", BAP_parameter_to_string(param));
 
         BAP_send_message(BAP_CMD_ACK, parameter, "unsubscribed");
 
-        xSemaphoreGive(subscription_mutex);
+        xSemaphoreGive(bap_subscription_mutex);
     } else {
         ESP_LOGE(TAG, "Failed to take subscription mutex");
     }
@@ -126,7 +120,7 @@ void BAP_send_subscription_update(GlobalState *state) {
 
     uint32_t current_time = esp_timer_get_time() / 1000;
 
-    if (subscription_mutex != NULL && xSemaphoreTake(subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (bap_subscription_mutex != NULL && xSemaphoreTake(bap_subscription_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         const uint32_t SUBSCRIPTION_TIMEOUT_MS = 5 * 60 * 1000;
 
         for (int i = 0; i < BAP_PARAM_UNKNOWN; i++) {
@@ -208,7 +202,7 @@ void BAP_send_subscription_update(GlobalState *state) {
             }
         }
         
-        xSemaphoreGive(subscription_mutex);
+        xSemaphoreGive(bap_subscription_mutex);
     } else {
         ESP_LOGE(TAG, "Failed to take subscription mutex");
     }

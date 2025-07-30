@@ -1,15 +1,24 @@
 /**
  * @file bap.c
- * @brief BAP (Bitcaxe accessory protocol) main interface
+ * @brief BAP (Bitaxe accessory protocol) main interface
  * 
  * Main implementation for BAP functionality. This file provides the
  * high-level initialization function that coordinates all BAP subsystems.
+ * Also manages shared resources like UART queue and mutexes.
  */
 
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "bap.h"
 
 static const char *TAG = "BAP";
+
+QueueHandle_t bap_uart_send_queue = NULL;
+SemaphoreHandle_t bap_uart_send_mutex = NULL;
+SemaphoreHandle_t bap_subscription_mutex = NULL;
+GlobalState *bap_global_state = NULL;
 
 esp_err_t BAP_init(GlobalState *state) {
     ESP_LOGI(TAG, "Initializing BAP system");
@@ -19,9 +28,32 @@ esp_err_t BAP_init(GlobalState *state) {
         return ESP_ERR_INVALID_ARG;
     }
     
+    bap_global_state = state;
+    
     esp_err_t ret;
     
-    // Initialize subscription management
+    bap_subscription_mutex = xSemaphoreCreateMutex();
+    if (bap_subscription_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create subscription mutex");
+        return ESP_ERR_NO_MEM;
+    }
+    
+    bap_uart_send_mutex = xSemaphoreCreateMutex();
+    if (bap_uart_send_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create UART send mutex");
+        vSemaphoreDelete(bap_subscription_mutex);
+        return ESP_ERR_NO_MEM;
+    }
+
+    bap_uart_send_queue = xQueueCreate(10, sizeof(bap_message_t));
+    if (bap_uart_send_queue == NULL) {
+        ESP_LOGE(TAG, "Failed to create UART send queue");
+        vSemaphoreDelete(bap_subscription_mutex);
+        vSemaphoreDelete(bap_uart_send_mutex);
+        return ESP_ERR_NO_MEM;
+    }
+    
+    // Initialize subscription management  
     ret = BAP_subscription_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize subscription management: %s", esp_err_to_name(ret));
