@@ -4,8 +4,8 @@
 #include <esp_err.h>
 #include "common.h"
 
-void ASIC_init_methods(int id);
-uint8_t ASIC_init(float frequency, uint8_t asic_count,uint16_t difficulty);
+
+uint8_t ASIC_init();
 task_result * ASIC_process_work();
 int ASIC_set_max_baud();
 void ASIC_send_work(void * next_job);

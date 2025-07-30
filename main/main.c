@@ -74,7 +74,6 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to init device config");
         return;
     }
-    ASIC_init_methods(DEVICE_CONFIG.family.asic.id);
     if (!self_test())
         return;
 
