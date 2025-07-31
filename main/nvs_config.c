@@ -167,6 +167,84 @@ void nvs_config_set_u64(const char * key, const uint64_t value)
     nvs_close(handle);
 }
 
+double nvs_config_get_double(const char * key, const double default_value)
+{
+    nvs_handle handle;
+    esp_err_t err;
+    err = nvs_open(NVS_CONFIG_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return default_value;
+    }
+
+    double out;
+    size_t size = sizeof(double);
+    err = nvs_get_blob(handle, key, &out, &size);
+
+    if (err != ESP_OK) {
+        nvs_close(handle);
+        return default_value;
+    }
+
+    nvs_close(handle);
+    return out;
+}
+
+void nvs_config_set_double(const char * key, const double value)
+{
+    nvs_handle handle;
+    esp_err_t err;
+    err = nvs_open(NVS_CONFIG_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Could not open nvs");
+        return;
+    }
+
+    err = nvs_set_blob(handle, key, &value, sizeof(double));
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Could not write nvs key: %s, value: %f", key, value);
+    }
+    nvs_close(handle);
+}
+
+bool nvs_config_get_bool(const char * key, const bool default_value)
+{
+    nvs_handle handle;
+    esp_err_t err;
+    err = nvs_open(NVS_CONFIG_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return default_value;
+    }
+
+    bool out;
+    size_t size = sizeof(bool);
+    err = nvs_get_blob(handle, key, &out, &size);
+
+    if (err != ESP_OK) {
+        nvs_close(handle);
+        return default_value;
+    }
+
+    nvs_close(handle);
+    return out;
+}
+
+void nvs_config_set_bool(const char * key, const bool value)
+{
+    nvs_handle handle;
+    esp_err_t err;
+    err = nvs_open(NVS_CONFIG_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Could not open nvs");
+        return;
+    }
+
+    err = nvs_set_blob(handle, key, &value, sizeof(bool));
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Could not write nvs key: %s, value: %i", key, value);
+    }
+    nvs_close(handle);
+}
+
 void nvs_config_commit()
 {
     nvs_handle handle;
