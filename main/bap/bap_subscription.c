@@ -195,6 +195,14 @@ void BAP_send_subscription_update(GlobalState *state) {
                             BAP_send_message_with_queue(BAP_CMD_RES, "sharesRejected", shares_str);
                         }
                         break;
+
+                    case BAP_PARAM_FAN_SPEED:
+                        {
+                            char fan_speed_str[32];
+                            snprintf(fan_speed_str, sizeof(fan_speed_str), "%d", state->POWER_MANAGEMENT_MODULE.fan_rpm);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "fan_speed", fan_speed_str);
+                        }
+                        break;
                         
                     default:
                         break;
