@@ -187,12 +187,10 @@ void BAP_send_subscription_update(GlobalState *state) {
                         
                     case BAP_PARAM_SHARES:
                         {
-                            char shares_str[32];
-                            snprintf(shares_str, sizeof(shares_str), "%llu", state->SYSTEM_MODULE.shares_accepted);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "sharesAccepted", shares_str);
+                            char shares_ar_str[64];
+                            snprintf(shares_ar_str, sizeof(shares_ar_str), "%lld/%lld", state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "shares", shares_ar_str);
                             
-                            snprintf(shares_str, sizeof(shares_str), "%llu", state->SYSTEM_MODULE.shares_rejected);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "sharesRejected", shares_str);
                         }
                         break;
 
