@@ -48,6 +48,7 @@ typedef enum {
     BAP_PARAM_PASSWORD,
     BAP_PARAM_FAN_SPEED,
     BAP_PARAM_AUTO_FAN_SPEED,
+    BAP_PARAM_BEST_DIFFICULTY,
     BAP_PARAM_UNKNOWN
 } bap_parameter_t;
 

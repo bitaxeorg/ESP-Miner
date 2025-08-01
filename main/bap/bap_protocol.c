@@ -26,7 +26,9 @@ static const char *parameter_strings[] = {
     "ssid",
     "password",
     "fan_speed",
-    "auto_fan"
+    "auto_fan",
+    "best_difficulty",
+    "unknown"
 };
 
 static const char *command_strings[] = {

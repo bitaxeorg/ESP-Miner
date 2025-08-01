@@ -201,7 +201,15 @@ void BAP_send_subscription_update(GlobalState *state) {
                             BAP_send_message_with_queue(BAP_CMD_RES, "fan_speed", fan_speed_str);
                         }
                         break;
-                        
+                    
+                    case BAP_PARAM_BEST_DIFFICULTY:
+                        {
+                            char best_diff_str[32];
+                            snprintf(best_diff_str, sizeof(best_diff_str), "%s", state->SYSTEM_MODULE.best_diff_string);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "best_difficulty", best_diff_str);
+                        }
+                        break;
+
                     default:
                         break;
                 }
