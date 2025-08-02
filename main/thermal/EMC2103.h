@@ -3,6 +3,11 @@
 
 #include "i2c_bitaxe.h"
 
+typedef struct {
+    float temp1;
+    float temp2;
+} EMC2103_temps_t;
+
 #define EMC2103_I2CADDR_DEFAULT 0x2E ///< EMC2103 default i2c address
 
 #define EMC2103_INTERNAL_TEMP_MSB 0x00
@@ -67,6 +72,7 @@ esp_err_t EMC2103_set_fan_speed(float);
 uint16_t EMC2103_get_fan_speed(void);
 esp_err_t EMC2103_init();
 float EMC2103_get_external_temp(void);
+EMC2103_temps_t EMC2103_get_external_temps(void);
 float EMC2103_get_internal_temp(void);
 esp_err_t EMC2103_set_ideality_factor(uint8_t);
 esp_err_t EMC2103_set_beta_compensation(uint8_t);

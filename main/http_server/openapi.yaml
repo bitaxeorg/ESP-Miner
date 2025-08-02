@@ -135,6 +135,7 @@ components:
         - stratumURL
         - stratumUser
         - temp
+        - temp2
         - uptimeSeconds
         - version
         - axeOSVersion
@@ -288,6 +289,9 @@ components:
         temp:
           type: number
           description: Average chip temperature
+        temp2:
+          type: number
+          description: Average chip temperature from second sensor
         uptimeSeconds:
           type: number
           description: System uptime in seconds
