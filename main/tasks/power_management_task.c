@@ -84,13 +84,13 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
         
-        // Get both temperatures for EMC2103
-        if (GLOBAL_STATE->DEVICE_CONFIG.EMC2103) {
+        // Only get second temperature for dual-sensor devices (GAMMA_TURBO)
+        if (Thermal_has_dual_sensors(&GLOBAL_STATE->DEVICE_CONFIG)) {
             thermal_temps_t temps = Thermal_get_chip_temps(GLOBAL_STATE);
             power_management->chip_temp_avg = temps.temp1;
             power_management->chip_temp2_avg = temps.temp2;
         } else {
-            power_management->chip_temp2_avg = 0.0f; // Not used for non-EMC2103 devices
+            power_management->chip_temp2_avg = 0.0f;
         }
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
