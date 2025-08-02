@@ -18,6 +18,7 @@ export class PoolComponent implements OnInit {
 
   public pools: PoolType[] = ['stratum', 'fallbackStratum'];
   public showPassword = {'stratum': false, 'fallbackStratum': false};
+  public showAdvancedOptions = {'stratum': false, 'fallbackStratum': false};
 
   @Input() uri = '';
 
@@ -83,13 +84,13 @@ export class PoolComponent implements OnInit {
       .subscribe({
         next: () => {
           const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
-          this.toastr.warning('You must restart this device after saving for changes to take effect', 'Warning');
-          this.toastr.success(successMessage, 'Success!');
+          this.toastr.warning('You must restart this device after saving for changes to take effect.');
+          this.toastr.success(successMessage);
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Could not save pool settings for ${this.uri}. ${err.message}` : `Could not save pool settings. ${err.message}`;
-          this.toastr.error(errorMessage, 'Error');
+          this.toastr.error(errorMessage);
           this.savedChanges = false;
         }
       });
@@ -100,12 +101,12 @@ export class PoolComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Bitaxe at ${this.uri} restarted` : 'Bitaxe restarted';
-          this.toastr.success(successMessage, 'Success');
+          const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
+          this.toastr.success(successMessage);
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
-          this.toastr.error(errorMessage, 'Error');
+          this.toastr.error(errorMessage);
         }
       });
   }

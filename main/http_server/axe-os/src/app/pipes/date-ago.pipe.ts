@@ -5,6 +5,11 @@ import { Pipe, PipeTransform } from '@angular/core';
   pure: true
 })
 export class DateAgoPipe implements PipeTransform {
+  private static _this = new DateAgoPipe();
+
+  public static transform(value: number): string {
+    return this._this.transform(value);
+  }
 
   transform(value: any, args?: any): any {
     if (value) {

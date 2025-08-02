@@ -116,6 +116,7 @@ components:
         - isUsingFallbackStratum
         - macAddr
         - maxPower
+        - minimumFanSpeed
         - nominalVoltage
         - overheat_mode
         - overclockEnabled
@@ -228,6 +229,9 @@ components:
         maxPower:
           type: integer
           description: Maxmium power draw of the board in watts
+        minimumFanSpeed:
+          type: integer
+          description: Minimum fan speed percentage when using auto fan control
         nominalVoltage:
           type: integer
           description: Nominal board voltage

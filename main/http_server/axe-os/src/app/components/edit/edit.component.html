@@ -1,118 +1,112 @@
-<ng-container *ngIf="form != null">
-    <form [formGroup]="form">
-
+<form *ngIf="form" [formGroup]="form">
+    <div class="card">
         <p-message *ngIf="settingsUnlocked" severity="warn" styleClass="w-full mb-3 py-4 border-round-xl"
             text="Custom settings can cause damage & system instability. Only modify these settings if you understand the risks of running outside designed parameters.">
         </p-message>
 
-        <ng-container *ngIf="!settingsUnlocked">
-            <div class="field grid p-fluid">
-                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="frequency">Frequency</label>
-                <div class="col-12 md:col-10">
-                    <p-dropdown [options]="dropdownFrequency" optionLabel="name" optionValue="value"
-                        formControlName="frequency"></p-dropdown>
-                </div>
+        <div class="field grid p-fluid">
+            <label htmlFor="frequency" class="col-12 md:col-2 md:m-0">Frequency</label>
+            <div class="col-12 md:col-10">
+                <input *ngIf="settingsUnlocked" pInputText id="frequency" formControlName="frequency" type="number" />
+                <p-dropdown *ngIf="!settingsUnlocked" [options]="dropdownFrequency" optionLabel="name" optionValue="value"
+                    formControlName="frequency"></p-dropdown>
             </div>
+        </div>
 
-            <div class="field grid p-fluid">
-                <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="coreVoltage">Core Voltage</label>
-                <p-dropdown class="col-12 md:col-10" [options]="dropdownVoltage" optionLabel="name"
-                    optionValue="value" formControlName="coreVoltage"></p-dropdown>
+        <div class="field grid p-fluid">
+            <label htmlFor="coreVoltage" class="col-12 md:col-2 md:m-0">Core Voltage</label>
+            <div class="col-12 md:col-10">
+                <input *ngIf="settingsUnlocked" pInputText id="coreVoltage" formControlName="coreVoltage" type="number" />
+                <p-dropdown *ngIf="!settingsUnlocked" [options]="dropdownVoltage" optionLabel="name"
+                optionValue="value" formControlName="coreVoltage"></p-dropdown>
             </div>
-        </ng-container>
+        </div>
 
-        <ng-container *ngIf="settingsUnlocked === true">
-
-            <div class="field grid p-fluid">
-                <label htmlFor="frequency" class="col-12 mb-2 md:col-2 md:mb-0">Frequency</label>
-                <div class="col-12 md:col-10">
-                    <input pInputText id="frequency" formControlName="frequency" type="number" />
-                </div>
-            </div>
-
-            <div class="field grid p-fluid">
-                <label htmlFor="coreVoltage" class="col-12 mb-2 md:col-2 md:mb-0">Core Voltage</label>
-                <div class="col-12 md:col-10">
-                    <input pInputText id="coreVoltage" formControlName="coreVoltage" type="number" />
-                </div>
-            </div>
-
-        </ng-container>
-
-        <div class="col-12" *ngIf="form.get('overheat_mode')?.value === 1">
+        <div *ngIf="form.get('overheat_mode')?.value === 1" class="mt-4">
             <button pButton type="button" label="Disable Overheat Mode"
-                    class="p-button-danger w-full py-3"
+                    class="p-button-danger w-full"
                     (click)="disableOverheatMode()">
             </button>
-            <small class="block mt-1 text-center" style="color: #ff0000;">
+            <small class="block mt-1 text-center text-primary">
                 Make sure to reset Frequency and Voltage before clicking this button.
             </small>
         </div>
 
-        <div class="col-12">
-            <div class="field-checkbox">
-                <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed"
-                    [binary]="true"></p-checkbox>
-                <label for="autofanspeed">Automatic Fan Control</label>
+        <div class="field-checkbox grid my-2">
+            <div class="col-1 md:col-10 md:flex-order-2">
+                <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed" [binary]="true"></p-checkbox>
+            </div>
+            <label htmlFor="autofanspeed" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Automatic Fan Control</label>
+        </div>
+
+        <div *ngIf="form.controls['autofanspeed'].value" class="grid p-fluid my-2">
+            <label htmlFor="temptarget" class="hidden md:flex md:col-2 md:m-0">Target Temperature</label>
+            <div class="col-12 md:col-10">
+                <label class="block mb-1">
+                    <span class="md:hidden mr-1">Target Temperature:</span>{{form.controls['temptarget'].value}} °C
+                </label>
+                <p-slider [min]="35" [max]="66" formControlName="temptarget"></p-slider>
             </div>
         </div>
 
-        <div *ngIf="form.controls['autofanspeed'].value == true">
-          <div class="col-12" *ngIf="form.controls['autofanspeed'].value == true">
-              <label>Target Temperature {{form.controls['temptarget'].value}}°C</label>
-              <p-slider [min]="35" [max]="66" formControlName="temptarget"></p-slider>
-          </div>
-      </div>
+        <div *ngIf="form.controls['autofanspeed'].value" class="grid p-fluid">
+            <label htmlFor="minfanspeed" class="hidden md:flex md:col-2 md:m-0">Minimum Fan Speed</label>
+            <div class="col-12 md:col-10">
+                <label class="block mb-1">
+                    <span class="md:hidden mr-1">Minimum Fan Speed:</span>{{form.controls['minfanspeed'].value}} %
+                </label>
+                <p-slider [min]="0" [max]="99" formControlName="minfanspeed"></p-slider>
+            </div>
+        </div>
 
-        <div *ngIf="form.controls['autofanspeed'].value != true">
-            <div class="col-12" *ngIf="form.controls['autofanspeed'].value != true">
-                <label>Fan Speed {{form.controls['fanspeed'].value}}%
-                    <b *ngIf="form.controls['fanspeed'].value < 33" style="color:red">Danger: Could Cause
-                        Overheating</b> <b *ngIf="form.controls['fanspeed'].value == 100" style="color:	#F2A900">S19
-                        Simulator</b></label>
-
+        <div *ngIf="!form.controls['autofanspeed'].value" class="grid p-fluid mt-2">
+            <label htmlFor="fanspeed" class="hidden md:flex md:col-2 md:m-0">Fan Speed</label>
+            <div class="col-12 md:col-10">
+                <label class="block mb-1">
+                    <span class="md:hidden mr-1">Fan Speed:</span>{{form.controls['fanspeed'].value}}%
+                    <b *ngIf="form.controls['fanspeed'].value < 33" class="text-primary">
+                        Danger: Could Cause Overheating
+                    </b>
+                    <b *ngIf="form.controls['fanspeed'].value == 100" class="text-orange-500">
+                        S19 Simulator
+                    </b>
+                </label>
                 <p-slider formControlName="fanspeed"></p-slider>
             </div>
         </div>
+    </div>
 
-        <h3 class="mt-5">Display</h3>
+    <h3 class="mt-5">Display</h3>
 
+    <div class="card">
         <div class="field grid p-fluid">
-            <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="display">Display</label>
+            <label htmlFor="display" class="col-12 md:col-2 md:m-0">Type</label>
             <div class="col-12 md:col-10">
                 <p-dropdown [options]="displays" formControlName="display"></p-dropdown>
             </div>
         </div>
 
         <div class="field grid p-fluid">
-            <label class="col-12 mb-2 md:col-2 md:mb-0" htmlFor="rotation">Rotation</label>
+            <label htmlFor="rotation" class="col-12 md:col-2 md:m-0">Rotation</label>
             <div class="col-12 md:col-10">
                 <p-dropdown [options]="rotations" formControlName="rotation"></p-dropdown>
             </div>
         </div>
 
-        <div class="col-12 md:col-4">
-            <div class="field-checkbox">
-                <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen"
-                    [binary]="true"></p-checkbox>
-                <label for="invertscreen">Invert Screen <i class="pi pi-info-circle" style="font-size: 0.8rem; margin-left: 0.2rem;" pTooltip="Inverts the colors"></i></label>
-            </div>
-        </div>
-
         <div class="field grid p-fluid">
-            <label htmlFor="displayTimeoutControl" class="col-12 md:col-2 hidden md:flex mb-2 md:mb-0 relative" style="top: -5px;">
-                Display Sleep
+            <label htmlFor="displayTimeoutControl" class="col-12 md:col-2 hidden md:flex md:m-0 relative">
+                Sleep
             </label>
             <div class="col-12 md:col-10">
-                <label class="block mb-2">
+                <label class="block mb-1">
                     <ng-container *ngIf="this.form.controls['displayTimeout'].value == 0">
-                        Display always off
+                        <span class="md:hidden mr-1">Display</span> Always Off
                     </ng-container>
                     <ng-container *ngIf="this.form.controls['displayTimeout'].value > 0">
-                        Display timeout: {{this.form.controls['displayTimeout'].value * 60 | dateAgo}}
+                        <span class="md:hidden mr-1">Display</span> Timeout: {{this.form.controls['displayTimeout'].value * 60 | dateAgo}}
                     </ng-container>
                     <ng-container *ngIf="this.form.controls['displayTimeout'].value == -1">
-                        Display always on
+                        <span class="md:hidden mr-1">Display</span> Always On
                     </ng-container>
                 </label>
                 <p-slider [min]="0" [max]="displayTimeoutMaxSteps" [step]="1" [formControl]="displayTimeoutControl"></p-slider>
@@ -120,32 +114,43 @@
             </div>
         </div>
 
-        <h3 class="mt-5">Statistics</h3>
+        <div class="field-checkbox grid mt-2 mb-0">
+            <div class="col-1 md:col-10 md:flex-order-2">
+                <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen" [binary]="true"></p-checkbox>
+            </div>
+            <label htmlFor="invertscreen" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Invert Display Colors</label>
+        </div>
+    </div>
 
-        <div class="flex flex-column mb-5 gap-3">
-            <div>
+    <h3 class="mt-5">Statistics</h3>
+
+    <div class="card">
+        <div class="grid p-fluid">
+            <label htmlFor="statsFrequencyControl" class="col-12 md:col-2 hidden md:flex md:m-0 relative">
+                Data Logging
+            </label>
+            <div class="col-12 md:col-10">
                 <label class="block mb-2">
                     <ng-container *ngIf="this.form.controls['statsFrequency'].value == 0">
-                        Data logging disabled
+                        <span class="md:hidden mr-1">Data Logging</span>Disabled
                     </ng-container>
                     <ng-container *ngIf="this.form.controls['statsFrequency'].value > 0">
-                        Log data every {{form.controls['statsFrequency'].value | dateAgo: {strict: true} }} for {{(form.controls['statsFrequency'].value * 720) | dateAgo}}
+                        <span class="md:hidden mr-1">Log Data</span>Every {{form.controls['statsFrequency'].value | dateAgo: {strict: true} }} for {{(form.controls['statsFrequency'].value * 720) | dateAgo}}
                     </ng-container>
                 </label>
                 <p-slider [min]="0" [max]="statsFrequencyMaxSteps" [step]="1" [formControl]="statsFrequencyControl"></p-slider>
                 <input type="hidden" formControlName="statsFrequency" />
             </div>
         </div>
+    </div>
 
-        <div class="flex mt-5 gap-3">
-            <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-                class="btn btn-primary">Save</button>
+    <div class="flex mt-5 gap-3">
+        <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
+            class="btn btn-primary">Save</button>
 
-            <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
+        <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
 
-            <button *ngIf="settingsUnlocked" pButton pButton="p-button-danger" (click)="toggleOverclockMode(false)"
-                class="p-button-danger" pTooltip="Return to safe preset values only">Disable Overclock Mode</button>
-        </div>
-
-    </form>
-</ng-container>
+        <button *ngIf="settingsUnlocked" pButton pButton="p-button-danger" (click)="toggleOverclockMode(false)"
+            class="p-button-danger" pTooltip="Return to safe preset values only">Disable Overclock Mode</button>
+    </div>
+</form>

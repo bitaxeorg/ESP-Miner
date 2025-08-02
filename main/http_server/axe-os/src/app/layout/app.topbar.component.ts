@@ -34,7 +34,7 @@ export class AppTopBarComponent {
 
   public restart() {
     this.systemService.restart().subscribe(() => {});
-    this.toastr.success('Success!', 'Bitaxe restarted');
+    this.toastr.success('Device restarted');
   }
 
   public isDesktop() {
