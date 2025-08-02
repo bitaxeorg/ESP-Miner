@@ -101,8 +101,19 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         // }
 
         //overheat mode if the voltage regulator or ASIC is too hot
-        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || power_management->chip_temp_avg > THROTTLE_TEMP) && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
-            ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", power_management->vr_temp, power_management->chip_temp_avg );
+        bool asic_overheat = power_management->chip_temp_avg > THROTTLE_TEMP;
+        
+        // For EMC2103 devices, check second chip temperature
+        if (GLOBAL_STATE->DEVICE_CONFIG.EMC2103) {
+            asic_overheat = asic_overheat || (power_management->chip_temp2_avg > THROTTLE_TEMP);
+        }
+        
+        if ((power_management->vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
+            if (GLOBAL_STATE->DEVICE_CONFIG.EMC2103) {
+                ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC1: %fC ASIC2: %fC", power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
+            } else {
+                ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC: %fC", power_management->vr_temp, power_management->chip_temp_avg);
+            }
             power_management->fan_perc = 100;
             Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1);
 
