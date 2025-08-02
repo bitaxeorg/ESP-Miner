@@ -68,9 +68,9 @@ float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE)
     return -1;
 }
 
-EMC2103_temps_t Thermal_get_chip_temps(GlobalState * GLOBAL_STATE)
+thermal_temps_t Thermal_get_chip_temps(GlobalState * GLOBAL_STATE)
 {
-    EMC2103_temps_t temps = {-1.0f, -1.0f};
+    thermal_temps_t temps = {-1.0f, -1.0f};
     
     if (!GLOBAL_STATE->ASIC_initalized) {
         return temps;

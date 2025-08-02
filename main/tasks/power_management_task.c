@@ -86,7 +86,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         
         // Get both temperatures for EMC2103
         if (GLOBAL_STATE->DEVICE_CONFIG.EMC2103) {
-            EMC2103_temps_t temps = Thermal_get_chip_temps(GLOBAL_STATE);
+            thermal_temps_t temps = Thermal_get_chip_temps(GLOBAL_STATE);
             power_management->chip_temp_avg = temps.temp1;
             power_management->chip_temp2_avg = temps.temp2;
         } else {
