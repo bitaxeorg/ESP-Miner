@@ -69,7 +69,7 @@ const char* BAP_command_to_string(bap_command_t cmd) {
 
 uint8_t BAP_calculate_checksum(const char *sentence_body) {
     uint8_t checksum = 0;
-    ESP_LOGI(TAG, "Calculating checksum for: %s", sentence_body);
+    //ESP_LOGI(TAG, "Calculating checksum for: %s", sentence_body);
     
     while (*sentence_body) {
         ESP_LOGD(TAG, "XOR: 0x%02X ^ 0x%02X = 0x%02X",
@@ -78,6 +78,6 @@ uint8_t BAP_calculate_checksum(const char *sentence_body) {
         checksum ^= (uint8_t)(*sentence_body++);
     }
     
-    ESP_LOGI(TAG, "Final checksum: 0x%02X", checksum);
+    //ESP_LOGI(TAG, "Final checksum: 0x%02X", checksum);
     return checksum;
 }
