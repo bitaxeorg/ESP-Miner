@@ -26,6 +26,8 @@ export class HomeComponent {
   public hashrateData: number[] = [];
   public temperatureData: number[] = [];
   public powerData: number[] = [];
+  public frequencyData: number[] = [];
+  public voltageData: number[] = [];
   public chartData?: any;
 
   public maxPower: number = 0;
@@ -72,6 +74,8 @@ export class HomeComponent {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
+    const frequencyColor = documentStyle.getPropertyValue('--green-800');
+    const voltageColor = documentStyle.getPropertyValue('--orange-800');
 
     // Update chart colors
     if (this.chartData && this.chartData.datasets) {
@@ -79,6 +83,10 @@ export class HomeComponent {
       this.chartData.datasets[0].borderColor = primaryColor;
       this.chartData.datasets[1].backgroundColor = textColorSecondary;
       this.chartData.datasets[1].borderColor = textColorSecondary;
+      this.chartData.datasets[2].backgroundColor = frequencyColor;
+      this.chartData.datasets[2].borderColor = frequencyColor;
+      this.chartData.datasets[3].backgroundColor = voltageColor;
+      this.chartData.datasets[3].borderColor = voltageColor;
     }
 
     // Update chart options
@@ -90,6 +98,10 @@ export class HomeComponent {
       this.chartOptions.scales.y.grid.color = surfaceBorder;
       this.chartOptions.scales.y2.ticks.color = textColorSecondary;
       this.chartOptions.scales.y2.grid.color = surfaceBorder;
+      this.chartOptions.scales.y3.ticks.color = frequencyColor;
+      this.chartOptions.scales.y3.grid.color = surfaceBorder;
+      this.chartOptions.scales.y4.ticks.color = voltageColor;
+      this.chartOptions.scales.y4.grid.color = surfaceBorder;
     }
 
     // Force chart update
@@ -104,6 +116,8 @@ export class HomeComponent {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
+    const frequencyColor = documentStyle.getPropertyValue('--green-800');
+    const voltageColor = documentStyle.getPropertyValue('--orange-800');
 
     this.chartData = {
       labels: [],
@@ -133,6 +147,32 @@ export class HomeComponent {
           pointHoverRadius: 5,
           borderWidth: 1,
           yAxisID: 'y2',
+        },
+        {
+          type: 'line',
+          label: 'Frequency',
+          data: [this.temperatureData],
+          fill: false,
+          backgroundColor: frequencyColor,
+          borderColor: frequencyColor,
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          borderWidth: 1,
+          yAxisID: 'y3',
+        },
+        {
+          type: 'line',
+          label: 'Voltage',
+          data: [this.temperatureData],
+          fill: false,
+          backgroundColor: voltageColor,
+          borderColor: voltageColor,
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          borderWidth: 1,
+          yAxisID: 'y4',
         }
       ]
     };
@@ -155,7 +195,14 @@ export class HomeComponent {
               }
               if (tooltipItem.dataset.label === 'ASIC Temp') {
                 label += tooltipItem.raw + '°C';
-              } else {
+              }
+              else if (tooltipItem.dataset.label === 'Frequency') {
+                label += tooltipItem.raw + ' MHz';
+              }
+              else if (tooltipItem.dataset.label === 'Voltage') {
+                label += tooltipItem.raw + ' mV';
+              }
+              else {
                 label += HashSuffixPipe.transform(tooltipItem.raw);
               }
               return label;
@@ -201,6 +248,34 @@ export class HomeComponent {
             color: surfaceBorder
           },
           suggestedMax: 80
+        },
+        y3: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          ticks: {
+            color: frequencyColor,
+            callback: (value: number) => value + 'mhz'
+          },
+          grid: {
+            drawOnChartArea: false,
+            color: surfaceBorder
+          },
+          suggestedMax: 1200
+        },
+        y4: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          ticks: {
+            color: voltageColor,
+            callback: (value: number) => value + 'mv'
+          },
+          grid: {
+            drawOnChartArea: false,
+            color: surfaceBorder
+          },
+          suggestedMax: 1400
         }
       }
     };
@@ -208,6 +283,8 @@ export class HomeComponent {
     this.chartData.labels = this.dataLabel;
     this.chartData.datasets[0].data = this.hashrateData;
     this.chartData.datasets[1].data = this.temperatureData;
+    this.chartData.datasets[2].data = this.frequencyData;
+    this.chartData.datasets[3].data = this.voltageData;
 
     // load previous data
     this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
@@ -222,21 +299,24 @@ export class HomeComponent {
         this.temperatureData.push(element[idxTemperature]);
         this.powerData.push(element[idxPower]);
         this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
+        this.frequencyData.push(element[4]);
+        this.voltageData.push(element[6]);
 
         if (this.hashrateData.length >= 720) {
           this.hashrateData.shift();
           this.temperatureData.shift();
           this.powerData.shift();
           this.dataLabel.shift();
+          this.frequencyData.shift();
+          this.voltageData.shift();
         }
       }),
-      this.startGetLiveData();
+        this.startGetLiveData();
     });
   }
 
-  private startGetLiveData()
-  {
-     // live data
+  private startGetLiveData() {
+    // live data
     this.info$ = interval(5000).pipe(
       startWith(() => this.systemService.getInfo()),
       switchMap(() => {
@@ -249,12 +329,16 @@ export class HomeComponent {
           this.temperatureData.push(info.temp);
           this.powerData.push(info.power);
           this.dataLabel.push(new Date().getTime());
+          this.frequencyData.push(info.frequency);
+          this.voltageData.push(info.coreVoltage);
 
           if ((this.hashrateData.length) >= 720) {
             this.hashrateData.shift();
             this.temperatureData.shift();
             this.powerData.shift();
             this.dataLabel.shift();
+            this.frequencyData.shift();
+            this.voltageData.shift();
           }
         }
 
