@@ -1,3 +1,5 @@
+<ng-template #noTemp>--</ng-template>
+
 <ng-container *ngIf="info$ | async as info">
     <!-- Temp warning alert -->
     <p-message *ngIf="info.overheat_mode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
@@ -202,9 +204,13 @@
 
                 <div class="mb-3">
                     <h6 class="flex justify-content-between mb-1">
-                        ASIC Temperature
+                        <ng-container *ngIf="info.temp2 > 0; else singleTemp">
+                            ASIC Temperature 1
+                        </ng-container>
+                        <ng-template #singleTemp>
+                            ASIC Temperature
+                        </ng-template>
                         <span>
-                            <ng-template #noTemp>--</ng-template>
                             <ng-container *ngIf="info.temp > 0; else noTemp">
                                 {{info.temp}} &deg;C
                             </ng-container>
@@ -215,6 +221,24 @@
                     </p-progressBar>
 
                     <strong class="text-red-500" *ngIf="info.temp >= 70">
+                        Danger: High Temperature
+                    </strong>
+                </div>
+
+                <div class="mb-3" *ngIf="info.temp2 > 0">
+                    <h6 class="flex justify-content-between mb-1">
+                        ASIC Temperature 2
+                        <span>
+                            <ng-container *ngIf="info.temp2 > 0; else noTemp">
+                                {{info.temp2}} &deg;C
+                            </ng-container>
+                        </span>
+                    </h6>
+                    <p-progressBar [value]="(info.temp2 / maxTemp) * 100" [styleClass]="'p-progressbar--thin'">
+                        <ng-template pTemplate="content" let-value></ng-template>
+                    </p-progressBar>
+
+                    <strong class="text-red-500" *ngIf="info.temp2 >= 70">
                         Danger: High Temperature
                     </strong>
                 </div>

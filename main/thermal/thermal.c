@@ -68,3 +68,46 @@ float Thermal_get_chip_temp()
     }
     return -1;
 }
+
+thermal_temps_t Thermal_get_chip_temps()
+{
+    thermal_temps_t temps = {-1.0f, -1.0f};
+    
+    if (!STATE_MODULE.ASIC_initalized) {
+        return temps;
+    }
+
+    int8_t temp_offset = DEVICE_CONFIG.emc_temp_offset;
+    
+    if (DEVICE_CONFIG.EMC2103) {
+        EMC2103_temps_t raw_temps = EMC2103_get_external_temps();
+        temps.temp1 = raw_temps.temp1 + temp_offset;
+        temps.temp2 = raw_temps.temp2 + temp_offset;
+    }
+    
+    return temps;
+}
+
+void Thermal_get_temperatures(float * temp1, float * temp2)
+{
+    if (!temp1 || !temp2) {
+        return;
+    }
+    
+    // Get primary temperature (works for both EMC2101 and EMC2103)
+    *temp1 = Thermal_get_chip_temp();
+    
+    // Only get second temperature for EMC2103 devices (GAMMA_TURBO)
+    if (DEVICE_CONFIG.EMC2103) {
+        thermal_temps_t temps = Thermal_get_chip_temps();
+        *temp1 = temps.temp1;
+        *temp2 = temps.temp2;
+    } else {
+        *temp2 = 0.0f;
+    }
+}
+
+bool Thermal_has_dual_sensors()
+{
+    return DEVICE_CONFIG.EMC2103;
+}

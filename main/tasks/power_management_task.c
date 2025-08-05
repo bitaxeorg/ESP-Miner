@@ -16,6 +16,7 @@
 #include "power_management_module.h"
 #include "state_module.h"
 #include "wifi_module.h"
+#include "device_config.h"
 
 #define POLL_RATE 1800
 #define MAX_TEMP 90.0
@@ -80,8 +81,17 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         POWER_MANAGEMENT_MODULE.fan_rpm = Thermal_get_fan_speed();
         POWER_MANAGEMENT_MODULE.chip_temp_avg = Thermal_get_chip_temp();
-
+        
         POWER_MANAGEMENT_MODULE.vr_temp = Power_get_vreg_temp();
+        // Only get second temperature for dual-sensor devices (GAMMA_TURBO)
+        if (Thermal_has_dual_sensors()) {
+            thermal_temps_t temps = Thermal_get_chip_temps();
+            POWER_MANAGEMENT_MODULE.chip_temp_avg = temps.temp1;
+            POWER_MANAGEMENT_MODULE.chip_temp2_avg = temps.temp2;
+        } else {
+            POWER_MANAGEMENT_MODULE.chip_temp2_avg = 0.0f;
+        }
+
 
         // ASIC Thermal Diode will give bad readings if the ASIC is turned off
         // if(POWER_MANAGEMENT_MODULE.voltage < tps546_config.TPS546_INIT_VOUT_MIN){
@@ -89,10 +99,19 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         // }
 
         //overheat mode if the voltage regulator or ASIC is too hot
-        if ((POWER_MANAGEMENT_MODULE.vr_temp > TPS546_THROTTLE_TEMP || POWER_MANAGEMENT_MODULE.chip_temp_avg > THROTTLE_TEMP) && (POWER_MANAGEMENT_MODULE.frequency_value > 50 || POWER_MANAGEMENT_MODULE.voltage > 1000)) {
-            ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC %fC", POWER_MANAGEMENT_MODULE.vr_temp, POWER_MANAGEMENT_MODULE.chip_temp_avg );
-            POWER_MANAGEMENT_MODULE.fan_perc = 100;
-            Thermal_set_fan_percent(1);
+        bool asic_overheat = POWER_MANAGEMENT_MODULE.chip_temp_avg > THROTTLE_TEMP;
+        
+        // For EMC2103 devices, check second chip temperature
+        if (DEVICE_CONFIG.EMC2103) {
+            asic_overheat = asic_overheat || (POWER_MANAGEMENT_MODULE.chip_temp2_avg > THROTTLE_TEMP);
+        }
+        
+        if ((POWER_MANAGEMENT_MODULE.vr_temp > TPS546_THROTTLE_TEMP || asic_overheat) && (POWER_MANAGEMENT_MODULE.frequency_value > 50 || POWER_MANAGEMENT_MODULE.voltage > 1000)) {
+            if (DEVICE_CONFIG.EMC2103) {
+                ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC1: %fC ASIC2: %fC", POWER_MANAGEMENT_MODULE.vr_temp, POWER_MANAGEMENT_MODULE.chip_temp_avg, POWER_MANAGEMENT_MODULE.chip_temp2_avg);
+            } else {
+                ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC: %fC", POWER_MANAGEMENT_MODULE.vr_temp, POWER_MANAGEMENT_MODULE.chip_temp_avg);
+            }
 
             // Turn off core voltage
             VCORE_set_voltage(0.0f);

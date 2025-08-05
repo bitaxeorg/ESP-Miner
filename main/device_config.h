@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
+#define THERMAL_MAX_SENSORS 2
+
 typedef enum
 {
     BM1397,

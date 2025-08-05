@@ -88,7 +88,7 @@ static void display_msg(char * msg)
 
 static esp_err_t test_fan_sense()
 {
-    uint16_t fan_speed = Thermal_get_fan_speed(DEVICE_CONFIG);
+    uint16_t fan_speed = Thermal_get_fan_speed();
     ESP_LOGI(TAG, "fanSpeed: %d", fan_speed);
     if (fan_speed > FAN_SPEED_TARGET_MIN) {
         return ESP_OK;

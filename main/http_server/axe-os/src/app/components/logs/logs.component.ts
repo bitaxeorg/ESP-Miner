@@ -1,6 +1,7 @@
 import { AfterViewChecked, Component, Input, OnInit, ElementRef, OnDestroy, ViewChild, HostListener } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { ToastrService } from 'ngx-toastr';
 import { WebsocketService } from 'src/app/services/web-socket.service';
 
 @Component({
@@ -34,6 +35,7 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
   constructor(
     private fb: FormBuilder,
     private websocketService: WebsocketService,
+    private toastr: ToastrService,
   ) {}
 
   ngOnInit(): void {
@@ -78,6 +80,9 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
           if (this.logs.length > 256) {
             this.logs.shift();
           }
+        },
+        error: (error) => {
+          this.toastr.error("Error opening websocket connection");
         }
       })
   }

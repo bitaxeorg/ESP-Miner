@@ -13,6 +13,7 @@ typedef struct
     float chip_temp[6];
     /** @brief Average temperature of the chips (in Celsius) */
     float chip_temp_avg;
+    float chip_temp2_avg;
     /** @brief Voltage regulator temperature (VR temp) in Celsius */
     float vr_temp;
     /** @brief Input voltage value in Volts */
