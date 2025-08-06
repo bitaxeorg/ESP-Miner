@@ -105,7 +105,9 @@
                 },
             ]">
                 <div class="flex align-items-center cursor-pointer select-none h-full" (click)="sortBy(field.name)">
-                    <span class="flex-1">{{field.label}}</span>
+                    <span class="flex-1" 
+                          [pTooltip]="field.name === 'hostname' ? 'The name this miner will use on your local network. Choose a unique name to help you identify it easily (e.g., \'miner-01\' or \'garage-miner\'). This is useful when managing multiple miners.' : ''"
+                          tooltipPosition="top">{{field.label}}</span>
                     <i class="pi text-xs flex items-center" [ngClass]="{
                         'pi-sort-alt': sortField !== field.name,
                         'pi-sort-amount-up-alt': sortField === field.name && sortDirection === 'asc',
