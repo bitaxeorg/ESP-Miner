@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { finalize } from 'rxjs/operators';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { TOOLTIPS } from 'src/app/constants';
 import { DialogService } from 'src/app/services/dialog.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
@@ -26,6 +27,8 @@ export class NetworkEditComponent implements OnInit {
   public form!: FormGroup;
   public savedChanges: boolean = false;
   public scanning: boolean = false;
+  
+  public readonly HOSTNAME_TOOLTIP = TOOLTIPS.HOSTNAME;
 
   @Input() uri = '';
 

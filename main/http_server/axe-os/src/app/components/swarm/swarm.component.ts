@@ -3,6 +3,7 @@ import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable } from 'rxjs';
+import { TOOLTIPS } from 'src/app/constants';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
 
@@ -41,6 +42,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public sortField: string = '';
   public sortDirection: 'asc' | 'desc' = 'asc';
+
+  public readonly HOSTNAME_TOOLTIP = TOOLTIPS.HOSTNAME;
 
   constructor(
     private fb: FormBuilder,

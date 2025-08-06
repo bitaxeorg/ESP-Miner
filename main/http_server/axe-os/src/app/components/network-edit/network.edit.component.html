@@ -3,8 +3,7 @@
         <div class="field grid p-fluid">
             <label htmlFor="hostname" class="col-12 md:col-2 md:m-0">
                 Hostname<i class="pi pi-info-circle text-xs px-1" 
-                         pTooltip="The name this miner will use on your local network. Choose a unique name to help you identify it easily (e.g., 'miner-01' or 'garage-miner'). This is useful when managing multiple miners."
-                         ></i>
+                         [pTooltip]="HOSTNAME_TOOLTIP"></i>
             </label>
             <div class="col-12 md:col-10">
                 <input pInputText id="hostname" type="text" formControlName="hostname" />
