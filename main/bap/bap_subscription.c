@@ -17,6 +17,7 @@
 #include "bap_protocol.h"
 #include "bap_uart.h"
 #include "bap.h"
+#include "connect.h"
 
 static const char *TAG = "BAP_SUBSCRIPTION";
 
@@ -209,6 +210,27 @@ void BAP_send_subscription_update(GlobalState *state) {
                             BAP_send_message_with_queue(BAP_CMD_RES, "best_difficulty", best_diff_str);
                         }
                         break;
+
+                    case BAP_PARAM_WIFI:
+                        {
+                            char ssid_str[32];
+                            char wifi_status_str[256];
+                            char rssi_str[32];
+                            char ip_str[32];
+                            snprintf(ssid_str, sizeof(ssid_str), "%s", state->SYSTEM_MODULE.ssid);
+                            snprintf(wifi_status_str, sizeof(wifi_status_str), "%s", state->SYSTEM_MODULE.wifi_status);
+                            
+                            int8_t current_rssi = -128; // no connection
+                            if (state->SYSTEM_MODULE.is_connected) {
+                                get_wifi_current_rssi(&current_rssi);
+                            }
+                            snprintf(rssi_str, sizeof(rssi_str), "%d", current_rssi);
+                            
+                            snprintf(ip_str, sizeof(ip_str), "%s", state->SYSTEM_MODULE.ip_addr_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "wifi_ssid", ssid_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "wifi_rssi", rssi_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "wifi_ip", ip_str);
+                        }
 
                     default:
                         break;
