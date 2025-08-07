@@ -56,10 +56,10 @@
                                 [binary]="true"></p-checkbox>
                         </div>
                         <label [htmlFor]="pool + 'ExtranonceSubscribe'" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">
-                            Enable Extranonce <span class="white-space-nowrap">
-                                Subscribe
-                                <i class="pi pi-info-circle text-xs px-1" pTooltip="Required by some pools, check the pool documentation."></i>
-                            </span>
+                            <tooltip-text-icon
+                                text="Enable Extranonce Subscribe"
+                                tooltip="Required by some pools, check the pool documentation."
+                            />
                         </label>
                     </div>
                 </fieldset>
