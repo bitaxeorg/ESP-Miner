@@ -12,6 +12,7 @@ export interface ISystemInfo {
     voltage: number,
     current: number,
     temp: number,
+    temp2: number,
     vrTemp: number,
     maxPower: number,
     nominalVoltage: number,
