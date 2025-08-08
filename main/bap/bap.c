@@ -84,10 +84,10 @@ esp_err_t BAP_init(GlobalState *state) {
         return ret;
     }
     
-    // Start subscription task
-    ret = BAP_start_subscription_task(state);
+    // Start mode-aware BAP management task
+    ret = BAP_start_mode_management_task(state);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start subscription task: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to start BAP mode management task: %s", esp_err_to_name(ret));
         return ret;
     }
     

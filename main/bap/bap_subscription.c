@@ -255,6 +255,71 @@ static void subscription_update_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
+static void mode_management_task(void *pvParameters) {
+    GlobalState *state = (GlobalState *)pvParameters;
+    bool was_connected = false;
+    bool subscription_task_started = false;
+    
+    ESP_LOGI(TAG, "BAP mode management task started");
+    
+    while (1) {
+        bool is_connected = state->SYSTEM_MODULE.is_connected;
+        
+        // Check for mode transitions
+        if (!was_connected && !is_connected) {
+            // AP mode - send periodic AP messages
+            BAP_send_ap_message(state);
+            vTaskDelay(pdMS_TO_TICKS(5000));
+        } else if (!was_connected && is_connected) {
+            // Transition from AP to connected mode
+            ESP_LOGI(TAG, "WiFi connected - switching to normal BAP mode");
+            
+            // Start subscription task for connected mode
+            if (!subscription_task_started) {
+                esp_err_t ret = BAP_start_subscription_task(state);
+                if (ret == ESP_OK) {
+                    subscription_task_started = true;
+                    ESP_LOGI(TAG, "Subscription task started for connected mode");
+                } else {
+                    ESP_LOGE(TAG, "Failed to start subscription task");
+                }
+            }
+            
+            was_connected = true;
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        } else if (was_connected && is_connected) {
+            // Normal connected mode - subscription task handles updates
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        } else if (was_connected && !is_connected) {
+            // Transition from connected to AP mode (connection lost)
+            ESP_LOGI(TAG, "WiFi disconnected - switching to AP mode");
+            was_connected = false;
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+    
+    vTaskDelete(NULL);
+}
+
+esp_err_t BAP_start_mode_management_task(GlobalState *state) {
+    if (!state) {
+        ESP_LOGE(TAG, "Invalid global state");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    xTaskCreate(
+        mode_management_task,
+        "bap_mode_mgmt",
+        4096,
+        state,
+        5,
+        NULL
+    );
+
+    ESP_LOGI(TAG, "BAP mode management task started");
+    return ESP_OK;
+}
+
 esp_err_t BAP_start_subscription_task(GlobalState *state) {
     if (!state) {
         ESP_LOGE(TAG, "Invalid global state");

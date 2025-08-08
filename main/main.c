@@ -72,6 +72,15 @@ void app_main(void)
     //start the API for AxeOS
     start_rest_server((void *) &GLOBAL_STATE);
 
+    // Initialize BAP interface
+    esp_err_t bap_ret = BAP_init(&GLOBAL_STATE);
+    if (bap_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize BAP interface: %d", bap_ret);
+        // Continue anyway, as BAP is not critical for core functionality
+    } else {
+        ESP_LOGI(TAG, "BAP interface initialized successfully");
+    }
+
     while (!GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
@@ -86,15 +95,6 @@ void app_main(void)
     }
 
     SERIAL_init();
-
-    // Initialize BAP interface
-    esp_err_t bap_ret = BAP_init(&GLOBAL_STATE);
-    if (bap_ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize BAP interface: %d", bap_ret);
-        // Continue anyway, as BAP is not critical for core functionality
-    } else {
-        ESP_LOGI(TAG, "BAP interface initialized successfully");
-    }
 
     if (ASIC_init(&GLOBAL_STATE) == 0) {
         GLOBAL_STATE.SYSTEM_MODULE.asic_status = "Chip count 0";

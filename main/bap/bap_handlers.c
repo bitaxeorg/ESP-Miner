@@ -169,6 +169,13 @@ void BAP_handle_subscription(const char *parameter, const char *value) {
         return;
     }
 
+    // Check if we're in AP mode - subscriptions not allowed
+    if (!bap_global_state || !bap_global_state->SYSTEM_MODULE.is_connected) {
+        ESP_LOGW(TAG, "Subscription not allowed in AP mode");
+        BAP_send_message(BAP_CMD_ERR, parameter, "ap_mode_no_subscriptions");
+        return;
+    }
+
     BAP_subscription_handle_subscribe(parameter, value);
 }
 
@@ -188,6 +195,13 @@ void BAP_handle_request(const char *parameter, const char *value) {
     
     if (!parameter) {
         ESP_LOGE(TAG, "Invalid request parameter");
+        return;
+    }
+
+    // Check if we're in AP mode - most requests not allowed
+    if (!bap_global_state || !bap_global_state->SYSTEM_MODULE.is_connected) {
+        ESP_LOGW(TAG, "Request not allowed in AP mode");
+        BAP_send_message(BAP_CMD_ERR, parameter, "ap_mode_no_requests");
         return;
     }
 
@@ -247,6 +261,16 @@ void BAP_handle_settings(const char *parameter, const char *value) {
     }
 
     bap_parameter_t param = BAP_parameter_from_string(parameter);
+    
+    // In AP mode, only allow SSID and password settings
+    if (!bap_global_state->SYSTEM_MODULE.is_connected) {
+        if (param != BAP_PARAM_SSID && param != BAP_PARAM_PASSWORD) {
+            ESP_LOGW(TAG, "Setting '%s' not allowed in AP mode", parameter);
+            BAP_send_message(BAP_CMD_ERR, parameter, "ap_mode_limited_settings");
+            return;
+        }
+        //ESP_LOGI(TAG, "AP mode: allowing WiFi credential setting for %s", parameter);
+    }
     
     switch (param) {
         case BAP_PARAM_FREQUENCY:

@@ -52,6 +52,13 @@ void BAP_subscription_handle_unsubscribe(const char *parameter, const char *valu
 void BAP_send_subscription_update(GlobalState *state);
 
 /**
+ * @brief Start mode management task
+ * @param state Global state pointer
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t BAP_start_mode_management_task(GlobalState *state);
+
+/**
  * @brief Start subscription update task
  * @param state Global state pointer
  * @return ESP_OK on success, error code otherwise

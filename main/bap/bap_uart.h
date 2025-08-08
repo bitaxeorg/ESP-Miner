@@ -54,6 +54,18 @@ void BAP_send_message_with_queue(bap_command_t cmd, const char *parameter, const
 void BAP_send_init_message(GlobalState *state);
 
 /**
+ * @brief Send AP mode message
+ * @param state Global state (can be NULL)
+ */
+void BAP_send_ap_message(GlobalState *state);
+
+/**
+ * @brief AP mode task that sends periodic AP messages
+ * @param pvParameters Global state pointer
+ */
+void BAP_ap_mode_task(void *pvParameters);
+
+/**
  * @brief Start UART receive task
  * @return ESP_OK on success, error code otherwise
  */
