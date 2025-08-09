@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/param.h>
+#include <sys/stat.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -353,10 +354,16 @@ static esp_err_t rest_api_common_handler(httpd_req_t * req)
     return ESP_OK;
 }
 
+static bool file_exists(const char *path) {
+    struct stat buffer;
+    return (stat(path, &buffer) == 0);
+}
+
 /* Send HTTP response with the contents of the requested file */
 static esp_err_t rest_common_get_handler(httpd_req_t * req)
 {
     char filepath[FILE_PATH_MAX];
+    char gz_file[FILE_PATH_MAX];
     uint8_t filePathLength = sizeof(filepath);
 
     rest_server_context_t * rest_context = (rest_server_context_t *) req->user_ctx;
@@ -367,8 +374,14 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
         strlcat(filepath, req->uri, filePathLength);
     }
     set_content_type_from_file(req, filepath);
-    strcat(filepath, ".gz");
-    int fd = open(filepath, O_RDONLY, 0);
+
+    strlcpy(gz_file, filepath, filePathLength);
+    strlcat(gz_file, ".gz", filePathLength);
+
+    bool serve_gz = file_exists(gz_file);
+    const char *file_to_open = serve_gz ? gz_file : filepath;
+
+    int fd = open(file_to_open, O_RDONLY, 0);
     if (fd == -1) {
         // Set status
         httpd_resp_set_status(req, "302 Temporary Redirect");
@@ -384,7 +397,9 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
         httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
     }
 
-    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    if (serve_gz) {
+        httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    }
 
     char * chunk = rest_context->scratch;
     ssize_t read_bytes;
@@ -392,7 +407,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
         /* Read file in chunks into the scratch buffer */
         read_bytes = read(fd, chunk, SCRATCH_BUFSIZE);
         if (read_bytes == -1) {
-            ESP_LOGE(TAG, "Failed to read file : %s", filepath);
+            ESP_LOGE(TAG, "Failed to read file : %s", file_to_open);
         } else if (read_bytes > 0) {
             /* Send the buffer contents as HTTP response chunk */
             if (httpd_resp_send_chunk(req, chunk, read_bytes) != ESP_OK) {
