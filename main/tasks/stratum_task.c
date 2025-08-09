@@ -16,6 +16,7 @@
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
+#define MAX_EXTRANONCE_2_LEN 32
 
 #define BUFFER_SIZE 1024
 
@@ -339,6 +340,12 @@ void stratum_task(void * pvParameters)
                 GLOBAL_STATE->new_stratum_version_rolling_msg = true;
             } else if (stratum_api_v1_message.method == MINING_SET_EXTRANONCE ||
                     stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
+                // Validate extranonce_2_len to prevent buffer overflow
+                if (stratum_api_v1_message.extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
+                    ESP_LOGW(TAG, "Extranonce_2_len %d exceeds maximum %d, clamping to maximum", 
+                             stratum_api_v1_message.extranonce_2_len, MAX_EXTRANONCE_2_LEN);
+                    stratum_api_v1_message.extranonce_2_len = MAX_EXTRANONCE_2_LEN;
+                }
                 ESP_LOGI(TAG, "Set extranonce: %s, extranonce_2_len: %d", stratum_api_v1_message.extranonce_str, stratum_api_v1_message.extranonce_2_len);
                 char * old_extranonce_str = GLOBAL_STATE->extranonce_str;
                 GLOBAL_STATE->extranonce_str = stratum_api_v1_message.extranonce_str;
