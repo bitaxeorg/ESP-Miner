@@ -17,7 +17,6 @@
 #include <stdbool.h>
 
 #define BUFFER_SIZE 1024
-#define MAX_EXTRANONCE_2_LEN 32
 static const char * TAG = "stratum_api";
 
 static char * json_rpc_buffer = NULL;
