@@ -15,7 +15,7 @@ typedef struct
     float current;
 } PowerManagementModule;
 
-void POWER_MANAGEMENT_init_frequency(PowerManagementModule * power_management);
+void POWER_MANAGEMENT_init_frequency(PowerManagementModule * POWER_MANAGEMENT_MODULE);
 
 void POWER_MANAGEMENT_task(void * pvParameters);
 

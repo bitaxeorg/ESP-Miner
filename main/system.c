@@ -96,13 +96,13 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     _suffix_string(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 }
 
-esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
-    
+esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE)
+{    
     ESP_RETURN_ON_ERROR(gpio_install_isr_service(0), TAG, "Error installing ISR service");
 
     // Initialize the core voltage regulator
-    ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_init(&GLOBAL_STATE->DEVICE_CONFIG), TAG, "VCORE init failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(&GLOBAL_STATE->DEVICE_CONFIG, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
 
     ESP_RETURN_ON_ERROR(Thermal_init(&GLOBAL_STATE->DEVICE_CONFIG), TAG, "Thermal init failed!");
 
@@ -127,7 +127,8 @@ void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
     module->shares_accepted++;
 }
 
-static int compare_rejected_reason_stats(const void *a, const void *b) {
+static int compare_rejected_reason_stats(const void *a, const void *b)
+{
     const RejectedReasonStat *ea = a;
     const RejectedReasonStat *eb = b;
     return (eb->count > ea->count) - (ea->count > eb->count);

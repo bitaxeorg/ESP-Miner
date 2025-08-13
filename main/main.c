@@ -92,7 +92,7 @@ void app_main(void)
         return;
     }
 
-    SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
+    SERIAL_set_baud(ASIC_set_max_baud(GLOBAL_STATE.DEVICE_CONFIG.family.asic.id));
     SERIAL_clear_buffer();
 
     GLOBAL_STATE.ASIC_initalized = true;

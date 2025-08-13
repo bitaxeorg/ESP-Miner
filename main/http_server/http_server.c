@@ -628,7 +628,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON * root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
     cJSON_AddNumberToObject(root, "voltage", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
-    cJSON_AddNumberToObject(root, "current", Power_get_current(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "current", Power_get_current(&GLOBAL_STATE->DEVICE_CONFIG));
     cJSON_AddNumberToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
     cJSON_AddNumberToObject(root, "temp2", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
     cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
@@ -646,7 +646,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
-    cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(&GLOBAL_STATE->DEVICE_CONFIG));
     cJSON_AddNumberToObject(root, "frequency", frequency);
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
@@ -706,7 +706,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0));
 
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
-        cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
+        cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(&GLOBAL_STATE->DEVICE_CONFIG));
     }
 
     free(ssid);
