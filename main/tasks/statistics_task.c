@@ -67,20 +67,40 @@ StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
 
 StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr dataOut)
 {
-    if ((NULL == nodeIn) || (NULL == dataOut) || (0 == statsFrequency)) {
+    pthread_mutex_lock(&statisticsDataLock);
+
+    if ((NULL == nodeIn) || (NULL == dataOut)) {
+        pthread_mutex_unlock(&statisticsDataLock);
         return NULL;
     }
 
-    StatisticsNextNodePtr nextNode = NULL;
-
-    pthread_mutex_lock(&statisticsDataLock);
-
+    StatisticsNextNodePtr nextNode = nodeIn->next;
     *dataOut = *nodeIn;
-    nextNode = nodeIn->next;
 
     pthread_mutex_unlock(&statisticsDataLock);
 
     return nextNode;
+}
+
+void clearStatisticData()
+{
+    if (NULL != statisticsDataStart) {
+        pthread_mutex_lock(&statisticsDataLock);
+
+        StatisticsNextNodePtr nextNode = statisticsDataStart;
+
+        while (NULL != nextNode) {
+            StatisticsNodePtr node = nextNode;
+            nextNode = node->next;
+            free(node);
+        }
+
+        statisticsDataStart = NULL;
+        statisticsDataEnd = NULL;
+        currentDataCount = 0;
+
+        pthread_mutex_unlock(&statisticsDataLock);
+    }
 }
 
 void statistics_init(void * pvParameters)
@@ -103,26 +123,31 @@ void statistics_task(void * pvParameters)
     while (1) {
         const int64_t currentTime = esp_timer_get_time() / 1000;
         statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0) * 1000;
-        const int64_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
 
-        if ((0 != statsFrequency) && (currentTime > waitingTime)) {
-            int8_t wifiRSSI = -90;
-            get_wifi_current_rssi(&wifiRSSI);
+        if (0 != statsFrequency) {
+            const int64_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
 
-            statsData.timestamp = currentTime;
-            statsData.hashrate = sys_module->current_hashrate;
-            statsData.chipTemperature = power_management->chip_temp_avg;
-            statsData.vrTemperature = power_management->vr_temp;
-            statsData.power = power_management->power;
-            statsData.voltage = power_management->voltage;
-            statsData.current = Power_get_current(GLOBAL_STATE);
-            statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
-            statsData.fanSpeed = power_management->fan_perc;
-            statsData.fanRPM = power_management->fan_rpm;
-            statsData.wifiRSSI = wifiRSSI;
-            statsData.freeHeap = esp_get_free_heap_size();
+            if (currentTime > waitingTime) {
+                int8_t wifiRSSI = -90;
+                get_wifi_current_rssi(&wifiRSSI);
 
-            addStatisticData(&statsData);
+                statsData.timestamp = currentTime;
+                statsData.hashrate = sys_module->current_hashrate;
+                statsData.chipTemperature = power_management->chip_temp_avg;
+                statsData.vrTemperature = power_management->vr_temp;
+                statsData.power = power_management->power;
+                statsData.voltage = power_management->voltage;
+                statsData.current = Power_get_current(GLOBAL_STATE);
+                statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
+                statsData.fanSpeed = power_management->fan_perc;
+                statsData.fanRPM = power_management->fan_rpm;
+                statsData.wifiRSSI = wifiRSSI;
+                statsData.freeHeap = esp_get_free_heap_size();
+
+                addStatisticData(&statsData);
+            }
+        } else {
+            clearStatisticData();
         }
 
         vTaskDelayUntil(&taskWakeTime, DEFAULT_POLL_RATE / portTICK_PERIOD_MS); // taskWakeTime is automatically updated
