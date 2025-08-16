@@ -62,6 +62,7 @@ typedef struct
     bool pool_extranonce_subscribe;
     bool fallback_pool_extranonce_subscribe;
     double response_time;
+    bool use_fallback_stratum;
     bool is_using_fallback;
     uint16_t overheat_mode;
     uint16_t power_fault;
