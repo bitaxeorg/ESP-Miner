@@ -11,6 +11,7 @@ type TableRow = {
   value: string;
   class?: string;
   valueClass?: string;
+  isSensitive?: boolean;
   tooltip?: string;
 }
 
@@ -86,10 +87,10 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Asic Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
 
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds), class: 'pb-3' },
-      { label: 'Wi-Fi SSID', value: data.info.ssid },
+      { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitive: true },
       { label: 'Wi-Fi Status', value: data.info.wifiStatus },
       { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + 'dBm', class: 'pb-3', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) },
-      { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3' },
+      { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3', isSensitive: true },
       { label: 'Free Heap Memory', value: data.info.freeHeap.toString(), class: 'pb-3' },
       { label: 'Firmware Version', value: data.info.version },
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
