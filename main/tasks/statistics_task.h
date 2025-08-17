@@ -11,9 +11,11 @@ struct StatisticsData
     float chipTemperature;
     float vrTemperature;
     float power;
+    float frequency;
     float voltage;
     float current;
     int16_t coreVoltageActual;
+    float core_voltage;
     uint16_t fanSpeed;
     uint16_t fanRPM;
     int8_t wifiRSSI;
