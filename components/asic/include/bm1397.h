@@ -24,11 +24,11 @@ typedef struct __attribute__((__packed__))
 } job_packet;
 
 uint8_t BM1397_init(float frequency, uint16_t asic_count, uint16_t difficulty);
-void BM1397_send_work(void * GLOBAL_STATE, bm_job * next_bm_job);
+void BM1397_send_work(bm_job * next_bm_job);
 void BM1397_set_version_mask(uint32_t version_mask);
 int BM1397_set_max_baud(void);
 int BM1397_set_default_baud(void);
 void BM1397_send_hash_frequency(float frequency);
-task_result * BM1397_process_work(void * GLOBAL_STATE);
+task_result * BM1397_process_work();
 
 #endif /* BM1397_H_ */
