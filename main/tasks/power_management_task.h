@@ -3,6 +3,8 @@
 
 #define POLL_RATE 500
 
+void POWER_MANAGEMENT_init_frequency();
+
 void POWER_MANAGEMENT_task(void * pvParameters);
 
 

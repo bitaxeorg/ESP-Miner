@@ -208,7 +208,7 @@ components:
           description: ASIC frequency in MHz
         hashRate:
           type: number
-          description: Current hash rate
+          description: Current hashrate
         hostname:
           type: string
           description: Device hostname

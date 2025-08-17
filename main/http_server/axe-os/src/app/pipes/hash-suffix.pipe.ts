@@ -17,7 +17,7 @@ export class HashSuffixPipe implements PipeTransform {
       return '0';
     }
 
-    const suffixes = [' H/s', ' KH/s', ' MH/s', ' GH/s', ' TH/s', ' PH/s', ' EH/s'];
+    const suffixes = [' H/s', ' Kh/s', ' Mh/s', ' Gh/s', ' Th/s', ' Ph/s', ' Eh/s'];
 
     let power = Math.floor(Math.log10(value) / 3);
     if (power < 0) {

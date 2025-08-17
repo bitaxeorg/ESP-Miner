@@ -7,6 +7,7 @@
 #include "asic.h"
 #include "device_config.h"
 #include "power_management_module.h"
+#include "frequency_transition_bmXX.h"
 
 static const char *TAG = "asic";
 
@@ -23,7 +24,6 @@ uint8_t ASIC_init()
             return BM1368_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
         case BM1370:
             return BM1370_init(POWER_MANAGEMENT_MODULE.frequency_value, DEVICE_CONFIG.family.asic_count, DEVICE_CONFIG.family.asic.difficulty);
-        default:
     }
     return ESP_OK;
 }
@@ -54,7 +54,7 @@ int ASIC_set_max_baud()
             return BM1368_set_max_baud();
         case BM1370:
             return BM1370_set_max_baud();
-        }
+    }
     return 0;
 }
 
@@ -94,33 +94,21 @@ void ASIC_set_version_mask(uint32_t mask)
     }
 }
 
-bool ASIC_set_frequency(float target_frequency)
+bool ASIC_set_frequency(float frequency)
 {
-    ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
-    bool success = false;
-    
     switch (DEVICE_CONFIG.family.asic.id) {
-        case BM1366:
-            success = BM1366_set_frequency(target_frequency);
-            break;
-        case BM1368:
-            success = BM1368_set_frequency(target_frequency);
-            break;
-        case BM1370:
-            success = BM1370_set_frequency(target_frequency);
-            break;
         case BM1397:
-            // BM1397 doesn't have a set_frequency function yet
             ESP_LOGE(TAG, "Frequency transition not implemented for BM1397");
-            success = false;
-            break;
+            return false;
+        case BM1366:
+            do_frequency_transition(frequency, BM1366_send_hash_frequency);
+            return true;
+        case BM1368:
+            do_frequency_transition(frequency, BM1368_send_hash_frequency);
+            return true;
+        case BM1370:
+            do_frequency_transition(frequency, BM1370_send_hash_frequency);
+            return true;
     }
-    
-    if (success) {
-        ESP_LOGI(TAG, "Successfully transitioned to new ASIC frequency: %.2f MHz", target_frequency);
-    } else {
-        ESP_LOGE(TAG, "Failed to transition to new ASIC frequency: %.2f MHz", target_frequency);
-    }
-    
-    return success;
+    return false;
 }

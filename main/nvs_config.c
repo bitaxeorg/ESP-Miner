@@ -5,6 +5,8 @@
 
 #define NVS_CONFIG_NAMESPACE "main"
 
+#define FLOAT_STR_LEN 32
+
 static const char * TAG = "nvs_config";
 
 char * nvs_config_get_string(const char * key, const char * default_value)
@@ -165,6 +167,32 @@ void nvs_config_set_u64(const char * key, const uint64_t value)
         ESP_LOGW(TAG, "Could not write nvs key: %s, value: %llu", key, value);
     }
     nvs_close(handle);
+}
+
+float nvs_config_get_float(const char *key, float default_value)
+{
+    char default_str[FLOAT_STR_LEN];
+    snprintf(default_str, sizeof(default_str), "%.6f", default_value);
+
+    char *str_value = nvs_config_get_string(key, default_str);
+
+    char *endptr;
+    float value = strtof(str_value, &endptr);
+    if (endptr == str_value || *endptr != '\0') {
+        ESP_LOGW(TAG, "Invalid float format for key %s: %s", key, str_value);
+        value = default_value;
+    }
+
+    free(str_value);
+    return value;
+}
+
+void nvs_config_set_float(const char *key, float value)
+{
+    char str_value[FLOAT_STR_LEN];
+    snprintf(str_value, sizeof(str_value), "%.6f", value);
+
+    nvs_config_set_string(key, str_value);
 }
 
 void nvs_config_commit()

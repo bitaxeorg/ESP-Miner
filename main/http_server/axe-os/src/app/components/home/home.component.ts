@@ -154,7 +154,7 @@ export class HomeComponent {
                 label += ': ';
               }
               if (tooltipItem.dataset.label === 'ASIC Temp') {
-                label += tooltipItem.raw + '°C';
+                label += tooltipItem.raw + ' °C';
               } else {
                 label += HashSuffixPipe.transform(tooltipItem.raw);
               }
@@ -194,7 +194,7 @@ export class HomeComponent {
           position: 'right',
           ticks: {
             color: textColorSecondary,
-            callback: (value: number) => value + '°C'
+            callback: (value: number) => value + ' °C'
           },
           grid: {
             drawOnChartArea: false,
@@ -341,7 +341,7 @@ export class HomeComponent {
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       if (hashrate > 0) {
-        return power / (hashrate / 1000000000000); // Convert to J/TH
+        return power / (hashrate / 1000000000000); // Convert to J/Th
       } else {
         return power; // in this case better than infinity or NaN
       }

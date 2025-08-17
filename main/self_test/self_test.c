@@ -22,7 +22,7 @@
 #include "power.h"
 #include "screen.h"
 #include "thermal.h"
-#include "utils.h"
+#include "power_management_task.h"
 #include "vcore.h"
 
 #include "asic.h"
@@ -37,6 +37,7 @@
 #include "serial.h"
 #include "self_test_module.h"
 #include "state_module.h"
+#include "utils.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
@@ -343,8 +344,7 @@ bool self_test()
         tests_done(false);
     }
 
-    POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float) POWER_MANAGEMENT_MODULE.frequency_value);
+    POWER_MANAGEMENT_init_frequency();
     uint8_t chips_detected =
         ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value, 
                     DEVICE_CONFIG.family.asic_count,

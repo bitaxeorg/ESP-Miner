@@ -63,11 +63,11 @@
             <label htmlFor="fanspeed" class="hidden md:flex md:col-2 md:m-0">Fan Speed</label>
             <div class="col-12 md:col-10">
                 <label class="block mb-1">
-                    <span class="md:hidden mr-1">Fan Speed:</span>{{form.controls['fanspeed'].value}}%
+                    <span class="md:hidden mr-1">Fan Speed:</span>{{form.controls['fanspeed'].value}} %
                     <b *ngIf="form.controls['fanspeed'].value < 33" class="text-primary">
                         Danger: Could Cause Overheating
                     </b>
-                    <b *ngIf="form.controls['fanspeed'].value == 100" class="text-orange-500">
+                    <b *ngIf="form.controls['fanspeed'].value == 100" class="text-orange-500 ml-2">
                         S19 Simulator
                     </b>
                 </label>

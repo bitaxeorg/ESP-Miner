@@ -3,11 +3,11 @@
 <ng-container *ngIf="info$ | async as info">
     <!-- Temp warning alert -->
     <p-message *ngIf="info.overheat_mode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Bitaxe has overheated - See settings">
+        text="Device has overheated - See settings">
     </p-message>
 
     <p-message *ngIf="!info.frequency || info.frequency < 400" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Bitaxe frequency is set low - See settings">
+        text="Device frequency is set low - See settings">
     </p-message>
 
     <p-message *ngIf="info.power_fault" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
@@ -15,7 +15,7 @@
     </p-message>
 
     <p-message *ngIf="info.isUsingFallbackStratum" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Using fallback pool - Share stats reset. Check Pool Settings and or / reboot Bitaxe">
+        text="Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device">
     </p-message>
 
     <p-message *ngIf="info.version !== info.axeOSVersion" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
@@ -27,7 +27,7 @@
             <div class="card mb-0">
                 <div class="flex justify-content-between mb-3">
                     <div>
-                        <span class="block text-500 font-medium mb-3">Hash Rate</span>
+                        <span class="block text-500 font-medium mb-3">Hashrate</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
                             <span *ngIf="!info.power_fault">
                                 {{info.hashRate * 1000000000 | hashSuffix}}
@@ -58,7 +58,7 @@
                         <span class="block text-500 font-medium mb-3">Efficiency</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
                             <span *ngIf="!info.power_fault">
-                                {{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/TH</small>
+                                {{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/Th</small>
                             </span>
                             <span *ngIf="info.power_fault" class="text-red-500">
                                 Not available - Power fault
@@ -70,12 +70,12 @@
                 <ng-container *ngIf="!info.power_fault">
                     Average:
                     <span class="text-green-500 font-medium">
-                        {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} <small>J/TH</small>
+                        {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} <small>J/Th</small>
                     </span>
                 </ng-container>
 
                 <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
-                    Expected: {{info.power / (info.expectedHashrate/1000) | number: '1.2-2'}} J/TH
+                    Expected: {{info.power / (info.expectedHashrate/1000) | number: '1.2-2'}} J/Th
                 </div>
             </div>
         </div>
@@ -110,7 +110,7 @@
                             (sharesRejectedReason.count /
                             (info.sharesAccepted + info.sharesRejected) * 100)
                             | number: '1.2-2'
-                        }}%)
+                        }} %)
                         </span>
                     </div>
                 </div>
@@ -258,7 +258,7 @@
 
                 <div>
                     <h6 class="flex justify-content-between mb-1">
-                        Fan Speed<span>{{info.fanspeed}}% ({{info.fanrpm}} RPM)</span>
+                        Fan Speed<span>{{info.fanspeed}} % ({{info.fanrpm}} RPM)</span>
                     </h6>
                     <p-progressBar [value]="info.fanspeed" [styleClass]="'p-progressbar--thin'">
                         <ng-template pTemplate="content" let-value></ng-template>
@@ -312,6 +312,15 @@
                         {{ info.responseTime }} ms
                     </div>
                 </div>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width text-500">
+                        <span>Difficulty</span>
+                    </div>
+                    <div>
+                        {{ info.poolDifficulty }}
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -321,6 +330,5 @@
                 {{info.uptimeSeconds | dateAgo}}
             </div>
         </div>
-
     </div>
 </ng-container>
