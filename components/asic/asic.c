@@ -47,9 +47,9 @@ task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
     return NULL;
 }
 
-int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
+int ASIC_set_max_baud(Asic asic)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    switch (asic) {
         case BM1397:
             return BM1397_set_max_baud();
         case BM1366:
@@ -80,9 +80,9 @@ void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job)
     }
 }
 
-void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
+void ASIC_set_version_mask(Asic asic, uint32_t mask)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    switch (asic) {
         case BM1397:
             BM1397_set_version_mask(mask);
             break;
@@ -98,9 +98,9 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
     }
 }
 
-bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float frequency)
+bool ASIC_set_frequency(Asic asic, float frequency)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    switch (asic) {
         case BM1397:
             ESP_LOGE(TAG, "Frequency transition not implemented for BM1397");
             return false;
