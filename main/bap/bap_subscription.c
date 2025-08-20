@@ -58,7 +58,7 @@ void BAP_subscription_handle_subscribe(const char *parameter, const char *value)
         subscriptions[param].active = true;
         subscriptions[param].last_subscribe = current_time;
         subscriptions[param].last_response = 0;
-        subscriptions[param].update_interval_ms = 5000;
+        subscriptions[param].update_interval_ms = 3000;
 
         if (value) {
             int interval = atoi(value);
