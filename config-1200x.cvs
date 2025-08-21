@@ -15,13 +15,13 @@ fbstratumuser,data,string,bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc
 fbstratumpass,data,string,x
 fbstratumdiff,data,u16,1000
 fbstratumxnsum,data,u16,0
-asicfrequency,data,u16,325
-asicvoltage,data,u16,1000
+asicfrequency,data,u16,342
+asicvoltage,data,u16,1100
 asicmodel,data,string,BM1340
 devicemodel,data,string,naja
 boardversion,data,string,1200
 rotation,data,u16,0
-autofanspeed,data,u16,1
+autofanspeed,data,u16,0
 fanspeed,data,u16,100
-selftest,data,u16,1
+selftest,data,u16,0
 overheat_mode,data,u16,0
