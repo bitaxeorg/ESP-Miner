@@ -59,11 +59,6 @@ void BAP_send_init_message(GlobalState *state);
  */
 void BAP_send_ap_message(GlobalState *state);
 
-/**
- * @brief AP mode task that sends periodic AP messages
- * @param pvParameters Global state pointer
- */
-void BAP_ap_mode_task(void *pvParameters);
 
 /**
  * @brief Start UART receive task

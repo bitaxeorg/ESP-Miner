@@ -113,19 +113,6 @@ void BAP_send_ap_message(GlobalState *state) {
     BAP_send_message(BAP_CMD_CMD, "mode", "ap_mode");
 }
 
-void BAP_ap_mode_task(void *pvParameters) {
-    GlobalState *state = (GlobalState *)pvParameters;
-    
-    ESP_LOGI(TAG, "BAP AP mode task started - sending AP messages every 5 seconds");
-    
-    while (1) {
-        BAP_send_ap_message(state);
-        
-        vTaskDelay(pdMS_TO_TICKS(5000));
-    }
-    
-    vTaskDelete(NULL);
-}
 
 static void uart_receive_task(void *pvParameters) {
     uint8_t *data = (uint8_t *) malloc(BAP_BUF_SIZE);
