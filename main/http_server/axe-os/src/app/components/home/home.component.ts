@@ -1,4 +1,5 @@
 import { Component, OnInit, ViewChild, OnDestroy } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap, first, Subject, takeUntil } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
@@ -6,10 +7,14 @@ import { ShareRejectionExplanationService } from 'src/app/services/share-rejecti
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
+import { ToastrService } from 'ngx-toastr';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
+import { SelectItem } from 'primeng/api';
+
+type PoolLabel = 'Primary' | 'Fallback';
 
 @Component({
   selector: 'app-home',
@@ -20,6 +25,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
+  public pools$!: Observable<SelectItem<PoolLabel>[]>;
 
   public chartOptions: any;
   public dataLabel: number[] = [];
@@ -38,7 +44,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolURL!: string;
   public activePoolPort!: number;
   public activePoolUser!: string;
-  public activePoolLabel!: 'Primary' | 'Fallback';
+  public activePoolLabel!: PoolLabel;
   public responseTime!: number;
 
   @ViewChild('chart')
@@ -52,6 +58,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
     private titleService: Title,
+    private toastr: ToastrService,
     private loadingService: LoadingService,
     private shareRejectReasonsService: ShareRejectionExplanationService
   ) {
@@ -311,6 +318,19 @@ export class HomeComponent implements OnInit, OnDestroy {
       })
     );
 
+    this.pools$ = this.info$.pipe(
+      map(info => {
+        const result: SelectItem<PoolLabel>[] = [];
+        if (info.stratumURL) {
+          result.push({ label: 'Primary', value: 'Primary' });
+        }
+        if (info.fallbackStratumURL) {
+          result.push({ label: 'Fallback', value: 'Fallback' });
+        }
+        return result;
+      })
+    );
+
     this.info$
       .pipe(takeUntil(this.destroy$))
       .subscribe(info => {
@@ -326,6 +346,29 @@ export class HomeComponent implements OnInit, OnDestroy {
         );
       });
   }
+
+  onPoolChange(event: { originalEvent: Event; value: PoolLabel }) {
+    const useFallbackStratum = Number(event.value === 'Fallback');
+
+    this.systemService.updateSystem('', { useFallbackStratum })
+      .pipe(
+        this.loadingService.lockUIUntilComplete(),
+        switchMap(() =>
+          this.systemService.restart().pipe(
+            this.loadingService.lockUIUntilComplete()
+          )
+        )
+      )
+      .subscribe({
+        next: () => {
+          this.toastr.success('Pool changed and device restarted');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error(`Error during pool change or device restart: ${err.message}`);
+        }
+      });
+  }
+
 
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
