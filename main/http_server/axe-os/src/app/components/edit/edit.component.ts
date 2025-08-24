@@ -17,8 +17,7 @@ const STATS_FREQUENCY_STEPS = [0, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 *
 
 @Component({
   selector: 'app-edit',
-  templateUrl: './edit.component.html',
-  styleUrls: ['./edit.component.scss']
+  templateUrl: './edit.component.html'
 })
 
 export class EditComponent implements OnInit, OnDestroy, OnChanges {
