@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewChild, OnDestroy } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap, tap, first, Subject, takeUntil } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
+import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
 import { LoadingService } from 'src/app/services/loading.service';
@@ -321,7 +322,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             (info.hashRate ? HashSuffixPipe.transform(info.hashRate * 1000000000) : false),
             (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
             (!info.power_fault ? `${info.power} W` : false),
-            (info.bestDiff ? info.bestDiff : false),
+            (info.bestDiff ? DiffSuffixPipe.transform(info.bestDiff) : false),
           ].filter(Boolean).join(' • ')
         );
       });
