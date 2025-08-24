@@ -324,10 +324,46 @@
             </div>
         </div>
 
+        <!--
         <div class="col-12 md:col-6">
             <div class="card">
                 <h5>Uptime</h5>
                 {{info.uptimeSeconds | dateAgo}}
+            </div>
+        </div>
+        -->
+
+        <div class="col-12 md:col-6">
+            <div class="card">
+                <h5>Block header</h5>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width text-500">
+                        <span>Height</span>
+                    </div>
+                    <div>
+                        {{ info.blockHeight }}
+                    </div>
+                </div>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width text-500">
+                        <span>Miner tag</span>
+                    </div>
+                    <div >
+                        {{ info.minerTag }}
+                    </div>
+                </div>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width text-500">
+                        <span>Difficulty</span>
+                    </div>
+                    <div >
+                        {{ info.networkDifficulty }}
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>

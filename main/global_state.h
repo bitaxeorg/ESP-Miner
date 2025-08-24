@@ -115,6 +115,10 @@ typedef struct
 
     bool ASIC_initalized;
     bool psram_is_available;
+
+    int block_height;
+    char * miner_tag;
+    char network_diff_string[DIFF_STRING_SIZE];
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */

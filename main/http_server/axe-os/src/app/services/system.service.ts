@@ -83,7 +83,11 @@ export class SystemService {
 
         boardtemp1: 30,
         boardtemp2: 40,
-        overheat_mode: 0
+        overheat_mode: 0,
+
+        blockHeight: 811111,
+        minerTag: "pool",
+        networkDiffString: "25.3T",
       }
     ).pipe(delay(1000));
   }

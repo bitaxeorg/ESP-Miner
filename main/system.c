@@ -29,16 +29,14 @@
 #include "screen.h"
 #include "vcore.h"
 #include "thermal.h"
+#include "utils.h"
 
 static const char * TAG = "system";
-
-static void _suffix_string(uint64_t, char *, size_t, int);
 
 //local function prototypes
 static esp_err_t ensure_overheat_mode_config();
 
 static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id);
-static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 {
@@ -92,8 +90,8 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->power_fault = 0;
 
     // set the best diff string
-    _suffix_string(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
-    _suffix_string(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
+    suffixString(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
+    suffixString(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 }
 
 esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
@@ -227,28 +225,16 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double found_diff, ui
     _check_for_best_diff(GLOBAL_STATE, found_diff, job_id);
 }
 
-static double _calculate_network_difficulty(uint32_t nBits)
-{
-    uint32_t mantissa = nBits & 0x007fffff;  // Extract the mantissa from nBits
-    uint8_t exponent = (nBits >> 24) & 0xff; // Extract the exponent from nBits
-
-    double target = (double) mantissa * pow(256, (exponent - 3)); // Calculate the target value
-
-    double difficulty = (pow(2, 208) * 65535) / target; // Calculate the difficulty
-
-    return difficulty;
-}
-
 static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     if ((uint64_t) diff > module->best_session_nonce_diff) {
         module->best_session_nonce_diff = (uint64_t) diff;
-        _suffix_string((uint64_t) diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
+        suffixString((uint64_t) diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
     }
 
-    double network_diff = _calculate_network_difficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
+    double network_diff = networkDifficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
     if (diff > network_diff) {
         module->FOUND_BLOCK = true;
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
@@ -262,66 +248,9 @@ static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_
     nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, module->best_nonce_diff);
 
     // make the best_nonce_diff into a string
-    _suffix_string((uint64_t) diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
+    suffixString((uint64_t) diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
 
     ESP_LOGI(TAG, "Network diff: %f", network_diff);
-}
-
-/* Convert a uint64_t value into a truncated string for displaying with its
- * associated suitable for Mega, Giga etc. Buf array needs to be long enough */
-static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigits)
-{
-    const double dkilo = 1000.0;
-    const uint64_t kilo = 1000ull;
-    const uint64_t mega = 1000000ull;
-    const uint64_t giga = 1000000000ull;
-    const uint64_t tera = 1000000000000ull;
-    const uint64_t peta = 1000000000000000ull;
-    const uint64_t exa = 1000000000000000000ull;
-    char suffix[2] = "";
-    bool decimal = true;
-    double dval;
-
-    if (val >= exa) {
-        val /= peta;
-        dval = (double) val / dkilo;
-        strcpy(suffix, "E");
-    } else if (val >= peta) {
-        val /= tera;
-        dval = (double) val / dkilo;
-        strcpy(suffix, "P");
-    } else if (val >= tera) {
-        val /= giga;
-        dval = (double) val / dkilo;
-        strcpy(suffix, "T");
-    } else if (val >= giga) {
-        val /= mega;
-        dval = (double) val / dkilo;
-        strcpy(suffix, "G");
-    } else if (val >= mega) {
-        val /= kilo;
-        dval = (double) val / dkilo;
-        strcpy(suffix, "M");
-    } else if (val >= kilo) {
-        dval = (double) val / dkilo;
-        strcpy(suffix, "k");
-    } else {
-        dval = val;
-        decimal = false;
-    }
-
-    if (!sigdigits) {
-        if (decimal)
-            snprintf(buf, bufsiz, "%.2f %s", dval, suffix);
-        else
-            snprintf(buf, bufsiz, "%d %s", (unsigned int) dval, suffix);
-    } else {
-        /* Always show sigdigits + 1, padded on right with zeroes
-         * followed by suffix */
-        int ndigits = sigdigits - 1 - (dval > 0.0 ? floor(log10(dval)) : 0);
-
-        snprintf(buf, bufsiz, "%*.*f %s", sigdigits + 1, ndigits, dval, suffix);
-    }
 }
 
 static esp_err_t ensure_overheat_mode_config() {

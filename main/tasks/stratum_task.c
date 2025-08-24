@@ -13,6 +13,7 @@
 #include <sys/time.h>
 #include "esp_timer.h"
 #include <stdbool.h>
+#include "utils.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
@@ -171,6 +172,55 @@ void stratum_primary_heartbeat(void * pvParameters)
     }
 }
 
+void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
+{
+    int coinbase_1_len = strlen(mining_notification->coinbase_1) / 2;
+    if (coinbase_1_len >= 43) {
+        uint8_t block_height_len;
+        hex2bin(mining_notification->coinbase_1 + 84, &block_height_len, 1);
+        if (block_height_len > 0 && block_height_len <= 4 && coinbase_1_len >= 43 + block_height_len) {
+            uint32_t block_height = 0;
+            uint8_t b;
+            for (int i = block_height_len; i > 0; i--) {
+                hex2bin(mining_notification->coinbase_1 + 84 + (i * 2), &b, 1);
+                block_height = (block_height << 8) + b;
+            }
+            if (block_height != GLOBAL_STATE->block_height) {
+                ESP_LOGI(TAG, "Block height %d", block_height);
+                GLOBAL_STATE->block_height = block_height;
+            }
+        }
+    }
+
+    int coinbase_2_len = strlen(mining_notification->coinbase_2) / 2;
+    const char sequence[] = "ffffffff";
+    int offset = 1;
+    while (offset + 4 < coinbase_2_len) {
+        if (strncmp(mining_notification->coinbase_2 + (offset * 2), sequence, 8) == 0) {
+            char * miner_tag = (char*) malloc(offset);
+            if (miner_tag) {
+                hex2bin(mining_notification->coinbase_2 + 2, (uint8_t *) miner_tag, offset - 1);
+                miner_tag[offset - 1] = '\0';
+                if (GLOBAL_STATE->miner_tag == NULL || strcmp(miner_tag, GLOBAL_STATE->miner_tag) != 0) {
+                    ESP_LOGI(TAG, "Miner tag: %s", miner_tag);
+    
+                    char * previous_miner_tag = GLOBAL_STATE->miner_tag;
+                    GLOBAL_STATE->miner_tag = miner_tag;
+                    free(previous_miner_tag);
+                } else {
+                    free(miner_tag);
+                }
+            }
+            break;
+        }
+
+        offset++;
+    }
+
+    double network_difficulty = networkDifficulty(mining_notification->target);
+    suffixString(network_difficulty, GLOBAL_STATE->network_diff_string, DIFF_STRING_SIZE, 0);    
+}
+
 void stratum_task(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -188,7 +238,6 @@ void stratum_task(void * pvParameters)
     int ip_protocol = IPPROTO_IP;
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
-
 
     xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL);
 
@@ -329,6 +378,7 @@ void stratum_task(void * pvParameters)
                     STRATUM_V1_free_mining_notify(next_notify_json_str);
                 }
                 queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
+                decode_mining_notification(GLOBAL_STATE, stratum_api_v1_message.mining_notification);
             } else if (stratum_api_v1_message.method == MINING_SET_DIFFICULTY) {
                 ESP_LOGI(TAG, "Set pool difficulty: %ld", stratum_api_v1_message.new_difficulty);
                 GLOBAL_STATE->pool_difficulty = stratum_api_v1_message.new_difficulty;

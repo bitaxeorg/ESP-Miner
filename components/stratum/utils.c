@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "mbedtls/sha256.h"
 
@@ -302,4 +303,74 @@ uint32_t flip32(uint32_t val)
     ret |= (val & 0xFF0000) >> 8;
     ret |= (val & 0xFF000000) >> 24;
     return ret;
+}
+
+/* Calculate the network difficulty from nBits */
+double networkDifficulty(uint32_t nBits)
+{
+    uint32_t mantissa = nBits & 0x007fffff;  // Extract the mantissa from nBits
+    uint8_t exponent = (nBits >> 24) & 0xff; // Extract the exponent from nBits
+
+    double target = (double) mantissa * pow(256, (exponent - 3)); // Calculate the target value
+
+    double difficulty = (pow(2, 208) * 65535) / target; // Calculate the difficulty
+
+    return difficulty;
+}
+
+/* Convert a uint64_t value into a truncated string for displaying with its
+ * associated suitable for Mega, Giga etc. Buf array needs to be long enough */
+void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits)
+{
+    const double dkilo = 1000.0;
+    const uint64_t kilo = 1000ull;
+    const uint64_t mega = 1000000ull;
+    const uint64_t giga = 1000000000ull;
+    const uint64_t tera = 1000000000000ull;
+    const uint64_t peta = 1000000000000000ull;
+    const uint64_t exa = 1000000000000000000ull;
+    char suffix[2] = "";
+    bool decimal = true;
+    double dval;
+
+    if (val >= exa) {
+        val /= peta;
+        dval = (double) val / dkilo;
+        strcpy(suffix, "E");
+    } else if (val >= peta) {
+        val /= tera;
+        dval = (double) val / dkilo;
+        strcpy(suffix, "P");
+    } else if (val >= tera) {
+        val /= giga;
+        dval = (double) val / dkilo;
+        strcpy(suffix, "T");
+    } else if (val >= giga) {
+        val /= mega;
+        dval = (double) val / dkilo;
+        strcpy(suffix, "G");
+    } else if (val >= mega) {
+        val /= kilo;
+        dval = (double) val / dkilo;
+        strcpy(suffix, "M");
+    } else if (val >= kilo) {
+        dval = (double) val / dkilo;
+        strcpy(suffix, "k");
+    } else {
+        dval = val;
+        decimal = false;
+    }
+
+    if (!sigdigits) {
+        if (decimal)
+            snprintf(buf, bufsiz, "%.2f %s", dval, suffix);
+        else
+            snprintf(buf, bufsiz, "%d %s", (unsigned int) dval, suffix);
+    } else {
+        /* Always show sigdigits + 1, padded on right with zeroes
+         * followed by suffix */
+        int ndigits = sigdigits - 1 - (dval > 0.0 ? floor(log10(dval)) : 0);
+
+        snprintf(buf, bufsiz, "%*.*f %s", sigdigits + 1, ndigits, dval, suffix);
+    }
 }
