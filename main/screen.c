@@ -69,7 +69,7 @@ static lv_obj_t *wifi_rssi_value_label;
 static lv_obj_t *wifi_signal_strength_label;
 static lv_obj_t *esp_uptime_label;
 
-static lv_obj_t *notification_dot;
+static lv_obj_t *notification_label;
 
 static double current_hashrate;
 static float current_power;
@@ -453,14 +453,39 @@ static void screen_update_cb(lv_timer_t * timer)
         current_rssi_value = rssi_value;
     }
 
-    if (current_shares != module->shares_accepted) {
-        lv_obj_remove_flag(notification_dot, LV_OBJ_FLAG_HIDDEN);
-        current_shares = module->shares_accepted;
-    } else {
-        if (!lv_obj_has_flag(notification_dot, LV_OBJ_FLAG_HIDDEN)) {
-            lv_obj_add_flag(notification_dot, LV_OBJ_FLAG_HIDDEN);
+    // Track last share event type (1 = accepted, 2 = rejected)
+        static uint8_t last_share_event = 0;
+        static uint64_t last_shares_accepted = 0;
+        static uint64_t last_shares_rejected = 0;
+        static int notification_timer = 0;
+        const int NOTIFICATION_DURATION = 2;
+
+        // Check if this is a new accepted or rejected share
+        bool new_share_accepted = (module->shares_accepted > last_shares_accepted);
+        bool new_share_rejected = (module->shares_rejected > last_shares_rejected);
+        
+        if (new_share_accepted) {
+            last_share_event = 1;
+            last_shares_accepted = module->shares_accepted;
+            notification_timer = NOTIFICATION_DURATION;
+        } else if (new_share_rejected) {
+            last_share_event = 2;
+            last_shares_rejected = module->shares_rejected;
+            notification_timer = NOTIFICATION_DURATION;
         }
-    }
+        
+        if (notification_timer > 0) {
+            if (last_share_event == 1) {
+                lv_label_set_text(notification_label, "+");
+            } else if (last_share_event == 2) {
+                lv_label_set_text(notification_label, "-");
+            }
+            
+            lv_obj_clear_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
+            notification_timer--;
+        } else {
+            lv_obj_add_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
+        }
 
     if (current_screen_time_ms <= current_screen_delay_ms || found_block) {
         return;
@@ -537,13 +562,11 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_STATS] = create_scr_stats();
         screens[SCR_WIFI_RSSI] = create_scr_wifi_rssi();
 
-        notification_dot = lv_obj_create(lv_layer_top());
-        lv_obj_align(notification_dot, LV_ALIGN_TOP_RIGHT, 0, 0);
-        lv_obj_set_size(notification_dot, 8, 8);
-        lv_obj_set_style_radius(notification_dot, LV_RADIUS_CIRCLE, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(notification_dot, lv_color_black(), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(notification_dot, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_add_flag(notification_dot, LV_OBJ_FLAG_HIDDEN);
+        notification_label = lv_label_create(lv_layer_top());
+            lv_label_set_text(notification_label, "");
+            lv_obj_align(notification_label, LV_ALIGN_TOP_RIGHT, -2, 2);
+            lv_obj_set_style_text_font(notification_label, &lv_font_portfolio_6x8, LV_PART_MAIN);
+            lv_obj_add_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
 
         lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);
 
