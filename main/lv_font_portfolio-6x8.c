@@ -316,7 +316,18 @@ static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
     0x6a, 0xc0, 0x0, 0x0, 0x0, 0x0,
 
     /* U+007F "" */
-    0x0, 0x2, 0x14, 0x8b, 0xe0, 0x0
+    0x0, 0x2, 0x14, 0x8b, 0xe0, 0x0,
+
+    // Unicode characters
+
+    /* U+2191 "↑" */
+    0x21, 0xCF, 0x88, 0x20, 0x82, 0x00,
+
+    /* U+2193 "↓" */
+    0x20, 0x82, 0x08, 0xF9, 0xC2, 0x00,
+   
+    /* U+2195 "↕" */
+    0x21, 0xCF, 0x88, 0xF9, 0xC2, 0x00,
 };
 
 
@@ -421,14 +432,23 @@ static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
     {.bitmap_index = 552, .adv_w = 96, .box_w = 6, .box_h = 8, .ofs_x = 0, .ofs_y = -1},
     {.bitmap_index = 558, .adv_w = 96, .box_w = 6, .box_h = 8, .ofs_x = 0, .ofs_y = -1},
     {.bitmap_index = 564, .adv_w = 96, .box_w = 6, .box_h = 8, .ofs_x = 0, .ofs_y = -1},
-    {.bitmap_index = 570, .adv_w = 96, .box_w = 6, .box_h = 8, .ofs_x = 0, .ofs_y = -1}
+    {.bitmap_index = 570, .adv_w = 96, .box_w = 6, .box_h = 8, .ofs_x = 0, .ofs_y = -1},
+
+    // Unicode characters
+    {.bitmap_index = 576, .adv_w = 96, .box_w = 6, .box_h = 8, .ofs_x = 0, .ofs_y = -1},
+    {.bitmap_index = 582, .adv_w = 96, .box_w = 6, .box_h = 8, .ofs_x = 0, .ofs_y = -1},
+    {.bitmap_index = 588, .adv_w = 96, .box_w = 6, .box_h = 8, .ofs_x = 0, .ofs_y = -1},
 };
 
 /*---------------------
  *  CHARACTER MAPPING
  *--------------------*/
 
-
+/*
+static const uint16_t unicode_list_1[] = {
+    0x0, 0x2191, 0x2193, 0x2195,
+};
+*/
 
 /*Collect the unicode lists and glyph_id offsets*/
 static const lv_font_fmt_txt_cmap_t cmaps[] =
@@ -436,10 +456,27 @@ static const lv_font_fmt_txt_cmap_t cmaps[] =
     {
         .range_start = 32, .range_length = 96, .glyph_id_start = 1,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
-    }
+    },
+    {
+        .range_start = 0x2191, .range_length = 1, .glyph_id_start = 97,
+        .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
+    },
+    {
+        .range_start = 0x2193, .range_length = 1, .glyph_id_start = 98,
+        .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
+    },
+    {
+        .range_start = 0x2195, .range_length = 1, .glyph_id_start = 99,
+        .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
+    },
+
+    /* Can't get this working properly, only the first glyph shows
+    {
+        .range_start = 0x2191, .range_length = 5, .glyph_id_start = 97,
+        .unicode_list = unicode_list_1, .glyph_id_ofs_list = NULL, .list_length = 4, .type = LV_FONT_FMT_TXT_CMAP_SPARSE_TINY
+    },
+    */
 };
-
-
 
 /*--------------------
  *  ALL CUSTOM DATA
@@ -460,7 +497,7 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
     .cmaps = cmaps,
     .kern_dsc = NULL,
     .kern_scale = 0,
-    .cmap_num = 1,
+    .cmap_num = 4,
     .bpp = 1,
     .kern_classes = 0,
     .bitmap_format = 0,

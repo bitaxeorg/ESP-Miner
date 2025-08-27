@@ -35,6 +35,7 @@ typedef struct
     int64_t start_time;
     uint64_t shares_accepted;
     uint64_t shares_rejected;
+    uint64_t work_received;
     RejectedReasonStat rejected_reason_stats[10];
     int rejected_reason_stats_count;
     int screen_page;

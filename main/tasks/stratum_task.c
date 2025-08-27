@@ -219,6 +219,7 @@ void stratum_task(void * pvParameters)
             GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count = 0;
             GLOBAL_STATE->SYSTEM_MODULE.shares_accepted = 0;
             GLOBAL_STATE->SYSTEM_MODULE.shares_rejected = 0;
+            GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
 
             ESP_LOGI(TAG, "Switching target due to too many failures (retries: %d)...", retry_attempts);
             retry_attempts = 0;
@@ -319,6 +320,7 @@ void stratum_task(void * pvParameters)
             free(line);
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
+                GLOBAL_STATE->SYSTEM_MODULE.work_received++;
                 SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
                 if (stratum_api_v1_message.should_abandon_work &&
                     (GLOBAL_STATE->stratum_queue.count > 0 || GLOBAL_STATE->ASIC_jobs_queue.count > 0)) {

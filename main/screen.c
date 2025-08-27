@@ -75,7 +75,31 @@ static double current_hashrate;
 static float current_power;
 static uint64_t current_difficulty;
 static float current_chip_temp;
-static uint64_t current_shares;
+
+typedef union {
+    struct {
+        uint8_t share_accepted : 1;
+        uint8_t share_rejected : 1;
+        uint8_t work_received : 1;
+        uint8_t unused : 5;
+    } bits;
+    uint8_t byte;
+} NotificationState;
+
+static const char *notifications[] = {
+    "",     // 0b000: NONE
+    "↑",    // 0b001:                   ACCEPTED
+    "x",    // 0b010:          REJECTED
+    "x↑",   // 0b011:          REJECTED ACCEPTED
+    "↓",    // 0b100: RECEIVED
+    "↕",    // 0b101: RECEIVED          ACCEPTED
+    "x↓",   // 0b110: RECEIVED REJECTED 
+    "x↕"    // 0b111: RECEIVED REJECTED ACCEPTED
+};
+
+static uint64_t current_shares_accepted;
+static uint64_t current_shares_rejected;
+static uint64_t current_work_received;
 static int8_t current_rssi_value;
 
 static bool found_block;
@@ -453,39 +477,27 @@ static void screen_update_cb(lv_timer_t * timer)
         current_rssi_value = rssi_value;
     }
 
-    // Track last share event type (1 = accepted, 2 = rejected)
-        static uint8_t last_share_event = 0;
-        static uint64_t last_shares_accepted = 0;
-        static uint64_t last_shares_rejected = 0;
-        static int notification_timer = 0;
-        const int NOTIFICATION_DURATION = 2;
+    if (current_shares_accepted != module->shares_accepted 
+        || current_shares_rejected != module->shares_rejected
+        || current_work_received != module->work_received) {
 
-        // Check if this is a new accepted or rejected share
-        bool new_share_accepted = (module->shares_accepted > last_shares_accepted);
-        bool new_share_rejected = (module->shares_rejected > last_shares_rejected);
-        
-        if (new_share_accepted) {
-            last_share_event = 1;
-            last_shares_accepted = module->shares_accepted;
-            notification_timer = NOTIFICATION_DURATION;
-        } else if (new_share_rejected) {
-            last_share_event = 2;
-            last_shares_rejected = module->shares_rejected;
-            notification_timer = NOTIFICATION_DURATION;
-        }
-        
-        if (notification_timer > 0) {
-            if (last_share_event == 1) {
-                lv_label_set_text(notification_label, "+");
-            } else if (last_share_event == 2) {
-                lv_label_set_text(notification_label, "-");
-            }
-            
-            lv_obj_clear_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
-            notification_timer--;
-        } else {
+        NotificationState state = {0};
+        state.bits.share_accepted = module->shares_accepted > current_shares_accepted;
+        state.bits.share_rejected = module->shares_rejected > current_shares_rejected;
+        state.bits.work_received = module->work_received > current_work_received;
+
+        lv_label_set_text(notification_label, notifications[state.byte]);
+
+        lv_obj_remove_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
+
+        current_shares_accepted = module->shares_accepted;
+        current_shares_rejected = module->shares_rejected;
+        current_work_received = module->work_received;
+    } else {
+        if (!lv_obj_has_flag(notification_label, LV_OBJ_FLAG_HIDDEN)) {
             lv_obj_add_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
         }
+    }
 
     if (current_screen_time_ms <= current_screen_delay_ms || found_block) {
         return;
@@ -563,10 +575,9 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_WIFI_RSSI] = create_scr_wifi_rssi();
 
         notification_label = lv_label_create(lv_layer_top());
-            lv_label_set_text(notification_label, "");
-            lv_obj_align(notification_label, LV_ALIGN_TOP_RIGHT, -2, 2);
-            lv_obj_set_style_text_font(notification_label, &lv_font_portfolio_6x8, LV_PART_MAIN);
-            lv_obj_add_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(notification_label, "");
+        lv_obj_align(notification_label, LV_ALIGN_TOP_RIGHT, 0, 0);
+        lv_obj_add_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
 
         lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);
 
