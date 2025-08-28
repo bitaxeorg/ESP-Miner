@@ -1,5 +1,5 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
-import { interval, map, Observable, shareReplay, startWith, switchMap, tap, first } from 'rxjs';
+import { Component, OnInit, ViewChild, OnDestroy } from '@angular/core';
+import { interval, map, Observable, shareReplay, startWith, switchMap, tap, first, Subject, takeUntil } from 'rxjs';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
@@ -16,7 +16,7 @@ import { UIChart } from 'primeng/chart';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit, OnDestroy {
 
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
@@ -40,10 +40,12 @@ export class HomeComponent {
   public activePoolUser!: string;
   public activePoolLabel!: 'Primary' | 'Fallback';
   public responseTime!: number;
+
   @ViewChild('chart')
   private chart?: UIChart
 
   private pageDefaultTitle: string = '';
+  private destroy$ = new Subject<void>();
 
   constructor(
     private systemService: SystemService,
@@ -56,14 +58,21 @@ export class HomeComponent {
     this.initializeChart();
 
     // Subscribe to theme changes
-    this.themeService.getThemeSettings().subscribe(() => {
-      this.updateChartColors();
-    });
+    this.themeService.getThemeSettings()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.updateChartColors();
+      });
   }
 
   ngOnInit() {
     this.pageDefaultTitle = this.titleService.getTitle();
     this.loadingService.loading$.next(true);
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   private updateChartColors() {
@@ -95,8 +104,6 @@ export class HomeComponent {
     // Force chart update
     this.chartData = { ...this.chartData };
   }
-
-
 
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
@@ -210,28 +217,32 @@ export class HomeComponent {
     this.chartData.datasets[1].data = this.temperatureData;
 
     // load previous data
-    this.stats$ = this.systemService.getStatistics().pipe(shareReplay({ refCount: true, bufferSize: 1 }));
-    this.stats$.subscribe(stats => {
-      stats.statistics.forEach(element => {
-        const idxHashrate = 0;
-        const idxTemperature = 1;
-        const idxPower = 2;
-        const idxTimestamp = 3;
+    this.stats$ = this.systemService.getStatistics()
+      .pipe(shareReplay({ refCount: true, bufferSize: 1 }));
 
-        this.hashrateData.push(element[idxHashrate] * 1000000000);
-        this.temperatureData.push(element[idxTemperature]);
-        this.powerData.push(element[idxPower]);
-        this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
+    this.stats$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(stats => {
+        stats.statistics.forEach(element => {
+          const idxHashrate = 0;
+          const idxTemperature = 1;
+          const idxPower = 2;
+          const idxTimestamp = 3;
 
-        if (this.hashrateData.length >= 720) {
-          this.hashrateData.shift();
-          this.temperatureData.shift();
-          this.powerData.shift();
-          this.dataLabel.shift();
-        }
-      }),
-      this.startGetLiveData();
-    });
+          this.hashrateData.push(element[idxHashrate] * 1000000000);
+          this.temperatureData.push(element[idxTemperature]);
+          this.powerData.push(element[idxPower]);
+          this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
+
+          if (this.hashrateData.length >= 720) {
+            this.hashrateData.shift();
+            this.temperatureData.shift();
+            this.powerData.shift();
+            this.dataLabel.shift();
+          }
+        }),
+        this.startGetLiveData();
+      });
   }
 
   private startGetLiveData()
@@ -286,13 +297,11 @@ export class HomeComponent {
       shareReplay({ refCount: true, bufferSize: 1 })
     );
 
-    this.info$.pipe(
-      first()
-    ).subscribe({
-      next: () => {
-        this.loadingService.loading$.next(false)
-      }
-    });
+    this.info$
+      .pipe(first())
+      .subscribe(() => {
+        this.loadingService.loading$.next(false);
+      });
 
     this.quickLink$ = this.info$.pipe(
       map(info => {
@@ -302,18 +311,20 @@ export class HomeComponent {
       })
     );
 
-    this.info$.subscribe(info => {
-      this.titleService.setTitle(
-        [
-          this.pageDefaultTitle,
-          info.hostname,
-          (info.hashRate ? HashSuffixPipe.transform(info.hashRate * 1000000000) : false),
-          (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
-          (!info.power_fault ? `${info.power} W` : false),
-          (info.bestDiff ? info.bestDiff : false),
-        ].filter(Boolean).join(' • ')
-      );
-    });
+    this.info$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(info => {
+        this.titleService.setTitle(
+          [
+            this.pageDefaultTitle,
+            info.hostname,
+            (info.hashRate ? HashSuffixPipe.transform(info.hashRate * 1000000000) : false),
+            (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
+            (!info.power_fault ? `${info.power} W` : false),
+            (info.bestDiff ? info.bestDiff : false),
+          ].filter(Boolean).join(' • ')
+        );
+      });
   }
 
   getRejectionExplanation(reason: string): string | null {

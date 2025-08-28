@@ -31,6 +31,21 @@ p-chart>div {
     }
 }
 
+.hover-next-input:hover + * {
+    .p-dropdown {
+        border-color: var(--checkbox-hover-bg);
+    }
+    .p-slider {
+        .p-slider-handle {
+            border-color: var(--checkbox-hover-bg);
+            background-color: var(--checkbox-hover-bg);
+        }
+        .p-slider-range {
+            background-color: var(--checkbox-hover-bg);
+        }
+    }
+}
+
 /* PrimeNG Component Theme Overrides */
 .p-slider {
     .p-slider-range {
