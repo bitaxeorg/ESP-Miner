@@ -91,9 +91,9 @@ static const char *notifications[] = {
     "x↕"    // 0b111: RECEIVED REJECTED ACCEPTED
 };
 
-static uint64_t current_shares_accepted;
-static uint64_t current_shares_rejected;
-static uint64_t current_work_received;
+static uint32_t current_shares_accepted;
+static uint32_t current_shares_rejected;
+static uint32_t current_work_received;
 static int8_t current_rssi_value;
 
 static bool found_block;
@@ -471,22 +471,26 @@ static void screen_update_cb(lv_timer_t * timer)
         current_rssi_value = rssi_value;
     }
 
-    if (current_shares_accepted != module->shares_accepted 
-        || current_shares_rejected != module->shares_rejected
-        || current_work_received != module->work_received) {
+    uint32_t shares_accepted = module->shares_accepted;
+    uint32_t shares_rejected = module->shares_rejected;
+    uint32_t work_received = module->work_received;
+
+    if (current_shares_accepted != shares_accepted 
+        || current_shares_rejected != shares_rejected
+        || current_work_received != work_received) {
 
         uint8_t state = 0;
-        if (module->shares_accepted > current_shares_accepted) state |= NOTIFICATION_SHARE_ACCEPTED;
-        if (module->shares_rejected > current_shares_rejected) state |= NOTIFICATION_SHARE_REJECTED;
-        if (module->work_received > current_work_received) state |= NOTIFICATION_WORK_RECEIVED;
+        if (shares_accepted > current_shares_accepted) state |= NOTIFICATION_SHARE_ACCEPTED;
+        if (shares_rejected > current_shares_rejected) state |= NOTIFICATION_SHARE_REJECTED;
+        if (work_received > current_work_received) state |= NOTIFICATION_WORK_RECEIVED;
 
         lv_label_set_text(notification_label, notifications[state]);
 
         lv_obj_remove_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
 
-        current_shares_accepted = module->shares_accepted;
-        current_shares_rejected = module->shares_rejected;
-        current_work_received = module->work_received;
+        current_shares_accepted = shares_accepted;
+        current_shares_rejected = shares_rejected;
+        current_work_received = work_received;
     } else {
         if (!lv_obj_has_flag(notification_label, LV_OBJ_FLAG_HIDDEN)) {
             lv_obj_add_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
