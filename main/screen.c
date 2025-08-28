@@ -96,7 +96,6 @@ static uint64_t current_shares_rejected;
 static uint64_t current_work_received;
 static int8_t current_rssi_value;
 
-static bool found_block;
 static bool self_test_finished;
 
 static lv_obj_t * create_flex_screen(int expected_lines) {
@@ -421,9 +420,7 @@ static void screen_update_cb(lv_timer_t * timer)
     }
     current_hashrate = module->current_hashrate;
 
-    if (module->FOUND_BLOCK && !found_block) {
-        found_block = true;
-
+    if (module->FOUND_BLOCK && current_screen != SCR_STATS) {
         lv_obj_set_width(difficulty_label, LV_HOR_RES);
         lv_label_set_long_mode(difficulty_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
         lv_label_set_text_fmt(difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", module->best_session_diff_string);
@@ -497,7 +494,7 @@ static void screen_update_cb(lv_timer_t * timer)
         }
     }
 
-    if (current_screen_time_ms <= current_screen_delay_ms || found_block) {
+    if (current_screen_time_ms <= current_screen_delay_ms || module->FOUND_BLOCK) {
         return;
     }
 
