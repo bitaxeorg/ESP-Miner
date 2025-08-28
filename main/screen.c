@@ -76,15 +76,9 @@ static float current_power;
 static uint64_t current_difficulty;
 static float current_chip_temp;
 
-typedef union {
-    struct {
-        uint8_t share_accepted : 1;
-        uint8_t share_rejected : 1;
-        uint8_t work_received : 1;
-        uint8_t unused : 5;
-    } bits;
-    uint8_t byte;
-} NotificationState;
+#define NOTIFICATION_SHARE_ACCEPTED (1 << 0)
+#define NOTIFICATION_SHARE_REJECTED (1 << 1)
+#define NOTIFICATION_WORK_RECEIVED  (1 << 2)
 
 static const char *notifications[] = {
     "",     // 0b000: NONE
@@ -481,12 +475,12 @@ static void screen_update_cb(lv_timer_t * timer)
         || current_shares_rejected != module->shares_rejected
         || current_work_received != module->work_received) {
 
-        NotificationState state = {0};
-        state.bits.share_accepted = module->shares_accepted > current_shares_accepted;
-        state.bits.share_rejected = module->shares_rejected > current_shares_rejected;
-        state.bits.work_received = module->work_received > current_work_received;
+        uint8_t state = 0;
+        if (module->shares_accepted > current_shares_accepted) state |= NOTIFICATION_SHARE_ACCEPTED;
+        if (module->shares_rejected > current_shares_rejected) state |= NOTIFICATION_SHARE_REJECTED;
+        if (module->work_received > current_work_received) state |= NOTIFICATION_WORK_RECEIVED;
 
-        lv_label_set_text(notification_label, notifications[state.byte]);
+        lv_label_set_text(notification_label, notifications[state]);
 
         lv_obj_remove_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
 
