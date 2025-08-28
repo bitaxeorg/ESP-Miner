@@ -375,8 +375,8 @@ void BAP_handle_settings(const char *parameter, const char *value) {
             {
                 uint16_t fan_speed = (uint16_t)atoi(value);
 
-                if (fan_speed < 10 || fan_speed > 100) {
-                    ESP_LOGE(TAG, "Invalid fan speed value: %d%% (valid range: 10-100%%)", fan_speed);
+                if (fan_speed > 100) {
+                    ESP_LOGE(TAG, "Invalid fan speed value: %d%% (valid range: 0-100%%)", fan_speed);
                     BAP_send_message(BAP_CMD_ERR, parameter, "invalid_range");
                     return;
                 }
