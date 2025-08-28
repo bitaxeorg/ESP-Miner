@@ -91,9 +91,9 @@ static const char *notifications[] = {
     "x↕"    // 0b111: RECEIVED REJECTED ACCEPTED
 };
 
-static uint32_t current_shares_accepted;
-static uint32_t current_shares_rejected;
-static uint32_t current_work_received;
+static uint64_t current_shares_accepted;
+static uint64_t current_shares_rejected;
+static uint64_t current_work_received;
 static int8_t current_rssi_value;
 
 static bool found_block;
