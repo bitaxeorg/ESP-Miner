@@ -83,7 +83,11 @@ export class SystemService {
 
         boardtemp1: 30,
         boardtemp2: 40,
-        overheat_mode: 0
+        overheat_mode: 0,
+
+        blockHeight: 811111,
+        scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",
+        networkDifficulty: "25.3T",
       }
     ).pipe(delay(1000));
   }

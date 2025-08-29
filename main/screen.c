@@ -23,6 +23,7 @@ typedef enum {
     SCR_OSMU_LOGO,
     SCR_URLS,
     SCR_STATS,
+    SCR_MINING,
     SCR_WIFI_RSSI,
     MAX_SCREENS,
 } screen_t;
@@ -30,13 +31,12 @@ typedef enum {
 #define SCREEN_UPDATE_MS 500
 
 #define SCR_CAROUSEL_START SCR_URLS
-#define SCR_CAROUSEL_END SCR_WIFI_RSSI
 
 extern const lv_img_dsc_t bitaxe_logo;
 extern const lv_img_dsc_t osmu_logo;
 
 static lv_obj_t * screens[MAX_SCREENS];
-static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000, 5000};
+static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000, 10000, 10000};
 
 static screen_t current_screen = -1;
 static int current_screen_time_ms;
@@ -53,6 +53,10 @@ static lv_obj_t *hashrate_label;
 static lv_obj_t *efficiency_label;
 static lv_obj_t *difficulty_label;
 static lv_obj_t *chip_temp_label;
+
+static lv_obj_t *block_height_label;
+static lv_obj_t *network_difficulty_label;
+static lv_obj_t *scriptsig_label;
 
 static lv_obj_t *firmware_update_scr_filename_label;
 static lv_obj_t *firmware_update_scr_status_label;
@@ -95,6 +99,7 @@ static uint64_t current_shares_accepted;
 static uint64_t current_shares_rejected;
 static uint64_t current_work_received;
 static int8_t current_rssi_value;
+static int current_block_height;
 
 static bool found_block;
 static bool self_test_finished;
@@ -277,8 +282,28 @@ static lv_obj_t * create_scr_stats() {
     return scr;
 }
 
+static lv_obj_t * create_scr_mining() {
+    lv_obj_t * scr = create_flex_screen(4);
+
+    block_height_label = lv_label_create(scr);
+    lv_label_set_text(hashrate_label, "Block: --");
+
+    network_difficulty_label = lv_label_create(scr);
+    lv_label_set_text(network_difficulty_label, "Difficulty: --");
+
+    lv_obj_t *label3 = lv_label_create(scr);
+    lv_label_set_text(label3, "Scriptsig:");
+
+    scriptsig_label = lv_label_create(scr);
+    lv_label_set_text(scriptsig_label, "--");
+    lv_obj_set_width(scriptsig_label, LV_HOR_RES);
+    lv_label_set_long_mode(scriptsig_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+
+    return scr;
+}
+
 static lv_obj_t * create_scr_wifi_rssi() {
-    lv_obj_t * scr = create_flex_screen(3);
+    lv_obj_t * scr = create_flex_screen(4);
 
     lv_obj_t *title_label = lv_label_create(scr);
     lv_label_set_text(title_label, "Wi-Fi Signal");
@@ -444,6 +469,19 @@ static void screen_update_cb(lv_timer_t * timer)
         current_chip_temp = power_management->chip_temp_avg;
     }
 
+    if (current_block_height != GLOBAL_STATE->block_height) {
+        lv_label_set_text_fmt(block_height_label, "Block: %d", GLOBAL_STATE->block_height);
+        current_block_height = GLOBAL_STATE->block_height;
+    }
+    
+    if (strcmp(&lv_label_get_text(network_difficulty_label)[9], GLOBAL_STATE->network_diff_string) != 0) {
+        lv_label_set_text_fmt(network_difficulty_label, "Difficulty: %s", GLOBAL_STATE->network_diff_string);
+    }
+
+    if (GLOBAL_STATE->scriptsig != NULL && strcmp(lv_label_get_text(scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
+        lv_label_set_text(scriptsig_label, GLOBAL_STATE->scriptsig);
+    }
+
     // Update WiFi RSSI periodically
     int8_t rssi_value = -128;
     if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
@@ -506,17 +544,11 @@ static void screen_update_cb(lv_timer_t * timer)
 
 void screen_next()
 {
-    screen_t next_scr = current_screen;
+    screen_t next_scr = current_screen + 1;
 
-    // Loop to find the next screen that should be displayed
-    do {
-        next_scr++; // Advance to the next screen candidate
-        if (next_scr > SCR_CAROUSEL_END) { // If past the end of carousel
-            next_scr = SCR_CAROUSEL_START; // Wrap around to the start of carousel
-        }
-        // If the candidate screen is SCR_WIFI_RSSI AND this is NOT a bigger display,
-        // then this screen should be skipped, and the loop will continue to find the next one.
-    } while (next_scr == SCR_WIFI_RSSI && screen_lines == 4);
+    if (next_scr == MAX_SCREENS) {
+        next_scr = SCR_CAROUSEL_START;
+    }
 
     screen_show(next_scr);
 }
@@ -570,6 +602,7 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
         screens[SCR_URLS] = create_scr_urls(module);
         screens[SCR_STATS] = create_scr_stats();
+        screens[SCR_MINING] = create_scr_mining();
         screens[SCR_WIFI_RSSI] = create_scr_wifi_rssi();
 
         notification_label = lv_label_create(lv_layer_top());
