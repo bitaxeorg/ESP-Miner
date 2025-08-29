@@ -392,6 +392,18 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
+    if (module->FOUND_BLOCK) {
+        if (current_screen != SCR_STATS) {
+            lv_obj_set_width(difficulty_label, LV_HOR_RES);
+            lv_label_set_long_mode(difficulty_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+            lv_label_set_text_fmt(difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", module->best_session_diff_string);
+
+            screen_show(SCR_STATS);
+        }
+        lv_display_trigger_activity(NULL);
+        return;
+    }
+
     // Carousel
 
     current_screen_time_ms += SCREEN_UPDATE_MS;
@@ -420,18 +432,9 @@ static void screen_update_cb(lv_timer_t * timer)
     }
     current_hashrate = module->current_hashrate;
 
-    if (module->FOUND_BLOCK && current_screen != SCR_STATS) {
-        lv_obj_set_width(difficulty_label, LV_HOR_RES);
-        lv_label_set_long_mode(difficulty_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-        lv_label_set_text_fmt(difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", module->best_session_diff_string);
-
-        screen_show(SCR_STATS);
-        lv_display_trigger_activity(NULL);
-    } else {
-        if (current_difficulty != module->best_session_nonce_diff) {
-            lv_label_set_text_fmt(difficulty_label, "Best: %s/%s", module->best_session_diff_string, module->best_diff_string);
-            current_difficulty = module->best_session_nonce_diff;
-        }
+    if (current_difficulty != module->best_session_nonce_diff) {
+        lv_label_set_text_fmt(difficulty_label, "Best: %s/%s", module->best_session_diff_string, module->best_diff_string);
+        current_difficulty = module->best_session_nonce_diff;
     }
 
     if (current_chip_temp != power_management->chip_temp_avg) {
@@ -494,7 +497,7 @@ static void screen_update_cb(lv_timer_t * timer)
         }
     }
 
-    if (current_screen_time_ms <= current_screen_delay_ms || module->FOUND_BLOCK) {
+    if (current_screen_time_ms <= current_screen_delay_ms) {
         return;
     }
 
