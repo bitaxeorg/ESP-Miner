@@ -278,7 +278,7 @@ static lv_obj_t * create_scr_stats() {
     return scr;
 }
 
-static lv_obj_t * create_scr_wifi_rssi() {
+static lv_obj_t * create_scr_wifi() {
     lv_obj_t * scr = create_flex_screen(3);
 
     lv_obj_t *title_label = lv_label_create(scr);
@@ -575,7 +575,7 @@ esp_err_t screen_start(void * pvParameters)
         screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
         screens[SCR_URLS] = create_scr_urls(module);
         screens[SCR_STATS] = create_scr_stats();
-        screens[SCR_WIFI] = create_scr_wifi_rssi();
+        screens[SCR_WIFI] = create_scr_wifi();
 
         notification_label = lv_label_create(lv_layer_top());
         lv_label_set_text(notification_label, "");
