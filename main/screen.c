@@ -425,6 +425,8 @@ static void screen_update_cb(lv_timer_t * timer)
 
     if (current_difficulty != module->best_session_nonce_diff) {
         if (module->FOUND_BLOCK) {
+            lv_obj_set_width(stats_difficulty_label, LV_HOR_RES);
+            lv_label_set_long_mode(stats_difficulty_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
             lv_label_set_text_fmt(stats_difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", module->best_session_diff_string);
         } else {
             lv_label_set_text_fmt(stats_difficulty_label, "Best: %s/%s", module->best_session_diff_string, module->best_diff_string);
@@ -493,9 +495,6 @@ static void screen_update_cb(lv_timer_t * timer)
 
     if (module->FOUND_BLOCK) {
         if (current_screen != SCR_STATS) {
-            lv_obj_set_width(stats_difficulty_label, LV_HOR_RES);
-            lv_label_set_long_mode(stats_difficulty_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-
             screen_show(SCR_STATS);
         }
 
