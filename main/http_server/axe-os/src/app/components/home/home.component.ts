@@ -265,26 +265,29 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.stats$
       .pipe(takeUntil(this.destroy$))
       .subscribe(stats => {
+        const chartY1DataLabel = this.chartLabelValue(stats.chartY1Data);
+        const chartY2DataLabel = this.chartLabelValue(stats.chartY2Data);
+
         const idxTimestamp = 0;
         const idxHashrate = 1;
         const idxPower = 2;
         let idxChartY1Data = 3;
         let idxChartY2Data = 4;
 
-        if (stats.chartY1Data === eChartLabel.hashrate) {
+        if (chartY1DataLabel === eChartLabel.hashrate) {
           idxChartY1Data = 1;
-        } else if (stats.chartY1Data === eChartLabel.power) {
+        } else if (chartY1DataLabel === eChartLabel.power) {
           idxChartY1Data = 2;
-        } else if (stats.chartY1Data === eChartLabel.none) {
+        } else if (chartY1DataLabel === eChartLabel.none) {
           idxChartY1Data = -1;
         }
-        if (stats.chartY1Data === stats.chartY2Data) {
+        if (chartY1DataLabel === chartY2DataLabel) {
           idxChartY2Data = idxChartY1Data;
-        } else if (stats.chartY2Data === eChartLabel.hashrate) {
+        } else if (chartY2DataLabel === eChartLabel.hashrate) {
           idxChartY2Data = 1;
-        } else if (stats.chartY2Data === eChartLabel.power) {
+        } else if (chartY2DataLabel === eChartLabel.power) {
           idxChartY2Data = 2;
-        } else if (stats.chartY2Data === eChartLabel.none) {
+        } else if (chartY2DataLabel === eChartLabel.none) {
           idxChartY2Data = -1;
         } else if (idxChartY1Data < 3) {
           idxChartY2Data = 3;
@@ -292,7 +295,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         stats.statistics.forEach(element => {
           element[idxHashrate] = element[idxHashrate] * 1000000000;
-          switch (stats.chartY1Data) {
+          switch (chartY1DataLabel) {
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
             case eChartLabel.current:
@@ -301,7 +304,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             default:
               break;
           }
-          switch (stats.chartY2Data) {
+          switch (chartY2DataLabel) {
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
             case eChartLabel.current:
@@ -349,8 +352,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         return info;
       }),
       tap(info => {
-        const chartY1DataValue = this.form.get('chartY1Data')?.value;
-        const chartY2DataValue = this.form.get('chartY2Data')?.value;
+        const chartY1DataLabel = this.chartLabelValue(this.form.get('chartY1Data')?.value);
+        const chartY2DataLabel = this.chartLabelValue(this.form.get('chartY2Data')?.value);
 
         this.maxPower = Math.max(info.maxPower, info.power);
         this.nominalVoltage = info.nominalVoltage;
@@ -362,22 +365,22 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.dataLabel.push(new Date().getTime());
           this.hashrateData.push(info.hashRate);
           this.powerData.push(info.power);
-          this.chartY1Data.push(HomeComponent.getDataForLabel(chartY1DataValue, info));
-          this.chartY2Data.push(HomeComponent.getDataForLabel(chartY2DataValue, info));
+          this.chartY1Data.push(HomeComponent.getDataForLabel(chartY1DataLabel, info));
+          this.chartY2Data.push(HomeComponent.getDataForLabel(chartY2DataLabel, info));
 
           this.limitDataPoints();
 
-          this.chartData.datasets[0].label = chartY1DataValue;
-          this.chartData.datasets[1].label = chartY2DataValue;
+          this.chartData.datasets[0].label = chartY1DataLabel;
+          this.chartData.datasets[1].label = chartY2DataLabel;
 
-          this.chartData.datasets[0].hidden = (chartY1DataValue === eChartLabel.none);
-          this.chartData.datasets[1].hidden = (chartY2DataValue === eChartLabel.none);
+          this.chartData.datasets[0].hidden = (chartY1DataLabel === eChartLabel.none);
+          this.chartData.datasets[1].hidden = (chartY2DataLabel === eChartLabel.none);
 
-          this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartY1DataValue, info);
-          this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartY2DataValue, info);
+          this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartY1DataLabel, info);
+          this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartY2DataLabel, info);
 
-          this.chartOptions.scales.y.display = (chartY1DataValue != eChartLabel.none);
-          this.chartOptions.scales.y2.display = (chartY2DataValue != eChartLabel.none);
+          this.chartOptions.scales.y.display = (chartY1DataLabel != eChartLabel.none);
+          this.chartOptions.scales.y2.display = (chartY2DataLabel != eChartLabel.none);
         }
 
         this.chart?.refresh();
@@ -446,6 +449,14 @@ export class HomeComponent implements OnInit, OnDestroy {
     return item.message; //Track only by message
   }
 
+  chartLabelValue(enumKey: string) {
+    return Object.entries(eChartLabel).find(([key, val]) => key === enumKey)?.[1];
+  }
+
+  chartLabelKey(value: eChartLabel): string {
+    return Object.keys(eChartLabel)[Object.values(eChartLabel).indexOf(value)];
+  }
+
   public calculateAverage(data: number[]): number {
     if (data.length === 0) return 0;
     const sum = data.reduce((sum, value) => sum + value, 0);
@@ -486,7 +497,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  public getSuggestedMaxForLabel(label: eChartLabel, info: ISystemInfo): number {
+  public getSuggestedMaxForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
       case eChartLabel.hashrate:    return info.expectedHashrate;
       case eChartLabel.asicTemp:    return this.maxTemp;
@@ -503,7 +514,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  static getDataForLabel(label: eChartLabel, info: ISystemInfo): number {
+  static getDataForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
       case eChartLabel.hashrate:    return info.hashRate;
       case eChartLabel.asicTemp:    return info.temp;
@@ -548,6 +559,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   get dataSourceLabels() {
-    return Object.values(eChartLabel).map(label => ({name: label, value: label}));
+    return Object.entries(eChartLabel).map(([key, value]) => ({name: value, value: key}));
   }
 }

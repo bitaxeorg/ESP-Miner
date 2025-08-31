@@ -51,26 +51,19 @@ static const char * CORS_TAG = "CORS";
 
 static char axeOSVersion[32];
 
-static const char * STATS_LABEL_HASHRATE = "Hashrate";
-static const char * STATS_LABEL_ASIC_TEMP = "ASIC Temp";
-static const char * STATS_LABEL_ASIC_TEMP_URL = "ASIC%20Temp";
-static const char * STATS_LABEL_VR_TEMP = "VR Temp";
-static const char * STATS_LABEL_VR_TEMP_URL = "VR%20Temp";
-static const char * STATS_LABEL_ASIC_VOLTAGE = "ASIC Voltage";
-static const char * STATS_LABEL_ASIC_VOLTAGE_URL = "ASIC%20Voltage";
-static const char * STATS_LABEL_VOLTAGE = "Voltage";
-static const char * STATS_LABEL_POWER = "Power";
-static const char * STATS_LABEL_CURRENT = "Current";
-static const char * STATS_LABEL_FAN_SPEED = "Fan Speed";
-static const char * STATS_LABEL_FAN_SPEED_URL = "Fan%20Speed";
-static const char * STATS_LABEL_FAN_RPM = "Fan RPM";
-static const char * STATS_LABEL_FAN_RPM_URL = "Fan%20RPM";
-static const char * STATS_LABEL_WIFI_RSSI = "Wi-Fi RSSI";
-static const char * STATS_LABEL_WIFI_RSSI_URL = "Wi-Fi%20RSSI";
-static const char * STATS_LABEL_FREE_HEAP = "Free Heap";
-static const char * STATS_LABEL_FREE_HEAP_URL = "Free%20Heap";
+static const char * STATS_LABEL_HASHRATE = "hashrate";
+static const char * STATS_LABEL_ASIC_TEMP = "asicTemp";
+static const char * STATS_LABEL_VR_TEMP = "vrTemp";
+static const char * STATS_LABEL_ASIC_VOLTAGE = "asicVoltage";
+static const char * STATS_LABEL_VOLTAGE = "voltage";
+static const char * STATS_LABEL_POWER = "power";
+static const char * STATS_LABEL_CURRENT = "current";
+static const char * STATS_LABEL_FAN_SPEED = "fanSpeed";
+static const char * STATS_LABEL_FAN_RPM = "fanRpm";
+static const char * STATS_LABEL_WIFI_RSSI = "wifiRssi";
+static const char * STATS_LABEL_FREE_HEAP = "freeHeap";
 
-static const char * STATS_LABEL_TIMESTAMP = "Timestamp";
+static const char * STATS_LABEL_TIMESTAMP = "timestamp";
 
 typedef enum
 {
@@ -88,31 +81,20 @@ typedef enum
     SRC_NONE // last
 } DataSource;
 
-DataSource strToDataSource(const char * sourceStr, bool urlEnc)
+DataSource strToDataSource(const char * sourceStr)
 {
     if (NULL != sourceStr) {
         if (strcmp(sourceStr, STATS_LABEL_HASHRATE) == 0)     return SRC_HASHRATE;
         if (strcmp(sourceStr, STATS_LABEL_VOLTAGE) == 0)      return SRC_VOLTAGE;
         if (strcmp(sourceStr, STATS_LABEL_POWER) == 0)        return SRC_POWER;
         if (strcmp(sourceStr, STATS_LABEL_CURRENT) == 0)      return SRC_CURRENT;
-
-        if (urlEnc) {
-            if (strcmp(sourceStr, STATS_LABEL_ASIC_TEMP_URL) == 0)    return SRC_ASIC_TEMP;
-            if (strcmp(sourceStr, STATS_LABEL_VR_TEMP_URL) == 0)      return SRC_VR_TEMP;
-            if (strcmp(sourceStr, STATS_LABEL_ASIC_VOLTAGE_URL) == 0) return SRC_ASIC_VOLTAGE;
-            if (strcmp(sourceStr, STATS_LABEL_FAN_SPEED_URL) == 0)    return SRC_FAN_SPEED;
-            if (strcmp(sourceStr, STATS_LABEL_FAN_RPM_URL) == 0)      return SRC_FAN_RPM;
-            if (strcmp(sourceStr, STATS_LABEL_WIFI_RSSI_URL) == 0)    return SRC_WIFI_RSSI;
-            if (strcmp(sourceStr, STATS_LABEL_FREE_HEAP_URL) == 0)    return SRC_FREE_HEAP;
-        } else {
-            if (strcmp(sourceStr, STATS_LABEL_ASIC_TEMP) == 0)    return SRC_ASIC_TEMP;
-            if (strcmp(sourceStr, STATS_LABEL_VR_TEMP) == 0)      return SRC_VR_TEMP;
-            if (strcmp(sourceStr, STATS_LABEL_ASIC_VOLTAGE) == 0) return SRC_ASIC_VOLTAGE;
-            if (strcmp(sourceStr, STATS_LABEL_FAN_SPEED) == 0)    return SRC_FAN_SPEED;
-            if (strcmp(sourceStr, STATS_LABEL_FAN_RPM) == 0)      return SRC_FAN_RPM;
-            if (strcmp(sourceStr, STATS_LABEL_WIFI_RSSI) == 0)    return SRC_WIFI_RSSI;
-            if (strcmp(sourceStr, STATS_LABEL_FREE_HEAP) == 0)    return SRC_FREE_HEAP;
-        }
+        if (strcmp(sourceStr, STATS_LABEL_ASIC_TEMP) == 0)    return SRC_ASIC_TEMP;
+        if (strcmp(sourceStr, STATS_LABEL_VR_TEMP) == 0)      return SRC_VR_TEMP;
+        if (strcmp(sourceStr, STATS_LABEL_ASIC_VOLTAGE) == 0) return SRC_ASIC_VOLTAGE;
+        if (strcmp(sourceStr, STATS_LABEL_FAN_SPEED) == 0)    return SRC_FAN_SPEED;
+        if (strcmp(sourceStr, STATS_LABEL_FAN_RPM) == 0)      return SRC_FAN_RPM;
+        if (strcmp(sourceStr, STATS_LABEL_WIFI_RSSI) == 0)    return SRC_WIFI_RSSI;
+        if (strcmp(sourceStr, STATS_LABEL_FREE_HEAP) == 0)    return SRC_FREE_HEAP;
     }
     return SRC_NONE;
 }
@@ -834,8 +816,8 @@ int create_json_statistics_dashboard(cJSON * root)
 
         if (NULL != GLOBAL_STATE->STATISTICS_MODULE.statisticsList) {
             StatisticsNodePtr node = *GLOBAL_STATE->STATISTICS_MODULE.statisticsList; // double pointer
-            DataSource chartY1Source = strToDataSource(chartY1Data, false);
-            DataSource chartY2Source = strToDataSource(chartY2Data, false);
+            DataSource chartY1Source = strToDataSource(chartY1Data);
+            DataSource chartY2Source = strToDataSource(chartY2Data);
             struct StatisticsData statsData;
 
             if (chartY1Source == chartY2Source) {
@@ -916,7 +898,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
                     if (httpd_query_key_value(buf, "columns", columns, bufLen) == ESP_OK) {
                         char * param = strtok(columns, ",");
                         while (NULL != param) {
-                            DataSource sourceParam = strToDataSource(param, true);
+                            DataSource sourceParam = strToDataSource(param);
                             if (SRC_NONE != sourceParam) {
                                 dataSelection[sourceParam] = true;
                                 selectionCheck = true;

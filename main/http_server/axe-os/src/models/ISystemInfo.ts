@@ -60,8 +60,8 @@ export interface ISystemInfo {
     temptarget: number,
     fanrpm: number,
     statsFrequency: number,
-    chartY1Data: eChartLabel,
-    chartY2Data: eChartLabel,
+    chartY1Data: string,
+    chartY2Data: string,
     coreVoltageActual: number,
 
     boardtemp1?: number,

@@ -80,8 +80,8 @@ export class SystemService {
         fanspeed: 100,
         temptarget: 60,
         statsFrequency: 30,
-        chartY1Data: eChartLabel.hashrate,
-        chartY2Data: eChartLabel.asicTemp,
+        chartY1Data: "hashrate",
+        chartY2Data: "asicTemp",
         fanrpm: 0,
 
         boardtemp1: 30,
@@ -99,8 +99,8 @@ export class SystemService {
     // Mock data for development
     return of({
       currentTimestamp: 61125,
-      chartY1Data: eChartLabel.hashrate,
-      chartY2Data: eChartLabel.asicTemp,
+      chartY1Data: "hashrate",
+      chartY2Data: "asicTemp",
       statistics: [
         [13131,0,14.45068359375,-1],
         [18126,413.4903744405481,14.86083984375,58.5],
