@@ -911,14 +911,20 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         buf = (char *)malloc(bufLen);
         if (buf) {
             if (httpd_req_get_url_query_str(req, buf, bufLen) == ESP_OK) {
-                char * param = strtok(buf, "&");
-                while (NULL != param) {
-                    DataSource sourceParam = strToDataSource(param, true);
-                    if (SRC_NONE != sourceParam) {
-                        dataSelection[sourceParam] = true;
-                        selectionCheck = true;
+                char * columns = (char *)malloc(bufLen);
+                if (columns) {
+                    if (httpd_query_key_value(buf, "columns", columns, bufLen) == ESP_OK) {
+                        char * param = strtok(columns, ",");
+                        while (NULL != param) {
+                            DataSource sourceParam = strToDataSource(param, true);
+                            if (SRC_NONE != sourceParam) {
+                                dataSelection[sourceParam] = true;
+                                selectionCheck = true;
+                            }
+                            param = strtok(NULL, ",");
+                        }
                     }
-                    param = strtok(NULL, "&");
+                    free((void *)columns);
                 }
             }
             free((void *)buf);
