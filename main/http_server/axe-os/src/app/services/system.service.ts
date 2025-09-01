@@ -1,7 +1,9 @@
-import { HttpClient, HttpEvent } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpEvent } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { delay, Observable, of } from 'rxjs';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
+import { chartLabelKey } from 'src/models/enum/eChartLabel';
+import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { ISystemASIC } from 'src/models/ISystemASIC';
@@ -77,12 +79,10 @@ export class SystemService {
         displayTimeout: -1,
         autofanspeed: 1,
         minFanSpeed: 25,
-        fanspeed: 100,
+        fanspeed: 50,
         temptarget: 60,
         statsFrequency: 30,
-        chartY1Data: "hashrate",
-        chartY2Data: "asicTemp",
-        fanrpm: 0,
+        fanrpm: 3583,
 
         boardtemp1: 30,
         boardtemp2: 40,
@@ -91,28 +91,68 @@ export class SystemService {
     ).pipe(delay(1000));
   }
 
-  public getStatistics(uri: string = ''): Observable<ISystemStatistics> {
+  public getStatistics(y1: string, y2: string, uri: string = ''): Observable<ISystemStatistics> {
+    let columnList = [chartLabelKey(eChartLabel.hashrate), chartLabelKey(eChartLabel.power)];
+
+    if ((y1 != chartLabelKey(eChartLabel.hashrate)) && (y1 != chartLabelKey(eChartLabel.power))) {
+      columnList.push(y1);
+    }
+    if ((y2 != chartLabelKey(eChartLabel.hashrate)) && (y2 != chartLabelKey(eChartLabel.power))) {
+      columnList.push(y2);
+    }
+
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/statistics/dashboard`) as Observable<ISystemStatistics>;
+      const options = { params: new HttpParams().set('columns', columnList.join(',')) };
+      return this.httpClient.get(`${uri}/api/system/statistics`, options) as Observable<ISystemStatistics>;
     }
 
     // Mock data for development
+    const hashrateData = [0,413.4903744405481,410.7764830376959,440.100549473198,430.5816012914026,452.5464981767163,414.9564271189586,498.7294609150379,411.1671601439723,491.327834852684];
+    const powerData = [14.45068359375,14.86083984375,15.03173828125,15.1171875,15.1171875,15.1513671875,15.185546875,15.27099609375,15.30517578125,15.33935546875];
+    const asicTempData = [-1,58.5,59.625,60.125,60.75,61.5,61.875,62.125,62.5,63];
+    const vrTempData = [45,45,45,44,45,44,44,45,45,45];
+    const asicVoltageData = [1221,1223,1219,1223,1217,1222,1221,1219,1221,1221];
+    const voltageData = [5196.875,5204.6875,5196.875,5196.875,5196.875,5196.875,5196.875,5196.875,5196.875,5204.6875];
+    const currentData = [2284.375,2284.375,2253.125,2284.375,2253.125,2231.25,2284.375,2253.125,2253.125,2284.375];
+    const fanSpeedData = [48,52,50,52,53,54,50,50,48,48];
+    const fanRpmData = [4032,3545,3904,3691,3564,3554,3691,3573,3701,4044];
+    const wifiRssiData = [-35,-34,-33,-34,-34,-34,-33,-35,-33,-34];
+    const freeHeapData = [214504,212504,213504,210504,207504,209504,203504,202504,201504,200504];
+    const timestampData = [13131,18126,23125,28125,33125,38125,43125,48125,53125,58125];
+
+    columnList.push("timestamp");
+    let statisticsList: number[][] = [];
+
+    for(let i: number = 0; i < 10; i++) {
+      statisticsList[i] = [];
+      for(let j: number = 0; j < columnList.length; j++) {
+        switch (chartLabelValue(columnList[j])) {
+          case eChartLabel.hashrate:     statisticsList[i][j] = hashrateData[i];     break;
+          case eChartLabel.power:        statisticsList[i][j] = powerData[i];        break;
+          case eChartLabel.asicTemp:     statisticsList[i][j] = asicTempData[i];     break;
+          case eChartLabel.vrTemp:       statisticsList[i][j] = vrTempData[i];       break;
+          case eChartLabel.asicVoltage:  statisticsList[i][j] = asicVoltageData[i];  break;
+          case eChartLabel.voltage:      statisticsList[i][j] = voltageData[i];      break;
+          case eChartLabel.current:      statisticsList[i][j] = currentData[i];      break;
+          case eChartLabel.fanSpeed:     statisticsList[i][j] = fanSpeedData[i];     break;
+          case eChartLabel.fanRpm:       statisticsList[i][j] = fanRpmData[i];       break;
+          case eChartLabel.wifiRssi:     statisticsList[i][j] = wifiRssiData[i];     break;
+          case eChartLabel.freeHeap:     statisticsList[i][j] = freeHeapData[i];     break;
+          default:
+            if (columnList[j] === "timestamp") {
+              statisticsList[i][j] = timestampData[i];
+            } else {
+              statisticsList[i][j] = 0;
+            }
+            break;
+        }
+      }
+    }
+
     return of({
       currentTimestamp: 61125,
-      chartY1Data: "hashrate",
-      chartY2Data: "asicTemp",
-      statistics: [
-        [13131,0,14.45068359375,-1],
-        [18126,413.4903744405481,14.86083984375,58.5],
-        [23125,410.7764830376959,15.03173828125,59.625],
-        [28125,440.100549473198,15.1171875,60.125],
-        [33125,430.5816012914026,15.1171875,60.75],
-        [38125,452.5464981767163,15.1513671875,61.5],
-        [43125,414.9564271189586,15.185546875,61.875],
-        [48125,498.7294609150379,15.27099609375,62.125],
-        [53125,411.1671601439723,15.30517578125,62.5],
-        [58125,491.327834852684,15.33935546875,63]
-      ]
+      labels: columnList,
+      statistics: statisticsList
     }).pipe(delay(1000));
   }
 

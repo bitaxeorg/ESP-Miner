@@ -15,6 +15,9 @@ import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
+import { chartLabelValue } from 'src/models/enum/eChartLabel';
+import { chartLabelKey } from 'src/models/enum/eChartLabel';
+import { LocalStorageService } from 'src/app/local-storage.service';
 
 @Component({
   selector: 'app-home',
@@ -65,10 +68,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     private titleService: Title,
     private loadingService: LoadingService,
     private toastr: ToastrService,
-    private shareRejectReasonsService: ShareRejectionExplanationService
+    private shareRejectReasonsService: ShareRejectionExplanationService,
+    private storageService: LocalStorageService
   ) {
     this.initializeChart();
-    this.loadPreviousData();
 
     this.themeService.getThemeSettings()
       .pipe(takeUntil(this.destroy$))
@@ -81,17 +84,19 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.pageDefaultTitle = this.titleService.getTitle();
     this.loadingService.loading$.next(true);
 
-    this.systemService.getInfo(this.uri)
-      .subscribe(info => {
-        this.form = this.fb.group({
-          chartY1Data: [info.chartY1Data, [Validators.required]],
-          chartY2Data: [info.chartY2Data, [Validators.required]],
-        });
+    let dataSources = this.storageService.getItem('chartDataSources');
+    if (dataSources === null) {
+      dataSources = `{"chartY1Data":"${chartLabelKey(eChartLabel.hashrate)}",`;
+      dataSources += `"chartY2Data":"${chartLabelKey(eChartLabel.asicTemp)}"}`;
+    }
 
-        this.form.valueChanges.subscribe(() => {
-          this.updateSystem();
-        })
-      });
+    this.form = this.fb.group(JSON.parse(dataSources));
+
+    this.form.valueChanges.subscribe(() => {
+      this.updateSystem();
+    })
+
+    this.loadPreviousData();
   }
 
   ngOnDestroy() {
@@ -130,6 +135,8 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public updateSystem() {
     const form = this.form.getRawValue();
+
+    this.storageService.setItem('chartDataSources', JSON.stringify(form));
 
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
@@ -258,44 +265,34 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private loadPreviousData()
   {
+    const chartY1DataLabel = this.form.get('chartY1Data')?.value;
+    const chartY2DataLabel = this.form.get('chartY2Data')?.value;
+
     // load previous data
-    this.stats$ = this.systemService.getStatistics()
+    this.stats$ = this.systemService.getStatistics(chartY1DataLabel, chartY2DataLabel)
       .pipe(shareReplay({ refCount: true, bufferSize: 1 }));
 
     this.stats$
       .pipe(takeUntil(this.destroy$))
       .subscribe(stats => {
-        const chartY1DataLabel = this.chartLabelValue(stats.chartY1Data);
-        const chartY2DataLabel = this.chartLabelValue(stats.chartY2Data);
+        let idxHashrate = -1;
+        let idxPower = -1;
+        let idxChartY1Data = -1;
+        let idxChartY2Data = -1;
+        let idxTimestamp = -1;
 
-        const idxTimestamp = 0;
-        const idxHashrate = 1;
-        const idxPower = 2;
-        let idxChartY1Data = 3;
-        let idxChartY2Data = 4;
-
-        if (chartY1DataLabel === eChartLabel.hashrate) {
-          idxChartY1Data = 1;
-        } else if (chartY1DataLabel === eChartLabel.power) {
-          idxChartY1Data = 2;
-        } else if (chartY1DataLabel === eChartLabel.none) {
-          idxChartY1Data = -1;
-        }
-        if (chartY1DataLabel === chartY2DataLabel) {
-          idxChartY2Data = idxChartY1Data;
-        } else if (chartY2DataLabel === eChartLabel.hashrate) {
-          idxChartY2Data = 1;
-        } else if (chartY2DataLabel === eChartLabel.power) {
-          idxChartY2Data = 2;
-        } else if (chartY2DataLabel === eChartLabel.none) {
-          idxChartY2Data = -1;
-        } else if (idxChartY1Data < 3) {
-          idxChartY2Data = 3;
+        // map label to index
+        for (let i = 0; i < stats.labels.length; i++) {
+          if (stats.labels[i] === chartLabelKey(eChartLabel.hashrate)) { idxHashrate = i; }
+          if (stats.labels[i] === chartLabelKey(eChartLabel.power))    { idxPower = i; }
+          if (stats.labels[i] === chartY1DataLabel)                    { idxChartY1Data = i; }
+          if (stats.labels[i] === chartY2DataLabel)                    { idxChartY2Data = i; }
+          if (stats.labels[i] === 'timestamp')                         { idxTimestamp = i; }
         }
 
         stats.statistics.forEach(element => {
           element[idxHashrate] = element[idxHashrate] * 1000000000;
-          switch (chartY1DataLabel) {
+          switch (chartLabelValue(chartY1DataLabel)) {
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
             case eChartLabel.current:
@@ -304,7 +301,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             default:
               break;
           }
-          switch (chartY2DataLabel) {
+          switch (chartLabelValue(chartY2DataLabel)) {
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
             case eChartLabel.current:
@@ -317,12 +314,12 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
           this.hashrateData.push(element[idxHashrate]);
           this.powerData.push(element[idxPower]);
-          if ((-1 != idxChartY1Data) && (idxChartY1Data < element.length)) {
+          if (-1 != idxChartY1Data) {
             this.chartY1Data.push(element[idxChartY1Data]);
           } else {
             this.chartY1Data.push(0.0);
           }
-          if ((-1 != idxChartY2Data) && (idxChartY2Data < element.length)) {
+          if (-1 != idxChartY2Data) {
             this.chartY2Data.push(element[idxChartY2Data]);
           } else {
             this.chartY2Data.push(0.0);
@@ -352,8 +349,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         return info;
       }),
       tap(info => {
-        const chartY1DataLabel = this.chartLabelValue(this.form.get('chartY1Data')?.value);
-        const chartY2DataLabel = this.chartLabelValue(this.form.get('chartY2Data')?.value);
+        const chartY1DataLabel = chartLabelValue(this.form.get('chartY1Data')?.value);
+        const chartY2DataLabel = chartLabelValue(this.form.get('chartY2Data')?.value);
 
         this.maxPower = Math.max(info.maxPower, info.power);
         this.nominalVoltage = info.nominalVoltage;
@@ -447,14 +444,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   trackByReason(_index: number, item: { message: string, count: number }) {
     return item.message; //Track only by message
-  }
-
-  chartLabelValue(enumKey: string) {
-    return Object.entries(eChartLabel).find(([key, val]) => key === enumKey)?.[1];
-  }
-
-  chartLabelKey(value: eChartLabel): string {
-    return Object.keys(eChartLabel)[Object.values(eChartLabel).indexOf(value)];
   }
 
   public calculateAverage(data: number[]): number {

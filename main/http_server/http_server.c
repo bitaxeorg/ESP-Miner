@@ -618,12 +618,6 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "statsFrequency")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_STATISTICS_FREQUENCY, item->valueint);
     }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "chartY1Data"))) {
-        nvs_config_set_string(NVS_CONFIG_CHART_Y1_DATA, item->valuestring);
-    }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "chartY2Data"))) {
-        nvs_config_set_string(NVS_CONFIG_CHART_Y2_DATA, item->valuestring);
-    }
     if ((item = cJSON_GetObjectItem(root, "overclockEnabled")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
     }
@@ -685,8 +679,6 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)");
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
     float expected_hashrate = frequency * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
-    char * chartY1Data = nvs_config_get_string(NVS_CONFIG_CHART_Y1_DATA, STATS_LABEL_HASHRATE);
-    char * chartY2Data = nvs_config_get_string(NVS_CONFIG_CHART_Y2_DATA, STATS_LABEL_ASIC_TEMP);
 
     uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
@@ -775,8 +767,6 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
 
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0));
-    cJSON_AddStringToObject(root, "chartY1Data", chartY1Data);
-    cJSON_AddStringToObject(root, "chartY2Data", chartY2Data);
 
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
@@ -789,83 +779,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(stratumUser);
     free(fallbackStratumUser);
     free(display);
-    free(chartY1Data);
-    free(chartY2Data);
 
     const char * sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((char *)sys_info);
     cJSON_Delete(root);
     return ESP_OK;
-}
-
-int create_json_statistics_dashboard(cJSON * root)
-{
-    int prebuffer = 0;
-
-    if (root) {
-        // create array for dashboard statistics
-        char * chartY1Data = nvs_config_get_string(NVS_CONFIG_CHART_Y1_DATA, STATS_LABEL_HASHRATE);
-        char * chartY2Data = nvs_config_get_string(NVS_CONFIG_CHART_Y2_DATA, STATS_LABEL_ASIC_TEMP);
-
-        cJSON_AddStringToObject(root, "chartY1Data", chartY1Data);
-        cJSON_AddStringToObject(root, "chartY2Data", chartY2Data);
-        prebuffer++;
-
-        cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
-
-        if (NULL != GLOBAL_STATE->STATISTICS_MODULE.statisticsList) {
-            StatisticsNodePtr node = *GLOBAL_STATE->STATISTICS_MODULE.statisticsList; // double pointer
-            DataSource chartY1Source = strToDataSource(chartY1Data);
-            DataSource chartY2Source = strToDataSource(chartY2Data);
-            struct StatisticsData statsData;
-
-            if (chartY1Source == chartY2Source) {
-                chartY2Source = SRC_NONE;
-            }
-
-            while (NULL != node) {
-                node = statisticData(node, &statsData);
-
-                cJSON *valueArray = cJSON_CreateArray();
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate));
-                cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power));
-                switch (chartY1Source) {
-                    case SRC_ASIC_TEMP:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));   break;
-                    case SRC_VR_TEMP:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature));     break;
-                    case SRC_ASIC_VOLTAGE: cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); break;
-                    case SRC_VOLTAGE:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage));           break;
-                    case SRC_CURRENT:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current));           break;
-                    case SRC_FAN_SPEED:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed));          break;
-                    case SRC_FAN_RPM:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM));            break;
-                    case SRC_WIFI_RSSI:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI));          break;
-                    case SRC_FREE_HEAP:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap));          break;
-                    default: break;
-                }
-                switch (chartY2Source) {
-                    case SRC_ASIC_TEMP:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature));   break;
-                    case SRC_VR_TEMP:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature));     break;
-                    case SRC_ASIC_VOLTAGE: cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); break;
-                    case SRC_VOLTAGE:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage));           break;
-                    case SRC_CURRENT:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current));           break;
-                    case SRC_FAN_SPEED:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed));          break;
-                    case SRC_FAN_RPM:      cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM));            break;
-                    case SRC_WIFI_RSSI:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI));          break;
-                    case SRC_FREE_HEAP:    cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap));          break;
-                    default: break;
-                }
-
-                cJSON_AddItemToArray(statsArray, valueArray);
-                prebuffer++;
-            }
-        }
-
-        free(chartY1Data);
-        free(chartY2Data);
-    }
-
-    return prebuffer;
 }
 
 static esp_err_t GET_system_statistics(httpd_req_t * req)
@@ -971,35 +890,6 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     }
 
     const char * response = cJSON_PrintBuffered(root, (JSON_ALL_STATS_ELEMENT_SIZE * prebuffer), 0); // unformatted
-    httpd_resp_sendstr(req, response);
-    free((void *)response);
-
-    cJSON_Delete(root);
-
-    return ESP_OK;
-}
-
-static esp_err_t GET_system_statistics_dashboard(httpd_req_t * req)
-{
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-    }
-
-    httpd_resp_set_type(req, "application/json");
-
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
-        return ESP_OK;
-    }
-
-    cJSON * root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "currentTimestamp", (esp_timer_get_time() / 1000));
-    int prebuffer = 1;
-
-    prebuffer += create_json_statistics_dashboard(root);
-
-    const char * response = cJSON_PrintBuffered(root, (JSON_DASHBOARD_STATS_ELEMENT_SIZE * prebuffer), 0); // unformatted
     httpd_resp_sendstr(req, response);
     free((void *)response);
 
@@ -1236,15 +1126,6 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_statistics_get_uri);
-
-    /* URI handler for fetching system statistic values for dashboard */
-    httpd_uri_t system_statistics_dashboard_get_uri = {
-        .uri = "/api/system/statistics/dashboard", 
-        .method = HTTP_GET, 
-        .handler = GET_system_statistics_dashboard, 
-        .user_ctx = rest_context
-    };
-    httpd_register_uri_handler(server, &system_statistics_dashboard_get_uri);
 
     /* URI handler for WiFi scan */
     httpd_uri_t wifi_scan_get_uri = {

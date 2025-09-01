@@ -12,3 +12,11 @@ export enum eChartLabel {
     freeHeap = 'Free Heap',
     none = 'None'
 }
+
+export function chartLabelValue(enumKey: string) {
+  return Object.entries(eChartLabel).find(([key, val]) => key === enumKey)?.[1];
+}
+
+export function chartLabelKey(value: eChartLabel): string {
+  return Object.keys(eChartLabel)[Object.values(eChartLabel).indexOf(value)];
+}
