@@ -651,8 +651,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage);
     cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
     cJSON_AddNumberToObject(root, "expectedHashrate", expected_hashrate);
-    cJSON_AddStringToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_diff_string);
-    cJSON_AddStringToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_diff_string);
+    cJSON_AddNumberToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_nonce_diff);
+    cJSON_AddNumberToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_nonce_diff);
     cJSON_AddNumberToObject(root, "poolDifficulty", GLOBAL_STATE->pool_difficulty);
 
     cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);

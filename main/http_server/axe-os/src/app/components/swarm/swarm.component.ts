@@ -33,7 +33,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalTime = 30;
   public refreshTimeSet = 30;
 
-  public totals: { hashRate: number; power: number; bestDiff: string } = { hashRate: 0, power: 0, bestDiff: '0' };
+  public totals: { hashRate: number; power: number; bestDiff: number } = { hashRate: 0, power: 0, bestDiff: 0 };
 
   public isRefreshing = false;
 
@@ -291,29 +291,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
-  private compareBestDiff(a: string, b: string): string {
-    if (!a || a === '0') return b || '0';
-    if (!b || b === '0') return a;
-
-    const units = 'kMGTPE';
-    const unitA = units.indexOf(a.slice(-1));
-    const unitB = units.indexOf(b.slice(-1));
-
-    if (unitA !== unitB) {
-      return unitA > unitB ? a : b;
-    }
-
-    const valueA = parseFloat(a.slice(0, unitA >= 0 ? -1 : 0));
-    const valueB = parseFloat(b.slice(0, unitB >= 0 ? -1 : 0));
-    return valueA >= valueB ? a : b;
-  }
-
   private calculateTotals() {
     this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
     this.totals.power = this.swarm.reduce((sum, axe) => sum + (axe.power || 0), 0);
-    this.totals.bestDiff = this.swarm
-      .map(axe => axe.bestDiff || '0')
-      .reduce((max, curr) => this.compareBestDiff(max, curr), '0');
+    this.totals.bestDiff = this.swarm.reduce((max, axe) => Math.max(max, axe.bestDiff || 0), 0);
   }
 
   get getFamilies(): SwarmDevice[] {

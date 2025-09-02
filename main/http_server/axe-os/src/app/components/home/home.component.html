@@ -58,7 +58,7 @@
                         <span class="block text-500 font-medium mb-3">Efficiency</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
                             <span *ngIf="!info.power_fault">
-                                {{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/Th</small>
+                                {{info.power / (info.hashRate/1000) | number: '1.2-2'}} J/Th
                             </span>
                             <span *ngIf="info.power_fault" class="text-red-500">
                                 Not available - Power fault
@@ -70,7 +70,7 @@
                 <ng-container *ngIf="!info.power_fault">
                     Average:
                     <span class="text-green-500 font-medium">
-                        {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} <small>J/Th</small>
+                        {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} J/Th
                     </span>
                 </ng-container>
 
@@ -122,15 +122,13 @@
                 <div class="flex justify-content-between mb-3">
                     <div>
                         <span class="block text-500 font-medium mb-3">Best Difficulty</span>
-                        <div class="text-900 font-medium text-2xl">{{info.bestDiff}}
+                        <div class="text-900 font-medium text-2xl">{{info.bestDiff | diffSuffix}}
                             <span class="text-500 text-lg">all-time best</span>
                         </div>
                     </div>
                 </div>
-                <span class="text-900 font-medium">{{info.bestSessionDiff}} </span>
+                <span class="text-900 font-medium">{{info.bestSessionDiff | diffSuffix}} </span>
                 <span class="text-500">since system boot</span>
-                <!-- <span class="text-green-500 font-medium">520 </span>
-                <span class="text-500">newly registered</span> -->
             </div>
         </div>
 
