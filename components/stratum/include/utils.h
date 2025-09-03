@@ -34,6 +34,10 @@ void prettyHex(unsigned char *buf, int len);
 
 uint32_t flip32(uint32_t val);
 
+double networkDifficulty(uint32_t nBits);
+
+void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
+
 #define STRATUM_DEFAULT_VERSION_MASK 0x1fffe000
 
 #endif // STRATUM_UTILS_H

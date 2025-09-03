@@ -145,6 +145,9 @@ components:
         - wifiRSSI
         - displayTimeout
         - statsFrequency
+        - blockHeight
+        - scriptsig
+        - networkDifficulty
       properties:
         ASICModel:
           type: string
@@ -319,6 +322,15 @@ components:
         statsFrequency:
           type: number
           description: Statistics frequency in seconds
+        blockHeight:
+          type: integer
+          description: Current block height
+        scriptsig:
+          type: string
+          description: Scriptsig extracted from coinbase transaction
+        networkDifficulty:
+          type: string
+          description: Current network difficulty in human-readable format
 
     Settings:
       type: object
