@@ -87,25 +87,6 @@ thermal_temps_t Thermal_get_chip_temps(GlobalState * GLOBAL_STATE)
     return temps;
 }
 
-void Thermal_get_temperatures(GlobalState * GLOBAL_STATE, float * temp1, float * temp2)
-{
-    if (!temp1 || !temp2) {
-        return;
-    }
-    
-    // Get primary temperature (works for both EMC2101 and EMC2103)
-    *temp1 = Thermal_get_chip_temp(GLOBAL_STATE);
-    
-    // Only get second temperature for EMC2103 devices (GAMMA_TURBO)
-    if (GLOBAL_STATE->DEVICE_CONFIG.EMC2103) {
-        thermal_temps_t temps = Thermal_get_chip_temps(GLOBAL_STATE);
-        *temp1 = temps.temp1;
-        *temp2 = temps.temp2;
-    } else {
-        *temp2 = 0.0f;
-    }
-}
-
 bool Thermal_has_dual_sensors(DeviceConfig * DEVICE_CONFIG)
 {
     return DEVICE_CONFIG->EMC2103;

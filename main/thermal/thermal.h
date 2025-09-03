@@ -19,7 +19,6 @@ uint16_t Thermal_get_fan_speed(DeviceConfig * DEVICE_CONFIG);
 
 float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE);
 thermal_temps_t Thermal_get_chip_temps(GlobalState * GLOBAL_STATE);
-void Thermal_get_temperatures(GlobalState * GLOBAL_STATE, float * temp1, float * temp2);
 bool Thermal_has_dual_sensors(DeviceConfig * DEVICE_CONFIG);
 
 #endif // THERMAL_H

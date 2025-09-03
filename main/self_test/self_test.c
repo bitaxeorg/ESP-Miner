@@ -25,6 +25,7 @@
 #include "power.h"
 #include "thermal.h"
 #include "power_management_task.h"
+#include "asic_management_task.h"
 
 #include "bm1397.h"
 #include "bm1366.h"
@@ -330,7 +331,7 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
-    POWER_MANAGEMENT_init_frequency(&GLOBAL_STATE->POWER_MANAGEMENT_MODULE);
+    ASIC_MANAGEMENT_init_frequency(&GLOBAL_STATE->POWER_MANAGEMENT_MODULE);
 
     GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
 
