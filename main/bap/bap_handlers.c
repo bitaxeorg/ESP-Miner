@@ -285,7 +285,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 
                 //ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
                 
-                bool success = ASIC_set_frequency(bap_global_state, target_frequency);
+                bool success = ASIC_set_frequency(bap_global_state->DEVICE_CONFIG.family.asic.id, target_frequency);
                 
                 if (success) {
                     //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
