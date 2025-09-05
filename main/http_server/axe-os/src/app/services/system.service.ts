@@ -153,7 +153,7 @@ export class SystemService {
       currentTimestamp: 61125,
       labels: columnList,
       statistics: statisticsList
-    }).pipe(delay(1000));
+    });
   }
 
   public restart(uri: string = '') {
