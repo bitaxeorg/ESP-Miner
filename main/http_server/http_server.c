@@ -44,7 +44,6 @@
 #include "websocket.h"
 
 #define JSON_ALL_STATS_ELEMENT_SIZE 120
-#define JSON_DASHBOARD_STATS_ELEMENT_SIZE 85
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
