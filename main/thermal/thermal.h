@@ -1,11 +1,8 @@
 #ifndef THERMAL_H
 #define THERMAL_H
 
-#include <stdbool.h>
 #include <esp_err.h>
 
-#include "EMC2101.h"
-#include "EMC2103.h"
 #include "global_state.h"
 
 esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG);
