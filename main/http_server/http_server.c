@@ -504,6 +504,9 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumPassword"))) {
         nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, item->valuestring);
     }
+    if ((item = cJSON_GetObjectItem(root, "useFallbackStratum")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_USE_FALLBACK_STRATUM, item->valueint);
+    }
     if ((item = cJSON_GetObjectItem(root, "fallbackStratumExtranonceSubscribe")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
     }
