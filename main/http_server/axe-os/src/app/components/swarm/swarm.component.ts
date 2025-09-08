@@ -5,6 +5,7 @@ import { ToastrService } from 'ngx-toastr';
 import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
+import { ISystemInfo } from 'src/models/ISystemInfo';
 
 const SWARM_DATA = 'SWARM_DATA';
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
@@ -139,12 +140,12 @@ export class SwarmComponent implements OnInit, OnDestroy {
   private getAllDeviceInfo(ips: string[], errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>, fetchAsic: boolean = true) {
     return from(ips).pipe(
       mergeMap(IP => forkJoin({
-        info: this.httpClient.get(`http://${IP}/api/system/info`),
+        info: this.httpClient.get<ISystemInfo>(`http://${IP}/api/system/info`),
         asic: fetchAsic ? this.httpClient.get(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
       }).pipe(
         map(({ info, asic }) => {
           const existingDevice = this.swarm.find(device => device.IP === IP);
-          const result = { IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic };
+          const result = { IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) };
           return this.fallbackDeviceModel(result);
         }),
         timeout(5000),
@@ -173,7 +174,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
         return;
       }
 
-      this.swarm.push({ IP, ...asic, ...info });
+      this.swarm.push({ IP, ...asic, ...info, ...this.numerizeDeviceBestDiffs(info) });
       this.sortSwarm();
       this.localStorageService.setObject(SWARM_DATA, this.swarm);
       this.calculateTotals();
@@ -338,5 +339,42 @@ export class SwarmComponent implements OnInit, OnDestroy {
       case 'GammaTurbo': return 'cyan';
       default:           return 'gray';
     }
+  }
+
+  private numerizeDeviceBestDiffs(info: ISystemInfo) {
+    const parseAsNumber = (val: number | string): number => {
+      return typeof val === 'string' ? this.parseSuffixString(val) : val;
+    };
+
+    return {
+      bestDiff: parseAsNumber(info.bestDiff),
+      bestSessionDiff: parseAsNumber(info.bestSessionDiff),
+    };
+  }
+
+  private parseSuffixString(input: string): number {
+    const regex = /^\s*([\d]+(?:\.\d+)?)\s*([kMGTPE]?)\s*$/i;
+    const match = input.match(regex);
+
+    if (!match) {
+      throw new Error(`Invalid suffix string: "${input}"`);
+    }
+
+    const value = parseFloat(match[1]);
+    const suffix = match[2].toUpperCase();
+
+    const multipliers: Record<string, number> = {
+      '': 1,
+      K: 1e3,
+      M: 1e6,
+      G: 1e9,
+      T: 1e12,
+      P: 1e15,
+      E: 1e18,
+    };
+
+    const multiplier = multipliers[suffix] ?? 1;
+
+    return value * multiplier;
   }
 }
