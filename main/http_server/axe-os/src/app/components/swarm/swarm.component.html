@@ -51,7 +51,7 @@
             },
             {
                 label: 'Best Diff',
-                value: totals.bestDiff
+                value: totals.bestDiff | diffSuffix
             }
         ]"
     >
@@ -145,12 +145,12 @@
                     <div class="w-min cursor-pointer"
                          pTooltip="Best Diff"
                          tooltipPosition="top">
-                        {{axe.bestDiff}}
+                        {{axe.bestDiff | diffSuffix}}
                     </div>
                     <div class="text-sm w-min cursor-pointer"
                          pTooltip="Best Session Diff"
                          tooltipPosition="top">
-                        {{axe.bestSessionDiff}}
+                        {{axe.bestSessionDiff | diffSuffix}}
                     </div>
                 </td>
                 <td>{{axe.uptimeSeconds | dateAgo: {intervals: 2} }}</td>
