@@ -149,7 +149,7 @@ A custom board version is also possible with `config-custom.cvs`. A custom board
 
 Note: If you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
 
-Note: The Bitaxe Gamma 601 will not show up if connected with a USB-C to USB-C cable. Use an USB-A adapter as a woraround.
+Note: Every model prior to the 602 will not show up if connected with a USB-C to USB-C cable. Use a USB-A adapter as a workaround.
 
 ## Attributions
 
