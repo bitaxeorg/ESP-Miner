@@ -147,7 +147,8 @@ where xxx is the config file for your hardware version. You can see the list of 
 
 A custom board version is also possible with `config-custom.cvs`. A custom board needs to be based on an existing `devicemodel` and `asicmodel`.
 
-Note: if you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
+Note: If you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
+Note: The Bitaxe Gamma 601 will not show up if connected with a USB-C to USB-C cable. Use an USB-A adapter as a woraround.
 
 ## Attributions
 
