@@ -147,9 +147,9 @@ where xxx is the config file for your hardware version. You can see the list of 
 
 A custom board version is also possible with `config-custom.cvs`. A custom board needs to be based on an existing `devicemodel` and `asicmodel`.
 
-Note: If you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
-
-Note: Every model prior to the 602 will not show up if connected with a USB-C to USB-C cable. Use a USB-A adapter as a workaround.
+**Notes:** 
+  - If you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
+  - Every model prior to the 602 will not show up if connected with a USB-C to USB-C cable. Use a USB-A adapter as a workaround.
 
 ## Attributions
 
