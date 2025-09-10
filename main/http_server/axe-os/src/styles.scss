@@ -58,14 +58,21 @@ p-chart>div {
 }
 
 .p-checkbox {
-    .p-checkbox-box {
-        &.p-highlight {
-            border-color: var(--checkbox-border);
-            background: var(--checkbox-bg);
-
+    &:not(.p-checkbox-disabled) {
+        .p-checkbox-box {
+            &.p-focus,
             &:hover {
-                background: var(--checkbox-hover-bg);
                 border-color: var(--checkbox-hover-bg);
+            }
+
+            &.p-highlight {
+                border-color: var(--checkbox-border);
+                background: var(--checkbox-bg);
+
+                &:hover {
+                    background: var(--checkbox-hover-bg);
+                    border-color: var(--checkbox-hover-bg);
+                }
             }
         }
     }
