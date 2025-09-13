@@ -60,16 +60,6 @@ a {
     }
 }
 
-.refresh-button {
-  display: grid;
-  place-items: center;
-
-  > span:first-child {
-    visibility: hidden;
-    grid-area: 1 / 1;
-  }
-
-  > span:last-child {
-    grid-area: 1 / 1;
-  }
+.button {
+    min-width: 8rem;
 }
