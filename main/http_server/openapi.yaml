@@ -607,6 +607,16 @@ paths:
       summary: Get system statistics
       description: Returns system statistics
       operationId: getSystemStatistics
+      parameters:
+        - in: query
+          name: columns
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+            example: hashrate,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,wifiRssi,freeHeap
+          description: List of labels for which data should be retrieved
       tags:
         - system
       responses:
@@ -629,40 +639,6 @@ paths:
                     description: Labels for statistics data value index
                     items:
                       type: string
-                  statistics:
-                    type: array
-                    description: Statistics data point(s)
-                    items:
-                      type: array
-                      description: Statistics data values(s)
-                      items:
-                        type: number
-        '401':
-          description: Unauthorized - Client not in allowed network range
-        '500':
-          description: Internal server error
-
-  /api/system/statistics/dashboard:
-    get:
-      summary: Get system statistics for dashboard
-      description: Returns system statistics for dashboard
-      operationId: getSystemStatisticsDashboard
-      tags:
-        - system
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - currentTimestamp
-                  - statistics
-                properties:
-                  currentTimestamp:
-                    type: number
-                    description: Current timestamp as a reference
                   statistics:
                     type: array
                     description: Statistics data point(s)
