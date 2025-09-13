@@ -34,14 +34,14 @@ jobs:
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5
+          esp_idf_version: v5.5.1
           target: esp32s3
           command: GITHUB_ACTIONS="true" idf.py build
           path: '.'
       - name: "esp-idf build factory config for ${{ matrix.build_type }}"
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5
+          esp_idf_version: v5.5.1
           target: esp32s3
           command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate config-${{ matrix.build_type }}.cvs config.bin 0x6000
           path: '.'
