@@ -76,7 +76,7 @@
                             <p class="cursor-pointer m-0" [ngClass]="{'text-orange-500': axe.temp > 68}" pTooltip="ASIC Temperature" tooltipPosition="top">
                                 {{axe.temp | number: '1.0-1'}} °C
                             </p>
-                            <p class="text-500 cursor-pointer m-0" [ngClass]="{'text-orange-500': axe.vrTemp > 90}" pTooltip="Voltage Regulator Temperature" tooltipPosition="top">
+                            <p class="text-500 cursor-pointer m-0" *ngIf="axe.vrTemp" [ngClass]="{'text-orange-500': axe.vrTemp > 90}" pTooltip="Voltage Regulator Temperature" tooltipPosition="top">
                                 {{axe.vrTemp | number: '1.0-1'}} °C
                             </p>
                         </td>
