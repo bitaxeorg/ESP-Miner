@@ -1,40 +1,4 @@
-<div class="card p-3">
-
-    <form [formGroup]="form">
-        <div class="field grid p-fluid mb-0">
-            <label htmlFor="ip" class="col-12 mb-2 md:col-4 md:mb-0">Manual Addition</label>
-            <div class="col-12 md:col-8">
-                <p-inputGroup>
-                    <input pInputText id="manualAddIp" formControlName="manualAddIp" type="text" />
-                    <button pButton  [disabled]="form.invalid" (click)="add()">Add</button>
-                </p-inputGroup>
-
-            </div>
-        </div>
-
-    </form>
-</div>
-<div class="flex flex-column sm:flex-row gap-4 justify-content-between">
-    <div class="flex gap-1 sm:gap-3 text-sm md:text-base">
-        <button pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
-        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing" class="refresh-button">
-          <span aria-hidden="true">Refresh List (30)</span>
-          <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh List (' + refreshIntervalTime + ')' }}</span>
-        </button>
-    </div>
-    <div class="flex align-items-center gap-2">
-        <label for="refresh-interval" class="text-sm md:text-base">Refresh Interval:</label>
-        <p-slider id="refresh-interval" class="pl-2 pr-2"
-                 [min]="5"
-                 [max]="30"
-                 [style]="{'width': '150px'}"
-                 [formControl]="refreshIntervalControl">
-        </p-slider>
-        <span class="text-sm md:text-base">{{refreshTimeSet}} s</span>
-    </div>
-</div>
-
-<div class="flex flex-column sm:flex-row w-full gap-2 xl:gap-4 mt-4 mb-4">
+<div class="flex flex-column sm:flex-row w-full gap-2 xl:gap-4 mb-4">
     <div class="card mb-0 w-full text-center p-4 min-w-max flex sm:flex-column xl:flex-row justify-content-center gap-1"
         *ngFor="let metric of [
             {
@@ -186,6 +150,41 @@
         </div>
     </div>
 
+</div>
+
+<div class="card p-3 mt-4">
+    <form [formGroup]="form">
+        <div class="field grid p-fluid mb-0">
+            <label htmlFor="ip" class="col-12 mb-2 md:col-4 md:mb-0">Manual Addition</label>
+            <div class="col-12 md:col-8">
+                <p-inputGroup>
+                    <input pInputText id="manualAddIp" formControlName="manualAddIp" type="text" />
+                    <button pButton  [disabled]="form.invalid" (click)="add()">Add</button>
+                </p-inputGroup>
+
+            </div>
+        </div>
+
+    </form>
+</div>
+<div class="flex flex-column sm:flex-row gap-4 justify-content-between">
+    <div class="flex gap-1 sm:gap-3 text-sm md:text-base">
+        <button pButton (click)="scanNetwork()" [disabled]="scanning">{{scanning ? 'Scanning...' : 'Automatic Scan'}}</button>
+        <button pButton severity="secondary" (click)="refreshList()" [disabled]="scanning || isRefreshing" class="refresh-button">
+          <span aria-hidden="true">Refresh List (30)</span>
+          <span>{{ isRefreshing ? 'Refreshing...' : 'Refresh List (' + refreshIntervalTime + ')' }}</span>
+        </button>
+    </div>
+    <div class="flex align-items-center gap-2">
+        <label for="refresh-interval" class="text-sm md:text-base">Refresh Interval:</label>
+        <p-slider id="refresh-interval" class="pl-2 pr-2"
+                 [min]="5"
+                 [max]="30"
+                 [style]="{'width': '150px'}"
+                 [formControl]="refreshIntervalControl">
+        </p-slider>
+        <span class="text-sm md:text-base">{{refreshTimeSet}} s</span>
+    </div>
 </div>
 
 <app-modal [headline]="selectedAxeOs?.IP">
