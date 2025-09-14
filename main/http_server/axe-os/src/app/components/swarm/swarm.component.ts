@@ -132,6 +132,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       },
       complete: () => {
         this.scanning = false;
+        this.refreshIntervalTime = this.refreshTimeSet;
       }
     });
   }

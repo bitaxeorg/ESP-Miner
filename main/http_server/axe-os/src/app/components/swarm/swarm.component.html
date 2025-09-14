@@ -126,13 +126,13 @@
 
     <form *ngIf="form" [formGroup]="form" class="card flex flex-column md:flex-row gap-3 mt-5">
         <button pButton (click)="scanNetwork()" [disabled]="scanning" class="white-space-nowrap w-full md:w-auto block text-center button-text">
-            {{scanning ? 'Scanning ...' : 'Auto Scan'}}
+            {{scanning ? 'Scanning...' : 'Auto Scan'}}
         </button>
 
         <div class="flex align-items-center gap-3" *ngIf="this.swarm.length">
-            <button pButton (click)="refreshList()" [disabled]="isRefreshing" class="flex justify-content-between button-text">
-                <span>Refresh</span>
-                <span class="text-sm text-700">{{refreshIntervalTime}}</span>
+            <button pButton (click)="refreshList()" class="flex justify-content-between button-text">
+                <span>{{isRefreshing ? 'Refreshing...' : 'Refresh'}}</span>
+                <span *ngIf="!isRefreshing" class="text-sm text-700">{{refreshIntervalTime}}</span>
             </button>
             <div class="flex flex-grow-1 align-items-center gap-3">
                 <p-slider class="w-full md:w-3rem xl:w-6rem" [min]="5" [max]="30" [formControl]="refreshIntervalControl"></p-slider>
