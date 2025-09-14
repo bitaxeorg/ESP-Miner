@@ -21,8 +21,8 @@
                 <thead>
                     <tr>
                         <th *ngFor="let field of [
-                            { label: 'IP', name: 'IP' },
                             { label: 'Hostname', name: 'hostname' },
+                            { label: 'IP', name: 'IP' },
                             { label: 'Hashrate', name: 'hashRate' },
                             { label: 'Shares', name: 'sharesAccepted' },
                             { label: 'Best Diff', name: 'bestDiff' },
@@ -47,10 +47,12 @@
                     <tr *ngFor="let axe of swarm">
                         <td>
                             <a [href]="'http://' + axe.IP" target="_blank" [ngClass]="'text-' + axe.swarmColor + '-500'">
-                                {{axe.IP}}
+                                {{axe.hostname}}
                             </a>
                         </td>
-                        <td>{{axe.hostname}}</td>
+                        <td>
+                            <a [href]="'http://' + axe.IP" target="_blank" class="text-900">{{axe.IP}}</a>
+                        </td>
                         <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
                         <td>
                             <p class="cursor-pointer m-0" pTooltip="Shares Accepted" tooltipPosition="top">
