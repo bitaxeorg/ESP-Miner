@@ -129,8 +129,6 @@
                 </div>
                 <span class="text-900 font-medium">{{info.bestSessionDiff}} </span>
                 <span class="text-500">since system boot</span>
-                <!-- <span class="text-green-500 font-medium">520 </span>
-                <span class="text-500">newly registered</span> -->
             </div>
         </div>
 
@@ -326,8 +324,35 @@
 
         <div class="col-12 md:col-6">
             <div class="card">
-                <h5>Uptime</h5>
-                {{info.uptimeSeconds | dateAgo}}
+                <h5>Block Header</h5>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width text-500">
+                        <span>Height</span>
+                    </div>
+                    <div>
+                        {{ info.blockHeight }}
+                    </div>
+                </div>
+
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width text-500">
+                        <span>Difficulty</span>
+                    </div>
+                    <div>
+                        {{ info.networkDifficulty }}
+                    </div>
+                </div>
+
+                <div class="flex flex-nowrap align-items-baseline">
+                    <div class="col-fixed-width text-500">
+                        <span>Scriptsig</span>
+                    </div>
+                    <div class="code">
+                        {{ info.scriptsig }}
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
