@@ -139,18 +139,18 @@
                 <form [formGroup]="form">
                     <div class="flex flex-nowrap justify-content-between mb-3">
                         <p-dropdown
-                            [options]="dataSourceLabels"
+                            [options]="dataSourceLabels(info)"
                             optionLabel="name"
                             optionValue="value"
                             formControlName="chartY1Data"
-                            styleClass="w-9rem p-dropdown--border-color-primary p-dropdown--small">
+                            styleClass="w-10rem p-dropdown--border-color-primary p-dropdown--small">
                         </p-dropdown>
                         <p-dropdown
-                            [options]="dataSourceLabels"
+                            [options]="dataSourceLabels(info)"
                             optionLabel="name"
                             optionValue="value"
                             formControlName="chartY2Data"
-                            styleClass="w-9rem border-500 p-dropdown--small">
+                            styleClass="w-10rem border-500 p-dropdown--small">
                         </p-dropdown>
                     </div>
 
