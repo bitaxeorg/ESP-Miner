@@ -20,6 +20,7 @@ import { SystemComponent } from './components/system/system.component';
 import { UpdateComponent } from './components/update/update.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SettingsComponent } from './components/settings/settings.component';
+import { AutotuneComponent } from './components/autotune/autotune.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
 import { ThemeConfigComponent } from './components/design/theme-config.component';
 import { DesignComponent } from './components/design/design.component';
@@ -37,6 +38,7 @@ import { DialogService, DialogListComponent } from './services/dialog.service';
 const components = [
   AppComponent,
   EditComponent,
+  AutotuneComponent,
   NetworkEditComponent,
   HomeComponent,
   ModalComponent,
