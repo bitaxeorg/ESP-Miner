@@ -163,11 +163,10 @@ typedef enum
 } emc2101_rate_t;
 
 esp_err_t EMC2101_set_fan_speed(float);
-// void EMC2101_read(void);
 uint16_t EMC2101_get_fan_speed(void);
 esp_err_t EMC2101_init();
 float EMC2101_get_external_temp(void);
-uint8_t EMC2101_get_internal_temp(void);
+float EMC2101_get_internal_temp(void);
 esp_err_t EMC2101_set_ideality_factor(uint8_t);
 esp_err_t EMC2101_set_beta_compensation(uint8_t);
 #endif /* EMC2101_H_ */

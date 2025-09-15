@@ -35,6 +35,7 @@ typedef struct
     int64_t start_time;
     uint64_t shares_accepted;
     uint64_t shares_rejected;
+    uint64_t work_received;
     RejectedReasonStat rejected_reason_stats[10];
     int rejected_reason_stats_count;
     int screen_page;
@@ -116,6 +117,10 @@ typedef struct
 
     bool ASIC_initalized;
     bool psram_is_available;
+
+    int block_height;
+    char * scriptsig;
+    char network_diff_string[DIFF_STRING_SIZE];
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */
