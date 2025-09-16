@@ -547,7 +547,9 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  get dataSourceLabels() {
-    return Object.entries(eChartLabel).map(([key, value]) => ({name: value, value: key}));
+  dataSourceLabels(info: ISystemInfo) {
+    return Object.entries(eChartLabel)
+      .filter(([key, ]) => key !== 'vrTemp' || info.vrTemp)
+      .map(([key, value]) => ({name: value, value: key}));
   }
 }
