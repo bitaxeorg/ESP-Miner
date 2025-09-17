@@ -298,7 +298,7 @@ void stratum_task(void * pvParameters)
 
         if (retry_attempts >= MAX_RETRY_ATTEMPTS)
         {
-            POOL_MODULE.active_pool_idx = POOL_MODULE.active_pool_idx+1 % 2;
+            POOL_MODULE.active_pool_idx = POOL_MODULE.active_pool_idx+1 % STRATUM_POOL_CAPACITY;
             if (POOL_MODULE.pools[POOL_MODULE.active_pool_idx].url == NULL || POOL_MODULE.pools[POOL_MODULE.active_pool_idx].url[0] == '\0') {
                 ESP_LOGI(TAG, "Unable to switch to fallback. No url configured. (retries: %d)...", retry_attempts);
                 retry_attempts = 0;

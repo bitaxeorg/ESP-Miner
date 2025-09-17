@@ -2,6 +2,7 @@
 #define POOL_MODULE_H_
 
 #include <stdint.h>
+#define STRATUM_POOL_CAPACITY 2
 typedef struct
 {
     // The URL of the mining pool.
@@ -21,7 +22,7 @@ typedef struct
 typedef struct
 {
     // The configured pools to connect to.
-    stratum_pool pools[2];
+    stratum_pool pools[STRATUM_POOL_CAPACITY];
     
     // The currently active pool.
     uint8_t active_pool_idx;
