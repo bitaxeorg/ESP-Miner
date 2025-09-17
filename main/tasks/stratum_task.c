@@ -178,7 +178,7 @@ void stratum_primary_heartbeat()
 
         int send_uid = 1;
         STRATUM_V1_subscribe(sock, send_uid++, DEVICE_CONFIG.family.asic.name);
-        STRATUM_V1_authorize(sock, send_uid++, POOL_MODULE.pools[POOL_MODULE.active_pool_idx].user, POOL_MODULE.pools[POOL_MODULE.active_pool].pass);
+        STRATUM_V1_authorize(sock, send_uid++, POOL_MODULE.pools[POOL_MODULE.active_pool_idx].user, POOL_MODULE.pools[POOL_MODULE.active_pool_idx].pass);
 
         char recv_buffer[BUFFER_SIZE];
         memset(recv_buffer, 0, BUFFER_SIZE);
