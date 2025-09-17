@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <sys/param.h>
+#include <sys/stat.h>
 
 #include "esp_chip_info.h"
 #include "esp_http_server.h"
@@ -357,10 +358,16 @@ static esp_err_t rest_api_common_handler(httpd_req_t * req)
     return ESP_OK;
 }
 
+static bool file_exists(const char *path) {
+    struct stat buffer;
+    return (stat(path, &buffer) == 0);
+}
+
 /* Send HTTP response with the contents of the requested file */
 static esp_err_t rest_common_get_handler(httpd_req_t * req)
 {
     char filepath[FILE_PATH_MAX];
+    char gz_file[FILE_PATH_MAX];
     uint8_t filePathLength = sizeof(filepath);
 
     rest_server_context_t * rest_context = (rest_server_context_t *) req->user_ctx;
@@ -371,8 +378,14 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
         strlcat(filepath, req->uri, filePathLength);
     }
     set_content_type_from_file(req, filepath);
-    strcat(filepath, ".gz");
-    int fd = open(filepath, O_RDONLY, 0);
+
+    strlcpy(gz_file, filepath, filePathLength);
+    strlcat(gz_file, ".gz", filePathLength);
+
+    bool serve_gz = file_exists(gz_file);
+    const char *file_to_open = serve_gz ? gz_file : filepath;
+
+    int fd = open(file_to_open, O_RDONLY, 0);
     if (fd == -1) {
         // Set status
         httpd_resp_set_status(req, "302 Temporary Redirect");
@@ -388,7 +401,9 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
         httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
     }
 
-    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    if (serve_gz) {
+        httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    }
 
     char * chunk = rest_context->scratch;
     ssize_t read_bytes;
@@ -396,7 +411,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
         /* Read file in chunks into the scratch buffer */
         read_bytes = read(fd, chunk, SCRATCH_BUFSIZE);
         if (read_bytes == -1) {
-            ESP_LOGE(TAG, "Failed to read file : %s", filepath);
+            ESP_LOGE(TAG, "Failed to read file : %s", file_to_open);
         } else if (read_bytes > 0) {
             /* Send the buffer contents as HTTP response chunk */
             if (httpd_resp_send_chunk(req, chunk, read_bytes) != ESP_OK) {
@@ -523,8 +538,11 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
     }
-    if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL && item->valueint > 0) {
-        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, item->valueint);
+    if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL && item->valuedouble > 0) {
+        float frequency = item->valuedouble;
+        nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
+        // also store as u16 for backwards compatibility
+        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, (int) frequency);
     }
     if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
@@ -615,7 +633,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)");
-    uint16_t frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
     float expected_hashrate = frequency * DEVICE_CONFIG.family.asic.small_core_count * DEVICE_CONFIG.family.asic_count / 1000.0;
 
     uint8_t mac[6];
@@ -707,6 +725,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0));
     if (STATE_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string());
+    }
+
+    if (SYSTEM_MODULE.block_height > 0) {
+        cJSON_AddNumberToObject(root, "blockHeight", SYSTEM_MODULE.block_height);
+        cJSON_AddStringToObject(root, "scriptsig", SYSTEM_MODULE.scriptsig);
+        cJSON_AddStringToObject(root, "networkDifficulty", SYSTEM_MODULE.network_diff_string);
     }
 
     free(ssid);

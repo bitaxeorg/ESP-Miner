@@ -18,7 +18,7 @@ static const char * TAG = "create_jobs_task";
 #define QUEUE_LOW_WATER_MARK 10 // Adjust based on your requirements
 
 static bool should_generate_more_work();
-static void generate_work(mining_notify * notification, uint32_t extranonce_2, uint32_t difficulty);
+static void generate_work(mining_notify *notification, uint64_t extranonce_2, uint32_t difficulty);
 
 void create_jobs_task(void * pvParameters)
 {
@@ -45,7 +45,7 @@ void create_jobs_task(void * pvParameters)
             MINING_MODULE.new_stratum_version_rolling_msg = false;
         }
 
-        uint32_t extranonce_2 = 0;
+        uint64_t extranonce_2 = 0;
         while (MINING_MODULE.stratum_queue.count < 1 && MINING_MODULE.abandon_work == 0) {
             if (should_generate_more_work()) {
                 generate_work(mining_notification, extranonce_2, difficulty);
@@ -75,13 +75,15 @@ static bool should_generate_more_work()
     return MINING_MODULE.ASIC_jobs_queue.count < QUEUE_LOW_WATER_MARK;
 }
 
-static void generate_work(mining_notify * notification, uint32_t extranonce_2, uint32_t difficulty)
+static void generate_work(mining_notify *notification, uint64_t extranonce_2, uint32_t difficulty)
 {
     char * extranonce_2_str = extranonce_2_generate(extranonce_2, MINING_MODULE.extranonce_2_len);
     if (extranonce_2_str == NULL) {
         ESP_LOGE(TAG, "Failed to generate extranonce_2");
         return;
     }
+    //print generated extranonce_2
+    //ESP_LOGI(TAG, "Generated extranonce_2: %s", extranonce_2_str);
 
     char * coinbase_tx =
         construct_coinbase_tx(notification->coinbase_1, notification->coinbase_2, MINING_MODULE.extranonce_str, extranonce_2_str);

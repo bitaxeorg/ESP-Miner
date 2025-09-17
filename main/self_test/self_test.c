@@ -32,6 +32,7 @@
 #include "bm1370.h"
 #include "bm1397.h"
 #include "device_config.h"
+#include "power_management_task.h"
 #include "power_management_module.h"
 #include "asic_task_module.h"
 #include "serial.h"
@@ -343,8 +344,7 @@ bool self_test()
         tests_done(false);
     }
 
-    POWER_MANAGEMENT_MODULE.frequency_value = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-    ESP_LOGI(TAG, "NVS_CONFIG_ASIC_FREQ %f", (float) POWER_MANAGEMENT_MODULE.frequency_value);
+    POWER_MANAGEMENT_init_frequency();
     uint8_t chips_detected =
         ASIC_init(POWER_MANAGEMENT_MODULE.frequency_value, 
                     DEVICE_CONFIG.family.asic_count,

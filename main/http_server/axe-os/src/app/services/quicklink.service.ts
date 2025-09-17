@@ -39,8 +39,8 @@ export class QuicklinkService {
             return pool.url;
           }
           if ('regex' in pool) {
-            const match = pool.regex.exec(stratumURL)!;
-            return pool.url.replace(/\$(\d+)/g, (_, group) => match[+group] ?? '');
+            const match = pool.regex.exec(stratumURL);
+            if (match) return pool.url.replace(/\$(\d+)/g, (_, group) => match[+group] ?? '');
           }
         }
 

@@ -19,7 +19,6 @@
 @mixin focused-input() {
     outline: $focusOutline;
     outline-offset: $inputFocusOutlineOffset;
-    box-shadow: $focusShadow;
 	border-color: $inputFocusBorderColor;
 }
 

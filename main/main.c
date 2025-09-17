@@ -15,6 +15,7 @@
 #include "self_test.h"
 #include "serial.h"
 #include "statistics_task.h"
+#include "bap/bap.h"
 #include "stratum_task.h"
 #include "system.h"
 #include "power_management_module.h"
@@ -88,6 +89,15 @@ void app_main(void)
     xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, NULL,10, NULL);
     // start the API for AxeOS
     start_rest_server();
+
+    // Initialize BAP interface
+    esp_err_t bap_ret = BAP_init();
+    if (bap_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize BAP interface: %d", bap_ret);
+        // Continue anyway, as BAP is not critical for core functionality
+    } else {
+        ESP_LOGI(TAG, "BAP interface initialized successfully");
+    }
 
     while (!WIFI_MODULE.is_connected) {
         vTaskDelay(100 / portTICK_PERIOD_MS);

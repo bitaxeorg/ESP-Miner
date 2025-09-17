@@ -30,8 +30,8 @@ typedef struct
 } StatisticsModule;
 
 StatisticsNodePtr addStatisticData(StatisticsNodePtr data);
-
 StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr dataOut);
+void clearStatisticData();
 
 void statistics_init();
 void statistics_task(void * pvParameters);
