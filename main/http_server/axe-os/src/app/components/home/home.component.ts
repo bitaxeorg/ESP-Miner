@@ -425,7 +425,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           [
             this.pageDefaultTitle,
             info.hostname,
-            (info.hashRate ? HashSuffixPipe.transform(info.hashRate * 1000000000) : false),
+            (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : false),
             (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
             (!info.power_fault ? `${info.power} W` : false),
             (info.bestDiff ? info.bestDiff : false),
