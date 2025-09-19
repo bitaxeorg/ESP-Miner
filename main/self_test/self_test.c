@@ -58,7 +58,8 @@ static bool isFactoryTest = false;
 //local function prototypes
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
-static bool should_test() {
+static bool should_test()
+{
     uint64_t is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0) < 1;
     uint16_t is_self_test_flag_set = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
     if (is_factory_flash && is_self_test_flag_set) {
@@ -70,7 +71,8 @@ static bool should_test() {
     return gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
 }
 
-static void reset_self_test() {
+static void reset_self_test()
+{
     ESP_LOGI(TAG, "Long press detected...");
     // Give the semaphore back
     xSemaphoreGive(longPressSemaphore);
@@ -119,7 +121,7 @@ static esp_err_t test_TPS546_power_consumption(int target_power, int margin)
 
 static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 {
-    uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
+    uint16_t core_voltage = VCORE_get_voltage_mv(&GLOBAL_STATE->DEVICE_CONFIG);
     ESP_LOGI(TAG, "Voltage: %u", core_voltage);
 
     if (core_voltage > CORE_VOLTAGE_TARGET_MIN && core_voltage < CORE_VOLTAGE_TARGET_MAX) {
@@ -131,7 +133,8 @@ static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
     return ESP_FAIL;
 }
 
-esp_err_t test_display(GlobalState * GLOBAL_STATE) {
+esp_err_t test_display(GlobalState * GLOBAL_STATE)
+{
     // Display testing
     if (display_init(GLOBAL_STATE) != ESP_OK) {
         display_msg("DISPLAY:FAIL", GLOBAL_STATE);
@@ -147,7 +150,8 @@ esp_err_t test_display(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_input(GlobalState * GLOBAL_STATE) {
+esp_err_t test_input(GlobalState * GLOBAL_STATE)
+{
     // Input testing
     if (input_init(NULL, reset_self_test) != ESP_OK) {
         display_msg("INPUT:FAIL", GLOBAL_STATE);
@@ -159,7 +163,8 @@ esp_err_t test_input(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
+esp_err_t test_screen(GlobalState * GLOBAL_STATE)
+{
     // Screen testing
     if (screen_start(GLOBAL_STATE) != ESP_OK) {
         display_msg("SCREEN:FAIL", GLOBAL_STATE);
@@ -171,15 +176,17 @@ esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
-    ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
+esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE)
+{
+    ESP_RETURN_ON_ERROR(VCORE_init(&GLOBAL_STATE->DEVICE_CONFIG), TAG, "VCORE init failed!");
 
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(&GLOBAL_STATE->DEVICE_CONFIG, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
     
     return ESP_OK;
 }
 
-esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
+esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE)
+{
     //check for faults on the voltage regulator
     ESP_RETURN_ON_ERROR(VCORE_check_fault(GLOBAL_STATE), TAG, "VCORE check fault failed!");
 
@@ -189,8 +196,8 @@ esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
-    
+esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE)
+{    
     //enable the voltage regulator GPIO on HW that supports it
     if (GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
         gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
@@ -218,8 +225,8 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
-    
+esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE)
+{    
     if (GLOBAL_STATE->DEVICE_CONFIG.EMC2101) {
         ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
         EMC2101_set_fan_speed(1);
@@ -240,7 +247,8 @@ esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_psram(GlobalState * GLOBAL_STATE){
+esp_err_t test_psram(GlobalState * GLOBAL_STATE)
+{
     if(!esp_psram_is_initialized()) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32!");
         display_msg("PSRAM:FAIL", GLOBAL_STATE);
@@ -356,7 +364,7 @@ bool self_test(void * pvParameters)
     }
 
     //setup and test hashrate
-    int baud = ASIC_set_max_baud(GLOBAL_STATE);
+    int baud = ASIC_set_max_baud(GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     if (SERIAL_set_baud(baud) != ESP_OK) {
@@ -483,7 +491,7 @@ bool self_test(void * pvParameters)
 
 static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed) 
 {
-    VCORE_set_voltage(GLOBAL_STATE, 0.0f);
+    VCORE_set_voltage(&GLOBAL_STATE->DEVICE_CONFIG, 0.0f);
 
     if (isTestPassed) {
         if (isFactoryTest) {
