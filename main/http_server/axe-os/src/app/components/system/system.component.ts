@@ -36,11 +36,11 @@ export class SystemComponent implements OnInit, OnDestroy {
   ) {
     this.info$ = timer(0, 5000).pipe(
       switchMap(() => this.systemService.getInfo()),
-      shareReplay(1)
+      shareReplay({ refCount: true, bufferSize: 1 })
     );
 
     this.asic$ = this.systemService.getAsicSettings().pipe(
-      shareReplay(1)
+      shareReplay({ refCount: true, bufferSize: 1 })
     );
 
     this.combinedData$ = combineLatest([this.info$, this.asic$]).pipe(
