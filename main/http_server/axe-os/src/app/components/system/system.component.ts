@@ -88,7 +88,7 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds), class: 'pb-3' },
       { label: 'Wi-Fi SSID', value: data.info.ssid },
       { label: 'Wi-Fi Status', value: data.info.wifiStatus },
-      { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + 'dBm', class: 'pb-3', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) },
+      { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + ' dBm', class: 'pb-3', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) },
       { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3' },
       { label: 'Free Heap Memory', value: data.info.freeHeap.toString(), class: 'pb-3' },
       { label: 'Firmware Version', value: data.info.version },
