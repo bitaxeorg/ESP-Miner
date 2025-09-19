@@ -18,17 +18,9 @@ static const char *TAG = "BAP";
 QueueHandle_t bap_uart_send_queue = NULL;
 SemaphoreHandle_t bap_uart_send_mutex = NULL;
 SemaphoreHandle_t bap_subscription_mutex = NULL;
-GlobalState *bap_global_state = NULL;
 
-esp_err_t BAP_init(GlobalState *state) {
+esp_err_t BAP_init() {
     ESP_LOGI(TAG, "Initializing BAP system");
-    
-    if (!state) {
-        ESP_LOGE(TAG, "Invalid global state pointer");
-        return ESP_ERR_INVALID_ARG;
-    }
-    
-    bap_global_state = state;
     
     esp_err_t ret;
     
@@ -68,14 +60,14 @@ esp_err_t BAP_init(GlobalState *state) {
     }
     
     // Initialize command handlers
-    ret = BAP_handlers_init(state);
+    ret = BAP_handlers_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize handlers: %s", esp_err_to_name(ret));
         return ret;
     }
     
     // Send initialization message
-    BAP_send_init_message(state);
+    BAP_send_init_message();
     
     // Start UART receive task
     ret = BAP_start_uart_receive_task();
@@ -85,7 +77,7 @@ esp_err_t BAP_init(GlobalState *state) {
     }
     
     // Start mode-aware BAP management task
-    ret = BAP_start_mode_management_task(state);
+    ret = BAP_start_mode_management_task();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start BAP mode management task: %s", esp_err_to_name(ret));
         return ret;

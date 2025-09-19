@@ -10,7 +10,6 @@
 #define BAP_H_
 
 #include "esp_err.h"
-#include "global_state.h"
 #include "freertos/FreeRTOS.h" 
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -24,7 +23,6 @@
 extern QueueHandle_t bap_uart_send_queue;
 extern SemaphoreHandle_t bap_uart_send_mutex;
 extern SemaphoreHandle_t bap_subscription_mutex;
-extern GlobalState *bap_global_state;
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,7 +40,7 @@ extern "C" {
  * @param state Global state pointer
  * @return ESP_OK on success, error code otherwise
  */
-esp_err_t BAP_init(GlobalState *state);
+esp_err_t BAP_init();
 
 #ifdef __cplusplus
 }

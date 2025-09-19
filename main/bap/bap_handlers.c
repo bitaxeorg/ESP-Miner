@@ -18,6 +18,10 @@
 #include "bap_subscription.h"
 #include "bap.h"
 #include "asic.h"
+#include "wifi_module.h"
+#include "device_config.h"
+#include "power_management_module.h"
+#include "pool_module.h"
 
 static const char *TAG = "BAP_HANDLERS";
 
@@ -170,7 +174,7 @@ void BAP_handle_subscription(const char *parameter, const char *value) {
     }
 
     // Check if we're in AP mode - subscriptions not allowed
-    if (!bap_global_state || !bap_global_state->SYSTEM_MODULE.is_connected) {
+    if (!WIFI_MODULE.is_connected) {
         ESP_LOGW(TAG, "Subscription not allowed in AP mode");
         BAP_send_message(BAP_CMD_ERR, parameter, "ap_mode_no_subscriptions");
         return;
@@ -199,7 +203,7 @@ void BAP_handle_request(const char *parameter, const char *value) {
     }
 
     // Check if we're in AP mode - most requests not allowed
-    if (!bap_global_state || !bap_global_state->SYSTEM_MODULE.is_connected) {
+    if (!WIFI_MODULE.is_connected) {
         ESP_LOGW(TAG, "Request not allowed in AP mode");
         BAP_send_message(BAP_CMD_ERR, parameter, "ap_mode_no_requests");
         return;
@@ -211,31 +215,22 @@ void BAP_handle_request(const char *parameter, const char *value) {
         return;
     }
 
-    if (!bap_global_state) {
-        ESP_LOGE(TAG, "Global state not available for request");
-        return;
-    }
-
-    BAP_send_request(param, bap_global_state);
+    BAP_send_request(param);
 }
 
-void BAP_send_request(bap_parameter_t param, GlobalState *state) {
-    if (!state) {
-        ESP_LOGE(TAG, "Invalid global state for request");
-        return;
-    }
+void BAP_send_request(bap_parameter_t param) {
 
     //ESP_LOGI(TAG, "Sending request response for %s", BAP_parameter_to_string(param));
 
     switch (param) {
         case BAP_PARAM_SYSTEM_INFO:
-            BAP_send_message(BAP_CMD_RES, "deviceModel", state->DEVICE_CONFIG.family.name);
-            BAP_send_message(BAP_CMD_RES, "asicModel", state->DEVICE_CONFIG.family.asic.name);
+            BAP_send_message(BAP_CMD_RES, "deviceModel", DEVICE_CONFIG.family.name);
+            BAP_send_message(BAP_CMD_RES, "asicModel", DEVICE_CONFIG.family.asic.name);
             char port_str[6];
-            snprintf(port_str, sizeof(port_str),"%u", state->SYSTEM_MODULE.pool_port);
-            BAP_send_message(BAP_CMD_RES, "pool", state->SYSTEM_MODULE.pool_url);
+            snprintf(port_str, sizeof(port_str),"%u", POOL_MODULE.pool_port);
+            BAP_send_message(BAP_CMD_RES, "pool", POOL_MODULE.pool_url);
             BAP_send_message(BAP_CMD_RES, "poolPort", port_str);
-            BAP_send_message(BAP_CMD_RES, "poolUser", state->SYSTEM_MODULE.pool_user);
+            BAP_send_message(BAP_CMD_RES, "poolUser", POOL_MODULE.pool_user);
             break;
             
         default:
@@ -254,16 +249,10 @@ void BAP_handle_settings(const char *parameter, const char *value) {
         return;
     }
 
-    if (!bap_global_state) {
-        ESP_LOGE(TAG, "Global state not available for settings");
-        BAP_send_message(BAP_CMD_ERR, parameter, "system_not_ready");
-        return;
-    }
-
     bap_parameter_t param = BAP_parameter_from_string(parameter);
     
     // In AP mode, only allow SSID and password settings
-    if (!bap_global_state->SYSTEM_MODULE.is_connected) {
+    if (!WIFI_MODULE.is_connected) {
         if (param != BAP_PARAM_SSID && param != BAP_PARAM_PASSWORD) {
             ESP_LOGW(TAG, "Setting '%s' not allowed in AP mode", parameter);
             BAP_send_message(BAP_CMD_ERR, parameter, "ap_mode_limited_settings");
@@ -285,12 +274,12 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 
                 //ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
                 
-                bool success = ASIC_set_frequency(bap_global_state, target_frequency);
+                bool success = ASIC_set_frequency(target_frequency);
                 
                 if (success) {
                     //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
                     
-                    bap_global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
+                    POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
                     nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
                     
                     char freq_str[32];
@@ -408,7 +397,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
     }
 }
 
-esp_err_t BAP_handlers_init(GlobalState *state) {
+esp_err_t BAP_handlers_init() {
     // Clear all handlers
     memset(handlers, 0, sizeof(handlers));
     

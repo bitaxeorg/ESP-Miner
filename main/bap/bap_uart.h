@@ -13,7 +13,6 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
-#include "global_state.h"
 #include "bap_protocol.h"
 
 #ifdef __cplusplus
@@ -51,13 +50,13 @@ void BAP_send_message_with_queue(bap_command_t cmd, const char *parameter, const
  * @brief Send initialization message
  * @param state Global state (can be NULL)
  */
-void BAP_send_init_message(GlobalState *state);
+void BAP_send_init_message();
 
 /**
  * @brief Send AP mode message
  * @param state Global state (can be NULL)
  */
-void BAP_send_ap_message(GlobalState *state);
+void BAP_send_ap_message();
 
 
 /**

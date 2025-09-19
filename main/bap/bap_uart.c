@@ -99,7 +99,7 @@ void BAP_send_message_with_queue(bap_command_t cmd, const char *parameter, const
     }
 }
 
-void BAP_send_init_message(GlobalState *state) {
+void BAP_send_init_message() {
     const char *init_message = "BAP UART Interface Initialized\r\n";
     esp_err_t ret = uart_write_bytes(BAP_UART_NUM, init_message, strlen(init_message));
     if (ret < 0) {
@@ -109,7 +109,7 @@ void BAP_send_init_message(GlobalState *state) {
     }
 }
 
-void BAP_send_ap_message(GlobalState *state) {
+void BAP_send_ap_message() {
     BAP_send_message(BAP_CMD_CMD, "mode", "ap_mode");
 }
 

@@ -11,7 +11,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
-#include "global_state.h"
 #include "bap_protocol.h"
 
 #ifdef __cplusplus
@@ -49,21 +48,21 @@ void BAP_subscription_handle_unsubscribe(const char *parameter, const char *valu
  * @brief Send subscription updates for all active subscriptions
  * @param state Global state pointer
  */
-void BAP_send_subscription_update(GlobalState *state);
+void BAP_send_subscription_update();
 
 /**
  * @brief Start mode management task
  * @param state Global state pointer
  * @return ESP_OK on success, error code otherwise
  */
-esp_err_t BAP_start_mode_management_task(GlobalState *state);
+esp_err_t BAP_start_mode_management_task();
 
 /**
  * @brief Start subscription update task
  * @param state Global state pointer
  * @return ESP_OK on success, error code otherwise
  */
-esp_err_t BAP_start_subscription_task(GlobalState *state);
+esp_err_t BAP_start_subscription_task();
 
 #ifdef __cplusplus
 }

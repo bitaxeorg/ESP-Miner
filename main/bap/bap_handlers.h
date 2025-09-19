@@ -9,7 +9,6 @@
 #define BAP_HANDLERS_H_
 
 #include "esp_err.h"
-#include "global_state.h"
 #include "bap_protocol.h"
 
 #ifdef __cplusplus
@@ -58,7 +57,7 @@ void BAP_handle_request(const char *parameter, const char *value);
  * @param param Parameter type
  * @param state Global state pointer
  */
-void BAP_send_request(bap_parameter_t param, GlobalState *state);
+void BAP_send_request(bap_parameter_t param);
 
 /**
  * @brief Handle settings change
@@ -72,7 +71,7 @@ void BAP_handle_settings(const char *parameter, const char *value);
  * @param state Global state pointer
  * @return ESP_OK on success, error code otherwise
  */
-esp_err_t BAP_handlers_init(GlobalState *state);
+esp_err_t BAP_handlers_init();
 
 #ifdef __cplusplus
 }

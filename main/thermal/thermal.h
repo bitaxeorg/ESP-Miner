@@ -3,13 +3,14 @@
 
 #include <esp_err.h>
 
-#include "global_state.h"
 
-esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG);
-esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent);
-uint16_t Thermal_get_fan_speed(DeviceConfig * DEVICE_CONFIG);
+esp_err_t Thermal_init();
+esp_err_t Thermal_set_fan_percent(float percent);
+uint16_t Thermal_get_fan_speed();
 
-float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE);
-float Thermal_get_chip_temp2(GlobalState * GLOBAL_STATE);
+esp_err_t Thermal_init();
+float Thermal_get_chip_temp2();
+float Thermal_get_chip_temp();
+uint16_t Thermal_get_fan_speed();
 
 #endif // THERMAL_H

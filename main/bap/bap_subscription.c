@@ -18,6 +18,9 @@
 #include "bap_uart.h"
 #include "bap.h"
 #include "connect.h"
+#include "system_module.h"
+#include "power_management_module.h"
+#include "wifi_module.h"
 
 static const char *TAG = "BAP_SUBSCRIPTION";
 
@@ -113,11 +116,7 @@ void BAP_subscription_handle_unsubscribe(const char *parameter, const char *valu
     }
 }
 
-void BAP_send_subscription_update(GlobalState *state) {
-    if (!state) {
-        ESP_LOGE(TAG, "Invalid global state");
-        return;
-    }
+void BAP_send_subscription_update() {
 
     uint32_t current_time = esp_timer_get_time() / 1000;
 
@@ -146,7 +145,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_HASHRATE:
                         {
                             char hashrate_str[32];
-                            snprintf(hashrate_str, sizeof(hashrate_str), "%.2f", state->SYSTEM_MODULE.current_hashrate);
+                            snprintf(hashrate_str, sizeof(hashrate_str), "%.2f", SYSTEM_MODULE.current_hashrate);
                             BAP_send_message_with_queue(BAP_CMD_RES, "hashrate", hashrate_str);
                         }
                         break;
@@ -154,10 +153,10 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_TEMPERATURE:
                         {
                             char temp_str[32];
-                            snprintf(temp_str, sizeof(temp_str), "%f", state->POWER_MANAGEMENT_MODULE.chip_temp_avg);
+                            snprintf(temp_str, sizeof(temp_str), "%f", POWER_MANAGEMENT_MODULE.chip_temp_avg);
                             BAP_send_message_with_queue(BAP_CMD_RES, "chipTemp", temp_str);
                             
-                            snprintf(temp_str, sizeof(temp_str), "%f", state->POWER_MANAGEMENT_MODULE.vr_temp);
+                            snprintf(temp_str, sizeof(temp_str), "%f", POWER_MANAGEMENT_MODULE.vr_temp);
                             BAP_send_message_with_queue(BAP_CMD_RES, "vrTemp", temp_str);
                         }
                         break;
@@ -165,7 +164,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_POWER:
                         {
                             char power_str[32];
-                            snprintf(power_str, sizeof(power_str), "%.2f", state->POWER_MANAGEMENT_MODULE.power);
+                            snprintf(power_str, sizeof(power_str), "%.2f", POWER_MANAGEMENT_MODULE.power);
                             BAP_send_message_with_queue(BAP_CMD_RES, "power", power_str);
                         }
                         break;
@@ -173,7 +172,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_VOLTAGE:
                         {
                             char voltage_str[32];
-                            snprintf(voltage_str, sizeof(voltage_str), "%.2f", state->POWER_MANAGEMENT_MODULE.voltage);
+                            snprintf(voltage_str, sizeof(voltage_str), "%.2f", POWER_MANAGEMENT_MODULE.voltage);
                             BAP_send_message_with_queue(BAP_CMD_RES, "voltage", voltage_str);
                         }
                         break;
@@ -181,7 +180,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_CURRENT:
                         {
                             char current_str[32];
-                            snprintf(current_str, sizeof(current_str), "%.2f", state->POWER_MANAGEMENT_MODULE.current);
+                            snprintf(current_str, sizeof(current_str), "%.2f", POWER_MANAGEMENT_MODULE.current);
                             BAP_send_message_with_queue(BAP_CMD_RES, "current", current_str);
                         }
                         break;
@@ -189,7 +188,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_SHARES:
                         {
                             char shares_ar_str[64];
-                            snprintf(shares_ar_str, sizeof(shares_ar_str), "%lld/%lld", state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
+                            snprintf(shares_ar_str, sizeof(shares_ar_str), "%lld/%lld", SYSTEM_MODULE.shares_accepted, SYSTEM_MODULE.shares_rejected);
                             BAP_send_message_with_queue(BAP_CMD_RES, "shares", shares_ar_str);
                             
                         }
@@ -198,7 +197,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_FAN_SPEED:
                         {
                             char fan_speed_str[32];
-                            snprintf(fan_speed_str, sizeof(fan_speed_str), "%d", state->POWER_MANAGEMENT_MODULE.fan_rpm);
+                            snprintf(fan_speed_str, sizeof(fan_speed_str), "%d", POWER_MANAGEMENT_MODULE.fan_rpm);
                             BAP_send_message_with_queue(BAP_CMD_RES, "fan_speed", fan_speed_str);
                         }
                         break;
@@ -206,7 +205,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_BEST_DIFFICULTY:
                         {
                             char best_diff_str[32];
-                            snprintf(best_diff_str, sizeof(best_diff_str), "%s", state->SYSTEM_MODULE.best_diff_string);
+                            snprintf(best_diff_str, sizeof(best_diff_str), "%s", SYSTEM_MODULE.best_diff_string);
                             BAP_send_message_with_queue(BAP_CMD_RES, "best_difficulty", best_diff_str);
                         }
                         break;
@@ -217,16 +216,16 @@ void BAP_send_subscription_update(GlobalState *state) {
                             char wifi_status_str[256];
                             char rssi_str[32];
                             char ip_str[32];
-                            snprintf(ssid_str, sizeof(ssid_str), "%s", state->SYSTEM_MODULE.ssid);
-                            snprintf(wifi_status_str, sizeof(wifi_status_str), "%s", state->SYSTEM_MODULE.wifi_status);
+                            snprintf(ssid_str, sizeof(ssid_str), "%s", WIFI_MODULE.ssid);
+                            snprintf(wifi_status_str, sizeof(wifi_status_str), "%s", WIFI_MODULE.wifi_status);
                             
                             int8_t current_rssi = -128; // no connection
-                            if (state->SYSTEM_MODULE.is_connected) {
+                            if (WIFI_MODULE.is_connected) {
                                 get_wifi_current_rssi(&current_rssi);
                             }
                             snprintf(rssi_str, sizeof(rssi_str), "%d", current_rssi);
                             
-                            snprintf(ip_str, sizeof(ip_str), "%s", state->SYSTEM_MODULE.ip_addr_str);
+                            snprintf(ip_str, sizeof(ip_str), "%s", WIFI_MODULE.ip_addr_str);
                             BAP_send_message_with_queue(BAP_CMD_RES, "wifi_ssid", ssid_str);
                             BAP_send_message_with_queue(BAP_CMD_RES, "wifi_rssi", rssi_str);
                             BAP_send_message_with_queue(BAP_CMD_RES, "wifi_ip", ip_str);
@@ -245,10 +244,9 @@ void BAP_send_subscription_update(GlobalState *state) {
 }
 
 static void subscription_update_task(void *pvParameters) {
-    GlobalState *state = (GlobalState *)pvParameters;
     
     while (1) {
-        BAP_send_subscription_update(state);
+        BAP_send_subscription_update();
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
     
@@ -256,19 +254,18 @@ static void subscription_update_task(void *pvParameters) {
 }
 
 static void mode_management_task(void *pvParameters) {
-    GlobalState *state = (GlobalState *)pvParameters;
     bool was_connected = false;
     bool subscription_task_started = false;
     
     ESP_LOGI(TAG, "BAP mode management task started");
     
     while (1) {
-        bool is_connected = state->SYSTEM_MODULE.is_connected;
+        bool is_connected = WIFI_MODULE.is_connected;
         
         // Check for mode transitions
         if (!was_connected && !is_connected) {
             // AP mode - send periodic AP messages
-            BAP_send_ap_message(state);
+            BAP_send_ap_message();
             vTaskDelay(pdMS_TO_TICKS(5000));
         } else if (!was_connected && is_connected) {
             // Transition from AP to connected mode
@@ -276,7 +273,7 @@ static void mode_management_task(void *pvParameters) {
             
             // Start subscription task for connected mode
             if (!subscription_task_started) {
-                esp_err_t ret = BAP_start_subscription_task(state);
+                esp_err_t ret = BAP_start_subscription_task();
                 if (ret == ESP_OK) {
                     subscription_task_started = true;
                     ESP_LOGI(TAG, "Subscription task started for connected mode");
@@ -301,17 +298,14 @@ static void mode_management_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
-esp_err_t BAP_start_mode_management_task(GlobalState *state) {
-    if (!state) {
-        ESP_LOGE(TAG, "Invalid global state");
-        return ESP_ERR_INVALID_ARG;
-    }
+esp_err_t BAP_start_mode_management_task() {
+
     
     xTaskCreate(
         mode_management_task,
         "bap_mode_mgmt",
         4096,
-        state,
+        NULL,
         5,
         NULL
     );
@@ -320,17 +314,13 @@ esp_err_t BAP_start_mode_management_task(GlobalState *state) {
     return ESP_OK;
 }
 
-esp_err_t BAP_start_subscription_task(GlobalState *state) {
-    if (!state) {
-        ESP_LOGE(TAG, "Invalid global state");
-        return ESP_ERR_INVALID_ARG;
-    }
+esp_err_t BAP_start_subscription_task() {
     
     xTaskCreate(
         subscription_update_task,
         "subscription_up",
         4096,
-        state,
+        NULL,
         5,
         &subscription_task_handle
     );
