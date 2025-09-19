@@ -121,7 +121,7 @@
             <tr>
                 <td>
                     <a
-                       [ngClass]="'text-'+axe.swarmColor+'-500'"
+                       [ngStyle]="{color: axe.swarmColor}"
                        [href]="'http://'+axe.IP"
                        target="_blank"
                        [pTooltip]="axe.deviceModel || 'Other'"
@@ -181,7 +181,7 @@
 
     <div class="flex flex-wrap gap-2 mt-3 text-sm justify-content-center">
         <div *ngFor="let item of getFamilies" class="flex align-items-center gap-1">
-            <span [class]="'text-' + item.swarmColor + '-500'">●</span>
+            <span [ngStyle]="{color: item.swarmColor}">●</span>
             <span>{{ item.deviceModel || 'Other' }} ({{item.asicCount > 1 ? item.asicCount + 'x ' : ''}}{{item.ASICModel}})</span>
         </div>
     </div>
