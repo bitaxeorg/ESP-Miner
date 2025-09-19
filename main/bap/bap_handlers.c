@@ -227,10 +227,10 @@ void BAP_send_request(bap_parameter_t param) {
             BAP_send_message(BAP_CMD_RES, "deviceModel", DEVICE_CONFIG.family.name);
             BAP_send_message(BAP_CMD_RES, "asicModel", DEVICE_CONFIG.family.asic.name);
             char port_str[6];
-            snprintf(port_str, sizeof(port_str),"%u", POOL_MODULE.pool_port);
-            BAP_send_message(BAP_CMD_RES, "pool", POOL_MODULE.pool_url);
+            snprintf(port_str, sizeof(port_str),"%u", POOL_MODULE.pools[POOL_MODULE.active_pool_idx].port);
+            BAP_send_message(BAP_CMD_RES, "pool", POOL_MODULE.pools[POOL_MODULE.active_pool_idx].url);
             BAP_send_message(BAP_CMD_RES, "poolPort", port_str);
-            BAP_send_message(BAP_CMD_RES, "poolUser", POOL_MODULE.pool_user);
+            BAP_send_message(BAP_CMD_RES, "poolUser", POOL_MODULE.pools[POOL_MODULE.active_pool_idx].user);
             break;
             
         default:
