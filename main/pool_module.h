@@ -1,49 +1,40 @@
 #ifndef POOL_MODULE_H_
 #define POOL_MODULE_H_
 
+#include <stdint.h>
+#define STRATUM_POOL_CAPACITY 2
 typedef struct
 {
-    // The URL of the main mining pool.
-    char * pool_url;
+    // The URL of the mining pool.
+    char * url;
+    // The port number on which the mining pool operates.
+    uint16_t port;
+    // The username for authenticating with the mining pool.
+    char * user;
+    // The password for authenticating with the mining pool.
+    char * pass;
+    // The suggested difficulty level set on the mining pool.
+    uint16_t difficulty;
+     // A flag indicating whether the mining pool supports extranonce subscription.
+    bool extranonce_subscribe;
+} stratum_pool;
 
-    // The URL of the fallback mining pool in case the main one fails.
-    char * fallback_pool_url;
+typedef struct
+{
+    // The configured pools to connect to.
+    stratum_pool pools[STRATUM_POOL_CAPACITY];
+    
+    // The currently active pool.
+    uint8_t active_pool_idx;
 
-    // The port number on which the main mining pool operates.
-    uint16_t pool_port;
-
-    // The port number on which the fallback mining pool operates.
-    uint16_t fallback_pool_port;
-
-    // The username for authenticating with the main mining pool.
-    char * pool_user;
-
-    // The username for authenticating with the fallback mining pool.
-    char * fallback_pool_user;
-
-    // The password for authenticating with the main mining pool.
-    char * pool_pass;
-
-    // The password for authenticating with the fallback mining pool.
-    char * fallback_pool_pass;
-
-    // The difficulty level set on the main mining pool.
+    // The difficulty level set on the active mining pool.
     uint16_t pool_difficulty;
-
-    // The difficulty level set on the fallback mining pool.
-    uint16_t fallback_pool_difficulty;
-
-    // A flag indicating whether the main mining pool supports extranonce subscription.
-    bool pool_extranonce_subscribe;
-
-    // A flag indicating whether the fallback mining pool supports extranonce subscription.
-    bool fallback_pool_extranonce_subscribe;
 
     // The average response time of the main mining pool to requests.
     double response_time;
 
     // A flag indicating if the system is currently using the fallback pool instead of the main one.
-    bool is_using_fallback;
+    uint8_t default_pool_idx;
 }PoolModule;
 
 extern PoolModule POOL_MODULE;

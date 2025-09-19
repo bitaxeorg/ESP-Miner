@@ -95,7 +95,7 @@ void stratum_close_connection()
 
 int stratum_submit_share(char * jobid, char * extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version)
 {
-    char * user = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
+    char * user = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].user;
     int ret = STRATUM_V1_submit_share(
         sock,
         send_uid++,
@@ -129,7 +129,7 @@ void stratum_primary_heartbeat()
 
     while (1)
     {
-        if (POOL_MODULE.is_using_fallback == false) {
+        if (POOL_MODULE.active_pool_idx == POOL_MODULE.default_pool_idx) {
             vTaskDelay(10000 / portTICK_PERIOD_MS);
             continue;
         }
@@ -178,7 +178,7 @@ void stratum_primary_heartbeat()
 
         int send_uid = 1;
         STRATUM_V1_subscribe(sock, send_uid++, DEVICE_CONFIG.family.asic.name);
-        STRATUM_V1_authorize(sock, send_uid++, POOL_MODULE.pool_user, POOL_MODULE.pool_pass);
+        STRATUM_V1_authorize(sock, send_uid++, POOL_MODULE.pools[POOL_MODULE.active_pool_idx].user, POOL_MODULE.pools[POOL_MODULE.active_pool_idx].pass);
 
         char recv_buffer[BUFFER_SIZE];
         memset(recv_buffer, 0, BUFFER_SIZE);
@@ -194,7 +194,6 @@ void stratum_primary_heartbeat()
 
         if (strstr(recv_buffer, "mining.notify") != NULL) {
             ESP_LOGI(TAG, "Heartbeat successful and in fallback mode. Switching back to primary.");
-            POOL_MODULE.is_using_fallback = false;
             stratum_close_connection();
             continue;
         }
@@ -273,12 +272,12 @@ void decode_mining_notification(const mining_notify *mining_notification)
 void stratum_task(void * pvParameters)
 {
 
-    primary_stratum_url = POOL_MODULE.pool_url;
-    primary_stratum_port = POOL_MODULE.pool_port;
-    char * stratum_url = POOL_MODULE.pool_url;
-    uint16_t port = POOL_MODULE.pool_port;
-    bool extranonce_subscribe = POOL_MODULE.pool_extranonce_subscribe;
-    uint16_t difficulty = POOL_MODULE.pool_difficulty;
+    primary_stratum_url = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].url;
+    primary_stratum_port = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].port;
+    char * stratum_url = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].url;
+    uint16_t port = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].port;
+    bool extranonce_subscribe = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].extranonce_subscribe;
+    uint16_t difficulty = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].difficulty;
 
     STRATUM_V1_initialize_buffer();
     char host_ip[20];
@@ -299,14 +298,13 @@ void stratum_task(void * pvParameters)
 
         if (retry_attempts >= MAX_RETRY_ATTEMPTS)
         {
-            if (POOL_MODULE.fallback_pool_url == NULL || POOL_MODULE.fallback_pool_url[0] == '\0') {
+            POOL_MODULE.active_pool_idx = POOL_MODULE.active_pool_idx+1 % STRATUM_POOL_CAPACITY;
+            if (POOL_MODULE.pools[POOL_MODULE.active_pool_idx].url == NULL || POOL_MODULE.pools[POOL_MODULE.active_pool_idx].url[0] == '\0') {
                 ESP_LOGI(TAG, "Unable to switch to fallback. No url configured. (retries: %d)...", retry_attempts);
-                POOL_MODULE.is_using_fallback = false;
                 retry_attempts = 0;
                 continue;
             }
 
-            POOL_MODULE.is_using_fallback = !POOL_MODULE.is_using_fallback;
             
             // Reset share stats at failover
             for (int i = 0; i < SYSTEM_MODULE.rejected_reason_stats_count; i++) {
@@ -322,10 +320,10 @@ void stratum_task(void * pvParameters)
             retry_attempts = 0;
         }
 
-        stratum_url = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_url : POOL_MODULE.pool_url;
-        port = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_port : POOL_MODULE.pool_port;
-        extranonce_subscribe = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_extranonce_subscribe : POOL_MODULE.pool_extranonce_subscribe;
-        difficulty = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_difficulty : POOL_MODULE.pool_difficulty;
+        stratum_url = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].url;
+        port = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].port;
+        extranonce_subscribe = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].extranonce_subscribe;
+        difficulty = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].difficulty;
 
         struct hostent *dns_addr = gethostbyname(stratum_url);
         if (dns_addr == NULL) {
@@ -387,8 +385,8 @@ void stratum_task(void * pvParameters)
         // mining.subscribe - ID: 2
         STRATUM_V1_subscribe(sock, send_uid++, DEVICE_CONFIG.family.asic.name);
 
-        char * username = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_user : POOL_MODULE.pool_user;
-        char * password = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_pass : POOL_MODULE.pool_pass;
+        char * username = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].user;
+        char * password = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].pass;
 
         int authorize_message_id = send_uid++;
         //mining.authorize - ID: 3

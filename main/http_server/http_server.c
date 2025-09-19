@@ -659,7 +659,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "bestSessionDiff", SYSTEM_MODULE.best_session_diff_string);
     cJSON_AddNumberToObject(root, "poolDifficulty", POOL_MODULE.pool_difficulty);
 
-    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", POOL_MODULE.is_using_fallback);
+    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", POOL_MODULE.active_pool_idx != POOL_MODULE.default_pool_idx);
 
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", STATE_MODULE.psram_is_available);
 

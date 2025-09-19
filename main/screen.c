@@ -431,7 +431,7 @@ static void screen_update_cb(lv_timer_t * timer)
 
     current_screen_time_ms += SCREEN_UPDATE_MS;
 
-    char * pool_url = POOL_MODULE.is_using_fallback ? POOL_MODULE.fallback_pool_url : POOL_MODULE.pool_url;
+    char * pool_url = POOL_MODULE.pools[POOL_MODULE.active_pool_idx].url;
     if (strcmp(lv_label_get_text(urls_mining_url_label), pool_url) != 0) {
         lv_label_set_text(urls_mining_url_label, pool_url);
     }
