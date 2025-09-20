@@ -28,6 +28,7 @@ export class AppMenuComponent implements OnInit {
                 label: 'Menu',
                 items: [
                     { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/'] },
+                    { label: 'Scoreboard', icon: 'pi pi-fw pi-trophy', routerLink: ['scoreboard'] },
                     { label: 'Swarm', icon: 'pi pi-fw pi-sitemap', routerLink: ['swarm'] },
                     { label: 'Logs', icon: 'pi pi-fw pi-list', routerLink: ['logs'] },
                     { label: 'System', icon: 'pi pi-fw pi-wave-pulse', routerLink: ['system'] },

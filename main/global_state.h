@@ -12,6 +12,7 @@
 #include "work_queue.h"
 #include "device_config.h"
 #include "display.h"
+#include "scoreboard.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
@@ -72,6 +73,7 @@ typedef struct
     char firmware_update_filename[20];
     char firmware_update_status[20];
     char * asic_status;
+    Scoreboard scoreboard;
 } SystemModule;
 
 typedef struct

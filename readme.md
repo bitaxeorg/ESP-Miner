@@ -51,6 +51,7 @@ Available API endpoints:
 * `/api/system/asic` Get ASIC settings information
 * `/api/system/statistics` Get system statistics (data logging should be activated)
 * `/api/system/statistics/dashboard` Get system statistics for dashboard
+* `/api/system/scoreboard` Get top 20 highest difficulty shares
 * `/api/system/wifi/scan` Scan for available Wi-Fi networks
 
 **POST**

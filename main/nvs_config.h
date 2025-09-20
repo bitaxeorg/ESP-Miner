@@ -40,6 +40,7 @@
 #define NVS_CONFIG_OVERCLOCK_ENABLED "oc_enabled"
 #define NVS_CONFIG_SWARM "swarmconfig"
 #define NVS_CONFIG_STATISTICS_FREQUENCY "statsFrequency"
+#define NVS_CONFIG_SCOREBOARD_PREFIX "scoreboard_"
 
 // Theme configuration
 #define NVS_CONFIG_THEME_SCHEME "themescheme"

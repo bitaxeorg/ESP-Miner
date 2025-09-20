@@ -43,7 +43,7 @@
             },
             {
                 label: 'Total Hashrate',
-                value: totals.hashRate * 1000000000 | hashSuffix
+                value: (totals.hashRate * 1000000000 | suffix) + 'H/s'
             },
             {
                 label: 'Total Power',
@@ -128,7 +128,7 @@
                        tooltipPosition="top">{{axe.IP}}</a>
                 </td>
                 <td>{{axe.hostname}}</td>
-                <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
+                <td>{{axe.hashRate * 1000000000 | suffix}}H/s</td>
                 <td>
                     <div class="w-min cursor-pointer"
                          pTooltip="Shares Accepted"
