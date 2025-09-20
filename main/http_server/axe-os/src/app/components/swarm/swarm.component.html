@@ -32,9 +32,9 @@
                             { label: 'Pool Diff', name: 'poolDifficulty' },
                             { label: 'Version', name: 'version' },
                         ]" class="text-500 font-medium">
-                            <div class="flex align-items-center cursor-pointer select-none" (click)="sortBy(field.name)">
-                                <span>{{field.label}}</span>
-                                <i class="pi text-xs ml-2" [ngClass]="{
+                            <div class="flex align-items-center cursor-pointer select-none relative" (click)="sortBy(field.name)">
+                                <span class="pr-3">{{field.label}}</span>
+                                <i class="pi text-xs absolute right-0" [ngClass]="{
                                     'pi-sort-up-fill': sortField === field.name && sortDirection === 'asc',
                                     'pi-sort-down-fill': sortField === field.name && sortDirection === 'desc'
                                 }"></i>
