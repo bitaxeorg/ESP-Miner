@@ -214,6 +214,26 @@ static uint32_t extract_origin_ip_addr(char *origin)
     return origin_ip_addr;
 }
 
+// Helper function to normalize hostname by stripping ".local" suffix if present
+// This prevents Avahi from creating duplicate ".local.local" hostnames
+static void normalize_hostname(char *hostname, size_t max_len) {
+    if (hostname == NULL || strlen(hostname) == 0) {
+        return;
+    }
+
+    size_t len = strlen(hostname);
+    const char *suffix = ".local";
+    size_t suffix_len = strlen(suffix);
+
+    // Check if hostname ends with ".local" (case-insensitive)
+    if (len > suffix_len &&
+        strcasecmp(hostname + len - suffix_len, suffix) == 0) {
+        // Strip the ".local" suffix
+        hostname[len - suffix_len] = '\0';
+        ESP_LOGD(TAG, "Normalized hostname from '%s.local' to '%s'", hostname, hostname);
+    }
+}
+
 esp_err_t is_network_allowed(httpd_req_t * req)
 {
     if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
@@ -251,7 +271,35 @@ esp_err_t is_network_allowed(httpd_req_t * req)
     }
 
     if (ip_in_private_range(origin_ip_addr) == ESP_OK && ip_in_private_range(request_ip_addr) == ESP_OK) {
+        ESP_LOGD(CORS_TAG, "Origin and IP both in private range. Allowing.");
         return ESP_OK;
+    }
+
+    // Check if Origin header matches the avahi hostname    
+    if (httpd_req_get_hdr_value_len(req, "Origin") > 0) {
+        httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin));
+        ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
+        char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
+        ESP_LOGD(CORS_TAG, "Configured hostname: %s", hostname);
+        char expected[256];
+        snprintf(expected, sizeof(expected), "http://%s.local", hostname);
+        ESP_LOGD(CORS_TAG, "Expected origin with .local: %s", expected);
+        if (strcmp(origin, expected) == 0) {
+            free(hostname);
+            ESP_LOGD(CORS_TAG, "Request from avahi hostname - allowing access");
+            return ESP_OK;
+        }
+        // Also check without .local suffix
+        snprintf(expected, sizeof(expected), "http://%s", hostname);
+        ESP_LOGD(CORS_TAG, "Expected origin without .local: %s", expected);
+        if (strcmp(origin, expected) == 0) {
+            free(hostname);
+            ESP_LOGD(CORS_TAG, "Request from hostname - allowing access");
+            return ESP_OK;
+        }
+        free(hostname);
+    } else {
+        ESP_LOGD(CORS_TAG, "No Origin header found");
     }
 
     ESP_LOGI(CORS_TAG, "Client is NOT in the private ip ranges or same range as server.");
@@ -576,7 +624,20 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         nvs_config_set_string(NVS_CONFIG_WIFI_PASS, item->valuestring);
     }
     if (cJSON_IsString(item = cJSON_GetObjectItem(root, "hostname"))) {
-        nvs_config_set_string(NVS_CONFIG_HOSTNAME, item->valuestring);
+        // Create a copy of the hostname for normalization
+        char normalized_hostname[64];
+        strlcpy(normalized_hostname, item->valuestring, sizeof(normalized_hostname));
+
+        // Normalize hostname by stripping ".local" suffix if present
+        normalize_hostname(normalized_hostname, sizeof(normalized_hostname));
+
+        // Store the normalized hostname in NVS
+        nvs_config_set_string(NVS_CONFIG_HOSTNAME, normalized_hostname);
+
+        // Update mDNS hostname dynamically with normalized hostname
+        update_mdns_hostname(normalized_hostname);
+
+        ESP_LOGI(TAG, "Updated hostname to: %s", normalized_hostname);
     }
     if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
         nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
