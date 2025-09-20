@@ -47,6 +47,7 @@ export interface ISystemInfo {
     poolDifficulty: number,
     responseTime: number,
     isUsingFallbackStratum: boolean,
+    isPSRAMAvailable: boolean,
     frequency: number,
     version: string,
     axeOSVersion: string,

@@ -90,7 +90,7 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Wi-Fi Status', value: data.info.wifiStatus },
       { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + 'dBm', class: 'pb-3', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) },
       { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3' },
-      { label: 'Free Heap Memory', value: data.info.freeHeap.toString(), class: 'pb-3' },
+      { label: 'Free Heap Memory', value: data.info.freeHeap.toString(), class: 'pb-3', valueClass: data.info.isPSRAMAvailable ? '' : 'text-red-500', tooltip: data.info.isPSRAMAvailable ? '' : 'No PSRAM available or misconfigured, running in low memory mode. Disabled statistics and BAP port.' },
       { label: 'Firmware Version', value: data.info.version },
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
       { label: 'ESP-IDF Version', value: data.info.idfVersion },
