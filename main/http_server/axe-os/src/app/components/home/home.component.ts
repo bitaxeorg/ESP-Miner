@@ -148,11 +148,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.titleSubscription?.
-          
-          
-          
-          scribe();
+          this.titleSubscription?.unsubscribe();
           this.clearDataPoints();
           this.loadPreviousData();
         },
