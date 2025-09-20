@@ -22,6 +22,10 @@
         text="Firmware ({{info.version}}) and AxeOS ({{info.axeOSVersion}}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.">
     </p-message>
 
+    <p-message *ngIf="info.blockFound" severity="success" styleClass="w-full mb-4 py-4 border-round-xl"
+        text="Today is your lucky day! Your device has found a block 🎉">
+    </p-message>
+
     <div class="grid">
         <div class="col-12 md:col-6 xl:col-3">
             <div class="card mb-0">
@@ -375,4 +379,6 @@
             </div>
         </div>
     </div>
+
+    <app-confetti *ngIf="info.blockFound"></app-confetti>
 </ng-container>

@@ -53,7 +53,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->best_session_nonce_diff = 0;
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
-    module->FOUND_BLOCK = false;
+    module->block_found = false;
     
     // set the pool url
     module->pool_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
@@ -236,7 +236,7 @@ static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_
 
     double network_diff = networkDifficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
     if (diff > network_diff) {
-        module->FOUND_BLOCK = true;
+        module->block_found = true;
         ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
     }
 
