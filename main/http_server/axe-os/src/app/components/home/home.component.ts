@@ -14,10 +14,13 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
+import { SelectItem } from 'primeng/api';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { LocalStorageService } from 'src/app/local-storage.service';
+
+type PoolLabel = 'Primary' | 'Fallback';
 
 @Component({
   selector: 'app-home',
@@ -28,6 +31,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
+  public pools$!: Observable<SelectItem<PoolLabel>[]>;
 
   public chartOptions: any;
   public dataLabel: number[] = [];
@@ -47,7 +51,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolURL!: string;
   public activePoolPort!: number;
   public activePoolUser!: string;
-  public activePoolLabel!: 'Primary' | 'Fallback';
+  public activePoolLabel!: PoolLabel;
   public responseTime!: number;
 
   @ViewChild('chart')
@@ -418,6 +422,19 @@ export class HomeComponent implements OnInit, OnDestroy {
       })
     );
 
+    this.pools$ = this.info$
+      .pipe(map(info => {
+        const result: SelectItem<PoolLabel>[] = [];
+        if (info.stratumURL) {
+          result.push({ label: 'Primary', value: 'Primary' });
+        }
+        if (info.fallbackStratumURL) {
+          result.push({ label: 'Fallback', value: 'Fallback' });
+        }
+        return result;
+      })
+    );
+
     this.titleSubscription = this.info$
       .pipe(takeUntil(this.destroy$))
       .subscribe(info => {
@@ -433,6 +450,29 @@ export class HomeComponent implements OnInit, OnDestroy {
         );
       });
   }
+
+  onPoolChange(event: { originalEvent: Event; value: PoolLabel }) {
+    const useFallbackStratum = Number(event.value === 'Fallback');
+
+    this.systemService.updateSystem('', { useFallbackStratum })
+      .pipe(
+        this.loadingService.lockUIUntilComplete(),
+        switchMap(() =>
+          this.systemService.restart().pipe(
+            this.loadingService.lockUIUntilComplete()
+          )
+        )
+      )
+      .subscribe({
+        next: () => {
+          this.toastr.success('Pool changed and device restarted');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error(`Error during pool change or device restart: ${err.message}`);
+        }
+      });
+  }
+
 
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
