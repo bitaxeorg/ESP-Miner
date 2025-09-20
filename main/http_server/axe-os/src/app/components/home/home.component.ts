@@ -10,7 +10,6 @@ import { ShareRejectionExplanationService } from 'src/app/services/share-rejecti
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
-import { ToastrService } from 'ngx-toastr';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
@@ -71,7 +70,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
     private titleService: Title,
-    private toastr: ToastrService,
     private loadingService: LoadingService,
     private toastr: ToastrService,
     private shareRejectReasonsService: ShareRejectionExplanationService,
