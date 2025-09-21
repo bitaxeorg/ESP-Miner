@@ -104,7 +104,7 @@ export class AppLayoutComponent implements OnDestroy {
             'layout-mobile-active': this.layoutService.state.staticMenuMobileActive,
             'p-input-filled': this.layoutService.config().inputStyle === 'filled',
             'p-ripple-disabled': !this.layoutService.config().ripple,
-            'sensitive-content-hidden': this.sensitiveDataHidden,
+            'sensitive-data-hidden': this.sensitiveDataHidden,
         }
     }
 
