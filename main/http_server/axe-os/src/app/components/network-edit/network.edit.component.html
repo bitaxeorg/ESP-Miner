@@ -1,13 +1,13 @@
 <form *ngIf="form" [formGroup]="form">
     <div class="card">
         <div class="field grid p-fluid">
-            <label htmlFor="hostname" class="col-12 md:col-2 md:m-0">Hostname</label>
+            <label for="hostname" class="col-12 md:col-2 md:m-0">Hostname</label>
             <div class="col-12 md:col-10">
                 <input pInputText id="hostname" type="text" formControlName="hostname" />
             </div>
         </div>
         <div class="field grid p-fluid">
-            <label htmlFor="ssid" class="col-12 md:col-2 md:m-0">Wi-Fi SSID</label>
+            <label for="ssid" class="col-12 md:col-2 md:m-0">Wi-Fi SSID</label>
             <div class="col-12 md:col-10 p-inputgroup">
                 <input pInputText id="ssid" type="text" formControlName="ssid" />
                 <p-button
@@ -20,7 +20,7 @@
             </div>
         </div>
         <div class="field grid p-fluid">
-            <label htmlFor="wifiPass" class="col-12 md:col-2 md:m-0">Wi-Fi Password</label>
+            <label for="wifiPass" class="col-12 md:col-2 md:m-0">Wi-Fi Password</label>
             <div class="col-12 md:col-10 p-input-icon-right">
                 <i *ngIf="form.get('wifiPass')?.dirty" class="pi cursor-pointer"
                     [ngClass]="{'pi-eye': !showWifiPassword, 'pi-eye-slash': showWifiPassword}"

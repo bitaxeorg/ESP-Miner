@@ -1,8 +1,8 @@
-import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { Component, ViewChild } from '@angular/core';
+import { Observable, switchMap, shareReplay, map, timer, distinctUntilChanged } from 'rxjs';
+import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
 import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
-import { map, Observable, shareReplay, startWith } from 'rxjs';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
@@ -42,7 +42,11 @@ export class UpdateComponent {
       return releases[0];
     }));
 
-    this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}))
+    this.info$ = timer(0, 5000).pipe(
+      switchMap(() => this.systemService.getInfo()),
+      distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr)),
+      shareReplay(1)
+    );
   }
 
   otaUpdate(event: FileUploadHandlerEvent) {

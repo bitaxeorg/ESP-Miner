@@ -149,7 +149,7 @@ float EMC2101_get_external_temp(void)
     return result;
 }
 
-uint8_t EMC2101_get_internal_temp(void)
+float EMC2101_get_internal_temp(void)
 {
     uint8_t temp = 0;
     esp_err_t err;
@@ -159,5 +159,5 @@ uint8_t EMC2101_get_internal_temp(void)
         ESP_LOGE(TAG, "Failed to read internal temperature: %s", esp_err_to_name(err));
         return 0;
     }
-    return temp;
+    return (float) temp;
 }

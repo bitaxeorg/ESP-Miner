@@ -43,31 +43,66 @@ The esp-miner UI is called AxeOS and provides an API to expose actions and infor
 
 For more details take a look at [`main/http_server/openapi.yaml`](./main/http_server/openapi.yaml).
 
-Things that can be done are:
+Available API endpoints:
   
-  - Get System Info
-  - Get System Statistics
-  - Update Swarm
-  - System Restart Action
-  - Update System Settings Action
-  - System Options
-  - Update OTA Firmware
-  - Update OTA WWW
-  - Logs over WebSocket
+**GET**
 
-Some API examples in curl:
-  ```bash
-  # Get system information
-  curl http://YOUR-BITAXE-IP/api/system/info
-  ```
-  ```bash
-  # Get system statistics
-  curl http://YOUR-BITAXE-IP/api/system/statistics
-  ```
-  ```bash
-  # System restart action
-  curl -X POST http://YOUR-BITAXE-IP/api/system/restart
-  ```
+* `/api/system/info` Get system information
+* `/api/system/asic` Get ASIC settings information
+* `/api/system/statistics` Get system statistics (data logging should be activated)
+* `/api/system/statistics/dashboard` Get system statistics for dashboard
+* `/api/system/wifi/scan` Scan for available Wi-Fi networks
+
+**POST**
+
+* `/api/system/restart` Restart the system
+* `/api/system/OTA` Update system firmware
+* `/api/system/OTAWWW` Update AxeOS
+
+**PATCH**
+
+* `/api/system` Update system settings
+
+### API examples in `curl`:
+
+```bash
+# Get system information
+curl http://YOUR-BITAXE-IP/api/system/info
+
+# Get ASIC settings information
+curl http://YOUR-BITAXE-IP/api/system/asic
+
+# Get system statistics
+curl http://YOUR-BITAXE-IP/api/system/statistics
+
+# Get dashboard statistics
+curl http://YOUR-BITAXE-IP/api/system/statistics/dashboard
+
+# Get available Wi-Fi networks
+curl http://YOUR-BITAXE-IP/api/system/wifi/scan
+
+
+# Restart the system
+curl -X POST http://YOUR-BITAXE-IP/api/system/restart
+
+# Update system firmware
+curl -X POST \
+     -H "Content-Type: application/octet-stream" \
+     --data-binary "@esp-miner.bin" \
+     http://YOUR-BITAXE-IP/api/system/OTA
+
+# Update AxeOS
+curl -X POST \
+     -H "Content-Type: application/octet-stream" \
+     --data-binary "@www.bin" \
+     http://YOUR-BITAXE-IP/api/system/OTAWWW
+
+
+# Update system settings
+curl -X PATCH http://YOUR-BITAXE-IP/api/system \
+     -H "Content-Type: application/json" \
+     -d '{"fanspeed": "desired_speed_value"}'
+```
 
 ## Administration
 
@@ -112,7 +147,9 @@ where xxx is the config file for your hardware version. You can see the list of 
 
 A custom board version is also possible with `config-custom.cvs`. A custom board needs to be based on an existing `devicemodel` and `asicmodel`.
 
-Note: if you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
+**Notes:** 
+  - If you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
+  - Some Bitaxe versions can't directly connect to a USB-C port. If yours is affected use a USB-A adapter as a workaround. More about it [here](https://github.com/bitaxeorg/bitaxeGamma/issues/37).
 
 ## Attributions
 

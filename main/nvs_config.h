@@ -20,7 +20,8 @@
 #define NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE "stratumfbxnsub"
 #define NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY "fbstratumdiff"
 #define NVS_CONFIG_FALLBACK_STRATUM_PASS "fbstratumpass"
-#define NVS_CONFIG_ASIC_FREQ "asicfrequency"
+#define NVS_CONFIG_ASIC_FREQUENCY "asicfrequency"
+#define NVS_CONFIG_ASIC_FREQUENCY_FLOAT "asicfrequency_f"
 #define NVS_CONFIG_ASIC_VOLTAGE "asicvoltage"
 #define NVS_CONFIG_ASIC_MODEL "asicmodel"
 #define NVS_CONFIG_DEVICE_MODEL "devicemodel"
@@ -66,6 +67,8 @@ int32_t nvs_config_get_i32(const char * key, const int32_t default_value);
 void nvs_config_set_i32(const char * key, const int32_t value);
 uint64_t nvs_config_get_u64(const char * key, const uint64_t default_value);
 void nvs_config_set_u64(const char * key, const uint64_t value);
+float nvs_config_get_float(const char *key, float default_value);
+void nvs_config_set_float(const char *key, float value);
 void nvs_config_commit(void);
 
 #endif // MAIN_NVS_CONFIG_H

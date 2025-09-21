@@ -22,10 +22,6 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
 
   @ViewChild('menubutton') menuButton!: ElementRef;
 
-  @ViewChild('topbarmenubutton') topbarMenuButton!: ElementRef;
-
-  @ViewChild('topbarmenu') menu!: ElementRef;
-
   constructor(
     public layoutService: LayoutService,
     private systemService: SystemService,

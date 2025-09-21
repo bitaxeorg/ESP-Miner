@@ -34,24 +34,40 @@
                             [type]="showPassword[pool] ? 'text' : 'password'" />
                     </div>
                 </div>
-                <div class="field grid p-fluid">
-                    <label [htmlFor]="pool + 'SuggestedDifficulty'" class="col-12 md:col-2 md:mb-0">Suggested Difficulty</label>
-                    <div class="col-12 md:col-10">
-                        <input pInputText [id]="pool + 'SuggestedDifficulty'" [formControlName]="pool + 'SuggestedDifficulty'" type="number" />
+
+                <fieldset class="m-0 p-0 mt-4 border-200 border-bottom-none border-left-none border-right-none">
+                    <legend class="p-0 pr-3">
+                        <label class="cursor-pointer">
+                            <input type="checkbox" hidden (click)="showAdvancedOptions[pool] = !showAdvancedOptions[pool]">
+                            <i class="pi pi-angle-{{showAdvancedOptions[pool] ? 'down' : 'right'}} text-sm -ml-1 mr-1"></i>
+                            {{showAdvancedOptions[pool] ? 'Hide' : 'Show'}} Advanced Options
+                        </label>
+                    </legend>
+
+                    <div *ngIf="showAdvancedOptions[pool]" class="field grid p-fluid mt-4">
+                        <label [htmlFor]="pool + 'SuggestedDifficulty'" class="col-12 md:col-2 md:mb-0">
+                            Suggested <span class="white-space-nowrap">
+                                Difficulty
+                                <i class="pi pi-info-circle text-xs px-1" pTooltip="Used to indicate a preference for share difficulty to the pool. Servers are not required to honour this request, even if they support the stratum method."></i>
+                            </span>
+                        </label>
+                        <div class="col-12 md:col-10">
+                            <input pInputText [id]="pool + 'SuggestedDifficulty'" [formControlName]="pool + 'SuggestedDifficulty'" type="number" />
+                        </div>
                     </div>
-                </div>
-                <div class="field-checkbox grid mb-0">
-                    <div class="col-1 md:col-10 md:flex-order-2">
-                        <p-checkbox [name]="pool + 'ExtranonceSubscribe'" [inputId]="pool + 'ExtranonceSubscribe'" [formControlName]="pool + 'ExtranonceSubscribe'"
-                            [binary]="true"></p-checkbox>
+                    <div *ngIf="showAdvancedOptions[pool]" class="field-checkbox grid mb-0">
+                        <div class="col-1 md:col-10 md:flex-order-2">
+                            <p-checkbox [name]="pool + 'ExtranonceSubscribe'" [inputId]="pool + 'ExtranonceSubscribe'" [formControlName]="pool + 'ExtranonceSubscribe'"
+                                [binary]="true"></p-checkbox>
+                        </div>
+                        <label [htmlFor]="pool + 'ExtranonceSubscribe'" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">
+                            Enable Extranonce <span class="white-space-nowrap">
+                                Subscribe
+                                <i class="pi pi-info-circle text-xs px-1" pTooltip="Indicates to the server that the client supports the mining.set_extranonce method. Required by some pools, check the pool documentation."></i>
+                            </span>
+                        </label>
                     </div>
-                    <label [htmlFor]="pool + 'ExtranonceSubscribe'" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">
-                        Enable Extranonce <span class="white-space-nowrap">
-                            Subscribe
-                            <i class="pi pi-info-circle text-xs px-1" pTooltip="Required by some pools, check the pool documentation."></i>
-                        </span>
-                    </label>
-                </div>
+                </fieldset>
             </div>
         </ng-container>
 

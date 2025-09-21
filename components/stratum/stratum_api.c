@@ -17,6 +17,7 @@
 #include <stdbool.h>
 
 #define BUFFER_SIZE 1024
+#define MAX_EXTRANONCE_2_LEN 32
 static const char * TAG = "stratum_api";
 
 static char * json_rpc_buffer = NULL;
@@ -243,7 +244,13 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 message->response_success = false;
                 goto done;
             }
-            message->extranonce_2_len = extranonce2_len_json->valueint;
+            int extranonce_2_len = extranonce2_len_json->valueint;
+            if (extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
+                ESP_LOGW(TAG, "Extranonce_2_len %d exceeds maximum %d, clamping to maximum", 
+                         extranonce_2_len, MAX_EXTRANONCE_2_LEN);
+                extranonce_2_len = MAX_EXTRANONCE_2_LEN;
+            }
+            message->extranonce_2_len = extranonce_2_len;
 
             cJSON * extranonce_json = cJSON_GetArrayItem(result_json, 1);
             if (extranonce_json == NULL) {
@@ -313,6 +320,11 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         cJSON * params = cJSON_GetObjectItem(json, "params");
         char * extranonce_str = cJSON_GetArrayItem(params, 0)->valuestring;
         uint32_t extranonce_2_len = cJSON_GetArrayItem(params, 1)->valueint;
+        if (extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
+            ESP_LOGW(TAG, "Extranonce_2_len %u exceeds maximum %d, clamping to maximum", 
+                     extranonce_2_len, MAX_EXTRANONCE_2_LEN);
+            extranonce_2_len = MAX_EXTRANONCE_2_LEN;
+        }
         message->extranonce_str = strdup(extranonce_str);
         message->extranonce_2_len = extranonce_2_len;
     }
