@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include "esp_log.h"
 #include "esp_timer.h"
+#include <esp_heap_caps.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "statistics_task.h"
@@ -11,18 +12,17 @@
 #include "connect.h"
 #include "vcore.h"
 #include "bm1370.h"
-#include <esp_heap_caps.h>
 
 #define DEFAULT_POLL_RATE 5000
 
 static const char * TAG = "statistics_task";
 
+static StatisticsNodePtr statisticsBuffer = NULL;
 static StatisticsNodePtr statisticsDataStart = NULL;
 static StatisticsNodePtr statisticsDataEnd = NULL;
 static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 
 static const uint16_t maxDataCount = 720;
-static uint16_t currentDataCount;
 static uint16_t statsFrequency;
 
 StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
@@ -31,44 +31,35 @@ StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
         return NULL;
     }
 
-    StatisticsNodePtr newData = NULL;
-
-    // create new data block or reuse first data block
-    if (currentDataCount < maxDataCount) {
-        newData = (StatisticsNodePtr)heap_caps_malloc(sizeof(struct StatisticsData), MALLOC_CAP_SPIRAM);
-        currentDataCount++;
-    } else {
-        newData = statisticsDataStart;
+    if (NULL == statisticsBuffer) {
+        createStatisticsBuffer();
     }
 
-    // set data
-    if (NULL != newData) {
+    if (NULL != statisticsBuffer) {
         pthread_mutex_lock(&statisticsDataLock);
 
-        if (NULL == statisticsDataStart) {
-            statisticsDataStart = newData; // set first new data block
-        } else {
-            if ((statisticsDataStart == newData) && (NULL != statisticsDataStart->next)) {
-                statisticsDataStart = statisticsDataStart->next; // move DataStart to next (first data block reused)
-            }
+        statisticsDataEnd = statisticsDataEnd->next;
+
+        if (statisticsDataStart == statisticsDataEnd) {
+            statisticsDataStart = statisticsDataStart->next;
+        } else if(NULL == statisticsDataStart) {
+            statisticsDataStart = statisticsDataEnd;
         }
 
-        *newData = *data;
-        newData->next = NULL;
-
-        if ((NULL != statisticsDataEnd) && (newData != statisticsDataEnd)) {
-            statisticsDataEnd->next = newData; // link data block
-        }
-        statisticsDataEnd = newData; // set DataEnd to new data
+        StatisticsNextNodePtr next = statisticsDataEnd->next;
+        *statisticsDataEnd = *data;
+        statisticsDataEnd->next = next;
 
         pthread_mutex_unlock(&statisticsDataLock);
     }
 
-    return newData;
+    return statisticsDataEnd;
 }
 
 StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr dataOut)
 {
+    StatisticsNextNodePtr nextNode = NULL;
+
     pthread_mutex_lock(&statisticsDataLock);
 
     if ((NULL == nodeIn) || (NULL == dataOut)) {
@@ -76,30 +67,51 @@ StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr 
         return NULL;
     }
 
-    StatisticsNextNodePtr nextNode = nodeIn->next;
+    if (nodeIn != statisticsDataEnd) {
+        nextNode = nodeIn->next;
+    }
+
     *dataOut = *nodeIn;
+    dataOut->next = nextNode;
 
     pthread_mutex_unlock(&statisticsDataLock);
 
     return nextNode;
 }
 
-void clearStatisticData()
+void createStatisticsBuffer()
 {
-    if (NULL != statisticsDataStart) {
+    removeStatisticsBuffer();
+
+    StatisticsNodePtr buffer = (StatisticsNodePtr)heap_caps_malloc(sizeof(struct StatisticsData) * maxDataCount, MALLOC_CAP_SPIRAM);
+    if (NULL != buffer) {
+        for (uint16_t i = 0; i < (maxDataCount - 1); i++) {
+            buffer[i].next = &buffer[i + 1];
+        }
+        buffer[maxDataCount - 1].next = &buffer[0];
+
         pthread_mutex_lock(&statisticsDataLock);
 
-        StatisticsNextNodePtr nextNode = statisticsDataStart;
+        statisticsBuffer = buffer;
+        statisticsDataStart = NULL;
+        statisticsDataEnd = &buffer[maxDataCount - 1];
 
-        while (NULL != nextNode) {
-            StatisticsNodePtr node = nextNode;
-            nextNode = node->next;
-            free(node);
-        }
+        pthread_mutex_unlock(&statisticsDataLock);
+    } else {
+        ESP_LOGW(TAG, "Not enough memory for the statistics data buffer!");
+    }
+}
 
+void removeStatisticsBuffer()
+{
+    if (NULL != statisticsBuffer) {
+        pthread_mutex_lock(&statisticsDataLock);
+
+        heap_caps_free(statisticsBuffer);
+
+        statisticsBuffer = NULL;
         statisticsDataStart = NULL;
         statisticsDataEnd = NULL;
-        currentDataCount = 0;
 
         pthread_mutex_unlock(&statisticsDataLock);
     }
@@ -152,7 +164,7 @@ void statistics_task(void * pvParameters)
                 addStatisticData(&statsData);
             }
         } else {
-            clearStatisticData();
+            removeStatisticsBuffer();
         }
 
         vTaskDelayUntil(&taskWakeTime, DEFAULT_POLL_RATE / portTICK_PERIOD_MS); // taskWakeTime is automatically updated

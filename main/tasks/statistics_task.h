@@ -31,7 +31,8 @@ typedef struct
 
 StatisticsNodePtr addStatisticData(StatisticsNodePtr data);
 StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr dataOut);
-void clearStatisticData();
+void createStatisticsBuffer();
+void removeStatisticsBuffer();
 
 void statistics_init(void * pvParameters);
 void statistics_task(void * pvParameters);
