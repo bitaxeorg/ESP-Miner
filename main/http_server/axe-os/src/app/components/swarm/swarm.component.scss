@@ -34,8 +34,15 @@ tbody tr {
 .button-text {
     min-width: 8rem;
 }
-::ng-deep .p-button.button-icon {
-    width: 2.2rem;
-    height: 2.2rem;
-    margin-top: 0.25rem;
+
+::ng-deep {
+    .p-button.button-icon {
+        width: 2.2rem;
+        height: 2.2rem;
+        margin-top: 0.25rem;
+    }
+    .p-button.button-icon-small {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
 }

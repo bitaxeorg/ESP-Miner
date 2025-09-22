@@ -9,6 +9,7 @@ import { ModalComponent } from '../modal/modal.component';
 const SWARM_DATA = 'SWARM_DATA';
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 const SWARM_SORTING = 'SWARM_SORTING';
+const SWARM_GRID_VIEW = 'SWARM_GRID_VIEW';
 
 type SwarmDevice = { IP: string; ASICModel: string; deviceModel: string; swarmColor: string; asicCount: number; [key: string]: any };
 
@@ -39,8 +40,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public refreshIntervalControl: FormControl;
 
-  public sortField: string = '';
-  public sortDirection: 'asc' | 'desc' = 'asc';
+  public gridView: boolean;
+  public selectedSort: { field: string; direction: 'asc' | 'desc' };
 
   constructor(
     private fb: FormBuilder,
@@ -53,6 +54,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
       manualAddIp: [null, [Validators.required, Validators.pattern('(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')]]
     });
 
+    this.gridView = this.localStorageService.getBool(SWARM_GRID_VIEW);
+
     const storedRefreshTime = this.localStorageService.getNumber(SWARM_REFRESH_TIME) ?? 30;
     this.refreshIntervalTime = storedRefreshTime;
     this.refreshTimeSet = storedRefreshTime;
@@ -64,12 +67,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
       this.localStorageService.setNumber(SWARM_REFRESH_TIME, value);
     });
 
-    const storedSorting = this.localStorageService.getObject(SWARM_SORTING) ?? {
-      sortField: 'IP',
-      sortDirection: 'asc'
+    this.selectedSort = this.localStorageService.getObject(SWARM_SORTING) ?? {
+      field: 'IP',
+      direction: 'asc'
     };
-    this.sortField = storedSorting.sortField;
-    this.sortDirection = storedSorting.sortDirection;
   }
 
   ngOnInit(): void {
@@ -250,20 +251,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
-  sortBy(field: string) {
-    // If clicking the same field, toggle direction
-    if (this.sortField === field) {
-      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-    } else {
-      // New field, set to ascending by default
-      this.sortField = field;
-      this.sortDirection = 'asc';
-    }
+  sortBy(field: string, direction: 'asc' | 'desc') {
+    this.selectedSort.field = field;
+    this.selectedSort.direction = direction;
 
-    this.localStorageService.setObject(SWARM_SORTING, {
-      sortField: this.sortField,
-      sortDirection: this.sortDirection
-    });
+    this.localStorageService.setObject(SWARM_SORTING, this.selectedSort);
 
     this.sortSwarm();
   }
@@ -271,12 +263,12 @@ export class SwarmComponent implements OnInit, OnDestroy {
   private sortSwarm() {
     this.swarm.sort((a, b) => {
       let comparison = 0;
-      const fieldType = typeof a[this.sortField];
+      const fieldType = typeof a[this.selectedSort.field];
 
-      if (this.sortField === 'IP') {
+      if (this.selectedSort.field === 'IP') {
         // Split IP into octets and compare numerically
-        const aOctets = a[this.sortField].split('.').map(Number);
-        const bOctets = b[this.sortField].split('.').map(Number);
+        const aOctets = a[this.selectedSort.field].split('.').map(Number);
+        const bOctets = b[this.selectedSort.field].split('.').map(Number);
         for (let i = 0; i < 4; i++) {
           if (aOctets[i] !== bOctets[i]) {
             comparison = aOctets[i] - bOctets[i];
@@ -284,11 +276,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
           }
         }
       } else if (fieldType === 'number') {
-        comparison = a[this.sortField] - b[this.sortField];
+        comparison = a[this.selectedSort.field] - b[this.selectedSort.field];
       } else if (fieldType === 'string') {
-        comparison = a[this.sortField].localeCompare(b[this.sortField], undefined, { numeric: true });
+        comparison = a[this.selectedSort.field].localeCompare(b[this.selectedSort.field], undefined, { numeric: true });
       }
-      return this.sortDirection === 'asc' ? comparison : -comparison;
+      return this.selectedSort.direction === 'asc' ? comparison : -comparison;
     });
   }
 
@@ -358,5 +350,34 @@ export class SwarmComponent implements OnInit, OnDestroy {
       case 'GammaTurbo': return 'cyan';
       default:           return 'gray';
     }
+  }
+
+  public changeView(event: any) {
+    this.localStorageService.setBool(SWARM_GRID_VIEW, event.checked);
+  }
+
+  get sortOptions() {
+    return [
+      { label: 'Hostname', value: { field: 'hostname', direction: 'desc' } },
+      { label: 'Hostname', value: { field: 'hostname', direction: 'asc' } },
+      { label: 'IP', value: { field: 'IP', direction: 'desc' } },
+      { label: 'IP', value: { field: 'IP', direction: 'asc' } },
+      { label: 'Hashrate', value: { field: 'hashRate', direction: 'desc' } },
+      { label: 'Hashrate', value: { field: 'hashRate', direction: 'asc' } },
+      { label: 'Shares', value: { field: 'sharesAccepted', direction: 'desc' } },
+      { label: 'Shares', value: { field: 'sharesAccepted', direction: 'asc' } },
+      { label: 'Best Diff', value: { field: 'bestDiff', direction: 'desc' } },
+      { label: 'Best Diff', value: { field: 'bestDiff', direction: 'asc' } },
+      { label: 'ASIC Temp', value: { field: 'temp', direction: 'desc' } },
+      { label: 'ASIC Temp', value: { field: 'temp', direction: 'asc' } },
+      { label: 'Power', value: { field: 'power', direction: 'desc' } },
+      { label: 'Power', value: { field: 'power', direction: 'asc' } },
+    ];
+  }
+
+  onSortChange(event: any) {
+    const {field, direction} = event.value;
+
+    this.sortBy(field, direction);
   }
 }

@@ -16,7 +16,119 @@
             </div>
         </div>
 
-        <div class="card mt-2 overflow-x-auto">
+        <div class="mt-2 mb-3 flex justify-content-between">
+            <div class="flex align-items-center">
+                <span [ngClass]="{'text-500': gridView}">List</span>
+                <p-inputSwitch [(ngModel)]="gridView" (onChange)="changeView($event)" class="flex mx-2" />
+                <span [ngClass]="{'text-500': !gridView}">Grid</span>
+            </div>
+            <div class="flex">
+                <ng-template #sortTemplate let-option>
+                    <span>{{option.label}}</span>
+                    <i class="pi pi-sort-{{option.value.direction === 'asc' ? 'up' : 'down'}}-fill text-xs ml-2"></i>
+                </ng-template>
+
+                <p-dropdown
+                    [options]="sortOptions"
+                    [(ngModel)]="selectedSort"
+                    (onChange)="onSortChange($event)"
+                    optionLabel="label"
+                    optionValue="value"
+                    styleClass="w-10rem p-dropdown--small">
+                >
+                    <ng-template let-option pTemplate="item">
+                        <ng-container *ngTemplateOutlet="sortTemplate; context: { $implicit: option }"></ng-container>
+                    </ng-template>
+
+                    <ng-template let-option pTemplate="selectedItem">
+                        <ng-container *ngTemplateOutlet="sortTemplate; context: { $implicit: option }"></ng-container>
+                    </ng-template>
+                </p-dropdown>
+            </div>
+        </div>
+
+        <div class="grid" *ngIf="gridView">
+            <div class="col-12 sm:col-6 xl:col-4" *ngFor="let axe of swarm">
+                <div class="card flex justify-content-between mb-0">
+                    <div class="flex flex-column justify-content-between">
+                        <div class="flex flex-column">
+                            <a [href]="'http://' + axe.IP" target="_blank" class="flex flex-column">
+                                <span [ngStyle]="{color: axe.swarmColor}" pTooltip="Hostname" tooltipPosition="top">
+                                    {{axe.hostname}}
+                                </span>
+                                <span class="text-900" pTooltip="IP" tooltipPosition="top">
+                                    {{axe.IP}}
+                                </span>
+                            </a>
+                            <span class="text-500 cursor-pointer" pTooltip="Version" tooltipPosition="top">
+                                {{axe.version}}
+                            </span>
+                        </div>
+                        <div class="mb-1">
+                            <p-button
+                                icon="pi pi-pencil text-sm flex align-items-center justify-content-center"
+                                pp-button
+                                pTooltip="Edit"
+                                tooltipPosition="top"
+                                severity="secondary"
+                                styleClass="button-icon-small"
+                                (click)="edit(axe)" />
+                            <p-button
+                                icon="pi pi-refresh text-sm flex align-items-center justify-content-center"
+                                pp-button
+                                pTooltip="Restart"
+                                tooltipPosition="top"
+                                severity="secondary"
+                                styleClass="button-icon-small"
+                                class="mx-2"
+                                (click)="restart(axe)" />
+                            <p-button
+                                icon="pi pi-trash text-sm flex align-items-center justify-content-center"
+                                pp-button
+                                pTooltip="Remove"
+                                tooltipPosition="top"
+                                severity="secondary"
+                                styleClass="button-icon-small"
+                                (click)="remove(axe)" />
+                        </div>
+                    </div>
+                    <div class="flex flex-column text-right white-space-nowrap cursor-pointer">
+                        <span pTooltip="Hashrate" tooltipPosition="top">
+                            {{axe.hashRate * 1000000000 | hashSuffix}}
+                        </span>
+                        <div>
+                            <span class="text-500 cursor-pointer mr-2" pTooltip="Shares Rejected" tooltipPosition="top">
+                                {{axe.sharesRejected | number: '1.0-0'}}
+                            </span>
+                            <span class="cursor-pointer" pTooltip="Shares Accepted" tooltipPosition="top">
+                                {{axe.sharesAccepted | number: '1.0-0'}}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-500 cursor-pointer mr-2" pTooltip="Best Session Diff" tooltipPosition="top">
+                                {{axe.bestSessionDiff}}
+                            </span>
+                            <span class="cursor-pointer" pTooltip="Best Diff" tooltipPosition="top">
+                                {{axe.bestDiff}}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-500 cursor-pointer mr-2" *ngIf="axe.vrTemp" [ngClass]="{'text-orange-500': axe.vrTemp > 90}" pTooltip="Voltage Regulator Temperature" tooltipPosition="top">
+                                {{axe.vrTemp | number: '1.0-1'}} °C
+                            </span>
+                            <span class="cursor-pointer" [ngClass]="{'text-orange-500': axe.temp > 68}" pTooltip="ASIC Temperature" tooltipPosition="top">
+                                {{axe.temp | number: '1.0-1'}} °C
+                            </span>
+                        </div>
+                        <span class="cursor-pointer" pTooltip="Power" tooltipPosition="top">
+                            {{axe.power | number: '1.1-1'}} W
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card overflow-x-auto" *ngIf="!gridView">
             <table class="w-full">
                 <thead>
                     <tr>
@@ -32,13 +144,7 @@
                             { label: 'Pool Diff', name: 'poolDifficulty' },
                             { label: 'Version', name: 'version' },
                         ]" class="text-500 font-medium">
-                            <div class="flex align-items-center cursor-pointer select-none relative" (click)="sortBy(field.name)">
-                                <span class="pr-3">{{field.label}}</span>
-                                <i class="pi text-xs absolute right-0" [ngClass]="{
-                                    'pi-sort-up-fill': sortField === field.name && sortDirection === 'asc',
-                                    'pi-sort-down-fill': sortField === field.name && sortDirection === 'desc'
-                                }"></i>
-                            </div>
+                            {{field.label}}
                         </th>
                         <th></th>
                     </tr>
