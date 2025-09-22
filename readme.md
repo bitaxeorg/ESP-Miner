@@ -104,6 +104,48 @@ curl -X PATCH http://YOUR-BITAXE-IP/api/system \
      -d '{"fanspeed": "desired_speed_value"}'
 ```
 
+## mDNS Support
+
+ESP-Miner now includes comprehensive mDNS (multicast DNS) support for seamless network discovery and device accessibility. This feature enables automatic device discovery on local networks without requiring manual IP address configuration.
+
+### Features
+
+- **Automatic mDNS Initialization**: Device automatically registers with mDNS/Bonjour/Avahi services on network connection
+- **Dynamic Hostname Registration**: Device hostname is registered as `<hostname>.local` (e.g., `bitaxe.local`)
+- **Service Advertisement**: HTTP service is advertised as `_http._tcp` on port 80
+- **Dynamic Hostname Updates**: mDNS hostname updates automatically when device hostname is changed via web interface
+- **Hostname Normalization**: Automatically strips `.local` suffix when setting hostnames to prevent duplicate registrations
+- **CORS Support**: Enhanced CORS handling to allow requests from mDNS hostnames
+
+### Network Discovery
+
+Once connected to your local network, the device becomes discoverable through:
+
+```bash
+# Using avahi-browse (Linux)
+avahi-browse _http._tcp
+
+# Using dns-sd (macOS)
+dns-sd -B _http._tcp
+
+# Direct access
+http://<hostname>.local
+```
+
+### Configuration
+
+- **Default Hostname**: `bitaxe` (configurable via web interface)
+- **Service Type**: `_http._tcp`
+- **Port**: `80`
+- **Instance Name**: `ESP-Miner Web Server`
+
+### Benefits
+
+- **Zero-Configuration Discovery**: Devices automatically appear in network browsers
+- **Cross-Platform Compatibility**: Works with Windows, macOS, Linux, and mobile devices
+- **No IP Address Required**: Access devices using human-readable names
+- **Automatic Resolution**: DNS resolution happens transparently in the background
+
 ## Administration
 
 The firmware hosts a small web server on port 80 for administrative purposes. Once the Bitaxe device is connected to the local network, the admin web front end may be accessed via a web browser connected to the same network at `http://<IP>`, replacing `IP` with the LAN IP address of the Bitaxe device, or `http://bitaxe`, provided your network supports mDNS configuration.

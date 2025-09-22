@@ -28,8 +28,8 @@
         <tr>
             <th *ngFor="let field of [
                 {
-                    name: 'IP',
-                    label: 'IP'
+                    name: 'address',
+                    label: 'Address'
                 },
                 {
                     name: 'hostname',
@@ -85,11 +85,11 @@
             <tr>
                 <td>
                     <a
-                       [ngClass]="'text-'+axe.swarmColor+'-500'"
-                       [href]="'http://'+axe.IP"
-                       target="_blank"
-                       [pTooltip]="axe.deviceModel || 'Other'"
-                       tooltipPosition="top">{{axe.IP}}</a>
+                        [ngClass]="'text-'+axe.swarmColor+'-500'"
+                        [href]="'http://'+axe.address"
+                        target="_blank"
+                        [pTooltip]="axe.deviceModel || 'Other'"
+                        tooltipPosition="top">{{axe.address}}</a>
                 </td>
                 <td>{{axe.hostname}}</td>
                 <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
@@ -155,10 +155,10 @@
 <div class="card p-3 mt-4">
     <form [formGroup]="form">
         <div class="field grid p-fluid mb-0">
-            <label htmlFor="ip" class="col-12 mb-2 md:col-4 md:mb-0">Manual Addition</label>
+            <label htmlFor="manualAddAddress" class="col-12 mb-2 md:col-4 md:mb-0">Manual Addition</label>
             <div class="col-12 md:col-8">
                 <p-inputGroup>
-                    <input pInputText id="manualAddIp" formControlName="manualAddIp" type="text" />
+                    <input pInputText id="manualAddAddress" formControlName="manualAddAddress" type="text" placeholder="192.168.1.100 or bitaxe.local" />
                     <button pButton  [disabled]="form.invalid" (click)="add()">Add</button>
                 </p-inputGroup>
 
@@ -187,6 +187,6 @@
     </div>
 </div>
 
-<app-modal [headline]="selectedAxeOs?.IP">
-    <app-edit *ngIf="selectedAxeOs" [uri]="'http://' + selectedAxeOs.IP"></app-edit>
+<app-modal [headline]="selectedAxeOs?.address">
+    <app-edit *ngIf="selectedAxeOs" [uri]="'http://' + selectedAxeOs.address"></app-edit>
 </app-modal>
