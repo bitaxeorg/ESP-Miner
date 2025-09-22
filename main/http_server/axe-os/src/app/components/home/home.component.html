@@ -30,7 +30,7 @@
                         <span class="block text-500 font-medium mb-3">Hashrate</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
                             <span *ngIf="!info.power_fault">
-                                {{info.hashRate * 1000000000 | hashSuffix}}
+                                {{info.hashRate | hashSuffix}}
                             </span>
                             <span *ngIf="info.power_fault" class="text-red-500">
                                 Not available - Power fault
@@ -47,7 +47,7 @@
                 </ng-container>
 
                 <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
-                    Expected: {{info.expectedHashrate * 1000000000 | hashSuffix}}
+                    Expected: {{info.expectedHashrate | hashSuffix}}
                 </div>
             </div>
         </div>
@@ -58,7 +58,7 @@
                         <span class="block text-500 font-medium mb-3">Efficiency</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
                             <span *ngIf="!info.power_fault">
-                                {{info.power / (info.hashRate/1000) | number: '1.2-2'}} <small>J/Th</small>
+                                {{info.power / (info.hashRate / 1000000000000) | number: '1.2-2'}} J/Th
                             </span>
                             <span *ngIf="info.power_fault" class="text-red-500">
                                 Not available - Power fault
@@ -70,12 +70,12 @@
                 <ng-container *ngIf="!info.power_fault">
                     Average:
                     <span class="text-green-500 font-medium">
-                        {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} <small>J/Th</small>
+                        {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} J/Th
                     </span>
                 </ng-container>
 
                 <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
-                    Expected: {{info.power / (info.expectedHashrate/1000) | number: '1.2-2'}} J/Th
+                    Expected: {{info.power / (info.expectedHashrate / 1000000000000) | number: '1.2-2'}} J/Th
                 </div>
             </div>
         </div>
@@ -134,7 +134,26 @@
 
         <div class="col-12" *ngIf="!info.power_fault">
             <div class="card">
-                <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
+                <form [formGroup]="form">
+                    <div class="flex flex-nowrap justify-content-between mb-3">
+                        <p-dropdown
+                            [options]="dataSourceLabels(info)"
+                            optionLabel="name"
+                            optionValue="value"
+                            formControlName="chartY1Data"
+                            styleClass="w-10rem p-dropdown--border-color-primary p-dropdown--small">
+                        </p-dropdown>
+                        <p-dropdown
+                            [options]="dataSourceLabels(info)"
+                            optionLabel="name"
+                            optionValue="value"
+                            formControlName="chartY2Data"
+                            styleClass="w-10rem border-500 p-dropdown--small">
+                        </p-dropdown>
+                    </div>
+
+                    <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
+                </form>
             </div>
         </div>
 
