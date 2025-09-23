@@ -354,18 +354,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   private parseSuffixString(input: string): number {
-    const regex = /^\s*([\d]+(?:\.\d+)?)\s*([kMGTPE]?)\s*$/i;
-    const match = input.match(regex);
-
-    if (!match) {
-      throw new Error(`Invalid suffix string: "${input}"`);
-    }
-
-    const value = parseFloat(match[1]);
-    const suffix = match[2].toUpperCase();
+    input = input.trim();
+    const value = parseFloat(input);
+    const lastChar = input.charAt(input.length - 1).toUpperCase();
 
     const multipliers: Record<string, number> = {
-      '': 1,
       K: 1e3,
       M: 1e6,
       G: 1e9,
@@ -374,7 +367,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       E: 1e18,
     };
 
-    const multiplier = multipliers[suffix] ?? 1;
+    const multiplier = multipliers[lastChar] ?? 1;
 
     return value * multiplier;
   }
