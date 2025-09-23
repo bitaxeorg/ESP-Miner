@@ -141,8 +141,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
   private getAllDeviceInfo(ips: string[], errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>, fetchAsic: boolean = true) {
     return from(ips).pipe(
       mergeMap(IP => forkJoin({
-        info: this.httpClient.get<ISystemInfo>(`http://${IP}/api/system/info`),
-        asic: fetchAsic ? this.httpClient.get(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
+        info: this.httpClient.get<any>(`http://${IP}/api/system/info`),
+        asic: fetchAsic ? this.httpClient.get<any>(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
       }).pipe(
         map(({ info, asic }) => {
           const existingDevice = this.swarm.find(device => device.IP === IP);
