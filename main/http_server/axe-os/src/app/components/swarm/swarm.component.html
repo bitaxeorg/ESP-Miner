@@ -25,7 +25,7 @@
             <div class="flex">
                 <ng-template #sortTemplate let-option>
                     <span>{{option.label}}</span>
-                    <i class="pi pi-sort-{{option.value.direction === 'asc' ? 'up' : 'down'}}-fill text-xs ml-2"></i>
+                    <i class="pi pi-sort-{{option.value.sortDirection === 'asc' ? 'up' : 'down'}}-fill text-xs ml-2"></i>
                 </ng-template>
 
                 <p-dropdown
