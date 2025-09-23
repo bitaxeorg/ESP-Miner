@@ -84,7 +84,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
 
     this.refreshIntervalRef = window.setInterval(() => {
-      if (!this.scanning && !this.isRefreshing) {
+      if (!this.scanning && !this.isRefreshing && this.swarm.length) {
         this.refreshIntervalTime--;
         if (this.refreshIntervalTime <= 0) {
           this.refreshList(false);
@@ -133,6 +133,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       },
       complete: () => {
         this.scanning = false;
+        this.refreshIntervalTime = this.refreshTimeSet;
       }
     });
   }
@@ -298,7 +299,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.totals.bestDiff = this.swarm.reduce((max, axe) => Math.max(max, axe.bestDiff || 0), 0);
   }
 
-  get getFamilies(): SwarmDevice[] {
+  get deviceFamilies(): SwarmDevice[] {
     return this.swarm.filter((v, i, a) =>
       a.findIndex(({ deviceModel, ASICModel, asicCount }) =>
         v.deviceModel === deviceModel &&
