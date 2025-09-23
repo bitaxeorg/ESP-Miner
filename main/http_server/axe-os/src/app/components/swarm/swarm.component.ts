@@ -233,9 +233,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.sortSwarm();
-    return;
-
     this.refreshIntervalTime = this.refreshTimeSet;
     const ips = this.swarm.map(axeOs => axeOs.IP);
     this.isRefreshing = true;
