@@ -49,7 +49,7 @@
 
         <div class="grid" *ngIf="gridView">
             <div class="col-12 sm:col-6 xl:col-4" *ngFor="let axe of swarm">
-                <div class="card flex justify-content-between mb-0">
+                <div class="card flex justify-content-between mb-0 h-full">
                     <div class="flex flex-column justify-content-between">
                         <div class="flex flex-column">
                             <a [href]="'http://' + axe.IP" target="_blank" class="flex flex-column">
@@ -80,7 +80,7 @@
                                 tooltipPosition="top"
                                 severity="secondary"
                                 styleClass="button-icon-small"
-                                class="mx-2"
+                                class="mx-3 lg:mx-2"
                                 (click)="restart(axe)" />
                             <p-button
                                 icon="pi pi-trash text-sm flex align-items-center justify-content-center"
