@@ -31,7 +31,6 @@ import { PrimeNGModule } from './prime-ng.module';
 import { MessageModule } from 'primeng/message';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
-import { InputSwitchModule } from 'primeng/inputswitch';
 import { DynamicDialogModule, DialogService as PrimeDialogService } from 'primeng/dynamicdialog';
 import { DialogService, DialogListComponent } from './services/dialog.service';
 
@@ -79,7 +78,6 @@ const components = [
     MessageModule,
     TooltipModule,
     DialogModule,
-    InputSwitchModule,
     DynamicDialogModule
   ],
   providers: [

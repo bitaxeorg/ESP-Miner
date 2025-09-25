@@ -369,8 +369,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
   }
 
-  public changeView(event: any) {
-    this.localStorageService.setBool(SWARM_GRID_VIEW, event.checked);
+  public toggleGridView(gridView: boolean): void {
+    this.localStorageService.setBool(SWARM_GRID_VIEW, this.gridView = gridView);
   }
 
   get sortOptions() {

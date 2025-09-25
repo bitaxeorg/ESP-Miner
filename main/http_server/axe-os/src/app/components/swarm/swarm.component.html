@@ -18,9 +18,20 @@
 
         <div class="mt-2 mb-3 flex justify-content-between">
             <div class="flex align-items-center">
-                <span [ngClass]="{'text-500': gridView}">List</span>
-                <p-inputSwitch [(ngModel)]="gridView" (onChange)="changeView($event)" class="flex mx-2" />
-                <span [ngClass]="{'text-500': !gridView}">Grid</span>
+                <p-button
+                    icon="pi pi-list flex align-items-center justify-content-center"
+                    pp-button
+                    [ngClass]="gridView ? 'opacity-70' : ''"
+                    pTooltip="List View"
+                    tooltipPosition="top"
+                    (click)="toggleGridView(false)" />
+                <p-button
+                    icon="pi pi-th-large flex align-items-center justify-content-center"
+                    pp-button
+                    [ngClass]="gridView ? '' : 'opacity-70'"
+                    pTooltip="Grid View"
+                    tooltipPosition="top"
+                    (click)="toggleGridView(true)" />
             </div>
             <div class="flex">
                 <div *ngIf="gridView">
@@ -35,7 +46,7 @@
                         (onChange)="onSortChange($event)"
                         optionLabel="label"
                         optionValue="value"
-                        styleClass="w-10rem p-dropdown--small">
+                        styleClass="w-10rem">
                     >
                         <ng-template let-option pTemplate="item">
                             <ng-container *ngTemplateOutlet="sortTemplate; context: { $implicit: option }"></ng-container>

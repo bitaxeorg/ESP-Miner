@@ -47,20 +47,6 @@ p-chart>div {
 }
 
 /* PrimeNG Component Theme Overrides */
-.p-inputswitch {
-    &.p-inputswitch-checked {
-        .p-inputswitch-slider {
-            background: var(--checkbox-bg);
-        }
-    }
-    &.p-focus,
-    &:hover {
-        .p-inputswitch-slider {
-            box-shadow: var(--focus-ring);
-        }
-    }
-}
-
 .p-slider {
     .p-slider-range {
         background: var(--slider-range-bg);
