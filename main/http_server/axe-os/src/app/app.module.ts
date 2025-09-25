@@ -1,7 +1,7 @@
 import 'chartjs-adapter-moment';
 
 import { CommonModule, HashLocationStrategy, LocationStrategy } from '@angular/common';
-import { HttpClientModule } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { BrowserModule } from '@angular/platform-browser';
@@ -17,6 +17,7 @@ import { HomeComponent } from './components/home/home.component';
 import { ModalComponent } from './components/modal/modal.component';
 import { TooltipIconComponent } from './components/tooltip-icon/tooltip-icon.component';
 import { TooltipTextIconComponent } from './components/tooltip-text-icon/tooltip-text-icon.component';
+import { ConfettiComponent } from './components/confetti/confetti.component';
 import { LogsComponent } from './components/logs/logs.component';
 import { SystemComponent } from './components/system/system.component';
 import { UpdateComponent } from './components/update/update.component';
@@ -33,7 +34,7 @@ import { PrimeNGModule } from './prime-ng.module';
 import { MessageModule } from 'primeng/message';
 import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
-import { DynamicDialogModule, DialogService as PrimeDialogService } from 'primeng/dynamicdialog';
+import { DialogService as PrimeDialogService } from 'primeng/dynamicdialog';
 import { DialogService, DialogListComponent } from './services/dialog.service';
 
 const components = [
@@ -44,6 +45,7 @@ const components = [
   ModalComponent,
   TooltipIconComponent,
   TooltipTextIconComponent,
+  ConfettiComponent,
   NetworkComponent,
   SettingsComponent,
   LogsComponent,
@@ -69,7 +71,6 @@ const components = [
   imports: [
     BrowserModule,
     AppRoutingModule,
-    HttpClientModule,
     ReactiveFormsModule,
     FormsModule,
     ToastrModule.forRoot({
@@ -81,13 +82,13 @@ const components = [
     AppLayoutModule,
     MessageModule,
     TooltipModule,
-    DialogModule,
-    DynamicDialogModule
+    DialogModule
   ],
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },
     DialogService,
-    PrimeDialogService
+    PrimeDialogService,
+    provideHttpClient()
   ],
   bootstrap: [AppComponent]
 })
