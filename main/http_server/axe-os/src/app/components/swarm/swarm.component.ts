@@ -225,7 +225,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public refreshErrorHandler = (error: any, ip: string) => {
     const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
-    this.toastr.error(`Failed to get info from ${ip}`);
+    this.toastr.error(`Failed to get info from ${ip}. ${errorMessage}`);
     const existingDevice = this.swarm.find(axeOs => axeOs.IP === ip);
     return of({
       ...existingDevice,
