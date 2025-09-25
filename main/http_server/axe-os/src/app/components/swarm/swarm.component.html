@@ -48,7 +48,7 @@
         </div>
 
         <div class="grid" *ngIf="gridView">
-            <div class="col-12 sm:col-6 xl:col-4" *ngFor="let axe of swarm">
+            <div class="col-12 sm:col-6 xl:col-{{staticMenuDesktopInactive ? 3 : 4}}" *ngFor="let axe of swarm">
                 <div class="card flex justify-content-between mb-0 h-full">
                     <div class="flex flex-column justify-content-between">
                         <div class="flex flex-column">

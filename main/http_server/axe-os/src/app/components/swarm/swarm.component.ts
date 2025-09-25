@@ -2,8 +2,9 @@ import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable } from 'rxjs';
+import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable, Subscription } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
+import { LayoutService } from "../../layout/service/app.layout.service";
 import { ModalComponent } from '../modal/modal.component';
 
 const SWARM_DATA = 'SWARM_DATA';
@@ -43,10 +44,14 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public gridView: boolean;
   public selectedSort: { sortField: string; sortDirection: 'asc' | 'desc' };
 
+  public staticMenuDesktopInactive: boolean;
+  private staticMenuDesktopSubscription!: Subscription;
+
   constructor(
     private fb: FormBuilder,
     private toastr: ToastrService,
     private localStorageService: LocalStorageService,
+    public layoutService: LayoutService,
     private httpClient: HttpClient
   ) {
 
@@ -71,6 +76,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
       sortField: 'IP',
       sortDirection: 'asc'
     };
+
+    this.staticMenuDesktopInactive = this.layoutService.state.staticMenuDesktopInactive;
   }
 
   ngOnInit(): void {
@@ -83,6 +90,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
       this.refreshList(true);
     }
 
+    this.staticMenuDesktopSubscription = this.layoutService.getStaticMenuDesktopInactive$()
+      .subscribe(inactive => {
+        this.staticMenuDesktopInactive = inactive;
+      });
+
     this.refreshIntervalRef = window.setInterval(() => {
       if (!this.scanning && !this.isRefreshing && this.swarm.length) {
         this.refreshIntervalTime--;
@@ -94,6 +106,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.staticMenuDesktopSubscription.unsubscribe();
     window.clearInterval(this.refreshIntervalRef);
     this.form.reset();
   }
