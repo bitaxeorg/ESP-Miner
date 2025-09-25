@@ -148,6 +148,7 @@ components:
         - blockHeight
         - scriptsig
         - networkDifficulty
+        - blockFound
       properties:
         ASICModel:
           type: string
@@ -331,6 +332,9 @@ components:
         networkDifficulty:
           type: string
           description: Current network difficulty in human-readable format
+        blockFound:
+          type: number
+          description: Whether a block was found (0=no, 1=yes)
 
     Settings:
       type: object

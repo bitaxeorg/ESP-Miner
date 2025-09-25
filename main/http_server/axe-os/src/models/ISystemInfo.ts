@@ -69,4 +69,6 @@ export interface ISystemInfo {
     blockHeight?: number,
     scriptsig?: string,
     networkDifficulty?: string,
+
+    blockFound: number,
 }
