@@ -419,6 +419,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
 
     const filter = this.filterText.toLowerCase();
-    return this.swarm.filter(axe =>axe.hostname.toLowerCase().includes(filter) || axe.IP.includes(filter));
+    return this.swarm.filter(axe =>
+      axe.hostname.toLowerCase().includes(filter) ||
+      axe.ASICModel.toLowerCase().includes(filter) ||
+      axe.deviceModel.toLowerCase().includes(filter) ||
+      axe.IP.includes(filter)
+    );
   }
 }
