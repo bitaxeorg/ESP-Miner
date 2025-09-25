@@ -16,23 +16,7 @@
             </div>
         </div>
 
-        <div class="mt-2 mb-3 gap-2 sm:gap-3 flex justify-content-between">
-            <div class="flex align-items-center">
-                <p-button
-                    icon="pi pi-list flex align-items-center justify-content-center"
-                    pp-button
-                    [ngClass]="gridView ? 'opacity-70' : ''"
-                    pTooltip="List View"
-                    tooltipPosition="top"
-                    (click)="toggleGridView(false)" />
-                <p-button
-                    icon="pi pi-th-large flex align-items-center justify-content-center"
-                    pp-button
-                    [ngClass]="gridView ? '' : 'opacity-70'"
-                    pTooltip="Grid View"
-                    tooltipPosition="top"
-                    (click)="toggleGridView(true)" />
-            </div>
+        <div class="mt-2 mb-3 gap-2 sm:gap-3 flex justify-content-end">
             <div class="flex gap-2 sm:gap-3">
                 <div *ngIf="gridView && filteredSwarm.length">
                     <ng-template #sortTemplate let-option>
@@ -63,7 +47,7 @@
                     <input
                         pInputText
                         type="text"
-                        class="w-full sm:w-12rem pr-5"
+                        class="w-full sm:w-12rem lg:w-14rem pr-5"
                         autocomplete="off"
                         placeholder="Filter"
                         [(ngModel)]="filterText" />
@@ -77,6 +61,23 @@
                         class="absolute right-0 mt-2 mr-2"
                         *ngIf="filterText"
                         (click)="filterText = ''" />
+                </div>
+
+                <div class="flex align-items-center">
+                    <p-button
+                        icon="pi pi-list flex align-items-center justify-content-center"
+                        pp-button
+                        [ngClass]="gridView ? 'opacity-70' : ''"
+                        pTooltip="List View"
+                        tooltipPosition="top"
+                        (click)="toggleGridView(false)" />
+                    <p-button
+                        icon="pi pi-th-large flex align-items-center justify-content-center"
+                        pp-button
+                        [ngClass]="gridView ? '' : 'opacity-70'"
+                        pTooltip="Grid View"
+                        tooltipPosition="top"
+                        (click)="toggleGridView(true)" />
                 </div>
             </div>
         </div>
