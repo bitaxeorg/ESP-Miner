@@ -19,12 +19,18 @@ import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { LocalStorageService } from 'src/app/local-storage.service';
 
+type Message = {
+  severity: 'error' | 'warn' | 'success' | 'info';
+  text: string;
+}
+
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit, OnDestroy {
+  public messages: Message[] = [];
 
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
@@ -421,6 +427,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.titleSubscription = this.info$
       .pipe(takeUntil(this.destroy$))
       .subscribe(info => {
+        this.handleSystemMessages(info);
         this.setTitle(info);
       });
   }
@@ -475,6 +482,23 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
 
     return this.calculateAverage(efficiencies);
+  }
+
+  public handleSystemMessages(info: ISystemInfo) {
+    const updateMessage = (condition: boolean, severity: Message['severity'], text: string) => {
+      const exists = this.messages.some(msg => msg.text === text);
+      if (condition && !exists) {
+        this.messages.push({ severity, text });
+      } else if (!condition && exists) {
+        this.messages = this.messages.filter(msg => msg.text !== text);
+      }
+    };
+
+    updateMessage(info.overheat_mode === 1, 'error', 'Device has overheated - See settings');
+    updateMessage(!!info.power_fault, 'error', `${info.power_fault} Check your Power Supply.`);
+    updateMessage(!info.frequency || info.frequency < 400, 'warn', 'Device frequency is set low - See settings');
+    updateMessage(info.isUsingFallbackStratum, 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
+    updateMessage(info.version !== info.axeOSVersion, 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
   }
 
   public clearDataPoints() {
