@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, HostListener } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable, Subscription } from 'rxjs';
@@ -46,6 +46,15 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public staticMenuDesktopInactive: boolean;
   private staticMenuDesktopSubscription!: Subscription;
+
+  public filterText = '';
+
+  @HostListener('document:keydown.esc', ['$event'])
+  onEscKey() {
+    if (this.filterText) {
+      this.filterText = '';
+    }
+  }
 
   constructor(
     private fb: FormBuilder,
@@ -402,5 +411,14 @@ export class SwarmComponent implements OnInit, OnDestroy {
     const {sortField, sortDirection} = event.value;
 
     this.sortBy(sortField, sortDirection);
+  }
+
+  get filteredSwarm() {
+    if (!this.filterText) {
+      return this.swarm;
+    }
+
+    const filter = this.filterText.toLowerCase();
+    return this.swarm.filter(axe =>axe.hostname.toLowerCase().includes(filter) || axe.IP.includes(filter));
   }
 }
