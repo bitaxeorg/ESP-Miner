@@ -22,6 +22,10 @@
         text="Firmware ({{info.version}}) and AxeOS ({{info.axeOSVersion}}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.">
     </p-message>
 
+    <p-message *ngIf="!info.isPSRAMAvailable" severity="info" styleClass="w-full mb-4 py-4 border-round-xl"
+        text="No PSRAM available or misconfigured, running in low memory mode. Disabled statistics and BAP port.">
+    </p-message>
+
     <div class="grid">
         <div class="col-12 md:col-6 xl:col-3">
             <div class="card mb-0">

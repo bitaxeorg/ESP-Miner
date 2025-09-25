@@ -68,6 +68,7 @@ export class SystemService {
         poolDifficulty: 1000,
         responseTime: 10,
         isUsingFallbackStratum: true,
+        isPSRAMAvailable: true,
         frequency: 485,
         version: "v2.9.0",
         axeOSVersion: "v2.9.0",
