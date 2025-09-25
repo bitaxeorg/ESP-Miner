@@ -438,16 +438,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.titleSubscription = this.info$
       .pipe(takeUntil(this.destroy$))
       .subscribe(info => {
-        this.titleService.setTitle(
-          [
-            this.pageDefaultTitle,
-            info.hostname,
-            (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : false),
-            (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : false),
-            (!info.power_fault ? `${info.power} W` : false),
-            (info.bestDiff ? info.bestDiff : false),
-          ].filter(Boolean).join(' • ')
-        );
+        this.setTitle(info);
       });
   }
 
@@ -473,6 +464,23 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
   }
 
+  private setTitle(info: ISystemInfo) {
+    const parts = [this.pageDefaultTitle];
+
+    if (info.blockFound) {
+      parts.push('Block found 🎉');
+    } else {
+      parts.push(
+        info.hostname,
+        (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : ''),
+        (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : ''),
+        (!info.power_fault ? `${info.power} W` : ''),
+        (info.bestDiff ? info.bestDiff : ''),
+      );
+    }
+
+    this.titleService.setTitle(parts.filter(Boolean).join(' • '));
+  }
 
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
