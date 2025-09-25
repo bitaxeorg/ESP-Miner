@@ -8,7 +8,6 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "frequency_transition_bmXX.h"
 #include "pll.h"
 
 #include <math.h>
@@ -208,8 +207,6 @@ uint8_t BM1366_init(float frequency, uint16_t asic_count, uint16_t difficulty)
         unsigned char set_3c_register_third[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x82, 0xAA};
         _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_third, 6, BM1366_SERIALTX_DEBUG);
     }
-
-    do_frequency_transition(frequency, BM1366_send_hash_frequency);
 
     //register 10 is still a bit of a mystery. discussion: https://github.com/bitaxeorg/ESP-Miner/pull/167
 

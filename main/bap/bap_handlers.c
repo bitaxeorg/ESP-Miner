@@ -284,22 +284,12 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 }
                 
                 //ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
-                
-                bool success = ASIC_set_frequency(bap_global_state, target_frequency);
-                
-                if (success) {
-                    //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
+
+                nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
                     
-                    bap_global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
-                    
-                    char freq_str[32];
-                    snprintf(freq_str, sizeof(freq_str), "%.2f", target_frequency);
-                    BAP_send_message(BAP_CMD_ACK, parameter, freq_str);
-                } else {
-                    ESP_LOGE(TAG, "Failed to set frequency to %.2f MHz", target_frequency);
-                    BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
-                }
+                char freq_str[32];
+                snprintf(freq_str, sizeof(freq_str), "%.2f", target_frequency);
+                BAP_send_message(BAP_CMD_ACK, parameter, freq_str);
             }
             break;
 

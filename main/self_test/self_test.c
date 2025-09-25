@@ -25,6 +25,7 @@
 #include "power.h"
 #include "thermal.h"
 #include "power_management_task.h"
+#include "asic_management_task.h"
 
 #include "bm1397.h"
 #include "bm1366.h"
@@ -330,11 +331,12 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
-    POWER_MANAGEMENT_init_frequency(&GLOBAL_STATE->POWER_MANAGEMENT_MODULE);
+    ASIC_MANAGEMENT_init_frequency(GLOBAL_STATE);
 
     GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
 
     uint8_t chips_detected = ASIC_init(GLOBAL_STATE);
+
     uint8_t chips_expected = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, chips_expected);
 
@@ -344,6 +346,10 @@ bool self_test(void * pvParameters)
         snprintf(error_buf, 20, "ASIC:FAIL %d CHIPS", chips_detected);
         display_msg(error_buf, GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
+    }
+
+    while (ASIC_MANAGEMENT_adjust_frequency(GLOBAL_STATE)) {
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
     //test for voltage regulator faults
