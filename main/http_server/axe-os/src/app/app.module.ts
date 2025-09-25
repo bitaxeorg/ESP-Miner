@@ -22,12 +22,13 @@ import { UpdateComponent } from './components/update/update.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
+import { ScoreboardComponent } from './components/scoreboard/scoreboard.component';
 import { ThemeConfigComponent } from './components/design/theme-config.component';
 import { DesignComponent } from './components/design/design.component';
 import { AppLayoutModule } from './layout/app.layout.module';
 import { ANSIPipe } from './pipes/ansi.pipe';
 import { DateAgoPipe } from './pipes/date-ago.pipe';
-import { HashSuffixPipe } from './pipes/hash-suffix.pipe';
+import { SuffixPipe } from './pipes/suffix.pipe';
 import { PrimeNGModule } from './prime-ng.module';
 import { MessageModule } from 'primeng/message';
 import { TooltipModule } from 'primeng/tooltip';
@@ -57,8 +58,9 @@ const components = [
     ANSIPipe,
     DateAgoPipe,
     SwarmComponent,
+    ScoreboardComponent,
     SettingsComponent,
-    HashSuffixPipe,
+    SuffixPipe,
     ThemeConfigComponent,
     DesignComponent,
     PoolComponent,

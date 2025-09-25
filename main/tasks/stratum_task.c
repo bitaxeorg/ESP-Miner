@@ -4,7 +4,6 @@
 #include "global_state.h"
 #include "lwip/dns.h"
 #include <lwip/tcpip.h>
-#include "nvs_config.h"
 #include "stratum_task.h"
 #include "work_queue.h"
 #include "esp_wifi.h"
@@ -257,7 +256,11 @@ void stratum_task(void * pvParameters)
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
-    xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL);
+    if (xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create stratum primary heartbeat task");
+        vTaskDelete(NULL);
+        return;
+    }
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
     while (1) {

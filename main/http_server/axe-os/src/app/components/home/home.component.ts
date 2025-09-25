@@ -3,8 +3,7 @@ import { interval, map, Observable, shareReplay, startWith, Subscription, switch
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
-import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
+import { SuffixPipe } from 'src/app/pipes/suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
 import { LoadingService } from 'src/app/services/loading.service';
@@ -433,7 +432,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     } else {
       parts.push(
         info.hostname,
-        (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : ''),
+        (info.hashRate ? SuffixPipe.transform(info.hashRate) : ''),
         (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : ''),
         (!info.power_fault ? `${info.power} W` : ''),
         (info.bestDiff ? info.bestDiff : ''),
@@ -548,8 +547,8 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   static cbFormatValue(value: number, datasetLabel: eChartLabel): string {
     switch (datasetLabel) {
-      case eChartLabel.hashrate:    return HashSuffixPipe.transform(value);
-      case eChartLabel.freeHeap:    return ByteSuffixPipe.transform(value);
+      case eChartLabel.hashrate:    return SuffixPipe.transform(value) + 'H/s';
+      case eChartLabel.freeHeap:    return SuffixPipe.transform(value) + 'B';
       default:
         const settings = HomeComponent.getSettingsForLabel(datasetLabel);
         return value.toFixed(settings.precision) + settings.suffix;
