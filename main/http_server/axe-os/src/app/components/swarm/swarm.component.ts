@@ -336,7 +336,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   get deviceFamilies(): SwarmDevice[] {
-    return this.swarm.filter((v, i, a) =>
+    return this.filteredSwarm.filter((v, i, a) =>
       a.findIndex(({ deviceModel, ASICModel, asicCount }) =>
         v.deviceModel === deviceModel &&
         v.ASICModel === ASICModel &&
