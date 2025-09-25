@@ -264,12 +264,16 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
-  sortBy(sortField: string, sortDirection: 'asc' | 'desc') {
-    this.selectedSort.sortField = sortField;
-    this.selectedSort.sortDirection = sortDirection;
+  sortBy(sortField: string, sortDirection?: 'asc' | 'desc' | undefined) {
+    if (sortDirection) {
+      this.selectedSort = { sortField, sortDirection };
+    } else if (this.selectedSort.sortField === sortField) {
+      this.selectedSort = { sortField, sortDirection: this.selectedSort.sortDirection === 'asc' ? 'desc' : 'asc' };
+    } else {
+      this.selectedSort = { sortField, sortDirection: 'asc' };
+    }
 
     this.localStorageService.setObject(SWARM_SORTING, this.selectedSort);
-
     this.sortSwarm();
   }
 
@@ -381,10 +385,16 @@ export class SwarmComponent implements OnInit, OnDestroy {
       { label: 'Shares', value: { sortField: 'sharesAccepted', sortDirection: 'asc' } },
       { label: 'Best Diff', value: { sortField: 'bestDiff', sortDirection: 'desc' } },
       { label: 'Best Diff', value: { sortField: 'bestDiff', sortDirection: 'asc' } },
-      { label: 'ASIC Temp', value: { sortField: 'temp', sortDirection: 'desc' } },
-      { label: 'ASIC Temp', value: { sortField: 'temp', sortDirection: 'asc' } },
+      { label: 'Uptime', value: { sortField: 'uptimeSeconds', sortDirection: 'desc' } },
+      { label: 'Uptime', value: { sortField: 'uptimeSeconds', sortDirection: 'asc' } },
       { label: 'Power', value: { sortField: 'power', sortDirection: 'desc' } },
       { label: 'Power', value: { sortField: 'power', sortDirection: 'asc' } },
+      { label: 'Temp', value: { sortField: 'temp', sortDirection: 'desc' } },
+      { label: 'Temp', value: { sortField: 'temp', sortDirection: 'asc' } },
+      { label: 'Pool Diff', value: { sortField: 'poolDifficulty', sortDirection: 'desc' } },
+      { label: 'Pool Diff', value: { sortField: 'poolDifficulty', sortDirection: 'asc' } },
+      { label: 'Version', value: { sortField: 'version', sortDirection: 'desc' } },
+      { label: 'Version', value: { sortField: 'version', sortDirection: 'asc' } },
     ];
   }
 

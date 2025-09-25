@@ -23,27 +23,29 @@
                 <span [ngClass]="{'text-500': !gridView}">Grid</span>
             </div>
             <div class="flex">
-                <ng-template #sortTemplate let-option>
-                    <span>{{option.label}}</span>
-                    <i class="pi pi-sort-{{option.value.sortDirection === 'asc' ? 'up' : 'down'}}-fill text-xs ml-2"></i>
-                </ng-template>
-
-                <p-dropdown
-                    [options]="sortOptions"
-                    [(ngModel)]="selectedSort"
-                    (onChange)="onSortChange($event)"
-                    optionLabel="label"
-                    optionValue="value"
-                    styleClass="w-10rem p-dropdown--small">
-                >
-                    <ng-template let-option pTemplate="item">
-                        <ng-container *ngTemplateOutlet="sortTemplate; context: { $implicit: option }"></ng-container>
+                <div *ngIf="gridView">
+                    <ng-template #sortTemplate let-option>
+                        <span>{{option.label}}</span>
+                        <i class="pi pi-sort-{{option.value.sortDirection === 'asc' ? 'up' : 'down'}}-fill text-xs ml-2"></i>
                     </ng-template>
 
-                    <ng-template let-option pTemplate="selectedItem">
-                        <ng-container *ngTemplateOutlet="sortTemplate; context: { $implicit: option }"></ng-container>
-                    </ng-template>
-                </p-dropdown>
+                    <p-dropdown
+                        [options]="sortOptions"
+                        [(ngModel)]="selectedSort"
+                        (onChange)="onSortChange($event)"
+                        optionLabel="label"
+                        optionValue="value"
+                        styleClass="w-10rem p-dropdown--small">
+                    >
+                        <ng-template let-option pTemplate="item">
+                            <ng-container *ngTemplateOutlet="sortTemplate; context: { $implicit: option }"></ng-container>
+                        </ng-template>
+
+                        <ng-template let-option pTemplate="selectedItem">
+                            <ng-container *ngTemplateOutlet="sortTemplate; context: { $implicit: option }"></ng-container>
+                        </ng-template>
+                    </p-dropdown>
+                </div>
             </div>
         </div>
 
@@ -62,6 +64,9 @@
                             </a>
                             <span class="text-500 cursor-pointer" pTooltip="Version" tooltipPosition="top">
                                 {{axe.version}}
+                            </span>
+                            <span class="text-500 cursor-pointer" pTooltip="Uptime: {{axe.uptimeSeconds | dateAgo}}" tooltipPosition="top">
+                                {{axe.uptimeSeconds | dateAgo: {intervals: 1} }}
                             </span>
                         </div>
                         <div class="mb-1">
@@ -123,6 +128,9 @@
                         <span class="cursor-pointer" pTooltip="Power" tooltipPosition="top">
                             {{axe.power | number: '1.1-1'}} W
                         </span>
+                        <span class="cursor-pointer" pTooltip="Pool Diff" tooltipPosition="top">
+                            {{axe.poolDifficulty}}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -144,7 +152,13 @@
                             { label: 'Pool Diff', name: 'poolDifficulty' },
                             { label: 'Version', name: 'version' },
                         ]" class="text-500 font-medium">
-                            {{field.label}}
+                            <div class="flex align-items-center cursor-pointer select-none relative" (click)="sortBy(field.name)">
+                                <span class="pr-3">{{field.label}}</span>
+                                <i class="pi text-xs absolute right-0" [ngClass]="{
+                                    'pi-sort-up-fill': selectedSort.sortField === field.name && selectedSort.sortDirection === 'asc',
+                                    'pi-sort-down-fill': selectedSort.sortField === field.name && selectedSort.sortDirection === 'desc'
+                                }"></i>
+                            </div>
                         </th>
                         <th></th>
                     </tr>
@@ -176,7 +190,7 @@
                                 {{axe.bestSessionDiff}}
                             </p>
                         </td>
-                        <td class="cursor-pointer" pTooltip="{{axe.uptimeSeconds | dateAgo}}" tooltipPosition="top">
+                        <td class="cursor-pointer" pTooltip="Uptime: {{axe.uptimeSeconds | dateAgo}}" tooltipPosition="top">
                             {{axe.uptimeSeconds | dateAgo: {intervals: 1} }}
                         </td>
                         <td>{{axe.power | number: '1.1-1'}} W</td>
