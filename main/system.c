@@ -163,7 +163,7 @@ void SYSTEM_notify_mining_started(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
-    module->duration_start = esp_timer_get_time();
+    module->duration_start = esp_timer_get_time() / 1000;
 }
 
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
@@ -190,7 +190,7 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double found_diff, ui
     // hashrate = (nonce_difficulty * 2^32) / time_to_find
 
     module->historical_hashrate[module->historical_hashrate_rolling_index] = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
-    module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time();
+    module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time() / 1000;
 
     module->historical_hashrate_rolling_index = (module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
 
@@ -203,21 +203,20 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double found_diff, ui
         module->duration_start =
             module->historical_hashrate_time_stamps[(module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
     }
-    double sum = 0;
+    uint32_t sum = 0;
     for (int i = 0; i < module->historical_hashrate_init; i++) {
         sum += module->historical_hashrate[i];
     }
 
-    double duration = (double) (esp_timer_get_time() - module->duration_start) / 1000000;
+    uint32_t duration_ms = (esp_timer_get_time() / 1000) - module->duration_start;
+    float hashrate_ghs = hashCounterToHashrate(duration_ms, sum) / 1e9f;
 
-    double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
     if (module->historical_hashrate_init < HISTORY_LENGTH) {
-        module->current_hashrate = rolling_rate;
+        module->current_hashrate = hashrate_ghs;
     } else {
         // More smoothing
-        module->current_hashrate = ((module->current_hashrate * 9) + rolling_rate) / 10;
+        module->current_hashrate = ((module->current_hashrate * 9) + hashrate_ghs) / 10;
     }
-
 
     // logArrayContents(historical_hashrate, HISTORY_LENGTH);
     // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
