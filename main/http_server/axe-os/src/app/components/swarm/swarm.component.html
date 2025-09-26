@@ -89,7 +89,8 @@
                         <div class="flex flex-column justify-content-between">
                             <div class="flex flex-column">
                                 <a [href]="'http://' + axe.IP" target="_blank" class="flex flex-column">
-                                    <span [ngStyle]="{color: axe.swarmColor}" pTooltip="Hostname" tooltipPosition="top">
+                                    <span class="text-800" pTooltip="Hostname" tooltipPosition="top">
+                                        <span class="mr-1 text-lg line-height-1" [ngStyle]="{color: axe.swarmColor}">●</span>
                                         {{axe.hostname}}
                                     </span>
                                     <span class="text-900" pTooltip="IP" tooltipPosition="top">
@@ -200,7 +201,8 @@
                     <tbody>
                         <tr *ngFor="let axe of filteredSwarm">
                             <td>
-                                <a [href]="'http://' + axe.IP" target="_blank" [ngStyle]="{color: axe.swarmColor}">
+                                <a [href]="'http://' + axe.IP" target="_blank" class="text-800">
+                                     <span class="mr-1 text-lg line-height-1" [ngStyle]="{color: axe.swarmColor}">●</span>
                                     {{axe.hostname}}
                                 </a>
                             </td>
@@ -267,7 +269,7 @@
             <div class="flex flex-wrap gap-2 mt-3 text-sm justify-content-center">
                 <div *ngFor="let item of deviceFamilies" class="flex align-items-center gap-1">
                     <span [ngStyle]="{color: item.swarmColor}">●</span>
-                    <span>{{ item.deviceModel || 'Other' }} ({{ item.asicCount > 1 ? item.asicCount + 'x ' : '' }}{{ item.ASICModel }})</span>
+                    <span class="text-500">{{ item.deviceModel || 'Other' }} ({{ item.asicCount > 1 ? item.asicCount + 'x ' : '' }}{{ item.ASICModel }})</span>
                 </div>
             </div>
         </ng-container>
