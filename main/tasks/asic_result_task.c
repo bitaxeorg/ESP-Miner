@@ -8,6 +8,7 @@
 #include "nvs_config.h"
 #include "utils.h"
 #include "stratum_task.h"
+#include "hashrate_monitor_task.h"
 #include "asic.h"
 
 static const char *TAG = "asic_result";
@@ -23,6 +24,11 @@ void ASIC_result_task(void *pvParameters)
 
         if (asic_result == NULL)
         {
+            continue;
+        }
+
+        if (asic_result->register_type != REGISTER_INVALID) {
+            hashrate_monitor_register_read(GLOBAL_STATE, asic_result->register_type, asic_result->asic_nr, asic_result->value);
             continue;
         }
 

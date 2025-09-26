@@ -53,6 +53,10 @@
                 <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
                     Expected: {{info.expectedHashrate | hashSuffix}}
                 </div>
+
+                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.hashrateMonitor">
+                    Register: {{info.hashrateMonitor.hashrate | hashSuffix}} Error: {{info.hashrateMonitor.errorCount}}
+                </div>
             </div>
         </div>
         <div class="col-12 md:col-6 xl:col-3">

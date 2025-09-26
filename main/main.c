@@ -6,6 +6,7 @@
 #include "asic_result_task.h"
 #include "asic_task.h"
 #include "create_jobs_task.h"
+#include "hashrate_monitor_task.h"
 #include "statistics_task.h"
 #include "system.h"
 #include "http_server.h"
@@ -107,9 +108,22 @@ void app_main(void)
 
     GLOBAL_STATE.ASIC_initalized = true;
 
-    xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
-    xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
-    xTaskCreate(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL);
+    if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating stratum admin task");
+    }
+    if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating stratum miner task");
+    }
+    if (xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating asic task");
+    }
+    if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating asic result task");
+    }
+    if (xTaskCreate(hashrate_monitor_task, "hashrate monitor", 4096, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating hashrate monitor task");
+    }
+    if (xTaskCreate(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating statistics task");
+    }
 }
