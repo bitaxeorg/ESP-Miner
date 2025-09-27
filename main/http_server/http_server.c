@@ -8,6 +8,7 @@
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "esp_chip_info.h"
+#include "esp_heap_caps.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_random.h"
@@ -707,6 +708,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
 
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
+    cJSON_AddNumberToObject(root, "freePSRAM", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
     cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "frequency", frequency);
