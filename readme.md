@@ -165,6 +165,7 @@ There are some Wi-Fi routers that will block mining, ASUS Wi-Fi routers & some T
 If you find that your not able to mine / have no hash rate you will need to check the Wi-Fi routers settings and disable the following;
 
 1/ AiProtection
+
 2/ IoT 
 
 If your Wi-Fi router has both of these options you might have to disable them both.
