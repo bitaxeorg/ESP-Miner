@@ -47,6 +47,7 @@ typedef struct
     char ssid[32];
     char wifi_status[256];
     char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
+    char ipv6_addr_str[40]; // IPv6 address string
     char ap_ssid[32];
     bool ap_enabled;
     bool is_connected;

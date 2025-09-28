@@ -55,6 +55,11 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->lastClockSync = 0;
     module->block_found = false;
     
+    // Initialize network address strings
+    strcpy(module->ip_addr_str, "");
+    strcpy(module->ipv6_addr_str, "");
+    strcpy(module->wifi_status, "Initializing...");
+    
     // set the pool url
     module->pool_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
     module->fallback_pool_url = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);

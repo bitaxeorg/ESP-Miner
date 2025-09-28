@@ -4,6 +4,7 @@
 #include "global_state.h"
 #include "lwip/dns.h"
 #include <lwip/tcpip.h>
+#include <lwip/netdb.h>
 #include "nvs_config.h"
 #include "stratum_task.h"
 #include "work_queue.h"
@@ -88,8 +89,6 @@ void stratum_primary_heartbeat(void * pvParameters)
     ESP_LOGI(TAG, "Starting heartbeat thread for primary pool: %s:%d", primary_stratum_url, primary_stratum_port);
     vTaskDelay(10000 / portTICK_PERIOD_MS);
 
-    int addr_family = AF_INET;
-    int ip_protocol = IPPROTO_IP;
 
     struct timeval tcp_timeout = {
         .tv_sec = 5,
@@ -103,7 +102,7 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
 
-        char host_ip[INET_ADDRSTRLEN];
+        char host_ip[INET6_ADDRSTRLEN];
         ESP_LOGD(TAG, "Running Heartbeat on: %s!", primary_stratum_url);
 
         if (!is_wifi_connected()) {
@@ -112,18 +111,65 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
 
-        struct hostent *primary_dns_addr = gethostbyname(primary_stratum_url);
-        if (primary_dns_addr == NULL) {
-            ESP_LOGD(TAG, "Heartbeat. Failed DNS check for: %s!", primary_stratum_url);
+        struct addrinfo hints = {
+            .ai_family = AF_UNSPEC,
+            .ai_socktype = SOCK_STREAM,
+            .ai_protocol = IPPROTO_TCP
+        };
+        struct addrinfo *res;
+        char port_str[6];
+        snprintf(port_str, sizeof(port_str), "%d", primary_stratum_port);
+        int gai_err = getaddrinfo(primary_stratum_url, port_str, &hints, &res);
+        if (gai_err != 0) {
+            ESP_LOGD(TAG, "Heartbeat. getaddrinfo failed for: %s (%d)", primary_stratum_url, gai_err);
             vTaskDelay(60000 / portTICK_PERIOD_MS);
             continue;
         }
-        inet_ntop(AF_INET, (void *)primary_dns_addr->h_addr_list[0], host_ip, sizeof(host_ip));
 
-        struct sockaddr_in dest_addr;
-        dest_addr.sin_addr.s_addr = inet_addr(host_ip);
-        dest_addr.sin_family = AF_INET;
-        dest_addr.sin_port = htons(primary_stratum_port);
+        struct sockaddr_storage dest_addr = {0};
+        socklen_t addrlen = 0;
+        int addr_family = AF_UNSPEC;
+        int ip_protocol = 0;
+
+        // Prefer IPv6
+        struct addrinfo *p;
+        for (p = res; p != NULL; p = p->ai_next) {
+            if (p->ai_family == AF_INET6) {
+                memcpy(&dest_addr, p->ai_addr, p->ai_addrlen);
+                addrlen = p->ai_addrlen;
+                addr_family = AF_INET6;
+                ip_protocol = IPPROTO_IPV6;
+                break;
+            }
+        }
+
+        // If no IPv6, use IPv4
+        if (addr_family == AF_UNSPEC) {
+            for (p = res; p != NULL; p = p->ai_next) {
+                if (p->ai_family == AF_INET) {
+                    memcpy(&dest_addr, p->ai_addr, p->ai_addrlen);
+                    addrlen = p->ai_addrlen;
+                    addr_family = AF_INET;
+                    ip_protocol = IPPROTO_IP;
+                    break;
+                }
+            }
+        }
+
+        freeaddrinfo(res);
+
+        if (addr_family == AF_UNSPEC) {
+            ESP_LOGD(TAG, "Heartbeat. No suitable address found for: %s", primary_stratum_url);
+            vTaskDelay(60000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        // Log the address
+        if (addr_family == AF_INET6) {
+            inet_ntop(AF_INET6, &((struct sockaddr_in6 *)&dest_addr)->sin6_addr, host_ip, sizeof(host_ip));
+        } else {
+            inet_ntop(AF_INET, &((struct sockaddr_in *)&dest_addr)->sin_addr, host_ip, sizeof(host_ip));
+        }
 
         int sock = socket(addr_family, SOCK_STREAM, ip_protocol);
         if (sock < 0) {
@@ -132,7 +178,7 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
 
-        int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        int err = connect(sock, (struct sockaddr *)&dest_addr, addrlen);
         if (err != 0)
         {
             ESP_LOGD(TAG, "Heartbeat. Failed connect check: %s:%d (errno %d: %s)", host_ip, primary_stratum_port, errno, strerror(errno));
@@ -251,9 +297,7 @@ void stratum_task(void * pvParameters)
     uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
 
     STRATUM_V1_initialize_buffer();
-    char host_ip[20];
-    int addr_family = AF_INET;
-    int ip_protocol = IPPROTO_IP;
+    char host_ip[INET6_ADDRSTRLEN];
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
@@ -297,20 +341,69 @@ void stratum_task(void * pvParameters)
         extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
         difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
 
-        struct hostent *dns_addr = gethostbyname(stratum_url);
-        if (dns_addr == NULL) {
+        struct addrinfo hints = {
+            .ai_family = AF_UNSPEC,
+            .ai_socktype = SOCK_STREAM,
+            .ai_protocol = IPPROTO_TCP
+        };
+        struct addrinfo *res;
+        char port_str[6];
+        snprintf(port_str, sizeof(port_str), "%d", port);
+        int gai_err = getaddrinfo(stratum_url, port_str, &hints, &res);
+        if (gai_err != 0) {
+            ESP_LOGE(TAG, "getaddrinfo failed: %d", gai_err);
             retry_attempts++;
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             continue;
         }
-        inet_ntop(AF_INET, (void *)dns_addr->h_addr_list[0], host_ip, sizeof(host_ip));
+
+        struct sockaddr_storage dest_addr = {0};
+        socklen_t addrlen = 0;
+        int addr_family = AF_UNSPEC;
+        int ip_protocol = 0;
+
+        // Prefer IPv6
+        struct addrinfo *p;
+        for (p = res; p != NULL; p = p->ai_next) {
+            if (p->ai_family == AF_INET6) {
+                memcpy(&dest_addr, p->ai_addr, p->ai_addrlen);
+                addrlen = p->ai_addrlen;
+                addr_family = AF_INET6;
+                ip_protocol = IPPROTO_IPV6;
+                break;
+            }
+        }
+
+        // If no IPv6, use IPv4
+        if (addr_family == AF_UNSPEC) {
+            for (p = res; p != NULL; p = p->ai_next) {
+                if (p->ai_family == AF_INET) {
+                    memcpy(&dest_addr, p->ai_addr, p->ai_addrlen);
+                    addrlen = p->ai_addrlen;
+                    addr_family = AF_INET;
+                    ip_protocol = IPPROTO_IP;
+                    break;
+                }
+            }
+        }
+
+        freeaddrinfo(res);
+
+        if (addr_family == AF_UNSPEC) {
+            ESP_LOGE(TAG, "No suitable address found for %s", stratum_url);
+            retry_attempts++;
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        // Log the address
+        if (addr_family == AF_INET6) {
+            inet_ntop(AF_INET6, &((struct sockaddr_in6 *)&dest_addr)->sin6_addr, host_ip, sizeof(host_ip));
+        } else {
+            inet_ntop(AF_INET, &((struct sockaddr_in *)&dest_addr)->sin_addr, host_ip, sizeof(host_ip));
+        }
 
         ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)", stratum_url, port, host_ip);
-
-        struct sockaddr_in dest_addr;
-        dest_addr.sin_addr.s_addr = inet_addr(host_ip);
-        dest_addr.sin_family = AF_INET;
-        dest_addr.sin_port = htons(port);
 
         GLOBAL_STATE->sock = socket(addr_family, SOCK_STREAM, ip_protocol);
         vTaskDelay(300 / portTICK_PERIOD_MS);
@@ -326,7 +419,7 @@ void stratum_task(void * pvParameters)
         retry_critical_attempts = 0;
 
         ESP_LOGI(TAG, "Socket created, connecting to %s:%d", host_ip, port);
-        int err = connect(GLOBAL_STATE->sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        int err = connect(GLOBAL_STATE->sock, (struct sockaddr *)&dest_addr, addrlen);
         if (err != 0)
         {
             retry_attempts++;
