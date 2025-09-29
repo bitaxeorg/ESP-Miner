@@ -39,7 +39,7 @@ export class PoolComponent implements OnInit {
           stratumURL: [info.stratumURL, [
             Validators.required,
             Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
-            Validators.pattern(/^[^:]*$/),
+            Validators.pattern(/^(?!.*:[1-9]\d{0,4}$).*$/),
           ]],
           stratumPort: [info.stratumPort, [
             Validators.required,
@@ -54,6 +54,7 @@ export class PoolComponent implements OnInit {
 
           fallbackStratumURL: [info.fallbackStratumURL, [
             Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
+            Validators.pattern(/^(?!.*:[1-9]\d{0,4}$).*$/),
           ]],
           fallbackStratumPort: [info.fallbackStratumPort, [
             Validators.required,
