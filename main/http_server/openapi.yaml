@@ -129,6 +129,8 @@ components:
         - sharesRejectedReasons
         - smallCoreCount
         - ssid
+        - ipv4
+        - ipv6
         - stratumExtranonceSubscribe
         - stratumPort
         - stratumSuggestedDifficulty
@@ -275,6 +277,12 @@ components:
         ssid:
           type: string
           description: Connected WiFi network SSID
+        ipv4:
+          type: string
+          description: IPv4 address
+        ipv6:
+          type: string
+          description: IPv6 address
         stratumExtranonceSubscribe:
           type: boolean
           description: Enable pool extranonce subscription

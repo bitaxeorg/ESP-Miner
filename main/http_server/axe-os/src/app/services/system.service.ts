@@ -45,6 +45,8 @@ export class SystemService {
         hostname: "Bitaxe",
         macAddr: "2C:54:91:88:C9:E3",
         ssid: "default",
+        ipv4: "192.168.1.1",
+        ipv6: "fe80::62be:b4ff:fe04:ea9c",
         wifiPass: "password",
         wifiStatus: "Connected!",
         wifiRSSI: -32,
