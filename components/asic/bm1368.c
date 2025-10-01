@@ -120,8 +120,10 @@ void BM1368_send_hash_frequency(float target_freq)
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, new_freq);
 }
 
-uint8_t BM1368_init(float frequency, uint16_t asic_count, uint16_t difficulty)
+uint8_t BM1368_init(void * pvParameters)
 {
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+
     // set version mask
     for (int i = 0; i < 4; i++) {
         BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
@@ -129,7 +131,7 @@ uint8_t BM1368_init(float frequency, uint16_t asic_count, uint16_t difficulty)
 
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_READ, (uint8_t[]){0x00, 0x00}, 2, false);
 
-    int chip_counter = count_asic_chips(asic_count, BM1368_CHIP_ID, BM1368_CHIP_ID_RESPONSE_LENGTH);
+    int chip_counter = count_asic_chips(GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, BM1368_CHIP_ID, BM1368_CHIP_ID_RESPONSE_LENGTH);
 
     if (chip_counter == 0) {
         return 0;
@@ -155,6 +157,7 @@ uint8_t BM1368_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     for (int i = 0; i < chip_counter; i++) {
         _set_chip_address(i * address_interval);
     }
+    GLOBAL_STATE->asic_address_interval = address_interval;
 
     for (int i = 0; i < chip_counter; i++) {
         uint8_t chip_init_cmds[][6] = {
@@ -172,10 +175,10 @@ uint8_t BM1368_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     }
 
     uint8_t difficulty_mask[6];
-    get_difficulty_mask(difficulty, difficulty_mask);
+    get_difficulty_mask(GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty, difficulty_mask);
     _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1368_SERIALTX_DEBUG);    
 
-    do_frequency_transition(frequency, BM1368_send_hash_frequency);
+    do_frequency_transition(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, BM1368_send_hash_frequency);
 
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, (uint8_t[]){0x00, 0x10, 0x00, 0x00, 0x15, 0xa4}, 6, false);
     BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);

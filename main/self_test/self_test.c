@@ -105,9 +105,10 @@ static esp_err_t test_INA260_power_consumption(int target_power, int margin)
     return ESP_FAIL;
 }
 
-static esp_err_t test_TPS546_power_consumption(int target_power, int margin)
+static esp_err_t test_TPS546_power_consumption(GlobalState * GLOBAL_STATE, int margin)
 {
-    float voltage = TPS546_get_vout();
+    int target_power = GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
+    float voltage = TPS546_get_vout() / GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domain;
     float current = TPS546_get_iout();
     float power = voltage * current;
     ESP_LOGI(TAG, "Power: %f, Voltage: %f, Current %f", power, voltage, current);
@@ -464,7 +465,7 @@ bool self_test(void * pvParameters)
         }
     }
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
-        if (test_TPS546_power_consumption(GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
+        if (test_TPS546_power_consumption(GLOBAL_STATE, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
             ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
             display_msg("POWER:FAIL", GLOBAL_STATE);
             tests_done(GLOBAL_STATE, false);

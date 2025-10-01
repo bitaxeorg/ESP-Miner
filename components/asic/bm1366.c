@@ -100,7 +100,6 @@ static void _send_simple(uint8_t * data, uint8_t total_length)
 
 static void _send_chain_inactive(void)
 {
-
     unsigned char read_address[2] = {0x00, 0x00};
     // send serial data
     _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_INACTIVE), read_address, 2, BM1366_SERIALTX_DEBUG);
@@ -108,6 +107,7 @@ static void _send_chain_inactive(void)
 
 static void _set_chip_address(uint8_t chipAddr)
 {
+    ESP_LOGI(TAG, "Set chip address: 0x%02x", chipAddr);
 
     unsigned char read_address[2] = {chipAddr, 0x00};
     // send serial data
@@ -139,8 +139,10 @@ void BM1366_send_hash_frequency(float target_freq)
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, new_freq);
 }
 
-uint8_t BM1366_init(float frequency, uint16_t asic_count, uint16_t difficulty)
+uint8_t BM1366_init(void * pvParameters)
 {
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+
     // set version mask
     for (int i = 0; i < 3; i++) {
         BM1366_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
@@ -150,7 +152,7 @@ uint8_t BM1366_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};
     _send_simple(init3, 7);
 
-    int chip_counter = count_asic_chips(asic_count, BM1366_CHIP_ID, BM1366_CHIP_ID_RESPONSE_LENGTH);
+    int chip_counter = count_asic_chips(GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, BM1366_CHIP_ID, BM1366_CHIP_ID_RESPONSE_LENGTH);
 
     if (chip_counter == 0) {
         return 0;
@@ -166,11 +168,12 @@ uint8_t BM1366_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     _send_chain_inactive();
 
     // split the chip address space evenly
-    uint8_t address_interval = (uint8_t) (256 / chip_counter);
+    uint8_t address_interval = (uint8_t) (128 / chip_counter);
     for (uint8_t i = 0; i < chip_counter; i++) {
         //{ 0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C };
         _set_chip_address(i * address_interval);
     }
+    GLOBAL_STATE->asic_address_interval = address_interval;
 
     unsigned char init135[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x85, 0x40, 0x0C};
     _send_simple(init135, 11);
@@ -180,7 +183,7 @@ uint8_t BM1366_init(float frequency, uint16_t asic_count, uint16_t difficulty)
 
     //set difficulty mask
     uint8_t difficulty_mask[6];
-    get_difficulty_mask(difficulty, difficulty_mask);
+    get_difficulty_mask(GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty, difficulty_mask);
     _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1366_SERIALTX_DEBUG);    
 
     unsigned char init138[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x54, 0x00, 0x00, 0x00, 0x03, 0x1D};
@@ -209,7 +212,7 @@ uint8_t BM1366_init(float frequency, uint16_t asic_count, uint16_t difficulty)
         _send_BM1366((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_third, 6, BM1366_SERIALTX_DEBUG);
     }
 
-    do_frequency_transition(frequency, BM1366_send_hash_frequency);
+    do_frequency_transition(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, BM1366_send_hash_frequency);
 
     //register 10 is still a bit of a mystery. discussion: https://github.com/bitaxeorg/ESP-Miner/pull/167
 
@@ -256,7 +259,6 @@ static uint8_t id = 0;
 
 void BM1366_send_work(void * pvParameters, bm_job * next_bm_job)
 {
-
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     BM1366_job job;

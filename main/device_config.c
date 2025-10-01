@@ -64,7 +64,7 @@ esp_err_t device_config_init(void * pvParameters)
     GLOBAL_STATE->DEVICE_CONFIG.emc_internal_temp = nvs_config_get_u16(NVS_CONFIG_EMC_INTERNAL_TEMP, 0) != 0;
     GLOBAL_STATE->DEVICE_CONFIG.emc_ideality_factor = nvs_config_get_u16(NVS_CONFIG_EMC_IDEALITY_FACTOR, 0);
     GLOBAL_STATE->DEVICE_CONFIG.emc_beta_compensation = nvs_config_get_u16(NVS_CONFIG_EMC_BETA_COMPENSATION, 0);
-    GLOBAL_STATE->DEVICE_CONFIG.emc_temp_offset = nvs_config_get_i32(NVS_CONFIG_EMC_TEMP_OFFSET, 0);
+    GLOBAL_STATE->DEVICE_CONFIG.temp_offset = nvs_config_get_i32(NVS_CONFIG_TEMP_OFFSET, 0);
     GLOBAL_STATE->DEVICE_CONFIG.DS4432U = nvs_config_get_u16(NVS_CONFIG_DS4432U, 0) != 0;
     GLOBAL_STATE->DEVICE_CONFIG.INA260 = nvs_config_get_u16(NVS_CONFIG_INA260, 0) != 0;
     GLOBAL_STATE->DEVICE_CONFIG.TPS546 = nvs_config_get_u16(NVS_CONFIG_TPS546, 0) != 0;

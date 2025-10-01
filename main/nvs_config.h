@@ -53,7 +53,7 @@
 #define NVS_CONFIG_EMC_INTERNAL_TEMP "emc_int_temp"
 #define NVS_CONFIG_EMC_IDEALITY_FACTOR "emc_ideality_f"
 #define NVS_CONFIG_EMC_BETA_COMPENSATION "emc_beta_comp"
-#define NVS_CONFIG_EMC_TEMP_OFFSET "emc_temp_offset"
+#define NVS_CONFIG_TEMP_OFFSET "temp_offset"
 #define NVS_CONFIG_DS4432U "DS4432U"
 #define NVS_CONFIG_INA260 "INA260"
 #define NVS_CONFIG_TPS546 "TPS546"
