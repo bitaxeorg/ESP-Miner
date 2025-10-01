@@ -7,6 +7,7 @@
 #include "common.h"
 #include "power_management_task.h"
 #include "statistics_task.h"
+#include "hashrate_monitor_task.h"
 #include "serial.h"
 #include "stratum_api.h"
 #include "work_queue.h"
@@ -96,6 +97,7 @@ typedef struct
     PowerManagementModule POWER_MANAGEMENT_MODULE;
     SelfTestModule SELF_TEST_MODULE;
     StatisticsModule STATISTICS_MODULE;
+    HashrateMonitorModule HASHRATE_MONITOR_MODULE;
 
     char * extranonce_str;
     int extranonce_2_len;

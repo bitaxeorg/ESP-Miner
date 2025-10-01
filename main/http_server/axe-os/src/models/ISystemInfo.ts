@@ -3,6 +3,18 @@ interface ISharesRejectedStat {
     count: number;
 }
 
+interface IHashrateMonitorAsic {
+    total: number;
+    domains: number[];
+    error: number;
+}
+
+interface IHashrateMonitor {
+    asics: IHashrateMonitorAsic[];
+    hashrate: number;
+    errorCount: number;
+}
+
 export interface ISystemInfo {
     display: string;
     rotation: number;
@@ -72,5 +84,6 @@ export interface ISystemInfo {
     scriptsig?: string,
     networkDifficulty?: string,
 
+    hashrateMonitor: IHashrateMonitor,
     blockFound: number,
 }

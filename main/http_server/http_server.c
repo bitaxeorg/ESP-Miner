@@ -51,6 +51,8 @@ static const char * CORS_TAG = "CORS";
 static char axeOSVersion[32];
 
 static const char * STATS_LABEL_HASHRATE = "hashrate";
+static const char * STATS_LABEL_HASHRATE_REGISTER = "hashrateRegister";
+static const char * STATS_LABEL_ERROR_COUNTER_REGISTER = "errorCountRegister";
 static const char * STATS_LABEL_ASIC_TEMP = "asicTemp";
 static const char * STATS_LABEL_VR_TEMP = "vrTemp";
 static const char * STATS_LABEL_ASIC_VOLTAGE = "asicVoltage";
@@ -67,6 +69,8 @@ static const char * STATS_LABEL_TIMESTAMP = "timestamp";
 typedef enum
 {
     SRC_HASHRATE,
+    SRC_HASHRATE_REGISTER,
+    SRC_ERROR_COUNTER_REGISTER,
     SRC_ASIC_TEMP,
     SRC_VR_TEMP,
     SRC_ASIC_VOLTAGE,
@@ -84,6 +88,8 @@ DataSource strToDataSource(const char * sourceStr)
 {
     if (NULL != sourceStr) {
         if (strcmp(sourceStr, STATS_LABEL_HASHRATE) == 0)     return SRC_HASHRATE;
+        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_REGISTER) == 0)      return SRC_HASHRATE_REGISTER;
+        if (strcmp(sourceStr, STATS_LABEL_ERROR_COUNTER_REGISTER) == 0) return SRC_ERROR_COUNTER_REGISTER;
         if (strcmp(sourceStr, STATS_LABEL_VOLTAGE) == 0)      return SRC_VOLTAGE;
         if (strcmp(sourceStr, STATS_LABEL_POWER) == 0)        return SRC_POWER;
         if (strcmp(sourceStr, STATS_LABEL_CURRENT) == 0)      return SRC_CURRENT;
@@ -679,7 +685,6 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)");
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
-    float expected_hashrate = frequency * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
 
     uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
@@ -699,7 +704,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "maxPower", GLOBAL_STATE->DEVICE_CONFIG.family.max_power);
     cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage);
     cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
-    cJSON_AddNumberToObject(root, "expectedHashrate", expected_hashrate);
+    cJSON_AddNumberToObject(root, "hashrateRegister", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.hashrate);
+    cJSON_AddNumberToObject(root, "errorCountRegister", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_count);
+    cJSON_AddNumberToObject(root, "expectedHashrate", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
     cJSON_AddStringToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_diff_string);
     cJSON_AddStringToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_diff_string);
     cJSON_AddNumberToObject(root, "poolDifficulty", GLOBAL_STATE->pool_difficulty);
@@ -783,6 +790,31 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         cJSON_AddStringToObject(root, "networkDifficulty", GLOBAL_STATE->network_diff_string);
     }
 
+    cJSON *hashrate_monitor = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "hashrateMonitor", hashrate_monitor);
+    
+    cJSON *asics_array = cJSON_CreateArray();
+    cJSON_AddItemToObject(hashrate_monitor, "asics", asics_array);
+
+    if (GLOBAL_STATE->HASHRATE_MONITOR_MODULE.is_initialized) {
+        for (int i = 0; i < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; i++) {
+            cJSON *asic = cJSON_CreateObject();
+            cJSON_AddItemToArray(asics_array, asic);
+            cJSON_AddNumberToObject(asic, "total", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
+    
+            float domains[4] = { 0 };
+            domains[0] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_0_measurement[i].hashrate;
+            domains[1] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_1_measurement[i].hashrate;
+            domains[2] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_2_measurement[i].hashrate;
+            domains[3] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_3_measurement[i].hashrate;
+            cJSON_AddItemToObject(asic, "domains", cJSON_CreateFloatArray(domains, 4));
+    
+            cJSON_AddNumberToObject(asic, "error", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_measurement[i].hashrate);
+        }
+    }
+    cJSON_AddNumberToObject(hashrate_monitor, "hashrate", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.hashrate);
+    cJSON_AddNumberToObject(hashrate_monitor, "errorCount", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_count);
+
     free(ssid);
     free(hostname);
     free(stratumURL);
@@ -858,6 +890,8 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     cJSON * labelArray = cJSON_CreateArray();
     if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE)); }
     if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_TEMP)); }
+    if (dataSelection[SRC_HASHRATE_REGISTER]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_REGISTER)); }
+    if (dataSelection[SRC_ERROR_COUNTER_REGISTER]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ERROR_COUNTER_REGISTER)); }
     if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VR_TEMP)); }
     if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_VOLTAGE)); }
     if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VOLTAGE)); }
@@ -884,6 +918,8 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
             cJSON * valueArray = cJSON_CreateArray();
             if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate)); }
             if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature)); }
+            if (dataSelection[SRC_HASHRATE_REGISTER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrateRegister)); }
+            if (dataSelection[SRC_ERROR_COUNTER_REGISTER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.errorCountRegister)); }
             if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature)); }
             if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); }
             if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage)); }

@@ -10,6 +10,7 @@
 #include "power.h"
 #include "connect.h"
 #include "vcore.h"
+#include "bm1370.h"
 
 #define DEFAULT_POLL_RATE 5000
 
@@ -116,6 +117,7 @@ void statistics_task(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    HashrateMonitorModule * hashrate_monitor = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
     struct StatisticsData statsData = {};
 
     TickType_t taskWakeTime = xTaskGetTickCount();
@@ -133,6 +135,8 @@ void statistics_task(void * pvParameters)
 
                 statsData.timestamp = currentTime;
                 statsData.hashrate = sys_module->current_hashrate;
+                statsData.hashrateRegister = hashrate_monitor->hashrate;
+                statsData.errorCountRegister = hashrate_monitor->error_count;
                 statsData.chipTemperature = power_management->chip_temp_avg;
                 statsData.vrTemperature = power_management->vr_temp;
                 statsData.power = power_management->power;

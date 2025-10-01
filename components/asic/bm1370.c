@@ -34,14 +34,42 @@
 
 #define MISC_CONTROL 0x18
 
+static const register_type_t REGISTER_MAP[] = {
+    [0x4C] = REGISTER_ERROR_COUNT,
+    [0x88] = REGISTER_DOMAIN_0_COUNT,
+    [0x89] = REGISTER_DOMAIN_1_COUNT,
+    [0x8A] = REGISTER_DOMAIN_2_COUNT,
+    [0x8B] = REGISTER_DOMAIN_3_COUNT,
+    [0x8C] = REGISTER_TOTAL_COUNT
+};
+
 typedef struct __attribute__((__packed__))
 {
-    uint16_t preamble;
-    uint32_t nonce;
-    uint8_t midstate_num;
-    uint8_t job_id;
-    uint16_t version;
-    uint8_t crc;
+    uint32_t nonce;                   // 2-5
+    uint8_t midstate_num;             // 6
+    uint8_t id;                       // 7
+    uint16_t version;                 // 8-9
+} bm1370_asic_result_job_t;
+
+typedef struct __attribute__((__packed__))
+{
+    uint32_t value;                   // 2-5
+    uint8_t                   : 1;    // 6:0
+    uint8_t asic_nr           : 7;    // 6:1-7
+    uint8_t register_address;         // 7
+    uint16_t                  : 16;   // 8-9
+} bm1370_asic_result_cmd_t;
+
+typedef struct __attribute__((__packed__))
+{
+    uint16_t preamble;                // 0-1
+    union {
+        bm1370_asic_result_job_t job; // 2-9
+        bm1370_asic_result_cmd_t cmd; // 2-9
+    };
+    uint8_t crc             : 5;      // 10:0-5
+    uint8_t                 : 2;      // 10:6-7
+    uint8_t is_job_response : 1;      // 10:8
 } bm1370_asic_result_t;
 
 static const char * TAG = "bm1370";
@@ -102,7 +130,6 @@ static void _send_simple(uint8_t * data, uint8_t total_length)
 
 static void _send_chain_inactive(void)
 {
-
     unsigned char read_address[2] = {0x00, 0x00};
     // send serial data
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_INACTIVE), read_address, 2, BM1370_SERIALTX_DEBUG);
@@ -110,7 +137,6 @@ static void _send_chain_inactive(void)
 
 static void _set_chip_address(uint8_t chipAddr)
 {
-
     unsigned char read_address[2] = {chipAddr, 0x00};
     // send serial data
     _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, BM1370_SERIALTX_DEBUG);
@@ -318,21 +344,28 @@ task_result * BM1370_process_work(void * pvParameters)
 {
     bm1370_asic_result_t asic_result = {0};
 
+    memset(&result, 0, sizeof(task_result));
+
     if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
         return NULL;
     }
+    
+    if (!asic_result.is_job_response) {
+        result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
+        if (result.register_type == REGISTER_INVALID) {
+            ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
+            return NULL;
+        }
+        result.asic_nr = asic_result.cmd.asic_nr;
+        result.value = ntohl(asic_result.cmd.value);
+        
+        return &result;
+    }
 
-    // uint8_t job_id = asic_result.job_id;
-    // uint8_t rx_job_id = ((int8_t)job_id & 0xf0) >> 1;
-    // ESP_LOGI(TAG, "Job ID: %02X, RX: %02X", job_id, rx_job_id);
-
-    // uint8_t job_id = asic_result.job_id & 0xf8;
-    // ESP_LOGI(TAG, "Job ID: %02X, Core: %01X", job_id, asic_result.job_id & 0x07);
-
-    uint8_t job_id = (asic_result.job_id & 0xf0) >> 1;
-    uint8_t core_id = (uint8_t)((ntohl(asic_result.nonce) >> 25) & 0x7f); // BM1370 has 80 cores, so it should be coded on 7 bits
-    uint8_t small_core_id = asic_result.job_id & 0x0f; // BM1370 has 16 small cores, so it should be coded on 4 bits
-    uint32_t version_bits = (ntohs(asic_result.version) << 13); // shift the 16 bit value left 13
+    uint8_t job_id = (asic_result.job.id & 0xf0) >> 1;
+    uint8_t core_id = (uint8_t)((ntohl(asic_result.job.nonce) >> 25) & 0x7f); // BM1370 has 80 cores, so it should be coded on 7 bits
+    uint8_t small_core_id = asic_result.job.id & 0x0f; // BM1370 has 16 small cores, so it should be coded on 4 bits
+    uint32_t version_bits = (ntohs(asic_result.job.version) << 13); // shift the 16 bit value left 13
     ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -345,8 +378,19 @@ task_result * BM1370_process_work(void * pvParameters)
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
 
     result.job_id = job_id;
-    result.nonce = asic_result.nonce;
+    result.nonce = asic_result.job.nonce;
     result.rolled_version = rolled_version;
 
     return &result;
+}
+
+void BM1370_read_registers(void) 
+{
+    int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
+    for (int reg = 0; reg < size; reg++) {
+        if (REGISTER_MAP[reg] != REGISTER_INVALID) {
+            _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){0x00, reg}, 2, false);
+            vTaskDelay(1 / portTICK_PERIOD_MS);
+        }
+    }
 }
