@@ -41,7 +41,7 @@ void ASIC_result_task(void *pvParameters)
 
         //log the ASIC response
         ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid, asic_nr, asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
-        
+
         if (nonce_diff >= active_job->pool_diff)
         {
             char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
