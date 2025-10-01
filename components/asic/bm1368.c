@@ -8,7 +8,6 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "frequency_transition_bmXX.h"
 #include "pll.h"
 
 #include <math.h>
@@ -174,8 +173,6 @@ uint8_t BM1368_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     uint8_t difficulty_mask[6];
     get_difficulty_mask(difficulty, difficulty_mask);
     _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1368_SERIALTX_DEBUG);    
-
-    do_frequency_transition(frequency, BM1368_send_hash_frequency);
 
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, (uint8_t[]){0x00, 0x10, 0x00, 0x00, 0x15, 0xa4}, 6, false);
     BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);

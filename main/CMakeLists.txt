@@ -29,6 +29,8 @@ SRCS
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
     "./tasks/statistics_task.c"
+    "./tasks/fan_controller_task.c"
+    "./tasks/asic_management_task.c"
     "./thermal/EMC2101.c"
     "./thermal/EMC2103.c"
     "./thermal/TMP1075.c"

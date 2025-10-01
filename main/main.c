@@ -6,6 +6,8 @@
 #include "asic_result_task.h"
 #include "asic_task.h"
 #include "create_jobs_task.h"
+#include "fan_controller_task.h"
+#include "asic_management_task.h"
 #include "statistics_task.h"
 #include "system.h"
 #include "http_server.h"
@@ -67,8 +69,6 @@ void app_main(void)
 
     SYSTEM_init_peripherals(&GLOBAL_STATE);
 
-    xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-
     //start the API for AxeOS
     start_rest_server((void *) &GLOBAL_STATE);
 
@@ -105,11 +105,19 @@ void app_main(void)
     SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
     SERIAL_clear_buffer();
 
+    ASIC_MANAGEMENT_init_frequency(&GLOBAL_STATE);
+
+    xTaskCreate(POWER_MANAGEMENT_task, "power management", 4096, (void *) &GLOBAL_STATE, 10, NULL);
+
+    vTaskDelay(500 / portTICK_PERIOD_MS); // Wait for power management to stabilize
+
     GLOBAL_STATE.ASIC_initalized = true;
 
+    xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 3072, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(ASIC_MANAGEMENT_task, "asic_management", 3072, (void *) &GLOBAL_STATE, 10, NULL);
     xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
-    xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
-    xTaskCreate(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL);
+    xTaskCreate(create_jobs_task, "stratum miner", 3072, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(ASIC_task, "asic", 3072, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(ASIC_result_task, "asic result", 4096, (void *) &GLOBAL_STATE, 15, NULL);
+    xTaskCreate(statistics_task, "statistics", 2048, (void *) &GLOBAL_STATE, 3, NULL);
 }

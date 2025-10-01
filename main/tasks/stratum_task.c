@@ -318,7 +318,7 @@ void stratum_task(void * pvParameters)
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
-    xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL);
+    xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 4096, pvParameters, 1, NULL);
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
     while (1) {
