@@ -239,4 +239,29 @@ export class SystemService {
   public updateSwarm(uri: string = '', swarmConfig: any) {
     return this.httpClient.patch(`${uri}/api/swarm`, swarmConfig);
   }
+
+  public getAutotune() {
+    if (environment.production) {
+      return this.httpClient.get<any>('/api/system/autotune');
+    }
+
+    // Mock data for development
+    return of({
+      power_limit: 20,
+      fan_limit: 75,
+      max_volt_asic: 1400,
+      max_freq_asic: 1000,
+      max_temp_asic: 65,
+      max_temp_vr: 85,
+      auto_tune: false,
+      osh_pow_limit: 0.2,
+      osh_fan_limit: 5,
+      vf_ratio_max: 2.2,
+      vf_ratio_min: 1.76
+    }).pipe(delay(1000));
+  }
+
+  public updateAutotune(data: any) {
+    return this.httpClient.post('/api/system/autotune', data);
+  }
 }

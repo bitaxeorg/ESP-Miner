@@ -2,6 +2,7 @@
 #define MAIN_NVS_CONFIG_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 // Max length 15
 
@@ -40,6 +41,17 @@
 #define NVS_CONFIG_OVERCLOCK_ENABLED "oc_enabled"
 #define NVS_CONFIG_SWARM "swarmconfig"
 #define NVS_CONFIG_STATISTICS_FREQUENCY "statsFrequency"
+#define NVS_CONFIG_KEY_POWER_LIMIT "power_limit"
+#define NVS_CONFIG_KEY_FAN_LIMIT "fan_limit"
+#define NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC "max_volt_asic"
+#define NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC "max_freq_asic"
+#define NVS_CONFIG_KEY_MAX_TEMP_ASIC "max_temp_asic"
+#define NVS_CONFIG_KEY_AUTO_TUNE_ENABLE "auto_tune"
+#define NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT "osh_pow_limit"
+#define NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT "osh_fan_limit"
+#define NVS_CONFIG_KEY_VF_RATIO_MAX "vf_ratio_max"
+#define NVS_CONFIG_KEY_VF_RATIO_MIN "vf_ratio_min"
+#define NVS_CONFIG_KEY_MAX_TEMP_VR "max_temp_vr"
 
 // Theme configuration
 #define NVS_CONFIG_THEME_SCHEME "themescheme"
@@ -69,6 +81,10 @@ uint64_t nvs_config_get_u64(const char * key, const uint64_t default_value);
 void nvs_config_set_u64(const char * key, const uint64_t value);
 float nvs_config_get_float(const char *key, float default_value);
 void nvs_config_set_float(const char *key, float value);
+double nvs_config_get_double(const char * key, const double default_value);
+void nvs_config_set_double(const char * key, const double value);
+bool nvs_config_get_bool(const char * key, const bool default_value);
+void nvs_config_set_bool(const char * key, const bool value);
 void nvs_config_commit(void);
 
 #endif // MAIN_NVS_CONFIG_H
