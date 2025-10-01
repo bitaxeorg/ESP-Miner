@@ -9,8 +9,7 @@
 
 #include "i2c_bitaxe.h"
 #include "DS4432U.h"
-#include "EMC2101.h"
-#include "INA260.h"
+#include "thermal.h"
 #include "adc.h"
 #include "global_state.h"
 #include "nvs_config.h"
@@ -79,6 +78,7 @@ static void reset_self_test() {
 static void display_msg(char * msg, GlobalState * GLOBAL_STATE) 
 {
     GLOBAL_STATE->SELF_TEST_MODULE.message = msg;
+    vTaskDelay(10 / portTICK_PERIOD_MS);
 }
 
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
@@ -95,24 +95,14 @@ static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
     return ESP_FAIL;
 }
 
-static esp_err_t test_INA260_power_consumption(int target_power, int margin)
+static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 {
-    float power = INA260_read_power() / 1000;
-    ESP_LOGI(TAG, "Power: %f", power);
-    if (power > target_power -margin && power < target_power +margin) {
-        return ESP_OK;
-    }
-    return ESP_FAIL;
-}
+    uint16_t target_power = GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
+    uint16_t margin = POWER_CONSUMPTION_MARGIN;
 
-static esp_err_t test_TPS546_power_consumption(GlobalState * GLOBAL_STATE, int margin)
-{
-    int target_power = GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
-    float voltage = TPS546_get_vout() / GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domain;
-    float current = TPS546_get_iout();
-    float power = voltage * current;
-    ESP_LOGI(TAG, "Power: %f, Voltage: %f, Current %f", power, voltage, current);
-    if (power < target_power +margin) {
+    float power = Power_get_power(GLOBAL_STATE);
+    ESP_LOGI(TAG, "Power: %f", power);
+    if (power > target_power - margin && power < target_power + margin) {
         return ESP_OK;
     }
     return ESP_FAIL;
@@ -221,21 +211,9 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
 
 esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
     
-    if (GLOBAL_STATE->DEVICE_CONFIG.EMC2101) {
-        ESP_RETURN_ON_ERROR(EMC2101_init(), TAG, "EMC2101 init failed!");
-        EMC2101_set_fan_speed(1);
+    ESP_RETURN_ON_ERROR(Thermal_init(&GLOBAL_STATE->DEVICE_CONFIG), TAG, "THERMAL init failed");
 
-        if (GLOBAL_STATE->DEVICE_CONFIG.emc_ideality_factor != 0x00) {
-            EMC2101_set_ideality_factor(GLOBAL_STATE->DEVICE_CONFIG.emc_ideality_factor);
-            EMC2101_set_beta_compensation(GLOBAL_STATE->DEVICE_CONFIG.emc_beta_compensation);
-        }
-    }
-
-    // TODO: EMC2103
-
-    if (GLOBAL_STATE->DEVICE_CONFIG.INA260) {
-        ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
-    }
+    ESP_RETURN_ON_ERROR(Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1), TAG, "THERMAL set fan percent failed");
 
     ESP_LOGI(TAG, "Peripherals init success!");
     return ESP_OK;
@@ -437,12 +415,15 @@ bool self_test(void * pvParameters)
         duration = (double) (esp_timer_get_time() - start) / 1000000;
     }
 
-    ESP_LOGI(TAG, "Hashrate: %f", hash_rate);
+    vTaskDelay(10 / portTICK_PERIOD_MS);
 
     float expected_hashrate_mhs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value 
                                 * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count 
                                 * GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
+                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count
                                 / 1000.0f;
+
+    ESP_LOGI(TAG, "Hashrate: %f, Expected: %f", hash_rate, expected_hashrate_mhs);
 
     if (hash_rate < expected_hashrate_mhs) {
         display_msg("HASHRATE:FAIL", GLOBAL_STATE);
@@ -457,19 +438,10 @@ bool self_test(void * pvParameters)
     }
 
     // TODO: Maybe make a test equivalent for test values
-    if (GLOBAL_STATE->DEVICE_CONFIG.INA260) {
-        if (test_INA260_power_consumption(GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-            ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
-            display_msg("POWER:FAIL", GLOBAL_STATE);
-            tests_done(GLOBAL_STATE, false);
-        }
-    }
-    if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
-        if (test_TPS546_power_consumption(GLOBAL_STATE, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
-            ESP_LOGE(TAG, "TPS546 Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
-            display_msg("POWER:FAIL", GLOBAL_STATE);
-            tests_done(GLOBAL_STATE, false);
-        }
+    if (test_power_consumption(GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
+        display_msg("POWER:FAIL", GLOBAL_STATE);
+        tests_done(GLOBAL_STATE, false);
     }
 
     if (test_fan_sense(GLOBAL_STATE) != ESP_OK) {     
