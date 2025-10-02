@@ -1,11 +1,11 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
 @Pipe({
-  name: 'hashSuffix'
+  name: 'suffix'
 })
-export class HashSuffixPipe implements PipeTransform {
+export class SuffixPipe implements PipeTransform {
 
-  private static _this = new HashSuffixPipe();
+  private static _this = new SuffixPipe();
 
   public static transform(value: number): string {
     return this._this.transform(value);
@@ -17,7 +17,7 @@ export class HashSuffixPipe implements PipeTransform {
       return '0';
     }
 
-    const suffixes = [' H/s', ' Kh/s', ' Mh/s', ' Gh/s', ' Th/s', ' Ph/s', ' Eh/s'];
+    const suffixes = [' ', ' k', ' M', ' G', ' T', ' P', ' E', ' Z', ' Y'];
 
     let power = Math.floor(Math.log10(value) / 3);
     if (power < 0) {
@@ -34,6 +34,4 @@ export class HashSuffixPipe implements PipeTransform {
 
     return scaledValue.toFixed(0) + suffix;
   }
-
-
 }

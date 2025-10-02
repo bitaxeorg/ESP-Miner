@@ -1,3 +1,4 @@
+
 <div class="card">
     <h2>Swarm</h2>
 
@@ -5,7 +6,7 @@
         <div class="grid">
             <div class="col-6 xl:col-3" *ngFor="let metric of [
                 { label: 'Total Devices', value: swarm.length },
-                { label: 'Total Hashrate', value: totals.hashRate * 1000000000 | hashSuffix},
+                { label: 'Total Hashrate', value: (totals.hashRate * 1000000000 | suffix) + 'H/s' },
                 { label: 'Total Power', value: (totals.power | number: '1.1-1')  + ' W' },
                 { label: 'Best Diff', value: totals.bestDiff }
             ]">
@@ -53,7 +54,7 @@
                         <td>
                             <a [href]="'http://' + axe.IP" target="_blank" class="text-900">{{axe.IP}}</a>
                         </td>
-                        <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
+                        <td>{{axe.hashRate * 1000000000 | suffix}}H/s</td>
                         <td>
                             <p class="cursor-pointer m-0" pTooltip="Shares Accepted" tooltipPosition="top">
                                 {{axe.sharesAccepted | number: '1.0-0'}}
