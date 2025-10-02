@@ -1,4 +1,5 @@
 #include "esp_event.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "nvs_flash.h"
@@ -24,6 +25,9 @@
 static GlobalState GLOBAL_STATE;
 
 static const char * TAG = "bitaxe";
+
+// Static task control blocks for PSRAM tasks
+static StaticTask_t stratum_tcb, create_jobs_tcb, asic_tcb, asic_result_tcb;
 
 void app_main(void)
 {
@@ -107,9 +111,33 @@ void app_main(void)
 
     GLOBAL_STATE.ASIC_initalized = true;
 
-    xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
-    xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
+    // Allocate stacks in PSRAM for tasks that don't access flash
+    if (GLOBAL_STATE.psram_is_available) {
+        uint8_t *stratum_stack = heap_caps_malloc(8192, MALLOC_CAP_SPIRAM);
+        uint8_t *create_jobs_stack = heap_caps_malloc(8192, MALLOC_CAP_SPIRAM);
+        uint8_t *asic_stack = heap_caps_malloc(8192, MALLOC_CAP_SPIRAM);
+        uint8_t *asic_result_stack = heap_caps_malloc(8192, MALLOC_CAP_SPIRAM);
+
+        if (stratum_stack && create_jobs_stack && asic_stack && asic_result_stack) {
+            ESP_LOGI(TAG, "Allocated task stacks in PSRAM");
+            xTaskCreateStatic(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, stratum_stack, &stratum_tcb);
+            xTaskCreateStatic(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, create_jobs_stack, &create_jobs_tcb);
+            xTaskCreateStatic(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, asic_stack, &asic_tcb);
+            xTaskCreateStatic(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, asic_result_stack, &asic_result_tcb);
+        } else {
+            ESP_LOGE(TAG, "Failed to allocate some PSRAM stacks, falling back to internal RAM");
+            xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
+            xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+            xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+            xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
+        }
+    } else {
+        ESP_LOGI(TAG, "PSRAM not available, creating tasks in internal RAM");
+        xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
+        xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+        xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+        xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
+    }
+
     xTaskCreate(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL);
 }
