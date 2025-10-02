@@ -26,3 +26,15 @@
         top: 100px;
     }
 }
+
+.p-tooltip-text {
+    font-size: 0.9rem;
+}
+
+.field.grid > label {
+    @media (min-width: 768px) {
+        align-items: baseline;
+        flex-direction: column;
+        justify-content: center;
+    }
+}
