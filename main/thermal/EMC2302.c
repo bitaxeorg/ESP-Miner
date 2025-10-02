@@ -39,6 +39,32 @@ esp_err_t EMC2302_set_fan_speed(float percent)
     return ESP_OK;
 }
 
+static uint16_t get_fan_speed(uint8_t reg_addr)
+{
+    esp_err_t err;
+
+    uint8_t tach_data[2];
+    err = i2c_bitaxe_register_read(EMC2302_dev_handle, reg_addr, tach_data, 2);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read fan speed: %s", esp_err_to_name(err));
+        return 0;
+    }
+    
+    if (tach_data[0] == 0xFF) {
+        return 0;
+    }
+
+    uint16_t tach_counter = (tach_data[0] << 5) | (tach_data[1] >> 3);
+    uint32_t rpm = 3932160UL / tach_counter;
+
+    if (rpm > UINT16_MAX) {
+        ESP_LOGW(TAG, "RPM %u exceeds uint16_t range, clamping", rpm);
+        rpm = UINT16_MAX;
+    }
+
+    return (uint16_t)rpm;
+}
+
 /**
  * @brief Get the current fan speed in RPM.
  *
@@ -46,35 +72,15 @@ esp_err_t EMC2302_set_fan_speed(float percent)
  */
 uint16_t EMC2302_get_fan_speed(void)
 {
-    uint8_t tach_lsb = 0, tach_msb = 0;
-    uint16_t reading;
-    uint32_t RPM;
-    esp_err_t err;
+    return get_fan_speed(EMC2302_TACH1_LSB);
+}
 
-    err = i2c_bitaxe_register_read(EMC2302_dev_handle, EMC2302_TACH1_LSB, &tach_lsb, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read fan speed LSB: %s", esp_err_to_name(err));
-        return 0;
-    }
-    
-    err = i2c_bitaxe_register_read(EMC2302_dev_handle, EMC2302_TACH1_MSB, &tach_msb, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read fan speed MSB: %s", esp_err_to_name(err));
-        return 0;
-    }
-
-    // ESP_LOGI(TAG, "Raw Fan Speed = %02X %02X", tach_msb, tach_lsb);
-
-    reading = tach_lsb | (tach_msb << 8);
-    reading >>= 3;
-
-    //RPM = (3,932,160 * m)/reading
-    //m is the multipler, which is default 2
-    RPM = 7864320 / reading;
-
-    // ESP_LOGI(TAG, "Fan Speed = %d RPM", RPM);
-    if (RPM == 82) {
-        return 0;
-    }
-    return RPM;
+/**
+ * @brief Get the current fan 2 speed in RPM.
+ *
+ * @return uint16_t The fan 2 speed in RPM.
+ */
+uint16_t EMC2302_get_fan2_speed(void)
+{
+    return get_fan_speed(EMC2302_TACH2_LSB);
 }

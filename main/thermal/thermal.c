@@ -67,6 +67,14 @@ uint16_t Thermal_get_fan_speed(DeviceConfig * DEVICE_CONFIG)
     return 0;
 }
 
+uint16_t Thermal_get_fan2_speed(DeviceConfig * DEVICE_CONFIG) 
+{
+    if (DEVICE_CONFIG->EMC2302) {
+        return EMC2302_get_fan2_speed();
+    }
+    return 0;
+}
+
 float Thermal_get_chip_temp(GlobalState * GLOBAL_STATE)
 {
     if (!GLOBAL_STATE->ASIC_initalized) {

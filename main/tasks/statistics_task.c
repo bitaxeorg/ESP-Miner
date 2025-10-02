@@ -141,6 +141,7 @@ void statistics_task(void * pvParameters)
                 statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
                 statsData.fanSpeed = power_management->fan_perc;
                 statsData.fanRPM = power_management->fan_rpm;
+                statsData.fan2RPM = power_management->fan2_rpm;
                 statsData.wifiRSSI = wifiRSSI;
                 statsData.freeHeap = esp_get_free_heap_size();
 
