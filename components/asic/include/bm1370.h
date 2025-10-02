@@ -21,7 +21,7 @@ typedef struct __attribute__((__packed__))
     uint8_t version[4];
 } BM1370_job;
 
-uint8_t BM1370_init(void * GLOBAL_STATE);
+uint8_t BM1370_init(float frequency, uint16_t asic_count, uint16_t difficulty);
 void BM1370_send_work(void * GLOBAL_STATE, bm_job * next_bm_job);
 void BM1370_set_version_mask(uint32_t version_mask);
 int BM1370_set_max_baud(void);

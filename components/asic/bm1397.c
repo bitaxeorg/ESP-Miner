@@ -56,6 +56,8 @@ static const char * TAG = "bm1397";
 static uint32_t prev_nonce = 0;
 static task_result result;
 
+static uint8_t address_interval;
+
 /// @brief
 /// @param ftdi
 /// @param header
@@ -223,14 +225,12 @@ void BM1397_send_hash_frequency(float frequency)
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", frequency, newf);
 }
 
-uint8_t BM1397_init(void * pvParameters)
+uint8_t BM1397_init(float frequency, uint16_t asic_count, uint16_t difficulty)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-    
     // send the init command
     _send_read_address();
 
-    int chip_counter = count_asic_chips(GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, BM1397_CHIP_ID, BM1397_CHIP_ID_RESPONSE_LENGTH);
+    int chip_counter = count_asic_chips(asic_count, BM1397_CHIP_ID, BM1397_CHIP_ID_RESPONSE_LENGTH);
 
     if (chip_counter == 0) {
         return 0;
@@ -241,11 +241,10 @@ uint8_t BM1397_init(void * pvParameters)
     _send_chain_inactive();
 
     // split the chip address space evenly
-    uint8_t address_interval = (uint8_t) (256 / chip_counter);
+    address_interval = (uint8_t) (256 / chip_counter);
     for (uint8_t i = 0; i < chip_counter; i++) {
         _set_chip_address(i * address_interval);
     }
-    GLOBAL_STATE->asic_address_interval = address_interval;
 
     unsigned char init[6] = {0x00, CLOCK_ORDER_CONTROL_0, 0x00, 0x00, 0x00, 0x00}; // init1 - clock_order_control0
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init, 6, BM1397_SERIALTX_DEBUG);
@@ -261,7 +260,7 @@ uint8_t BM1397_init(void * pvParameters)
 
     //set difficulty mask
     uint8_t difficulty_mask[6];
-    get_difficulty_mask(GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty, difficulty_mask);
+    get_difficulty_mask(difficulty, difficulty_mask);
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), difficulty_mask, 6, BM1397_SERIALTX_DEBUG);
 
     unsigned char init5[9] = {0x00, PLL3_PARAMETER, 0xC0, 0x70, 0x01, 0x11}; // init5 - pll3_parameter
@@ -272,7 +271,7 @@ uint8_t BM1397_init(void * pvParameters)
 
     BM1397_set_default_baud();
 
-    BM1397_send_hash_frequency(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
+    BM1397_send_hash_frequency(frequency);
 
     return chip_counter;
 }
@@ -395,6 +394,7 @@ task_result *BM1397_process_work(void *pvParameters)
     result.job_id = rx_job_id;
     result.nonce = asic_result.nonce;
     result.rolled_version = rolled_version;
+    result.asic_nr = 1; // TODO
 
     return &result;
 }
