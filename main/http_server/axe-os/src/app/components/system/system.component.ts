@@ -36,11 +36,11 @@ export class SystemComponent implements OnInit, OnDestroy {
   ) {
     this.info$ = timer(0, 5000).pipe(
       switchMap(() => this.systemService.getInfo()),
-      shareReplay(1)
+      shareReplay({ refCount: true, bufferSize: 1 })
     );
 
     this.asic$ = this.systemService.getAsicSettings().pipe(
-      shareReplay(1)
+      shareReplay({ refCount: true, bufferSize: 1 })
     );
 
     this.combinedData$ = combineLatest([this.info$, this.asic$]).pipe(
@@ -88,7 +88,9 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds), class: 'pb-3' },
       { label: 'Wi-Fi SSID', value: data.info.ssid },
       { label: 'Wi-Fi Status', value: data.info.wifiStatus },
-      { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + 'dBm', class: 'pb-3', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) },
+      { label: 'Wi-Fi IPv4', value: data.info.ipv4},
+      { label: 'Wi-Fi IPv6', value: data.info.ipv6},
+      { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + ' dBm', class: 'pb-3', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) },
       { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3' },
       { label: 'Free Heap Memory', value: data.info.freeHeap.toString(), class: 'pb-3', valueClass: data.info.isPSRAMAvailable ? '' : 'text-red-500', tooltip: data.info.isPSRAMAvailable ? '' : 'No PSRAM available or misconfigured, running in low memory mode. Disabled statistics and BAP port.' },
       { label: 'Firmware Version', value: data.info.version },
