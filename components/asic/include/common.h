@@ -9,6 +9,7 @@ typedef struct __attribute__((__packed__))
     uint8_t job_id;
     uint32_t nonce;
     uint32_t rolled_version;
+    int asic_nr;
 } task_result;
 
 unsigned char _reverse_bits(unsigned char num);

@@ -95,6 +95,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->power = Power_get_power(GLOBAL_STATE);
 
         power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+        power_management->fan2_rpm = Thermal_get_fan2_speed(&GLOBAL_STATE->DEVICE_CONFIG);
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
         power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
 
@@ -185,9 +186,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 }
             }
         } else { // Manual fan speed
-            float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
-            power_management->fan_perc = fs;
-            Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, (float) fs / 100.0);
+            uint16_t fan_perc = nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
+            if (power_management->fan_perc != fan_perc) {
+                power_management->fan_perc = fan_perc;
+                Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, (float) fan_perc / 100.0);
+            }
         }
 
         uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
