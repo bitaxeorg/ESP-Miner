@@ -60,7 +60,9 @@ void app_main(void)
     if (self_test(&GLOBAL_STATE)) return;
 
     SYSTEM_init_system(&GLOBAL_STATE);
-    statistics_init(&GLOBAL_STATE);
+    if (GLOBAL_STATE.psram_is_available) {
+        statistics_init(&GLOBAL_STATE);
+    }
 
     // init AP and connect to wifi
     wifi_init(&GLOBAL_STATE);
@@ -72,13 +74,15 @@ void app_main(void)
     //start the API for AxeOS
     start_rest_server((void *) &GLOBAL_STATE);
 
-    // Initialize BAP interface
-    esp_err_t bap_ret = BAP_init(&GLOBAL_STATE);
-    if (bap_ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize BAP interface: %d", bap_ret);
-        // Continue anyway, as BAP is not critical for core functionality
-    } else {
-        ESP_LOGI(TAG, "BAP interface initialized successfully");
+    if (GLOBAL_STATE.psram_is_available) {
+        // Initialize BAP interface
+        esp_err_t bap_ret = BAP_init(&GLOBAL_STATE);
+        if (bap_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize BAP interface: %d", bap_ret);
+            // Continue anyway, as BAP is not critical for core functionality
+        } else {
+            ESP_LOGI(TAG, "BAP interface initialized successfully");
+        }
     }
 
     while (!GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
@@ -111,5 +115,7 @@ void app_main(void)
     xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
-    xTaskCreate(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL);
+    if (GLOBAL_STATE.psram_is_available) {
+        xTaskCreate(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL);
+    }
 }
