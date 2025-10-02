@@ -347,6 +347,9 @@ components:
     Settings:
       type: object
       properties:
+        useFallbackStratum:
+          type: number
+          description: Forces the use the fallback stratum pool
         stratumURL:
           type: string
           description: Primary stratum server URL

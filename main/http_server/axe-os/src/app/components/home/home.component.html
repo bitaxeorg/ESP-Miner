@@ -290,7 +290,20 @@
 
         <div class="col-12 md:col-6">
             <div class="card">
-                <h5>Pool ({{ activePoolLabel }})</h5>
+                <div class="flex flex-nowrap justify-content-between mb-3">
+                    <h4 class="mb-0">Pool</h4>
+                    <p-dropdown
+                        [options]="(pools$ | async) ?? []"
+                        [(ngModel)]="activePoolLabel"
+                        optionLabel="label"
+                        optionValue="value"
+                        (onChange)="onPoolChange($event)"
+                        [ngClass]="{
+                            'primary-pool': activePoolLabel === 'Primary',
+                            'fallback-pool': activePoolLabel === 'Fallback'
+                        }"
+                    />
+                </div>
 
                 <div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
@@ -375,7 +388,6 @@
                         {{ info.scriptsig }}
                     </div>
                 </div>
-
             </div>
         </div>
     </div>

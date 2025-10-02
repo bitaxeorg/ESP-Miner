@@ -84,8 +84,11 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, STRATUM_EXTRANONCE_SUBSCRIBE);
     module->fallback_pool_extranonce_subscribe = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
 
-    // set fallback to false.
-    module->is_using_fallback = false;
+    // use fallback stratum
+    module->use_fallback_stratum = nvs_config_get_u16(NVS_CONFIG_USE_FALLBACK_STRATUM, 0) != 0;
+
+    // set based on config
+    module->is_using_fallback = module->use_fallback_stratum;
 
     // Initialize overheat_mode
     module->overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);

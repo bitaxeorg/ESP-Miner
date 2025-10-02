@@ -225,7 +225,7 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
 
-        if (strstr(recv_buffer, "mining.notify") != NULL) {
+        if (strstr(recv_buffer, "mining.notify") != NULL && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
             ESP_LOGI(TAG, "Heartbeat successful and in fallback mode. Switching back to primary.");
             GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
             stratum_close_connection(GLOBAL_STATE);
