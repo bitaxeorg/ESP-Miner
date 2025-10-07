@@ -9,6 +9,7 @@
 #define NVS_CONFIG_WIFI_PASS "wifipass"
 #define NVS_CONFIG_HOSTNAME "hostname"
 #define NVS_CONFIG_STRATUM_URL "stratumurl"
+#define NVS_CONFIG_USE_FALLBACK_STRATUM "usefbstartum"
 #define NVS_CONFIG_STRATUM_PORT "stratumport"
 #define NVS_CONFIG_FALLBACK_STRATUM_URL "fbstratumurl"
 #define NVS_CONFIG_FALLBACK_STRATUM_PORT "fbstratumport"

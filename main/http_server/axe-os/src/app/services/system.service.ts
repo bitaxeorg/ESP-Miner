@@ -45,6 +45,8 @@ export class SystemService {
         hostname: "Bitaxe",
         macAddr: "2C:54:91:88:C9:E3",
         ssid: "default",
+        ipv4: "192.168.1.1",
+        ipv6: "fe80::62be:b4ff:fe04:ea9c",
         wifiPass: "password",
         wifiStatus: "Connected!",
         wifiRSSI: -32,
@@ -67,7 +69,7 @@ export class SystemService {
         fallbackStratumExtranonceSubscribe: 0,
         poolDifficulty: 1000,
         responseTime: 10,
-        isUsingFallbackStratum: true,
+        isUsingFallbackStratum: false,
         frequency: 485,
         version: "v2.9.0",
         axeOSVersion: "v2.9.0",
@@ -92,7 +94,15 @@ export class SystemService {
         blockHeight: 811111,
         scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",
         networkDifficulty: "25.3T",
-
+        hashrateMonitor: {
+          asics: [{
+            total: 1069.8,
+            domains: [273.1, 298.9, 263.7, 255.9],
+            error: 0,
+          }],
+          hashrate: 1069.8,
+          errorCount: 3,
+        },
         blockFound: 0,
       }
     ).pipe(delay(1000));

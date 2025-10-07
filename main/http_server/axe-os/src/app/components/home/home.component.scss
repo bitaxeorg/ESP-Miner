@@ -31,6 +31,43 @@
     }
 }
 
+:host ::ng-deep {
+    .p-inputwrapper {
+        border: none;
+        display: flex;
+        align-items: center;
+        border-radius: 0.2rem;
+    }
+    .p-dropdown-label {
+        font-size: 13px;
+        padding: 0.2rem 0 0.2rem 0.8rem;
+    }
+    .p-overlay {
+        margin-top: 3px !important;
+    }
+    .p-dropdown-items {
+        padding: 0;
+        font-size: 13px;
+    }
+    .p-dropdown-item {
+        padding: 0.3rem 0.8rem;
+    }
+    .p-dropdown-items-wrapper {
+        border-radius: 0.2rem;
+        background-color: #304562;
+    }
+    .p-dropdown-panel {
+        border: 0;
+    }
+}
+
+.primary-pool.p-inputwrapper {
+    background-color: var(--green-500);
+}
+.fallback-pool.p-inputwrapper {
+    background-color: var(--orange-500);
+}
+
 .code {
     line-break: anywhere;
     font-family: 'Courier New', Courier, monospace;

@@ -309,7 +309,7 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
-    POWER_MANAGEMENT_init_frequency(&GLOBAL_STATE->POWER_MANAGEMENT_MODULE);
+    POWER_MANAGEMENT_init_frequency(GLOBAL_STATE);
 
     GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
 
