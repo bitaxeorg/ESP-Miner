@@ -22,6 +22,14 @@ pip install --upgrade bitaxetool
 ```
 The bitaxetool includes all necessary library for flashing the binaries to the Bitaxe Hardware.
 
+**Notes**
+ - The bitaxetool does not work properly with esptool v5.x.x, esptool v4.9.0 or earlier is required.
+ - Bitaxetool v0.6.1 - locked to using esptool v4.9.0
+
+```
+pip install bitaxetool==0.6.1
+```
+
 - Flash a "factory" image to a Bitaxe to reset to factory settings. Make sure to choose an image built for your hardware version (401) in this case:
 
 ```
@@ -150,6 +158,20 @@ A custom board version is also possible with `config-custom.cvs`. A custom board
 **Notes:** 
   - If you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
   - Some Bitaxe versions can't directly connect to a USB-C port. If yours is affected use a USB-A adapter as a workaround. More about it [here](https://github.com/bitaxeorg/bitaxeGamma/issues/37).
+
+### Wi-Fi routers
+
+There are some Wi-Fi routers that will block mining, ASUS Wi-Fi routers & some TP-Link Wi-Fi routers for example.
+If you find that your not able to mine / have no hash rate you will need to check the Wi-Fi routers settings and disable the following;
+
+1/ AiProtection
+
+2/ IoT 
+
+If your Wi-Fi router has both of these options you might have to disable them both.
+
+If your still having problems here, check other settings within the Wi-Fi router and the bitaxe device, this includes the URL for
+the Stratum Host and Stratum Port.
 
 ## Attributions
 
