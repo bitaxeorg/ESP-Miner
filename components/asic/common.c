@@ -50,6 +50,8 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
             break;
         }
 
+        ESP_LOG_BUFFER_HEX(TAG, buffer, received);
+
         if (received != chip_id_response_length) {
             ESP_LOGE(TAG, "Invalid CHIP_ID response length: expected %d, got %d", chip_id_response_length, received);
             ESP_LOG_BUFFER_HEX(TAG, buffer, received);
