@@ -13,15 +13,9 @@ static i2c_master_dev_handle_t ina260_dev_handle;
  *
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
-esp_err_t INA260_init(void) {
-    return i2c_bitaxe_add_device(INA260_I2CADDR_DEFAULT, &ina260_dev_handle, TAG);
-}
-
-
-bool INA260_installed(void)
+esp_err_t INA260_init(void)
 {
-    uint8_t data[2];
-    return i2c_bitaxe_register_read(ina260_dev_handle, INA260_REG_BUSVOLTAGE, data, 2) == ESP_OK;
+    return i2c_bitaxe_add_device(INA260_I2CADDR_DEFAULT, &ina260_dev_handle, TAG);
 }
 
 float INA260_read_current(void)
