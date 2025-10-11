@@ -169,7 +169,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           fanspeed: [info.fanspeed, [Validators.required]],
           temptarget: [info.temptarget, [Validators.required]],
           overheat_mode: [info.overheat_mode, [Validators.required]],
-          statsFrequency: [info.statsFrequency, [
+          statsFrequency: [info.frequency, [
             Validators.required,
             Validators.min(0),
             Validators.max(this.statsFrequencyMaxValue)
@@ -203,13 +203,13 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       );
 
       // Add custom value to predefined steps
-      if (STATS_FREQUENCY_STEPS.filter(x => x === info.statsFrequency).length === 0) {
-        STATS_FREQUENCY_STEPS.push(info.statsFrequency);
+      if (STATS_FREQUENCY_STEPS.filter(x => x === info.frequency).length === 0) {
+        STATS_FREQUENCY_STEPS.push(info.frequency);
         STATS_FREQUENCY_STEPS.sort((a, b) => a - b);
       }
 
       this.statsFrequencyControl.setValue(
-        STATS_FREQUENCY_STEPS.findIndex(x => x === info.statsFrequency)
+        STATS_FREQUENCY_STEPS.findIndex(x => x === info.frequency)
       );
     });
   }
