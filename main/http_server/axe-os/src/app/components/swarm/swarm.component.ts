@@ -145,8 +145,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       }).pipe(
         map(({ info, asic }) => {
           const existingDevice = this.swarm.find(device => device.IP === IP);
-          const result = { IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic };
-          return this.fallbackDeviceModel(result);
+          return this.fallbackDeviceModel({ IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic });
         }),
         timeout(5000),
         catchError(error => errorHandler(error, IP))
@@ -173,8 +172,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       if (!info.ASICModel || !asic.ASICModel) {
         return;
       }
-
-      this.swarm.push({ IP, ...asic, ...info });
+      this.swarm.push(this.fallbackDeviceModel({ IP, ...info, ...asic }));
       this.sortSwarm();
       this.localStorageService.setObject(SWARM_DATA, this.swarm);
       this.calculateTotals();
@@ -329,11 +327,12 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   // Fallback logic to derive deviceModel and swarmColor, can be removed after some time
   private fallbackDeviceModel(data: any): any {
-    if (data.deviceModel && data.swarmColor && data.poolDifficulty) return data;
+    if (data.deviceModel && data.swarmColor && data.poolDifficulty && data.hashRate) return data;
     const deviceModel = data.deviceModel || this.deriveDeviceModel(data);
     const swarmColor = data.swarmColor || this.deriveSwarmColor(deviceModel);
     const poolDifficulty = data.poolDifficulty || data.stratumDiff;
-    return { ...data, deviceModel, swarmColor, poolDifficulty };
+    const hashRate = data.hashRate || data.hashRate_10m;
+    return { ...data, deviceModel, swarmColor, poolDifficulty, hashRate };
   }
 
   private deriveDeviceModel(data: any): string {
