@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
+import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
@@ -482,7 +483,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : ''),
         (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : ''),
         (!info.power_fault ? `${info.power} W` : ''),
-        (info.bestDiff ? info.bestDiff : ''),
+        (info.bestDiff ? DiffSuffixPipe.transform(info.bestDiff) : ''),
       );
     }
 
