@@ -345,6 +345,8 @@ task_result *BM1397_process_work(void *pvParameters)
 {
     bm1397_asic_result_t asic_result = {0};
 
+    memset(&result, 0, sizeof(task_result));
+
     if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
         return NULL;
     }
@@ -394,7 +396,7 @@ task_result *BM1397_process_work(void *pvParameters)
     result.job_id = rx_job_id;
     result.nonce = asic_result.nonce;
     result.rolled_version = rolled_version;
-    result.asic_nr = 1; // TODO
+    result.asic_nr = 0; // TODO
 
     return &result;
 }

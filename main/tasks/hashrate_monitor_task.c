@@ -79,22 +79,13 @@ void hashrate_monitor_task(void *pvParameters)
     HASHRATE_MONITOR_MODULE->domain_3_measurement = malloc(asic_count * sizeof(measurement_t));
     HASHRATE_MONITOR_MODULE->error_measurement = malloc(asic_count * sizeof(measurement_t));
 
-    // Initialize all measurement arrays to zero to prevent garbage data on chips without register support
     clear_measurements(HASHRATE_MONITOR_MODULE, asic_count);
 
     HASHRATE_MONITOR_MODULE->is_initialized = true;
 
-    // Only BM1370 supports register-based hashrate monitoring
-    // adding BM1366 and BM1368 later
-    bool supports_register_reading = (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BM1370);
-
     TickType_t taskWakeTime = xTaskGetTickCount();
     while (1) {
-        if (supports_register_reading) {
-            ASIC_read_registers(GLOBAL_STATE);
-        }
-
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        ASIC_read_registers(GLOBAL_STATE);
 
         float hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
 
@@ -124,7 +115,7 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
 
     if (asic_nr >= asic_count) {
-        ESP_LOGE(TAG, "Asic nr out of bounds");
+        ESP_LOGE(TAG, "Asic nr out of bounds [%d]", asic_nr);
         return;
     }
 

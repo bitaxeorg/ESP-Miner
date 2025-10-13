@@ -48,7 +48,7 @@ static const char * TAG = "bm1368";
 
 static task_result result;
 
-static uint8_t address_interval;
+static int address_interval;
 
 static void _send_BM1368(uint8_t header, uint8_t * data, uint8_t data_len, bool debug)
 {
@@ -153,7 +153,7 @@ uint8_t BM1368_init(float frequency, uint16_t asic_count, uint16_t difficulty)
         _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, init_cmds[i], 6, false);
     }
 
-    address_interval = (uint8_t) (256 / chip_counter);
+    address_interval = 256 / chip_counter;
     for (int i = 0; i < chip_counter; i++) {
         _set_chip_address(i * address_interval);
     }
@@ -239,13 +239,15 @@ task_result * BM1368_process_work(void * pvParameters)
 {
     bm1368_asic_result_t asic_result = {0};
 
+    memset(&result, 0, sizeof(task_result));
+
     if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
         return NULL;
     }
 
     uint8_t job_id = (asic_result.job_id & 0xf0) >> 1;
     uint32_t nonce_h = ntohl(asic_result.nonce);
-    uint8_t asic_nr = ((uint8_t)((nonce_h >> 17) & 0xff) / address_interval) + 1;
+    uint8_t asic_nr = (uint8_t)((nonce_h >> 17) & 0xff) / address_interval;
     uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
     uint8_t small_core_id = asic_result.job_id & 0x0f;
     uint32_t version_bits = (ntohs(asic_result.version) << 13);
