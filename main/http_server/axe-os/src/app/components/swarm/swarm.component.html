@@ -88,15 +88,19 @@
                     <div class="card flex justify-content-between mb-0 h-full">
                         <div class="flex flex-column justify-content-between">
                             <div class="flex flex-column">
-                                <a [href]="'http://' + axe.IP" target="_blank" class="flex flex-column">
-                                    <span class="text-800" pTooltip="Hostname" tooltipPosition="top">
-                                        {{axe.hostname}}
-                                        <span class="ml-1 text-lg line-height-1" [ngStyle]="{color: axe.swarmColor}">●</span>
-                                    </span>
-                                    <span class="text-900" pTooltip="IP" tooltipPosition="top">
+                                <div class="flex flex-column">
+                                    <div>
+                                        <a [href]="'http://' + axe.IP" target="_blank" class="text-900" pTooltip="Hostname" tooltipPosition="top">
+                                            {{axe.hostname}}
+                                        </a>
+                                        <span class="ml-1 text-lg line-height-1 cursor-pointer" [ngStyle]="{color: axe.swarmColor}" pTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">
+                                            ●
+                                        </span>
+                                    </div>
+                                    <a [href]="'http://' + axe.IP" target="_blank" class="text-800" pTooltip="IP" tooltipPosition="top">
                                         {{axe.IP}}
-                                    </span>
-                                </a>
+                                    </a>
+                                </div>
                                 <span class="text-500 cursor-pointer" pTooltip="Version" tooltipPosition="top">
                                     {{axe.version}}
                                 </span>
@@ -201,13 +205,13 @@
                     <tbody>
                         <tr *ngFor="let axe of filteredSwarm">
                             <td>
-                                <a [href]="'http://' + axe.IP" target="_blank" class="text-800">
-                                     <span class="mr-1 text-lg line-height-1" [ngStyle]="{color: axe.swarmColor}">●</span>
-                                    {{axe.hostname}}
+                                <a [href]="'http://' + axe.IP" target="_blank">
+                                    <span class="text-900">{{axe.hostname}}</span>
+                                    <span class="ml-2 text-lg line-height-1 cursor-pointer" [ngStyle]="{color: axe.swarmColor}" pTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">●</span>
                                 </a>
                             </td>
                             <td>
-                                <a [href]="'http://' + axe.IP" target="_blank" class="text-900">{{axe.IP}}</a>
+                                <a [href]="'http://' + axe.IP" target="_blank" class="text-800">{{axe.IP}}</a>
                             </td>
                             <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
                             <td>
@@ -269,7 +273,7 @@
             <div class="flex flex-wrap gap-2 mt-3 text-sm justify-content-center">
                 <div *ngFor="let item of deviceFamilies" class="flex align-items-center gap-1">
                     <span [ngStyle]="{color: item.swarmColor}">●</span>
-                    <span class="text-500">{{ item.deviceModel || 'Other' }} ({{ item.asicCount > 1 ? item.asicCount + 'x ' : '' }}{{ item.ASICModel }})</span>
+                    <span class="text-500">{{stringifyDeviceLabel(item)}}</span>
                 </div>
             </div>
         </ng-container>

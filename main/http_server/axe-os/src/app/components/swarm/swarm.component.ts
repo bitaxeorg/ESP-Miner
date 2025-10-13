@@ -378,6 +378,15 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
   }
 
+  public stringifyDeviceLabel(data: any): string {
+    const model = data.deviceModel || 'Other';
+    const asicCountPart = data.asicCount > 1 ? data.asicCount + 'x ' : '';
+    const asicModel = data.ASICModel || '';
+
+    return model + ' (' + asicCountPart + asicModel + ')';
+  };
+
+
   public toggleGridView(gridView: boolean): void {
     this.localStorageService.setBool(SWARM_GRID_VIEW, this.gridView = gridView);
   }
