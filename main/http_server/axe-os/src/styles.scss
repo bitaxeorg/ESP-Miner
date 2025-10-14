@@ -212,9 +212,9 @@ button.color-dot {
         .p-dropdown-item {
             font-size: small;
         }
-    }
-    &--border-color-primary {
-        border-color: var(--primary-color);
+        .p-dropdown-label {
+            padding: 0.3rem 0 0.3rem 0.7rem;
+        }
     }
 }
 
