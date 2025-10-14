@@ -9,6 +9,7 @@
 #define EMA_ALPHA 12
 
 #define HASH_CNT_LSB 0x100000000uLL // Hash counters are incremented on difficulty 1 (2^32 hashes)
+#define HASHRATE_UNIT 0x100000uLL // Hashrate register unit (2^24 hashes)
 
 static const char *TAG = "hashrate_monitor";
 
@@ -53,7 +54,18 @@ static float hash_counter_to_ghs(uint32_t duration_ms, uint32_t counter)
     return hashrate / 1e9f; // Convert to Gh/s
 }
 
-static void update_measurement(uint32_t time_ms, uint32_t value, measurement_t * measurement, int asic_nr)
+static void update_hashrate(uint32_t value, measurement_t * measurement, int asic_nr)
+{
+    uint8_t flag_long = (value & 0x80000000) >> 31;
+    uint32_t hashrate_value = value & 0x7FFFFFFF;    
+
+    if (hashrate_value != 0x007FFFFF && !flag_long) {
+        float hashrate = hashrate_value * (float)HASHRATE_UNIT; // Make sure it stays in float
+        measurement[asic_nr].hashrate =  hashrate / 1e9f; // Convert to Gh/s
+    }
+}
+
+static void update_hash_counter(uint32_t time_ms, uint32_t value, measurement_t * measurement, int asic_nr)
 {
     uint32_t previous_time_ms = measurement[asic_nr].time_ms;
     if (previous_time_ms != 0) {
@@ -128,23 +140,26 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
     }
 
     switch(register_type) {
+        case REGISTER_HASHRATE:
+            update_hashrate(value, HASHRATE_MONITOR_MODULE->total_measurement, asic_nr);
+            break;
         case REGISTER_TOTAL_COUNT:
-            update_measurement(time_ms, value, HASHRATE_MONITOR_MODULE->total_measurement, asic_nr);
+            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->total_measurement, asic_nr);
             break;
         case REGISTER_DOMAIN_0_COUNT:
-            update_measurement(time_ms, value, HASHRATE_MONITOR_MODULE->domain_0_measurement, asic_nr);
+            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_0_measurement, asic_nr);
             break;
         case REGISTER_DOMAIN_1_COUNT:
-            update_measurement(time_ms, value, HASHRATE_MONITOR_MODULE->domain_1_measurement, asic_nr);
+            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_1_measurement, asic_nr);
             break;
         case REGISTER_DOMAIN_2_COUNT:
-            update_measurement(time_ms, value, HASHRATE_MONITOR_MODULE->domain_2_measurement, asic_nr);
+            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_2_measurement, asic_nr);
             break;
         case REGISTER_DOMAIN_3_COUNT:
-            update_measurement(time_ms, value, HASHRATE_MONITOR_MODULE->domain_3_measurement, asic_nr);
+            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_3_measurement, asic_nr);
             break;
         case REGISTER_ERROR_COUNT:
-            update_measurement(time_ms, value, HASHRATE_MONITOR_MODULE->error_measurement, asic_nr);
+            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->error_measurement, asic_nr);
             break;
         case REGISTER_INVALID:
             ESP_LOGE(TAG, "Invalid register type");
