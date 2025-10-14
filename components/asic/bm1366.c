@@ -319,7 +319,7 @@ task_result * BM1366_process_work(void * pvParameters)
 {
     bm1366_asic_result_t asic_result = {0};
 
-    memset(&result, 0, sizeof(task_result));    
+    memset(&result, 0, sizeof(task_result));
 
     if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
         return NULL;
@@ -364,7 +364,7 @@ void BM1366_read_registers(void)
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
     for (int reg = 0; reg < size; reg++) {
         if (REGISTER_MAP[reg] != REGISTER_INVALID) {
-            _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, reg}, 2, false);
+            _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1366_SERIALTX_DEBUG);
             vTaskDelay(1 / portTICK_PERIOD_MS);
         }
     }
