@@ -36,13 +36,12 @@ static uint32_t sum_values(measurement_t * measurement, int asic_count)
     return total;
 }
 
-static void clear_measurements(HashrateMonitorModule * HASHRATE_MONITOR_MODULE, int asic_count)
+static void clear_measurements(HashrateMonitorModule * HASHRATE_MONITOR_MODULE, int asic_count, int hash_domains)
 {
     memset(HASHRATE_MONITOR_MODULE->total_measurement, 0, asic_count * sizeof(measurement_t));
-    memset(HASHRATE_MONITOR_MODULE->domain_0_measurement, 0, asic_count * sizeof(measurement_t));
-    memset(HASHRATE_MONITOR_MODULE->domain_1_measurement, 0, asic_count * sizeof(measurement_t));
-    memset(HASHRATE_MONITOR_MODULE->domain_2_measurement, 0, asic_count * sizeof(measurement_t));
-    memset(HASHRATE_MONITOR_MODULE->domain_3_measurement, 0, asic_count * sizeof(measurement_t));
+    if (hash_domains > 0) {
+        memset(HASHRATE_MONITOR_MODULE->domain_measurements[0], 0, asic_count * hash_domains * sizeof(measurement_t));
+    }
     memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
 }
 
@@ -83,15 +82,19 @@ void hashrate_monitor_task(void *pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
     HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
 
     HASHRATE_MONITOR_MODULE->total_measurement = malloc(asic_count * sizeof(measurement_t));
-    HASHRATE_MONITOR_MODULE->domain_0_measurement = malloc(asic_count * sizeof(measurement_t));
-    HASHRATE_MONITOR_MODULE->domain_1_measurement = malloc(asic_count * sizeof(measurement_t));
-    HASHRATE_MONITOR_MODULE->domain_2_measurement = malloc(asic_count * sizeof(measurement_t));
-    HASHRATE_MONITOR_MODULE->domain_3_measurement = malloc(asic_count * sizeof(measurement_t));
+    if (hash_domains > 0) {
+        measurement_t* data = malloc(asic_count * hash_domains * sizeof(measurement_t));
+        HASHRATE_MONITOR_MODULE->domain_measurements = malloc(asic_count * sizeof(measurement_t*));
+        for (size_t i = 0; i < asic_count; i++) {
+            HASHRATE_MONITOR_MODULE->domain_measurements[i] = data + (i * hash_domains);
+        }
+    }
     HASHRATE_MONITOR_MODULE->error_measurement = malloc(asic_count * sizeof(measurement_t));
 
-    clear_measurements(HASHRATE_MONITOR_MODULE, asic_count);
+    clear_measurements(HASHRATE_MONITOR_MODULE, asic_count, hash_domains);
 
     HASHRATE_MONITOR_MODULE->is_initialized = true;
 
@@ -127,6 +130,7 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
     PowerManagementModule * POWER_MANAGEMENT_MODULE = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
 
     if (asic_nr >= asic_count) {
         ESP_LOGE(TAG, "Asic nr out of bounds");
@@ -135,7 +139,7 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
 
     // Reset statistics on start and when frequency changes
     if (POWER_MANAGEMENT_MODULE->frequency_value != frequency_value) {
-        clear_measurements(HASHRATE_MONITOR_MODULE, asic_count);
+        clear_measurements(HASHRATE_MONITOR_MODULE, asic_count, hash_domains);
         frequency_value = POWER_MANAGEMENT_MODULE->frequency_value;
     }
 
@@ -147,16 +151,16 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
             update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->total_measurement, asic_nr);
             break;
         case REGISTER_DOMAIN_0_COUNT:
-            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_0_measurement, asic_nr);
+            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_measurements[0], asic_nr);
             break;
         case REGISTER_DOMAIN_1_COUNT:
-            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_1_measurement, asic_nr);
+            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_measurements[1], asic_nr);
             break;
         case REGISTER_DOMAIN_2_COUNT:
-            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_2_measurement, asic_nr);
+            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_measurements[2], asic_nr);
             break;
         case REGISTER_DOMAIN_3_COUNT:
-            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_3_measurement, asic_nr);
+            update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->domain_measurements[3], asic_nr);
             break;
         case REGISTER_ERROR_COUNT:
             update_hash_counter(time_ms, value, HASHRATE_MONITOR_MODULE->error_measurement, asic_nr);

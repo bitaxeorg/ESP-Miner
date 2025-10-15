@@ -992,14 +992,17 @@ static esp_err_t GET_system_info(httpd_req_t * req)
             cJSON *asic = cJSON_CreateObject();
             cJSON_AddItemToArray(asics_array, asic);
             cJSON_AddNumberToObject(asic, "total", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
-    
-            float domains[4] = { 0 };
-            domains[0] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_0_measurement[i].hashrate;
-            domains[1] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_1_measurement[i].hashrate;
-            domains[2] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_2_measurement[i].hashrate;
-            domains[3] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_3_measurement[i].hashrate;
-            cJSON_AddItemToObject(asic, "domains", cJSON_CreateFloatArray(domains, 4));
-    
+
+            int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
+            if (hash_domains > 0) {
+                cJSON* hash_domain_array = cJSON_CreateArray();
+                for (int j = 0; j < hash_domains; j++) {
+                    cJSON *hashrate = cJSON_CreateNumber(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][j].hashrate);
+                    cJSON_AddItemToArray(hash_domain_array, hashrate);
+                }
+                cJSON_AddItemToObject(asic, "domains", hash_domain_array);
+            }
+
             cJSON_AddNumberToObject(asic, "error", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_measurement[i].hashrate);
         }
     }
