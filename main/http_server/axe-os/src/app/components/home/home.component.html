@@ -46,7 +46,7 @@
                 <ng-container *ngIf="!info.power_fault">
                     Average:
                     <span class="text-green-500 font-medium">
-                        {{calculateAverage(hashrateData) | hashSuffix}}
+                        {{getHashrateAverage() | hashSuffix}}
                     </span>
                 </ng-container>
 
@@ -66,7 +66,7 @@
                         <span class="block text-500 font-medium mb-3">Efficiency</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
                             <span *ngIf="!info.power_fault">
-                                {{info.power / (info.hashRate / 1000000000000) | number: '1.2-2'}} J/Th
+                                {{getEfficiency(info) | number: '1.2-2'}} J/Th
                             </span>
                             <span *ngIf="info.power_fault" class="text-red-500">
                                 Not available - Power fault
@@ -78,12 +78,12 @@
                 <ng-container *ngIf="!info.power_fault">
                     Average:
                     <span class="text-green-500 font-medium">
-                        {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} J/Th
+                        {{getEfficiencyAverage() | number: '1.2-2'}} J/Th
                     </span>
                 </ng-container>
 
                 <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
-                    Expected: {{info.power / (info.expectedHashrate / 1000000000000) | number: '1.2-2'}} J/Th
+                    Expected: {{getExpectedEfficiency(info) | number: '1.2-2'}} J/Th
                 </div>
             </div>
         </div>
@@ -114,11 +114,7 @@
                         <span class="text-500">
                             {{ sharesRejectedReason.message }}
                         </span>
-                        ({{
-                            (sharesRejectedReason.count /
-                            (info.sharesAccepted + info.sharesRejected) * 100)
-                            | number: '1.2-2'
-                        }} %)
+                        ({{getShareRejectionPercentage(sharesRejectedReason, info) | number: '1.2-2'}} %)
                         </span>
                     </div>
                 </div>
