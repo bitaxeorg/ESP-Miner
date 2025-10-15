@@ -53,6 +53,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolUser!: string;
   public activePoolLabel!: PoolLabel;
   public responseTime!: number;
+  public heatmapVisible: boolean = false;
 
   @ViewChild('chart')
   private chart?: UIChart
@@ -578,7 +579,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number} {
     switch (label) {
-      case eChartLabel.hashrate:    
+      case eChartLabel.hashrate:
       case eChartLabel.hashrateRegister: return {suffix: ' H/s', precision: 0};
       case eChartLabel.asicTemp:
       case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};

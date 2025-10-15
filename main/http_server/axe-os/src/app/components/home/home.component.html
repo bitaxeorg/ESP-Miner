@@ -28,34 +28,97 @@
 
     <div class="grid">
         <div class="col-12 md:col-6 xl:col-3">
-            <div class="card mb-0">
-                <div class="flex justify-content-between mb-3">
-                    <div>
-                        <span class="block text-500 font-medium mb-3">Hashrate</span>
-                        <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
-                            <span *ngIf="!info.power_fault">
-                                {{info.hashRate | hashSuffix}}
-                            </span>
-                            <span *ngIf="info.power_fault" class="text-red-500">
+            <div class="card mb-0 p-0" [ngClass]="{'is-flipped': heatmapVisible}">
+                <div class="card__face card__face--front p-4 md:p-5">
+                    <div class="flex flex-column justify-content-between">
+                        <div class="flex flex-row justify-content-between align-items-center mb-3">
+                            <span class="block text-500 font-medium">Hashrate</span>
+                            <button pButton type="button"
+                                class="cursor-pointer p-button-icon-only-borderless"
+                                (click)="heatmapVisible = !heatmapVisible"
+                                pTooltip="Hashrate Heatmap"
+                                tooltipPosition="bottom">
+                                    <i class="pi pi-table"></i>
+                            </button>
+                        </div>
+
+                        <ng-container *ngIf="!info.power_fault; else powerFault">
+                            <div class="flex align-items-baseline gap-2 mb-3">
+                                <ng-container *ngIf="info.hashrateMonitor; else noHashrateMonitor">
+                                    <span class="text-900 font-medium text-2xl">
+                                        {{info.hashrateMonitor.hashrate | hashSuffix}}
+                                    </span>
+                                    <span class="text-500 text-xs">
+                                        Error: {{info.hashrateMonitor.errorCount}}
+                                    </span>
+                                </ng-container>
+                                <ng-template #noHashrateMonitor>
+                                    {{info.hashRate | hashSuffix}}
+                                </ng-template>
+                            </div>
+
+                            <div>
+                                Average:
+                                <span class="text-green-500 font-medium">
+                                    {{calculateAverage(hashrateData) | hashSuffix}}
+                                </span>
+                            </div>
+                            <div class="text-500 text-xs" *ngIf="info.expectedHashrate">
+                                Expected: {{info.expectedHashrate | hashSuffix}}
+                            </div>
+                        </ng-container>
+
+                        <ng-template #powerFault>
+                            <span class="text-red-500">
                                 Not available - Power fault
                             </span>
-                        </div>
+                        </ng-template>
                     </div>
                 </div>
 
-                <ng-container *ngIf="!info.power_fault">
-                    Average:
-                    <span class="text-green-500 font-medium">
-                        {{calculateAverage(hashrateData) | hashSuffix}}
-                    </span>
-                </ng-container>
+                <div class="card__face card__face--back p-4 md:p-5">
+                    <div class="flex flex-column justify-content-between max-h-full">
+                        <div class="flex flex-row justify-content-between align-items-center mb-3">
+                            <span class="block text-500 font-medium">Hashrate Heatmap</span>
+                            <button pButton type="button"
+                                class="cursor-pointer p-button-icon-only-borderless"
+                                (click)="heatmapVisible = !heatmapVisible"
+                                pTooltip="Close Heatmap"
+                                tooltipPosition="bottom">
+                                    <i class="pi pi-times"></i>
+                            </button>
+                        </div>
 
-                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
-                    Expected: {{info.expectedHashrate | hashSuffix}}
-                </div>
-
-                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.hashrateMonitor">
-                    Register: {{info.hashrateMonitor.hashrate | hashSuffix}} Error: {{info.hashrateMonitor.errorCount}}
+                        <div class="overflow-auto">
+                            <table class="heatmap text-{{info.hashrateMonitor.asics.length <= 2 ? 'sm' : 'xs'}}">
+                                <thead>
+                                    <tr>
+                                        <th class="text-left">#</th>
+                                        <th colspan="4">Domains</th>
+                                        <th>Error</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr *ngFor="let asic of info.hashrateMonitor.asics; let i = index">
+                                        <td class="text-500 text-left cursor-pointer" pTooltip="ASIC {{ i + 1 }}" tooltipPosition="bottom">
+                                            {{ i + 1 }}
+                                        </td>
+                                        <td *ngFor="let domain of asic.domains"
+                                            [style.--intensity]="domain / 1000"
+                                            [style.height]="(info.hashrateMonitor.asics.length <= 2 ? '2rem' : null)"
+                                            class="text-center cursor-pointer"
+                                            pTooltip="{{ (domain * 100000000000) | hashSuffix }}"
+                                            tooltipPosition="bottom">
+                                            <span class="md:hidden">{{ domain }}</span>
+                                        </td>
+                                        <td class="text-center cursor-pointer" pTooltip="{{ (asic.error * 100000000000) | hashSuffix }}" tooltipPosition="bottom">
+                                            {{ asic.error ? ((asic.error / (info.expectedHashrate / 100000000000)) | number: '1.0-0') : '0' }} %
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
