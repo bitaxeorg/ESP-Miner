@@ -87,9 +87,9 @@ void hashrate_monitor_task(void *pvParameters)
     HASHRATE_MONITOR_MODULE->total_measurement = malloc(asic_count * sizeof(measurement_t));
     if (hash_domains > 0) {
         measurement_t* data = malloc(asic_count * hash_domains * sizeof(measurement_t));
-        HASHRATE_MONITOR_MODULE->domain_measurements = malloc(asic_count * sizeof(measurement_t*));
-        for (size_t i = 0; i < asic_count; i++) {
-            HASHRATE_MONITOR_MODULE->domain_measurements[i] = data + (i * hash_domains);
+        HASHRATE_MONITOR_MODULE->domain_measurements = malloc(hash_domains * sizeof(measurement_t*));
+        for (size_t i = 0; i < hash_domains; i++) {
+            HASHRATE_MONITOR_MODULE->domain_measurements[i] = data + (i * asic_count);
         }
     }
     HASHRATE_MONITOR_MODULE->error_measurement = malloc(asic_count * sizeof(measurement_t));
