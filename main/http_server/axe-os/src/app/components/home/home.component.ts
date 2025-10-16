@@ -523,15 +523,20 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.calculateAverage(efficiencies);
   }
 
+  private calculateEfficiency(info: ISystemInfo, key: 'hashRate' | 'expectedHashrate'): number {
+    const hashrate = info[key];
+    if (info.power_fault || hashrate <= 0) {
+      return 0;
+    }
+    return info.power / (hashrate / 1_000_000_000_000);
+  }
+
   public getHashrateAverage(): number {
     return this.calculateAverage(this.hashrateData);
   }
 
   public getEfficiency(info: ISystemInfo): number {
-    if (info.power_fault || info.hashRate <= 0) {
-      return 0;
-    }
-    return info.power / (info.hashRate / 1000000000000);
+    return this.calculateEfficiency(info, 'hashRate');
   }
 
   public getEfficiencyAverage(): number {
@@ -539,10 +544,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   public getExpectedEfficiency(info: ISystemInfo): number {
-    if (info.power_fault || info.expectedHashrate <= 0) {
-      return 0;
-    }
-    return info.power / (info.expectedHashrate / 1000000000000);
+    return this.calculateEfficiency(info, 'expectedHashrate');
   }
 
   public getShareRejectionPercentage(sharesRejectedReason: { count: number }, info: ISystemInfo): number {
@@ -608,7 +610,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number} {
     switch (label) {
-      case eChartLabel.hashrate:    
+      case eChartLabel.hashrate:
       case eChartLabel.hashrateRegister: return {suffix: ' H/s', precision: 0};
       case eChartLabel.asicTemp:
       case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};
