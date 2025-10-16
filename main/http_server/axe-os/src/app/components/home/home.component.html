@@ -107,12 +107,12 @@
                                             [style.--intensity]="domain / 1000"
                                             [style.height]="(info.hashrateMonitor.asics.length <= 2 ? '2rem' : null)"
                                             class="text-center cursor-pointer"
-                                            pTooltip="{{ (domain * 100000000000) | hashSuffix }}"
+                                            pTooltip="{{ domain | hashSuffix }}"
                                             tooltipPosition="bottom">
                                             <span class="md:hidden">{{ domain }}</span>
                                         </td>
-                                        <td class="text-center cursor-pointer" pTooltip="{{ (asic.error * 100000000000) | hashSuffix }}" tooltipPosition="bottom">
-                                            {{ asic.error ? ((asic.error / (info.expectedHashrate / 100000000000)) | number: '1.0-0') : '0' }} %
+                                        <td class="text-center cursor-pointer" pTooltip="{{ asic.error | hashSuffix }}" tooltipPosition="bottom">
+                                            {{getDomainErrorPercentage(asic, info) | number: '1.0-0'}} %
                                         </td>
                                     </tr>
                                 </tbody>

@@ -556,6 +556,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     return (sharesRejectedReason.count / totalShares) * 100;
   }
 
+  public getDomainErrorPercentage(asic: { error: number }, info: ISystemInfo): number {
+    return asic.error ? (asic.error / (info.expectedHashrate / 1_000_000_000_000)) : 0;
+  }
+
   public clearDataPoints() {
     this.dataLabel.length = 0;
     this.hashrateData.length = 0;
