@@ -236,7 +236,7 @@ void stratum_primary_heartbeat(void * pvParameters)
     }
 }
 
-void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
+static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
 {
     double network_difficulty = networkDifficulty(mining_notification->target);
     suffixString(network_difficulty, GLOBAL_STATE->network_diff_string, DIFF_STRING_SIZE, 0);    
@@ -278,6 +278,10 @@ void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify 
     if (!scriptsig) return;
 
     int coinbase_1_tag_len = coinbase_1_len - coinbase_1_offset;
+    if (coinbase_1_tag_len > scriptsig_length) {
+        coinbase_1_tag_len = scriptsig_length;
+    }
+
     hex2bin(mining_notification->coinbase_1 + (coinbase_1_offset * 2), (uint8_t *) scriptsig, coinbase_1_tag_len);
 
     int coinbase_2_tag_len = scriptsig_length - coinbase_1_tag_len;
