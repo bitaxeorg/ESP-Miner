@@ -268,10 +268,14 @@ void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify 
         GLOBAL_STATE->block_height = block_height;
     }
 
-    size_t scriptsig_length = scriptsig_len - 1 - block_height_len - (strlen(GLOBAL_STATE->extranonce_str) / 2) - GLOBAL_STATE->extranonce_2_len;
+    size_t scriptsig_length = scriptsig_len - 1 - block_height_len;
+    if (coinbase_1_len - coinbase_1_offset < scriptsig_len - 1 - block_height_len) {
+        scriptsig_length -= (strlen(GLOBAL_STATE->extranonce_str) / 2) + GLOBAL_STATE->extranonce_2_len;
+    }
     if (scriptsig_length <= 0) return;
     
     char * scriptsig = malloc(scriptsig_length + 1);
+    if (!scriptsig) return;
 
     int coinbase_1_tag_len = coinbase_1_len - coinbase_1_offset;
     hex2bin(mining_notification->coinbase_1 + (coinbase_1_offset * 2), (uint8_t *) scriptsig, coinbase_1_tag_len);

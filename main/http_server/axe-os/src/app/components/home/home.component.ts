@@ -524,6 +524,38 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.calculateAverage(efficiencies);
   }
 
+  private calculateEfficiency(info: ISystemInfo, key: 'hashRate' | 'expectedHashrate'): number {
+    const hashrate = info[key];
+    if (info.power_fault || hashrate <= 0) {
+      return 0;
+    }
+    return info.power / (hashrate / 1_000_000_000_000);
+  }
+
+  public getHashrateAverage(): number {
+    return this.calculateAverage(this.hashrateData);
+  }
+
+  public getEfficiency(info: ISystemInfo): number {
+    return this.calculateEfficiency(info, 'hashRate');
+  }
+
+  public getEfficiencyAverage(): number {
+    return this.calculateEfficiencyAverage(this.hashrateData, this.powerData);
+  }
+
+  public getExpectedEfficiency(info: ISystemInfo): number {
+    return this.calculateEfficiency(info, 'expectedHashrate');
+  }
+
+  public getShareRejectionPercentage(sharesRejectedReason: { count: number }, info: ISystemInfo): number {
+    const totalShares = info.sharesAccepted + info.sharesRejected;
+    if (totalShares <= 0) {
+      return 0;
+    }
+    return (sharesRejectedReason.count / totalShares) * 100;
+  }
+
   public clearDataPoints() {
     this.dataLabel.length = 0;
     this.hashrateData.length = 0;
