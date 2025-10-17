@@ -84,7 +84,7 @@ export class SystemComponent implements OnInit, OnDestroy {
     return [
       { label: 'Device Model', value: data.asic.deviceModel || 'Other', valueClass: 'text-' + data.asic.swarmColor + '-500' },
       { label: 'Board Version', value: data.info.boardVersion },
-      { label: 'Asic Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
+      { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
 
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds), class: 'pb-3' },
       { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitiveData: true },
