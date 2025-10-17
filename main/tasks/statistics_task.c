@@ -17,65 +17,13 @@
 
 static const char * TAG = "statistics_task";
 
-static StatisticsNodePtr statisticsBuffer = NULL;
-static StatisticsNodePtr statisticsDataStart = NULL;
-static StatisticsNodePtr statisticsDataEnd = NULL;
+static StatisticsDataPtr statisticsBuffer;
+static int16_t statisticsDataStart = -1;
+static int16_t statisticsDataEnd = -1;
 static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 
 static const uint16_t maxDataCount = 720;
 static uint16_t statsFrequency;
-
-StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
-{
-    if ((NULL == data) || (0 == statsFrequency)) {
-        return NULL;
-    }
-
-    createStatisticsBuffer();
-
-    pthread_mutex_lock(&statisticsDataLock);
-
-    if (NULL != statisticsBuffer) {
-        statisticsDataEnd = statisticsDataEnd->next;
-
-        if (statisticsDataStart == statisticsDataEnd) {
-            statisticsDataStart = statisticsDataStart->next;
-        } else if(NULL == statisticsDataStart) {
-            statisticsDataStart = statisticsDataEnd;
-        }
-
-        StatisticsNextNodePtr next = statisticsDataEnd->next;
-        *statisticsDataEnd = *data;
-        statisticsDataEnd->next = next;
-    }
-
-    pthread_mutex_unlock(&statisticsDataLock);
-
-    return statisticsDataEnd;
-}
-
-StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr dataOut)
-{
-    StatisticsNextNodePtr nextNode = NULL;
-
-    pthread_mutex_lock(&statisticsDataLock);
-
-    if ((NULL == nodeIn) || (NULL == dataOut)) {
-        pthread_mutex_unlock(&statisticsDataLock);
-        return NULL;
-    }
-
-    if (nodeIn != statisticsDataEnd) {
-        nextNode = nodeIn->next;
-    }
-
-    *dataOut = *nodeIn;
-    dataOut->next = nextNode;
-
-    pthread_mutex_unlock(&statisticsDataLock);
-
-    return nextNode;
-}
 
 void createStatisticsBuffer()
 {
@@ -83,17 +31,11 @@ void createStatisticsBuffer()
         pthread_mutex_lock(&statisticsDataLock);
 
         if (NULL == statisticsBuffer) {
-            StatisticsNodePtr buffer = (StatisticsNodePtr)heap_caps_malloc(sizeof(struct StatisticsData) * maxDataCount, MALLOC_CAP_SPIRAM);
-            if (NULL != buffer) {
-                for (uint16_t i = 0; i < (maxDataCount - 1); i++) {
-                    buffer[i].next = &buffer[i + 1];
-                }
-                buffer[maxDataCount - 1].next = &buffer[0];
+            statisticsBuffer = (StatisticsDataPtr)heap_caps_malloc(sizeof(struct StatisticsData) * maxDataCount, MALLOC_CAP_SPIRAM);
+            statisticsDataStart = -1;
+            statisticsDataEnd = -1;
 
-                statisticsBuffer = buffer;
-                statisticsDataStart = NULL;
-                statisticsDataEnd = &buffer[maxDataCount - 1];
-            } else {
+            if (NULL == statisticsBuffer) {
                 ESP_LOGW(TAG, "Not enough memory for the statistics data buffer!");
             }
         }
@@ -111,18 +53,69 @@ void removeStatisticsBuffer()
             heap_caps_free(statisticsBuffer);
 
             statisticsBuffer = NULL;
-            statisticsDataStart = NULL;
-            statisticsDataEnd = NULL;
+            statisticsDataStart = -1;
+            statisticsDataEnd = -1;
         }
 
         pthread_mutex_unlock(&statisticsDataLock);
     }
 }
 
-void statistics_init(void * pvParameters)
+bool addStatisticData(StatisticsDataPtr data)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-    GLOBAL_STATE->STATISTICS_MODULE.statisticsList = &statisticsDataStart;
+    bool result = false;
+
+    if (NULL == data) {
+        return result;
+    }
+
+    createStatisticsBuffer();
+
+    pthread_mutex_lock(&statisticsDataLock);
+
+    if (NULL != statisticsBuffer) {
+        statisticsDataEnd++;
+        statisticsDataEnd = statisticsDataEnd % maxDataCount;
+
+        if (-1 == statisticsDataStart) {
+            statisticsDataStart = statisticsDataEnd;
+        } else if (statisticsDataStart == statisticsDataEnd) {
+            statisticsDataStart++;
+            statisticsDataStart = statisticsDataStart % maxDataCount;
+        }
+
+        statisticsBuffer[statisticsDataEnd] = *data;
+        result = true;
+    }
+
+    pthread_mutex_unlock(&statisticsDataLock);
+
+    return result;
+}
+
+bool getStatisticData(uint16_t index, StatisticsDataPtr dataOut)
+{
+    bool result = false;
+
+    if ((NULL == statisticsBuffer) || (NULL == dataOut) || (maxDataCount <= index)) {
+        return result;
+    }
+
+    pthread_mutex_lock(&statisticsDataLock);
+
+    if ((NULL != statisticsBuffer) && (-1 < statisticsDataStart) && (-1 < statisticsDataEnd)) {
+        const uint16_t count = ((maxDataCount - statisticsDataStart + statisticsDataEnd) % maxDataCount) + 1;
+
+        if (index < count) {
+            index = (statisticsDataStart + index) % maxDataCount;
+            *dataOut = statisticsBuffer[index];
+            result = true;
+        }
+    }
+
+    pthread_mutex_unlock(&statisticsDataLock);
+
+    return result;
 }
 
 void statistics_task(void * pvParameters)
