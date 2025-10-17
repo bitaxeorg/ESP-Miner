@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "statistics_task.h"
@@ -82,7 +83,7 @@ void createStatisticsBuffer()
         pthread_mutex_lock(&statisticsDataLock);
 
         if (NULL == statisticsBuffer) {
-            StatisticsNodePtr buffer = (StatisticsNodePtr)malloc(sizeof(struct StatisticsData) * maxDataCount);
+            StatisticsNodePtr buffer = (StatisticsNodePtr)heap_caps_malloc(sizeof(struct StatisticsData) * maxDataCount, MALLOC_CAP_DEFAULT | MALLOC_CAP_SPIRAM);
             if (NULL != buffer) {
                 for (uint16_t i = 0; i < (maxDataCount - 1); i++) {
                     buffer[i].next = &buffer[i + 1];
@@ -107,7 +108,7 @@ void removeStatisticsBuffer()
         pthread_mutex_lock(&statisticsDataLock);
 
         if (NULL != statisticsBuffer) {
-            free(statisticsBuffer);
+            heap_caps_free(statisticsBuffer);
 
             statisticsBuffer = NULL;
             statisticsDataStart = NULL;
