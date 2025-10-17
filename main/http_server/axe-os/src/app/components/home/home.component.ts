@@ -21,6 +21,7 @@ import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { LocalStorageService } from 'src/app/local-storage.service';
 
 type PoolLabel = 'Primary' | 'Fallback';
+const HOME_CHART_DATA_SOURCES = 'HOME_CHART_DATA_SOURCES';
 
 @Component({
   selector: 'app-home',
@@ -88,7 +89,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.pageDefaultTitle = this.titleService.getTitle();
     this.loadingService.loading$.next(true);
 
-    let dataSources = this.storageService.getItem('chartDataSources');
+    let dataSources = this.storageService.getItem(HOME_CHART_DATA_SOURCES);
     if (dataSources === null) {
       dataSources = `{"chartY1Data":"${chartLabelKey(eChartLabel.hashrate)}",`;
       dataSources += `"chartY2Data":"${chartLabelKey(eChartLabel.asicTemp)}"}`;
@@ -140,7 +141,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public updateSystem() {
     const form = this.form.getRawValue();
 
-    this.storageService.setItem('chartDataSources', JSON.stringify(form));
+    this.storageService.setItem(HOME_CHART_DATA_SOURCES, JSON.stringify(form));
 
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
