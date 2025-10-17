@@ -532,7 +532,7 @@ void stratum_task(void * pvParameters)
                 retry_attempts = 0;
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "setup message accepted");
-                    if (stratum_api_v1_message.message_id == authorize_message_id) {
+                    if (stratum_api_v1_message.message_id == authorize_message_id && difficulty > 0) {
                         STRATUM_V1_suggest_difficulty(GLOBAL_STATE->sock, GLOBAL_STATE->send_uid++, difficulty);
                     }
                     if (extranonce_subscribe) {
