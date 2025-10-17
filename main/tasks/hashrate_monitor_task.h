@@ -11,10 +11,7 @@ typedef struct {
 
 typedef struct {
     measurement_t* total_measurement;
-    measurement_t* domain_0_measurement;
-    measurement_t* domain_1_measurement;
-    measurement_t* domain_2_measurement;
-    measurement_t* domain_3_measurement;
+    measurement_t** domain_measurements;
     measurement_t* error_measurement;
 
     float hashrate;
