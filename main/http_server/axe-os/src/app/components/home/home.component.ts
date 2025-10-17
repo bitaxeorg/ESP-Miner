@@ -53,6 +53,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolUser!: string;
   public activePoolLabel!: PoolLabel;
   public responseTime!: number;
+  public heatmapVisible: boolean = false;
 
   @ViewChild('chart')
   private chart?: UIChart
@@ -553,6 +554,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       return 0;
     }
     return (sharesRejectedReason.count / totalShares) * 100;
+  }
+
+  public getDomainErrorPercentage(asic: { error: number }, info: ISystemInfo): number {
+    return asic.error ? (asic.error / (info.expectedHashrate / 1_000_000_000_000)) : 0;
   }
 
   public clearDataPoints() {

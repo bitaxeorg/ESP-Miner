@@ -123,6 +123,16 @@ p-chart>div {
     }
 }
 
+.p-button.p-button-icon-only-borderless {
+    padding: 0;
+    background: none;
+    border: none;
+
+    &:enabled:hover {
+        background: none;
+    }
+}
+
 // Remove focus ring from theme color buttons
 button.color-dot {
     &:focus {
