@@ -73,7 +73,11 @@ int16_t SERIAL_rx(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
 {
     int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, size, timeout_ms / portTICK_PERIOD_MS);
 
-    #if BM1397_SERIALRX_DEBUG || BM1366_SERIALRX_DEBUG || BM1368_SERIALRX_DEBUG || BM1370_SERIALRX_DEBUG
+    #if (defined(BM1397_SERIALRX_DEBUG) && BM1397_SERIALRX_DEBUG == true) || \
+        (defined(BM1366_SERIALRX_DEBUG) && BM1366_SERIALRX_DEBUG == true) || \
+        (defined(BM1368_SERIALRX_DEBUG) && BM1368_SERIALRX_DEBUG == true) || \
+        (defined(BM1370_SERIALRX_DEBUG) && BM1370_SERIALRX_DEBUG == true) || \
+        (defined(BM1340_SERIALRX_DEBUG) && BM1340_SERIALRX_DEBUG == true)
     size_t buff_len = 0;
     if (bytes_read > 0) {
         uart_get_buffered_data_len(UART_NUM_1, &buff_len);

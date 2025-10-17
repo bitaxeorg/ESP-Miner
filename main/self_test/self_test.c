@@ -30,6 +30,7 @@
 #include "bm1366.h"
 #include "bm1368.h"
 #include "bm1370.h"
+#include "bm1340.h"
 #include "asic.h"
 #include "device_config.h"
 #include "asic_reset.h"
