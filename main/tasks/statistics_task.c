@@ -30,13 +30,11 @@ StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
         return NULL;
     }
 
-    if (NULL == statisticsBuffer) {
-        createStatisticsBuffer();
-    }
+    createStatisticsBuffer();
+
+    pthread_mutex_lock(&statisticsDataLock);
 
     if (NULL != statisticsBuffer) {
-        pthread_mutex_lock(&statisticsDataLock);
-
         statisticsDataEnd = statisticsDataEnd->next;
 
         if (statisticsDataStart == statisticsDataEnd) {
@@ -48,9 +46,9 @@ StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
         StatisticsNextNodePtr next = statisticsDataEnd->next;
         *statisticsDataEnd = *data;
         statisticsDataEnd->next = next;
-
-        pthread_mutex_unlock(&statisticsDataLock);
     }
+
+    pthread_mutex_unlock(&statisticsDataLock);
 
     return statisticsDataEnd;
 }
@@ -80,24 +78,26 @@ StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr 
 
 void createStatisticsBuffer()
 {
-    removeStatisticsBuffer();
-
-    StatisticsNodePtr buffer = (StatisticsNodePtr)malloc(sizeof(struct StatisticsData) * maxDataCount);
-    if (NULL != buffer) {
-        for (uint16_t i = 0; i < (maxDataCount - 1); i++) {
-            buffer[i].next = &buffer[i + 1];
-        }
-        buffer[maxDataCount - 1].next = &buffer[0];
-
+    if (NULL == statisticsBuffer) {
         pthread_mutex_lock(&statisticsDataLock);
 
-        statisticsBuffer = buffer;
-        statisticsDataStart = NULL;
-        statisticsDataEnd = &buffer[maxDataCount - 1];
+        if (NULL == statisticsBuffer) {
+            StatisticsNodePtr buffer = (StatisticsNodePtr)malloc(sizeof(struct StatisticsData) * maxDataCount);
+            if (NULL != buffer) {
+                for (uint16_t i = 0; i < (maxDataCount - 1); i++) {
+                    buffer[i].next = &buffer[i + 1];
+                }
+                buffer[maxDataCount - 1].next = &buffer[0];
+
+                statisticsBuffer = buffer;
+                statisticsDataStart = NULL;
+                statisticsDataEnd = &buffer[maxDataCount - 1];
+            } else {
+                ESP_LOGW(TAG, "Not enough memory for the statistics data buffer!");
+            }
+        }
 
         pthread_mutex_unlock(&statisticsDataLock);
-    } else {
-        ESP_LOGW(TAG, "Not enough memory for the statistics data buffer!");
     }
 }
 
@@ -106,11 +106,13 @@ void removeStatisticsBuffer()
     if (NULL != statisticsBuffer) {
         pthread_mutex_lock(&statisticsDataLock);
 
-        free(statisticsBuffer);
+        if (NULL != statisticsBuffer) {
+            free(statisticsBuffer);
 
-        statisticsBuffer = NULL;
-        statisticsDataStart = NULL;
-        statisticsDataEnd = NULL;
+            statisticsBuffer = NULL;
+            statisticsDataStart = NULL;
+            statisticsDataEnd = NULL;
+        }
 
         pthread_mutex_unlock(&statisticsDataLock);
     }
