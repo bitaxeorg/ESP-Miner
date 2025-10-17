@@ -3,6 +3,7 @@ import { Observable, Subject, combineLatest, switchMap, shareReplay, first, take
 import { SystemService } from 'src/app/services/system.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
+import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemASIC } from 'src/models/ISystemASIC';
 
@@ -92,7 +93,7 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Wi-Fi IPv4', value: data.info.ipv4},
       { label: 'Wi-Fi IPv6', value: data.info.ipv6, class: 'pb-3', isSensitiveData: true},
       { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3', isSensitiveData: true },
-      { label: 'Free Heap Memory', value: data.info.freeHeap.toString(), class: 'pb-3' },
+      { label: 'Free Heap Memory', value: ByteSuffixPipe.transform(data.info.freeHeap), class: 'pb-3' },
       { label: 'Firmware Version', value: data.info.version },
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
       { label: 'ESP-IDF Version', value: data.info.idfVersion },
