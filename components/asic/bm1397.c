@@ -56,6 +56,8 @@ static const char * TAG = "bm1397";
 static uint32_t prev_nonce = 0;
 static task_result result;
 
+static uint8_t address_interval;
+
 /// @brief
 /// @param ftdi
 /// @param header
@@ -239,8 +241,9 @@ uint8_t BM1397_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     _send_chain_inactive();
 
     // split the chip address space evenly
-    for (uint8_t i = 0; i < asic_count; i++) {
-        _set_chip_address(i * (256 / asic_count));
+    address_interval = (uint8_t) (256 / chip_counter);
+    for (uint8_t i = 0; i < chip_counter; i++) {
+        _set_chip_address(i * address_interval);
     }
 
     unsigned char init[6] = {0x00, CLOCK_ORDER_CONTROL_0, 0x00, 0x00, 0x00, 0x00}; // init1 - clock_order_control0
@@ -342,6 +345,8 @@ task_result *BM1397_process_work(void *pvParameters)
 {
     bm1397_asic_result_t asic_result = {0};
 
+    memset(&result, 0, sizeof(task_result));
+
     if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
         return NULL;
     }
@@ -391,6 +396,7 @@ task_result *BM1397_process_work(void *pvParameters)
     result.job_id = rx_job_id;
     result.nonce = asic_result.nonce;
     result.rolled_version = rolled_version;
+    result.asic_nr = 0; // TODO
 
     return &result;
 }

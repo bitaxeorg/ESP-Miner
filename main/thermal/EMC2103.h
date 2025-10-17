@@ -3,11 +3,6 @@
 
 #include "i2c_bitaxe.h"
 
-typedef struct {
-    float temp1;
-    float temp2;
-} EMC2103_temps_t;
-
 #define EMC2103_I2CADDR_DEFAULT 0x2E ///< EMC2103 default i2c address
 
 #define EMC2103_INTERNAL_TEMP_MSB 0x00
