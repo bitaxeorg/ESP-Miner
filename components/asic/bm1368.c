@@ -33,6 +33,7 @@
 #define CMD_INACTIVE 0x03
 
 #define MISC_CONTROL 0x18
+#define FAST_UART_CONFIGURATION 0x28
 
 typedef struct __attribute__((__packed__))
 {
@@ -53,7 +54,7 @@ static void _send_BM1368(uint8_t header, uint8_t * data, uint8_t data_len, bool 
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
-    unsigned char * buf = malloc(total_length);
+    uint8_t buf[total_length];
 
     buf[0] = 0x55;
     buf[1] = 0xAA;
@@ -70,18 +71,8 @@ static void _send_BM1368(uint8_t header, uint8_t * data, uint8_t data_len, bool 
     }
 
     SERIAL_send(buf, total_length, debug);
-
-    free(buf);
 }
 
-static void _send_simple(uint8_t * data, uint8_t total_length)
-{
-    unsigned char * buf = malloc(total_length);
-    memcpy(buf, data, total_length);
-    SERIAL_send(buf, total_length, BM1368_SERIALTX_DEBUG);
-
-    free(buf);
-}
 
 static void _send_chain_inactive(void)
 {
@@ -194,8 +185,9 @@ int BM1368_set_max_baud(void)
 {
     ESP_LOGI(TAG, "Setting max baud of 1000000");
 
-    unsigned char init8[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x28, 0x11, 0x30, 0x02, 0x00, 0x03};
-    _send_simple(init8, 11);
+    unsigned char fast_uart[] = {0x00, FAST_UART_CONFIGURATION, 0x11, 0x30, 0x02, 0x00};
+    _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), fast_uart, 6, BM1368_SERIALTX_DEBUG);
+
     return 1000000;
 }
 

@@ -4,6 +4,7 @@
 #include "mining.h"
 #include "utils.h"
 #include "mbedtls/sha256.h"
+#include "esp_log.h"
 
 void free_bm_job(bm_job *job)
 {
@@ -27,28 +28,20 @@ char *construct_coinbase_tx(const char *coinbase_1, const char *coinbase_2,
     return coinbase_tx;
 }
 
-char *calculate_merkle_root_hash(const char *coinbase_tx, const uint8_t merkle_branches[][32], const int num_merkle_branches)
+void calculate_merkle_root_hash(const char *coinbase_tx, const uint8_t merkle_branches[][32], const int num_merkle_branches, char dest[65])
 {
     size_t coinbase_tx_bin_len = strlen(coinbase_tx) / 2;
-    uint8_t *coinbase_tx_bin = malloc(coinbase_tx_bin_len);
+    uint8_t coinbase_tx_bin[coinbase_tx_bin_len];
     hex2bin(coinbase_tx, coinbase_tx_bin, coinbase_tx_bin_len);
 
     uint8_t both_merkles[64];
-    uint8_t *new_root = double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len);
-    free(coinbase_tx_bin);
-    memcpy(both_merkles, new_root, 32);
-    free(new_root);
-    for (int i = 0; i < num_merkle_branches; i++)
-    {
+    double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len, both_merkles);
+    for (int i = 0; i < num_merkle_branches; i++) {
         memcpy(both_merkles + 32, merkle_branches[i], 32);
-        uint8_t *new_root = double_sha256_bin(both_merkles, 64);
-        memcpy(both_merkles, new_root, 32);
-        free(new_root);
+        double_sha256_bin(both_merkles, 64, both_merkles);
     }
 
-    char *merkle_root_hash = malloc(65);
-    bin2hex(both_merkles, 32, merkle_root_hash, 65);
-    return merkle_root_hash;
+    bin2hex(both_merkles, 32, dest, 65);
 }
 
 // take a mining_notify struct with ascii hex strings and convert it to a bm_job struct
@@ -110,31 +103,19 @@ bm_job construct_bm_job(mining_notify *params, const char *merkle_root, const ui
     return new_job;
 }
 
-char *extranonce_2_generate(uint64_t extranonce_2, uint32_t length)
+void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[static length * 2 + 1])
 {
     // Allocate buffer to hold the extranonce_2 value in bytes
-    uint8_t *extranonce_2_bytes = calloc(length, 1);
-    if (extranonce_2_bytes == NULL) {
-        return NULL;
-    }
+    uint8_t extranonce_2_bytes[length];
+    memset(extranonce_2_bytes, 0, length);
     
     // Copy the extranonce_2 value into the buffer, handling endianness
     // Copy up to the size of uint64_t or the requested length, whichever is smaller
     size_t copy_len = (length < sizeof(uint64_t)) ? length : sizeof(uint64_t);
     memcpy(extranonce_2_bytes, &extranonce_2, copy_len);
     
-    // Allocate the output string
-    char *extranonce_2_str = malloc(length * 2 + 1);
-    if (extranonce_2_str == NULL) {
-        free(extranonce_2_bytes);
-        return NULL;
-    }
-    
     // Convert the bytes to hex string
-    bin2hex(extranonce_2_bytes, length, extranonce_2_str, length * 2 + 1);
-    
-    free(extranonce_2_bytes);
-    return extranonce_2_str;
+    bin2hex(extranonce_2_bytes, length, dest, length * 2 + 1);
 }
 
 ///////cgminer nonce testing

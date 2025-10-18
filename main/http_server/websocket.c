@@ -48,7 +48,7 @@ int log_to_queue(const char *format, va_list args)
     }
 
     // Print to standard output
-    printf("%s", log_buffer);
+    fputs(log_buffer, stdout);
 
     // Send to queue for WebSocket broadcasting
     if (xQueueSendToBack(log_queue, &log_buffer, pdMS_TO_TICKS(100)) != pdPASS) {

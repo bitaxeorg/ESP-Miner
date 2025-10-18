@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <esp_heap_caps.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -71,6 +72,11 @@ static const char * STATS_LABEL_WIFI_RSSI = "wifiRssi";
 static const char * STATS_LABEL_FREE_HEAP = "freeHeap";
 
 static const char * STATS_LABEL_TIMESTAMP = "timestamp";
+
+static int system_info_prebuffer_len = 256;
+static int system_statistics_prebuffer_len = 256;
+static int system_wifi_scan_prebuffer_len = 256;
+static int api_common_prebuffer_len = 256;
 
 typedef enum
 {
@@ -140,6 +146,16 @@ typedef struct {
     char * str_value;
 } Settings;
 
+esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_len)
+{
+    const char * response = cJSON_PrintBuffered(item, *prebuffer_len, true);
+    int len = strlen(response);
+    esp_err_t res = httpd_resp_send(req, response, len);
+    if (len > *prebuffer_len) *prebuffer_len = len * 1.2;
+    free((void *)response);
+    return res;
+}
+
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
@@ -170,12 +186,11 @@ static esp_err_t GET_wifi_scan(httpd_req_t *req)
 
     cJSON_AddItemToObject(root, "networks", networks);
 
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
+    esp_err_t res = HTTP_send_json(req, root, &system_wifi_scan_prebuffer_len);
 
-    free((void *)response);
     cJSON_Delete(root);
-    return ESP_OK;
+
+    return res;
 }
 
 
@@ -432,12 +447,11 @@ static esp_err_t rest_api_common_handler(httpd_req_t * req)
     cJSON * root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "error", "unknown route");
 
-    const char * error_obj = cJSON_Print(root);
-    httpd_resp_set_status(req, HTTPD_404);
-    httpd_resp_sendstr(req, error_obj);
-    free((char *)error_obj);
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+
     cJSON_Delete(root);
-    return ESP_OK;
+
+    return res;
 }
 
 static bool file_exists(const char *path) {
@@ -907,6 +921,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
 
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
+
+    cJSON_AddNumberToObject(root, "freeHeapInternal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
     cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "frequency", frequency);
@@ -1014,11 +1032,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(fallbackStratumUser);
     free(display);
 
-    const char * sys_info = cJSON_Print(root);
-    httpd_resp_sendstr(req, sys_info);
-    free((char *)sys_info);
+    esp_err_t res = HTTP_send_json(req, root, &system_info_prebuffer_len);
+
     cJSON_Delete(root);
-    return ESP_OK;
+
+    return res;
 }
 
 static esp_err_t GET_system_statistics(httpd_req_t * req)
@@ -1035,34 +1053,26 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         return ESP_OK;
     }
 
-    char * buf = NULL;
     size_t bufLen = httpd_req_get_url_query_len(req) + 1;
     bool dataSelection[SRC_NONE] = {false};
     bool selectionCheck = false;
-    int prebuffer = 0;
 
     // Check query parameters
     if (1 < bufLen) {
-        buf = (char *)malloc(bufLen);
-        if (buf) {
-            if (httpd_req_get_url_query_str(req, buf, bufLen) == ESP_OK) {
-                char * columns = (char *)malloc(bufLen);
-                if (columns) {
-                    if (httpd_query_key_value(buf, "columns", columns, bufLen) == ESP_OK) {
-                        char * param = strtok(columns, ",");
-                        while (NULL != param) {
-                            DataSource sourceParam = strToDataSource(param);
-                            if (SRC_NONE != sourceParam) {
-                                dataSelection[sourceParam] = true;
-                                selectionCheck = true;
-                            }
-                            param = strtok(NULL, ",");
-                        }
+        char buf[bufLen];
+        if (httpd_req_get_url_query_str(req, buf, bufLen) == ESP_OK) {
+            char columns[bufLen];
+            if (httpd_query_key_value(buf, "columns", columns, bufLen) == ESP_OK) {
+                char * param = strtok(columns, ",");
+                while (NULL != param) {
+                    DataSource sourceParam = strToDataSource(param);
+                    if (SRC_NONE != sourceParam) {
+                        dataSelection[sourceParam] = true;
+                        selectionCheck = true;
                     }
-                    free((void *)columns);
+                    param = strtok(NULL, ",");
                 }
             }
-            free((void *)buf);
         }
     }
 
@@ -1076,7 +1086,6 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     // Create object for statistics
     cJSON * root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "currentTimestamp", (esp_timer_get_time() / 1000));
-    prebuffer++;
 
     cJSON * labelArray = cJSON_CreateArray();
     if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE)); }
@@ -1095,7 +1104,6 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_TIMESTAMP));
 
     cJSON_AddItemToObject(root, "labels", labelArray);
-    prebuffer++;
 
     cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
 
@@ -1123,17 +1131,14 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
             cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
 
             cJSON_AddItemToArray(statsArray, valueArray);
-            prebuffer++;
         }
     }
 
-    const char * response = cJSON_PrintBuffered(root, (JSON_ALL_STATS_ELEMENT_SIZE * prebuffer), 0); // unformatted
-    httpd_resp_sendstr(req, response);
-    free((void *)response);
+    esp_err_t res = HTTP_send_json(req, root, &system_statistics_prebuffer_len);
 
     cJSON_Delete(root);
 
-    return ESP_OK;
+    return res;
 }
 
 esp_err_t POST_WWW_update(httpd_req_t * req)
