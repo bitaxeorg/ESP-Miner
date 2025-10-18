@@ -118,22 +118,25 @@ TEST_CASE("Validate version mask incrementing", "[mining]")
 
 TEST_CASE("Test extranonce 2 generation", "[mining extranonce2]")
 {
-    char extranonce_2_str[9];
-    extranonce_2_generate(0, 4, extranonce_2_str);
-    TEST_ASSERT_EQUAL_STRING("00000000", extranonce_2_str);
+    char first[9];
+    extranonce_2_generate(0, 4, first);
+    TEST_ASSERT_EQUAL_STRING("00000000", first);
 
-    extranonce_2_generate(1, 4, extranonce_2_str);
-    TEST_ASSERT_EQUAL_STRING("01000000", extranonce_2_str);
+    char second[9];
+    extranonce_2_generate(1, 4, second);
+    TEST_ASSERT_EQUAL_STRING("01000000", second);
 
-    extranonce_2_generate(2, 4, extranonce_2_str);
-    TEST_ASSERT_EQUAL_STRING("02000000", extranonce_2_str);
+    char third[9];
+    extranonce_2_generate(2, 4, third);
+    TEST_ASSERT_EQUAL_STRING("02000000", third);
 
-    extranonce_2_generate(UINT_MAX - 1, 4, extranonce_2_str);
-    TEST_ASSERT_EQUAL_STRING("feffffff", extranonce_2_str);
+    char fourth[9];
+    extranonce_2_generate(UINT_MAX - 1, 4, fourth);
+    TEST_ASSERT_EQUAL_STRING("feffffff", fourth);
 
-    char extranonce_2_str_large[13];
-    extranonce_2_generate(UINT_MAX / 2, 6, extranonce_2_str_large);
-    TEST_ASSERT_EQUAL_STRING("ffffff7f0000", extranonce_2_str_large);
+    char fifth[13];
+    extranonce_2_generate(UINT_MAX / 2, 6, fifth);
+    TEST_ASSERT_EQUAL_STRING("ffffff7f0000", fifth);
 }
 
 TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
