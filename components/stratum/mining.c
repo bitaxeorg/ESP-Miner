@@ -106,7 +106,8 @@ bm_job construct_bm_job(mining_notify *params, const char *merkle_root, const ui
 void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[static length * 2 + 1])
 {
     // Allocate buffer to hold the extranonce_2 value in bytes
-    uint8_t extranonce_2_bytes[length] = {0};
+    uint8_t extranonce_2_bytes[length];
+    memset(extranonce_2_bytes, 0, length);
     
     // Copy the extranonce_2 value into the buffer, handling endianness
     // Copy up to the size of uint64_t or the requested length, whichever is smaller
