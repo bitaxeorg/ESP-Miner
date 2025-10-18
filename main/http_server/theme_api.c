@@ -72,6 +72,9 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
 
     cJSON_Delete(root);
 
+    free(scheme);
+    free(colors);    
+
     return res;
 }
 
