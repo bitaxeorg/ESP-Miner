@@ -142,7 +142,7 @@ char *double_sha256(const char *hex_string)
     return output_hash;
 }
 
-void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest)
+void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32])
 {
     uint8_t first_hash_output[32];
 
@@ -150,7 +150,7 @@ void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest
     mbedtls_sha256(first_hash_output, 32, dest, 0);
 }
 
-void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest)
+void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32])
 {
     // mbedtls_sha256(data, data_len, dest, 0);
 
@@ -168,7 +168,7 @@ void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest
     memcpy(dest, hash, 32);
 }
 
-void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest)
+void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32])
 {
     mbedtls_sha256_context midstate;
 

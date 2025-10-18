@@ -28,7 +28,7 @@ char *construct_coinbase_tx(const char *coinbase_1, const char *coinbase_2,
     return coinbase_tx;
 }
 
-void calculate_merkle_root_hash(const char *coinbase_tx, const uint8_t merkle_branches[][32], const int num_merkle_branches, char *dest)
+void calculate_merkle_root_hash(const char *coinbase_tx, const uint8_t merkle_branches[][32], const int num_merkle_branches, char dest[65])
 {
     size_t coinbase_tx_bin_len = strlen(coinbase_tx) / 2;
     uint8_t coinbase_tx_bin[coinbase_tx_bin_len];
@@ -103,7 +103,7 @@ bm_job construct_bm_job(mining_notify *params, const char *merkle_root, const ui
     return new_job;
 }
 
-char *extranonce_2_generate(uint64_t extranonce_2, uint32_t length)
+void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[static length * 2 + 1])
 {
     // Allocate buffer to hold the extranonce_2 value in bytes
     uint8_t extranonce_2_bytes[length];
@@ -113,16 +113,8 @@ char *extranonce_2_generate(uint64_t extranonce_2, uint32_t length)
     size_t copy_len = (length < sizeof(uint64_t)) ? length : sizeof(uint64_t);
     memcpy(extranonce_2_bytes, &extranonce_2, copy_len);
     
-    // Allocate the output string
-    char *extranonce_2_str = malloc(length * 2 + 1);
-    if (extranonce_2_str == NULL) {
-        return NULL;
-    }
-    
     // Convert the bytes to hex string
-    bin2hex(extranonce_2_bytes, length, extranonce_2_str, length * 2 + 1);
-    
-    return extranonce_2_str;
+    bin2hex(extranonce_2_bytes, length, dest, length * 2 + 1);
 }
 
 ///////cgminer nonce testing

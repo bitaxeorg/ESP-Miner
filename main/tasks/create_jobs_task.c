@@ -81,18 +81,15 @@ static bool should_generate_more_work(GlobalState *GLOBAL_STATE)
 
 static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, uint32_t difficulty)
 {
-    char *extranonce_2_str = extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len);
-    if (extranonce_2_str == NULL) {
-        ESP_LOGE(TAG, "Failed to generate extranonce_2");
-        return;
-    }
+    char extranonce_2_str[GLOBAL_STATE->extranonce_2_len * 2 + 1];
+    extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len, extranonce_2_str);
+
     //print generated extranonce_2
     //ESP_LOGI(TAG, "Generated extranonce_2: %s", extranonce_2_str);
 
     char *coinbase_tx = construct_coinbase_tx(notification->coinbase_1, notification->coinbase_2, GLOBAL_STATE->extranonce_str, extranonce_2_str);
     if (coinbase_tx == NULL) {
         ESP_LOGE(TAG, "Failed to construct coinbase_tx");
-        free(extranonce_2_str);
         return;
     }
 
@@ -104,13 +101,12 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
     bm_job *queued_next_job = malloc(sizeof(bm_job));
     if (queued_next_job == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for queued_next_job");
-        free(extranonce_2_str);
         free(coinbase_tx);
         return;
     }
 
     memcpy(queued_next_job, &next_job, sizeof(bm_job));
-    queued_next_job->extranonce2 = extranonce_2_str; // Transfer ownership
+    queued_next_job->extranonce2 = strdup(extranonce_2_str);
     queued_next_job->jobid = strdup(notification->job_id);
     queued_next_job->version_mask = GLOBAL_STATE->version_mask;
 
