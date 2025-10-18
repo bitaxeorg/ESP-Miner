@@ -106,10 +106,7 @@ bm_job construct_bm_job(mining_notify *params, const char *merkle_root, const ui
 char *extranonce_2_generate(uint64_t extranonce_2, uint32_t length)
 {
     // Allocate buffer to hold the extranonce_2 value in bytes
-    uint8_t *extranonce_2_bytes = calloc(length, 1);
-    if (extranonce_2_bytes == NULL) {
-        return NULL;
-    }
+    uint8_t extranonce_2_bytes[length];
     
     // Copy the extranonce_2 value into the buffer, handling endianness
     // Copy up to the size of uint64_t or the requested length, whichever is smaller
@@ -119,14 +116,12 @@ char *extranonce_2_generate(uint64_t extranonce_2, uint32_t length)
     // Allocate the output string
     char *extranonce_2_str = malloc(length * 2 + 1);
     if (extranonce_2_str == NULL) {
-        free(extranonce_2_bytes);
         return NULL;
     }
     
     // Convert the bytes to hex string
     bin2hex(extranonce_2_bytes, length, extranonce_2_str, length * 2 + 1);
     
-    free(extranonce_2_bytes);
     return extranonce_2_str;
 }
 

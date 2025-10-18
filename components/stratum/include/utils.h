@@ -4,11 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-int hex2char(uint8_t x, char *c);
-
 size_t bin2hex(const uint8_t *buf, size_t buflen, char *hex, size_t hexlen);
 
-uint8_t hex2val(char c);
 void flip80bytes(void *dest_p, const void *src_p);
 void flip32bytes(void *dest_p, const void *src_p);
 
