@@ -35,7 +35,8 @@ TEST_CASE("Validate merkle root calculation", "[mining]")
     hex2bin("463c19427286342120039a83218fa87ce45448e246895abac11fff0036076758", merkles[10], 32);
     hex2bin("03d287f655813e540ddb9c4e7aeb922478662b0f5d8e9d0cbd564b20146bab76", merkles[11], 32);
 
-    char *root_hash = calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles);
+    char root_hash[65];
+    calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles, root_hash);
     TEST_ASSERT_EQUAL_STRING("adbcbc21e20388422198a55957aedfa0e61be0b8f2b87d7c08510bb9f099a893", root_hash);
     free(root_hash);
 }
@@ -99,7 +100,8 @@ TEST_CASE("Validate version mask incrementing", "[mining]")
 //     "\"20000004\",\"1705ae3a\",\"6470e2a1\",true]}";
 //     mining_notify * params = parse_mining_notify_message(notify_json_str, 512);
 //     char * coinbase_tx = construct_coinbase_tx(params->coinbase_1, params->coinbase_2, "336508070fca95", "0000000000000000");
-//     char * merkle_root = calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])params->merkle_branches, params->n_merkle_branches);
+//     char merkle_root[65]
+//     calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])params->merkle_branches, params->n_merkle_branches, merkle_root);
 //     bm_job job = construct_bm_job(params, merkle_root, 1000);
 
 //     uint8_t expected_midstate_bin[32];
