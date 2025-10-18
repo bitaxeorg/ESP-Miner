@@ -125,14 +125,14 @@ TEST_CASE("Test extranonce 2 generation", "[mining extranonce2]")
     extranonce_2_generate(1, 4, extranonce_2_str);
     TEST_ASSERT_EQUAL_STRING("01000000", extranonce_2_str);
 
-    extranonce_2_generate(2, 4);
+    extranonce_2_generate(2, 4, extranonce_2_str);
     TEST_ASSERT_EQUAL_STRING("02000000", extranonce_2_str);
 
-    extranonce_2_generate(UINT_MAX - 1, 4);
+    extranonce_2_generate(UINT_MAX - 1, 4, extranonce_2_str);
     TEST_ASSERT_EQUAL_STRING("feffffff", extranonce_2_str);
 
     char extranonce_2_str_large[13];
-    extranonce_2_generate(UINT_MAX / 2, 6);
+    extranonce_2_generate(UINT_MAX / 2, 6, extranonce_2_str);
     TEST_ASSERT_EQUAL_STRING("ffffff7f0000", extranonce_2_str_large);
 }
 
