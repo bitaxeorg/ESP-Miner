@@ -96,13 +96,8 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
         return;
     }
 
-    char *merkle_root = calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])notification->merkle_branches, notification->n_merkle_branches);
-    if (merkle_root == NULL) {
-        ESP_LOGE(TAG, "Failed to calculate merkle_root");
-        free(extranonce_2_str);
-        free(coinbase_tx);
-        return;
-    }
+    char merkle_root[65];
+    calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])notification->merkle_branches, notification->n_merkle_branches, merkle_root);
 
     bm_job next_job = construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask, difficulty);
 
@@ -111,7 +106,6 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
         ESP_LOGE(TAG, "Failed to allocate memory for queued_next_job");
         free(extranonce_2_str);
         free(coinbase_tx);
-        free(merkle_root);
         return;
     }
 
@@ -123,5 +117,4 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
     queue_enqueue(&GLOBAL_STATE->ASIC_jobs_queue, queued_next_job);
 
     free(coinbase_tx);
-    free(merkle_root);
 }

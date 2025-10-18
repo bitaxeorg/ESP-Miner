@@ -4,6 +4,7 @@
 #include "mining.h"
 #include "utils.h"
 #include "mbedtls/sha256.h"
+#include "esp_log.h"
 
 void free_bm_job(bm_job *job)
 {
@@ -27,28 +28,20 @@ char *construct_coinbase_tx(const char *coinbase_1, const char *coinbase_2,
     return coinbase_tx;
 }
 
-char *calculate_merkle_root_hash(const char *coinbase_tx, const uint8_t merkle_branches[][32], const int num_merkle_branches)
+void calculate_merkle_root_hash(const char *coinbase_tx, const uint8_t merkle_branches[][32], const int num_merkle_branches, char *dest)
 {
     size_t coinbase_tx_bin_len = strlen(coinbase_tx) / 2;
-    uint8_t *coinbase_tx_bin = malloc(coinbase_tx_bin_len);
+    uint8_t coinbase_tx_bin[coinbase_tx_bin_len];
     hex2bin(coinbase_tx, coinbase_tx_bin, coinbase_tx_bin_len);
 
     uint8_t both_merkles[64];
-    uint8_t *new_root = double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len);
-    free(coinbase_tx_bin);
-    memcpy(both_merkles, new_root, 32);
-    free(new_root);
-    for (int i = 0; i < num_merkle_branches; i++)
-    {
+    double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len, both_merkles);
+    for (int i = 0; i < num_merkle_branches; i++) {
         memcpy(both_merkles + 32, merkle_branches[i], 32);
-        uint8_t *new_root = double_sha256_bin(both_merkles, 64);
-        memcpy(both_merkles, new_root, 32);
-        free(new_root);
+        double_sha256_bin(both_merkles, 64, both_merkles);
     }
 
-    char *merkle_root_hash = malloc(65);
-    bin2hex(both_merkles, 32, merkle_root_hash, 65);
-    return merkle_root_hash;
+    bin2hex(both_merkles, 32, dest, 65);
 }
 
 // take a mining_notify struct with ascii hex strings and convert it to a bm_job struct

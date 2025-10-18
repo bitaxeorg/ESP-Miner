@@ -4,6 +4,9 @@
 #include "cJSON.h"
 #include "global_state.h"
 #include "asic.h"
+#include "http_server.h"
+
+static int system_asic_prebuffer_len = 256;
 
 // static const char *TAG = "asic_settings";
 static GlobalState *GLOBAL_STATE = NULL;
@@ -61,10 +64,9 @@ esp_err_t GET_system_asic(httpd_req_t *req)
     }
     cJSON_AddItemToObject(root, "voltageOptions", voltageOptions);
 
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
+    esp_err_t res = HTTP_send_json(req, root, &system_asic_prebuffer_len);
 
-    free((void *)response);
     cJSON_Delete(root);
-    return ESP_OK;
+
+    return res;
 }

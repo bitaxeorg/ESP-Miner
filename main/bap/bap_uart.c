@@ -13,6 +13,7 @@
 #include "driver/uart.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_heap_caps.h"
 #include "device_config.h"
 #include "bap_uart.h"
 #include "bap_protocol.h"
@@ -83,7 +84,7 @@ void BAP_send_message_with_queue(bap_command_t cmd, const char *parameter, const
 
     len = snprintf(message, sizeof(message), "$%s*%02X\r\n", sentence_body, checksum);
 
-    msg.message = malloc(len + 1);
+    msg.message = heap_caps_malloc(len + 1, MALLOC_CAP_SPIRAM);
     if (msg.message == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for message");
         return;
@@ -115,7 +116,7 @@ void BAP_send_ap_message(GlobalState *state) {
 
 
 static void uart_receive_task(void *pvParameters) {
-    uint8_t *data = (uint8_t *) malloc(BAP_BUF_SIZE);
+    uint8_t *data = (uint8_t *) heap_caps_malloc(BAP_BUF_SIZE, MALLOC_CAP_SPIRAM);
     if (!data) {
         ESP_LOGE(TAG, "Failed to allocate memory for UART receive buffer");
         vTaskDelete(NULL);

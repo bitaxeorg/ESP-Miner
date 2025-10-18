@@ -184,15 +184,12 @@ char *double_sha256(const char *hex_string)
     return output_hash;
 }
 
-uint8_t *double_sha256_bin(const uint8_t *data, const size_t data_len)
+void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest)
 {
     uint8_t first_hash_output[32];
-    uint8_t *second_hash_output = malloc(32);
 
     mbedtls_sha256(data, data_len, first_hash_output, 0);
-    mbedtls_sha256(first_hash_output, 32, second_hash_output, 0);
-
-    return second_hash_output;
+    mbedtls_sha256(first_hash_output, 32, dest, 0);
 }
 
 void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest)

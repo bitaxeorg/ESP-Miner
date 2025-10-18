@@ -52,9 +52,9 @@ TEST_CASE("Validate another merkle root calculation", "[mining]")
     hex2bin("9f64f3b0d9edddb14be6f71c3ac2e80455916e207ffc003316c6a515452aa7b4", merkles[3], 32);
     hex2bin("2d0b54af60fad4ae59ec02031f661d026f2bb95e2eeb1e6657a35036c017c595", merkles[4], 32);
 
-    char *root_hash = calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles);
+    char root_hash[65];
+    calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles, root_hash);
     TEST_ASSERT_EQUAL_STRING("5cc58f5e84aafc740d521b92a7bf72f4e56c4cc3ad1c2159f1d094f97ac34eee", root_hash);
-    free(root_hash);
 }
 
 // Values calculated from esp-miner/components/stratum/test/verifiers/bm1397.py
@@ -179,7 +179,8 @@ TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
     hex2bin("c4f5ab01913fc186d550c1a28f3f3e9ffaca2016b961a6a751f8cca0089df924", merkles[11], 32);
     hex2bin("cff737e1d00176dd6bbfa73071adbb370f227cfb5fba186562e4060fcec877e1", merkles[12], 32);
 
-    char *merkle_root = calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles);
+    char merkle_root[65];
+    calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles, merkle_root);
     TEST_ASSERT_EQUAL_STRING("5bdc1968499c3393873edf8e07a1c3a50a97fc3a9d1a376bbf77087dd63778eb", merkle_root);
 
     bm_job job = construct_bm_job(&notify_message, merkle_root, 0, 1000);
