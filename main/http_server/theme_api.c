@@ -70,10 +70,10 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
 
     esp_err_t res = HTTP_send_json(req, root, &theme_prebuffer_len);
 
-    cJSON_Delete(root);
-
     free(scheme);
-    free(colors);    
+    free(colors);
+
+    cJSON_Delete(root);
 
     return res;
 }
