@@ -38,7 +38,6 @@ TEST_CASE("Validate merkle root calculation", "[mining]")
     char root_hash[65];
     calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles, root_hash);
     TEST_ASSERT_EQUAL_STRING("adbcbc21e20388422198a55957aedfa0e61be0b8f2b87d7c08510bb9f099a893", root_hash);
-    free(root_hash);
 }
 
 TEST_CASE("Validate another merkle root calculation", "[mining]")
