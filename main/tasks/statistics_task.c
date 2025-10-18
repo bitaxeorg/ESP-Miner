@@ -18,8 +18,8 @@
 static const char * TAG = "statistics_task";
 
 static StatisticsDataPtr statisticsBuffer;
-static int16_t statisticsDataStart = -1;
-static int16_t statisticsDataEnd = -1;
+static uint16_t statisticsDataStart;
+static uint16_t statisticsDataSize;
 static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 
 static const uint16_t maxDataCount = 720;
@@ -32,9 +32,6 @@ void createStatisticsBuffer()
 
         if (NULL == statisticsBuffer) {
             statisticsBuffer = (StatisticsDataPtr)heap_caps_malloc(sizeof(struct StatisticsData) * maxDataCount, MALLOC_CAP_SPIRAM);
-            statisticsDataStart = -1;
-            statisticsDataEnd = -1;
-
             if (NULL == statisticsBuffer) {
                 ESP_LOGW(TAG, "Not enough memory for the statistics data buffer!");
             }
@@ -53,8 +50,8 @@ void removeStatisticsBuffer()
             heap_caps_free(statisticsBuffer);
 
             statisticsBuffer = NULL;
-            statisticsDataStart = -1;
-            statisticsDataEnd = -1;
+            statisticsDataStart = 0;
+            statisticsDataSize = 0;
         }
 
         pthread_mutex_unlock(&statisticsDataLock);
@@ -74,17 +71,16 @@ bool addStatisticData(StatisticsDataPtr data)
     pthread_mutex_lock(&statisticsDataLock);
 
     if (NULL != statisticsBuffer) {
-        statisticsDataEnd++;
-        statisticsDataEnd = statisticsDataEnd % maxDataCount;
+        statisticsDataSize++;
 
-        if (-1 == statisticsDataStart) {
-            statisticsDataStart = statisticsDataEnd;
-        } else if (statisticsDataStart == statisticsDataEnd) {
+        if (maxDataCount < statisticsDataSize) {
+            statisticsDataSize = maxDataCount;
             statisticsDataStart++;
             statisticsDataStart = statisticsDataStart % maxDataCount;
         }
 
-        statisticsBuffer[statisticsDataEnd] = *data;
+        const uint16_t last = (statisticsDataStart + statisticsDataSize - 1) % maxDataCount;
+        statisticsBuffer[last] = *data;
         result = true;
     }
 
@@ -103,14 +99,10 @@ bool getStatisticData(uint16_t index, StatisticsDataPtr dataOut)
 
     pthread_mutex_lock(&statisticsDataLock);
 
-    if ((NULL != statisticsBuffer) && (-1 < statisticsDataStart) && (-1 < statisticsDataEnd)) {
-        const uint16_t count = ((maxDataCount - statisticsDataStart + statisticsDataEnd) % maxDataCount) + 1;
-
-        if (index < count) {
-            index = (statisticsDataStart + index) % maxDataCount;
-            *dataOut = statisticsBuffer[index];
-            result = true;
-        }
+    if ((NULL != statisticsBuffer) && (index < statisticsDataSize)) {
+        index = (statisticsDataStart + index) % maxDataCount;
+        *dataOut = statisticsBuffer[index];
+        result = true;
     }
 
     pthread_mutex_unlock(&statisticsDataLock);
