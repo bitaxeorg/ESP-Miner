@@ -111,10 +111,15 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColor = documentStyle.getPropertyValue('--text-color');
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
+
+    const {r, g, b} = this.hexToRgb(primaryColor);
+
+    document.documentElement.style.setProperty('--primary-color-r', r.toString());
+    document.documentElement.style.setProperty('--primary-color-g', g.toString());
+    document.documentElement.style.setProperty('--primary-color-b', b.toString());
 
     // Update chart colors
     if (this.chartData && this.chartData.datasets) {
@@ -490,6 +495,19 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.titleService.setTitle(parts.filter(Boolean).join(' • '));
   }
 
+  private hexToRgb(hex: string): {r: number, g: number, b: number} {
+    if (hex[0] === '#') hex = hex.slice(1);
+    if (hex.length === 3) {
+      hex = hex.split('').map((h: string) => h + h).join('');
+    }
+
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+
+    return { r, g, b };
+  }
+
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
   }
@@ -574,8 +592,30 @@ export class HomeComponent implements OnInit, OnDestroy {
     return info.hashrateMonitor.asics.length;
   }
 
-  public getAsicDomainsAmount(info: ISystemInfo, row: number): number {
-    return info.hashrateMonitor.asics[row].domains.length;
+  public getAsicDomainsAmount(info: ISystemInfo, asicCount: number): number {
+    return info.hashrateMonitor.asics[asicCount].domains.length;
+  }
+
+  public getHighestAsicDomainPercentage(asics: { total: number, domains: number[] }[]): number {
+    let highest = 0;
+
+    for (const asic of asics) {
+      for (const domain of asic.domains) {
+        const percentage = (domain * 100) / asic.total;
+        if (percentage > highest) {
+          highest = percentage;
+        }
+      }
+    }
+
+    return highest;
+  }
+
+  public calculateAsicDomainIntensity(info: ISystemInfo, asicCount: number, domain: number): number {
+    const highestPercentage = this.getHighestAsicDomainPercentage(info.hashrateMonitor.asics);
+    const domainPercentage = (domain * 100) / info.hashrateMonitor.asics[asicCount].total;
+
+    return domainPercentage / highestPercentage;
   }
 
   public normalizeHashrate(hashrate: number): number {

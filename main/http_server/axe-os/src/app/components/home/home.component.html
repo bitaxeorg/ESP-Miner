@@ -110,12 +110,12 @@
                                             {{ i + 1 }}
                                         </td>
                                         <td *ngFor="let domain of asic.domains"
-                                            [style.--intensity]="domain / 1000"
+                                            [style.--intensity]="calculateAsicDomainIntensity(info, i, domain)"
                                             [style.height]="(getAsicsAmount(info) <= 2 ? '2rem' : null)"
                                             class="text-center cursor-pointer"
                                             pTooltip="{{ normalizeHashrate(domain) | hashSuffix }}"
                                             tooltipPosition="bottom">
-                                            <span class="md:hidden">{{ normalizeHashrate(domain) | hashSuffix }}</span>
+                                            <span class="text-xs md:hidden">{{ normalizeHashrate(domain) | hashSuffix }}</span>
                                         </td>
                                         <td class="text-center cursor-pointer text-{{getDomainErrorColor(info, asic)}}-500" pTooltip="{{ normalizeHashrate(asic.error) | hashSuffix }}" tooltipPosition="bottom">
                                             {{getDomainErrorPercentage(info, asic) | number: '1.0-0'}} %
