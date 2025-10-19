@@ -557,7 +557,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   public getDomainErrorPercentage(info: ISystemInfo, asic: { error: number }): number {
-    return asic.error ? (asic.error / (info.expectedHashrate / 1_000_000_000_000)) : 0;
+    return asic.error ? (this.normalizeHashrate(asic.error) * 100 / info.expectedHashrate) : 0;
   }
 
   public getDomainErrorColor(info: ISystemInfo, asic: { error: number }): string {
