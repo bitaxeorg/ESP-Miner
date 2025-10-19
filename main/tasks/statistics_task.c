@@ -11,6 +11,7 @@
 #include "connect.h"
 #include "vcore.h"
 #include "bm1370.h"
+#include <esp_heap_caps.h>
 
 #define DEFAULT_POLL_RATE 5000
 
@@ -34,7 +35,7 @@ StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
 
     // create new data block or reuse first data block
     if (currentDataCount < maxDataCount) {
-        newData = (StatisticsNodePtr)malloc(sizeof(struct StatisticsData));
+        newData = (StatisticsNodePtr)heap_caps_malloc(sizeof(struct StatisticsData), MALLOC_CAP_SPIRAM);
         currentDataCount++;
     } else {
         newData = statisticsDataStart;
