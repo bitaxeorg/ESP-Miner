@@ -58,8 +58,7 @@ static void _send_BM1366(uint8_t header, uint8_t * data, uint8_t data_len, bool 
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
-    // allocate memory for buffer
-    unsigned char * buf = malloc(total_length);
+    uint8_t buf[total_length];
 
     // add the preamble
     buf[0] = 0x55;
@@ -85,17 +84,13 @@ static void _send_BM1366(uint8_t header, uint8_t * data, uint8_t data_len, bool 
 
     // send serial data
     SERIAL_send(buf, total_length, debug);
-
-    free(buf);
 }
 
 static void _send_simple(uint8_t * data, uint8_t total_length)
 {
-    unsigned char * buf = malloc(total_length);
+    uint8_t buf[total_length];
     memcpy(buf, data, total_length);
     SERIAL_send(buf, total_length, BM1366_SERIALTX_DEBUG);
-
-    free(buf);
 }
 
 static void _send_chain_inactive(void)

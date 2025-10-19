@@ -331,7 +331,8 @@ static void screen_show(screen_t screen)
         lv_obj_t * scr = screens[screen];
 
         if (scr && lvgl_port_lock(0)) {
-            lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, false);
+            bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
+            lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
             lvgl_port_unlock();
         }
 
