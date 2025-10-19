@@ -296,10 +296,10 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
 
         stats.statistics.forEach(element => {
-          element[idxHashrate] = element[idxHashrate] * 1000000000;
+          element[idxHashrate] = this.normalizeHashrate(element[idxHashrate]);
           switch (chartLabelValue(chartY1DataLabel)) {
             case eChartLabel.hashrateRegister:
-              element[idxChartY1Data] = element[idxChartY1Data] * 1000000000;
+              element[idxChartY1Data] = this.normalizeHashrate(element[idxChartY1Data]);
               break;
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
@@ -311,7 +311,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
           switch (chartLabelValue(chartY2DataLabel)) {
             case eChartLabel.hashrateRegister:
-              element[idxChartY2Data] = element[idxChartY2Data] * 1000000000;
+              element[idxChartY2Data] = this.normalizeHashrate(element[idxChartY2Data]);
               break;
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
@@ -351,9 +351,9 @@ export class HomeComponent implements OnInit, OnDestroy {
         return this.systemService.getInfo()
       }),
       map(info => {
-        info.hashRate = info.hashRate * 1000000000;
-        info.hashrateMonitor.hashrate = info.hashrateMonitor?.hashrate * 1000000000;
-        info.expectedHashrate = info.expectedHashrate * 1000000000;
+        info.hashRate = this.normalizeHashrate(info.hashRate);
+        info.hashrateMonitor.hashrate = this.normalizeHashrate(info.hashrateMonitor?.hashrate);
+        info.expectedHashrate = this.normalizeHashrate(info.expectedHashrate);
         info.voltage = info.voltage / 1000;
         info.current = info.current / 1000;
         info.coreVoltageActual = info.coreVoltageActual / 1000;
@@ -515,7 +515,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       if (hashrate > 0) {
-        return power / (hashrate / 1000000000000); // Convert to J/Th
+        return power / (hashrate / 1_000_000_000_000); // Convert to J/Th
       } else {
         return power; // in this case better than infinity or NaN
       }
@@ -556,8 +556,30 @@ export class HomeComponent implements OnInit, OnDestroy {
     return (sharesRejectedReason.count / totalShares) * 100;
   }
 
-  public getDomainErrorPercentage(asic: { error: number }, info: ISystemInfo): number {
+  public getDomainErrorPercentage(info: ISystemInfo, asic: { error: number }): number {
     return asic.error ? (asic.error / (info.expectedHashrate / 1_000_000_000_000)) : 0;
+  }
+
+  public getDomainErrorColor(info: ISystemInfo, asic: { error: number }): string {
+    const percentage = this.getDomainErrorPercentage(info, asic);
+
+    switch (true) {
+      case (percentage < 1): return 'green';
+      case (percentage >= 1 && percentage < 10): return 'orange';
+      default: return 'red';
+    }
+  }
+
+  public getAsicsAmount(info: ISystemInfo): number {
+    return info.hashrateMonitor.asics.length;
+  }
+
+  public getAsicDomainsAmount(info: ISystemInfo, row: number): number {
+    return info.hashrateMonitor.asics[row].domains.length;
+  }
+
+  public normalizeHashrate(hashrate: number): number {
+    return hashrate * 1_000_000_000;
   }
 
   public clearDataPoints() {

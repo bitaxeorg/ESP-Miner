@@ -49,7 +49,10 @@
                                         {{info.hashrateMonitor.hashrate | hashSuffix}}
                                     </span>
                                     <span class="text-500 text-xs">
-                                        Error: {{info.hashrateMonitor.errorCount}}
+                                        Error:
+                                        <span class="text-{{info.hashrateMonitor.errorCount === 0 ? 'green' : 'red'}}-500">
+                                            {{info.hashrateMonitor.errorCount}}
+                                        </span>
                                     </span>
                                 </ng-container>
                                 <ng-template #noHashrateMonitor>
@@ -90,11 +93,14 @@
                         </div>
 
                         <div class="overflow-auto">
-                            <table class="heatmap text-{{info.hashrateMonitor.asics.length <= 2 ? 'sm' : 'xs'}}">
+                            <table class="heatmap text-{{getAsicsAmount(info) <= 2 ? 'sm' : 'xs'}}">
                                 <thead>
                                     <tr>
                                         <th class="text-left">#</th>
-                                        <th colspan="4">Domains</th>
+                                        <th *ngIf="getAsicsAmount(info) === 1 && getAsicDomainsAmount(info, 0) === 1; else multiDomain">Domain</th>
+                                        <ng-template #multiDomain>
+                                            <th colspan="4">Domains</th>
+                                        </ng-template>
                                         <th>Error</th>
                                     </tr>
                                 </thead>
@@ -105,14 +111,14 @@
                                         </td>
                                         <td *ngFor="let domain of asic.domains"
                                             [style.--intensity]="domain / 1000"
-                                            [style.height]="(info.hashrateMonitor.asics.length <= 2 ? '2rem' : null)"
+                                            [style.height]="(getAsicsAmount(info) <= 2 ? '2rem' : null)"
                                             class="text-center cursor-pointer"
-                                            pTooltip="{{ domain | hashSuffix }}"
+                                            pTooltip="{{ normalizeHashrate(domain) | hashSuffix }}"
                                             tooltipPosition="bottom">
-                                            <span class="md:hidden">{{ domain }}</span>
+                                            <span class="md:hidden">{{ normalizeHashrate(domain) | hashSuffix }}</span>
                                         </td>
-                                        <td class="text-center cursor-pointer" pTooltip="{{ asic.error | hashSuffix }}" tooltipPosition="bottom">
-                                            {{getDomainErrorPercentage(asic, info) | number: '1.0-0'}} %
+                                        <td class="text-center cursor-pointer text-{{getDomainErrorColor(info, asic)}}-500" pTooltip="{{ normalizeHashrate(asic.error) | hashSuffix }}" tooltipPosition="bottom">
+                                            {{getDomainErrorPercentage(info, asic) | number: '1.0-0'}} %
                                         </td>
                                     </tr>
                                 </tbody>
