@@ -1,3 +1,5 @@
+#include "esp_attr.h"
+
 /*******************************************************************************
  * Size: 8 px
  * Bpp: 1
@@ -29,7 +31,7 @@
  *----------------*/
 
 /*Store the image of the glyphs*/
-static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
+static LV_ATTRIBUTE_LARGE_CONST const uint8_t EXT_RAM_BSS_ATTR glyph_bitmap[] = {
     /* U+0020 " " */
     0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 
@@ -340,7 +342,7 @@ static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
  *  GLYPH DESCRIPTION
  *--------------------*/
 
-static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
+static const lv_font_fmt_txt_glyph_dsc_t EXT_RAM_BSS_ATTR glyph_dsc[] = {
     {.bitmap_index = 0, .adv_w = 0, .box_w = 0, .box_h = 0, .ofs_x = 0, .ofs_y = 0} /* id = 0 reserved */,
     {.bitmap_index = 0, .adv_w = 96, .box_w = 6, .box_h = 8, .ofs_x = 0, .ofs_y = -1},
     {.bitmap_index = 6, .adv_w = 96, .box_w = 6, .box_h = 8, .ofs_x = 0, .ofs_y = -1},
