@@ -1,4 +1,5 @@
 #include <string.h>
+#include <esp_heap_caps.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "system.h"
@@ -84,15 +85,15 @@ void hashrate_monitor_task(void *pvParameters)
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
 
-    HASHRATE_MONITOR_MODULE->total_measurement = malloc(asic_count * sizeof(measurement_t));
+    HASHRATE_MONITOR_MODULE->total_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
     if (hash_domains > 0) {
         measurement_t* data = malloc(asic_count * hash_domains * sizeof(measurement_t));
-        HASHRATE_MONITOR_MODULE->domain_measurements = malloc(hash_domains * sizeof(measurement_t*));
+        HASHRATE_MONITOR_MODULE->domain_measurements = heap_caps_malloc(hash_domains * sizeof(measurement_t*), MALLOC_CAP_SPIRAM);
         for (size_t i = 0; i < hash_domains; i++) {
             HASHRATE_MONITOR_MODULE->domain_measurements[i] = data + (i * asic_count);
         }
     }
-    HASHRATE_MONITOR_MODULE->error_measurement = malloc(asic_count * sizeof(measurement_t));
+    HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
 
     clear_measurements(HASHRATE_MONITOR_MODULE, asic_count, hash_domains);
 

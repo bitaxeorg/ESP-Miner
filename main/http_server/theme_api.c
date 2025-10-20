@@ -3,8 +3,11 @@
 #include "esp_log.h"
 #include "nvs_config.h"
 #include "cJSON.h"
+#include "http_server.h"
 
 //static const char *TAG = "theme_api";
+
+static int theme_prebuffer_len = 256;
 
 // Helper function to set CORS headers
 static esp_err_t set_cors_headers(httpd_req_t *req)
@@ -65,15 +68,14 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
         cJSON_AddItemToObject(root, "accentColors", colors_json);
     }
 
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
+    esp_err_t res = HTTP_send_json(req, root, &theme_prebuffer_len);
 
     free(scheme);
     free(colors);
-    free((char *)response);
+
     cJSON_Delete(root);
 
-    return ESP_OK;
+    return res;
 }
 
 // POST /api/theme handler
