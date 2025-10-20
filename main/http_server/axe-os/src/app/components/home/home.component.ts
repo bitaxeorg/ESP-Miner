@@ -19,8 +19,16 @@ import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { LocalStorageService } from 'src/app/local-storage.service';
 
-type Message = {
-  severity: 'error' | 'warn' | 'success' | 'info';
+type MessageType =
+  | 'DEVICE_OVERHEAT'
+  | 'POWER_FAULT'
+  | 'FREQUENCY_LOW'
+  | 'FALLBACK_STRATUM'
+  | 'VERSION_MISMATCH';
+
+interface ISystemMessage {
+  type: MessageType;
+  severity: 'error' | 'warn' | 'info';
   text: string;
 }
 
@@ -30,7 +38,7 @@ type Message = {
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit, OnDestroy {
-  public messages: Message[] = [];
+  public messages: ISystemMessage[] = [];
 
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
@@ -61,7 +69,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private pageDefaultTitle: string = '';
   private destroy$ = new Subject<void>();
-  private titleSubscription?: Subscription;
+  private infoSubscription?: Subscription;
   public form!: FormGroup;
 
   @Input() uri = '';
@@ -148,7 +156,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.titleSubscription?.unsubscribe();
+          this.infoSubscription?.unsubscribe();
           this.clearDataPoints();
           this.loadPreviousData();
         },
@@ -424,7 +432,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       })
     );
 
-    this.titleSubscription = this.info$
+    this.infoSubscription = this.info$
       .pipe(takeUntil(this.destroy$))
       .subscribe(info => {
         this.handleSystemMessages(info);
@@ -485,20 +493,25 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   public handleSystemMessages(info: ISystemInfo) {
-    const updateMessage = (condition: boolean, severity: Message['severity'], text: string) => {
-      const exists = this.messages.some(msg => msg.text === text);
+    const updateMessage = (
+      condition: boolean,
+      type: MessageType,
+      severity: ISystemMessage['severity'],
+      text: string
+    ) => {
+      const exists = this.messages.some(msg => msg.type === type);
       if (condition && !exists) {
-        this.messages.push({ severity, text });
+        this.messages.push({ type, severity, text });
       } else if (!condition && exists) {
-        this.messages = this.messages.filter(msg => msg.text !== text);
+        this.messages = this.messages.filter(msg => msg.type !== type);
       }
     };
 
-    updateMessage(info.overheat_mode === 1, 'error', 'Device has overheated - See settings');
-    updateMessage(!!info.power_fault, 'error', `${info.power_fault} Check your Power Supply.`);
-    updateMessage(!info.frequency || info.frequency < 400, 'warn', 'Device frequency is set low - See settings');
-    updateMessage(info.isUsingFallbackStratum, 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
-    updateMessage(info.version !== info.axeOSVersion, 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
+    updateMessage(info.overheat_mode === 1, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
+    updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
+    updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
+    updateMessage(info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
+    updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
   }
 
   public clearDataPoints() {
