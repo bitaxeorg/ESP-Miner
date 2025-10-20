@@ -775,7 +775,7 @@ static esp_err_t GET_system_status(httpd_req_t * req)
         for (int asic_nr = 0; asic_nr < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; asic_nr++) {
             cJSON *asic = cJSON_CreateObject();
             cJSON_AddItemToArray(asics_array, asic);
-            cJSON_AddNumberToObject(asic, "total", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[asic_nr].hashrate);
+            cJSON_AddNumberToObject(asic, "hashrate", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[asic_nr].hashrate);
 
             int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
             if (hash_domains > 0) {
@@ -790,8 +790,8 @@ static esp_err_t GET_system_status(httpd_req_t * req)
             cJSON_AddNumberToObject(asic, "error", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_measurement[asic_nr].hashrate);
         }
     }
-    cJSON_AddNumberToObject(hashrate_monitor, "hashrate", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.hashrate);
-    cJSON_AddNumberToObject(hashrate_monitor, "errorCount", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_count);
+    cJSON_AddNumberToObject(hashrate_monitor, "totalHashrate", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.hashrate);
+    cJSON_AddNumberToObject(hashrate_monitor, "totalErrorCount", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_count);
 
     cJSON_AddBoolToObject(root, "overheatMode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE));
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
