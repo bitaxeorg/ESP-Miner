@@ -192,16 +192,16 @@ components:
           type: string
           description: IPv6 address
         isUsingFallbackStratum:
-          type: number
-          description: Whether using fallback stratum (0=no, 1=yes)
+          type: boolean
+          description: Whether using fallback stratum
         networkDifficulty:
           type: number
           description: Current network difficulty
         overheatMode:
-          type: number
+          type: boolean
           description: Overheat protection mode
         overclockEnabled:
-          type: integer
+          type: boolean
           description: Set custom voltage/frequency in AxeOS
         poolDifficulty:
           type: number
@@ -272,8 +272,8 @@ components:
         - voltageOptions
       properties:
         apEnabled:
-          type: number
-          description: Whether AP mode is enabled (0=no, 1=yes)
+          type: boolean
+          description: Whether AP mode is enabled
         asicCount:
           type: number
           description: Number of ASICs detected
@@ -316,8 +316,8 @@ components:
           type: string
           description: ESP-IDF version
         isPSRAMAvailable:
-          type: number
-          description: Whether PSRAM is available (0=no, 1=yes)
+          type: boolean
+          description: Whether PSRAM is available
         macAddr:
           type: string
           description: Device MAC address
@@ -380,8 +380,8 @@ components:
         - tempTarget
       properties:
         autoFanSpeed:
-          type: number
-          description: Automatic fan speed control (0=manual, 1=auto)
+          type: boolean
+          description: Automatic fan speed control (false=manual, true=auto)
         coreVoltage:
           type: number
           description: Configured ASIC core voltage
@@ -410,10 +410,10 @@ components:
           type: string
           description: Device hostname
         invertScreen:
-          type: number
-          description: Screen invert setting (0=normal, 1=inverted)
+          type: boolean
+          description: Screen invert setting (false=normal, true=inverted)
         overheatMode:
-          type: number
+          type: boolean
           description: Overheat protection mode
         rotation:
           type: number
@@ -535,26 +535,26 @@ components:
           examples:
             - 0
         overheatMode:
-          type: integer
-          description: Overheat protection mode (0=disabled)
+          type: boolean
+          description: Overheat protection mode
           enum: [0]
           examples:
             - 0
         overclockEnabled:
-          type: integer
-          description: Set custom voltage/frequency in AxeOS (0=disabled, 1=enabled)
+          type: boolean
+          description: Set custom voltage/frequency in AxeOS
           enum: [0,1]
           examples:
             - 0
         invertScreen:
-          type: integer
-          description: Whether to invert screen colors (0=normal, 1=inverted)
+          type: boolean
+          description: Whether to invert screen colors (false=normal, true=inverted)
           enum: [0, 1]
           examples:
             - 0
         autoFanSpeed:
-          type: integer
-          description: Whether to enable automatic fan speed control (0=manual, 1=auto)
+          type: boolean
+          description: Whether to enable automatic fan speed control (false=manual, true=auto)
           enum: [0, 1]
           examples:
             - 1

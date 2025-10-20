@@ -746,8 +746,10 @@ static esp_err_t GET_system_status(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
     cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
+    cJSON_AddNumberToObject(root, "fanRPM", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
+    cJSON_AddNumberToObject(root, "fanSpeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
 
-    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
+    cJSON_AddBoolToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
     cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
     cJSON_AddNumberToObject(root, "sharesAccepted", GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
     cJSON_AddNumberToObject(root, "sharesRejected", GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
@@ -835,7 +837,7 @@ static esp_err_t GET_system_board(httpd_req_t *req)
 
     cJSON_AddStringToObject(root, "hostname", hostname);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
-    cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
+    cJSON_AddBoolToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "ipv4", ipv4);
     cJSON_AddStringToObject(root, "ipv6", ipv6);
@@ -845,7 +847,7 @@ static esp_err_t GET_system_board(httpd_req_t *req)
     cJSON_AddStringToObject(root, "deviceModel", GLOBAL_STATE->DEVICE_CONFIG.family.name);
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
 
-    cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
+    cJSON_AddBoolToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
     cJSON_AddNumberToObject(root, "freeHeapInternal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
@@ -899,20 +901,20 @@ static esp_err_t GET_system_config(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT));
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
     cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY));
-    cJSON_AddNumberToObject(root, "stratumExtranonceSubscribe", nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE));
+    cJSON_AddBoolToObject(root, "stratumExtranonceSubscribe", nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
     cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT));
     cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
     cJSON_AddNumberToObject(root, "fallbackStratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY));
-    cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
+    cJSON_AddBoolToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT));
     cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION));
-    cJSON_AddNumberToObject(root, "invertScreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN));
+    cJSON_AddBoolToObject(root, "invertScreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN));
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY));
-    cJSON_AddNumberToObject(root, "autoFanSpeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED));
+    cJSON_AddBoolToObject(root, "autoFanSpeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED));
     cJSON_AddNumberToObject(root, "tempTarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET));
-    cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED));
-    cJSON_AddNumberToObject(root, "overheatMode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE));
+    cJSON_AddBoolToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED));
+    cJSON_AddBoolToObject(root, "overheatMode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE));
 
     free(stratumURL);
     free(fallbackStratumURL);
