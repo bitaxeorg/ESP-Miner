@@ -62,29 +62,35 @@
     }
 }
 
-.card {
-    transition: transform 1s;
-    transform-style: preserve-3d;
-    position: relative;
+.card-flip {
+    perspective: 600px;
 
-    @media (max-width: 768px) {
-        min-height: 11.2rem;
-    }
+    .card {
+        transition: transform 1s;
+        transform-style: preserve-3d;
+        position: relative;
 
-    &.is-flipped {
-        transform: rotateY(180deg);
-    }
+        @media (max-width: 768px) {
+            min-height: 11.2rem;
+        }
 
-    &__face {
-        top: 0;
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        -webkit-backface-visibility: hidden;
-        backface-visibility: hidden;
-
-        &--back {
+        &.is-flipped {
             transform: rotateY(180deg);
+        }
+
+        &__face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+
+            &--front {
+                transform: rotateY(0deg);
+            }
+
+            &--back {
+                transform: rotateY(180deg);
+            }
         }
     }
 }
