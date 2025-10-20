@@ -1,8 +1,9 @@
 import { Component, OnInit } from '@angular/core';
-import { Observable, shareReplay } from 'rxjs';
+import { Observable, shareReplay, Subject, takeUntil } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { SystemService } from '../services/system.service';
 import { LayoutService } from './service/app.layout.service';
+import { SensitiveData } from 'src/app/services/sensitive-data.service';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 
 @Component({
@@ -10,14 +11,17 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
     templateUrl: './app.menu.component.html'
 })
 export class AppMenuComponent implements OnInit {
+    private destroy$ = new Subject<void>();
 
+    public sensitiveDataHidden: boolean = false;
     public info$!: Observable<ISystemInfo>;
 
     model: any[] = [];
 
     constructor(public layoutService: LayoutService,
         private systemService: SystemService,
-        private toastr: ToastrService
+        private toastr: ToastrService,
+        private sensitiveData: SensitiveData,
     ) {
         this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}))
     }
@@ -44,6 +48,21 @@ export class AppMenuComponent implements OnInit {
                 ]
             }
         ];
+
+        this.sensitiveData.hidden
+          .pipe(takeUntil(this.destroy$))
+          .subscribe((hidden: boolean) => {
+            this.sensitiveDataHidden = hidden;
+          });
+    }
+
+    ngOnDestroy() {
+      this.destroy$.next();
+      this.destroy$.complete();
+    }
+
+    public toggleSensitiveData() {
+      this.sensitiveData.toggle();
     }
 
     public restart() {

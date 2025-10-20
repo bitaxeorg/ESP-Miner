@@ -2,14 +2,32 @@
 #define COMMON_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "esp_err.h"
 
-typedef struct __attribute__((__packed__))
+typedef enum
 {
+    REGISTER_INVALID = 0,
+    REGISTER_ERROR_COUNT,
+    REGISTER_DOMAIN_0_COUNT,
+    REGISTER_DOMAIN_1_COUNT,
+    REGISTER_DOMAIN_2_COUNT,
+    REGISTER_DOMAIN_3_COUNT,
+    REGISTER_TOTAL_COUNT,
+} register_type_t;
+
+typedef struct
+{
+    // -- job result response
     uint8_t job_id;
     uint32_t nonce;
     uint32_t rolled_version;
+    // ---- register response
+    register_type_t register_type;
+    uint8_t asic_nr;
+    uint32_t value;
 } task_result;
+
 
 unsigned char _reverse_bits(unsigned char num);
 int _largest_power_of_two(int num);

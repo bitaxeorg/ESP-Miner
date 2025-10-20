@@ -33,12 +33,16 @@
                 <ng-container *ngIf="!info.power_fault">
                     Average:
                     <span class="text-green-500 font-medium">
-                        {{calculateAverage(hashrateData) | hashSuffix}}
+                        {{getHashrateAverage() | hashSuffix}}
                     </span>
                 </ng-container>
 
                 <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
                     Expected: {{info.expectedHashrate | hashSuffix}}
+                </div>
+
+                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.hashrateMonitor">
+                    Register: {{info.hashrateMonitor.hashrate | hashSuffix}} Error: {{info.hashrateMonitor.errorCount}}
                 </div>
             </div>
         </div>
@@ -49,7 +53,7 @@
                         <span class="block text-500 font-medium mb-3">Efficiency</span>
                         <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
                             <span *ngIf="!info.power_fault">
-                                {{info.power / (info.hashRate / 1000000000000) | number: '1.2-2'}} J/Th
+                                {{getEfficiency(info) | number: '1.2-2'}} J/Th
                             </span>
                             <span *ngIf="info.power_fault" class="text-red-500">
                                 Not available - Power fault
@@ -61,12 +65,12 @@
                 <ng-container *ngIf="!info.power_fault">
                     Average:
                     <span class="text-green-500 font-medium">
-                        {{calculateEfficiencyAverage(hashrateData, powerData) | number: '1.2-2'}} J/Th
+                        {{getEfficiencyAverage() | number: '1.2-2'}} J/Th
                     </span>
                 </ng-container>
 
                 <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
-                    Expected: {{info.power / (info.expectedHashrate / 1000000000000) | number: '1.2-2'}} J/Th
+                    Expected: {{getExpectedEfficiency(info) | number: '1.2-2'}} J/Th
                 </div>
             </div>
         </div>
@@ -97,11 +101,7 @@
                         <span class="text-500">
                             {{ sharesRejectedReason.message }}
                         </span>
-                        ({{
-                            (sharesRejectedReason.count /
-                            (info.sharesAccepted + info.sharesRejected) * 100)
-                            | number: '1.2-2'
-                        }} %)
+                        ({{getShareRejectionPercentage(sharesRejectedReason, info) | number: '1.2-2'}} %)
                         </span>
                     </div>
                 </div>
@@ -132,14 +132,14 @@
                             optionLabel="name"
                             optionValue="value"
                             formControlName="chartY1Data"
-                            styleClass="w-10rem p-dropdown--border-color-primary p-dropdown--small">
+                            styleClass="w-10rem border-100 p-dropdown--small">
                         </p-dropdown>
                         <p-dropdown
                             [options]="dataSourceLabels(info)"
                             optionLabel="name"
                             optionValue="value"
                             formControlName="chartY2Data"
-                            styleClass="w-10rem border-500 p-dropdown--small">
+                            styleClass="w-10rem border-100 p-dropdown--small">
                         </p-dropdown>
                     </div>
 
@@ -277,7 +277,17 @@
 
         <div class="col-12 md:col-6">
             <div class="card">
-                <h5>Pool ({{ activePoolLabel }})</h5>
+                <div class="flex flex-nowrap justify-content-between mb-3 relative">
+                    <h4 class="mb-0">Pool</h4>
+                    <p-dropdown
+                        [options]="(pools$ | async) ?? []"
+                        [(ngModel)]="activePoolLabel"
+                        optionLabel="label"
+                        optionValue="value"
+                        (onChange)="onPoolChange($event)"
+                        styleClass="border-100 p-dropdown--small absolute right-0"
+                    />
+                </div>
 
                 <div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
@@ -304,10 +314,10 @@
                         <span>User</span>
                     </div>
 
-                    <span class="start">
+                    <span class="start" sensitive-data>
                         {{ activePoolUser.substring(0, activePoolUser.length - 20) }}
                     </span>
-                    <span class="end">
+                    <span class="end" sensitive-data>
                         {{ activePoolUser.substring(activePoolUser.length - 20) }}
                     </span>
                 </div>
@@ -334,7 +344,7 @@
 
         <div class="col-12 md:col-6">
             <div class="card">
-                <h5>Block Header</h5>
+                <h4>Block Header</h4>
 
                 <div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
@@ -362,7 +372,6 @@
                         {{ info.scriptsig }}
                     </div>
                 </div>
-
             </div>
         </div>
     </div>

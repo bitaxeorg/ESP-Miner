@@ -14,6 +14,8 @@
 #include "PID.h"
 #include "power.h"
 #include "asic.h"
+#include "bm1370.h"
+#include "utils.h"
 
 #define POLL_RATE 1800
 #define MAX_TEMP 90.0
@@ -47,8 +49,15 @@ int pid_startup_counter = 0;
 
 PIDController pid;
 
-void POWER_MANAGEMENT_init_frequency(PowerManagementModule * power_management)
+static float expected_hashrate(GlobalState * GLOBAL_STATE, float frequency)
 {
+    return frequency * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
+}
+
+void POWER_MANAGEMENT_init_frequency(void * pvParameters)
+{
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, -1);
     if (frequency < 0) { // fallback if the float value is not yet set
         frequency = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY, CONFIG_ASIC_FREQUENCY);
@@ -56,9 +65,12 @@ void POWER_MANAGEMENT_init_frequency(PowerManagementModule * power_management)
         nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
     }
 
-    ESP_LOGI(TAG, "ASIC Frequency: %g MHz", frequency);
-
-    power_management->frequency_value = frequency;
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = frequency;
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = expected_hashrate(GLOBAL_STATE, frequency);
+    
+    char expected_hashrate_str[16] = {0};
+    suffixString(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate * 1e6, expected_hashrate_str, sizeof(expected_hashrate_str), 0);
+    ESP_LOGI(TAG, "ASIC Frequency: %g MHz, Expected hashrate: %sH/s", frequency, expected_hashrate_str);
 }
 
 void POWER_MANAGEMENT_task(void * pvParameters)
@@ -70,7 +82,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
 
-    POWER_MANAGEMENT_init_frequency(power_management);
+    POWER_MANAGEMENT_init_frequency(GLOBAL_STATE);
     
     float last_asic_frequency = power_management->frequency_value;
 
@@ -206,6 +218,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             
             if (success) {
                 power_management->frequency_value = asic_frequency;
+                power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE, asic_frequency);
             }
             
             last_asic_frequency = asic_frequency;

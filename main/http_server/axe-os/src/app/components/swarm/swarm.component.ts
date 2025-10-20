@@ -1,14 +1,16 @@
 import { HttpClient } from '@angular/common/http';
-import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, HostListener } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable } from 'rxjs';
+import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable, Subscription } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
+import { LayoutService } from "../../layout/service/app.layout.service";
 import { ModalComponent } from '../modal/modal.component';
 
 const SWARM_DATA = 'SWARM_DATA';
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 const SWARM_SORTING = 'SWARM_SORTING';
+const SWARM_GRID_VIEW = 'SWARM_GRID_VIEW';
 
 type SwarmDevice = { IP: string; ASICModel: string; deviceModel: string; swarmColor: string; asicCount: number; [key: string]: any };
 
@@ -39,19 +41,34 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public refreshIntervalControl: FormControl;
 
-  public sortField: string = '';
-  public sortDirection: 'asc' | 'desc' = 'asc';
+  public gridView: boolean;
+  public selectedSort: { sortField: string; sortDirection: 'asc' | 'desc' };
+
+  public staticMenuDesktopInactive: boolean;
+  private staticMenuDesktopSubscription!: Subscription;
+
+  public filterText = '';
+
+  @HostListener('document:keydown.esc', ['$event'])
+  onEscKey() {
+    if (this.filterText) {
+      this.filterText = '';
+    }
+  }
 
   constructor(
     private fb: FormBuilder,
     private toastr: ToastrService,
     private localStorageService: LocalStorageService,
+    public layoutService: LayoutService,
     private httpClient: HttpClient
   ) {
 
     this.form = this.fb.group({
       manualAddIp: [null, [Validators.required, Validators.pattern('(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')]]
     });
+
+    this.gridView = this.localStorageService.getBool(SWARM_GRID_VIEW);
 
     const storedRefreshTime = this.localStorageService.getNumber(SWARM_REFRESH_TIME) ?? 30;
     this.refreshIntervalTime = storedRefreshTime;
@@ -64,12 +81,12 @@ export class SwarmComponent implements OnInit, OnDestroy {
       this.localStorageService.setNumber(SWARM_REFRESH_TIME, value);
     });
 
-    const storedSorting = this.localStorageService.getObject(SWARM_SORTING) ?? {
+    this.selectedSort = this.localStorageService.getObject(SWARM_SORTING) ?? {
       sortField: 'IP',
       sortDirection: 'asc'
     };
-    this.sortField = storedSorting.sortField;
-    this.sortDirection = storedSorting.sortDirection;
+
+    this.staticMenuDesktopInactive = this.layoutService.state.staticMenuDesktopInactive;
   }
 
   ngOnInit(): void {
@@ -82,6 +99,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
       this.refreshList(true);
     }
 
+    this.staticMenuDesktopSubscription = this.layoutService.getStaticMenuDesktopInactive$()
+      .subscribe(inactive => {
+        this.staticMenuDesktopInactive = inactive;
+      });
+
     this.refreshIntervalRef = window.setInterval(() => {
       if (!this.scanning && !this.isRefreshing && this.swarm.length) {
         this.refreshIntervalTime--;
@@ -93,6 +115,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.staticMenuDesktopSubscription.unsubscribe();
     window.clearInterval(this.refreshIntervalRef);
     this.form.reset();
   }
@@ -211,7 +234,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public refreshErrorHandler = (error: any, ip: string) => {
     const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
-    this.toastr.error(`Failed to get info from ${ip}`);
+    this.toastr.error(`Failed to get info from ${ip}. ${errorMessage}`);
     const existingDevice = this.swarm.find(axeOs => axeOs.IP === ip);
     return of({
       ...existingDevice,
@@ -250,33 +273,28 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
-  sortBy(field: string) {
-    // If clicking the same field, toggle direction
-    if (this.sortField === field) {
-      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+  sortBy(sortField: string, sortDirection?: 'asc' | 'desc' | undefined) {
+    if (sortDirection) {
+      this.selectedSort = { sortField, sortDirection };
+    } else if (this.selectedSort.sortField === sortField) {
+      this.selectedSort = { sortField, sortDirection: this.selectedSort.sortDirection === 'asc' ? 'desc' : 'asc' };
     } else {
-      // New field, set to ascending by default
-      this.sortField = field;
-      this.sortDirection = 'asc';
+      this.selectedSort = { sortField, sortDirection: 'asc' };
     }
 
-    this.localStorageService.setObject(SWARM_SORTING, {
-      sortField: this.sortField,
-      sortDirection: this.sortDirection
-    });
-
+    this.localStorageService.setObject(SWARM_SORTING, this.selectedSort);
     this.sortSwarm();
   }
 
   private sortSwarm() {
     this.swarm.sort((a, b) => {
       let comparison = 0;
-      const fieldType = typeof a[this.sortField];
+      const fieldType = typeof a[this.selectedSort.sortField];
 
-      if (this.sortField === 'IP') {
+      if (this.selectedSort.sortField === 'IP') {
         // Split IP into octets and compare numerically
-        const aOctets = a[this.sortField].split('.').map(Number);
-        const bOctets = b[this.sortField].split('.').map(Number);
+        const aOctets = a[this.selectedSort.sortField].split('.').map(Number);
+        const bOctets = b[this.selectedSort.sortField].split('.').map(Number);
         for (let i = 0; i < 4; i++) {
           if (aOctets[i] !== bOctets[i]) {
             comparison = aOctets[i] - bOctets[i];
@@ -284,11 +302,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
           }
         }
       } else if (fieldType === 'number') {
-        comparison = a[this.sortField] - b[this.sortField];
+        comparison = a[this.selectedSort.sortField] - b[this.selectedSort.sortField];
       } else if (fieldType === 'string') {
-        comparison = a[this.sortField].localeCompare(b[this.sortField], undefined, { numeric: true });
+        comparison = a[this.selectedSort.sortField].localeCompare(b[this.selectedSort.sortField], undefined, { numeric: true });
       }
-      return this.sortDirection === 'asc' ? comparison : -comparison;
+      return this.selectedSort.sortDirection === 'asc' ? comparison : -comparison;
     });
   }
 
@@ -318,7 +336,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   get deviceFamilies(): SwarmDevice[] {
-    return this.swarm.filter((v, i, a) =>
+    return this.filteredSwarm.filter((v, i, a) =>
       a.findIndex(({ deviceModel, ASICModel, asicCount }) =>
         v.deviceModel === deviceModel &&
         v.ASICModel === ASICModel &&
@@ -358,5 +376,63 @@ export class SwarmComponent implements OnInit, OnDestroy {
       case 'GammaTurbo': return 'cyan';
       default:           return 'gray';
     }
+  }
+
+  public stringifyDeviceLabel(data: any): string {
+    const model = data.deviceModel || 'Other';
+    const asicCountPart = data.asicCount > 1 ? data.asicCount + 'x ' : '';
+    const asicModel = data.ASICModel || '';
+
+    return model + ' (' + asicCountPart + asicModel + ')';
+  };
+
+
+  public toggleGridView(gridView: boolean): void {
+    this.localStorageService.setBool(SWARM_GRID_VIEW, this.gridView = gridView);
+  }
+
+  get sortOptions() {
+    return [
+      { label: 'Hostname', value: { sortField: 'hostname', sortDirection: 'desc' } },
+      { label: 'Hostname', value: { sortField: 'hostname', sortDirection: 'asc' } },
+      { label: 'IP', value: { sortField: 'IP', sortDirection: 'desc' } },
+      { label: 'IP', value: { sortField: 'IP', sortDirection: 'asc' } },
+      { label: 'Hashrate', value: { sortField: 'hashRate', sortDirection: 'desc' } },
+      { label: 'Hashrate', value: { sortField: 'hashRate', sortDirection: 'asc' } },
+      { label: 'Shares', value: { sortField: 'sharesAccepted', sortDirection: 'desc' } },
+      { label: 'Shares', value: { sortField: 'sharesAccepted', sortDirection: 'asc' } },
+      { label: 'Best Diff', value: { sortField: 'bestDiff', sortDirection: 'desc' } },
+      { label: 'Best Diff', value: { sortField: 'bestDiff', sortDirection: 'asc' } },
+      { label: 'Uptime', value: { sortField: 'uptimeSeconds', sortDirection: 'desc' } },
+      { label: 'Uptime', value: { sortField: 'uptimeSeconds', sortDirection: 'asc' } },
+      { label: 'Power', value: { sortField: 'power', sortDirection: 'desc' } },
+      { label: 'Power', value: { sortField: 'power', sortDirection: 'asc' } },
+      { label: 'Temp', value: { sortField: 'temp', sortDirection: 'desc' } },
+      { label: 'Temp', value: { sortField: 'temp', sortDirection: 'asc' } },
+      { label: 'Pool Diff', value: { sortField: 'poolDifficulty', sortDirection: 'desc' } },
+      { label: 'Pool Diff', value: { sortField: 'poolDifficulty', sortDirection: 'asc' } },
+      { label: 'Version', value: { sortField: 'version', sortDirection: 'desc' } },
+      { label: 'Version', value: { sortField: 'version', sortDirection: 'asc' } },
+    ];
+  }
+
+  onSortChange(event: {value: {sortField: string; sortDirection: 'asc' | 'desc'}}) {
+    const {sortField, sortDirection} = event.value;
+
+    this.sortBy(sortField, sortDirection);
+  }
+
+  get filteredSwarm() {
+    if (!this.filterText) {
+      return this.swarm;
+    }
+
+    const filter = this.filterText.toLowerCase();
+    return this.swarm.filter(axe =>
+      axe.hostname.toLowerCase().includes(filter) ||
+      axe.ASICModel.toLowerCase().includes(filter) ||
+      axe.deviceModel.toLowerCase().includes(filter) ||
+      axe.IP.includes(filter)
+    );
   }
 }
