@@ -33,6 +33,8 @@ export interface ISystemInfo {
     bestDiff: number,
     bestSessionDiff: number,
     freeHeap: number,
+    freeHeapInternal: number,
+    freeHeapSpiram: number,
     coreVoltage: number,
     hostname: string,
     macAddr: string,

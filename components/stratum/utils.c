@@ -6,6 +6,15 @@
 
 #include "mbedtls/sha256.h"
 
+static const char hex_table[] = "0123456789abcdef";
+
+static const uint8_t hex_val_table[256] = {
+    ['0'] = 0, ['1'] = 1, ['2'] = 2, ['3'] = 3, ['4'] = 4,
+    ['5'] = 5, ['6'] = 6, ['7'] = 7, ['8'] = 8, ['9'] = 9,
+    ['a'] = 10, ['b'] = 11, ['c'] = 12, ['d'] = 13, ['e'] = 14, ['f'] = 15,
+    ['A'] = 10, ['B'] = 11, ['C'] = 12, ['D'] = 13, ['E'] = 14, ['F'] = 15
+};
+
 #ifndef bswap_16
 #define bswap_16(a) ((((uint16_t)(a) << 8) & 0xff00) | (((uint16_t)(a) >> 8) & 0xff))
 #endif
@@ -60,82 +69,31 @@ void flip32bytes(void *dest_p, const void *src_p)
         dest[i] = swab32(src[i]);
 }
 
-int hex2char(uint8_t x, char *c)
-{
-    if (x <= 9)
-    {
-        *c = x + '0';
-    }
-    else if (x <= 15)
-    {
-        *c = x - 10 + 'a';
-    }
-    else
-    {
-        return -1;
-    }
-
-    return 0;
-}
-
 size_t bin2hex(const uint8_t *buf, size_t buflen, char *hex, size_t hexlen)
 {
-    if ((hexlen + 1) < buflen * 2)
-    {
+    if (hexlen < buflen * 2) {
         return 0;
     }
 
-    for (size_t i = 0; i < buflen; i++)
-    {
-        if (hex2char(buf[i] >> 4, &hex[2 * i]) < 0)
-        {
-            return 0;
-        }
-        if (hex2char(buf[i] & 0xf, &hex[2 * i + 1]) < 0)
-        {
-            return 0;
-        }
+    for (size_t i = 0; i < buflen; i++) {
+        hex[2 * i] = hex_table[buf[i] >> 4];
+        hex[2 * i + 1] = hex_table[buf[i] & 0x0F];
     }
-
     hex[2 * buflen] = '\0';
     return 2 * buflen;
-}
-
-uint8_t hex2val(char c)
-{
-    if (c >= '0' && c <= '9')
-    {
-        return c - '0';
-    }
-    else if (c >= 'a' && c <= 'f')
-    {
-        return c - 'a' + 10;
-    }
-    else if (c >= 'A' && c <= 'F')
-    {
-        return c - 'A' + 10;
-    }
-    else
-    {
-        return 0;
-    }
 }
 
 size_t hex2bin(const char *hex, uint8_t *bin, size_t bin_len)
 {
     size_t len = 0;
 
-    while (*hex && len < bin_len)
-    {
-        bin[len] = hex2val(*hex++) << 4;
-
-        if (!*hex)
-        {
-            len++;
+    while (len < bin_len && hex[0]) {
+        if (!hex[1]) {
+            bin[len++] = hex_val_table[(unsigned char)hex[0]] << 4;
             break;
         }
-
-        bin[len++] |= hex2val(*hex++);
+        bin[len++] = (hex_val_table[(unsigned char)hex[0]] << 4) | hex_val_table[(unsigned char)hex[1]];
+        hex += 2;
     }
 
     return len;
@@ -184,18 +142,15 @@ char *double_sha256(const char *hex_string)
     return output_hash;
 }
 
-uint8_t *double_sha256_bin(const uint8_t *data, const size_t data_len)
+void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32])
 {
     uint8_t first_hash_output[32];
-    uint8_t *second_hash_output = malloc(32);
 
     mbedtls_sha256(data, data_len, first_hash_output, 0);
-    mbedtls_sha256(first_hash_output, 32, second_hash_output, 0);
-
-    return second_hash_output;
+    mbedtls_sha256(first_hash_output, 32, dest, 0);
 }
 
-void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest)
+void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32])
 {
     // mbedtls_sha256(data, data_len, dest, 0);
 
@@ -213,7 +168,7 @@ void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest
     memcpy(dest, hash, 32);
 }
 
-void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest)
+void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32])
 {
     mbedtls_sha256_context midstate;
 

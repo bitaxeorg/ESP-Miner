@@ -40,6 +40,8 @@ export class SystemService {
         bestDiff: 238214491,
         bestSessionDiff: 21212121,
         freeHeap: 200504,
+        freeHeapInternal: 200504,
+        freeHeapSpiram: 200504,
         coreVoltage: 1200,
         coreVoltageActual: 1200,
         hostname: "Bitaxe",

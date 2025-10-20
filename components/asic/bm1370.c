@@ -32,7 +32,9 @@
 #define CMD_READ 0x02
 #define CMD_INACTIVE 0x03
 
+#define BM_CHIP_ID 0x00
 #define MISC_CONTROL 0x18
+#define FAST_UART_CONFIGURATION 0x28
 
 static const register_type_t REGISTER_MAP[] = {
     [0x4C] = REGISTER_ERROR_COUNT,
@@ -81,13 +83,12 @@ static task_result result;
 /// @param header
 /// @param data
 /// @param len
-static void _send_BM1370(uint8_t header, uint8_t * data, uint8_t data_len, bool debug)
+static void _send_BM1370(uint8_t header, const uint8_t * data, uint8_t data_len, bool debug)
 {
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
-    uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
+    const uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
-    // allocate memory for buffer
-    unsigned char * buf = malloc(total_length);
+    uint8_t buf[total_length];
 
     // add the preamble
     buf[0] = 0x55;
@@ -115,29 +116,18 @@ static void _send_BM1370(uint8_t header, uint8_t * data, uint8_t data_len, bool 
     if (SERIAL_send(buf, total_length, debug) == 0) {
         ESP_LOGE(TAG, "Failed to send data to BM1370");
     }
-
-    free(buf);
-}
-
-static void _send_simple(uint8_t * data, uint8_t total_length)
-{
-    unsigned char * buf = malloc(total_length);
-    memcpy(buf, data, total_length);
-    SERIAL_send(buf, total_length, BM1370_SERIALTX_DEBUG);
-
-    free(buf);
 }
 
 static void _send_chain_inactive(void)
 {
-    unsigned char read_address[2] = {0x00, 0x00};
+    unsigned char read_address[] = {0x00, 0x00};
     // send serial data
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_INACTIVE), read_address, 2, BM1370_SERIALTX_DEBUG);
 }
 
 static void _set_chip_address(uint8_t chipAddr)
 {
-    unsigned char read_address[2] = {chipAddr, 0x00};
+    unsigned char read_address[] = {chipAddr, 0x00};
     // send serial data
     _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, BM1370_SERIALTX_DEBUG);
 }
@@ -175,8 +165,7 @@ uint8_t BM1370_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     }
 
     //read register 00 on all chips (should respond AA 55 13 68 00 00 00 00 00 00 0F)
-    unsigned char init3[7] = {0x55, 0xAA, 0x52, 0x05, 0x00, 0x00, 0x0A};
-    _send_simple(init3, 7);
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, BM_CHIP_ID}, 2, BM1370_SERIALTX_DEBUG);
 
     int chip_counter = count_asic_chips(asic_count, BM1370_CHIP_ID, BM1370_CHIP_ID_RESPONSE_LENGTH);
 
@@ -290,7 +279,7 @@ uint8_t BM1370_init(float frequency, uint16_t asic_count, uint16_t difficulty)
 int BM1370_set_default_baud(void)
 {
     // default divider of 26 (11010) for 115,749
-    unsigned char baudrate[9] = {0x00, MISC_CONTROL, 0x00, 0x00, 0b01111010, 0b00110001}; // baudrate - misc_control
+    unsigned char baudrate[] = {0x00, MISC_CONTROL, 0x00, 0x00, 0b01111010, 0b00110001}; // baudrate - misc_control
     _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, BM1370_SERIALTX_DEBUG);
     return 115749;
 }
@@ -300,8 +289,8 @@ int BM1370_set_max_baud(void)
     // divider of 0 for 3,125,000
     ESP_LOGI(TAG, "Setting max baud of 1000000 ");
 
-    unsigned char init8[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x28, 0x11, 0x30, 0x02, 0x00, 0x03};
-    _send_simple(init8, 11);
+    unsigned char fast_uart[] = {0x00, FAST_UART_CONFIGURATION, 0x11, 0x30, 0x02, 0x00};
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), fast_uart, 6, BM1370_SERIALTX_DEBUG);
     return 1000000;
 }
 
