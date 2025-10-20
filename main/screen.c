@@ -331,7 +331,8 @@ static void screen_show(screen_t screen)
         lv_obj_t * scr = screens[screen];
 
         if (scr && lvgl_port_lock(0)) {
-            lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, false);
+            bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
+            lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
             lvgl_port_unlock();
         }
 
@@ -590,36 +591,39 @@ static void uptime_update_cb(lv_timer_t * timer)
 
 esp_err_t screen_start(void * pvParameters)
 {
-    // screen_chars = lv_display_get_horizontal_resolution(NULL) / 6;
-    screen_lines = lv_display_get_vertical_resolution(NULL) / 8;
+    if (lvgl_port_lock(0)) {
+        // screen_chars = lv_display_get_horizontal_resolution(NULL) / 6;
+        screen_lines = lv_display_get_vertical_resolution(NULL) / 8;
 
-    GLOBAL_STATE = (GlobalState *) pvParameters;
+        GLOBAL_STATE = (GlobalState *) pvParameters;
 
-    if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
-        SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+        if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
+            SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
-        screens[SCR_SELF_TEST] = create_scr_self_test();
-        screens[SCR_OVERHEAT] = create_scr_overheat(module);
-        screens[SCR_ASIC_STATUS] = create_scr_asic_status(module);
-        screens[SCR_WELCOME] = create_scr_welcome(module);
-        screens[SCR_FIRMWARE] = create_scr_firmware(module);
-        screens[SCR_CONNECTION] = create_scr_connection(module);
-        screens[SCR_BITAXE_LOGO] = create_scr_bitaxe_logo(GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version);
-        screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
-        screens[SCR_URLS] = create_scr_urls(module);
-        screens[SCR_STATS] = create_scr_stats();
-        screens[SCR_MINING] = create_scr_mining();
-        screens[SCR_WIFI] = create_scr_wifi();
+            screens[SCR_SELF_TEST] = create_scr_self_test();
+            screens[SCR_OVERHEAT] = create_scr_overheat(module);
+            screens[SCR_ASIC_STATUS] = create_scr_asic_status(module);
+            screens[SCR_WELCOME] = create_scr_welcome(module);
+            screens[SCR_FIRMWARE] = create_scr_firmware(module);
+            screens[SCR_CONNECTION] = create_scr_connection(module);
+            screens[SCR_BITAXE_LOGO] = create_scr_bitaxe_logo(GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version);
+            screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
+            screens[SCR_URLS] = create_scr_urls(module);
+            screens[SCR_STATS] = create_scr_stats();
+            screens[SCR_MINING] = create_scr_mining();
+            screens[SCR_WIFI] = create_scr_wifi();
 
-        notification_label = lv_label_create(lv_layer_top());
-        lv_label_set_text(notification_label, "");
-        lv_obj_align(notification_label, LV_ALIGN_TOP_RIGHT, 0, 0);
-        lv_obj_add_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
+            notification_label = lv_label_create(lv_layer_top());
+            lv_label_set_text(notification_label, "");
+            lv_obj_align(notification_label, LV_ALIGN_TOP_RIGHT, 0, 0);
+            lv_obj_add_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
 
-        lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);
+            lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);
 
-        // Create uptime update timer (runs every 1 second)
-        lv_timer_create(uptime_update_cb, 1000, NULL);
+            // Create uptime update timer (runs every 1 second)
+            lv_timer_create(uptime_update_cb, 1000, NULL);
+        }
+        lvgl_port_unlock();
     }
 
     return ESP_OK;

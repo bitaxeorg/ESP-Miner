@@ -330,7 +330,7 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
-    POWER_MANAGEMENT_init_frequency(&GLOBAL_STATE->POWER_MANAGEMENT_MODULE);
+    POWER_MANAGEMENT_init_frequency(GLOBAL_STATE);
 
     GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
 
@@ -407,7 +407,9 @@ bool self_test(void * pvParameters)
     hex2bin("c4f5ab01913fc186d550c1a28f3f3e9ffaca2016b961a6a751f8cca0089df924", merkles[11], 32);
     hex2bin("cff737e1d00176dd6bbfa73071adbb370f227cfb5fba186562e4060fcec877e1", merkles[12], 32);
 
-    char * merkle_root = calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles);
+    char merkle_root[65];
+    
+    calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles, merkle_root);
 
     bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
 
@@ -436,14 +438,10 @@ bool self_test(void * pvParameters)
         duration = (double) (esp_timer_get_time() - start) / 1000000;
     }
 
-    ESP_LOGI(TAG, "Hashrate: %f", hash_rate);
+    float target_hashrate = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate * GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target;
+    ESP_LOGI(TAG, "Hashrate: %f, target: %f (%f%% of %f)", hash_rate, target_hashrate, GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target, GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
 
-    float expected_hashrate_mhs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value 
-                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count 
-                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
-                                / 1000.0f;
-
-    if (hash_rate < expected_hashrate_mhs) {
+    if (hash_rate < target_hashrate) {
         display_msg("HASHRATE:FAIL", GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
     }

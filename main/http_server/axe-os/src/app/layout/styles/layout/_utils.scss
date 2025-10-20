@@ -38,3 +38,18 @@
         justify-content: center;
     }
 }
+
+.sensitive-data-hidden {
+    [sensitive-data] {
+        font-size: 0;
+
+        &.p-inputtext {
+            height: 2.536rem;
+        }
+
+        &::before {
+            content: '•••••';
+            font-size: $scale;
+        }
+    }
+}

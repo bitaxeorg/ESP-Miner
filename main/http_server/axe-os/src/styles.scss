@@ -177,7 +177,8 @@ button.color-dot {
 
     &:hover,
     &:focus,
-    &.p-dropdown-open {
+    &.p-dropdown-open,
+    &:not(.p-disabled).p-focus {
         border-color: var(--togglebutton-hover-bg) !important;
     }
 
@@ -211,9 +212,9 @@ button.color-dot {
         .p-dropdown-item {
             font-size: small;
         }
-    }
-    &--border-color-primary {
-        border-color: var(--primary-color);
+        .p-dropdown-label {
+            padding: 0.3rem 0 0.3rem 0.7rem;
+        }
     }
 }
 
@@ -248,4 +249,8 @@ button.color-dot {
         @extend h2;
         margin: 0;
     }
+}
+
+.line-break-anywhere {
+    line-break: anywhere;
 }
