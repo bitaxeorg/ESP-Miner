@@ -574,15 +574,15 @@ bool check_settings_and_update(const cJSON * const root)
                         break;
                     }
                 }
-            }
 
-            if (key == NVS_CONFIG_DISPLAY && get_display_config(item->valuestring) == NULL) {
-                ESP_LOGW(TAG, "Invalid display config: '%s'", item->valuestring);
-                result = false;
-            }
-            if (key == NVS_CONFIG_ROTATION && item->valueint != 0 && item->valueint != 90 && item->valueint != 180 && item->valueint != 270) {
-                ESP_LOGW(TAG, "Invalid display rotation: '%d'", item->valueint);
-                result = false;
+                if (key == NVS_CONFIG_DISPLAY && get_display_config(item->valuestring) == NULL) {
+                    ESP_LOGW(TAG, "Invalid display config: '%s'", item->valuestring);
+                    result = false;
+                }
+                if (key == NVS_CONFIG_ROTATION && item->valueint != 0 && item->valueint != 90 && item->valueint != 180 && item->valueint != 270) {
+                    ESP_LOGW(TAG, "Invalid display rotation: '%d'", item->valueint);
+                    result = false;
+                }
             }
         }
     }
