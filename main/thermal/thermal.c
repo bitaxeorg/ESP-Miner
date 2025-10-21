@@ -29,10 +29,10 @@ esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG)
 esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent)
 {
     if (DEVICE_CONFIG->EMC2101) {
-        EMC2101_set_fan_speed(percent);
+        return EMC2101_set_fan_speed(percent);
     }
     if (DEVICE_CONFIG->EMC2103) {
-        EMC2103_set_fan_speed(percent);
+        return EMC2103_set_fan_speed(percent);
     }
     return ESP_OK;
 }
