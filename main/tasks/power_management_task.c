@@ -145,7 +145,17 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
             nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
             nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
-            exit(EXIT_FAILURE);
+            // Instead of exiting, enter a safe mode loop to prevent further operation until temperature decreases
+            ESP_LOGW(TAG, "Entering safe mode due to overheat condition. System operation halted.");
+            while (power_management->vr_temp > TPS546_THROTTLE_TEMP-20 || power_management->chip_temp_avg > THROTTLE_TEMP-20 || power_management->chip_temp2_avg > THROTTLE_TEMP-20) {
+                vTaskDelay(5000 / portTICK_PERIOD_MS); // Wait and recheck temperature every 5 seconds
+                power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
+                power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
+                power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
+                ESP_LOGW(TAG, "Safe mode active - VR: %fC ASIC1: %fC ASIC2: %fC", power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
+            }
+            ESP_LOGI(TAG, "Temperature normalized. Resuming normal operation.");
+            nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
         }
 
         //enable the PID auto control for the FAN if set
