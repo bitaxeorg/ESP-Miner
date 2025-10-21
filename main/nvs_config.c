@@ -10,7 +10,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
 #include "display.h"
 #include "theme_api.h"
 
@@ -128,6 +127,7 @@ static void nvs_task(void *pvParameters)
                         ESP_LOGI(TAG, "U64: %s: %d", setting->nvs_key_name, setting->value.u64);
                         break;
                     case TYPE_FLOAT:
+                        setting->value.f = update.value.f;
                         char buf[32];
                         snprintf(buf, sizeof(buf), "%f", setting->value.f);
                         ret = nvs_set_str(handle, setting->nvs_key_name, buf);
@@ -140,7 +140,10 @@ static void nvs_task(void *pvParameters)
                         break;
                 }
                 if (ret == ESP_OK) {
-                    nvs_commit(handle);
+                    ret = nvs_commit(handle);
+                    if (ret != ESP_OK) {
+                        ESP_LOGE(TAG, "Failed to commit data to NVS");
+                    }
                 }
                 if (old_str) free(old_str);
             } 
@@ -217,13 +220,13 @@ esp_err_t nvs_config_init(void)
                 uint16_t val;
                 ret = nvs_get_u16(handle, setting->nvs_key_name, &val);
                 setting->value.b = (ret == ESP_OK) ? (val != 0) : setting->default_value.b;
-                ESP_LOGI(TAG, "BOOL: %s: %d", setting->nvs_key_name, setting->value.u16);
+                ESP_LOGI(TAG, "BOOL: %s: %d", setting->nvs_key_name, setting->value.b);
                 break;
             }
         }
     }
 
-    nvs_save_queue = xQueueCreate(20, sizeof(NvsConfigKey));
+    nvs_save_queue = xQueueCreate(20, sizeof(ConfigUpdate));
 
     TaskHandle_t task_handle;
 
