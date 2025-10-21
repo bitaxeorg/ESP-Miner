@@ -194,6 +194,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                     Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 0.7);
                 } else {
                     ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f °C", power_management->chip_temp_avg);
+                    if (power_management->fan_perc < 100) {
+                        ESP_LOGW(TAG, "Setting fan speed to 100%%");
+                        power_management->fan_perc = 100;
+                        Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1);
+                    }
                 }
             }
         } else { // Manual fan speed
