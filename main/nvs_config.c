@@ -16,6 +16,18 @@
 #define NVS_CONFIG_NAMESPACE "main"
 #define NVS_STR_LIMIT (4000 - 1) // See nvs_set_str
 
+#ifdef CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE
+    #define STRATUM_EXTRANONCE_SUBSCRIBE 1
+#else
+    #define STRATUM_EXTRANONCE_SUBSCRIBE 0
+#endif
+
+#ifdef CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE
+    #define FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE 1
+#else
+    #define FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE 0
+#endif
+
 typedef struct {
     NvsConfigKey key;
     ConfigType type;
@@ -44,28 +56,28 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_FALLBACK_STRATUM_PASS]                 = {.nvs_key_name = "fbstratumpass",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_PW},          .rest_name = "fallbackStratumPassword",            .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY]           = {.nvs_key_name = "fbstratumdiff",   .type = TYPE_U16,   .default_value = {.u16 = CONFIG_FALLBACK_STRATUM_DIFFICULTY},          .rest_name = "fallbackStratumSuggestedDifficulty", .min = 0,  .max = UINT16_MAX},
     [NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE] = {.nvs_key_name = "stratumfbxnsub",  .type = TYPE_BOOL,  .default_value = {.b   = (bool)FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE}, .rest_name = "fallbackStratumExtranonceSubscribe", .min = 0,  .max = 1},
-    [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstartum",    .type = TYPE_BOOL,  .default_value = {.b   = false},                                       .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
+    [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstartum",    .type = TYPE_BOOL,                                                                         .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
 
     [NVS_CONFIG_ASIC_FREQUENCY]                        = {.nvs_key_name = "asicfrequency",   .type = TYPE_U16,   .default_value = {.u16 = CONFIG_ASIC_FREQUENCY}},
     [NVS_CONFIG_ASIC_FREQUENCY_FLOAT]                  = {.nvs_key_name = "asicfrequency_f", .type = TYPE_FLOAT, .default_value = {.f   = -1},                                          .rest_name = "frequency",                          .min = 1,  .max = UINT16_MAX},
     [NVS_CONFIG_ASIC_VOLTAGE]                          = {.nvs_key_name = "asicvoltage",     .type = TYPE_U16,   .default_value = {.u16 = CONFIG_ASIC_VOLTAGE},                         .rest_name = "coreVoltage",                        .min = 1,  .max = UINT16_MAX},
-    [NVS_CONFIG_OVERCLOCK_ENABLED]                     = {.nvs_key_name = "oc_enabled",      .type = TYPE_BOOL,  .default_value = {.b   = false},                                       .rest_name = "overclockEnabled",                   .min = 0,  .max = 1},
+    [NVS_CONFIG_OVERCLOCK_ENABLED]                     = {.nvs_key_name = "oc_enabled",      .type = TYPE_BOOL,                                                                         .rest_name = "overclockEnabled",                   .min = 0,  .max = 1},
     
     [NVS_CONFIG_DISPLAY]                               = {.nvs_key_name = "display",         .type = TYPE_STR,   .default_value = {.str = DEFAULT_DISPLAY},                             .rest_name = "display",                            .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_ROTATION]                              = {.nvs_key_name = "rotation",        .type = TYPE_U16,   .default_value = {.u16 = 0},                                           .rest_name = "rotation",                           .min = 0,  .max = 270},
-    [NVS_CONFIG_INVERT_SCREEN]                         = {.nvs_key_name = "invertscreen",    .type = TYPE_BOOL,  .default_value = {.b   = false},                                       .rest_name = "invertscreen",                       .min = 0,  .max = 1},
+    [NVS_CONFIG_ROTATION]                              = {.nvs_key_name = "rotation",        .type = TYPE_U16,                                                                          .rest_name = "rotation",                           .min = 0,  .max = 270},
+    [NVS_CONFIG_INVERT_SCREEN]                         = {.nvs_key_name = "invertscreen",    .type = TYPE_BOOL,                                                                         .rest_name = "invertscreen",                       .min = 0,  .max = 1},
     [NVS_CONFIG_DISPLAY_TIMEOUT]                       = {.nvs_key_name = "displayTimeout",  .type = TYPE_I32,   .default_value = {.i32 = -1},                                          .rest_name = "displayTimeout",                     .min = -1, .max = UINT16_MAX},
 
     [NVS_CONFIG_AUTO_FAN_SPEED]                        = {.nvs_key_name = "autofanspeed",    .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "autofanspeed",                       .min = 0,  .max = 1},
     [NVS_CONFIG_FAN_SPEED]                             = {.nvs_key_name = "fanspeed",        .type = TYPE_U16,   .default_value = {.u16 = 100},                                         .rest_name = "fanspeed",                           .min = 0,  .max = 100},
     [NVS_CONFIG_MIN_FAN_SPEED]                         = {.nvs_key_name = "minfanspeed",     .type = TYPE_U16,   .default_value = {.u16 = 25},                                          .rest_name = "minFanSpeed",                        .min = 0,  .max = 99},
     [NVS_CONFIG_TEMP_TARGET]                           = {.nvs_key_name = "temptarget",      .type = TYPE_U16,   .default_value = {.u16 = 60},                                          .rest_name = "temptarget",                         .min = 35, .max = 66},
-    [NVS_CONFIG_OVERHEAT_MODE]                         = {.nvs_key_name = "overheat_mode",   .type = TYPE_BOOL,  .default_value = {.b   = false},                                       .rest_name = "overheat_mode",                      .min = 0,  .max = 0},
+    [NVS_CONFIG_OVERHEAT_MODE]                         = {.nvs_key_name = "overheat_mode",   .type = TYPE_BOOL,                                                                         .rest_name = "overheat_mode",                      .min = 0,  .max = 0},
 
-    [NVS_CONFIG_STATISTICS_FREQUENCY]                  = {.nvs_key_name = "statsFrequency",  .type = TYPE_U16,   .default_value = {.u16 = 0},                                           .rest_name = "statsFrequency",                     .min = 0,  .max = UINT16_MAX},
+    [NVS_CONFIG_STATISTICS_FREQUENCY]                  = {.nvs_key_name = "statsFrequency",  .type = TYPE_U16,                                                                          .rest_name = "statsFrequency",                     .min = 0,  .max = UINT16_MAX},
 
-    [NVS_CONFIG_BEST_DIFF]                             = {.nvs_key_name = "bestdiff",        .type = TYPE_U64,   .default_value = {.u64 = 0}},
-    [NVS_CONFIG_SELF_TEST]                             = {.nvs_key_name = "selftest",        .type = TYPE_BOOL,  .default_value = {.b   = false}},
+    [NVS_CONFIG_BEST_DIFF]                             = {.nvs_key_name = "bestdiff",        .type = TYPE_U64},
+    [NVS_CONFIG_SELF_TEST]                             = {.nvs_key_name = "selftest",        .type = TYPE_BOOL},
     [NVS_CONFIG_SWARM]                                 = {.nvs_key_name = "swarmconfig",     .type = TYPE_STR,   .default_value = {.str = ""}},
     [NVS_CONFIG_THEME_SCHEME]                          = {.nvs_key_name = "themescheme",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_THEME}},
     [NVS_CONFIG_THEME_COLORS]                          = {.nvs_key_name = "themecolors",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_COLORS}},
@@ -73,18 +85,18 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_BOARD_VERSION]                         = {.nvs_key_name = "boardversion",    .type = TYPE_STR,   .default_value = {.str = "000"}},
     [NVS_CONFIG_DEVICE_MODEL]                          = {.nvs_key_name = "devicemodel",     .type = TYPE_STR,   .default_value = {.str = "unknown"}},
     [NVS_CONFIG_ASIC_MODEL]                            = {.nvs_key_name = "asicmodel",       .type = TYPE_STR,   .default_value = {.str = "unknown"}},
-    [NVS_CONFIG_PLUG_SENSE]                            = {.nvs_key_name = "plug_sense",      .type = TYPE_BOOL,  .default_value = {.b   = false}},
-    [NVS_CONFIG_ASIC_ENABLE]                           = {.nvs_key_name = "asic_enable",     .type = TYPE_BOOL,  .default_value = {.b   = false}},
-    [NVS_CONFIG_EMC2101]                               = {.nvs_key_name = "EMC2101",         .type = TYPE_BOOL,  .default_value = {.b   = false}},
-    [NVS_CONFIG_EMC2103]                               = {.nvs_key_name = "EMC2103",         .type = TYPE_BOOL,  .default_value = {.b   = false}},
-    [NVS_CONFIG_EMC_INTERNAL_TEMP]                     = {.nvs_key_name = "emc_int_temp",    .type = TYPE_BOOL,  .default_value = {.b   = false}},
-    [NVS_CONFIG_EMC_IDEALITY_FACTOR]                   = {.nvs_key_name = "emc_ideality_f",  .type = TYPE_U16,   .default_value = {.u16 = 0}},
-    [NVS_CONFIG_EMC_BETA_COMPENSATION]                 = {.nvs_key_name = "emc_beta_comp",   .type = TYPE_U16,   .default_value = {.u16 = 0}},
-    [NVS_CONFIG_EMC_TEMP_OFFSET]                       = {.nvs_key_name = "emc_temp_offset", .type = TYPE_I32,   .default_value = {.i32 = 0}},
-    [NVS_CONFIG_DS4432U]                               = {.nvs_key_name = "DS4432U",         .type = TYPE_BOOL,  .default_value = {.b   = false}},
-    [NVS_CONFIG_INA260]                                = {.nvs_key_name = "INA260",          .type = TYPE_BOOL,  .default_value = {.b   = false}},
-    [NVS_CONFIG_TPS546]                                = {.nvs_key_name = "TPS546",          .type = TYPE_BOOL,  .default_value = {.b   = false}},
-    [NVS_CONFIG_POWER_CONSUMPTION_TARGET]              = {.nvs_key_name = "power_cons_tgt",  .type = TYPE_U16,   .default_value = {.u16 = 0}},
+    [NVS_CONFIG_PLUG_SENSE]                            = {.nvs_key_name = "plug_sense",      .type = TYPE_BOOL},
+    [NVS_CONFIG_ASIC_ENABLE]                           = {.nvs_key_name = "asic_enable",     .type = TYPE_BOOL},
+    [NVS_CONFIG_EMC2101]                               = {.nvs_key_name = "EMC2101",         .type = TYPE_BOOL},
+    [NVS_CONFIG_EMC2103]                               = {.nvs_key_name = "EMC2103",         .type = TYPE_BOOL},
+    [NVS_CONFIG_EMC_INTERNAL_TEMP]                     = {.nvs_key_name = "emc_int_temp",    .type = TYPE_BOOL},
+    [NVS_CONFIG_EMC_IDEALITY_FACTOR]                   = {.nvs_key_name = "emc_ideality_f",  .type = TYPE_U16},
+    [NVS_CONFIG_EMC_BETA_COMPENSATION]                 = {.nvs_key_name = "emc_beta_comp",   .type = TYPE_U16},
+    [NVS_CONFIG_EMC_TEMP_OFFSET]                       = {.nvs_key_name = "emc_temp_offset", .type = TYPE_I32},
+    [NVS_CONFIG_DS4432U]                               = {.nvs_key_name = "DS4432U",         .type = TYPE_BOOL},
+    [NVS_CONFIG_INA260]                                = {.nvs_key_name = "INA260",          .type = TYPE_BOOL},
+    [NVS_CONFIG_TPS546]                                = {.nvs_key_name = "TPS546",          .type = TYPE_BOOL},
+    [NVS_CONFIG_POWER_CONSUMPTION_TARGET]              = {.nvs_key_name = "power_cons_tgt",  .type = TYPE_U16},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
