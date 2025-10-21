@@ -310,7 +310,7 @@ esp_err_t BAP_start_mode_management_task(GlobalState *state) {
     xTaskCreateWithCaps(
         mode_management_task,
         "bap_mode_mgmt",
-        4096,
+        8192,
         state,
         5,
         NULL,
