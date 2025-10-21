@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
+import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
@@ -21,6 +22,7 @@ import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { LocalStorageService } from 'src/app/local-storage.service';
 
 type PoolLabel = 'Primary' | 'Fallback';
+const HOME_CHART_DATA_SOURCES = 'HOME_CHART_DATA_SOURCES';
 
 @Component({
   selector: 'app-home',
@@ -88,7 +90,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.pageDefaultTitle = this.titleService.getTitle();
     this.loadingService.loading$.next(true);
 
-    let dataSources = this.storageService.getItem('chartDataSources');
+    let dataSources = this.storageService.getItem(HOME_CHART_DATA_SOURCES);
     if (dataSources === null) {
       dataSources = `{"chartY1Data":"${chartLabelKey(eChartLabel.hashrate)}",`;
       dataSources += `"chartY2Data":"${chartLabelKey(eChartLabel.asicTemp)}"}`;
@@ -140,7 +142,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public updateSystem() {
     const form = this.form.getRawValue();
 
-    this.storageService.setItem('chartDataSources', JSON.stringify(form));
+    this.storageService.setItem(HOME_CHART_DATA_SOURCES, JSON.stringify(form));
 
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
@@ -482,7 +484,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : ''),
         (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : ''),
         (!info.power_fault ? `${info.power} W` : ''),
-        (info.bestDiff ? info.bestDiff : ''),
+        (info.bestDiff ? DiffSuffixPipe.transform(info.bestDiff) : ''),
       );
     }
 
@@ -521,6 +523,38 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
 
     return this.calculateAverage(efficiencies);
+  }
+
+  private calculateEfficiency(info: ISystemInfo, key: 'hashRate' | 'expectedHashrate'): number {
+    const hashrate = info[key];
+    if (info.power_fault || hashrate <= 0) {
+      return 0;
+    }
+    return info.power / (hashrate / 1_000_000_000_000);
+  }
+
+  public getHashrateAverage(): number {
+    return this.calculateAverage(this.hashrateData);
+  }
+
+  public getEfficiency(info: ISystemInfo): number {
+    return this.calculateEfficiency(info, 'hashRate');
+  }
+
+  public getEfficiencyAverage(): number {
+    return this.calculateEfficiencyAverage(this.hashrateData, this.powerData);
+  }
+
+  public getExpectedEfficiency(info: ISystemInfo): number {
+    return this.calculateEfficiency(info, 'expectedHashrate');
+  }
+
+  public getShareRejectionPercentage(sharesRejectedReason: { count: number }, info: ISystemInfo): number {
+    const totalShares = info.sharesAccepted + info.sharesRejected;
+    if (totalShares <= 0) {
+      return 0;
+    }
+    return (sharesRejectedReason.count / totalShares) * 100;
   }
 
   public clearDataPoints() {
@@ -578,7 +612,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number} {
     switch (label) {
-      case eChartLabel.hashrate:    
+      case eChartLabel.hashrate:
       case eChartLabel.hashrateRegister: return {suffix: ' H/s', precision: 0};
       case eChartLabel.asicTemp:
       case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <esp_heap_caps.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "system.h"
@@ -72,18 +73,27 @@ void hashrate_monitor_task(void *pvParameters)
     HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
 
-    HASHRATE_MONITOR_MODULE->total_measurement = malloc(asic_count * sizeof(measurement_t));
-    HASHRATE_MONITOR_MODULE->domain_0_measurement = malloc(asic_count * sizeof(measurement_t));
-    HASHRATE_MONITOR_MODULE->domain_1_measurement = malloc(asic_count * sizeof(measurement_t));
-    HASHRATE_MONITOR_MODULE->domain_2_measurement = malloc(asic_count * sizeof(measurement_t));
-    HASHRATE_MONITOR_MODULE->domain_3_measurement = malloc(asic_count * sizeof(measurement_t));
-    HASHRATE_MONITOR_MODULE->error_measurement = malloc(asic_count * sizeof(measurement_t));
+    HASHRATE_MONITOR_MODULE->total_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+    HASHRATE_MONITOR_MODULE->domain_0_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+    HASHRATE_MONITOR_MODULE->domain_1_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+    HASHRATE_MONITOR_MODULE->domain_2_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+    HASHRATE_MONITOR_MODULE->domain_3_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+    HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+
+    // Initialize all measurement arrays to zero to prevent garbage data on chips without register support
+    clear_measurements(HASHRATE_MONITOR_MODULE, asic_count);
 
     HASHRATE_MONITOR_MODULE->is_initialized = true;
 
+    // Only BM1370 supports register-based hashrate monitoring
+    // adding BM1366 and BM1368 later
+    bool supports_register_reading = (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BM1370);
+
     TickType_t taskWakeTime = xTaskGetTickCount();
     while (1) {
-        ASIC_read_registers(GLOBAL_STATE);
+        if (supports_register_reading) {
+            ASIC_read_registers(GLOBAL_STATE);
+        }
 
         vTaskDelay(100 / portTICK_PERIOD_MS);
 
