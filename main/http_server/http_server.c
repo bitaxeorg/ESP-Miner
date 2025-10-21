@@ -46,10 +46,6 @@
 #include "system.h"
 #include "websocket.h"
 
-#define JSON_ALL_STATS_ELEMENT_SIZE 120
-
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
 
@@ -524,75 +520,75 @@ bool check_settings_and_update(const cJSON * const root)
 
     for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
         Settings *setting = nvs_config_get_settings(key);
-        if (setting->rest_name) {
-            cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
-            if (item) {
-                switch (setting->type) {
-                    case TYPE_STR: {
-                        if (!cJSON_IsString(item)) {
-                            ESP_LOGW(TAG, "Invalid type for '%s', expected string", setting->rest_name);                            
-                            result = false;
-                        } else {
-                            const size_t str_value_len = strlen(item->valuestring);
-                            if ((str_value_len < setting->min) || (str_value_len > setting->max)) {
-                                ESP_LOGW(TAG, "Value '%s' for '%s' is out of length (%d-%d)", item->valuestring, setting->rest_name, setting->min, setting->max);
-                                result = false;
-                            }
-                        }
-                        break;
-                    }
-                    case TYPE_U16:
-                    case TYPE_I32: {
-                        if (!cJSON_IsNumber(item)) {
-                            ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
-                            result = false;
-                        } else if ((item->valueint < setting->min) || (item->valueint > setting->max)) {
-                            ESP_LOGW(TAG, "Value '%d' for '%s' is out of range", item->valueint, setting->rest_name);
-                            result = false;
-                        }
-                        break;
-                    }
-                    case TYPE_U64: {
-                        if (!cJSON_IsNumber(item)) {
-                            ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
-                            result = false;
-                        } else if ((item->valuedouble < setting->min) || (item->valuedouble > setting->max)) {
-                            ESP_LOGW(TAG, "Value '%lld' for '%s' is out of range", (long long)item->valuedouble, setting->rest_name);
-                            result = false;
-                        }
-                        break;
-                    }
-                    case TYPE_FLOAT: {
-                        if (!cJSON_IsNumber(item)) {
-                            ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
-                            result = false;
-                        } else if ((item->valuedouble < setting->min) || (item->valuedouble > setting->max)) {
-                            ESP_LOGW(TAG, "Value '%f' for '%s' is out of range", item->valuedouble, setting->rest_name);
-                            result = false;
-                        }
-                        break;
-                    }
-                    case TYPE_BOOL: {
-                        if (!cJSON_IsNumber(item) && !cJSON_IsBool(item) && !cJSON_IsTrue(item) && !cJSON_IsFalse(item)) {
-                            ESP_LOGW(TAG, "Invalid type for '%s', expected bool", setting->rest_name);                            
-                            result = false;
-                        } else if ((item->valueint < setting->min) || (item->valueint > setting->max)) {
-                            ESP_LOGW(TAG, "Value '%d' for '%s' is out of range", item->valueint, setting->rest_name);
-                            result = false;
-                        }
-                        break;
-                    }
-                }
+        if (!setting->rest_name) continue;
 
-                if (key == NVS_CONFIG_DISPLAY && get_display_config(item->valuestring) == NULL) {
-                    ESP_LOGW(TAG, "Invalid display config: '%s'", item->valuestring);
+        cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
+        if (!item) continue;
+
+        switch (setting->type) {
+            case TYPE_STR: {
+                if (!cJSON_IsString(item)) {
+                    ESP_LOGW(TAG, "Invalid type for '%s', expected string", setting->rest_name);                            
                     result = false;
+                } else {
+                    const size_t str_value_len = strlen(item->valuestring);
+                    if ((str_value_len < setting->min) || (str_value_len > setting->max)) {
+                        ESP_LOGW(TAG, "Value '%s' for '%s' is out of length (%d-%d)", item->valuestring, setting->rest_name, setting->min, setting->max);
+                        result = false;
+                    }
                 }
-                if (key == NVS_CONFIG_ROTATION && item->valueint != 0 && item->valueint != 90 && item->valueint != 180 && item->valueint != 270) {
-                    ESP_LOGW(TAG, "Invalid display rotation: '%d'", item->valueint);
-                    result = false;
-                }
+                break;
             }
+            case TYPE_U16:
+            case TYPE_I32: {
+                if (!cJSON_IsNumber(item)) {
+                    ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
+                    result = false;
+                } else if ((item->valueint < setting->min) || (item->valueint > setting->max)) {
+                    ESP_LOGW(TAG, "Value '%d' for '%s' is out of range", item->valueint, setting->rest_name);
+                    result = false;
+                }
+                break;
+            }
+            case TYPE_U64: {
+                if (!cJSON_IsNumber(item)) {
+                    ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
+                    result = false;
+                } else if ((item->valuedouble < setting->min) || (item->valuedouble > setting->max)) {
+                    ESP_LOGW(TAG, "Value '%lld' for '%s' is out of range", (long long)item->valuedouble, setting->rest_name);
+                    result = false;
+                }
+                break;
+            }
+            case TYPE_FLOAT: {
+                if (!cJSON_IsNumber(item)) {
+                    ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
+                    result = false;
+                } else if ((item->valuedouble < setting->min) || (item->valuedouble > setting->max)) {
+                    ESP_LOGW(TAG, "Value '%f' for '%s' is out of range", item->valuedouble, setting->rest_name);
+                    result = false;
+                }
+                break;
+            }
+            case TYPE_BOOL: {
+                if (!cJSON_IsNumber(item) && !cJSON_IsBool(item) && !cJSON_IsTrue(item) && !cJSON_IsFalse(item)) {
+                    ESP_LOGW(TAG, "Invalid type for '%s', expected bool", setting->rest_name);                            
+                    result = false;
+                } else if ((item->valueint < setting->min) || (item->valueint > setting->max)) {
+                    ESP_LOGW(TAG, "Value '%d' for '%s' is out of range", item->valueint, setting->rest_name);
+                    result = false;
+                }
+                break;
+            }
+        }
+
+        if (key == NVS_CONFIG_DISPLAY && get_display_config(item->valuestring) == NULL) {
+            ESP_LOGW(TAG, "Invalid display config: '%s'", item->valuestring);
+            result = false;
+        }
+        if (key == NVS_CONFIG_ROTATION && item->valueint != 0 && item->valueint != 90 && item->valueint != 180 && item->valueint != 270) {
+            ESP_LOGW(TAG, "Invalid display rotation: '%d'", item->valueint);
+            result = false;
         }
     }
 
