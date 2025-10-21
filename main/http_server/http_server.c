@@ -542,13 +542,22 @@ bool check_settings_and_update(const cJSON * const root)
                         break;
                     }
                     case TYPE_U16:
-                    case TYPE_I32:
-                    case TYPE_U64: {
+                    case TYPE_I32: {
                         if (!cJSON_IsNumber(item)) {
                             ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
                             result = false;
                         } else if ((item->valueint < setting->min) || (item->valueint > setting->max)) {
                             ESP_LOGW(TAG, "Value '%d' for '%s' is out of range", item->valueint, setting->rest_name);
+                            result = false;
+                        }
+                        break;
+                    }
+                    case TYPE_U64: {
+                        if (!cJSON_IsNumber(item)) {
+                            ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
+                            result = false;
+                        } else if ((item->valuedouble < setting->min) || (item->valuedouble > setting->max)) {
+                            ESP_LOGW(TAG, "Value '%lld' for '%s' is out of range", (long long)item->valuedouble, setting->rest_name);
                             result = false;
                         }
                         break;
@@ -591,30 +600,30 @@ bool check_settings_and_update(const cJSON * const root)
         // update NVS (if result is okay) and clean up    
         for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
             Settings *setting = nvs_config_get_settings(key);
-            if (setting->rest_name) {
-                cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
-                if (item) {
-                    switch(setting->type) {
-                        case TYPE_STR:
-                            nvs_config_set_string(key, item->valuestring);
-                            break;
-                        case TYPE_U16:
-                            nvs_config_set_u16(key, item->valueint);
-                            break;
-                        case TYPE_I32:
-                            nvs_config_set_i32(key, item->valueint);
-                            break;
-                        case TYPE_U64:
-                            nvs_config_set_u64(key, item->valueint);
-                            break;
-                        case TYPE_BOOL:
-                            nvs_config_set_bool(key, item->valueint != 0);
-                            break;
-                        case TYPE_FLOAT:
-                            nvs_config_set_float(key, item->valuedouble);
-                            break;
-                    }
-                }
+            if (!setting || !setting->rest_name) continue;
+
+            cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
+            if (!item) continue;
+
+            switch(setting->type) {
+                case TYPE_STR:
+                    nvs_config_set_string(key, item->valuestring);
+                    break;
+                case TYPE_U16:
+                    nvs_config_set_u16(key, (uint16_t)item->valueint);
+                    break;
+                case TYPE_I32:
+                    nvs_config_set_i32(key, item->valueint);
+                    break;
+                case TYPE_U64:
+                    nvs_config_set_u64(key, (uint64_t)item->valuedouble);
+                    break;
+                case TYPE_BOOL:
+                    nvs_config_set_bool(key, item->valueint != 0 || cJSON_IsTrue(item));
+                    break;
+                case TYPE_FLOAT:
+                    nvs_config_set_float(key, (float)item->valuedouble);
+                    break;
             }
         }
     }
