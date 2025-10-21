@@ -7,7 +7,7 @@
                 { label: 'Total Devices', value: swarm.length },
                 { label: 'Total Hashrate', value: totals.hashRate * 1000000000 | hashSuffix},
                 { label: 'Total Power', value: (totals.power | number: '1.1-1')  + ' W' },
-                { label: 'Best Diff', value: totals.bestDiff }
+                { label: 'Best Diff', value: totals.bestDiff | diffSuffix }
             ]">
                 <div class="card flex flex-column mb-0">
                     <span class="text-500 font-medium mb-3">{{metric.label}}</span>
@@ -150,10 +150,10 @@
                             </div>
                             <div>
                                 <span class="text-500 cursor-pointer mr-2" pTooltip="Best Session Diff" tooltipPosition="top">
-                                    {{axe.bestSessionDiff}}
+                                    {{axe.bestSessionDiff | diffSuffix}}
                                 </span>
                                 <span class="cursor-pointer" pTooltip="Best Diff" tooltipPosition="top">
-                                    {{axe.bestDiff}}
+                                    {{axe.bestDiff | diffSuffix}}
                                 </span>
                             </div>
                             <div>
@@ -224,10 +224,10 @@
                             </td>
                             <td>
                                 <p class="cursor-pointer m-0" pTooltip="Best Diff" tooltipPosition="top">
-                                    {{axe.bestDiff}}
+                                    {{axe.bestDiff | diffSuffix}}
                                 </p>
                                 <p class="text-500 cursor-pointer m-0" pTooltip="Best Session Diff" tooltipPosition="top">
-                                    {{axe.bestSessionDiff}}
+                                    {{axe.bestSessionDiff | diffSuffix}}
                                 </p>
                             </td>
                             <td class="cursor-pointer" pTooltip="Uptime: {{axe.uptimeSeconds | dateAgo}}" tooltipPosition="top">

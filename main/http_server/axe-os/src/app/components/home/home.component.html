@@ -126,12 +126,12 @@
                 <div class="flex justify-content-between mb-3">
                     <div>
                         <span class="block text-500 font-medium mb-3">Best Difficulty</span>
-                        <div class="text-900 font-medium text-2xl">{{info.bestDiff}}
+                        <div class="text-900 font-medium text-2xl">{{info.bestDiff | diffSuffix}}
                             <span class="text-500 text-lg">all-time best</span>
                         </div>
                     </div>
                 </div>
-                <span class="text-900 font-medium">{{info.bestSessionDiff}} </span>
+                <span class="text-900 font-medium">{{info.bestSessionDiff | diffSuffix}} </span>
                 <span class="text-500">since system boot</span>
             </div>
         </div>
