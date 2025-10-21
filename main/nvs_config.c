@@ -49,6 +49,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_ASIC_FREQUENCY]                        = {.nvs_key_name = "asicfrequency",   .type = TYPE_U16,   .default_value = {.u16 = CONFIG_ASIC_FREQUENCY}},
     [NVS_CONFIG_ASIC_FREQUENCY_FLOAT]                  = {.nvs_key_name = "asicfrequency_f", .type = TYPE_FLOAT, .default_value = {.f   = -1},                                          .rest_name = "frequency",                          .min = 1,  .max = UINT16_MAX},
     [NVS_CONFIG_ASIC_VOLTAGE]                          = {.nvs_key_name = "asicvoltage",     .type = TYPE_U16,   .default_value = {.u16 = CONFIG_ASIC_VOLTAGE},                         .rest_name = "coreVoltage",                        .min = 1,  .max = UINT16_MAX},
+    [NVS_CONFIG_OVERCLOCK_ENABLED]                     = {.nvs_key_name = "oc_enabled",      .type = TYPE_BOOL,  .default_value = {.b   = false},                                       .rest_name = "overclockEnabled",                   .min = 0,  .max = 1},
     
     [NVS_CONFIG_DISPLAY]                               = {.nvs_key_name = "display",         .type = TYPE_STR,   .default_value = {.str = DEFAULT_DISPLAY},                             .rest_name = "display",                            .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_ROTATION]                              = {.nvs_key_name = "rotation",        .type = TYPE_U16,   .default_value = {.u16 = 0},                                           .rest_name = "rotation",                           .min = 0,  .max = 270},
@@ -61,7 +62,6 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_TEMP_TARGET]                           = {.nvs_key_name = "temptarget",      .type = TYPE_U16,   .default_value = {.u16 = 60},                                          .rest_name = "temptarget",                         .min = 35, .max = 66},
     [NVS_CONFIG_OVERHEAT_MODE]                         = {.nvs_key_name = "overheat_mode",   .type = TYPE_BOOL,  .default_value = {.b   = false},                                       .rest_name = "overheat_mode",                      .min = 0,  .max = 0},
 
-    [NVS_CONFIG_OVERCLOCK_ENABLED]                     = {.nvs_key_name = "oc_enabled",      .type = TYPE_BOOL,  .default_value = {.b   = false},                                       .rest_name = "overclockEnabled",                   .min = 0,  .max = 1},
     [NVS_CONFIG_STATISTICS_FREQUENCY]                  = {.nvs_key_name = "statsFrequency",  .type = TYPE_U16,   .default_value = {.u16 = 0},                                           .rest_name = "statsFrequency",                     .min = 0,  .max = UINT16_MAX},
 
     [NVS_CONFIG_BEST_DIFF]                             = {.nvs_key_name = "bestdiff",        .type = TYPE_U64,   .default_value = {.u64 = 0}},
