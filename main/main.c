@@ -40,6 +40,10 @@ void app_main(void)
     // Init I2C
     ESP_ERROR_CHECK(i2c_bitaxe_init());
     ESP_LOGI(TAG, "I2C initialized successfully");
+    
+    // Initialize RST pin to low early to minimize ASIC power consumption
+    ESP_ERROR_CHECK(asic_hold_reset_low());
+    ESP_LOGI(TAG, "RST pin initialized to low");
 
     //wait for I2C to init
     vTaskDelay(100 / portTICK_PERIOD_MS);

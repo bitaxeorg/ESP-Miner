@@ -16,6 +16,7 @@
 #include "asic.h"
 #include "bm1370.h"
 #include "utils.h"
+#include "asic_reset.h"
 
 #define POLL_RATE 1800
 #define MAX_TEMP 90.0
@@ -131,8 +132,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->fan_perc = 100;
             Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1);
 
-            // Turn off core voltage
+             // Turn off core voltage
             VCORE_set_voltage(GLOBAL_STATE, 0.0f);
+            
+            // Set RST pin to low to minimize ASIC power consumption
+            ESP_LOGI(TAG, "Setting RST pin to low due to overheat condition");
+            ESP_ERROR_CHECK(asic_hold_reset_low());
 
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
             nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, 50);
