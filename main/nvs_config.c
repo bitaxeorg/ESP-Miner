@@ -109,34 +109,28 @@ static void nvs_task(void *pvParameters)
                         old_str = setting->value.str;
                         setting->value.str = update.value.str;
                         ret = nvs_set_str(handle, setting->nvs_key_name, setting->value.str);
-                        ESP_LOGI(TAG, "STR %s: %s", setting->nvs_key_name, setting->value.str);
                         break;
                     case TYPE_U16:
                         setting->value.u16 = update.value.u16;
                         ret = nvs_set_u16(handle, setting->nvs_key_name, setting->value.u16);
-                        ESP_LOGI(TAG, "U16: %s: %d", setting->nvs_key_name, setting->value.u16);
                         break;
                     case TYPE_I32:
                         setting->value.i32 = update.value.i32;
                         ret = nvs_set_i32(handle, setting->nvs_key_name, setting->value.i32);
-                        ESP_LOGI(TAG, "I32: %s: %d", setting->nvs_key_name, setting->value.i32);
                         break;
                     case TYPE_U64:
                         setting->value.u64 = update.value.u64;
                         ret = nvs_set_u64(handle, setting->nvs_key_name, setting->value.u64);
-                        ESP_LOGI(TAG, "U64: %s: %d", setting->nvs_key_name, setting->value.u64);
                         break;
                     case TYPE_FLOAT:
                         setting->value.f = update.value.f;
                         char buf[32];
                         snprintf(buf, sizeof(buf), "%f", setting->value.f);
                         ret = nvs_set_str(handle, setting->nvs_key_name, buf);
-                        ESP_LOGI(TAG, "FLOAT: %s: %f", setting->nvs_key_name, setting->value.f);
                         break;
                     case TYPE_BOOL:
                         setting->value.b = update.value.b;
                         ret = nvs_set_u16(handle, setting->nvs_key_name, setting->value.b ? 1 : 0);
-                        ESP_LOGI(TAG, "BOOL: %s: %d", setting->nvs_key_name, setting->value.b);
                         break;
                 }
                 if (ret == ESP_OK) {
@@ -184,28 +178,24 @@ esp_err_t nvs_config_init(void)
                 } else {
                     setting->value.str = strdup(setting->default_value.str);
                 }
-                ESP_LOGI(TAG, "STR %s: %s", setting->nvs_key_name, setting->value.str);
                 break;
             }
             case TYPE_U16: {
                 uint16_t val;
                 ret = nvs_get_u16(handle, setting->nvs_key_name, &val);
                 setting->value.u16 = (ret == ESP_OK) ? val : setting->default_value.u16;
-                ESP_LOGI(TAG, "U16: %s: %d", setting->nvs_key_name, setting->value.u16);
                 break;
             }
             case TYPE_I32: {
                 int32_t val;
                 ret = nvs_get_i32(handle, setting->nvs_key_name, &val);
                 setting->value.i32 = (ret == ESP_OK) ? val : setting->default_value.i32;
-                ESP_LOGI(TAG, "I32: %s: %d", setting->nvs_key_name, setting->value.i32);
                 break;
             }
             case TYPE_U64: {
                 uint64_t val;
                 ret = nvs_get_u64(handle, setting->nvs_key_name, &val);
                 setting->value.u64 = (ret == ESP_OK) ? val : setting->default_value.u64;
-                ESP_LOGI(TAG, "U64: %s: %d", setting->nvs_key_name, setting->value.u64);
                 break;
             }
             case TYPE_FLOAT: {
@@ -213,14 +203,12 @@ esp_err_t nvs_config_init(void)
                 size_t len = sizeof(buf);
                 ret = nvs_get_str(handle, setting->nvs_key_name, buf, &len);
                 setting->value.f = (ret == ESP_OK) ? atof(buf) : setting->default_value.f;
-                ESP_LOGI(TAG, "FLOAT: %s: %f", setting->nvs_key_name, setting->value.f);
                 break;
             }
             case TYPE_BOOL: {
                 uint16_t val;
                 ret = nvs_get_u16(handle, setting->nvs_key_name, &val);
                 setting->value.b = (ret == ESP_OK) ? (val != 0) : setting->default_value.b;
-                ESP_LOGI(TAG, "BOOL: %s: %d", setting->nvs_key_name, setting->value.b);
                 break;
             }
         }
@@ -230,7 +218,7 @@ esp_err_t nvs_config_init(void)
 
     TaskHandle_t task_handle;
 
-    BaseType_t task_result = xTaskCreate(nvs_task, "nvs_task", 4096, NULL, 5, &task_handle);
+    BaseType_t task_result = xTaskCreate(nvs_task, "nvs_task", 8192, NULL, 5, &task_handle);
     if (task_result != pdPASS) {
         ESP_LOGE(TAG, "Failed to create nvs_task");
 

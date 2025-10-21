@@ -200,7 +200,7 @@ void websocket_task(void *pvParameters)
     ESP_LOGI(TAG, "websocket_task starting");
     httpd_handle_t https_handle = (httpd_handle_t)pvParameters;
 
-    log_queue = xQueueCreate(MESSAGE_QUEUE_SIZE, sizeof(char*));
+    log_queue = xQueueCreateWithCaps(MESSAGE_QUEUE_SIZE, sizeof(char*), MALLOC_CAP_SPIRAM);
     if (log_queue == NULL) {
         ESP_LOGE(TAG, "Error creating queue");
         vTaskDelete(NULL);

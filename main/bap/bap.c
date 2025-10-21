@@ -45,7 +45,7 @@ esp_err_t BAP_init(GlobalState *state) {
         return ESP_ERR_NO_MEM;
     }
 
-    bap_uart_send_queue = xQueueCreate(10, sizeof(bap_message_t));
+    bap_uart_send_queue = xQueueCreateWithCaps(10, sizeof(bap_message_t), MALLOC_CAP_SPIRAM);
     if (bap_uart_send_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create UART send queue");
         vSemaphoreDelete(bap_subscription_mutex);
