@@ -1,7 +1,6 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
-#include "nvs_flash.h"
 
 #include "asic_result_task.h"
 #include "asic_task.h"
@@ -14,7 +13,7 @@
 #include "stratum_task.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
-#include "nvs_device.h"
+#include "nvs_config.h"
 #include "self_test.h"
 #include "asic.h"
 #include "bap/bap.h"
@@ -48,7 +47,7 @@ void app_main(void)
     ADC_init();
 
     //initialize the ESP32 NVS
-    if (NVSDevice_init() != ESP_OK){
+    if (nvs_config_init() != ESP_OK){
         ESP_LOGE(TAG, "Failed to init NVS");
         return;
     }

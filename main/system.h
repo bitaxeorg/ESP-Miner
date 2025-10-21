@@ -4,18 +4,6 @@
 #include "esp_err.h"
 #include "global_state.h"
 
-#ifdef CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE
-    #define STRATUM_EXTRANONCE_SUBSCRIBE 1
-#else
-    #define STRATUM_EXTRANONCE_SUBSCRIBE 0
-#endif
-
-#ifdef CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE
-    #define FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE 1
-#else
-    #define FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE 0
-#endif
-
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE);
 esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE);
 

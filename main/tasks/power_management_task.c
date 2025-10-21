@@ -33,8 +33,8 @@ static const char * TAG = "power_management";
 
 double pid_input = 0.0;
 double pid_output = 0.0;
-double min_fan_pct = 25.0;
-double pid_setPoint = 60.0; // Default, will be overwritten by NVS
+double min_fan_pct;
+double pid_setPoint;
 double pid_p = 15.0;        
 double pid_i = 0.2;
 double pid_d = 3.0;
@@ -58,9 +58,9 @@ void POWER_MANAGEMENT_init_frequency(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
-    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, -1);
+    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT);
     if (frequency < 0) { // fallback if the float value is not yet set
-        frequency = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY, CONFIG_ASIC_FREQUENCY);
+        frequency = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY);
 
         nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
     }
@@ -86,8 +86,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     
     float last_asic_frequency = power_management->frequency_value;
 
-    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
-    min_fan_pct = (double)nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED, min_fan_pct);
+    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET);
+    min_fan_pct = (double)nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED);
 
     // Initialize PID controller with pid_d_startup and PID_REVERSE directly
     pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d_startup, PID_P_ON_E, PID_REVERSE);
@@ -101,7 +101,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     while (1) {
 
         // Refresh PID setpoint from NVS in case it was changed via API
-        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, pid_setPoint);
+        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET);
 
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);
@@ -138,13 +138,13 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, 50);
             nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, 50);
             nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-            nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-            nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+            nvs_config_set_bool(NVS_CONFIG_AUTO_FAN_SPEED, false);
+            nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, true);
             exit(EXIT_FAILURE);
         }
 
         //enable the PID auto control for the FAN if set
-        if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
+        if (nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED)) {
             if (power_management->chip_temp_avg >= 0) { // Ignore invalid temperature readings (-1)
                 if (power_management->chip_temp2_avg > 0) {
                     pid_input = (power_management->chip_temp_avg + power_management->chip_temp2_avg) / 2.0; // TODO: Or max of both?
@@ -197,13 +197,13 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 }
             }
         } else { // Manual fan speed
-            float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
+            float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED);
             power_management->fan_perc = fs;
             Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, (float) fs / 100.0);
         }
 
-        uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-        float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
+        uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+        float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT);
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
@@ -225,7 +225,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         // Check for changing of overheat mode
-        uint16_t new_overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+        bool new_overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
         
         if (new_overheat_mode != sys_module->overheat_mode) {
             sys_module->overheat_mode = new_overheat_mode;
