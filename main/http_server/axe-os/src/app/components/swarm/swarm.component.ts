@@ -6,6 +6,7 @@ import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, 
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { LayoutService } from "../../layout/service/app.layout.service";
 import { ModalComponent } from '../modal/modal.component';
+import { ISystemInfo } from 'src/models/ISystemInfo';
 
 const SWARM_DATA = 'SWARM_DATA';
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
@@ -35,7 +36,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalTime = 30;
   public refreshTimeSet = 30;
 
-  public totals: { hashRate: number; power: number; bestDiff: string } = { hashRate: 0, power: 0, bestDiff: '0' };
+  public totals: { hashRate: number; power: number; bestDiff: number } = { hashRate: 0, power: 0, bestDiff: 0 };
 
   public isRefreshing = false;
 
@@ -163,13 +164,12 @@ export class SwarmComponent implements OnInit, OnDestroy {
   private getAllDeviceInfo(ips: string[], errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>, fetchAsic: boolean = true) {
     return from(ips).pipe(
       mergeMap(IP => forkJoin({
-        info: this.httpClient.get(`http://${IP}/api/system/info`),
-        asic: fetchAsic ? this.httpClient.get(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
+        info: this.httpClient.get<any>(`http://${IP}/api/system/info`),
+        asic: fetchAsic ? this.httpClient.get<any>(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
       }).pipe(
         map(({ info, asic }) => {
           const existingDevice = this.swarm.find(device => device.IP === IP);
-          const result = { IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic };
-          return this.fallbackDeviceModel(result);
+          return this.fallbackDeviceModel({ IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) });
         }),
         timeout(5000),
         catchError(error => errorHandler(error, IP))
@@ -196,8 +196,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       if (!info.ASICModel || !asic.ASICModel) {
         return;
       }
-
-      this.swarm.push({ IP, ...asic, ...info });
+      this.swarm.push(this.fallbackDeviceModel({ IP, ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) }));
       this.sortSwarm();
       this.localStorageService.setObject(SWARM_DATA, this.swarm);
       this.calculateTotals();
@@ -310,29 +309,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
-  private compareBestDiff(a: string, b: string): string {
-    if (!a || a === '0') return b || '0';
-    if (!b || b === '0') return a;
-
-    const units = 'kMGTPE';
-    const unitA = units.indexOf(a.slice(-1));
-    const unitB = units.indexOf(b.slice(-1));
-
-    if (unitA !== unitB) {
-      return unitA > unitB ? a : b;
-    }
-
-    const valueA = parseFloat(a.slice(0, unitA >= 0 ? -1 : 0));
-    const valueB = parseFloat(b.slice(0, unitB >= 0 ? -1 : 0));
-    return valueA >= valueB ? a : b;
-  }
-
   private calculateTotals() {
     this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
     this.totals.power = this.swarm.reduce((sum, axe) => sum + (axe.power || 0), 0);
-    this.totals.bestDiff = this.swarm
-      .map(axe => axe.bestDiff || '0')
-      .reduce((max, curr) => this.compareBestDiff(max, curr), '0');
+    this.totals.bestDiff = this.swarm.reduce((max, axe) => Math.max(max, axe.bestDiff || 0), 0);
   }
 
   get deviceFamilies(): SwarmDevice[] {
@@ -347,11 +327,12 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   // Fallback logic to derive deviceModel and swarmColor, can be removed after some time
   private fallbackDeviceModel(data: any): any {
-    if (data.deviceModel && data.swarmColor && data.poolDifficulty) return data;
+    if (data.deviceModel && data.swarmColor && data.poolDifficulty && data.hashRate) return data;
     const deviceModel = data.deviceModel || this.deriveDeviceModel(data);
     const swarmColor = data.swarmColor || this.deriveSwarmColor(deviceModel);
     const poolDifficulty = data.poolDifficulty || data.stratumDiff;
-    return { ...data, deviceModel, swarmColor, poolDifficulty };
+    const hashRate = data.hashRate || data.hashRate_10m;
+    return { ...data, deviceModel, swarmColor, poolDifficulty, hashRate };
   }
 
   private deriveDeviceModel(data: any): string {
@@ -376,6 +357,36 @@ export class SwarmComponent implements OnInit, OnDestroy {
       case 'GammaTurbo': return 'cyan';
       default:           return 'gray';
     }
+  }
+
+  private numerizeDeviceBestDiffs(info: ISystemInfo) {
+    const parseAsNumber = (val: number | string): number => {
+      return typeof val === 'string' ? this.parseSuffixString(val) : val;
+    };
+
+    return {
+      bestDiff: parseAsNumber(info.bestDiff),
+      bestSessionDiff: parseAsNumber(info.bestSessionDiff),
+    };
+  }
+
+  private parseSuffixString(input: string): number {
+    input = input.trim();
+    const value = parseFloat(input);
+    const lastChar = input.charAt(input.length - 1).toUpperCase();
+
+    const multipliers: Record<string, number> = {
+      K: 1e3,
+      M: 1e6,
+      G: 1e9,
+      T: 1e12,
+      P: 1e15,
+      E: 1e18,
+    };
+
+    const multiplier = multipliers[lastChar] ?? 1;
+
+    return value * multiplier;
   }
 
   public stringifyDeviceLabel(data: any): string {
