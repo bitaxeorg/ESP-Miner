@@ -503,9 +503,8 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
                 if (xSemaphoreTake(longPressSemaphore, portMAX_DELAY) == pdTRUE) {
                     ESP_LOGI(TAG, "Self-test flag cleared");
                     nvs_config_set_bool(NVS_CONFIG_SELF_TEST, false);
-                    // flush all pending NVS writes
-                    // nvs_config_commit();
-                    // TODO: Wait until NVS is written
+                    // Wait until NVS is written
+                    vTaskDelay(100/ portTICK_PERIOD_MS);
                     esp_restart();
                 }
             }
