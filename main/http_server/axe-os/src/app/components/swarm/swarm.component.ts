@@ -446,4 +446,19 @@ export class SwarmComponent implements OnInit, OnDestroy {
       axe.IP.includes(filter)
     );
   }
+
+  getDeviceNotification(axe: any): { color: string; msg: string } | undefined {
+    switch (true) {
+      case axe.overheat_mode === 1:
+        return { color: 'red', msg: 'Overheated' };
+      case !!axe.power_fault:
+        return { color: 'red', msg: 'Power Fault' };
+      case !axe.frequency || axe.frequency < 400:
+        return { color: 'orange', msg: 'Frequency Low' };
+      case axe.isUsingFallbackStratum:
+        return { color: 'orange', msg: 'Fallback Pool' };
+      default:
+        return undefined;
+    }
+  }
 }
