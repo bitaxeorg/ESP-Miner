@@ -1,0 +1,66 @@
+<form [formGroup]="autotuneForm" *ngIf="autotuneForm">
+    <div class="card">
+      <h2>Autotune Settings</h2>
+
+      <p-message severity="warn" styleClass="w-full mb-4 border-round-sm" text="The following options should only be set by expert users"></p-message>
+
+      <div class="card">
+        <!-- Auto Tune Hashrate Checkbox -->
+        <div class="field-checkbox grid my-2">
+          <div class="col-1 md:col-10 md:flex-order-2">
+            <p-checkbox
+              name="auto_tune"
+              formControlName="auto_tune"
+              inputId="auto_tune"
+              binary>
+            </p-checkbox>
+          </div>
+          <label for="auto_tune" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">
+            Auto Tune <span class="white-space-nowrap">Hashrate
+              <i class="pi pi-info-circle text-xs px-1" pTooltip="Enables automatic tuning of hashrate based on system conditions. This feature adjusts the hashrate dynamically to optimize performance and efficiency."></i>
+            </span>
+          </label>
+        </div>
+
+        <!-- Slider Controls -->
+        <ng-container *ngIf="autotuneForm.get('auto_tune')?.value">
+          <div *ngFor="let slider of sliderConfigs" class="grid p-fluid my-2">
+            <label
+              [for]="slider.formControlName"
+              class="hidden md:flex md:col-2 md:m-0 md:align-items-baseline"
+              >
+              {{ slider.label }}
+              <i class="pi pi-info-circle text-xs px-1" [pTooltip]="slider.tooltip"></i>
+            </label>
+            <div class="col-12 md:col-10">
+              <label class="block mb-1">
+                <span class="md:hidden mr-1">{{ slider.label }}:</span>
+                {{ autotuneForm.value[slider.formControlName] }} {{ slider.unit }}
+              </label>
+              <p-slider
+                [id]="slider.formControlName"
+                [formControlName]="slider.formControlName"
+                [min]="slider.min"
+                [max]="slider.max"
+                [step]="slider.step"
+                >
+              </p-slider>
+            </div>
+          </div>
+        </ng-container>
+
+      </div>
+
+      <div class="flex mt-5 gap-3">
+        <button
+          pButton
+          class="btn btn-primary"
+          (click)="updateAutotune()"
+          [disabled]="!autotuneForm.dirty || autotuneForm.invalid"
+        >
+          Save
+        </button>
+      </div>
+
+    </div>
+  </form>
