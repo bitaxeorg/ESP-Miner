@@ -53,7 +53,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolUser!: string;
   public activePoolLabel!: PoolLabel;
   public responseTime!: number;
-  public heatmapVisible: boolean = false;
 
   @ViewChild('chart')
   private chart?: UIChart
