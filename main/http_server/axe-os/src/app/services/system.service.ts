@@ -97,12 +97,12 @@ export class SystemService {
         networkDifficulty: "25.3T",
         hashrateMonitor: {
           asics: [{
-            total: 1069.8,
-            domains: [273.1, 298.9, 263.7, 255.9],
-            error: 0,
+            total: 441.2579,
+            domains: [114.9901, 98.6658, 103.8136, 122.7133],
+            error: 1.7166,
           }],
-          hashrate: 1069.8,
-          errorCount: 3,
+          hashrate: 441.2579,
+          errorCount: 0,
         },
         blockFound: 0,
       }

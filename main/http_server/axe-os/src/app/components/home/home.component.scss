@@ -35,3 +35,29 @@
     line-break: anywhere;
     font-family: 'Courier New', Courier, monospace;
 }
+
+.heatmap {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 1px;
+
+    td {
+        width: 16%;
+        padding: 0;
+
+        &:first-child {
+            width: 10%;
+        }
+        &:last-child {
+            width: 26%;
+        }
+
+        &[style^="--intensity"] {
+            background: rgb(
+              calc(255 - ((255 - var(--primary-color-r)) * var(--intensity))),
+              calc(255 - ((255 - var(--primary-color-g)) * var(--intensity))),
+              calc(255 - ((255 - var(--primary-color-b)) * var(--intensity)))
+            );
+        }
+    }
+}

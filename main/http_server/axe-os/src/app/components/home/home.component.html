@@ -29,33 +29,43 @@
     <div class="grid">
         <div class="col-12 md:col-6 xl:col-3">
             <div class="card mb-0">
-                <div class="flex justify-content-between mb-3">
-                    <div>
-                        <span class="block text-500 font-medium mb-3">Hashrate</span>
-                        <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
-                            <span *ngIf="!info.power_fault">
+                <div class="flex flex-column justify-content-between">
+                    <span class="block text-500 font-medium mb-3">Hashrate</span>
+
+                    <ng-container *ngIf="!info.power_fault; else powerFault">
+                        <div class="flex align-items-baseline gap-2 mb-3">
+                            <ng-container *ngIf="info.hashrateMonitor; else noHashrateMonitor">
+                                <span class="text-900 font-medium text-2xl">
+                                    {{info.hashrateMonitor.hashrate | hashSuffix}}
+                                </span>
+                                <span class="text-500 text-xs">
+                                    Error:
+                                    <span class="text-{{info.hashrateMonitor.errorCount === 0 ? 'green' : 'red'}}-500">
+                                        {{info.hashrateMonitor.errorCount}}
+                                    </span>
+                                </span>
+                            </ng-container>
+                            <ng-template #noHashrateMonitor>
                                 {{info.hashRate | hashSuffix}}
-                            </span>
-                            <span *ngIf="info.power_fault" class="text-red-500">
-                                Not available - Power fault
+                            </ng-template>
+                        </div>
+
+                        <div>
+                            Average:
+                            <span class="text-green-500 font-medium">
+                                {{getHashrateAverage() | hashSuffix}}
                             </span>
                         </div>
-                    </div>
-                </div>
+                        <div class="text-500 text-xs" *ngIf="info.expectedHashrate">
+                            Expected: {{info.expectedHashrate | hashSuffix}}
+                        </div>
+                    </ng-container>
 
-                <ng-container *ngIf="!info.power_fault">
-                    Average:
-                    <span class="text-green-500 font-medium">
-                        {{getHashrateAverage() | hashSuffix}}
-                    </span>
-                </ng-container>
-
-                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
-                    Expected: {{info.expectedHashrate | hashSuffix}}
-                </div>
-
-                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.hashrateMonitor">
-                    Register: {{info.hashrateMonitor.hashrate | hashSuffix}} Error: {{info.hashrateMonitor.errorCount}}
+                    <ng-template #powerFault>
+                        <span class="text-red-500">
+                            Not available - Power fault
+                        </span>
+                    </ng-template>
                 </div>
             </div>
         </div>
@@ -288,7 +298,7 @@
             </div>
         </div>
 
-        <div class="col-12 md:col-6">
+        <div class="col-12 md:col-4">
             <div class="card">
                 <div class="flex flex-nowrap justify-content-between mb-3 relative">
                     <h4 class="mb-0">Pool</h4>
@@ -322,7 +332,7 @@
                     </div>
                 </div>
 
-                <div class="flex flex-nowrap ellipsis-magic" pTooltip="{{activePoolUser}}" tooltipPosition="top">
+                <div class="flex flex-nowrap ellipsis-magic overflow-hidden" pTooltip="{{activePoolUser}}" tooltipPosition="top">
                     <div class="col-fixed-width text-500">
                         <span>User</span>
                     </div>
@@ -355,9 +365,9 @@
             </div>
         </div>
 
-        <div class="col-12 md:col-6">
+        <div class="col-12 md:col-4">
             <div class="card">
-                <h4>Block Header</h4>
+                <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis">Block Header</h4>
 
                 <div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
@@ -385,6 +395,45 @@
                         {{ info.scriptsig }}
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div class="col-12 md:col-4">
+            <div class="card">
+                <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis">Hashrate Registers</h4>
+
+                <table class="heatmap text-{{getAsicsAmount(info) <= 2 ? 'sm' : 'xs'}}">
+                    <thead>
+                        <tr>
+                            <th class="text-left">#</th>
+                            <th *ngIf="getAsicsAmount(info) === 1 && getAsicDomainsAmount(info, 0) === 1; else multiDomain">
+                                Domain
+                            </th>
+                            <ng-template #multiDomain>
+                                <th colspan="4">Domains</th>
+                            </ng-template>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let asic of info.hashrateMonitor.asics; let i = index">
+                            <td class="text-500 text-left cursor-pointer" pTooltip="ASIC {{ i + 1 }}" tooltipPosition="bottom">
+                                {{ i + 1 }}
+                            </td>
+                            <td *ngFor="let domain of asic.domains"
+                                [style.--intensity]="calculateAsicDomainIntensity(info, i, domain)"
+                                [style.height]="(getAsicsAmount(info) <= 2 ? '2rem' : null)"
+                                class="text-center cursor-pointer"
+                                pTooltip="{{ normalizeHashrate(domain) | hashSuffix }}"
+                                tooltipPosition="bottom">
+                                <span class="text-xs md:hidden">{{ normalizeHashrate(domain) | hashSuffix }}</span>
+                            </td>
+                            <td class="text-center cursor-pointer text-{{getDomainErrorColor(info, asic)}}-500" pTooltip="{{ normalizeHashrate(asic.error) | hashSuffix }}" tooltipPosition="bottom">
+                                {{getDomainErrorPercentage(info, asic) | number: '1.0-0'}} %
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
