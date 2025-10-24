@@ -1,4 +1,4 @@
-<ng-template #noTemp>--</ng-template>
+<ng-template #noValue>--</ng-template>
 
 <ng-container *ngIf="info$ | async as info">
     <!-- Temp warning alert -->
@@ -232,7 +232,7 @@
                             ASIC Temperature
                         </ng-template>
                         <span>
-                            <ng-container *ngIf="info.temp > 0; else noTemp">
+                            <ng-container *ngIf="info.temp > 0; else noValue">
                                 {{info.temp}} &deg;C
                             </ng-container>
                         </span>
@@ -250,7 +250,7 @@
                     <h6 class="flex justify-content-between mb-1">
                         ASIC Temperature 2
                         <span>
-                            <ng-container *ngIf="info.temp2 > 0; else noTemp">
+                            <ng-container *ngIf="info.temp2 > 0; else noValue">
                                 {{info.temp2}} &deg;C
                             </ng-container>
                         </span>
@@ -277,11 +277,45 @@
                     </strong>
                 </div>
 
-                <div>
+                <div class="mb-3">
                     <h6 class="flex justify-content-between mb-1">
-                        Fan Speed<span>{{info.fanspeed}} % ({{info.fanrpm}} RPM)</span>
+                        Fan Speed<span>{{info.fanspeed}} %</span>
                     </h6>
                     <p-progressBar [value]="info.fanspeed" [styleClass]="'p-progressbar--thin'">
+                        <ng-template pTemplate="content" let-value></ng-template>
+                    </p-progressBar>
+                </div>
+
+                <div class="mb-3">
+                    <h6 class="flex justify-content-between mb-1">
+                        <ng-container *ngIf="info.fan2rpm > 0; else singleFan">
+                            Fan 1 RPM
+                        </ng-container>
+                        <ng-template #singleFan>
+                            Fan RPM
+                        </ng-template>
+                        <span>
+                            <ng-container *ngIf="info.fanrpm > 0; else noValue">
+                                {{info.fanrpm}} RPM
+                            </ng-container>
+                        </span>
+                    </h6>
+                    <p-progressBar [value]="(info.fanrpm / maxRpm) * 100" [styleClass]="'p-progressbar--thin'">
+                        <ng-template pTemplate="content" let-value></ng-template>
+                    </p-progressBar>
+
+                </div>
+
+                <div *ngIf="info.fan2rpm > 0">
+                    <h6 class="flex justify-content-between mb-1">
+                        Fan 2 RPM
+                        <span>
+                            <ng-container *ngIf="info.fan2rpm > 0; else noValue">
+                                {{info.fan2rpm}} RPM
+                            </ng-container>
+                        </span>
+                    </h6>
+                    <p-progressBar [value]="(info.fan2rpm / maxRpm) * 100" [styleClass]="'p-progressbar--thin'">
                         <ng-template pTemplate="content" let-value></ng-template>
                     </p-progressBar>
                 </div>

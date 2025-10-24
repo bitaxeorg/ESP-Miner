@@ -43,8 +43,8 @@ emc_int_temp,data,u16,0
 emc_ideality_f,data,u16,0
 # EMC Beta Compensation (0-8, See EMC2102.h)
 emc_beta_comp,data,u16,0
-# EMC Temperature Offset
-emc_temp_offset,data,i32,0
+# Temperature Offset
+temp_offset,data,i32,0
 # DS4432U (0,1)
 DS4432U,data,u16,0
 # INA260 (0,1)

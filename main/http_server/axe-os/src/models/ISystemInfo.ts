@@ -73,6 +73,7 @@ export interface ISystemInfo {
     fanspeed: number,
     temptarget: number,
     fanrpm: number,
+    fan2rpm: number,
     statsFrequency: number,
     coreVoltageActual: number,
 
