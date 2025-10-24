@@ -580,6 +580,7 @@ paths:
                       - BM1366
                       - BM1368
                       - BM1370
+                      - BM1340
                       - BM1397
                     examples:
                       - "BM1366"
