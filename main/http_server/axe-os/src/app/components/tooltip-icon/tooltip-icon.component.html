@@ -1,0 +1,12 @@
+<ng-container *ngIf="tooltip">
+    <i *ngIf="!isMobile" pTooltip="{{tooltip}}" [ngClass]="tooltipIconClass"></i>
+
+    <button *ngIf="isMobile" (click)="showMobileTooltip = true" [ngClass]="tooltipIconClass"></button>
+
+    <div *ngIf="showMobileTooltip" (click)="showMobileTooltip = false" class="tooltip-mobile-backdrop">
+        <div class="tooltip-mobile-content">
+            <button class="tooltip-mobile-close" (click)="showMobileTooltip = false">&times;</button>
+            <p>{{ tooltip }}</p>
+        </div>
+    </div>
+</ng-container>
