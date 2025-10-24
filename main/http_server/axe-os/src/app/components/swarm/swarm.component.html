@@ -89,7 +89,7 @@
                         <div class="flex flex-column justify-content-between">
                             <div class="flex flex-column">
                                 <div class="flex flex-column">
-                                    <div>
+                                    <div class="white-space-nowrap">
                                         <a [href]="'http://' + axe.IP" target="_blank" class="text-900" pTooltip="Hostname" tooltipPosition="top">
                                             {{axe.hostname}}
                                         </a>
@@ -108,7 +108,7 @@
                                     {{axe.uptimeSeconds | dateAgo: {intervals: 1} }}
                                 </span>
                             </div>
-                            <div class="mb-1">
+                            <div class="flex align-items-center mb-1 gap-3 md:gap-2">
                                 <p-button
                                     icon="pi pi-pencil text-sm flex align-items-center justify-content-center"
                                     pp-button
@@ -124,7 +124,6 @@
                                     tooltipPosition="top"
                                     severity="secondary"
                                     styleClass="button-icon-small"
-                                    class="mx-3 lg:mx-2"
                                     (click)="restart(axe)" />
                                 <p-button
                                     icon="pi pi-trash text-sm flex align-items-center justify-content-center"
@@ -134,6 +133,12 @@
                                     severity="secondary"
                                     styleClass="button-icon-small"
                                     (click)="remove(axe)" />
+                                <i
+                                    *ngIf="getDeviceNotification(axe) as notification"
+                                    class="pi pi-exclamation-triangle cursor-pointer text-lg"
+                                    pTooltip="{{ notification.msg }}"
+                                    tooltipPosition="top"
+                                    [ngClass]="'text-' + notification.color + '-500'"></i>
                             </div>
                         </div>
                         <div class="flex flex-column text-right white-space-nowrap cursor-pointer">
@@ -209,6 +214,10 @@
                                     <span class="text-900">{{axe.hostname}}</span>
                                     <span class="ml-2 text-lg line-height-1 cursor-pointer" [ngStyle]="{color: axe.swarmColor}" pTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">●</span>
                                 </a>
+                                <div *ngIf="getDeviceNotification(axe) as notification" class="flex align-items-center gap-1" [ngClass]="'text-' + notification.color + '-500'">
+                                    <i class="pi pi-exclamation-triangle"></i>
+                                    <span class="text-sm">{{ notification.msg }}</span>
+                                </div>
                             </td>
                             <td>
                                 <a [href]="'http://' + axe.IP" target="_blank" class="text-800">{{axe.IP}}</a>
