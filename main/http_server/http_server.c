@@ -180,7 +180,7 @@ static esp_err_t GET_wifi_scan(httpd_req_t *req)
         cJSON *network = cJSON_CreateObject();
         cJSON_AddStringToObject(network, "ssid", (char *)ap_records[i].ssid);
         cJSON_AddNumberToObject(network, "rssi", ap_records[i].rssi);
-        cJSON_AddNumberToObject(network, "authmode", ap_records[i].authmode);
+        cJSON_AddNumberToObject(network, "authMode", ap_records[i].authmode);
         cJSON_AddItemToArray(networks, network);
     }
 
@@ -865,8 +865,107 @@ static esp_err_t POST_restart(httpd_req_t * req)
     return ESP_OK;
 }
 
-/* Simple handler for getting system handler */
-static esp_err_t GET_system_info(httpd_req_t * req)
+
+/* Handler for system status endpoint, live */
+static esp_err_t GET_system_status(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
+    float expected_hashrate = frequency * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
+
+    cJSON * root = cJSON_CreateObject();
+
+    cJSON *shares_rejected_reason_array = cJSON_CreateArray();
+    for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+        cJSON *reason_obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(reason_obj, "message", GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].message);
+        cJSON_AddNumberToObject(reason_obj, "count", GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].count);
+        cJSON_AddItemToArray(shares_rejected_reason_array, reason_obj);
+    }
+
+    cJSON_AddNumberToObject(root, "hashrate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
+    cJSON_AddNumberToObject(root, "expectedHashrate", expected_hashrate);
+
+    cJSON_AddNumberToObject(root, "current", Power_get_current(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
+    cJSON_AddNumberToObject(root, "voltage", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
+    cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
+
+    cJSON_AddNumberToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
+    cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
+    cJSON_AddNumberToObject(root, "fanRPM", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
+    cJSON_AddNumberToObject(root, "fanSpeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
+
+    cJSON_AddBoolToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
+    cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
+    cJSON_AddNumberToObject(root, "sharesAccepted", GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
+    cJSON_AddNumberToObject(root, "sharesRejected", GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
+    cJSON_AddItemToObject(root, "sharesRejectedReasons", shares_rejected_reason_array);
+
+    cJSON_AddNumberToObject(root, "poolDifficulty", GLOBAL_STATE->pool_difficulty);
+    cJSON_AddNumberToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_nonce_diff);
+    cJSON_AddNumberToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_nonce_diff);
+
+    cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
+    cJSON_AddNumberToObject(root, "freeHeapInternal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+
+    cJSON_AddNumberToObject(root, "blockFound", GLOBAL_STATE->SYSTEM_MODULE.block_found);
+    if (GLOBAL_STATE->block_height > 0) {
+        cJSON_AddNumberToObject(root, "blockHeight", GLOBAL_STATE->block_height);
+        cJSON_AddStringToObject(root, "scriptSig", GLOBAL_STATE->scriptsig);
+        cJSON_AddStringToObject(root, "networkDifficulty", GLOBAL_STATE->network_diff_string);
+    }
+
+    cJSON *hashrate_monitor = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "hashrateMonitor", hashrate_monitor);
+    
+    cJSON *asics_array = cJSON_CreateArray();
+    cJSON_AddItemToObject(hashrate_monitor, "asics", asics_array);
+
+    if (GLOBAL_STATE->HASHRATE_MONITOR_MODULE.is_initialized) {
+        for (int i = 0; i < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; i++) {
+            cJSON *asic = cJSON_CreateObject();
+            cJSON_AddItemToArray(asics_array, asic);
+            cJSON_AddNumberToObject(asic, "hashrate", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
+    
+            float domains[4] = { 0 };
+            domains[0] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_0_measurement[i].hashrate;
+            domains[1] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_1_measurement[i].hashrate;
+            domains[2] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_2_measurement[i].hashrate;
+            domains[3] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_3_measurement[i].hashrate;
+            cJSON_AddItemToObject(asic, "domains", cJSON_CreateFloatArray(domains, 4));
+    
+            cJSON_AddNumberToObject(asic, "error", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_measurement[i].hashrate);
+        }
+    }
+    cJSON_AddNumberToObject(hashrate_monitor, "totalHashrate", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.hashrate);
+    cJSON_AddNumberToObject(hashrate_monitor, "totalErrorCount", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_count);
+
+    cJSON_AddBoolToObject(root, "overheatMode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
+    if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
+        cJSON_AddStringToObject(root, "powerFault", VCORE_get_fault_string(GLOBAL_STATE));
+    }
+
+    const char * status_res = cJSON_Print(root);
+    httpd_resp_sendstr(req, status_res);
+    free((char *)status_res);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+/* Handler for system config endpoint */
+static esp_err_t GET_system_config(httpd_req_t *req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
@@ -882,76 +981,19 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
     char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
-    char * ipv4 = GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str;
-    char * ipv6 = GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str;
     char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
     char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
-    char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)");
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
-
-    uint8_t mac[6];
-    esp_wifi_get_mac(WIFI_IF_STA, mac);
-    char formattedMac[18];
-    snprintf(formattedMac, sizeof(formattedMac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-    int8_t wifi_rssi = -90;
-    get_wifi_current_rssi(&wifi_rssi);
+    char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)");
 
     cJSON * root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
-    cJSON_AddNumberToObject(root, "voltage", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
-    cJSON_AddNumberToObject(root, "current", Power_get_current(GLOBAL_STATE));
-    cJSON_AddNumberToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
-    cJSON_AddNumberToObject(root, "temp2", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
-    cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
-    cJSON_AddNumberToObject(root, "maxPower", GLOBAL_STATE->DEVICE_CONFIG.family.max_power);
-    cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage);
-    cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
-    cJSON_AddNumberToObject(root, "hashrateRegister", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.hashrate);
-    cJSON_AddNumberToObject(root, "errorCountRegister", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_count);
-    cJSON_AddNumberToObject(root, "expectedHashrate", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
-    cJSON_AddNumberToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_nonce_diff);
-    cJSON_AddNumberToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_nonce_diff);
-    cJSON_AddNumberToObject(root, "poolDifficulty", GLOBAL_STATE->pool_difficulty);
 
-    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
-
-    cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
-
-    cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
-
-    cJSON_AddNumberToObject(root, "freeHeapInternal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-    cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-    
-    cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
-    cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
-    cJSON_AddNumberToObject(root, "frequency", frequency);
-    cJSON_AddStringToObject(root, "ssid", ssid);
-    cJSON_AddStringToObject(root, "macAddr", formattedMac);
     cJSON_AddStringToObject(root, "hostname", hostname);
-    cJSON_AddStringToObject(root, "ipv4", ipv4);
-    cJSON_AddStringToObject(root, "ipv6", ipv6);
-    cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
-    cJSON_AddNumberToObject(root, "wifiRSSI", wifi_rssi);
-    cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
-    cJSON_AddNumberToObject(root, "sharesAccepted", GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
-    cJSON_AddNumberToObject(root, "sharesRejected", GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
-
-    cJSON *error_array = cJSON_CreateArray();
-    cJSON_AddItemToObject(root, "sharesRejectedReasons", error_array);
-    
-    for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
-        cJSON *error_obj = cJSON_CreateObject();
-        cJSON_AddStringToObject(error_obj, "message", GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].message);
-        cJSON_AddNumberToObject(error_obj, "count", GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].count);
-        cJSON_AddItemToArray(error_array, error_obj);
-    }
-
-    cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000);
-    cJSON_AddNumberToObject(root, "smallCoreCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count);
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+    cJSON_AddStringToObject(root, "ssid", ssid);
+    cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
+    cJSON_AddNumberToObject(root, "frequency", frequency);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT));
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
@@ -962,67 +1004,15 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
     cJSON_AddNumberToObject(root, "fallbackStratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, CONFIG_FALLBACK_STRATUM_DIFFICULTY));
     cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
-    cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
-
-    cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
-    cJSON_AddStringToObject(root, "axeOSVersion", axeOSVersion);
-
-    cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
-    cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
-    cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
-
-    cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
-    cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED, 0));
     cJSON_AddStringToObject(root, "display", display);
-    cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION, 0));
-    cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
     cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1));
-
-    cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1));
-
-    cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
-    cJSON_AddNumberToObject(root, "minFanSpeed", nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED, 25));
-    cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
-    cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
-
+    cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION, 0));
+    cJSON_AddBoolToObject(root, "invertScreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0));
-
-    cJSON_AddNumberToObject(root, "blockFound", GLOBAL_STATE->SYSTEM_MODULE.block_found);
-
-    if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
-        cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
-    }
-
-    if (GLOBAL_STATE->block_height > 0) {
-        cJSON_AddNumberToObject(root, "blockHeight", GLOBAL_STATE->block_height);
-        cJSON_AddStringToObject(root, "scriptsig", GLOBAL_STATE->scriptsig);
-        cJSON_AddStringToObject(root, "networkDifficulty", GLOBAL_STATE->network_diff_string);
-    }
-
-    cJSON *hashrate_monitor = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "hashrateMonitor", hashrate_monitor);
-    
-    cJSON *asics_array = cJSON_CreateArray();
-    cJSON_AddItemToObject(hashrate_monitor, "asics", asics_array);
-
-    if (GLOBAL_STATE->HASHRATE_MONITOR_MODULE.is_initialized) {
-        for (int i = 0; i < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; i++) {
-            cJSON *asic = cJSON_CreateObject();
-            cJSON_AddItemToArray(asics_array, asic);
-            cJSON_AddNumberToObject(asic, "total", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
-    
-            float domains[4] = { 0 };
-            domains[0] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_0_measurement[i].hashrate;
-            domains[1] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_1_measurement[i].hashrate;
-            domains[2] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_2_measurement[i].hashrate;
-            domains[3] = GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_3_measurement[i].hashrate;
-            cJSON_AddItemToObject(asic, "domains", cJSON_CreateFloatArray(domains, 4));
-    
-            cJSON_AddNumberToObject(asic, "error", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_measurement[i].hashrate);
-        }
-    }
-    cJSON_AddNumberToObject(hashrate_monitor, "hashrate", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.hashrate);
-    cJSON_AddNumberToObject(hashrate_monitor, "errorCount", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_count);
+    cJSON_AddBoolToObject(root, "autoFanSpeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1));
+    cJSON_AddNumberToObject(root, "tempTarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
+    cJSON_AddBoolToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED, 0));
+    cJSON_AddBoolToObject(root, "overheatMode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
 
     free(ssid);
     free(hostname);
@@ -1344,26 +1334,35 @@ esp_err_t start_rest_server(void * pvParameters)
     ESP_ERROR_CHECK(register_theme_api_endpoints(server, rest_context));
 
     /* URI handler for fetching system info */
-    httpd_uri_t system_info_get_uri = {
-        .uri = "/api/system/info", 
+    httpd_uri_t system_status_get_uri = {
+        .uri = "/api/v2/system/status", 
         .method = HTTP_GET, 
-        .handler = GET_system_info, 
+        .handler = GET_system_status, 
         .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &system_info_get_uri);
+    httpd_register_uri_handler(server, &system_status_get_uri);
 
     /* URI handler for fetching system asic values */
-    httpd_uri_t system_asic_get_uri = {
-        .uri = "/api/system/asic", 
+    httpd_uri_t system_board_get_uri = {
+        .uri = "/api/v2/system/board", 
         .method = HTTP_GET, 
-        .handler = GET_system_asic, 
+        .handler = GET_system_board, 
         .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &system_asic_get_uri);
+    httpd_register_uri_handler(server, &system_board_get_uri);
+    
+    /* URI handler for fetching system config values */
+    httpd_uri_t system_config_get_uri = {
+        .uri = "/api/v2/system/config", 
+        .method = HTTP_GET, 
+        .handler = GET_system_config, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_config_get_uri);
 
     /* URI handler for fetching system statistic values */
     httpd_uri_t system_statistics_get_uri = {
-        .uri = "/api/system/statistics", 
+        .uri = "/api/v2/system/statistics", 
         .method = HTTP_GET, 
         .handler = GET_system_statistics, 
         .user_ctx = rest_context
@@ -1372,7 +1371,7 @@ esp_err_t start_rest_server(void * pvParameters)
 
     /* URI handler for WiFi scan */
     httpd_uri_t wifi_scan_get_uri = {
-        .uri = "/api/system/wifi/scan",
+        .uri = "/api/v2/system/wifi/scan",
         .method = HTTP_GET,
         .handler = GET_wifi_scan,
         .user_ctx = rest_context
@@ -1380,14 +1379,14 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &wifi_scan_get_uri);
 
     httpd_uri_t system_restart_uri = {
-        .uri = "/api/system/restart", .method = HTTP_POST, 
+        .uri = "/api/v2/system/restart", .method = HTTP_POST, 
         .handler = POST_restart, 
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_restart_uri);
 
     httpd_uri_t system_restart_options_uri = {
-        .uri = "/api/system/restart", 
+        .uri = "/api/v2/system/restart", 
         .method = HTTP_OPTIONS, 
         .handler = handle_options_request, 
         .user_ctx = NULL
@@ -1395,7 +1394,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &system_restart_options_uri);
 
     httpd_uri_t update_system_settings_uri = {
-        .uri = "/api/system", 
+        .uri = "/api/v2/system", 
         .method = HTTP_PATCH, 
         .handler = PATCH_update_settings, 
         .user_ctx = rest_context
@@ -1403,7 +1402,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &update_system_settings_uri);
 
     httpd_uri_t system_options_uri = {
-        .uri = "/api/system",
+        .uri = "/api/v2/system",
         .method = HTTP_OPTIONS,
         .handler = handle_options_request,
         .user_ctx = NULL,
@@ -1411,7 +1410,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &system_options_uri);
 
     httpd_uri_t update_post_ota_firmware = {
-        .uri = "/api/system/OTA", 
+        .uri = "/api/v2/system/ota", 
         .method = HTTP_POST, 
         .handler = POST_OTA_update, 
         .user_ctx = NULL
@@ -1419,7 +1418,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &update_post_ota_firmware);
 
     httpd_uri_t update_post_ota_www = {
-        .uri = "/api/system/OTAWWW", 
+        .uri = "/api/v2/system/otawww", 
         .method = HTTP_POST, 
         .handler = POST_WWW_update, 
         .user_ctx = NULL
@@ -1427,7 +1426,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &update_post_ota_www);
 
     httpd_uri_t ws = {
-        .uri = "/api/ws", 
+        .uri = "/api/v2/ws", 
         .method = HTTP_GET, 
         .handler = websocket_handler, 
         .user_ctx = NULL, 
