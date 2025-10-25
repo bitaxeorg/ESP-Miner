@@ -341,6 +341,19 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
     }
 }
 
+static bool check_notify_timeout(GlobalState * GLOBAL_STATE, int64_t timeout_seconds)
+{
+    if (GLOBAL_STATE->SYSTEM_MODULE.last_notify_timestamp > 0) {
+        int64_t current_time = esp_timer_get_time();
+        int64_t time_diff = (current_time - GLOBAL_STATE->SYSTEM_MODULE.last_notify_timestamp) / 1000000;
+        if (time_diff > timeout_seconds) {
+            ESP_LOGW(TAG, "No mining.notify received for %lld seconds, reconnecting...", time_diff);
+            return true;
+        }
+    }
+    return false;
+}
+
 void stratum_task(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -463,6 +476,12 @@ void stratum_task(void * pvParameters)
         GLOBAL_STATE->abandon_work = 0;
 
         while (1) {
+            if (check_notify_timeout(GLOBAL_STATE, 300)) {
+                retry_attempts++;
+                stratum_close_connection(GLOBAL_STATE);
+                break;
+            }
+
             char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->sock);
             if (!line) {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
@@ -482,6 +501,7 @@ void stratum_task(void * pvParameters)
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
                 GLOBAL_STATE->SYSTEM_MODULE.work_received++;
+                GLOBAL_STATE->SYSTEM_MODULE.last_notify_timestamp = esp_timer_get_time();
                 SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
                 if (stratum_api_v1_message.should_abandon_work &&
                     (GLOBAL_STATE->stratum_queue.count > 0 || GLOBAL_STATE->ASIC_jobs_queue.count > 0)) {
