@@ -53,6 +53,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->best_session_nonce_diff = 0;
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
+    module->last_notify_timestamp = 0;
     module->block_found = false;
     
     // Initialize network address strings
