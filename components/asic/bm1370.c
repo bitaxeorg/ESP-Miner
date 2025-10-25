@@ -56,8 +56,7 @@ typedef struct __attribute__((__packed__))
 typedef struct __attribute__((__packed__))
 {
     uint32_t value;                   // 2-5
-    uint8_t                   : 1;    // 6:0
-    uint8_t asic_nr           : 7;    // 6:1-7
+    uint8_t asic_address;             // 6
     uint8_t register_address;         // 7
     uint16_t                  : 16;   // 8-9
 } bm1370_asic_result_cmd_t;
@@ -345,7 +344,7 @@ task_result * BM1370_process_work(void * pvParameters)
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
-        result.asic_nr = asic_result.cmd.asic_nr;
+        result.asic_nr = asic_result.cmd.asic_address;
         result.value = ntohl(asic_result.cmd.value);
         
         return &result;
@@ -378,7 +377,7 @@ void BM1370_read_registers(void)
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
     for (int reg = 0; reg < size; reg++) {
         if (REGISTER_MAP[reg] != REGISTER_INVALID) {
-            _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){0x00, reg}, 2, false);
+            _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1370_SERIALTX_DEBUG);
             vTaskDelay(1 / portTICK_PERIOD_MS);
         }
     }

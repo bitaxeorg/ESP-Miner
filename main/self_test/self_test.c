@@ -59,8 +59,8 @@ static bool isFactoryTest = false;
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
 static bool should_test() {
-    uint64_t is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0) < 1;
-    uint16_t is_self_test_flag_set = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
+    bool is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF) < 1;
+    bool is_self_test_flag_set = nvs_config_get_bool(NVS_CONFIG_SELF_TEST);
     if (is_factory_flash && is_self_test_flag_set) {
         isFactoryTest = true;
         return true;
@@ -174,7 +174,7 @@ esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
 esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
     ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
 
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
     
     return ESP_OK;
 }
@@ -486,7 +486,7 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
     if (isTestPassed) {
         if (isFactoryTest) {
             ESP_LOGI(TAG, "Self-test flag cleared");
-            nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
+            nvs_config_set_bool(NVS_CONFIG_SELF_TEST, false);
         }
         ESP_LOGI(TAG, "SELF-TEST PASS! -- Press RESET button to restart.");
         GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST PASS!";
@@ -502,9 +502,9 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
                 // Wait here forever until reset_self_test() gives the longPressSemaphore
                 if (xSemaphoreTake(longPressSemaphore, portMAX_DELAY) == pdTRUE) {
                     ESP_LOGI(TAG, "Self-test flag cleared");
-                    nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
-                    // flush all pending NVS writes
-                    nvs_config_commit();
+                    nvs_config_set_bool(NVS_CONFIG_SELF_TEST, false);
+                    // Wait until NVS is written
+                    vTaskDelay(100/ portTICK_PERIOD_MS);
                     esp_restart();
                 }
             }

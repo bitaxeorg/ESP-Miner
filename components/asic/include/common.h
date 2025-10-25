@@ -8,12 +8,13 @@
 typedef enum
 {
     REGISTER_INVALID = 0,
-    REGISTER_ERROR_COUNT,
-    REGISTER_DOMAIN_0_COUNT,
+    REGISTER_HASHRATE,       // hashrate register (BM1397)
+    REGISTER_TOTAL_COUNT,    // total counter (BM1366,BM1368,BM1370)
+    REGISTER_DOMAIN_0_COUNT, // domain counters (BM1366,BM1368,BM1370)
     REGISTER_DOMAIN_1_COUNT,
     REGISTER_DOMAIN_2_COUNT,
     REGISTER_DOMAIN_3_COUNT,
-    REGISTER_TOTAL_COUNT,
+    REGISTER_ERROR_COUNT,    // error count register (all)
 } register_type_t;
 
 typedef struct

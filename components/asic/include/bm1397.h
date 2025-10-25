@@ -4,7 +4,7 @@
 #include "common.h"
 #include "mining.h"
 
-#define BM1397_SERIALTX_DEBUG true
+#define BM1397_SERIALTX_DEBUG false
 #define BM1397_SERIALRX_DEBUG false
 #define BM1397_DEBUG_WORK false //causes insane amount of debug output
 #define BM1397_DEBUG_JOBS false //causes insane amount of debug output
@@ -30,5 +30,6 @@ int BM1397_set_max_baud(void);
 int BM1397_set_default_baud(void);
 void BM1397_send_hash_frequency(float frequency);
 task_result * BM1397_process_work(void * GLOBAL_STATE);
+void BM1397_read_registers(void);
 
 #endif /* BM1397_H_ */
