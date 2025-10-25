@@ -9,12 +9,18 @@ static const char * TAG = "EMC2103";
 
 static i2c_master_dev_handle_t EMC2103_dev_handle;
 
+static int temp_offset;
+
 /**
  * @brief Initialize the EMC2103 sensor.
  *
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
-esp_err_t EMC2103_init() {
+esp_err_t EMC2103_init(int temp_offset_param)
+{
+    ESP_LOGI(TAG, "Initializing EMC2103 (Temperature offset: %d° C)", temp_offset_param);
+    
+    temp_offset = temp_offset_param;
 
     if (i2c_bitaxe_add_device(EMC2103_I2CADDR_DEFAULT, &EMC2103_dev_handle, TAG) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add device");
@@ -107,13 +113,13 @@ static float get_external_temp(int i, uint8_t msb_register, uint8_t lsb_register
     err = i2c_bitaxe_register_read(EMC2103_dev_handle, msb_register, &temp_msb, 1);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read external temperature %d MSB: %s", i, esp_err_to_name(err));
-        return 0.0f;
+        return -1;
     }
     
     err = i2c_bitaxe_register_read(EMC2103_dev_handle, lsb_register, &temp_lsb, 1);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read external temperature %d LSB: %s", i, esp_err_to_name(err));
-        return 0.0f;
+        return -1;
     }
 
     // Combine MSB and LSB, and then right shift to get 11 bits
@@ -134,7 +140,9 @@ static float get_external_temp(int i, uint8_t msb_register, uint8_t lsb_register
     }
 
     // Convert the signed reading to temperature in Celsius
-    return (float)signed_reading / 8.0f;
+    float result = (float)signed_reading / 8.0f;
+
+    return result + temp_offset;
 }
 
 /**
