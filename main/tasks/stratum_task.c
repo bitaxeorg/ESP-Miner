@@ -346,8 +346,8 @@ static bool check_notify_timeout(GlobalState * GLOBAL_STATE, int64_t timeout_sec
 {
     if (last_notify_timestamp > 0) {
         int64_t current_time_ms = esp_timer_get_time() / 1000;
-        int64_t time_diff_ms = current_time_ms - last_notify_timestamp;
-        int64_t time_diff_seconds = time_diff_ms / 1000;
+        int32_t time_diff_ms = current_time_ms - last_notify_timestamp;
+        int32_t time_diff_seconds = time_diff_ms / 1000;
         if (time_diff_seconds > timeout_seconds) {
             ESP_LOGW(TAG, "No mining.notify received for %lld seconds, reconnecting...", time_diff_seconds);
             return true;
