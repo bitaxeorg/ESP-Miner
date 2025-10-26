@@ -11,6 +11,7 @@
 #include "connect.h"
 #include "vcore.h"
 #include "bm1370.h"
+#include <esp_heap_caps.h>
 
 #define DEFAULT_POLL_RATE 5000
 
@@ -34,7 +35,7 @@ StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
 
     // create new data block or reuse first data block
     if (currentDataCount < maxDataCount) {
-        newData = (StatisticsNodePtr)malloc(sizeof(struct StatisticsData));
+        newData = (StatisticsNodePtr)heap_caps_malloc(sizeof(struct StatisticsData), MALLOC_CAP_SPIRAM);
         currentDataCount++;
     } else {
         newData = statisticsDataStart;
@@ -124,7 +125,7 @@ void statistics_task(void * pvParameters)
 
     while (1) {
         const int64_t currentTime = esp_timer_get_time() / 1000;
-        statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0) * 1000;
+        statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY) * 1000;
 
         if (0 != statsFrequency) {
             const int64_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);

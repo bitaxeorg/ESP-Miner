@@ -233,9 +233,33 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
         ip_event_got_ip6_t * event = (ip_event_got_ip6_t *) event_data;
-        inet_ntop(AF_INET6, &event->ip6_info.ip, GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str));
-
-        ESP_LOGI(TAG, "IPv6 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
+        
+        // Convert IPv6 address to string
+        char ipv6_str[INET6_ADDRSTRLEN];
+        inet_ntop(AF_INET6, &event->ip6_info.ip, ipv6_str, sizeof(ipv6_str));
+        
+        // Check if it's a link-local address (fe80::/10)
+        if ((event->ip6_info.ip.addr[0] & 0xFFC0) == 0xFE80) {
+            // For link-local addresses, append zone identifier using netif index
+            int netif_index = esp_netif_get_netif_impl_index(event->esp_netif);
+            if (netif_index >= 0) {
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str,
+                        sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str),
+                        "%s%%%d", ipv6_str, netif_index);
+                ESP_LOGI(TAG, "IPv6 Link-Local Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
+            } else {
+                strncpy(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str, ipv6_str,
+                       sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1);
+                GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1] = '\0';
+                ESP_LOGW(TAG, "IPv6 Link-Local Address: %s (could not get interface index)", ipv6_str);
+            }
+        } else {
+            // Global or ULA address - no zone identifier needed
+            strncpy(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str, ipv6_str,
+                   sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1);
+            GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1] = '\0';
+            ESP_LOGI(TAG, "IPv6 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
+        }
     }
 }
 
@@ -347,7 +371,7 @@ void wifi_init(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
-    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
+    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
     // copy the wifi ssid to the global state
     strncpy(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid));
     GLOBAL_STATE->SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid)-1] = 0;
@@ -387,7 +411,7 @@ void wifi_init(void * pvParameters)
         return;
     } else {
 
-        char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, CONFIG_ESP_WIFI_PASSWORD);
+        char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS);
 
         /* Initialize STA */
         ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
@@ -401,7 +425,7 @@ void wifi_init(void * pvParameters)
         /* Disable power savings for best performance */
         ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
-        char * hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
+        char * hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
 
         /* Set Hostname */
         esp_err_t err = esp_netif_set_hostname(esp_netif_sta, hostname);

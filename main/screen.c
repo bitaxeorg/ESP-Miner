@@ -331,7 +331,8 @@ static void screen_show(screen_t screen)
         lv_obj_t * scr = screens[screen];
 
         if (scr && lvgl_port_lock(0)) {
-            lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, false);
+            bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
+            lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
             lvgl_port_unlock();
         }
 
@@ -343,7 +344,7 @@ static void screen_show(screen_t screen)
 
 static void screen_update_cb(lv_timer_t * timer)
 {
-    int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1);
+    int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT);
 
     if (0 > display_timeout_config) {
         // display always on
@@ -397,7 +398,7 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (module->overheat_mode == 1) {
+    if (module->overheat_mode) {
         if (strcmp(module->ip_addr_str, lv_label_get_text(overheat_ip_addr_label)) != 0) {
             lv_label_set_text(overheat_ip_addr_label, module->ip_addr_str);
         }

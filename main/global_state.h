@@ -48,7 +48,7 @@ typedef struct
     char ssid[32];
     char wifi_status[256];
     char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
-    char ipv6_addr_str[40]; // IPv6 address string
+    char ipv6_addr_str[64]; // IPv6 address string with zone identifier (INET6_ADDRSTRLEN=46 + % + interface=15)
     char ap_ssid[32];
     bool ap_enabled;
     bool is_connected;
@@ -67,7 +67,7 @@ typedef struct
     double response_time;
     bool use_fallback_stratum;
     bool is_using_fallback;
-    uint16_t overheat_mode;
+    bool overheat_mode;
     uint16_t power_fault;
     uint32_t lastClockSync;
     bool is_screen_active;

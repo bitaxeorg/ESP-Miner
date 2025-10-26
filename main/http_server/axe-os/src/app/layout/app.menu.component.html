@@ -1,6 +1,11 @@
 <ng-container *ngIf="isMobile()">
     <ul *ngIf="info$ | async as info" class="flex lg:hidden list-none absolute flex p-0 mt-0 mr-4 mt-3 gap-4 right-0 top-0">
         <li>
+            <a class="block text-white" (click)="toggleSensitiveData()">
+                <i class="pi pi-{{sensitiveDataHidden ? 'eye-slash' : 'eye'}} block" style="font-size: 1.4rem;"></i>
+            </a>
+        </li>
+        <li>
             <a routerLink="network" class="block">
                 <wifi-icon [rssi]="info.wifiRSSI" />
             </a>
