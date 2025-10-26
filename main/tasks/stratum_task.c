@@ -36,7 +36,7 @@ struct timeval tcp_snd_timeout = {
 };
 
 struct timeval tcp_rcv_timeout = {
-    .tv_sec = 60 * 10,
+    .tv_sec = 180,
     .tv_usec = 0
 };
 
@@ -458,6 +458,9 @@ void stratum_task(void * pvParameters)
 
         stratum_reset_uid(GLOBAL_STATE);
         cleanQueue(GLOBAL_STATE);
+        
+        // Reset notify timestamp for new connection
+        last_notify_timestamp = 0;
 
         ///// Start Stratum Action
         // mining.configure - ID: 1
@@ -486,10 +489,10 @@ void stratum_task(void * pvParameters)
 
             char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->sock);
             if (!line) {
-                ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
-                retry_attempts++;
-                stratum_close_connection(GLOBAL_STATE);
-                break;
+                ESP_LOGD(TAG, "No data received from socket (may be timeout), checking notify timeout...");
+                // Don't immediately reconnect - could just be a socket timeout
+                // Loop back to check notify timeout
+                continue;
             }
 
             double response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id);
