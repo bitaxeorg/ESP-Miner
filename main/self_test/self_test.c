@@ -354,6 +354,7 @@ bool self_test(void * pvParameters)
         display_msg(error_buf, GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
     }
+    GLOBAL_STATE->ASIC_initalized = true;
 
     //setup and test hashrate
     int baud = ASIC_set_max_baud(GLOBAL_STATE);
@@ -448,6 +449,16 @@ bool self_test(void * pvParameters)
 
     free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
     free(GLOBAL_STATE->valid_jobs);
+
+
+    float asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
+    ESP_LOGI(TAG, "ASIC Temp %f", asic_temp);
+
+    // detect open circiut 
+    if(asic_temp == -1.0){
+        display_msg("TEMP:FAIL", GLOBAL_STATE);
+        tests_done(GLOBAL_STATE, false);
+    }
 
     if (test_core_voltage(GLOBAL_STATE) != ESP_OK) {
         tests_done(GLOBAL_STATE, false);
