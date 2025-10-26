@@ -342,16 +342,33 @@ esp_err_t TPS546_init(TPS546_CONFIG config)
 
     tps546_config = config;
 
-    ESP_LOGI(TAG, "Initializing the core voltage regulator");
-
+     ESP_LOGI(TAG, "Initializing the core voltage regulator");
     ESP_RETURN_ON_ERROR(i2c_bitaxe_add_device(TPS546_I2CADDR, &tps546_i2c_handle, TAG), TAG, "Failed to add TPS546 I2C");
 
-    /* Establish communication with regulator */
-    smb_read_block(PMBUS_IC_DEVICE_ID, data, 6); //the DEVICE_ID block first byte is the length.
-    ESP_LOGI(TAG, "Device ID: %02x %02x %02x %02x %02x %02x", data[0], data[1], data[2], data[3], data[4], data[5]);
-    /* There's 3 different known device IDs observed so far */
-    if ( (memcmp(data, DEVICE_ID1, 6) != 0) && (memcmp(data, DEVICE_ID2, 6) != 0) && (memcmp(data, DEVICE_ID3, 6) != 0))
-    {
+    // 1) Power-up guard (PMBus ready after AVIN UVLO + ~8 ms)
+    vTaskDelay(pdMS_TO_TICKS(15));  // conservative
+
+    // 2) Robust ID read with retries
+    const uint8_t ID_A1[6] = {0x54,0x49,0x54,0x6B,0x24,0x41};
+    const uint8_t ID_S [6] = {0x54,0x49,0x54,0x6B,0x24,0x62};
+    uint8_t id[6] = {0};
+    const int max_attempts = 6;
+    for (int attempt = 0; attempt < max_attempts; ++attempt) {
+        esp_err_t err = smb_read_block(PMBUS_IC_DEVICE_ID, id, 6);  // ensure this API consumes the length byte internally
+        if (err == ESP_OK) {
+            bool all_ff = true;
+            for (int i=0;i<6;i++) if (id[i] != 0xFF) { all_ff = false; break; }
+            if (!all_ff) break;  // got a real response
+        }
+        vTaskDelay(pdMS_TO_TICKS(3));  // short backoff; total extra ~15 ms worst case
+    }
+
+    ESP_LOGI(TAG, "Device ID: %02x %02x %02x %02x %02x %02x", id[0], id[1], id[2], id[3], id[4], id[5]);
+
+    if (memcmp(id, ID_A1, 6) != 0 &&
+        memcmp(id, DEVICE_ID2, 6) != 0 &&  // keep your other known A IDs
+        memcmp(id, DEVICE_ID3, 6) != 0 &&
+        memcmp(id, ID_S,   6) != 0) {
         ESP_LOGE(TAG, "Cannot find TPS546 regulator - Device ID mismatch");
         return ESP_FAIL;
     }
