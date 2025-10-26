@@ -690,7 +690,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.voltage:          return {suffix: ' V', precision: 1};
       case eChartLabel.power:            return {suffix: ' W', precision: 1};
       case eChartLabel.current:          return {suffix: ' A', precision: 1};
-      case eChartLabel.fanSpeed:         return {suffix: ' %', precision: 0};
+      case eChartLabel.fanSpeed:         return {suffix: ' %', precision: 1};
       case eChartLabel.fanRpm:           return {suffix: ' rpm', precision: 0};
       case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
       case eChartLabel.freeHeap:         return {suffix: ' B', precision: 0};

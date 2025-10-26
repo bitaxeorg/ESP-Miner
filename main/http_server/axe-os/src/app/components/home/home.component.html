@@ -171,7 +171,7 @@
             </div>
         </div>
 
-        <div class="col-12 md:col-6">
+        <div class="col-12 md:col-4">
             <div class="card">
                 <h4 class="text-center">Power</h4>
 
@@ -229,7 +229,7 @@
             </div>
         </div>
 
-        <div class="col-12 md:col-6">
+        <div class="col-12 md:col-4">
             <div class="card">
                 <h4 class="text-center">Heat</h4>
 
@@ -286,10 +286,16 @@
                         Danger: High Temperature
                     </strong>
                 </div>
+            </div>
+        </div>
+
+        <div class="col-12 md:col-4">
+            <div class="card">
+                <h4 class="text-center">Fan</h4>
 
                 <div class="mb-3">
                     <h6 class="flex justify-content-between mb-1">
-                        Fan Speed<span>{{info.fanspeed}} %</span>
+                        Fan Speed<span>{{info.fanspeed.toFixed(1)}} %</span>
                     </h6>
                     <p-progressBar [value]="info.fanspeed" [styleClass]="'p-progressbar--thin'">
                         <ng-template pTemplate="content" let-value></ng-template>
