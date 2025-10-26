@@ -40,31 +40,6 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     cJSON *colors_json = cJSON_Parse(colors);
     if (colors_json) {
         cJSON_AddItemToObject(root, "accentColors", colors_json);
-    } else {
-        // If no colors are stored, return default red theme colors
-        cJSON *default_colors = cJSON_CreateObject();
-        cJSON_AddStringToObject(default_colors, "--primary-color", "#F80421");
-        cJSON_AddStringToObject(default_colors, "--primary-color-text", "#ffffff");
-        cJSON_AddStringToObject(default_colors, "--highlight-bg", "#F80421");
-        cJSON_AddStringToObject(default_colors, "--highlight-text-color", "#ffffff");
-        cJSON_AddStringToObject(default_colors, "--focus-ring", "0 0 0 0.2rem rgba(248,4,33,0.2)");
-        cJSON_AddStringToObject(default_colors, "--slider-bg", "#dee2e6");
-        cJSON_AddStringToObject(default_colors, "--slider-range-bg", "#F80421");
-        cJSON_AddStringToObject(default_colors, "--slider-handle-bg", "#F80421");
-        cJSON_AddStringToObject(default_colors, "--progressbar-bg", "#dee2e6");
-        cJSON_AddStringToObject(default_colors, "--progressbar-value-bg", "#F80421");
-        cJSON_AddStringToObject(default_colors, "--checkbox-border", "#F80421");
-        cJSON_AddStringToObject(default_colors, "--checkbox-bg", "#F80421");
-        cJSON_AddStringToObject(default_colors, "--checkbox-hover-bg", "#df031d");
-        cJSON_AddStringToObject(default_colors, "--button-bg", "#F80421");
-        cJSON_AddStringToObject(default_colors, "--button-hover-bg", "#df031d");
-        cJSON_AddStringToObject(default_colors, "--button-focus-shadow", "0 0 0 2px #ffffff, 0 0 0 4px #F80421");
-        cJSON_AddStringToObject(default_colors, "--togglebutton-bg", "#F80421");
-        cJSON_AddStringToObject(default_colors, "--togglebutton-border", "1px solid #F80421");
-        cJSON_AddStringToObject(default_colors, "--togglebutton-hover-bg", "#df031d");
-        cJSON_AddStringToObject(default_colors, "--togglebutton-hover-border", "1px solid #df031d");
-        cJSON_AddStringToObject(default_colors, "--togglebutton-text-color", "#ffffff");
-        cJSON_AddItemToObject(root, "accentColors", default_colors);
     }
 
     esp_err_t res = HTTP_send_json(req, root, &theme_prebuffer_len);
