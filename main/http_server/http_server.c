@@ -403,6 +403,8 @@ static esp_err_t rest_api_common_handler(httpd_req_t * req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    httpd_resp_set_status(req, "404 Not Found");
+
     httpd_resp_set_type(req, "application/json");
 
     // Set CORS headers
