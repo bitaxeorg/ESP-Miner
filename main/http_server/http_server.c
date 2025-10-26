@@ -799,11 +799,11 @@ static esp_err_t GET_system_status(httpd_req_t * req)
         cJSON_AddStringToObject(root, "powerFault", VCORE_get_fault_string(GLOBAL_STATE));
     }
 
-    const char * status_res = cJSON_Print(root);
-    httpd_resp_sendstr(req, status_res);
-    free((char *)status_res);
+    esp_err_t ret = HTTP_send_json(req, root, &system_info_prebuffer_len);
+
     cJSON_Delete(root);
-    return ESP_OK;
+
+    return ret;
 }
 /* Handler for system board endpoint */
 static esp_err_t GET_system_board(httpd_req_t *req)
