@@ -76,7 +76,7 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
             continue;
         }
 
-        ESP_LOGI(TAG, "Chip %d detected", chip_counter);
+        ESP_LOGI(TAG, "Chip %d detected: CORE_NUM: 0x%02x ADDR: 0x%02x", chip_counter, buffer[4], buffer[5]);
 
         chip_counter++;
     }    

@@ -78,7 +78,7 @@ static const char * TAG = "bm1397";
 static uint32_t prev_nonce = 0;
 static task_result result;
 
-static uint8_t address_interval;
+static int address_interval;
 
 /// @brief
 /// @param ftdi
@@ -260,7 +260,7 @@ uint8_t BM1397_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     _send_chain_inactive();
 
     // split the chip address space evenly
-    address_interval = (uint8_t) (256 / chip_counter);
+    address_interval = 256 / chip_counter;
     for (uint8_t i = 0; i < chip_counter; i++) {
         _set_chip_address(i * address_interval);
     }

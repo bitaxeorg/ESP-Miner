@@ -64,7 +64,7 @@ static TPS546_CONFIG TPS546_CONFIG_HEX = {
 
 esp_err_t VCORE_init(GlobalState * GLOBAL_STATE)
 {
-    ESP_RETURN_ON_FALSE(GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domain != 0, ESP_FAIL, TAG, "voltage_domain not defined");
+    ESP_RETURN_ON_FALSE(GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains != 0, ESP_FAIL, TAG, "voltage_domains not defined");
 
     if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {
         ESP_RETURN_ON_ERROR(DS4432U_init(), TAG, "DS4432 init failed!");
@@ -116,8 +116,8 @@ esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
         }
     }
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
-        uint16_t voltage_domain = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domain;
-        ESP_RETURN_ON_ERROR(TPS546_set_vout(core_voltage * voltage_domain), TAG, "TPS546 set voltage failed!");
+        uint16_t voltage_domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
+        ESP_RETURN_ON_ERROR(TPS546_set_vout(core_voltage * voltage_domains), TAG, "TPS546 set voltage failed!");
     }
     if (core_voltage == 0.0f && GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
         gpio_set_level(GPIO_ASIC_ENABLE, 1);
@@ -129,7 +129,7 @@ esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
 int16_t VCORE_get_voltage_mv(GlobalState * GLOBAL_STATE) 
 {
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
-        return TPS546_get_vout() / GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domain * 1000;
+        return TPS546_get_vout() / GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains * 1000;
     }
     return ADC_get_vcore();
 }

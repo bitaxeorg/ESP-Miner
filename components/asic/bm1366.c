@@ -320,7 +320,7 @@ task_result * BM1366_process_work(void * pvParameters)
     if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
         return NULL;
     }
-        
+
     if (!asic_result.is_job_response) {
         result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
         if (result.register_type == REGISTER_INVALID) {

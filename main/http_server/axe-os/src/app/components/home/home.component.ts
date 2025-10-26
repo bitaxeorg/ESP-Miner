@@ -650,15 +650,13 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.asicTemp:         return this.maxTemp;
       case eChartLabel.vrTemp:           return this.maxTemp + 25;
       case eChartLabel.asicVoltage:      return info.coreVoltage;
-      case eChartLabel.voltage:          return (info.nominalVoltage + .5);
+      case eChartLabel.voltage:          return info.nominalVoltage + .5;
       case eChartLabel.power:            return this.maxPower;
-      case eChartLabel.current:          return (this.maxPower / info.coreVoltage);
+      case eChartLabel.current:          return this.maxPower / info.coreVoltage;
       case eChartLabel.fanSpeed:         return 100;
       case eChartLabel.fanRpm:           return 7000;
       case eChartLabel.fan2Rpm:          return 7000;
-      case eChartLabel.wifiRssi:         return 0;
-      case eChartLabel.freeHeap:         return 0;
-      default: return 0;
+      default:                           return 0;
     }
   }
 
@@ -678,7 +676,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fan2Rpm:            return info.fan2rpm;
       case eChartLabel.wifiRssi:           return info.wifiRSSI;
       case eChartLabel.freeHeap:           return info.freeHeap;
-      default: return 0.0;
+      default:                             return 0.0;
     }
   }
 
