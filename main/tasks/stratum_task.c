@@ -28,6 +28,7 @@ static StratumApiV1Message stratum_api_v1_message = {};
 
 static const char * primary_stratum_url;
 static uint16_t primary_stratum_port;
+static int64_t last_notify_timestamp = 0;
 
 struct timeval tcp_snd_timeout = {
     .tv_sec = 5,
@@ -343,11 +344,12 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
 
 static bool check_notify_timeout(GlobalState * GLOBAL_STATE, int64_t timeout_seconds)
 {
-    if (GLOBAL_STATE->SYSTEM_MODULE.last_notify_timestamp > 0) {
-        int64_t current_time = esp_timer_get_time();
-        int64_t time_diff = (current_time - GLOBAL_STATE->SYSTEM_MODULE.last_notify_timestamp) / 1000000;
-        if (time_diff > timeout_seconds) {
-            ESP_LOGW(TAG, "No mining.notify received for %lld seconds, reconnecting...", time_diff);
+    if (last_notify_timestamp > 0) {
+        int64_t current_time_ms = esp_timer_get_time() / 1000;
+        int64_t time_diff_ms = current_time_ms - last_notify_timestamp;
+        int64_t time_diff_seconds = time_diff_ms / 1000;
+        if (time_diff_seconds > timeout_seconds) {
+            ESP_LOGW(TAG, "No mining.notify received for %lld seconds, reconnecting...", time_diff_seconds);
             return true;
         }
     }
@@ -501,7 +503,7 @@ void stratum_task(void * pvParameters)
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
                 GLOBAL_STATE->SYSTEM_MODULE.work_received++;
-                GLOBAL_STATE->SYSTEM_MODULE.last_notify_timestamp = esp_timer_get_time();
+                last_notify_timestamp = esp_timer_get_time() / 1000;
                 SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
                 if (stratum_api_v1_message.should_abandon_work &&
                     (GLOBAL_STATE->stratum_queue.count > 0 || GLOBAL_STATE->ASIC_jobs_queue.count > 0)) {
