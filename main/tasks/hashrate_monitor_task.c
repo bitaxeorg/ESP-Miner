@@ -82,6 +82,8 @@ void hashrate_monitor_task(void *pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
     HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
+    SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;
+
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
 
@@ -108,12 +110,12 @@ void hashrate_monitor_task(void *pvParameters)
         float hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
 
         if (hashrate == 0.0) {
-            HASHRATE_MONITOR_MODULE->hashrate = 0.0;
+            SYSTEM_MODULE->current_hashrate = 0.0;
         } else {
-            if (HASHRATE_MONITOR_MODULE->hashrate == 0.0f) {
-                HASHRATE_MONITOR_MODULE->hashrate = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
+            if (SYSTEM_MODULE->current_hashrate == 0.0f) {
+                SYSTEM_MODULE->current_hashrate = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
             }
-            HASHRATE_MONITOR_MODULE->hashrate = ((HASHRATE_MONITOR_MODULE->hashrate * (EMA_ALPHA - 1)) + hashrate) / EMA_ALPHA;
+            SYSTEM_MODULE->current_hashrate = ((SYSTEM_MODULE->current_hashrate * (EMA_ALPHA - 1)) + hashrate) / EMA_ALPHA;
         }
 
         HASHRATE_MONITOR_MODULE->error_count = sum_values(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);

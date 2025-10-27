@@ -304,9 +304,6 @@ export class HomeComponent implements OnInit, OnDestroy {
         stats.statistics.forEach(element => {
           element[idxHashrate] = this.normalizeHashrate(element[idxHashrate]);
           switch (chartLabelValue(chartY1DataLabel)) {
-            case eChartLabel.hashrateRegister:
-              element[idxChartY1Data] = this.normalizeHashrate(element[idxChartY1Data]);
-              break;
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
             case eChartLabel.current:
@@ -316,9 +313,6 @@ export class HomeComponent implements OnInit, OnDestroy {
               break;
           }
           switch (chartLabelValue(chartY2DataLabel)) {
-            case eChartLabel.hashrateRegister:
-              element[idxChartY2Data] = this.normalizeHashrate(element[idxChartY2Data]);
-              break;
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
             case eChartLabel.current:
@@ -358,7 +352,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       }),
       map(info => {
         info.hashRate = this.normalizeHashrate(info.hashRate);
-        info.hashrateMonitor.hashrate = this.normalizeHashrate(info.hashrateMonitor?.hashrate);
         info.expectedHashrate = this.normalizeHashrate(info.expectedHashrate);
         info.voltage = info.voltage / 1000;
         info.current = info.current / 1000;
@@ -644,7 +637,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   public getSuggestedMaxForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
       case eChartLabel.hashrate:         return info.expectedHashrate;
-      case eChartLabel.hashrateRegister: return info.expectedHashrate;
       case eChartLabel.asicTemp:         return this.maxTemp;
       case eChartLabel.vrTemp:           return this.maxTemp + 25;
       case eChartLabel.asicVoltage:      return info.coreVoltage;
@@ -660,8 +652,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   static getDataForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
       case eChartLabel.hashrate:           return info.hashRate;
-      case eChartLabel.hashrateRegister:   return info.hashrateMonitor?.hashrate;
-      case eChartLabel.errorCountRegister: return info.hashrateMonitor?.errorCount;
+      case eChartLabel.errorCount:         return info.hashrateMonitor?.errorCount;
       case eChartLabel.asicTemp:           return info.temp;
       case eChartLabel.vrTemp:             return info.vrTemp;
       case eChartLabel.asicVoltage:        return info.coreVoltageActual;
@@ -678,8 +669,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number} {
     switch (label) {
-      case eChartLabel.hashrate:
-      case eChartLabel.hashrateRegister: return {suffix: ' H/s', precision: 0};
+      case eChartLabel.hashrate:         return {suffix: ' H/s', precision: 0};
       case eChartLabel.asicTemp:
       case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};
       case eChartLabel.asicVoltage:
@@ -697,7 +687,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   static cbFormatValue(value: number, datasetLabel: eChartLabel): string {
     switch (datasetLabel) {
       case eChartLabel.hashrate:
-      case eChartLabel.hashrateRegister:
         return HashSuffixPipe.transform(value);
       case eChartLabel.freeHeap:
         return ByteSuffixPipe.transform(value);

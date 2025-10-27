@@ -77,7 +77,7 @@ static lv_obj_t *wifi_uptime_label;
 
 static lv_obj_t *notification_label;
 
-static double current_hashrate;
+static float current_hashrate;
 static float current_power;
 static uint64_t current_difficulty;
 static float current_chip_temp;
