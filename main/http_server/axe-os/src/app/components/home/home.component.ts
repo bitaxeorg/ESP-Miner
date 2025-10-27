@@ -5,7 +5,6 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
-import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
 import { LoadingService } from 'src/app/services/loading.service';
@@ -238,7 +237,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           position: 'left',
           ticks: {
             color: primaryColor,
-            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[0].label)
+            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[0].label, {complete: true})
           },
           grid: {
             color: surfaceBorder,
@@ -252,7 +251,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           position: 'right',
           ticks: {
             color: textColorSecondary,
-            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[1].label)
+            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[1].label, {complete: true})
           },
           grid: {
             drawOnChartArea: false,
@@ -684,7 +683,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number} {
     switch (label) {
-      case eChartLabel.hashrate:         return {suffix: ' H/s', precision: 0};
       case eChartLabel.asicTemp:
       case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};
       case eChartLabel.asicVoltage:
@@ -694,17 +692,16 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fanSpeed:         return {suffix: ' %', precision: 0};
       case eChartLabel.fanRpm:           return {suffix: ' rpm', precision: 0};
       case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
-      case eChartLabel.freeHeap:         return {suffix: ' B', precision: 0};
       default:                           return {suffix: '', precision: 0};
     }
   }
 
-  static cbFormatValue(value: number, datasetLabel: eChartLabel): string {
+  static cbFormatValue(value: number, datasetLabel: eChartLabel, args?: any): string {
     switch (datasetLabel) {
       case eChartLabel.hashrate:
-        return HashSuffixPipe.transform(value);
+        return HashSuffixPipe.transform(value, args);
       case eChartLabel.freeHeap:
-        return ByteSuffixPipe.transform(value);
+        return (value / 1000) + ' kB';
       default:
         const settings = HomeComponent.getSettingsForLabel(datasetLabel);
         return value.toFixed(settings.precision) + settings.suffix;
