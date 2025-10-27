@@ -216,6 +216,10 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
         },
       },
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
       scales: {
         x: {
           type: 'time',
