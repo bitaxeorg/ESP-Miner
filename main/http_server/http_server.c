@@ -850,7 +850,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
             if (hash_domains > 0) {
                 cJSON* hash_domain_array = cJSON_CreateArray();
                 for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
-                    cJSON *hashrate = cJSON_CreateNumber(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[domain_nr][asic_nr].hashrate);
+                    cJSON *hashrate = cJSON_CreateNumber(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[asic_nr][domain_nr].hashrate);
                     cJSON_AddItemToArray(hash_domain_array, hashrate);
                 }
                 cJSON_AddItemToObject(asic, "domains", hash_domain_array);
