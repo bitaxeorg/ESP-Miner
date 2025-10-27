@@ -414,8 +414,8 @@
                             <td class="text-500 text-left cursor-pointer" pTooltip="ASIC {{ i + 1 }}" tooltipPosition="bottom">
                                 {{ i + 1 }}
                             </td>
-                            <td *ngFor="let domain of asic.domains"
-                                [style.--intensity]="calculateAsicDomainIntensity(info, i, domain)"
+                            <td *ngFor="let domain of asic.domains; let j = index"
+                                [style.background]="getHeatmapColor(info, i, j)"
                                 [style.height]="(getAsicsAmount(info) <= 2 ? '2rem' : null)"
                                 class="text-center cursor-pointer"
                                 pTooltip="{{ normalizeHashrate(domain) | hashSuffix }}"

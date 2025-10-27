@@ -116,12 +116,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
 
-    const {r, g, b} = this.hexToRgb(primaryColor);
-
-    document.documentElement.style.setProperty('--primary-color-r', r.toString());
-    document.documentElement.style.setProperty('--primary-color-g', g.toString());
-    document.documentElement.style.setProperty('--primary-color-b', b.toString());
-
     // Update chart colors
     if (this.chartData && this.chartData.datasets) {
       this.chartData.datasets[0].backgroundColor = primaryColor + '30';
@@ -502,6 +496,11 @@ export class HomeComponent implements OnInit, OnDestroy {
     return { r, g, b };
   }
 
+  private rgbToHex(r: number, g: number, b: number): string {
+    const toHex = (n: number) => (n < 16 ? '0' : '') + (n | 0).toString(16);
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
   }
@@ -603,6 +602,22 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
 
     return highest;
+  }
+
+  public getHeatmapColor(info: ISystemInfo, asic: number, domain: number): string {
+    const domainHashrate = this.normalizeHashrate(info.hashrateMonitor.asics[asic].domains[domain]);
+    const ratio = Math.max(0, Math.min(2, (domainHashrate / info.expectedHashrate) * 2));
+    const t = Math.abs(ratio - 1);
+    const target = ratio > 1 ? 255 : 0;
+    
+    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
+    const { r, g, b } = this.hexToRgb(primaryColor);
+
+    const finalR = (r * (1 - t) + target * t) | 0;
+    const finalG = (g * (1 - t) + target * t) | 0;
+    const finalB = (b * (1 - t) + target * t) | 0;
+
+    return this.rgbToHex(finalR, finalG, finalB);
   }
 
   public calculateAsicDomainIntensity(info: ISystemInfo, asicCount: number, domain: number): number {
