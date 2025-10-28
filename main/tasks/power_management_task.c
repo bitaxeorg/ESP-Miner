@@ -185,23 +185,36 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 // ESP_LOGD(TAG, "DEBUG: PID raw output: %.2f%%, Input: %.1f, SetPoint: %.1f", pid_output, pid_input, pid_setPoint);
 
                 power_management->fan_perc = pid_output;
-                Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, pid_output / 100.0);
+                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, pid_output / 100.0) != ESP_OK) {
+                    exit(EXIT_FAILURE);
+                }
                 ESP_LOGI(TAG, "Temp: %.1f °C, SetPoint: %.1f °C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
                          pid_input, pid_setPoint, pid_output, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
             } else {
                 if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled) {
                     ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f °C - Setting fan to 70%%", power_management->chip_temp_avg);
                     power_management->fan_perc = 70;
-                    Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 0.7);
+                    if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 0.7) != ESP_OK) {
+                        exit(EXIT_FAILURE);
+                    }
                 } else {
                     ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f °C", power_management->chip_temp_avg);
+                    if (power_management->fan_perc < 100) {
+                        ESP_LOGW(TAG, "Setting fan speed to 100%%");
+                        power_management->fan_perc = 100;
+                        if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1)) {
+                            exit(EXIT_FAILURE);
+                        }
+                    }
                 }
             }
         } else { // Manual fan speed
             float fan_perc = nvs_config_get_float(NVS_CONFIG_FAN_SPEED);
             if (power_management->fan_perc != fan_perc) {
                 power_management->fan_perc = fan_perc;
-                Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_perc / 100);
+                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_perc / 100) != ESP_OK) {
+                    exit(EXIT_FAILURE);
+                }
             }
         }
 

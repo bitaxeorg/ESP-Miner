@@ -29,10 +29,9 @@
 
 .sensitive-data-hidden {
     [sensitive-data] {
-        font-size: 0;
-
         &.p-inputtext {
-            height: 2.536rem;
+            -webkit-text-security: disc;
+            pointer-events: none;
         }
 
         &::before {

@@ -9,6 +9,6 @@
 #define TMP1075_DEVICE_ID 0x0F        ///< Device ID register
 
 float TMP1075_read_temperature(int);
-esp_err_t TMP1075_init(void);
+esp_err_t TMP1075_init(int temp_offset_param);
 
 #endif /* TMP1075_H_ */
