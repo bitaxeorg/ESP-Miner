@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
+import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
@@ -21,6 +22,7 @@ import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { LocalStorageService } from 'src/app/local-storage.service';
 
 type PoolLabel = 'Primary' | 'Fallback';
+const HOME_CHART_DATA_SOURCES = 'HOME_CHART_DATA_SOURCES';
 
 @Component({
   selector: 'app-home',
@@ -76,19 +78,19 @@ export class HomeComponent implements OnInit, OnDestroy {
     private storageService: LocalStorageService
   ) {
     this.initializeChart();
+  }
 
+  ngOnInit(): void {
     this.themeService.getThemeSettings()
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.updateChartColors();
       });
-  }
 
-  ngOnInit(): void {
     this.pageDefaultTitle = this.titleService.getTitle();
     this.loadingService.loading$.next(true);
 
-    let dataSources = this.storageService.getItem('chartDataSources');
+    let dataSources = this.storageService.getItem(HOME_CHART_DATA_SOURCES);
     if (dataSources === null) {
       dataSources = `{"chartY1Data":"${chartLabelKey(eChartLabel.hashrate)}",`;
       dataSources += `"chartY2Data":"${chartLabelKey(eChartLabel.asicTemp)}"}`;
@@ -110,10 +112,15 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColor = documentStyle.getPropertyValue('--text-color');
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
+
+    const {r, g, b} = this.hexToRgb(primaryColor);
+
+    document.documentElement.style.setProperty('--primary-color-r', r.toString());
+    document.documentElement.style.setProperty('--primary-color-g', g.toString());
+    document.documentElement.style.setProperty('--primary-color-b', b.toString());
 
     // Update chart colors
     if (this.chartData && this.chartData.datasets) {
@@ -140,7 +147,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public updateSystem() {
     const form = this.form.getRawValue();
 
-    this.storageService.setItem('chartDataSources', JSON.stringify(form));
+    this.storageService.setItem(HOME_CHART_DATA_SOURCES, JSON.stringify(form));
 
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
@@ -295,10 +302,10 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
 
         stats.statistics.forEach(element => {
-          element[idxHashrate] = element[idxHashrate] * 1000000000;
+          element[idxHashrate] = this.normalizeHashrate(element[idxHashrate]);
           switch (chartLabelValue(chartY1DataLabel)) {
             case eChartLabel.hashrateRegister:
-              element[idxChartY1Data] = element[idxChartY1Data] * 1000000000;
+              element[idxChartY1Data] = this.normalizeHashrate(element[idxChartY1Data]);
               break;
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
@@ -310,7 +317,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
           switch (chartLabelValue(chartY2DataLabel)) {
             case eChartLabel.hashrateRegister:
-              element[idxChartY2Data] = element[idxChartY2Data] * 1000000000;
+              element[idxChartY2Data] = this.normalizeHashrate(element[idxChartY2Data]);
               break;
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
@@ -350,9 +357,9 @@ export class HomeComponent implements OnInit, OnDestroy {
         return this.systemService.getInfo()
       }),
       map(info => {
-        info.hashRate = info.hashRate * 1000000000;
-        info.hashrateMonitor.hashrate = info.hashrateMonitor?.hashrate * 1000000000;
-        info.expectedHashrate = info.expectedHashrate * 1000000000;
+        info.hashRate = this.normalizeHashrate(info.hashRate);
+        info.hashrateMonitor.hashrate = this.normalizeHashrate(info.hashrateMonitor?.hashrate);
+        info.expectedHashrate = this.normalizeHashrate(info.expectedHashrate);
         info.voltage = info.voltage / 1000;
         info.current = info.current / 1000;
         info.coreVoltageActual = info.coreVoltageActual / 1000;
@@ -482,11 +489,24 @@ export class HomeComponent implements OnInit, OnDestroy {
         (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : ''),
         (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : ''),
         (!info.power_fault ? `${info.power} W` : ''),
-        (info.bestDiff ? info.bestDiff : ''),
+        (info.bestDiff ? DiffSuffixPipe.transform(info.bestDiff) : ''),
       );
     }
 
     this.titleService.setTitle(parts.filter(Boolean).join(' • '));
+  }
+
+  private hexToRgb(hex: string): {r: number, g: number, b: number} {
+    if (hex[0] === '#') hex = hex.slice(1);
+    if (hex.length === 3) {
+      hex = hex.split('').map((h: string) => h + h).join('');
+    }
+
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+
+    return { r, g, b };
   }
 
   getRejectionExplanation(reason: string): string | null {
@@ -514,7 +534,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       if (hashrate > 0) {
-        return power / (hashrate / 1000000000000); // Convert to J/Th
+        return power / (hashrate / 1_000_000_000_000); // Convert to J/Th
       } else {
         return power; // in this case better than infinity or NaN
       }
@@ -553,6 +573,54 @@ export class HomeComponent implements OnInit, OnDestroy {
       return 0;
     }
     return (sharesRejectedReason.count / totalShares) * 100;
+  }
+
+  public getDomainErrorPercentage(info: ISystemInfo, asic: { error: number }): number {
+    return asic.error ? (this.normalizeHashrate(asic.error) * 100 / info.expectedHashrate) : 0;
+  }
+
+  public getDomainErrorColor(info: ISystemInfo, asic: { error: number }): string {
+    const percentage = this.getDomainErrorPercentage(info, asic);
+
+    switch (true) {
+      case (percentage < 1): return 'green';
+      case (percentage >= 1 && percentage < 10): return 'orange';
+      default: return 'red';
+    }
+  }
+
+  public getAsicsAmount(info: ISystemInfo): number {
+    return info.hashrateMonitor.asics.length;
+  }
+
+  public getAsicDomainsAmount(info: ISystemInfo, asicCount: number): number {
+    return info.hashrateMonitor.asics[asicCount].domains.length;
+  }
+
+  public getHighestAsicDomainPercentage(asics: { total: number, domains: number[] }[]): number {
+    let highest = 0;
+
+    for (const asic of asics) {
+      for (const domain of asic.domains) {
+        const percentage = (domain * 100) / asic.total;
+        if (percentage > highest) {
+          highest = percentage;
+        }
+      }
+    }
+
+    return highest;
+  }
+
+  public calculateAsicDomainIntensity(info: ISystemInfo, asicCount: number, domain: number): number {
+    const highestPercentage = this.getHighestAsicDomainPercentage(info.hashrateMonitor.asics);
+    const domainPercentage = (domain * 100) / info.hashrateMonitor.asics[asicCount].total;
+
+    return domainPercentage / highestPercentage;
+  }
+
+  public normalizeHashrate(hashrate: number): number {
+    return hashrate * 1_000_000_000;
   }
 
   public clearDataPoints() {

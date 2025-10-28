@@ -344,7 +344,7 @@ static void screen_show(screen_t screen)
 
 static void screen_update_cb(lv_timer_t * timer)
 {
-    int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1);
+    int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT);
 
     if (0 > display_timeout_config) {
         // display always on
@@ -398,7 +398,7 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (module->overheat_mode == 1) {
+    if (module->overheat_mode) {
         if (strcmp(module->ip_addr_str, lv_label_get_text(overheat_ip_addr_label)) != 0) {
             lv_label_set_text(overheat_ip_addr_label, module->ip_addr_str);
         }

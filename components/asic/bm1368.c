@@ -35,14 +35,41 @@
 #define MISC_CONTROL 0x18
 #define FAST_UART_CONFIGURATION 0x28
 
+static const register_type_t REGISTER_MAP[] = {
+    [0x4C] = REGISTER_ERROR_COUNT,
+    [0x88] = REGISTER_DOMAIN_0_COUNT,
+    [0x89] = REGISTER_DOMAIN_1_COUNT,
+    [0x8A] = REGISTER_DOMAIN_2_COUNT,
+    [0x8B] = REGISTER_DOMAIN_3_COUNT,
+    [0x8C] = REGISTER_TOTAL_COUNT
+};
+
 typedef struct __attribute__((__packed__))
 {
-    uint16_t preamble;
-    uint32_t nonce;
-    uint8_t midstate_num;
-    uint8_t job_id;
-    uint16_t version;
-    uint8_t crc;
+    uint32_t nonce;                   // 2-5
+    uint8_t midstate_num;             // 6
+    uint8_t id;                       // 7
+    uint16_t version;                 // 8-9
+} bm1368_asic_result_job_t;
+
+typedef struct __attribute__((__packed__))
+{
+    uint32_t value;                   // 2-5
+    uint8_t asic_address;             // 6
+    uint8_t register_address;         // 7
+    uint16_t                  : 16;   // 8-9
+} bm1368_asic_result_cmd_t;
+
+typedef struct __attribute__((__packed__))
+{
+    uint16_t preamble;                // 0-1
+    union {
+        bm1368_asic_result_job_t job; // 2-9
+        bm1368_asic_result_cmd_t cmd; // 2-9
+    };
+    uint8_t crc             : 5;      // 10:0-5
+    uint8_t                 : 2;      // 10:6-7
+    uint8_t is_job_response : 1;      // 10:8
 } bm1368_asic_result_t;
 
 static const char * TAG = "bm1368";
@@ -229,28 +256,53 @@ task_result * BM1368_process_work(void * pvParameters)
 {
     bm1368_asic_result_t asic_result = {0};
 
+    memset(&result, 0, sizeof(task_result));
+
     if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
         return NULL;
     }
 
-    uint8_t job_id = (asic_result.job_id & 0xf0) >> 1;
-    uint8_t core_id = (uint8_t)((ntohl(asic_result.nonce) >> 25) & 0x7f);
-    uint8_t small_core_id = asic_result.job_id & 0x0f;
-    uint32_t version_bits = (ntohs(asic_result.version) << 13);
+    if (!asic_result.is_job_response) {
+        result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
+        if (result.register_type == REGISTER_INVALID) {
+            ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
+            return NULL;
+        }
+        result.asic_nr = asic_result.cmd.asic_address;
+        result.value = ntohl(asic_result.cmd.value);
+        
+        return &result;
+    }
+
+    uint8_t job_id = (asic_result.job.id & 0xf0) >> 1;
+    uint8_t core_id = (uint8_t)((ntohl(asic_result.job.nonce) >> 25) & 0x7f);
+    uint8_t small_core_id = asic_result.job.id & 0x0f;
+    uint32_t version_bits = (ntohs(asic_result.job.version) << 13);
     ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     if (GLOBAL_STATE->valid_jobs[job_id] == 0) {
-        ESP_LOGW(TAG, "Invalid job found, 0x%02X", job_id);
+        ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
         return NULL;
     }
 
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
 
     result.job_id = job_id;
-    result.nonce = asic_result.nonce;
+    result.nonce = asic_result.job.nonce;
     result.rolled_version = rolled_version;
 
     return &result;
+}
+
+void BM1368_read_registers(void)
+{
+    int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
+    for (int reg = 0; reg < size; reg++) {
+        if (REGISTER_MAP[reg] != REGISTER_INVALID) {
+            _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1368_SERIALTX_DEBUG);
+            vTaskDelay(1 / portTICK_PERIOD_MS);
+        }
+    }
 }

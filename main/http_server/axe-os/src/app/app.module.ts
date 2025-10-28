@@ -30,6 +30,7 @@ import { AppLayoutModule } from './layout/app.layout.module';
 import { ANSIPipe } from './pipes/ansi.pipe';
 import { DateAgoPipe } from './pipes/date-ago.pipe';
 import { HashSuffixPipe } from './pipes/hash-suffix.pipe';
+import { DiffSuffixPipe } from './pipes/diff-suffix.pipe';
 import { PrimeNGModule } from './prime-ng.module';
 import { MessageModule } from 'primeng/message';
 import { TooltipModule } from 'primeng/tooltip';
@@ -63,6 +64,7 @@ const components = [
     SwarmComponent,
     SettingsComponent,
     HashSuffixPipe,
+    DiffSuffixPipe,
     ThemeConfigComponent,
     DesignComponent,
     PoolComponent,

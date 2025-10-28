@@ -371,7 +371,7 @@ void wifi_init(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
-    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
+    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
     // copy the wifi ssid to the global state
     strncpy(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid));
     GLOBAL_STATE->SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid)-1] = 0;
@@ -411,7 +411,7 @@ void wifi_init(void * pvParameters)
         return;
     } else {
 
-        char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, CONFIG_ESP_WIFI_PASSWORD);
+        char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS);
 
         /* Initialize STA */
         ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
@@ -425,7 +425,7 @@ void wifi_init(void * pvParameters)
         /* Disable power savings for best performance */
         ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
-        char * hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
+        char * hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
 
         /* Set Hostname */
         esp_err_t err = esp_netif_set_hostname(esp_netif_sta, hostname);

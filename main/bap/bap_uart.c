@@ -210,13 +210,14 @@ static void uart_send_task(void *pvParameters) {
 }
 
 esp_err_t BAP_start_uart_receive_task(void) {
-    xTaskCreate(
+    xTaskCreateWithCaps(
         uart_receive_task,
         "uart_receive_ta",
-        4096,
+        8192,
         NULL,
         5,
-        &uart_receive_task_handle
+        &uart_receive_task_handle,
+        MALLOC_CAP_SPIRAM
     );
 
     //ESP_LOGI(TAG, "UART receive task started");
@@ -260,13 +261,14 @@ esp_err_t BAP_uart_init(void) {
     
     ESP_LOGI(TAG, "BAP UART interface initialized successfully");
     
-    BaseType_t task_result = xTaskCreate(
+    BaseType_t task_result = xTaskCreateWithCaps(
         uart_send_task,
         "uart_send_task",
-        3072,
+        8192,
         NULL,
         5,
-        &uart_send_task_handle
+        &uart_send_task_handle,
+        MALLOC_CAP_SPIRAM
     );
     
     if (task_result != pdPASS) {

@@ -42,13 +42,35 @@
 #define FAST_UART_CONFIGURATION 0x28
 #define MISC_CONTROL 0x18
 
+static const register_type_t REGISTER_MAP[] = {
+    [0x04] = REGISTER_HASHRATE,
+    [0x4C] = REGISTER_ERROR_COUNT,
+};
+
 typedef struct __attribute__((__packed__))
 {
-    uint16_t preamble;
-    uint32_t nonce;
-    uint8_t midstate_num;
-    uint8_t job_id;
-    uint8_t crc;
+    uint32_t nonce;                   // 2-5
+    uint8_t midstate_num;             // 6
+    uint8_t id;                       // 7
+} bm1397_asic_result_job_t;
+
+typedef struct __attribute__((__packed__))
+{
+    uint32_t value;                   // 2-5
+    uint8_t asic_address;             // 6
+    uint8_t register_address;         // 7
+} bm1397_asic_result_cmd_t;
+
+typedef struct __attribute__((__packed__))
+{
+    uint16_t preamble;                // 0-1
+    union {
+        bm1397_asic_result_job_t job; // 2-7
+        bm1397_asic_result_cmd_t cmd; // 2-7
+    };
+    uint8_t crc             : 5;      // 8:0-5
+    uint8_t                 : 2;      // 8:6-7
+    uint8_t is_job_response : 1;      // 8:8
 } bm1397_asic_result_t;
 
 static const char * TAG = "bm1397";
@@ -339,15 +361,29 @@ task_result *BM1397_process_work(void *pvParameters)
 {
     bm1397_asic_result_t asic_result = {0};
 
+    memset(&result, 0, sizeof(task_result));
+
     if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
         return NULL;
+    }
+
+    if (!asic_result.is_job_response) {
+        result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
+        if (result.register_type == REGISTER_INVALID) {
+            ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
+            return NULL;
+        }
+        result.asic_nr = asic_result.cmd.asic_address;
+        result.value = ntohl(asic_result.cmd.value);
+        
+        return &result;
     }
 
     uint8_t nonce_found = 0;
     uint32_t first_nonce = 0;
 
-    uint8_t rx_job_id = asic_result.job_id & 0xfc;
-    uint8_t rx_midstate_index = asic_result.job_id & 0x03;
+    uint8_t rx_job_id = asic_result.job.id & 0xfc;
+    uint8_t rx_midstate_index = asic_result.job.id & 0x03;
 
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
     if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0)
@@ -364,30 +400,41 @@ task_result *BM1397_process_work(void *pvParameters)
 
     // ASIC may return the same nonce multiple times
     // or one that was already found
-    // most of the time it behavies however
+    // most of the time it behaves however
     if (nonce_found == 0)
     {
-        first_nonce = asic_result.nonce;
+        first_nonce = asic_result.job.nonce;
         nonce_found = 1;
     }
-    else if (asic_result.nonce == first_nonce)
+    else if (asic_result.job.nonce == first_nonce)
     {
         // stop if we've already seen this nonce
         return NULL;
     }
 
-    if (asic_result.nonce == prev_nonce)
+    if (asic_result.job.nonce == prev_nonce)
     {
         return NULL;
     }
     else
     {
-        prev_nonce = asic_result.nonce;
+        prev_nonce = asic_result.job.nonce;
     }
 
     result.job_id = rx_job_id;
-    result.nonce = asic_result.nonce;
+    result.nonce = asic_result.job.nonce;
     result.rolled_version = rolled_version;
 
     return &result;
+}
+
+void BM1397_read_registers(void)
+{
+    int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
+    for (int reg = 0; reg < size; reg++) {
+        if (REGISTER_MAP[reg] != REGISTER_INVALID) {
+            _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1397_SERIALTX_DEBUG);
+            vTaskDelay(1 / portTICK_PERIOD_MS);
+        }
+    }
 }
