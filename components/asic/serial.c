@@ -23,7 +23,7 @@ esp_err_t SERIAL_init(void)
     ESP_LOGI(TAG, "Initializing serial");
     // Configure UART1 parameters
     uart_config_t uart_config = {
-        .baud_rate = 115200,
+        .baud_rate = UART_FREQ,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
