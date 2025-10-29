@@ -22,6 +22,7 @@
 #define POLL_RATE 1800
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
+#define SAFE_TEMP 45.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
 
 #define VOLTAGE_START_THROTTLE 4900
@@ -164,7 +165,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                              cooling_cycles, power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
                     
                     // Continue if ASIC temps still too high
-                    if (power_management->chip_temp_avg > THROTTLE_TEMP - 30 || power_management->chip_temp2_avg > THROTTLE_TEMP - 30) {
+                    if (power_management->chip_temp_avg >  SAFE_TEMP || power_management->chip_temp2_avg > SAFE_TEMP) {
                         cooling_cycles = 0; // Reset cycle count if still hot
                     }
                 } else {
