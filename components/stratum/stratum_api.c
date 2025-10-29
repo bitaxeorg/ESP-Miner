@@ -415,31 +415,33 @@ int STRATUM_V1_authorize(int socket, int send_uid, const char * username, const 
 }
 
 /// @param socket Socket to write to
+/// @param send_uid Message ID
 /// @param username The client’s user name.
-/// @param jobid The job ID for the work being submitted.
-/// @param ntime The hex-encoded time value use in the block header.
+/// @param job_id The job ID for the work being submitted.
 /// @param extranonce_2 The hex-encoded value of extra nonce 2.
+/// @param ntime The hex-encoded time value use in the block header.
 /// @param nonce The hex-encoded nonce value to use in the block header.
-int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, const char * jobid,
+/// @param version_bits The hex-encoded version bits set by miner (BIP310).
+int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, const char * job_id,
                             const char * extranonce_2, const uint32_t ntime,
-                            const uint32_t nonce, const uint32_t version)
+                            const uint32_t nonce, const uint32_t version_bits)
 {
     char submit_msg[BUFFER_SIZE];
     sprintf(submit_msg,
             "{\"id\": %d, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%08lx\", \"%08lx\", \"%08lx\"]}\n",
-            send_uid, username, jobid, extranonce_2, ntime, nonce, version);
+            send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);
     debug_stratum_tx(submit_msg);
 
     return write(socket, submit_msg, strlen(submit_msg));
 }
 
-int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * version_mask)
+int STRATUM_V1_configure_version_rolling(int socket, int id, uint32_t * version_mask)
 {
     char configure_msg[BUFFER_SIZE * 2];
     sprintf(configure_msg,
             "{\"id\": %d, \"method\": \"mining.configure\", \"params\": [[\"version-rolling\"], {\"version-rolling.mask\": "
             "\"ffffffff\"}]}\n",
-            send_uid);
+            id);
     debug_stratum_tx(configure_msg);
 
     return write(socket, configure_msg, strlen(configure_msg));
