@@ -32,6 +32,8 @@
 #define TPS546_THROTTLE_TEMP 105.0
 #define TPS546_MAX_TEMP 145.0
 
+#define ASIC_REDUCTION 100.0
+
 static const char * TAG = "power_management";
 
 double pid_input = 0.0;
@@ -176,9 +178,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             }
             ESP_LOGI(TAG, "Temperature normalized after %d cooling cycles. Reinitializing ASIC...", cooling_cycles);
             
-            uint16_t reduced_voltage = last_known_asic_volt > 100 ? last_known_asic_volt - 100 : 1000;
-            uint16_t reduced_freq = last_known_asic_freq > 100 ? last_known_asic_freq - 100 : 400;
-            float reduced_freq_float = last_known_asic_freq_float > 100.0 ? last_known_asic_freq_float - 100.0 : 400.0;
+            uint16_t reduced_voltage = last_known_asic_volt > ASIC_REDUCTION ? last_known_asic_volt - ASIC_REDUCTION : 1000;
+            uint16_t reduced_freq = last_known_asic_freq > ASIC_REDUCTION ? last_known_asic_freq - ASIC_REDUCTION : 400;
+            float reduced_freq_float = last_known_asic_freq_float > ASIC_REDUCTION ? last_known_asic_freq_float - ASIC_REDUCTION : 400.0;
             
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, reduced_voltage);
             nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, reduced_freq);
@@ -205,7 +207,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             } else {
                 // Reset UART to 115200 baud - the ASIC expects this after reset
                 ESP_LOGI(TAG, "Resetting UART to 115200 baud for ASIC reinitialization...");
-                SERIAL_set_baud(115200);
+                SERIAL_set_baud(UART_FREQ);
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 
                 ESP_LOGI(TAG, "Detecting ASIC chips...");
