@@ -1,11 +1,11 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
 @Pipe({
-  name: 'suffix'
+  name: 'hashSuffix'
 })
-export class SuffixPipe implements PipeTransform {
+export class HashSuffixPipe implements PipeTransform {
 
-  private static _this = new SuffixPipe();
+  private static _this = new HashSuffixPipe();
 
   public static transform(value: number): string {
     return this._this.transform(value);

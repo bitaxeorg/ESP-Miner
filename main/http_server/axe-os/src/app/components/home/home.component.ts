@@ -486,7 +486,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     } else {
       parts.push(
         info.hostname,
-        (info.hashRate ? SuffixPipe.transform(info.hashRate) : ''),
+        (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : ''),
         (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : ''),
         (!info.power_fault ? `${info.power} W` : ''),
         (info.bestDiff ? DiffSuffixPipe.transform(info.bestDiff) : ''),
