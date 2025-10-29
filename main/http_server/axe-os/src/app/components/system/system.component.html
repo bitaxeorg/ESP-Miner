@@ -5,7 +5,7 @@
         <table>
             <tr *ngFor="let row of getSystemRows(data)">
                 <td class="text-500 vertical-align-top white-space-nowrap pr-4" [ngClass]="row.class">{{ row.label }}</td>
-                <td class="inline vertical-align-top select-none pr-2" [ngClass]="(row.class || '') + ' ' + (row.valueClass || '')" [pTooltip]="row.tooltip">{{ row.value }}</td>
+                <td class="vertical-align-top line-break-anywhere pr-2" [ngClass]="(row.class || '') + ' ' + (row.valueClass || '')" [attr.sensitive-data]="row.isSensitiveData ? '' : null" [pTooltip]="row.tooltip">{{ row.value }}</td>
             </tr>
         </table>
     </div>

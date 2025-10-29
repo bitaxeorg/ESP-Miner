@@ -38,8 +38,7 @@ export class PoolComponent implements OnInit {
         this.form = this.fb.group({
           stratumURL: [info.stratumURL, [
             Validators.required,
-            Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
-            Validators.pattern(/^[^:]*$/),
+            Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
           ]],
           stratumPort: [info.stratumPort, [
             Validators.required,
@@ -53,7 +52,7 @@ export class PoolComponent implements OnInit {
           stratumPassword: ['*****', [Validators.required]],
 
           fallbackStratumURL: [info.fallbackStratumURL, [
-            Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
+            Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
           ]],
           fallbackStratumPort: [info.fallbackStratumPort, [
             Validators.required,

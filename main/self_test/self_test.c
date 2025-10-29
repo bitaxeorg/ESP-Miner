@@ -59,8 +59,8 @@ static bool isFactoryTest = false;
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
 static bool should_test() {
-    uint64_t is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0) < 1;
-    uint16_t is_self_test_flag_set = nvs_config_get_u16(NVS_CONFIG_SELF_TEST, 0);
+    bool is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF) < 1;
+    bool is_self_test_flag_set = nvs_config_get_bool(NVS_CONFIG_SELF_TEST);
     if (is_factory_flash && is_self_test_flag_set) {
         isFactoryTest = true;
         return true;
@@ -174,7 +174,7 @@ esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
 esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
     ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
 
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
     
     return ESP_OK;
 }
@@ -330,7 +330,7 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
-    POWER_MANAGEMENT_init_frequency(&GLOBAL_STATE->POWER_MANAGEMENT_MODULE);
+    POWER_MANAGEMENT_init_frequency(GLOBAL_STATE);
 
     GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
 
@@ -354,6 +354,7 @@ bool self_test(void * pvParameters)
         display_msg(error_buf, GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
     }
+    GLOBAL_STATE->ASIC_initalized = true;
 
     //setup and test hashrate
     int baud = ASIC_set_max_baud(GLOBAL_STATE);
@@ -407,7 +408,9 @@ bool self_test(void * pvParameters)
     hex2bin("c4f5ab01913fc186d550c1a28f3f3e9ffaca2016b961a6a751f8cca0089df924", merkles[11], 32);
     hex2bin("cff737e1d00176dd6bbfa73071adbb370f227cfb5fba186562e4060fcec877e1", merkles[12], 32);
 
-    char * merkle_root = calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles);
+    char merkle_root[65];
+    
+    calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles, merkle_root);
 
     bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
 
@@ -436,20 +439,26 @@ bool self_test(void * pvParameters)
         }
     }
 
-    ESP_LOGI(TAG, "Hashrate: %f", hashrate);
+    float target_hashrate = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate * GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target;
+    ESP_LOGI(TAG, "Hashrate: %f, target: %f (%f%% of %f)", hashrate, target_hashrate, GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target, GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
 
-    float expected_hashrate_mhs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value 
-                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count 
-                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
-                                / 1000.0f;
-
-    if (hashrate < expected_hashrate_mhs) {
+    if (hashrate < target_hashrate) {
         display_msg("HASHRATE:FAIL", GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
     }
 
     free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
     free(GLOBAL_STATE->valid_jobs);
+
+
+    float asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
+    ESP_LOGI(TAG, "ASIC Temp %f", asic_temp);
+
+    // detect open circiut / no result
+    if(asic_temp == -1.0 || asic_temp == 127.0){
+        display_msg("TEMP:FAIL", GLOBAL_STATE);
+        tests_done(GLOBAL_STATE, false);
+    }
 
     if (test_core_voltage(GLOBAL_STATE) != ESP_OK) {
         tests_done(GLOBAL_STATE, false);
@@ -488,7 +497,7 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
     if (isTestPassed) {
         if (isFactoryTest) {
             ESP_LOGI(TAG, "Self-test flag cleared");
-            nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
+            nvs_config_set_bool(NVS_CONFIG_SELF_TEST, false);
         }
         ESP_LOGI(TAG, "SELF-TEST PASS! -- Press RESET button to restart.");
         GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST PASS!";
@@ -500,19 +509,19 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
             ESP_LOGI(TAG, "SELF-TEST FAIL! -- Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.");
             GLOBAL_STATE->SELF_TEST_MODULE.finished = "Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.";
             GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
-            while (1) {
-                // Wait here forever until reset_self_test() gives the longPressSemaphore
-                if (xSemaphoreTake(longPressSemaphore, portMAX_DELAY) == pdTRUE) {
-                    ESP_LOGI(TAG, "Self-test flag cleared");
-                    nvs_config_set_u16(NVS_CONFIG_SELF_TEST, 0);
-                    // flush all pending NVS writes
-                    nvs_config_commit();
-                    esp_restart();
-                }
-            }
         } else {
             ESP_LOGI(TAG, "SELF-TEST FAIL -- Press RESET button to restart.");
             GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart.";
+        }
+        while (1) {
+            // Wait here forever until reset_self_test() gives the longPressSemaphore
+            if (xSemaphoreTake(longPressSemaphore, portMAX_DELAY) == pdTRUE) {
+                ESP_LOGI(TAG, "Self-test flag cleared");
+                nvs_config_set_bool(NVS_CONFIG_SELF_TEST, false);
+                // Wait until NVS is written
+                vTaskDelay(100/ portTICK_PERIOD_MS);
+                esp_restart();
+            }
         }
         
     }

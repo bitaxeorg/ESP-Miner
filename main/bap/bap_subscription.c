@@ -307,13 +307,14 @@ esp_err_t BAP_start_mode_management_task(GlobalState *state) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    xTaskCreate(
+    xTaskCreateWithCaps(
         mode_management_task,
         "bap_mode_mgmt",
-        4096,
+        8192,
         state,
         5,
-        NULL
+        NULL,
+        MALLOC_CAP_SPIRAM
     );
 
     ESP_LOGI(TAG, "BAP mode management task started");
@@ -329,7 +330,7 @@ esp_err_t BAP_start_subscription_task(GlobalState *state) {
     xTaskCreate(
         subscription_update_task,
         "subscription_up",
-        4096,
+        8192,
         state,
         5,
         &subscription_task_handle

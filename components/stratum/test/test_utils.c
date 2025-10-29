@@ -29,18 +29,3 @@ TEST_CASE("Test bin2hex", "[utils]")
     bin2hex(bin, 5, hex_string, 11);
     TEST_ASSERT_EQUAL_STRING("48454c4c4f", hex_string);
 }
-
-TEST_CASE("Test hex2char", "[utils]")
-{
-    char output;
-    int result = hex2char(1, &output);
-    TEST_ASSERT_EQUAL(0, result);
-    TEST_ASSERT_EQUAL('1', output);
-
-    result = hex2char(15, &output);
-    TEST_ASSERT_EQUAL(0, result);
-    TEST_ASSERT_EQUAL('f', output);
-
-    result = hex2char(16, &output);
-    TEST_ASSERT_EQUAL(-1, result);
-}
