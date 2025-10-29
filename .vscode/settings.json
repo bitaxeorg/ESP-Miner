@@ -55,6 +55,7 @@
         "cmath": "c",
         "utils.h": "c",
         "task.h": "c",
+        "stdlib.h": "c"
     },
     "editor.formatOnSave": false,
     "cSpell.words": [
