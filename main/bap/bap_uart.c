@@ -220,6 +220,7 @@ esp_err_t BAP_start_uart_receive_task(void) {
         MALLOC_CAP_SPIRAM
     );
 
+    //ESP_LOGI(TAG, "UART receive task started");
     return ESP_OK;
 }
 

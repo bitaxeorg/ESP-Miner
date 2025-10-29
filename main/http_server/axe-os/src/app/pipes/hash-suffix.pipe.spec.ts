@@ -1,4 +1,4 @@
-import { SuffixPipe } from './hash-suffix.pipe';
+import { HashSuffixPipe } from './hash-suffix.pipe';
 
 describe('HashSuffixPipe', () => {
   it('create an instance', () => {

@@ -17,7 +17,7 @@ export class ByteSuffixPipe implements PipeTransform {
       return '0';
     }
 
-    const suffixes = [' H/s', ' Kh/s', ' Mh/s', ' Gh/s', ' Th/s', ' Ph/s', ' Eh/s'];
+    const suffixes = [' B', ' kB', ' MB', ' GB', ' TB', ' PB', ' EB'];
 
     let power = Math.floor(Math.log10(value) / 3);
     if (power < 0) {
