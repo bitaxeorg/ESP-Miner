@@ -435,13 +435,13 @@ int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, con
     return write(socket, submit_msg, strlen(submit_msg));
 }
 
-int STRATUM_V1_configure_version_rolling(int socket, int id, uint32_t * version_mask)
+int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * version_mask)
 {
     char configure_msg[BUFFER_SIZE * 2];
     sprintf(configure_msg,
             "{\"id\": %d, \"method\": \"mining.configure\", \"params\": [[\"version-rolling\"], {\"version-rolling.mask\": "
             "\"ffffffff\"}]}\n",
-            id);
+            send_uid);
     debug_stratum_tx(configure_msg);
 
     return write(socket, configure_msg, strlen(configure_msg));
