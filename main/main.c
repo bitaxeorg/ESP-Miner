@@ -122,7 +122,7 @@ void app_main(void)
     if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating asic result task");
     }
-    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+    if (xTaskCreate(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating hashrate monitor task");
     }
     if (GLOBAL_STATE.psram_is_available) {

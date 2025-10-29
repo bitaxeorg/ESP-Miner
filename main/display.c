@@ -69,7 +69,7 @@ esp_err_t display_init(void * pvParameters)
 
     lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
 
-    lvgl_cfg.task_stack_caps = MALLOC_CAP_SPIRAM;
+    // lvgl_cfg.task_stack_caps = MALLOC_CAP_SPIRAM;
 
     if (GLOBAL_STATE->DISPLAY_CONFIG.display == NONE) {
         ESP_LOGI(TAG, "Initialize LVGL");
