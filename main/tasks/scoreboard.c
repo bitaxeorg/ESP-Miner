@@ -13,9 +13,7 @@ void scoreboard_init(Scoreboard *scoreboard) {
     }
 
     for (int i = 0; i < MAX_SCOREBOARD; i++) {
-        char key[32];
-        snprintf(key, sizeof(key), NVS_CONFIG_SCOREBOARD_PREFIX "%02d", i + 1);
-        char *entry_str = nvs_config_get_string(key, "");
+        char *entry_str = nvs_config_get_string_indexed(NVS_CONFIG_SCOREBOARD, i);
         if (entry_str[0] == '\0') {
             free(entry_str);
             break;
@@ -40,9 +38,7 @@ void scoreboard_init(Scoreboard *scoreboard) {
 }
 
 static void scoreboard_save(int i, ScoreboardEntry *entry) {
-    char key[32];
-    snprintf(key, sizeof(key), NVS_CONFIG_SCOREBOARD_PREFIX "%02d", i + 1);
-    nvs_config_set_string(key, entry->nvs_entry);
+    nvs_config_set_string_indexed(NVS_CONFIG_SCOREBOARD, i, entry->nvs_entry);
 }
 
 void scoreboard_add(Scoreboard *scoreboard, double difficulty, const char *job_id, const char *extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version_bits)
