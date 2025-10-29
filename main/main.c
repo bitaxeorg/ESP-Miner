@@ -1,11 +1,11 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
-#include "nvs_flash.h"
 
 #include "asic_result_task.h"
 #include "asic_task.h"
 #include "create_jobs_task.h"
+#include "hashrate_monitor_task.h"
 #include "statistics_task.h"
 #include "system.h"
 #include "http_server.h"
@@ -13,7 +13,7 @@
 #include "stratum_task.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
-#include "nvs_device.h"
+#include "nvs_config.h"
 #include "self_test.h"
 #include "asic.h"
 #include "bap/bap.h"
@@ -47,7 +47,7 @@ void app_main(void)
     ADC_init();
 
     //initialize the ESP32 NVS
-    if (NVSDevice_init() != ESP_OK){
+    if (nvs_config_init() != ESP_OK){
         ESP_LOGE(TAG, "Failed to init NVS");
         return;
     }
@@ -69,8 +69,7 @@ void app_main(void)
     SYSTEM_init_peripherals(&GLOBAL_STATE);
 
     if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create power management task");
-        return;
+        ESP_LOGE(TAG, "Error creating power management task");
     }
 
     //start the API for AxeOS
@@ -112,23 +111,21 @@ void app_main(void)
     GLOBAL_STATE.ASIC_initalized = true;
 
     if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create stratum admin task");
-        return;
+        ESP_LOGE(TAG, "Error creating stratum admin task");
     }
     if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create stratum miner task");
-        return;
+        ESP_LOGE(TAG, "Error creating stratum miner task");
     }
     if (xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create asic task");
-        return;
+        ESP_LOGE(TAG, "Error creating asic task");
     }
     if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create asic result task");
-        return;
+        ESP_LOGE(TAG, "Error creating asic result task");
     }
-    if (xTaskCreate(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create statistics task");
-        return;
+    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating hashrate monitor task");
+    }
+    if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating statistics task");
     }
 }

@@ -3,6 +3,18 @@ interface ISharesRejectedStat {
     count: number;
 }
 
+interface IHashrateMonitorAsic {
+    total: number;
+    domains: number[];
+    error: number;
+}
+
+interface IHashrateMonitor {
+    asics: IHashrateMonitorAsic[];
+    hashrate: number;
+    errorCount: number;
+}
+
 export interface ISystemInfo {
     display: string;
     rotation: number;
@@ -18,14 +30,18 @@ export interface ISystemInfo {
     nominalVoltage: number,
     hashRate: number,
     expectedHashrate: number,
-    bestDiff: string,
-    bestSessionDiff: string,
+    bestDiff: number,
+    bestSessionDiff: number,
     freeHeap: number,
+    freeHeapInternal: number,
+    freeHeapSpiram: number,
     coreVoltage: number,
     hostname: string,
     macAddr: string,
     ssid: string,
     wifiStatus: string,
+    ipv4: string,
+    ipv6: string,
     wifiRSSI: number,
     apEnabled: number,
     sharesAccepted: number,
@@ -70,5 +86,6 @@ export interface ISystemInfo {
     scriptsig?: string,
     networkDifficulty?: string,
 
+    hashrateMonitor: IHashrateMonitor,
     blockFound: number,
 }

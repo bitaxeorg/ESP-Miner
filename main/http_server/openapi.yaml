@@ -106,6 +106,8 @@ components:
         - temptarget
         - rotation
         - freeHeap
+        - freeHeapInternal
+        - freeHeapSpiram
         - frequency
         - hashRate
         - expectedHashrate
@@ -129,6 +131,8 @@ components:
         - sharesRejectedReasons
         - smallCoreCount
         - ssid
+        - ipv4
+        - ipv6
         - stratumExtranonceSubscribe
         - stratumPort
         - stratumSuggestedDifficulty
@@ -160,10 +164,10 @@ components:
           type: number
           description: Automatic fan speed control (0=manual, 1=auto)
         bestDiff:
-          type: string
+          type: number
           description: Best difficulty achieved
         bestSessionDiff:
-          type: string
+          type: number
           description: Best difficulty achieved in current session
         boardVersion:
           type: string
@@ -207,6 +211,12 @@ components:
         freeHeap:
           type: number
           description: Available heap memory in bytes
+        freeHeapInternal:
+          type: number
+          description: Available internal heap memory in bytes
+        freeHeapSpiram:
+          type: number
+          description: Available Spiram heap memory in bytes
         frequency:
           type: number
           description: ASIC frequency in MHz
@@ -275,6 +285,12 @@ components:
         ssid:
           type: string
           description: Connected WiFi network SSID
+        ipv4:
+          type: string
+          description: IPv4 address
+        ipv6:
+          type: string
+          description: IPv6 address
         stratumExtranonceSubscribe:
           type: boolean
           description: Enable pool extranonce subscription
@@ -339,6 +355,9 @@ components:
     Settings:
       type: object
       properties:
+        useFallbackStratum:
+          type: number
+          description: Forces the use the fallback stratum pool
         stratumURL:
           type: string
           description: Primary stratum server URL

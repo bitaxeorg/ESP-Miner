@@ -23,8 +23,6 @@
 
 #define DISPLAY_I2C_ADDRESS    0x3C
 
-#define DEFAULT_DISPLAY        "SSD1306 (128x32)"
-
 #define LCD_CMD_BITS           8
 #define LCD_PARAM_BITS         8
 
@@ -35,7 +33,6 @@ static bool display_state_on = false;
 
 static lv_theme_t theme;
 static lv_style_t scr_style;
-
 
 extern const lv_font_t lv_font_portfolio_6x8;
 
@@ -49,19 +46,18 @@ static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
 
 static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
 {
-    char * display_config = nvs_config_get_string(NVS_CONFIG_DISPLAY, DEFAULT_DISPLAY);
+    char * display_config_name = nvs_config_get_string(NVS_CONFIG_DISPLAY);
+    const DisplayConfig * display_config = get_display_config(display_config_name);
 
-    for (int i = 0 ; i < ARRAY_SIZE(display_configs); i++) {
-        if (strcmp(display_configs[i].name, display_config) == 0) {
-            GLOBAL_STATE->DISPLAY_CONFIG = display_configs[i];
+    if (display_config) {
+        GLOBAL_STATE->DISPLAY_CONFIG = *display_config;
 
-            ESP_LOGI(TAG, "%s", GLOBAL_STATE->DISPLAY_CONFIG.name);
-            free(display_config);
-            return ESP_OK;
-        }
+        ESP_LOGI(TAG, "%s", GLOBAL_STATE->DISPLAY_CONFIG.name);
+        free(display_config_name);
+        return ESP_OK;
     }
 
-    free(display_config);
+    free(display_config_name);
     return ESP_FAIL;
 }
 
@@ -71,7 +67,9 @@ esp_err_t display_init(void * pvParameters)
 
     ESP_RETURN_ON_ERROR(read_display_config(GLOBAL_STATE), TAG, "Failed to read display config");
 
-    const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+
+    lvgl_cfg.task_stack_caps = MALLOC_CAP_SPIRAM;
 
     if (GLOBAL_STATE->DISPLAY_CONFIG.display == NONE) {
         ESP_LOGI(TAG, "Initialize LVGL");
@@ -135,7 +133,7 @@ esp_err_t display_init(void * pvParameters)
     if (esp_lcd_panel_init_err != ESP_OK) {
         ESP_LOGE(TAG, "Panel init failed, no display connected?");
     }  else {
-        uint8_t invert_screen = nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0);
+        bool invert_screen = nvs_config_get_bool(NVS_CONFIG_INVERT_SCREEN);
         ESP_RETURN_ON_ERROR(esp_lcd_panel_invert_color(panel_handle, invert_screen), TAG, "Panel invert failed");
         // ESP_RETURN_ON_ERROR(esp_lcd_panel_mirror(panel_handle, false, false), TAG, "Panel mirror failed");
     }
@@ -171,7 +169,7 @@ esp_err_t display_init(void * pvParameters)
     if (esp_lcd_panel_init_err == ESP_OK) {
         if (lvgl_port_lock(0)) {
 
-            uint16_t rotation = nvs_config_get_u16(NVS_CONFIG_ROTATION, 0);
+            uint16_t rotation = nvs_config_get_u16(NVS_CONFIG_ROTATION);
 
             ESP_LOGI(TAG, "Rotation: %d", rotation);
             switch(rotation) {
@@ -225,4 +223,14 @@ esp_err_t display_on(bool display_on)
     }
 
     return ESP_OK;
+}
+
+const DisplayConfig * get_display_config(const char * name)
+{
+    for (int i = 0 ; i < ARRAY_SIZE(display_configs); i++) {
+        if (strcmp(display_configs[i].name, name) == 0) {
+            return &display_configs[i];
+        }
+    }
+    return NULL;
 }

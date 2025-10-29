@@ -307,10 +307,16 @@ esp_err_t BAP_start_mode_management_task(GlobalState *state) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    if (xTaskCreate(mode_management_task, "bap_mode_mgmt", 4096, state, 5, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create BAP mode management task");
-        return ESP_FAIL;
-    }
+    xTaskCreateWithCaps(
+        mode_management_task,
+        "bap_mode_mgmt",
+        8192,
+        state,
+        5,
+        NULL,
+        MALLOC_CAP_SPIRAM
+    );
+
     ESP_LOGI(TAG, "BAP mode management task started");
     return ESP_OK;
 }
@@ -321,10 +327,14 @@ esp_err_t BAP_start_subscription_task(GlobalState *state) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    if (xTaskCreate(subscription_update_task, "subscription_up", 4096, state, 5, &subscription_task_handle) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create subscription update task");
-        return ESP_FAIL;
-    }
+    xTaskCreate(
+        subscription_update_task,
+        "subscription_up",
+        8192,
+        state,
+        5,
+        &subscription_task_handle
+    );
 
     //ESP_LOGI(TAG, "Subscription update task started");
     return ESP_OK;

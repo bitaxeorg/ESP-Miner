@@ -26,3 +26,17 @@
         top: 100px;
     }
 }
+
+.sensitive-data-hidden {
+    [sensitive-data] {
+        &.p-inputtext {
+            -webkit-text-security: disc;
+            pointer-events: none;
+        }
+
+        &::before {
+            content: '•••••';
+            font-size: $scale;
+        }
+    }
+}

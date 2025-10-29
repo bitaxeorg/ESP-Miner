@@ -1,8 +1,10 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <string.h>
+#include <limits.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <esp_heap_caps.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -39,11 +41,10 @@
 #include "statistics_task.h"
 #include "theme_api.h"  // Add theme API include
 #include "axe-os/api/system/asic_settings.h"
+#include "display.h"
 #include "http_server.h"
 #include "system.h"
 #include "websocket.h"
-
-#define JSON_ALL_STATS_ELEMENT_SIZE 120
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -51,6 +52,8 @@ static const char * CORS_TAG = "CORS";
 static char axeOSVersion[32];
 
 static const char * STATS_LABEL_HASHRATE = "hashrate";
+static const char * STATS_LABEL_HASHRATE_REGISTER = "hashrateRegister";
+static const char * STATS_LABEL_ERROR_COUNTER_REGISTER = "errorCountRegister";
 static const char * STATS_LABEL_ASIC_TEMP = "asicTemp";
 static const char * STATS_LABEL_VR_TEMP = "vrTemp";
 static const char * STATS_LABEL_ASIC_VOLTAGE = "asicVoltage";
@@ -64,9 +67,16 @@ static const char * STATS_LABEL_FREE_HEAP = "freeHeap";
 
 static const char * STATS_LABEL_TIMESTAMP = "timestamp";
 
+static int system_info_prebuffer_len = 256;
+static int system_statistics_prebuffer_len = 256;
+static int system_wifi_scan_prebuffer_len = 256;
+static int api_common_prebuffer_len = 256;
+
 typedef enum
 {
     SRC_HASHRATE,
+    SRC_HASHRATE_REGISTER,
+    SRC_ERROR_COUNTER_REGISTER,
     SRC_ASIC_TEMP,
     SRC_VR_TEMP,
     SRC_ASIC_VOLTAGE,
@@ -84,6 +94,8 @@ DataSource strToDataSource(const char * sourceStr)
 {
     if (NULL != sourceStr) {
         if (strcmp(sourceStr, STATS_LABEL_HASHRATE) == 0)     return SRC_HASHRATE;
+        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_REGISTER) == 0)      return SRC_HASHRATE_REGISTER;
+        if (strcmp(sourceStr, STATS_LABEL_ERROR_COUNTER_REGISTER) == 0) return SRC_ERROR_COUNTER_REGISTER;
         if (strcmp(sourceStr, STATS_LABEL_VOLTAGE) == 0)      return SRC_VOLTAGE;
         if (strcmp(sourceStr, STATS_LABEL_POWER) == 0)        return SRC_POWER;
         if (strcmp(sourceStr, STATS_LABEL_CURRENT) == 0)      return SRC_CURRENT;
@@ -100,6 +112,16 @@ DataSource strToDataSource(const char * sourceStr)
 
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
+
+esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_len)
+{
+    const char * response = cJSON_PrintBuffered(item, *prebuffer_len, true);
+    int len = strlen(response);
+    esp_err_t res = httpd_resp_send(req, response, len);
+    if (len > *prebuffer_len) *prebuffer_len = len * 1.2;
+    free((void *)response);
+    return res;
+}
 
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
@@ -131,12 +153,11 @@ static esp_err_t GET_wifi_scan(httpd_req_t *req)
 
     cJSON_AddItemToObject(root, "networks", networks);
 
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
+    esp_err_t res = HTTP_send_json(req, root, &system_wifi_scan_prebuffer_len);
 
-    free((void *)response);
     cJSON_Delete(root);
-    return ESP_OK;
+
+    return res;
 }
 
 
@@ -393,12 +414,11 @@ static esp_err_t rest_api_common_handler(httpd_req_t * req)
     cJSON * root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "error", "unknown route");
 
-    const char * error_obj = cJSON_Print(root);
-    httpd_resp_set_status(req, HTTPD_404);
-    httpd_resp_sendstr(req, error_obj);
-    free((char *)error_obj);
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+
     cJSON_Delete(root);
-    return ESP_OK;
+
+    return res;
 }
 
 static bool file_exists(const char *path) {
@@ -494,6 +514,119 @@ static esp_err_t handle_options_request(httpd_req_t * req)
     return ESP_OK;
 }
 
+bool check_settings_and_update(const cJSON * const root)
+{
+    bool result = true;
+
+    for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
+        Settings *setting = nvs_config_get_settings(key);
+        if (!setting->rest_name) continue;
+
+        cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
+        if (!item) continue;
+
+        switch (setting->type) {
+            case TYPE_STR: {
+                if (!cJSON_IsString(item)) {
+                    ESP_LOGW(TAG, "Invalid type for '%s', expected string", setting->rest_name);                            
+                    result = false;
+                } else {
+                    const size_t str_value_len = strlen(item->valuestring);
+                    if ((str_value_len < setting->min) || (str_value_len > setting->max)) {
+                        ESP_LOGW(TAG, "Value '%s' for '%s' is out of length (%d-%d)", item->valuestring, setting->rest_name, setting->min, setting->max);
+                        result = false;
+                    }
+                }
+                break;
+            }
+            case TYPE_U16:
+            case TYPE_I32: {
+                if (!cJSON_IsNumber(item)) {
+                    ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
+                    result = false;
+                } else if ((item->valueint < setting->min) || (item->valueint > setting->max)) {
+                    ESP_LOGW(TAG, "Value '%d' for '%s' is out of range", item->valueint, setting->rest_name);
+                    result = false;
+                }
+                break;
+            }
+            case TYPE_U64: {
+                if (!cJSON_IsNumber(item)) {
+                    ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
+                    result = false;
+                } else if ((item->valuedouble < setting->min) || (item->valuedouble > setting->max)) {
+                    ESP_LOGW(TAG, "Value '%lld' for '%s' is out of range", (long long)item->valuedouble, setting->rest_name);
+                    result = false;
+                }
+                break;
+            }
+            case TYPE_FLOAT: {
+                if (!cJSON_IsNumber(item)) {
+                    ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
+                    result = false;
+                } else if ((item->valuedouble < setting->min) || (item->valuedouble > setting->max)) {
+                    ESP_LOGW(TAG, "Value '%f' for '%s' is out of range", item->valuedouble, setting->rest_name);
+                    result = false;
+                }
+                break;
+            }
+            case TYPE_BOOL: {
+                if (!cJSON_IsNumber(item) && !cJSON_IsBool(item) && !cJSON_IsTrue(item) && !cJSON_IsFalse(item)) {
+                    ESP_LOGW(TAG, "Invalid type for '%s', expected bool", setting->rest_name);                            
+                    result = false;
+                } else if ((item->valueint < setting->min) || (item->valueint > setting->max)) {
+                    ESP_LOGW(TAG, "Value '%d' for '%s' is out of range", item->valueint, setting->rest_name);
+                    result = false;
+                }
+                break;
+            }
+        }
+
+        if (key == NVS_CONFIG_DISPLAY && get_display_config(item->valuestring) == NULL) {
+            ESP_LOGW(TAG, "Invalid display config: '%s'", item->valuestring);
+            result = false;
+        }
+        if (key == NVS_CONFIG_ROTATION && item->valueint != 0 && item->valueint != 90 && item->valueint != 180 && item->valueint != 270) {
+            ESP_LOGW(TAG, "Invalid display rotation: '%d'", item->valueint);
+            result = false;
+        }
+    }
+
+    if (result) {
+        // update NVS (if result is okay) and clean up    
+        for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
+            Settings *setting = nvs_config_get_settings(key);
+            if (!setting || !setting->rest_name) continue;
+
+            cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
+            if (!item) continue;
+
+            switch(setting->type) {
+                case TYPE_STR:
+                    nvs_config_set_string(key, item->valuestring);
+                    break;
+                case TYPE_U16:
+                    nvs_config_set_u16(key, (uint16_t)item->valueint);
+                    break;
+                case TYPE_I32:
+                    nvs_config_set_i32(key, item->valueint);
+                    break;
+                case TYPE_U64:
+                    nvs_config_set_u64(key, (uint64_t)item->valuedouble);
+                    break;
+                case TYPE_BOOL:
+                    nvs_config_set_bool(key, item->valueint != 0 || cJSON_IsTrue(item));
+                    break;
+                case TYPE_FLOAT:
+                    nvs_config_set_float(key, (float)item->valuedouble);
+                    break;
+            }
+        }
+    }
+
+    return result;
+}
+
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -527,98 +660,15 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     buf[total_len] = '\0';
 
     cJSON * root = cJSON_Parse(buf);
-    cJSON * item;
     if (root == NULL) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         return ESP_OK;
     }
 
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumURL"))) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_URL, item->valuestring);
-    }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumURL"))) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_URL, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "stratumExtranonceSubscribe")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "stratumSuggestedDifficulty")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_DIFFICULTY, item->valueint);
-    }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumUser"))) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_USER, item->valuestring);
-    }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "stratumPassword"))) {
-        nvs_config_set_string(NVS_CONFIG_STRATUM_PASS, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumExtranonceSubscribe")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumSuggestedDifficulty")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, item->valueint);
-    }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumUser"))) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_USER, item->valuestring);
-    }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "fallbackStratumPassword"))) {
-        nvs_config_set_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "stratumPort")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STRATUM_PORT, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "fallbackStratumPort")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, item->valueint);
-    }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "ssid"))) {
-        nvs_config_set_string(NVS_CONFIG_WIFI_SSID, item->valuestring);
-    }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "wifiPass"))) {
-        nvs_config_set_string(NVS_CONFIG_WIFI_PASS, item->valuestring);
-    }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "hostname"))) {
-        nvs_config_set_string(NVS_CONFIG_HOSTNAME, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "coreVoltage")) != NULL && item->valueint > 0) {
-        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "frequency")) != NULL && item->valuedouble > 0) {
-        float frequency = item->valuedouble;
-        nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
-        // also store as u16 for backwards compatibility
-        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, (int) frequency);
-    }
-    if ((item = cJSON_GetObjectItem(root, "overheat_mode")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-    }
-    if (cJSON_IsString(item = cJSON_GetObjectItem(root, "display"))) {
-        nvs_config_set_string(NVS_CONFIG_DISPLAY, item->valuestring);
-    }
-    if ((item = cJSON_GetObjectItem(root, "rotation")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_ROTATION, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "invertscreen")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_INVERT_SCREEN, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "displayTimeout")) != NULL) {
-        nvs_config_set_i32(NVS_CONFIG_DISPLAY_TIMEOUT, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "autofanspeed")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "fanspeed")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "minFanSpeed")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_MIN_FAN_SPEED, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "temptarget")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_TEMP_TARGET, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "statsFrequency")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_STATISTICS_FREQUENCY, item->valueint);
-    }
-    if ((item = cJSON_GetObjectItem(root, "overclockEnabled")) != NULL) {
-        nvs_config_set_u16(NVS_CONFIG_OVERCLOCK_ENABLED, item->valueint);
+    if (!check_settings_and_update(root)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Wrong API input");
+        return ESP_OK;
     }
 
     cJSON_Delete(root);
@@ -669,15 +719,16 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         return ESP_OK;
     }
 
-    char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
-    char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
-    char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
-    char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
-    char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
-    char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
-    char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)");
-    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, CONFIG_ASIC_FREQUENCY);
-    float expected_hashrate = frequency * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
+    char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
+    char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    char * ipv4 = GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str;
+    char * ipv6 = GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str;
+    char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL);
+    char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL);
+    char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER);
+    char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER);
+    char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY);
+    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT);
 
     uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
@@ -697,9 +748,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "maxPower", GLOBAL_STATE->DEVICE_CONFIG.family.max_power);
     cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage);
     cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
-    cJSON_AddNumberToObject(root, "expectedHashrate", expected_hashrate);
-    cJSON_AddStringToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_diff_string);
-    cJSON_AddStringToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_diff_string);
+    cJSON_AddNumberToObject(root, "hashrateRegister", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.hashrate);
+    cJSON_AddNumberToObject(root, "errorCountRegister", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_count);
+    cJSON_AddNumberToObject(root, "expectedHashrate", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
+    cJSON_AddNumberToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_nonce_diff);
+    cJSON_AddNumberToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_nonce_diff);
     cJSON_AddNumberToObject(root, "poolDifficulty", GLOBAL_STATE->pool_difficulty);
 
     cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
@@ -707,12 +760,18 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
 
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
-    cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
+
+    cJSON_AddNumberToObject(root, "freeHeapInternal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    
+    cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
     cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "frequency", frequency);
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
     cJSON_AddStringToObject(root, "hostname", hostname);
+    cJSON_AddStringToObject(root, "ipv4", ipv4);
+    cJSON_AddStringToObject(root, "ipv6", ipv6);
     cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
     cJSON_AddNumberToObject(root, "wifiRSSI", wifi_rssi);
     cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
@@ -733,15 +792,15 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "smallCoreCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count);
     cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
-    cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT));
+    cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT));
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
-    cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY, CONFIG_STRATUM_DIFFICULTY));
-    cJSON_AddNumberToObject(root, "stratumExtranonceSubscribe", nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, STRATUM_EXTRANONCE_SUBSCRIBE));
+    cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY));
+    cJSON_AddNumberToObject(root, "stratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
-    cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT));
+    cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT));
     cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
-    cJSON_AddNumberToObject(root, "fallbackStratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, CONFIG_FALLBACK_STRATUM_DIFFICULTY));
-    cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE, FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
+    cJSON_AddNumberToObject(root, "fallbackStratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY));
+    cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
@@ -751,21 +810,21 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
-    cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0));
-    cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_u16(NVS_CONFIG_OVERCLOCK_ENABLED, 0));
+    cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE));
+    cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED));
     cJSON_AddStringToObject(root, "display", display);
-    cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION, 0));
-    cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0));
-    cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT, -1));
+    cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION));
+    cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_bool(NVS_CONFIG_INVERT_SCREEN));
+    cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT));
 
-    cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1));
+    cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED));
 
     cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
-    cJSON_AddNumberToObject(root, "minFanSpeed", nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED, 25));
-    cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET, 60));
+    cJSON_AddNumberToObject(root, "minFanSpeed", nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED));
+    cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET));
     cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
 
-    cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0));
+    cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY));
 
     cJSON_AddNumberToObject(root, "blockFound", GLOBAL_STATE->SYSTEM_MODULE.block_found);
 
@@ -779,6 +838,34 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         cJSON_AddStringToObject(root, "networkDifficulty", GLOBAL_STATE->network_diff_string);
     }
 
+    cJSON *hashrate_monitor = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "hashrateMonitor", hashrate_monitor);
+    
+    cJSON *asics_array = cJSON_CreateArray();
+    cJSON_AddItemToObject(hashrate_monitor, "asics", asics_array);
+
+    if (GLOBAL_STATE->HASHRATE_MONITOR_MODULE.is_initialized) {
+        for (int asic_nr = 0; asic_nr < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; asic_nr++) {
+            cJSON *asic = cJSON_CreateObject();
+            cJSON_AddItemToArray(asics_array, asic);
+            cJSON_AddNumberToObject(asic, "total", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[asic_nr].hashrate);
+
+            int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
+            if (hash_domains > 0) {
+                cJSON* hash_domain_array = cJSON_CreateArray();
+                for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
+                    cJSON *hashrate = cJSON_CreateNumber(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[domain_nr][asic_nr].hashrate);
+                    cJSON_AddItemToArray(hash_domain_array, hashrate);
+                }
+                cJSON_AddItemToObject(asic, "domains", hash_domain_array);
+            }
+
+            cJSON_AddNumberToObject(asic, "error", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_measurement[asic_nr].hashrate);
+        }
+    }
+    cJSON_AddNumberToObject(hashrate_monitor, "hashrate", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.hashrate);
+    cJSON_AddNumberToObject(hashrate_monitor, "errorCount", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_count);
+
     free(ssid);
     free(hostname);
     free(stratumURL);
@@ -787,11 +874,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(fallbackStratumUser);
     free(display);
 
-    const char * sys_info = cJSON_Print(root);
-    httpd_resp_sendstr(req, sys_info);
-    free((char *)sys_info);
+    esp_err_t res = HTTP_send_json(req, root, &system_info_prebuffer_len);
+
     cJSON_Delete(root);
-    return ESP_OK;
+
+    return res;
 }
 
 static esp_err_t GET_system_statistics(httpd_req_t * req)
@@ -808,34 +895,26 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         return ESP_OK;
     }
 
-    char * buf = NULL;
     size_t bufLen = httpd_req_get_url_query_len(req) + 1;
     bool dataSelection[SRC_NONE] = {false};
     bool selectionCheck = false;
-    int prebuffer = 0;
 
     // Check query parameters
     if (1 < bufLen) {
-        buf = (char *)malloc(bufLen);
-        if (buf) {
-            if (httpd_req_get_url_query_str(req, buf, bufLen) == ESP_OK) {
-                char * columns = (char *)malloc(bufLen);
-                if (columns) {
-                    if (httpd_query_key_value(buf, "columns", columns, bufLen) == ESP_OK) {
-                        char * param = strtok(columns, ",");
-                        while (NULL != param) {
-                            DataSource sourceParam = strToDataSource(param);
-                            if (SRC_NONE != sourceParam) {
-                                dataSelection[sourceParam] = true;
-                                selectionCheck = true;
-                            }
-                            param = strtok(NULL, ",");
-                        }
+        char buf[bufLen];
+        if (httpd_req_get_url_query_str(req, buf, bufLen) == ESP_OK) {
+            char columns[bufLen];
+            if (httpd_query_key_value(buf, "columns", columns, bufLen) == ESP_OK) {
+                char * param = strtok(columns, ",");
+                while (NULL != param) {
+                    DataSource sourceParam = strToDataSource(param);
+                    if (SRC_NONE != sourceParam) {
+                        dataSelection[sourceParam] = true;
+                        selectionCheck = true;
                     }
-                    free((void *)columns);
+                    param = strtok(NULL, ",");
                 }
             }
-            free((void *)buf);
         }
     }
 
@@ -849,11 +928,12 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     // Create object for statistics
     cJSON * root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "currentTimestamp", (esp_timer_get_time() / 1000));
-    prebuffer++;
 
     cJSON * labelArray = cJSON_CreateArray();
     if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE)); }
     if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_TEMP)); }
+    if (dataSelection[SRC_HASHRATE_REGISTER]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_REGISTER)); }
+    if (dataSelection[SRC_ERROR_COUNTER_REGISTER]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ERROR_COUNTER_REGISTER)); }
     if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VR_TEMP)); }
     if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_VOLTAGE)); }
     if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VOLTAGE)); }
@@ -866,7 +946,6 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_TIMESTAMP));
 
     cJSON_AddItemToObject(root, "labels", labelArray);
-    prebuffer++;
 
     cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
 
@@ -880,6 +959,8 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
             cJSON * valueArray = cJSON_CreateArray();
             if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate)); }
             if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature)); }
+            if (dataSelection[SRC_HASHRATE_REGISTER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrateRegister)); }
+            if (dataSelection[SRC_ERROR_COUNTER_REGISTER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.errorCountRegister)); }
             if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature)); }
             if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); }
             if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage)); }
@@ -892,17 +973,14 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
             cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
 
             cJSON_AddItemToArray(statsArray, valueArray);
-            prebuffer++;
         }
     }
 
-    const char * response = cJSON_PrintBuffered(root, (JSON_ALL_STATS_ELEMENT_SIZE * prebuffer), 0); // unformatted
-    httpd_resp_sendstr(req, response);
-    free((void *)response);
+    esp_err_t res = HTTP_send_json(req, root, &system_statistics_prebuffer_len);
 
     cJSON_Delete(root);
 
-    return ESP_OK;
+    return res;
 }
 
 static esp_err_t GET_scoreboard(httpd_req_t * req)
@@ -1288,10 +1366,7 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
 
     // Start websocket log handler thread
-    if (xTaskCreate(websocket_task, "websocket_task", 4096, server, 2, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create websocket task");
-        goto err_start;
-    }
+    xTaskCreateWithCaps(websocket_task, "websocket_task", 8192, server, 2, NULL, MALLOC_CAP_SPIRAM);
 
     // Start the DNS server that will redirect all queries to the softAP IP
     dns_server_config_t dns_config = DNS_SERVER_CONFIG_SINGLE("*" /* all A queries */, "WIFI_AP_DEF" /* softAP netif ID */);

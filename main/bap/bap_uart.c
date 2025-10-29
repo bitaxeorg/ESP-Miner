@@ -210,10 +210,15 @@ static void uart_send_task(void *pvParameters) {
 }
 
 esp_err_t BAP_start_uart_receive_task(void) {
-    if (xTaskCreate(uart_receive_task, "uart_receive_ta", 4096, NULL, 5, &uart_receive_task_handle) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create UART receive task");
-        return ESP_ERR_NO_MEM;
-    }
+    xTaskCreateWithCaps(
+        uart_receive_task,
+        "uart_receive_ta",
+        8192,
+        NULL,
+        5,
+        &uart_receive_task_handle,
+        MALLOC_CAP_SPIRAM
+    );
 
     return ESP_OK;
 }
@@ -255,7 +260,17 @@ esp_err_t BAP_uart_init(void) {
     
     ESP_LOGI(TAG, "BAP UART interface initialized successfully");
     
-    if (xTaskCreate(uart_send_task, "uart_send_task", 3072, NULL, 5, &uart_send_task_handle) != pdPASS) {
+    BaseType_t task_result = xTaskCreateWithCaps(
+        uart_send_task,
+        "uart_send_task",
+        8192,
+        NULL,
+        5,
+        &uart_send_task_handle,
+        MALLOC_CAP_SPIRAM
+    );
+    
+    if (task_result != pdPASS) {
         ESP_LOGE(TAG, "Failed to create uart_send_task");
         return ESP_ERR_NO_MEM;
     }

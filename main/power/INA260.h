@@ -106,7 +106,6 @@ typedef enum _alert_latch
 } INA260_AlertLatch;
 
 esp_err_t INA260_init(void);
-bool INA260_installed(void);
 float INA260_read_current(void);
 float INA260_read_voltage(void);
 float INA260_read_power(void);

@@ -288,11 +288,7 @@ dns_server_handle_t start_dns_server(dns_server_config_t * config)
     handle->num_of_entries = config->num_of_entries;
     memcpy(handle->entry, config->item, config->num_of_entries * sizeof(dns_entry_pair_t));
 
-    if (xTaskCreate(dns_server_task, "dns_server", 4096, handle, 5, &handle->task) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create DNS server task");
-        free(handle);
-        return NULL;
-    }
+    xTaskCreateWithCaps(dns_server_task, "dns_server", 8192, handle, 5, &handle->task, MALLOC_CAP_SPIRAM);
     return handle;
 }
 

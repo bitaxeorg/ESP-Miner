@@ -10,6 +10,8 @@
 #include "power.h"
 #include "connect.h"
 #include "vcore.h"
+#include "bm1370.h"
+#include <esp_heap_caps.h>
 
 #define DEFAULT_POLL_RATE 5000
 
@@ -33,7 +35,7 @@ StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
 
     // create new data block or reuse first data block
     if (currentDataCount < maxDataCount) {
-        newData = (StatisticsNodePtr)malloc(sizeof(struct StatisticsData));
+        newData = (StatisticsNodePtr)heap_caps_malloc(sizeof(struct StatisticsData), MALLOC_CAP_SPIRAM);
         currentDataCount++;
     } else {
         newData = statisticsDataStart;
@@ -116,13 +118,14 @@ void statistics_task(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    HashrateMonitorModule * hashrate_monitor = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
     struct StatisticsData statsData = {};
 
     TickType_t taskWakeTime = xTaskGetTickCount();
 
     while (1) {
         const int64_t currentTime = esp_timer_get_time() / 1000;
-        statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0) * 1000;
+        statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY) * 1000;
 
         if (0 != statsFrequency) {
             const int64_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
@@ -133,6 +136,8 @@ void statistics_task(void * pvParameters)
 
                 statsData.timestamp = currentTime;
                 statsData.hashrate = sys_module->current_hashrate;
+                statsData.hashrateRegister = hashrate_monitor->hashrate;
+                statsData.errorCountRegister = hashrate_monitor->error_count;
                 statsData.chipTemperature = power_management->chip_temp_avg;
                 statsData.vrTemperature = power_management->vr_temp;
                 statsData.power = power_management->power;

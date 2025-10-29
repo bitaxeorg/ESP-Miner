@@ -4,6 +4,9 @@
 #include "cJSON.h"
 #include "global_state.h"
 #include "asic.h"
+#include "http_server.h"
+
+static int system_asic_prebuffer_len = 256;
 
 // static const char *TAG = "asic_settings";
 static GlobalState *GLOBAL_STATE = NULL;
@@ -39,6 +42,7 @@ esp_err_t GET_system_asic(httpd_req_t *req)
     cJSON_AddStringToObject(root, "deviceModel", GLOBAL_STATE->DEVICE_CONFIG.family.name);
     cJSON_AddStringToObject(root, "swarmColor", GLOBAL_STATE->DEVICE_CONFIG.family.swarm_color);
     cJSON_AddNumberToObject(root, "asicCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count);
+    cJSON_AddNumberToObject(root, "hashDomains", GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains);
 
     cJSON_AddNumberToObject(root, "defaultFrequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_frequency_mhz);
 
@@ -61,10 +65,9 @@ esp_err_t GET_system_asic(httpd_req_t *req)
     }
     cJSON_AddItemToObject(root, "voltageOptions", voltageOptions);
 
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
+    esp_err_t res = HTTP_send_json(req, root, &system_asic_prebuffer_len);
 
-    free((void *)response);
     cJSON_Delete(root);
-    return ESP_OK;
+
+    return res;
 }
