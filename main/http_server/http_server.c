@@ -400,6 +400,8 @@ static esp_err_t rest_api_common_handler(httpd_req_t * req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    httpd_resp_set_status(req, "404 Not Found");
+
     httpd_resp_set_type(req, "application/json");
 
     // Set CORS headers
@@ -942,31 +944,26 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     cJSON_AddItemToObject(root, "labels", labelArray);
 
     cJSON * statsArray = cJSON_AddArrayToObject(root, "statistics");
+    struct StatisticsData statsData;
+    uint16_t index = 0;
 
-    if (NULL != GLOBAL_STATE->STATISTICS_MODULE.statisticsList) {
-        StatisticsNodePtr node = *GLOBAL_STATE->STATISTICS_MODULE.statisticsList; // double pointer
-        struct StatisticsData statsData;
+    while (getStatisticData(index++, &statsData)) {
+        cJSON * valueArray = cJSON_CreateArray();
+        if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate)); }
+        if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature)); }
+        if (dataSelection[SRC_ERROR_COUNT]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.errorCount)); }
+        if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature)); }
+        if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); }
+        if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage)); }
+        if (dataSelection[SRC_POWER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power)); }
+        if (dataSelection[SRC_CURRENT]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current)); }
+        if (dataSelection[SRC_FAN_SPEED]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed)); }
+        if (dataSelection[SRC_FAN_RPM]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM)); }
+        if (dataSelection[SRC_WIFI_RSSI]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI)); }
+        if (dataSelection[SRC_FREE_HEAP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap)); }
+        cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
 
-        while (NULL != node) {
-            node = statisticData(node, &statsData);
-
-            cJSON * valueArray = cJSON_CreateArray();
-            if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate)); }
-            if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature)); }
-            if (dataSelection[SRC_ERROR_COUNT]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.errorCount)); }
-            if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature)); }
-            if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); }
-            if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage)); }
-            if (dataSelection[SRC_POWER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power)); }
-            if (dataSelection[SRC_CURRENT]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current)); }
-            if (dataSelection[SRC_FAN_SPEED]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed)); }
-            if (dataSelection[SRC_FAN_RPM]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM)); }
-            if (dataSelection[SRC_WIFI_RSSI]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI)); }
-            if (dataSelection[SRC_FREE_HEAP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap)); }
-            cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
-
-            cJSON_AddItemToArray(statsArray, valueArray);
-        }
+        cJSON_AddItemToArray(statsArray, valueArray);
     }
 
     esp_err_t res = HTTP_send_json(req, root, &system_statistics_prebuffer_len);
