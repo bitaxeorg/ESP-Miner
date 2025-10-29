@@ -52,4 +52,8 @@
             width: 26%;
         }
     }
+
+    &[style*="background"] {
+        transition: background 250ms;
+    }
 }

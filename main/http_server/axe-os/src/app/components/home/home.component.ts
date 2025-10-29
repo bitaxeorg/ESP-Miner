@@ -241,7 +241,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           position: 'left',
           ticks: {
             color: primaryColor,
-            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[0].label, {complete: true})
+            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[0].label, {tickmark: true})
           },
           grid: {
             color: surfaceBorder,
@@ -255,7 +255,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           position: 'right',
           ticks: {
             color: textColorSecondary,
-            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[1].label, {complete: true})
+            callback: (value: number) => HomeComponent.cbFormatValue(value, this.chartData.datasets[1].label, {tickmark: true})
           },
           grid: {
             drawOnChartArea: false,
@@ -499,11 +499,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     return { r, g, b };
   }
 
-  private rgbToHex(r: number, g: number, b: number): string {
-    const toHex = (n: number) => (n < 16 ? '0' : '') + (n | 0).toString(16);
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  }
-
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
   }
@@ -620,7 +615,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const finalG = (g * (1 - t) + target * t) | 0;
     const finalB = (b * (1 - t) + target * t) | 0;
 
-    return this.rgbToHex(finalR, finalG, finalB);
+    return `rgb(${finalR}, ${finalG}, ${finalB})`;
   }
 
   public calculateAsicDomainIntensity(info: ISystemInfo, asicCount: number, domain: number): number {

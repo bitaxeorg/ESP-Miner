@@ -26,7 +26,7 @@ export class HashSuffixPipe implements PipeTransform {
     const scaledValue = value / Math.pow(1000, power);
     const suffix = suffixes[power];
 
-    if (args?.complete) {
+    if (args?.tickmark) {
       return scaledValue + suffix;      
     }
 
