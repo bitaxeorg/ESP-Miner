@@ -78,15 +78,15 @@ export class HomeComponent implements OnInit, OnDestroy {
     private storageService: LocalStorageService
   ) {
     this.initializeChart();
+  }
 
+  ngOnInit(): void {
     this.themeService.getThemeSettings()
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.updateChartColors();
       });
-  }
 
-  ngOnInit(): void {
     this.pageDefaultTitle = this.titleService.getTitle();
     this.loadingService.loading$.next(true);
 

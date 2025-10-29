@@ -60,7 +60,6 @@ void app_main(void)
     if (self_test(&GLOBAL_STATE)) return;
 
     SYSTEM_init_system(&GLOBAL_STATE);
-    statistics_init(&GLOBAL_STATE);
     scoreboard_init(&GLOBAL_STATE.SYSTEM_MODULE.scoreboard);
 
     // init AP and connect to wifi
