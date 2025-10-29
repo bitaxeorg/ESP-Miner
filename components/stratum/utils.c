@@ -318,14 +318,14 @@ void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits)
 
     if (!sigdigits) {
         if (decimal)
-            snprintf(buf, bufsiz, "%.2f %s", dval, suffix);
+            snprintf(buf, bufsiz, "%.2f%s", dval, suffix);
         else
-            snprintf(buf, bufsiz, "%d %s", (unsigned int) dval, suffix);
+            snprintf(buf, bufsiz, "%d%s", (unsigned int) dval, suffix);
     } else {
         /* Always show sigdigits + 1, padded on right with zeroes
          * followed by suffix */
         int ndigits = sigdigits - 1 - (dval > 0.0 ? floor(log10(dval)) : 0);
 
-        snprintf(buf, bufsiz, "%*.*f %s", sigdigits + 1, ndigits, dval, suffix);
+        snprintf(buf, bufsiz, "%*.*f%s", sigdigits + 1, ndigits, dval, suffix);
     }
 }
