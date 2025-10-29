@@ -37,9 +37,11 @@ export class SystemService {
         nominalVoltage: 5,
         hashRate: 475,
         expectedHashrate: 420,
-        bestDiff: "0",
-        bestSessionDiff: "0",
+        bestDiff: 238214491,
+        bestSessionDiff: 21212121,
         freeHeap: 200504,
+        freeHeapInternal: 200504,
+        freeHeapSpiram: 200504,
         coreVoltage: 1200,
         coreVoltageActual: 1200,
         hostname: "Bitaxe",
@@ -69,7 +71,7 @@ export class SystemService {
         fallbackStratumExtranonceSubscribe: 0,
         poolDifficulty: 1000,
         responseTime: 10,
-        isUsingFallbackStratum: true,
+        isUsingFallbackStratum: false,
         isPSRAMAvailable: true,
         frequency: 485,
         version: "v2.9.0",
@@ -94,7 +96,15 @@ export class SystemService {
         blockHeight: 811111,
         scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",
         networkDifficulty: "25.3T",
-
+        hashrateMonitor: {
+          asics: [{
+            total: 441.2579,
+            domains: [114.9901, 98.6658, 103.8136, 122.7133],
+            error: 1.7166,
+          }],
+          hashrate: 441.2579,
+          errorCount: 0,
+        },
         blockFound: 0,
       }
     ).pipe(delay(1000));

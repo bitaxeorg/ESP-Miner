@@ -131,3 +131,21 @@ double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
     }
     return 500;
 }
+
+void ASIC_read_registers(GlobalState * GLOBAL_STATE)
+{
+    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BM1397:
+            BM1397_read_registers();
+            break;
+        case BM1366:
+            BM1366_read_registers();
+            break;
+        case BM1368:
+            BM1368_read_registers();
+            break;
+        case BM1370:
+            BM1370_read_registers();
+            break;
+    }
+}

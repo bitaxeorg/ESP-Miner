@@ -28,6 +28,7 @@ static StratumApiV1Message stratum_api_v1_message = {};
 
 static const char * primary_stratum_url;
 static uint16_t primary_stratum_port;
+static int64_t last_notify_timestamp = 0;
 
 struct timeval tcp_snd_timeout = {
     .tv_sec = 5,
@@ -35,16 +36,16 @@ struct timeval tcp_snd_timeout = {
 };
 
 struct timeval tcp_rcv_timeout = {
-    .tv_sec = 60 * 10,
+    .tv_sec = 180,
     .tv_usec = 0
 };
 
 typedef struct {
-    struct sockaddr_storage dest_addr;
+    struct sockaddr_storage dest_addr;  // Stores IPv4 or IPv6 address with scope_id for IPv6
     socklen_t addrlen;
     int addr_family;
     int ip_protocol;
-    char host_ip[INET6_ADDRSTRLEN];
+    char host_ip[INET6_ADDRSTRLEN + 16];  // IPv6 address + zone identifier (e.g., "fe80::1%wlan0")
 } stratum_connection_info_t;
 
 static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, stratum_connection_info_t *conn_info)
@@ -52,15 +53,19 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
     struct addrinfo hints = {
         .ai_family = AF_UNSPEC,
         .ai_socktype = SOCK_STREAM,
-        .ai_protocol = IPPROTO_TCP
+        .ai_protocol = IPPROTO_TCP,
+        .ai_flags = AI_NUMERICSERV  // Port is numeric
     };
     struct addrinfo *res;
     char port_str[6];
     
     snprintf(port_str, sizeof(port_str), "%d", port);
+    
+    ESP_LOGD(TAG, "Resolving address for hostname: %s (port %d)", hostname, port);
+    
     int gai_err = getaddrinfo(hostname, port_str, &hints, &res);
     if (gai_err != 0) {
-        ESP_LOGE(TAG, "getaddrinfo failed for %s: %d", hostname, gai_err);
+        ESP_LOGE(TAG, "getaddrinfo failed for %s: error code %d", hostname, gai_err);
         return ESP_FAIL;
     }
 
@@ -75,6 +80,24 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
             conn_info->addrlen = p->ai_addrlen;
             conn_info->addr_family = AF_INET6;
             conn_info->ip_protocol = IPPROTO_IPV6;
+            
+            // Log scope ID for IPv6 link-local addresses
+            struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
+            if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr)) {
+                ESP_LOGI(TAG, "Link-local IPv6 address detected, scope_id: %lu", (unsigned long)addr6->sin6_scope_id);
+                if (addr6->sin6_scope_id == 0) {
+                    ESP_LOGW(TAG, "Warning: Link-local IPv6 without scope ID - attempting to set from WIFI_STA_DEF");
+                    // Try to get the WiFi STA interface index
+                    esp_netif_t *esp_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+                    if (esp_netif) {
+                        int netif_index = esp_netif_get_netif_impl_index(esp_netif);
+                        if (netif_index >= 0) {
+                            addr6->sin6_scope_id = (u32_t)netif_index;
+                            ESP_LOGI(TAG, "Set scope_id to interface index: %lu", (unsigned long)addr6->sin6_scope_id);
+                        }
+                    }
+                }
+            }
             break;
         }
     }
@@ -101,8 +124,16 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
 
     // Convert address to string for logging
     if (conn_info->addr_family == AF_INET6) {
-        inet_ntop(AF_INET6, &((struct sockaddr_in6 *)&conn_info->dest_addr)->sin6_addr,
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
+        inet_ntop(AF_INET6, &addr6->sin6_addr,
                   conn_info->host_ip, sizeof(conn_info->host_ip));
+        
+        // Append zone identifier for link-local addresses
+        if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr) && addr6->sin6_scope_id != 0) {
+            char zone_buf[16];
+            snprintf(zone_buf, sizeof(zone_buf), "%%%lu", addr6->sin6_scope_id);
+            strncat(conn_info->host_ip, zone_buf, sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
+        }
     } else {
         inet_ntop(AF_INET, &((struct sockaddr_in *)&conn_info->dest_addr)->sin_addr,
                   conn_info->host_ip, sizeof(conn_info->host_ip));
@@ -225,7 +256,7 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
 
-        if (strstr(recv_buffer, "mining.notify") != NULL) {
+        if (strstr(recv_buffer, "mining.notify") != NULL && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
             ESP_LOGI(TAG, "Heartbeat successful and in fallback mode. Switching back to primary.");
             GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
             stratum_close_connection(GLOBAL_STATE);
@@ -236,7 +267,7 @@ void stratum_primary_heartbeat(void * pvParameters)
     }
 }
 
-void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
+static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
 {
     double network_difficulty = networkDifficulty(mining_notification->target);
     suffixString(network_difficulty, GLOBAL_STATE->network_diff_string, DIFF_STRING_SIZE, 0);    
@@ -268,12 +299,20 @@ void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify 
         GLOBAL_STATE->block_height = block_height;
     }
 
-    size_t scriptsig_length = scriptsig_len - 1 - block_height_len - (strlen(GLOBAL_STATE->extranonce_str) / 2) - GLOBAL_STATE->extranonce_2_len;
+    size_t scriptsig_length = scriptsig_len - 1 - block_height_len;
+    if (coinbase_1_len - coinbase_1_offset < scriptsig_len - 1 - block_height_len) {
+        scriptsig_length -= (strlen(GLOBAL_STATE->extranonce_str) / 2) + GLOBAL_STATE->extranonce_2_len;
+    }
     if (scriptsig_length <= 0) return;
     
     char * scriptsig = malloc(scriptsig_length + 1);
+    if (!scriptsig) return;
 
     int coinbase_1_tag_len = coinbase_1_len - coinbase_1_offset;
+    if (coinbase_1_tag_len > scriptsig_length) {
+        coinbase_1_tag_len = scriptsig_length;
+    }
+
     hex2bin(mining_notification->coinbase_1 + (coinbase_1_offset * 2), (uint8_t *) scriptsig, coinbase_1_tag_len);
 
     int coinbase_2_tag_len = scriptsig_length - coinbase_1_tag_len;
@@ -303,6 +342,20 @@ void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify 
     }
 }
 
+static bool check_notify_timeout(GlobalState * GLOBAL_STATE, int64_t timeout_seconds)
+{
+    if (last_notify_timestamp > 0) {
+        int64_t current_time_ms = esp_timer_get_time() / 1000;
+        int32_t time_diff_ms = current_time_ms - last_notify_timestamp;
+        int32_t time_diff_seconds = time_diff_ms / 1000;
+        if (time_diff_seconds > timeout_seconds) {
+            ESP_LOGW(TAG, "No mining.notify received for %lld seconds, reconnecting...", time_diff_seconds);
+            return true;
+        }
+    }
+    return false;
+}
+
 void stratum_task(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -318,7 +371,7 @@ void stratum_task(void * pvParameters)
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
-    xTaskCreate(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL);
+    xTaskCreateWithCaps(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL, MALLOC_CAP_SPIRAM);
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
     while (1) {
@@ -405,6 +458,9 @@ void stratum_task(void * pvParameters)
 
         stratum_reset_uid(GLOBAL_STATE);
         cleanQueue(GLOBAL_STATE);
+        
+        // Reset notify timestamp for new connection
+        last_notify_timestamp = 0;
 
         ///// Start Stratum Action
         // mining.configure - ID: 1
@@ -425,12 +481,18 @@ void stratum_task(void * pvParameters)
         GLOBAL_STATE->abandon_work = 0;
 
         while (1) {
-            char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->sock);
-            if (!line) {
-                ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
+            if (check_notify_timeout(GLOBAL_STATE, 300)) {
                 retry_attempts++;
                 stratum_close_connection(GLOBAL_STATE);
                 break;
+            }
+
+            char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->sock);
+            if (!line) {
+                ESP_LOGD(TAG, "No data received from socket (may be timeout), checking notify timeout...");
+                // Don't immediately reconnect - could just be a socket timeout
+                // Loop back to check notify timeout
+                continue;
             }
 
             double response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id);
@@ -444,6 +506,7 @@ void stratum_task(void * pvParameters)
 
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
                 GLOBAL_STATE->SYSTEM_MODULE.work_received++;
+                last_notify_timestamp = esp_timer_get_time() / 1000;
                 SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
                 if (stratum_api_v1_message.should_abandon_work &&
                     (GLOBAL_STATE->stratum_queue.count > 0 || GLOBAL_STATE->ASIC_jobs_queue.count > 0)) {
@@ -494,7 +557,7 @@ void stratum_task(void * pvParameters)
                 retry_attempts = 0;
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "setup message accepted");
-                    if (stratum_api_v1_message.message_id == authorize_message_id) {
+                    if (stratum_api_v1_message.message_id == authorize_message_id && difficulty > 0) {
                         STRATUM_V1_suggest_difficulty(GLOBAL_STATE->sock, GLOBAL_STATE->send_uid++, difficulty);
                     }
                     if (extranonce_subscribe) {

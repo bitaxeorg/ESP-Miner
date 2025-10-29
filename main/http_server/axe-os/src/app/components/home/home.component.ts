@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
+import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
@@ -14,10 +15,14 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
+import { SelectItem } from 'primeng/api';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { LocalStorageService } from 'src/app/local-storage.service';
+
+type PoolLabel = 'Primary' | 'Fallback';
+const HOME_CHART_DATA_SOURCES = 'HOME_CHART_DATA_SOURCES';
 
 @Component({
   selector: 'app-home',
@@ -28,6 +33,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
+  public pools$!: Observable<SelectItem<PoolLabel>[]>;
 
   public chartOptions: any;
   public dataLabel: number[] = [];
@@ -47,7 +53,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolURL!: string;
   public activePoolPort!: number;
   public activePoolUser!: string;
-  public activePoolLabel!: 'Primary' | 'Fallback';
+  public activePoolLabel!: PoolLabel;
   public responseTime!: number;
 
   @ViewChild('chart')
@@ -72,19 +78,19 @@ export class HomeComponent implements OnInit, OnDestroy {
     private storageService: LocalStorageService
   ) {
     this.initializeChart();
+  }
 
+  ngOnInit(): void {
     this.themeService.getThemeSettings()
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.updateChartColors();
       });
-  }
 
-  ngOnInit(): void {
     this.pageDefaultTitle = this.titleService.getTitle();
     this.loadingService.loading$.next(true);
 
-    let dataSources = this.storageService.getItem('chartDataSources');
+    let dataSources = this.storageService.getItem(HOME_CHART_DATA_SOURCES);
     if (dataSources === null) {
       dataSources = `{"chartY1Data":"${chartLabelKey(eChartLabel.hashrate)}",`;
       dataSources += `"chartY2Data":"${chartLabelKey(eChartLabel.asicTemp)}"}`;
@@ -106,10 +112,15 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColor = documentStyle.getPropertyValue('--text-color');
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
+
+    const {r, g, b} = this.hexToRgb(primaryColor);
+
+    document.documentElement.style.setProperty('--primary-color-r', r.toString());
+    document.documentElement.style.setProperty('--primary-color-g', g.toString());
+    document.documentElement.style.setProperty('--primary-color-b', b.toString());
 
     // Update chart colors
     if (this.chartData && this.chartData.datasets) {
@@ -136,7 +147,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public updateSystem() {
     const form = this.form.getRawValue();
 
-    this.storageService.setItem('chartDataSources', JSON.stringify(form));
+    this.storageService.setItem(HOME_CHART_DATA_SOURCES, JSON.stringify(form));
 
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
@@ -291,8 +302,11 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
 
         stats.statistics.forEach(element => {
-          element[idxHashrate] = element[idxHashrate] * 1000000000;
+          element[idxHashrate] = this.normalizeHashrate(element[idxHashrate]);
           switch (chartLabelValue(chartY1DataLabel)) {
+            case eChartLabel.hashrateRegister:
+              element[idxChartY1Data] = this.normalizeHashrate(element[idxChartY1Data]);
+              break;
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
             case eChartLabel.current:
@@ -302,6 +316,9 @@ export class HomeComponent implements OnInit, OnDestroy {
               break;
           }
           switch (chartLabelValue(chartY2DataLabel)) {
+            case eChartLabel.hashrateRegister:
+              element[idxChartY2Data] = this.normalizeHashrate(element[idxChartY2Data]);
+              break;
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
             case eChartLabel.current:
@@ -340,8 +357,9 @@ export class HomeComponent implements OnInit, OnDestroy {
         return this.systemService.getInfo()
       }),
       map(info => {
-        info.hashRate = info.hashRate * 1000000000;
-        info.expectedHashrate = info.expectedHashrate * 1000000000;
+        info.hashRate = this.normalizeHashrate(info.hashRate);
+        info.hashrateMonitor.hashrate = this.normalizeHashrate(info.hashrateMonitor?.hashrate);
+        info.expectedHashrate = this.normalizeHashrate(info.expectedHashrate);
         info.voltage = info.voltage / 1000;
         info.current = info.current / 1000;
         info.coreVoltageActual = info.coreVoltageActual / 1000;
@@ -391,7 +409,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.responseTime = info.responseTime;
       }),
       map(info => {
-        info.power = parseFloat(info.power.toFixed(1))
+        info.power = parseFloat(info.power.toFixed(1));
         info.voltage = parseFloat(info.voltage.toFixed(1));
         info.current = parseFloat(info.current.toFixed(1));
         info.coreVoltageActual = parseFloat(info.coreVoltageActual.toFixed(2));
@@ -418,10 +436,45 @@ export class HomeComponent implements OnInit, OnDestroy {
       })
     );
 
+    this.pools$ = this.info$
+      .pipe(map(info => {
+        const result: SelectItem<PoolLabel>[] = [];
+        if (info.stratumURL) {
+          result.push({ label: 'Primary', value: 'Primary' });
+        }
+        if (info.fallbackStratumURL) {
+          result.push({ label: 'Fallback', value: 'Fallback' });
+        }
+        return result;
+      })
+    );
+
     this.titleSubscription = this.info$
       .pipe(takeUntil(this.destroy$))
       .subscribe(info => {
         this.setTitle(info);
+      });
+  }
+
+  onPoolChange(event: { originalEvent: Event; value: PoolLabel }) {
+    const useFallbackStratum = Number(event.value === 'Fallback');
+
+    this.systemService.updateSystem('', { useFallbackStratum })
+      .pipe(
+        this.loadingService.lockUIUntilComplete(),
+        switchMap(() =>
+          this.systemService.restart().pipe(
+            this.loadingService.lockUIUntilComplete()
+          )
+        )
+      )
+      .subscribe({
+        next: () => {
+          this.toastr.success('Pool changed and device restarted');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error(`Error during pool change or device restart: ${err.message}`);
+        }
       });
   }
 
@@ -436,11 +489,24 @@ export class HomeComponent implements OnInit, OnDestroy {
         (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : ''),
         (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : ''),
         (!info.power_fault ? `${info.power} W` : ''),
-        (info.bestDiff ? info.bestDiff : ''),
+        (info.bestDiff ? DiffSuffixPipe.transform(info.bestDiff) : ''),
       );
     }
 
     this.titleService.setTitle(parts.filter(Boolean).join(' • '));
+  }
+
+  private hexToRgb(hex: string): {r: number, g: number, b: number} {
+    if (hex[0] === '#') hex = hex.slice(1);
+    if (hex.length === 3) {
+      hex = hex.split('').map((h: string) => h + h).join('');
+    }
+
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+
+    return { r, g, b };
   }
 
   getRejectionExplanation(reason: string): string | null {
@@ -468,13 +534,93 @@ export class HomeComponent implements OnInit, OnDestroy {
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       if (hashrate > 0) {
-        return power / (hashrate / 1000000000000); // Convert to J/Th
+        return power / (hashrate / 1_000_000_000_000); // Convert to J/Th
       } else {
         return power; // in this case better than infinity or NaN
       }
     });
 
     return this.calculateAverage(efficiencies);
+  }
+
+  private calculateEfficiency(info: ISystemInfo, key: 'hashRate' | 'expectedHashrate'): number {
+    const hashrate = info[key];
+    if (info.power_fault || hashrate <= 0) {
+      return 0;
+    }
+    return info.power / (hashrate / 1_000_000_000_000);
+  }
+
+  public getHashrateAverage(): number {
+    return this.calculateAverage(this.hashrateData);
+  }
+
+  public getEfficiency(info: ISystemInfo): number {
+    return this.calculateEfficiency(info, 'hashRate');
+  }
+
+  public getEfficiencyAverage(): number {
+    return this.calculateEfficiencyAverage(this.hashrateData, this.powerData);
+  }
+
+  public getExpectedEfficiency(info: ISystemInfo): number {
+    return this.calculateEfficiency(info, 'expectedHashrate');
+  }
+
+  public getShareRejectionPercentage(sharesRejectedReason: { count: number }, info: ISystemInfo): number {
+    const totalShares = info.sharesAccepted + info.sharesRejected;
+    if (totalShares <= 0) {
+      return 0;
+    }
+    return (sharesRejectedReason.count / totalShares) * 100;
+  }
+
+  public getDomainErrorPercentage(info: ISystemInfo, asic: { error: number }): number {
+    return asic.error ? (this.normalizeHashrate(asic.error) * 100 / info.expectedHashrate) : 0;
+  }
+
+  public getDomainErrorColor(info: ISystemInfo, asic: { error: number }): string {
+    const percentage = this.getDomainErrorPercentage(info, asic);
+
+    switch (true) {
+      case (percentage < 1): return 'green';
+      case (percentage >= 1 && percentage < 10): return 'orange';
+      default: return 'red';
+    }
+  }
+
+  public getAsicsAmount(info: ISystemInfo): number {
+    return info.hashrateMonitor.asics.length;
+  }
+
+  public getAsicDomainsAmount(info: ISystemInfo, asicCount: number): number {
+    return info.hashrateMonitor.asics[asicCount].domains.length;
+  }
+
+  public getHighestAsicDomainPercentage(asics: { total: number, domains: number[] }[]): number {
+    let highest = 0;
+
+    for (const asic of asics) {
+      for (const domain of asic.domains) {
+        const percentage = (domain * 100) / asic.total;
+        if (percentage > highest) {
+          highest = percentage;
+        }
+      }
+    }
+
+    return highest;
+  }
+
+  public calculateAsicDomainIntensity(info: ISystemInfo, asicCount: number, domain: number): number {
+    const highestPercentage = this.getHighestAsicDomainPercentage(info.hashrateMonitor.asics);
+    const domainPercentage = (domain * 100) / info.hashrateMonitor.asics[asicCount].total;
+
+    return domainPercentage / highestPercentage;
+  }
+
+  public normalizeHashrate(hashrate: number): number {
+    return hashrate * 1_000_000_000;
   }
 
   public clearDataPoints() {
@@ -497,59 +643,64 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public getSuggestedMaxForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
-      case eChartLabel.hashrate:    return info.expectedHashrate;
-      case eChartLabel.asicTemp:    return this.maxTemp;
-      case eChartLabel.vrTemp:      return this.maxTemp + 25;
-      case eChartLabel.asicVoltage: return info.coreVoltage;
-      case eChartLabel.voltage:     return (info.nominalVoltage + .5);
-      case eChartLabel.power:       return this.maxPower;
-      case eChartLabel.current:     return (this.maxPower / info.coreVoltage);
-      case eChartLabel.fanSpeed:    return 100;
-      case eChartLabel.fanRpm:      return 7000;
-      case eChartLabel.wifiRssi:    return 0;
-      case eChartLabel.freeHeap:    return 0;
-      default: return 0;
+      case eChartLabel.hashrate:         return info.expectedHashrate;
+      case eChartLabel.hashrateRegister: return info.expectedHashrate;
+      case eChartLabel.asicTemp:         return this.maxTemp;
+      case eChartLabel.vrTemp:           return this.maxTemp + 25;
+      case eChartLabel.asicVoltage:      return info.coreVoltage;
+      case eChartLabel.voltage:          return info.nominalVoltage + .5;
+      case eChartLabel.power:            return this.maxPower;
+      case eChartLabel.current:          return this.maxPower / info.coreVoltage;
+      case eChartLabel.fanSpeed:         return 100;
+      case eChartLabel.fanRpm:           return 7000;
+      default:                           return 0;
     }
   }
 
   static getDataForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
-      case eChartLabel.hashrate:    return info.hashRate;
-      case eChartLabel.asicTemp:    return info.temp;
-      case eChartLabel.vrTemp:      return info.vrTemp;
-      case eChartLabel.asicVoltage: return info.coreVoltageActual;
-      case eChartLabel.voltage:     return info.voltage;
-      case eChartLabel.power:       return info.power;
-      case eChartLabel.current:     return info.current;
-      case eChartLabel.fanSpeed:    return info.fanspeed;
-      case eChartLabel.fanRpm:      return info.fanrpm;
-      case eChartLabel.wifiRssi:    return info.wifiRSSI;
-      case eChartLabel.freeHeap:    return info.freeHeap;
-      default: return 0.0;
+      case eChartLabel.hashrate:           return info.hashRate;
+      case eChartLabel.hashrateRegister:   return info.hashrateMonitor?.hashrate;
+      case eChartLabel.errorCountRegister: return info.hashrateMonitor?.errorCount;
+      case eChartLabel.asicTemp:           return info.temp;
+      case eChartLabel.vrTemp:             return info.vrTemp;
+      case eChartLabel.asicVoltage:        return info.coreVoltageActual;
+      case eChartLabel.voltage:            return info.voltage;
+      case eChartLabel.power:              return info.power;
+      case eChartLabel.current:            return info.current;
+      case eChartLabel.fanSpeed:           return info.fanspeed;
+      case eChartLabel.fanRpm:             return info.fanrpm;
+      case eChartLabel.wifiRssi:           return info.wifiRSSI;
+      case eChartLabel.freeHeap:           return info.freeHeap;
+      default:                             return 0.0;
     }
   }
 
   static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number} {
     switch (label) {
-      case eChartLabel.hashrate:    return {suffix: ' H/s', precision: 0};
-      case eChartLabel.asicTemp:    return {suffix: ' °C', precision: 1};
-      case eChartLabel.vrTemp:      return {suffix: ' °C', precision: 1};
-      case eChartLabel.asicVoltage: return {suffix: ' V', precision: 3};
-      case eChartLabel.voltage:     return {suffix: ' V', precision: 1};
-      case eChartLabel.power:       return {suffix: ' W', precision: 1};
-      case eChartLabel.current:     return {suffix: ' A', precision: 1};
-      case eChartLabel.fanSpeed:    return {suffix: ' %', precision: 0};
-      case eChartLabel.fanRpm:      return {suffix: ' rpm', precision: 0};
-      case eChartLabel.wifiRssi:    return {suffix: ' dBm', precision: 0};
-      case eChartLabel.freeHeap:    return {suffix: ' B', precision: 0};
-      default: return {suffix: '', precision: 0};
+      case eChartLabel.hashrate:
+      case eChartLabel.hashrateRegister: return {suffix: ' H/s', precision: 0};
+      case eChartLabel.asicTemp:
+      case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};
+      case eChartLabel.asicVoltage:
+      case eChartLabel.voltage:          return {suffix: ' V', precision: 1};
+      case eChartLabel.power:            return {suffix: ' W', precision: 1};
+      case eChartLabel.current:          return {suffix: ' A', precision: 1};
+      case eChartLabel.fanSpeed:         return {suffix: ' %', precision: 0};
+      case eChartLabel.fanRpm:           return {suffix: ' rpm', precision: 0};
+      case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
+      case eChartLabel.freeHeap:         return {suffix: ' B', precision: 0};
+      default:                           return {suffix: '', precision: 0};
     }
   }
 
   static cbFormatValue(value: number, datasetLabel: eChartLabel): string {
     switch (datasetLabel) {
-      case eChartLabel.hashrate:    return HashSuffixPipe.transform(value);
-      case eChartLabel.freeHeap:    return ByteSuffixPipe.transform(value);
+      case eChartLabel.hashrate:
+      case eChartLabel.hashrateRegister:
+        return HashSuffixPipe.transform(value);
+      case eChartLabel.freeHeap:
+        return ByteSuffixPipe.transform(value);
       default:
         const settings = HomeComponent.getSettingsForLabel(datasetLabel);
         return value.toFixed(settings.precision) + settings.suffix;
