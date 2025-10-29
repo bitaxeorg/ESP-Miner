@@ -1,9 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { of } from 'rxjs';
-import { catchError, shareReplay } from 'rxjs/operators';
+import { BehaviorSubject, Observable, of } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
 
 export interface ThemeSettings {
   colorScheme: string;
@@ -16,15 +15,6 @@ export interface ThemeSettings {
   providedIn: 'root'
 })
 export class ThemeService {
-  private themeSettings$ = this.http.get<ThemeSettings>('/api/theme').pipe(
-    catchError(() => of(this.mockSettings)),
-    shareReplay({ 
-      bufferSize: 1, 
-      refCount: true, 
-      windowTime: 1000 // 1 second cache
-    })
-  );
-
   private readonly mockSettings: ThemeSettings = {
     colorScheme: 'dark',
     accentColors: {
@@ -57,21 +47,29 @@ export class ThemeService {
     }
   };
 
-  constructor(private http: HttpClient) {}
+  private themeSettingsSubject = new BehaviorSubject<ThemeSettings>(this.mockSettings);
+  private themeSettings$ = this.themeSettingsSubject.asObservable();
 
-  // Get theme settings from NVS storage
-  getThemeSettings(): Observable<ThemeSettings> {
-    if (!environment.production) {
-      return of(this.mockSettings);
+  constructor(private http: HttpClient) {
+    if (environment.production) {
+      this.http.get<ThemeSettings>('/api/theme').pipe(
+        catchError(() => of(this.mockSettings)),
+        tap(settings => this.themeSettingsSubject.next(settings))
+      ).subscribe();
     }
+  }
+
+  getThemeSettings(): Observable<ThemeSettings> {
     return this.themeSettings$;
   }
 
-  // Save theme settings to NVS storage
   saveThemeSettings(settings: ThemeSettings): Observable<void> {
     if (environment.production) {
-      return this.http.post<void>('/api/theme', settings);
+      return this.http.post<void>('/api/theme', settings).pipe(
+        tap(() => this.themeSettingsSubject.next(settings))
+      );
     } else {
+      this.themeSettingsSubject.next(settings);
       return of(void 0);
     }
   }
