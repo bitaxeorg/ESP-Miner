@@ -121,6 +121,7 @@ typedef struct
 
     int block_height;
     char * scriptsig;
+    uint64_t network_nonce_diff;
     char network_diff_string[DIFF_STRING_SIZE];
 } GlobalState;
 

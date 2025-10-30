@@ -382,8 +382,8 @@
                     <div class="col-fixed-width text-500">
                         <span>Difficulty</span>
                     </div>
-                    <div>
-                        {{ info.networkDifficulty }}
+                    <div *ngIf="info.networkDifficulty">
+                        {{ info.networkDifficulty | diffSuffix }}
                     </div>
                 </div>
 
