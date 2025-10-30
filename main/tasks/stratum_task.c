@@ -35,7 +35,7 @@ struct timeval tcp_snd_timeout = {
 };
 
 struct timeval tcp_rcv_timeout = {
-    .tv_sec = 60 * 10,
+    .tv_sec = 60 * 3,
     .tv_usec = 0
 };
 
