@@ -73,13 +73,15 @@ void app_main(void)
     //start the API for AxeOS
     start_rest_server((void *) &GLOBAL_STATE);
 
-    // Initialize BAP interface
-    esp_err_t bap_ret = BAP_init(&GLOBAL_STATE);
-    if (bap_ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize BAP interface: %d", bap_ret);
-        // Continue anyway, as BAP is not critical for core functionality
-    } else {
-        ESP_LOGI(TAG, "BAP interface initialized successfully");
+    if (GLOBAL_STATE.psram_is_available) {
+        // Initialize BAP interface
+        esp_err_t bap_ret = BAP_init(&GLOBAL_STATE);
+        if (bap_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize BAP interface: %d", bap_ret);
+            // Continue anyway, as BAP is not critical for core functionality
+        } else {
+            ESP_LOGI(TAG, "BAP interface initialized successfully");
+        }
     }
 
     while (!GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
@@ -120,10 +122,12 @@ void app_main(void)
     if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating asic result task");
     }
-    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+    if (xTaskCreate(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating hashrate monitor task");
     }
-    if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating statistics task");
+    if (GLOBAL_STATE.psram_is_available) {
+        if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating statistics task");
+        }
     }
 }

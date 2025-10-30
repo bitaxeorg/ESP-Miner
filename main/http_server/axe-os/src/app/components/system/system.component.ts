@@ -93,7 +93,7 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Wi-Fi IPv4', value: data.info.ipv4},
       { label: 'Wi-Fi IPv6', value: data.info.ipv6, class: 'pb-3', isSensitiveData: true},
       { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3', isSensitiveData: true },
-      { label: 'Free Heap Memory', value: ByteSuffixPipe.transform(data.info.freeHeap)},
+      { label: 'Free Heap Memory', value: ByteSuffixPipe.transform(data.info.freeHeap), class: 'pb-3', valueClass: data.info.isPSRAMAvailable ? '' : 'text-red-500', tooltip: data.info.isPSRAMAvailable ? '' : 'No PSRAM available or misconfigured, running in low memory mode. Disabled statistics and BAP port.' },
       { label: '• Internal', value: ByteSuffixPipe.transform(data.info.freeHeapInternal)},
       { label: '• Spiram', value: ByteSuffixPipe.transform(data.info.freeHeapSpiram), class: 'pb-3' },
       { label: 'Firmware Version', value: data.info.version },
