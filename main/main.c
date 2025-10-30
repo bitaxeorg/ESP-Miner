@@ -20,6 +20,7 @@
 #include "device_config.h"
 #include "connect.h"
 #include "asic_reset.h"
+#include "asic_init.h"
 
 static GlobalState GLOBAL_STATE;
 
@@ -94,24 +95,9 @@ void app_main(void)
     queue_init(&GLOBAL_STATE.stratum_queue);
     queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
 
-    if (asic_reset() != ESP_OK) {
-        GLOBAL_STATE.SYSTEM_MODULE.asic_status = "ASIC reset failed";
-        ESP_LOGE(TAG, "ASIC reset failed!");
+    if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
         return;
     }
-
-    SERIAL_init();
-
-    if (ASIC_init(&GLOBAL_STATE) == 0) {
-        GLOBAL_STATE.SYSTEM_MODULE.asic_status = "Chip count 0";
-        ESP_LOGE(TAG, "Chip count 0");
-        return;
-    }
-
-    SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
-    SERIAL_clear_buffer();
-
-    GLOBAL_STATE.ASIC_initalized = true;
 
     if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum admin task");

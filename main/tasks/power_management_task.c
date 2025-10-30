@@ -16,6 +16,7 @@
 #include "asic.h"
 #include "bm1370.h"
 #include "utils.h"
+#include "asic_init.h"
 #include "asic_reset.h"
 #include "driver/uart.h"
 
@@ -201,37 +202,16 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             uart_flush(UART_NUM_1);
             vTaskDelay(100 / portTICK_PERIOD_MS);
             
-            if (asic_reset() != ESP_OK) {
-                ESP_LOGE(TAG, "ASIC reset failed during reinitialization!");
-                GLOBAL_STATE->SYSTEM_MODULE.asic_status = "ASIC reset failed";
-            } else {
-                // Reset UART to 115200 baud - the ASIC expects this after reset
-                ESP_LOGI(TAG, "Resetting UART to 115200 baud for ASIC reinitialization...");
-                SERIAL_set_baud(UART_FREQ);
-                vTaskDelay(100 / portTICK_PERIOD_MS);
-                
-                ESP_LOGI(TAG, "Detecting ASIC chips...");
-                uint8_t chip_count = ASIC_init(GLOBAL_STATE);
-                if (chip_count == 0) {
-                    ESP_LOGE(TAG, "ASIC initialization failed - chip count 0");
-                    GLOBAL_STATE->SYSTEM_MODULE.asic_status = "Chip count 0";
-                } else {
-                    SERIAL_set_baud(ASIC_set_max_baud(GLOBAL_STATE));
-                    SERIAL_clear_buffer();
-                    
-                    GLOBAL_STATE->ASIC_initalized = true;
-                    ESP_LOGI(TAG, "ASIC reinitialized successfully with %d chip(s).", chip_count);
-                    
-                    // Give tasks time to start up and stabilize before frequency change
-                    // This prevents race conditions where tasks are just starting to use ASIC
-                    // while power management loop tries to change frequency
-                    ESP_LOGI(TAG, "Waiting for tasks to stabilize before applying frequency change...");
-                    vTaskDelay(2000 / portTICK_PERIOD_MS); // Wait 2 seconds
-                    
-                    // Frequency reduction to %.0f MHz will now be applied by normal power management loop
-                    nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, false);
-                    ESP_LOGI(TAG, "Resuming normal operation. Reduced frequency (%.0f MHz) will be applied automatically.", reduced_freq_float);
-                }
+            // Perform live recovery
+            // Stabilization delay of 2000ms prevents race conditions where tasks are just
+            // starting to use ASIC while power management loop tries to change frequency
+            uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, 2000);
+            
+            if (chip_count > 0) {
+                // Frequency reduction will now be applied by normal power management loop
+                nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, false);
+                ESP_LOGI(TAG, "Resuming normal operation. Reduced frequency (%.0f MHz) will be applied automatically.",
+                         reduced_freq_float);
             }
             
         }
