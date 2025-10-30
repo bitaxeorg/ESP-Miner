@@ -135,8 +135,7 @@ void statistics_task(void * pvParameters)
 
                 statsData.timestamp = currentTime;
                 statsData.hashrate = sys_module->current_hashrate;
-                statsData.hashrateRegister = hashrate_monitor->hashrate;
-                statsData.errorCountRegister = hashrate_monitor->error_count;
+                statsData.errorCount = hashrate_monitor->error_count;
                 statsData.chipTemperature = power_management->chip_temp_avg;
                 statsData.vrTemperature = power_management->vr_temp;
                 statsData.power = power_management->power;

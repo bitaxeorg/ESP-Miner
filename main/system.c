@@ -36,16 +36,10 @@ static const char * TAG = "system";
 //local function prototypes
 static esp_err_t ensure_overheat_mode_config();
 
-static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id);
-
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
-    module->duration_start = 0;
-    module->historical_hashrate_rolling_index = 0;
-    module->historical_hashrate_init = 0;
-    module->current_hashrate = 0;
     module->screen_page = 0;
     module->shares_accepted = 0;
     module->shares_rejected = 0;
@@ -167,13 +161,6 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
     }    
 }
 
-void SYSTEM_notify_mining_started(GlobalState * GLOBAL_STATE)
-{
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    module->duration_start = esp_timer_get_time();
-}
-
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -190,50 +177,7 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
     settimeofday(&tv, NULL);
 }
 
-void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double found_diff, uint8_t job_id)
-{
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    // Calculate the time difference in seconds with sub-second precision
-    // hashrate = (nonce_difficulty * 2^32) / time_to_find
-
-    module->historical_hashrate[module->historical_hashrate_rolling_index] = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
-    module->historical_hashrate_time_stamps[module->historical_hashrate_rolling_index] = esp_timer_get_time();
-
-    module->historical_hashrate_rolling_index = (module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH;
-
-    // ESP_LOGI(TAG, "nonce_diff %.1f, ttf %.1f, res %.1f", nonce_diff, duration,
-    // historical_hashrate[historical_hashrate_rolling_index]);
-
-    if (module->historical_hashrate_init < HISTORY_LENGTH) {
-        module->historical_hashrate_init++;
-    } else {
-        module->duration_start =
-            module->historical_hashrate_time_stamps[(module->historical_hashrate_rolling_index + 1) % HISTORY_LENGTH];
-    }
-    double sum = 0;
-    for (int i = 0; i < module->historical_hashrate_init; i++) {
-        sum += module->historical_hashrate[i];
-    }
-
-    double duration = (double) (esp_timer_get_time() - module->duration_start) / 1000000;
-
-    double rolling_rate = (sum * 4294967296) / (duration * 1000000000);
-    if (module->historical_hashrate_init < HISTORY_LENGTH) {
-        module->current_hashrate = rolling_rate;
-    } else {
-        // More smoothing
-        module->current_hashrate = ((module->current_hashrate * 9) + rolling_rate) / 10;
-    }
-
-
-    // logArrayContents(historical_hashrate, HISTORY_LENGTH);
-    // logArrayContents(historical_hashrate_time_stamps, HISTORY_LENGTH);
-
-    _check_for_best_diff(GLOBAL_STATE, found_diff, job_id);
-}
-
-static void _check_for_best_diff(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id)
+void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 

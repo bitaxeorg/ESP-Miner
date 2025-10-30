@@ -32,7 +32,6 @@ void ASIC_task(void *pvParameters)
     double asic_job_frequency_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
 
     ESP_LOGI(TAG, "ASIC Job Interval: %.2f ms", asic_job_frequency_ms);
-    SYSTEM_notify_mining_started(GLOBAL_STATE);
     ESP_LOGI(TAG, "ASIC Ready!");
 
     while (1)

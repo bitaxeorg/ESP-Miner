@@ -34,20 +34,14 @@
 
                     <ng-container *ngIf="!info.power_fault; else powerFault">
                         <div class="flex align-items-baseline gap-2 mb-3">
-                            <ng-container *ngIf="info.hashrateMonitor; else noHashrateMonitor">
-                                <span class="text-900 font-medium text-2xl">
-                                    {{info.hashrateMonitor.hashrate | hashSuffix}}
-                                </span>
-                                <span class="text-500 text-xs">
-                                    Error:
-                                    <span class="text-{{info.hashrateMonitor.errorCount === 0 ? 'green' : 'red'}}-500">
-                                        {{info.hashrateMonitor.errorCount}}
-                                    </span>
-                                </span>
-                            </ng-container>
-                            <ng-template #noHashrateMonitor>
+                            <span class="text-900 font-medium text-2xl">
                                 {{info.hashRate | hashSuffix}}
-                            </ng-template>
+                            </span>
+                            <span class="text-500 text-xs" 
+                                pTooltip="Hash errors as reported by the ASIC. A small number errors every few seconds is normal. Frequency changes, agressive overclocking, low voltage or a bad power supply can significantly increase the error rate."
+                                tooltipPosition="bottom">
+                                Error: {{info.hashrateMonitor.errorCount}}
+                            </span>
                         </div>
 
                         <div>
@@ -420,8 +414,8 @@
                             <td class="text-500 text-left cursor-pointer" pTooltip="ASIC {{ i + 1 }}" tooltipPosition="bottom">
                                 {{ i + 1 }}
                             </td>
-                            <td *ngFor="let domain of asic.domains"
-                                [style.--intensity]="calculateAsicDomainIntensity(info, i, domain)"
+                            <td *ngFor="let domain of asic.domains; let j = index"
+                                [style.background]="getHeatmapColor(info, i, j)"
                                 [style.height]="(getAsicsAmount(info) <= 2 ? '2rem' : null)"
                                 class="text-center cursor-pointer"
                                 pTooltip="{{ normalizeHashrate(domain) | hashSuffix }}"
@@ -429,7 +423,7 @@
                                 <span class="text-xs md:hidden">{{ normalizeHashrate(domain) | hashSuffix }}</span>
                             </td>
                             <td class="text-center cursor-pointer text-{{getDomainErrorColor(info, asic)}}-500" pTooltip="{{ normalizeHashrate(asic.error) | hashSuffix }}" tooltipPosition="bottom">
-                                {{getDomainErrorPercentage(info, asic) | number: '1.0-0'}} %
+                                {{getDomainErrorPercentage(info, asic) | number: '1.2-2'}} %
                             </td>
                         </tr>
                     </tbody>

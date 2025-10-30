@@ -11,7 +11,6 @@ interface IHashrateMonitorAsic {
 
 interface IHashrateMonitor {
     asics: IHashrateMonitorAsic[];
-    hashrate: number;
     errorCount: number;
 }
 

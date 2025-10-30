@@ -83,6 +83,24 @@ components:
             * 12 - WPA3_EXT_PSK (deprecated, use WPA3_PSK)
           examples:
             - 3
+    HashrateMonitorAsic:
+      type: object
+      required:
+        - total
+        - domains
+        - error
+      properties:
+        total:
+          type: number
+          description: Hashrate
+        domains:
+          type: array
+          description: Hashrate per domain
+          items:
+            type: string
+        error:
+          description: Error hashrate
+          type: number
 
     SystemInfo:
       type: object
@@ -153,6 +171,7 @@ components:
         - scriptsig
         - networkDifficulty
         - blockFound
+        - hashrateMonitor
       properties:
         ASICModel:
           type: string
@@ -351,6 +370,17 @@ components:
         blockFound:
           type: number
           description: Whether a block was found (0=no, 1=yes)
+        hashrateMonitor:
+          type: object
+          properties:
+            asics:
+              type: array
+              description: Hashrate register value per ASIC
+              items:
+                $ref: '#/components/schemas/HashrateMonitorAsic'
+            errorCount:
+              description: Hash error counter total
+              type: number
 
     Settings:
       type: object
