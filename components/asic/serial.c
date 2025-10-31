@@ -41,6 +41,11 @@ esp_err_t SERIAL_init(void)
     return uart_driver_install(UART_NUM_1, BUF_SIZE * 2, BUF_SIZE * 2, 0, NULL, 0);
 }
 
+bool SERIAL_is_initialized(void)
+{
+    return uart_is_driver_installed(UART_NUM_1);
+}
+
 esp_err_t SERIAL_set_baud(int baud)
 {
     ESP_LOGI(TAG, "Changing UART baud to %i", baud);

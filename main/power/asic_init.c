@@ -19,15 +19,25 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
         return 0;
     }
 
-    // CRITICAL: Different handling for cold boot vs recovery
-    if (mode == ASIC_INIT_COLD_BOOT) {
+    // Check actual UART state for safety
+    bool uart_initialized = SERIAL_is_initialized();
+    
+    // Verify mode matches actual state
+    if (mode == ASIC_INIT_COLD_BOOT && uart_initialized) {
+        ESP_LOGW(TAG, "Cold boot mode but UART already initialized - will reset baud only");
+    } else if (mode == ASIC_INIT_RECOVERY && !uart_initialized) {
+        ESP_LOGW(TAG, "Recovery mode but UART not initialized - will do full init");
+    }
+    
+    // Use actual state for decision, not just mode
+    if (!uart_initialized) {
         // Fresh boot - full UART initialization
         ESP_LOGI(TAG, "Performing full UART initialization");
         SERIAL_init();
     } else {
         // Live recovery - ASIC was reset, UART needs baud reset to 115200
         // This preserves the running system and avoids reboot
-        ESP_LOGI(TAG, "Resetting UART to %d baud for ASIC reinitialization", UART_FREQ);
+        ESP_LOGI(TAG, "UART already initialized, resetting baud to %d", UART_FREQ);
         SERIAL_set_baud(UART_FREQ);
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
