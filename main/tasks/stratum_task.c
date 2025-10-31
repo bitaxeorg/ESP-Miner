@@ -269,6 +269,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
 {
     double network_difficulty = networkDifficulty(mining_notification->target);
+    GLOBAL_STATE->network_nonce_diff = (uint64_t) network_difficulty;
     suffixString(network_difficulty, GLOBAL_STATE->network_diff_string, DIFF_STRING_SIZE, 0);    
 
     int coinbase_1_len = strlen(mining_notification->coinbase_1) / 2;

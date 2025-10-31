@@ -94,7 +94,7 @@ export class SystemService {
 
         blockHeight: 811111,
         scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",
-        networkDifficulty: "25.3T",
+        networkDifficulty: 155970000000000,
         hashrateMonitor: {
           asics: [{
             total: 441.2579,

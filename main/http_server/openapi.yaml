@@ -346,8 +346,8 @@ components:
           type: string
           description: Scriptsig extracted from coinbase transaction
         networkDifficulty:
-          type: string
-          description: Current network difficulty in human-readable format
+          type: number
+          description: Current network difficulty
         blockFound:
           type: number
           description: Whether a block was found (0=no, 1=yes)
