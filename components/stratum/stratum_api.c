@@ -380,7 +380,7 @@ int STRATUM_V1_subscribe(int socket, int send_uid, const char * model)
     char subscribe_msg[BUFFER_SIZE];
     const esp_app_desc_t *app_desc = esp_app_get_description();
     const char *version = app_desc->version;	
-    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe/%s/%s\"]}\n", send_uid, model, version);
+    sprintf(subscribe_msg, "{\"jsonrpc\": \"2.0\", \"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe/%s/%s\"]}\n", send_uid, model, version);
     debug_stratum_tx(subscribe_msg);
 
     return write(socket, subscribe_msg, strlen(subscribe_msg));
@@ -389,7 +389,7 @@ int STRATUM_V1_subscribe(int socket, int send_uid, const char * model)
 int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty)
 {
     char difficulty_msg[BUFFER_SIZE];
-    sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%ld]}\n", send_uid, difficulty);
+    sprintf(difficulty_msg, "{\"jsonrpc\": \"2.0\", \"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%ld]}\n", send_uid, difficulty);
     debug_stratum_tx(difficulty_msg);
 
     return write(socket, difficulty_msg, strlen(difficulty_msg));
@@ -398,7 +398,7 @@ int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty)
 int STRATUM_V1_extranonce_subscribe(int socket, int send_uid)
 {
     char extranonce_msg[BUFFER_SIZE];
-    sprintf(extranonce_msg, "{\"id\": %d, \"method\": \"mining.extranonce.subscribe\", \"params\": []}\n", send_uid);
+    sprintf(extranonce_msg, "{\"jsonrpc\": \"2.0\", \"id\": %d, \"method\": \"mining.extranonce.subscribe\", \"params\": []}\n", send_uid);
     debug_stratum_tx(extranonce_msg);
 
     return write(socket, extranonce_msg, strlen(extranonce_msg));
@@ -407,7 +407,7 @@ int STRATUM_V1_extranonce_subscribe(int socket, int send_uid)
 int STRATUM_V1_authorize(int socket, int send_uid, const char * username, const char * pass)
 {
     char authorize_msg[BUFFER_SIZE];
-    sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"%s\"]}\n", send_uid, username,
+    sprintf(authorize_msg, "{\"jsonrpc\": \"2.0\", \"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"%s\"]}\n", send_uid, username,
             pass);
     debug_stratum_tx(authorize_msg);
 
@@ -426,7 +426,7 @@ int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, con
 {
     char submit_msg[BUFFER_SIZE];
     sprintf(submit_msg,
-            "{\"id\": %d, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%08lx\", \"%08lx\", \"%08lx\"]}\n",
+            "{\"jsonrpc\": \"2.0\", \"id\": %d, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%08lx\", \"%08lx\", \"%08lx\"]}\n",
             send_uid, username, jobid, extranonce_2, ntime, nonce, version);
     debug_stratum_tx(submit_msg);
 
@@ -437,7 +437,7 @@ int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * ve
 {
     char configure_msg[BUFFER_SIZE * 2];
     sprintf(configure_msg,
-            "{\"id\": %d, \"method\": \"mining.configure\", \"params\": [[\"version-rolling\"], {\"version-rolling.mask\": "
+            "{\"jsonrpc\": \"2.0\", \"id\": %d, \"method\": \"mining.configure\", \"params\": [[\"version-rolling\"], {\"version-rolling.mask\": "
             "\"ffffffff\"}]}\n",
             send_uid);
     debug_stratum_tx(configure_msg);
