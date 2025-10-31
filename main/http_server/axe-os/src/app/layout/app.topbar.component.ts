@@ -54,8 +54,4 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
       error: () => this.toastr.error('Restart failed')
     });
   }
-
-  public isDesktop() {
-    return window.matchMedia("(min-width: 991px)").matches;
-  }
 }
