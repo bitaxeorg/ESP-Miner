@@ -1,6 +1,8 @@
 #ifndef POWER_MANAGEMENT_TASK_H_
 #define POWER_MANAGEMENT_TASK_H_
 
+
+
 typedef struct
 {
     uint16_t fan_perc;
@@ -10,6 +12,7 @@ typedef struct
     float chip_temp2_avg;
     float vr_temp;
     float voltage;
+    float core_voltage;
     float frequency_value;
     float expected_hashrate;
     float power;

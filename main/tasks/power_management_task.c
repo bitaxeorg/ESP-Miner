@@ -14,10 +14,10 @@
 #include "PID.h"
 #include "power.h"
 #include "asic.h"
+#include "auto_tune.h"
 #include "bm1370.h"
 #include "utils.h"
 
-#define POLL_RATE 1800
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
@@ -28,6 +28,7 @@
 
 #define TPS546_THROTTLE_TEMP 105.0
 #define TPS546_MAX_TEMP 145.0
+#define POLL_RATE 1800
 
 static const char * TAG = "power_management";
 
@@ -96,7 +97,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
-    uint16_t last_core_voltage = 0.0;
+    auto_tune_init(GLOBAL_STATE);
+    float last_core_voltage = 0.0;
 
     while (1) {
 
@@ -130,7 +132,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             }
             power_management->fan_perc = 100;
             Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1);
-
+            auto_tune_set_auto_tune_hashrate(false);
             // Turn off core voltage
             VCORE_set_voltage(GLOBAL_STATE, 0.0f);
 
@@ -144,7 +146,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         //enable the PID auto control for the FAN if set
-        if (nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED)) {
+        if(nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED)){
             if (power_management->chip_temp_avg >= 0) { // Ignore invalid temperature readings (-1)
                 if (power_management->chip_temp2_avg > 0) {
                     pid_input = (power_management->chip_temp_avg + power_management->chip_temp2_avg) / 2.0; // TODO: Or max of both?
@@ -215,17 +217,27 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             }
         }
 
-        uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
-        float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT);
+        float core_voltage = 0;
+        float asic_frequency = 0;
+
+        if (!auto_tune_get_auto_tune_hashrate()) {
+            core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+            asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY);
+        } else {
+            auto_tune();
+            core_voltage = auto_tune_get_voltage();
+            asic_frequency = auto_tune_get_frequency();
+        }
 
         if (core_voltage != last_core_voltage) {
-            ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
+            ESP_LOGI(TAG, "set vcore voltage from %fmV to %fmV", last_core_voltage, core_voltage);
             VCORE_set_voltage(GLOBAL_STATE, (double) core_voltage / 1000.0);
             last_core_voltage = core_voltage;
+            power_management->core_voltage = core_voltage;
         }
 
         if (asic_frequency != last_asic_frequency) {
-            ESP_LOGI(TAG, "New ASIC frequency requested: %g MHz (current: %g MHz)", asic_frequency, last_asic_frequency);
+            ESP_LOGI(TAG, "set frequency from %.2f MHz to  %.2f MHz", last_asic_frequency, asic_frequency);
             
             bool success = ASIC_set_frequency(GLOBAL_STATE, asic_frequency);
             

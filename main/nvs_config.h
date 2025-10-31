@@ -63,7 +63,22 @@ typedef enum {
     NVS_CONFIG_INA260,
     NVS_CONFIG_TPS546,
     NVS_CONFIG_POWER_CONSUMPTION_TARGET,
-    NVS_CONFIG_COUNT
+    //all after that get not read when looping through the settings,but is still avail due nvs
+    NVS_CONFIG_COUNT,
+
+    NVS_CONFIG_KEY_POWER_LIMIT,
+    NVS_CONFIG_KEY_FAN_LIMIT,
+    NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC,
+    NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC,
+    NVS_CONFIG_KEY_MAX_TEMP_ASIC,
+    NVS_CONFIG_KEY_AUTO_TUNE_ENABLE,
+    NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT,
+    NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT,
+    NVS_CONFIG_KEY_VF_RATIO_MAX,
+    NVS_CONFIG_KEY_VF_RATIO_MIN,
+    NVS_CONFIG_KEY_MAX_TEMP_VR,
+    NVS_ALL_CONFIG_COUNT
+    
 } NvsConfigKey;
 
 typedef enum {
@@ -85,6 +100,7 @@ typedef union {
 } ConfigValue;
 
 typedef struct {
+    //max key char length 15!
     const char *nvs_key_name;
     ConfigType type;
     ConfigValue value;
