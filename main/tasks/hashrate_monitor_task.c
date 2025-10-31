@@ -134,7 +134,7 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
 
     if (asic_nr >= asic_count) {
-        ESP_LOGE(TAG, "Asic nr out of bounds");
+        ESP_LOGE(TAG, "Asic nr out of bounds [%d]", asic_nr);
         return;
     }
 

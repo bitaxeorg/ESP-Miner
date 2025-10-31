@@ -107,6 +107,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->power = Power_get_power(GLOBAL_STATE);
 
         power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+        power_management->fan2_rpm = Thermal_get_fan2_speed(&GLOBAL_STATE->DEVICE_CONFIG);
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
         power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
 
@@ -146,8 +147,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         //enable the PID auto control for the FAN if set
         if (nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED)) {
             if (power_management->chip_temp_avg >= 0) { // Ignore invalid temperature readings (-1)
-                if (power_management->chip_temp2_avg > 0) {
-                    pid_input = (power_management->chip_temp_avg + power_management->chip_temp2_avg) / 2.0; // TODO: Or max of both?
+                if (power_management->chip_temp2_avg > power_management->chip_temp_avg) {
+                    pid_input = power_management->chip_temp2_avg;
                 } else {
                     pid_input = power_management->chip_temp_avg;
                 }
@@ -183,7 +184,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 // Uncomment for debugging PID output directly after compute
                 // ESP_LOGD(TAG, "DEBUG: PID raw output: %.2f%%, Input: %.1f, SetPoint: %.1f", pid_output, pid_input, pid_setPoint);
 
-                power_management->fan_perc = (uint16_t) pid_output;
+                power_management->fan_perc = pid_output;
                 if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, pid_output / 100.0) != ESP_OK) {
                     exit(EXIT_FAILURE);
                 }
@@ -208,10 +209,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 }
             }
         } else { // Manual fan speed
-            float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED);
-            power_management->fan_perc = fs;
-            if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, (float) fs / 100.0)) {
-                exit(EXIT_FAILURE);
+            float fan_perc = nvs_config_get_float(NVS_CONFIG_FAN_SPEED);
+            if (power_management->fan_perc != fan_perc) {
+                power_management->fan_perc = fan_perc;
+                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_perc / 100) != ESP_OK) {
+                    exit(EXIT_FAILURE);
+                }
             }
         }
 

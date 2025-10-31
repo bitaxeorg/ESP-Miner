@@ -46,6 +46,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public maxPower: number = 0;
   public nominalVoltage: number = 0;
   public maxTemp: number = 75;
+  public maxRpm: number = 7000;
   public maxFrequency: number = 800;
 
   public quickLink$!: Observable<string | undefined>;
@@ -373,6 +374,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.maxPower = Math.max(info.maxPower, info.power);
         this.nominalVoltage = info.nominalVoltage;
         this.maxTemp = Math.max(75, info.temp);
+        this.maxRpm = Math.max(7000, info.fanrpm, info.fan2rpm);
         this.maxFrequency = Math.max(800, info.frequency);
 
         // Only collect and update chart data if there's no power fault
@@ -653,6 +655,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.current:          return this.maxPower / info.coreVoltage;
       case eChartLabel.fanSpeed:         return 100;
       case eChartLabel.fanRpm:           return 7000;
+      case eChartLabel.fan2Rpm:          return 7000;
       default:                           return 0;
     }
   }
@@ -670,6 +673,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.current:            return info.current;
       case eChartLabel.fanSpeed:           return info.fanspeed;
       case eChartLabel.fanRpm:             return info.fanrpm;
+      case eChartLabel.fan2Rpm:            return info.fan2rpm;
       case eChartLabel.wifiRssi:           return info.wifiRSSI;
       case eChartLabel.freeHeap:           return info.freeHeap;
       default:                             return 0.0;
@@ -686,7 +690,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.voltage:          return {suffix: ' V', precision: 1};
       case eChartLabel.power:            return {suffix: ' W', precision: 1};
       case eChartLabel.current:          return {suffix: ' A', precision: 1};
-      case eChartLabel.fanSpeed:         return {suffix: ' %', precision: 0};
+      case eChartLabel.fanSpeed:         return {suffix: ' %', precision: 1};
       case eChartLabel.fanRpm:           return {suffix: ' rpm', precision: 0};
       case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
       case eChartLabel.freeHeap:         return {suffix: ' B', precision: 0};

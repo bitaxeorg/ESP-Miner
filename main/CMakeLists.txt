@@ -31,6 +31,7 @@ SRCS
     "./tasks/hashrate_monitor_task.c"
     "./thermal/EMC2101.c"
     "./thermal/EMC2103.c"
+    "./thermal/EMC2302.c"
     "./thermal/TMP1075.c"
     "./thermal/thermal.c"
     "./thermal/PID.c"
