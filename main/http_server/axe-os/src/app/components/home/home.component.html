@@ -1,26 +1,13 @@
 <ng-template #noTemp>--</ng-template>
 
 <ng-container *ngIf="info$ | async as info">
-    <!-- Temp warning alert -->
-    <p-message *ngIf="info.overheat_mode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Device has overheated - See settings">
-    </p-message>
-
-    <p-message *ngIf="!info.frequency || info.frequency < 400" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Device frequency is set low - See settings">
-    </p-message>
-
-    <p-message *ngIf="info.power_fault" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="{{info.power_fault}} Check your Power Supply.">
-    </p-message>
-
-    <p-message *ngIf="info.isUsingFallbackStratum" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device">
-    </p-message>
-
-    <p-message *ngIf="info.version !== info.axeOSVersion" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Firmware ({{info.version}}) and AxeOS ({{info.axeOSVersion}}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.">
-    </p-message>
+    <ng-container *ngFor="let message of messages">
+        <p-message
+            [severity]="message.severity"
+            [text]="message.text"
+            [styleClass]="'w-full mb-3 py-3 border-round-lg'"
+        />
+    </ng-container>
 
     <p-message *ngIf="info.blockFound" severity="success" styleClass="w-full mb-4 py-4 border-round-xl"
         text="Today is your lucky day! Your device has found a block 🎉">
