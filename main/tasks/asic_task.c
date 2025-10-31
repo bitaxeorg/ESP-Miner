@@ -37,8 +37,14 @@ void ASIC_task(void *pvParameters)
 
     while (1)
     {
+        // Check if ASIC is initialized before trying to send work
+        if (!GLOBAL_STATE->ASIC_initalized) {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        }
+        
         bm_job *next_bm_job = (bm_job *)queue_dequeue(&GLOBAL_STATE->ASIC_jobs_queue);
-
+    
         //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, next_bm_job); // send the job to the ASIC
         ASIC_send_work(GLOBAL_STATE, next_bm_job);
 

@@ -16,10 +16,14 @@
 #include "asic.h"
 #include "bm1370.h"
 #include "utils.h"
+#include "asic_init.h"
+#include "asic_reset.h"
+#include "driver/uart.h"
 
 #define POLL_RATE 1800
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
+#define SAFE_TEMP 45.0
 #define THROTTLE_TEMP_RANGE (MAX_TEMP - THROTTLE_TEMP)
 
 #define VOLTAGE_START_THROTTLE 4900
@@ -28,6 +32,8 @@
 
 #define TPS546_THROTTLE_TEMP 105.0
 #define TPS546_MAX_TEMP 145.0
+
+#define ASIC_REDUCTION 100.0
 
 static const char * TAG = "power_management";
 
@@ -97,6 +103,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
+    
+    uint16_t last_known_asic_volt = 0;
+    uint16_t last_known_asic_freq = 0;
+    float last_known_asic_freq_float = 0.0;
 
     while (1) {
 
@@ -111,13 +121,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
-
-        // ASIC Thermal Diode will give bad readings if the ASIC is turned off
-        // if(power_management->voltage < tps546_config.TPS546_INIT_VOUT_MIN){
-        //     goto looper;
-        // }
-
-        //overheat mode if the voltage regulator or ASIC is too hot
         bool asic_overheat = 
             power_management->chip_temp_avg > THROTTLE_TEMP
             || power_management->chip_temp2_avg > THROTTLE_TEMP;
@@ -131,16 +134,86 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->fan_perc = 100;
             Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1);
 
-            // Turn off core voltage
             VCORE_set_voltage(GLOBAL_STATE, 0.0f);
+            
+            ESP_LOGI(TAG, "Setting RST pin to low due to overheat condition");
+            ESP_ERROR_CHECK(asic_hold_reset_low());
 
-            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, 50);
-            nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, 50);
-            nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
+            last_known_asic_volt = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+            last_known_asic_freq = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY); 
+            last_known_asic_freq_float = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT);
             nvs_config_set_bool(NVS_CONFIG_AUTO_FAN_SPEED, false);
+            nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
             nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, true);
-            exit(EXIT_FAILURE);
+            ESP_LOGW(TAG, "Entering safe mode due to overheat condition. System operation halted.");
+            
+            // Note: ASIC temperature readings are invalid when ASIC is powered down (returns -1)
+            // For 600-series boards that use ASIC thermal diode, we rely on VR temp and fixed cooling time
+            // For boards with EMC internal temp sensor, readings remain valid
+            bool asic_temp_valid = GLOBAL_STATE->DEVICE_CONFIG.emc_internal_temp;
+            int cooling_cycles = 0;
+            const int MIN_COOLING_CYCLES = 6; // Minimum 30 seconds cooling
+            
+            while (cooling_cycles < MIN_COOLING_CYCLES || power_management->vr_temp > TPS546_THROTTLE_TEMP - 10) {
+                vTaskDelay(5000 / portTICK_PERIOD_MS); // Wait 5 seconds
+                cooling_cycles++;
+                
+                power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
+                
+                // Only check ASIC temps if they're valid (not using ASIC thermal diode)
+                if (asic_temp_valid) {
+                    power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
+                    power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
+                    ESP_LOGW(TAG, "Safe mode active (cycle %d) - VR: %.1fC ASIC1: %.1fC ASIC2: %.1fC",
+                             cooling_cycles, power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
+                    
+                    // Continue if ASIC temps still too high
+                    if (power_management->chip_temp_avg >  SAFE_TEMP || power_management->chip_temp2_avg > SAFE_TEMP) {
+                        cooling_cycles = 0; // Reset cycle count if still hot
+                    }
+                } else {
+                    // For boards using ASIC thermal diode (600 series), rely on VR temp and time
+                    ESP_LOGW(TAG, "Safe mode active (cycle %d/%d) - VR: %.1fC (ASIC temps unavailable while powered down)",
+                             cooling_cycles, MIN_COOLING_CYCLES, power_management->vr_temp);
+                }
+            }
+            ESP_LOGI(TAG, "Temperature normalized after %d cooling cycles. Reinitializing ASIC...", cooling_cycles);
+            
+            uint16_t reduced_voltage = last_known_asic_volt > ASIC_REDUCTION ? last_known_asic_volt - ASIC_REDUCTION : 1000;
+            uint16_t reduced_freq = last_known_asic_freq > ASIC_REDUCTION ? last_known_asic_freq - ASIC_REDUCTION : 400;
+            float reduced_freq_float = last_known_asic_freq_float > ASIC_REDUCTION ? last_known_asic_freq_float - ASIC_REDUCTION : 400.0;
+            
+            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, reduced_voltage);
+            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, reduced_freq);
+            nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, reduced_freq_float);
+            
+            ESP_LOGI(TAG, "Restoring core voltage to %umV = %.3fV (reduced from %umV = %.3fV)...",
+                     reduced_voltage, reduced_voltage/1000.0, last_known_asic_volt, last_known_asic_volt/1000.0);
+            VCORE_set_voltage(GLOBAL_STATE, (double)reduced_voltage / 1000.0);
+            vTaskDelay(500 / portTICK_PERIOD_MS); // Wait for voltage to stabilize
+            
+            ESP_LOGI(TAG, "Stopping ASIC tasks...");
+            // Mark ASIC as uninitialized to stop any tasks from trying to use UART
+            GLOBAL_STATE->ASIC_initalized = false;
+            // Give tasks time to complete any current UART operation and notice the flag
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+            ESP_LOGI(TAG, "Flushing UART buffers...");
+            // flush driver to clear any stale data
+            uart_flush(UART_NUM_1);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            
+            // Perform live recovery
+            // Stabilization delay of 2000ms prevents race conditions where tasks are just
+            // starting to use ASIC while power management loop tries to change frequency
+            uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, 2000);
+            
+            if (chip_count > 0) {
+                // Frequency reduction will now be applied by normal power management loop
+                nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, false);
+                ESP_LOGI(TAG, "Resuming normal operation. Reduced frequency (%.0f MHz) will be applied automatically.",
+                         reduced_freq_float);
+            }
+            
         }
 
         //enable the PID auto control for the FAN if set

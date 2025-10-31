@@ -40,6 +40,7 @@ SRCS
     "./power/power.c"
     "./power/vcore.c"
     "./power/asic_reset.c"
+    "./power/asic_init.c"
 
 INCLUDE_DIRS
     "."

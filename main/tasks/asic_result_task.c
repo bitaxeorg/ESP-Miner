@@ -19,6 +19,12 @@ void ASIC_result_task(void *pvParameters)
 
     while (1)
     {
+        // Check if ASIC is initialized before trying to process work
+        if (!GLOBAL_STATE->ASIC_initalized) {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        }
+        
         //task_result *asic_result = (*GLOBAL_STATE->ASIC_functions.receive_result_fn)(GLOBAL_STATE);
         task_result *asic_result = ASIC_process_work(GLOBAL_STATE);
 

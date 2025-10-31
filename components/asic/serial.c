@@ -23,7 +23,7 @@ esp_err_t SERIAL_init(void)
     ESP_LOGI(TAG, "Initializing serial");
     // Configure UART1 parameters
     uart_config_t uart_config = {
-        .baud_rate = 115200,
+        .baud_rate = UART_FREQ,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
@@ -39,6 +39,11 @@ esp_err_t SERIAL_init(void)
     // tx buffer 0 so the tx time doesn't overlap with the job wait time
     //  by returning before the job is written
     return uart_driver_install(UART_NUM_1, BUF_SIZE * 2, BUF_SIZE * 2, 0, NULL, 0);
+}
+
+bool SERIAL_is_initialized(void)
+{
+    return uart_is_driver_installed(UART_NUM_1);
 }
 
 esp_err_t SERIAL_set_baud(int baud)
