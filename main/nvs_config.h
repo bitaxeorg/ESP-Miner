@@ -47,6 +47,7 @@ typedef enum {
     NVS_CONFIG_SWARM,
     NVS_CONFIG_THEME_SCHEME,
     NVS_CONFIG_THEME_COLORS,
+    NVS_CONFIG_SCOREBOARD,
     
     NVS_CONFIG_BOARD_VERSION,
     NVS_CONFIG_DEVICE_MODEL,
@@ -87,7 +88,8 @@ typedef union {
 typedef struct {
     const char *nvs_key_name;
     ConfigType type;
-    ConfigValue value;
+    ConfigValue *value;
+    int array_size; // Numbered entries
     ConfigValue default_value;
     const char *rest_name;
     int min;
@@ -97,7 +99,9 @@ typedef struct {
 esp_err_t nvs_config_init(void);
 
 char * nvs_config_get_string(NvsConfigKey key);
+char *nvs_config_get_string_indexed(NvsConfigKey key, int index);
 void nvs_config_set_string(NvsConfigKey key, const char * value);
+void nvs_config_set_string_indexed(NvsConfigKey key, int index, const char *value);
 uint16_t nvs_config_get_u16(NvsConfigKey key);
 void nvs_config_set_u16(NvsConfigKey key, uint16_t value);
 int32_t nvs_config_get_i32(NvsConfigKey key);
