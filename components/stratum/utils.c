@@ -6,6 +6,8 @@
 
 #include "mbedtls/sha256.h"
 
+#define HASH_CNT_LSB 0x100000000uLL // 2^32 hashes for difficulty 1
+
 static const char hex_table[] = "0123456789abcdef";
 
 static const uint8_t hex_val_table[256] = {
@@ -328,4 +330,10 @@ void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits)
 
         snprintf(buf, bufsiz, "%*.*f %s", sigdigits + 1, ndigits, dval, suffix);
     }
+}
+
+float hashCounterToHashrate(uint32_t duration_ms, uint32_t counter)
+{
+    if (duration_ms == 0) return 0.0f;
+    return counter / (duration_ms / 1000.0) * (float)HASH_CNT_LSB; // Make sure it stays in float
 }
