@@ -77,6 +77,8 @@ bm_job construct_bm_job(mining_notify *params, const char *merkle_root, const ui
     midstate_sha256_bin(midstate_data, 64, new_job.midstate); // make the midstate hash
     reverse_bytes(new_job.midstate, 32);                      // reverse the midstate bytes for the BM job packet
 
+    // Only compute additional midstates if version rolling is enabled
+    // This saves 3 SHA-256 computations when version_mask is 0
     if (version_mask != 0)
     {
         uint32_t rolled_version = increment_bitmask(new_job.version, version_mask);
@@ -97,6 +99,10 @@ bm_job construct_bm_job(mining_notify *params, const char *merkle_root, const ui
     }
     else
     {
+        // Zero out unused midstates to avoid processing uninitialized data
+        memset(new_job.midstate1, 0, 32);
+        memset(new_job.midstate2, 0, 32);
+        memset(new_job.midstate3, 0, 32);
         new_job.num_midstates = 1;
     }
 

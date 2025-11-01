@@ -108,16 +108,17 @@ void app_main(void)
 
     GLOBAL_STATE.ASIC_initalized = true;
 
-    if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 9, NULL) != pdPASS) {
+    // Pin critical mining tasks to core 1 for better performance and reduced context switching
+    if (xTaskCreatePinnedToCore(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 9, NULL, 0) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum admin task");
     }
-    if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 13, NULL) != pdPASS) {
+    if (xTaskCreatePinnedToCore(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 13, NULL, 1) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum miner task");
     }
-    if (xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 12, NULL) != pdPASS) {
+    if (xTaskCreatePinnedToCore(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 12, NULL, 1) != pdPASS) {
         ESP_LOGE(TAG, "Error creating asic task");
     }
-    if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
+    if (xTaskCreatePinnedToCore(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 20, NULL, 1) != pdPASS) {
         ESP_LOGE(TAG, "Error creating asic result task");
     }
     if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {

@@ -11,6 +11,10 @@
 #include "hashrate_monitor_task.h"
 #include "asic.h"
 
+// Branch prediction hints for hot paths
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+
 static const char *TAG = "asic_result";
 
 void ASIC_result_task(void *pvParameters)
@@ -22,19 +26,22 @@ void ASIC_result_task(void *pvParameters)
         //task_result *asic_result = (*GLOBAL_STATE->ASIC_functions.receive_result_fn)(GLOBAL_STATE);
         task_result *asic_result = ASIC_process_work(GLOBAL_STATE);
 
-        if (asic_result == NULL)
+        // Most of the time we get valid results
+        if (unlikely(asic_result == NULL))
         {
             continue;
         }
 
-        if (asic_result->register_type != REGISTER_INVALID) {
+        // Register reads are rare, most results are nonces
+        if (unlikely(asic_result->register_type != REGISTER_INVALID)) {
             hashrate_monitor_register_read(GLOBAL_STATE, asic_result->register_type, asic_result->asic_nr, asic_result->value);
             continue;
         }
 
         uint8_t job_id = asic_result->job_id;
 
-        if (GLOBAL_STATE->valid_jobs[job_id] == 0)
+        // Invalid jobs are rare, most jobs are valid
+        if (unlikely(GLOBAL_STATE->valid_jobs[job_id] == 0))
         {
             ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
             continue;
@@ -47,7 +54,8 @@ void ASIC_result_task(void *pvParameters)
         //log the ASIC response
         ESP_LOGI(TAG, "ID: %s, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid, asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
 
-        if (nonce_diff >= active_job->pool_diff)
+        // Most nonces don't meet pool difficulty (only 1 in millions typically)
+        if (unlikely(nonce_diff >= active_job->pool_diff))
         {
             char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
             int ret = STRATUM_V1_submit_share(
