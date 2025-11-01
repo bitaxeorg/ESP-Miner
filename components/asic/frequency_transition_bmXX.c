@@ -37,8 +37,8 @@ void do_frequency_transition(float target_frequency, set_hash_frequency_fn set_f
 
             current_frequency = current_step * STEP_SIZE;
             set_frequency_fn(current_frequency);
-            
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+
+            vTaskDelay(25 / portTICK_PERIOD_MS);
         }
     }
     

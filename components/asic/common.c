@@ -90,7 +90,7 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
 
 esp_err_t receive_work(uint8_t * buffer, int buffer_size)
 {
-    int received = SERIAL_rx(buffer, buffer_size, 10000);
+    int received = SERIAL_rx(buffer, buffer_size, 1000);
 
     if (received < 0) {
         ESP_LOGE(TAG, "UART error in serial RX");

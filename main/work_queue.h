@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include "mining.h"
 
-#define QUEUE_SIZE 12
+#define QUEUE_SIZE 24
 
 typedef struct
 {

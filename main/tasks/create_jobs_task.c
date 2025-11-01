@@ -12,7 +12,7 @@
 
 static const char *TAG = "create_jobs_task";
 
-#define QUEUE_LOW_WATER_MARK 10 // Adjust based on your requirements
+#define QUEUE_LOW_WATER_MARK 20 // Adjust based on your requirements
 
 static bool should_generate_more_work(GlobalState *GLOBAL_STATE);
 static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, uint32_t difficulty);
@@ -27,7 +27,7 @@ void create_jobs_task(void *pvParameters)
         mining_notify *mining_notification = (mining_notify *)queue_dequeue(&GLOBAL_STATE->stratum_queue);
         if (mining_notification == NULL) {
             ESP_LOGE(TAG, "Failed to dequeue mining notification");
-            vTaskDelay(100 / portTICK_PERIOD_MS); // Wait a bit before trying again
+            vTaskDelay(10 / portTICK_PERIOD_MS); // Wait a bit before trying again
             continue;
         }
 
@@ -58,8 +58,8 @@ void create_jobs_task(void *pvParameters)
             }
             else
             {
-                // If no more work needed, wait a bit before checking again.
-                vTaskDelay(100 / portTICK_PERIOD_MS);
+                // If no more work needed, yield to other tasks briefly.
+                vTaskDelay(1 / portTICK_PERIOD_MS);
             }
         }
 
