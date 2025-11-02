@@ -26,11 +26,6 @@ typedef struct {
 
 typedef struct
 {
-    uint32_t duration_start;
-    int historical_hashrate_rolling_index;
-    uint32_t historical_hashrate_time_stamps[HISTORY_LENGTH];
-    uint16_t historical_hashrate[HISTORY_LENGTH];
-    int historical_hashrate_init;
     float current_hashrate;
     int64_t start_time;
     uint64_t shares_accepted;
