@@ -51,13 +51,9 @@
         &:last-child {
             width: 26%;
         }
+    }
 
-        &[style^="--intensity"] {
-            background: rgb(
-              calc(255 - ((255 - var(--primary-color-r)) * var(--intensity))),
-              calc(255 - ((255 - var(--primary-color-g)) * var(--intensity))),
-              calc(255 - ((255 - var(--primary-color-b)) * var(--intensity)))
-            );
-        }
+    &[style*="background"] {
+        transition: background 250ms;
     }
 }
