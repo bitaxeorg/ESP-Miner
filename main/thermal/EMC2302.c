@@ -53,7 +53,7 @@ esp_err_t EMC2302_init()
 
     // Set the minimum fan speed measured and reported to 500 RPM
     ESP_RETURN_ON_ERROR(set_fan_range(EMC2302_FAN1_CONFIG1, RNG_500_RPM, &fan1_multiplier), TAG, "Failed to set fan 1 config");
-    ESP_RETURN_ON_ERROR(set_fan_range(EMC2302_FAN2_CONFIG1, RNG_500_RPM, &fan2_multiplier), TAG, "Failed to add fan 2 config");
+    ESP_RETURN_ON_ERROR(set_fan_range(EMC2302_FAN2_CONFIG1, RNG_500_RPM, &fan2_multiplier), TAG, "Failed to set fan 2 config");
 
     return ESP_OK;
 }
