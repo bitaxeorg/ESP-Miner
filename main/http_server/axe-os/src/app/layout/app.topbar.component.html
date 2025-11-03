@@ -12,17 +12,13 @@
         </svg>
     </a>
 
-    <button *ngIf="!isAPMode" #menubutton class="p-link layout-topbar-button" (click)="layoutService.onMenuToggle()">
-        <i class="pi pi-bars"></i>
-    </button>
-
     <ng-container *ngIf="info$ | async as info">
         <span class="text-500 select-none absolute left-0 bottom-0 ml-6 md:ml-7 mb-1"
             tooltipPosition="bottom"
             pTooltip="Hostname"
         >{{info.hostname}}</span>
 
-        <ul *ngIf="isDesktop()" class="hidden lg:flex ml-auto list-none p-0 gap-4">
+        <ul *ngIf="!isAPMode" class="flex ml-auto list-none p-0 m-0 gap-4 lg:flex-order-2">
             <li>
                 <a class="block py-2 text-white cursor-pointer"
                     tooltipPosition="bottom"
@@ -52,4 +48,9 @@
             </li>
         </ul>
     </ng-container>
+
+    <button *ngIf="!isAPMode" #menubutton class="p-link layout-topbar-button"
+        (click)="layoutService.onMenuToggle()">
+        <i class="pi pi-bars"></i>
+    </button>
 </div>

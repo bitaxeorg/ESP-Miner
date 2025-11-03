@@ -77,6 +77,8 @@ static const char * TAG = "bm1370";
 
 static task_result result;
 
+static int address_interval;
+
 /// @brief
 /// @param ftdi
 /// @param header
@@ -172,6 +174,7 @@ uint8_t BM1370_init(float frequency, uint16_t asic_count, uint16_t difficulty)
         return 0;
     }
 
+
     // set version mask
     BM1370_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
@@ -190,7 +193,7 @@ uint8_t BM1370_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     // _send_simple(init7, 7);
 
     // split the chip address space evenly
-    uint8_t address_interval = (uint8_t) (256 / chip_counter);
+    address_interval = 256 / chip_counter;
     for (uint8_t i = 0; i < chip_counter; i++) {
         _set_chip_address(i * address_interval);
         // unsigned char init8[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
@@ -344,17 +347,19 @@ task_result * BM1370_process_work(void * pvParameters)
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
-        result.asic_nr = asic_result.cmd.asic_address;
+        result.asic_nr = asic_result.cmd.asic_address / address_interval;
         result.value = ntohl(asic_result.cmd.value);
         
         return &result;
     }
 
     uint8_t job_id = (asic_result.job.id & 0xf0) >> 1;
-    uint8_t core_id = (uint8_t)((ntohl(asic_result.job.nonce) >> 25) & 0x7f); // BM1370 has 80 cores, so it should be coded on 7 bits
+    uint32_t nonce_h = ntohl(asic_result.job.nonce);
+    uint8_t asic_nr = (uint8_t)((nonce_h >> 17) & 0xff) / address_interval; // Asic address is encoded in the next 8 bits
+    uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f); // BM1370 has 80 cores, so it should be coded on 7 bits
     uint8_t small_core_id = asic_result.job.id & 0x0f; // BM1370 has 16 small cores, so it should be coded on 4 bits
     uint32_t version_bits = (ntohs(asic_result.job.version) << 13); // shift the 16 bit value left 13
-    ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
+    ESP_LOGI(TAG, "Job ID: %02X, Asic nr: %d, Core: %d/%d, Ver: %08" PRIX32, job_id, asic_nr, core_id, small_core_id, version_bits);
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
@@ -368,11 +373,12 @@ task_result * BM1370_process_work(void * pvParameters)
     result.job_id = job_id;
     result.nonce = asic_result.job.nonce;
     result.rolled_version = rolled_version;
+    result.asic_nr = asic_nr;
 
     return &result;
 }
 
-void BM1370_read_registers(void) 
+void BM1370_read_registers(void)
 {
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
     for (int reg = 0; reg < size; reg++) {
