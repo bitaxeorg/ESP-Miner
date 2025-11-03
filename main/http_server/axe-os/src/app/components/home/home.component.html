@@ -387,9 +387,11 @@
                     <thead>
                         <tr>
                             <th class="text-left">#</th>
-                            <th *ngIf="getAsicDomainsAmount(info) > 0" [attr.colspan]="getAsicDomainsAmount(info)">
-                                {{ getAsicDomainsAmount(info) == 1 ? "Domain" : "Domains" }}
-                            </th>
+                            <ng-container *ngIf="getAsicDomainsAmount(info) as asicDomainsAmount">
+                                <th *ngIf="asicDomainsAmount > 0" [attr.colspan]="asicDomainsAmount">
+                                    {{ asicDomainsAmount == 1 ? "Domain" : "Domains" }}
+                                </th>
+                            </ng-container>
                             <th>Error</th>
                         </tr>
                     </thead>
