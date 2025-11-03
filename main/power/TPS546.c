@@ -343,8 +343,10 @@ esp_err_t TPS546_init(TPS546_CONFIG config)
     ESP_LOGI(TAG, "Initializing the core voltage regulator");
     ESP_RETURN_ON_ERROR(i2c_bitaxe_add_device(TPS546_I2CADDR, &tps546_i2c_handle, TAG), TAG, "Failed to add TPS546 I2C");
 
+    // 1) Power-up guard (PMBus ready after AVIN UVLO + ~8 ms)
     vTaskDelay(pdMS_TO_TICKS(15));  // conservative
 
+    // 2) Robust ID read with retries
     uint8_t id[6] = {0};
     const int max_attempts = 6;
     bool id_matched = false;
