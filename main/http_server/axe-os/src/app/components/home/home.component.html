@@ -1,26 +1,13 @@
 <ng-template #noTemp>--</ng-template>
 
 <ng-container *ngIf="info$ | async as info">
-    <!-- Temp warning alert -->
-    <p-message *ngIf="info.overheat_mode" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Device has overheated - See settings">
-    </p-message>
-
-    <p-message *ngIf="!info.frequency || info.frequency < 400" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Device frequency is set low - See settings">
-    </p-message>
-
-    <p-message *ngIf="info.power_fault" severity="error" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="{{info.power_fault}} Check your Power Supply.">
-    </p-message>
-
-    <p-message *ngIf="info.isUsingFallbackStratum" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device">
-    </p-message>
-
-    <p-message *ngIf="info.version !== info.axeOSVersion" severity="warn" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Firmware ({{info.version}}) and AxeOS ({{info.axeOSVersion}}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.">
-    </p-message>
+    <ng-container *ngFor="let message of messages">
+        <p-message
+            [severity]="message.severity"
+            [text]="message.text"
+            [styleClass]="'w-full mb-3 py-3 border-round-lg'"
+        />
+    </ng-container>
 
     <p-message *ngIf="info.blockFound" severity="success" styleClass="w-full mb-4 py-4 border-round-xl"
         text="Today is your lucky day! Your device has found a block 🎉">
@@ -34,20 +21,14 @@
 
                     <ng-container *ngIf="!info.power_fault; else powerFault">
                         <div class="flex align-items-baseline gap-2 mb-3">
-                            <ng-container *ngIf="info.hashrateMonitor; else noHashrateMonitor">
-                                <span class="text-900 font-medium text-2xl">
-                                    {{info.hashrateMonitor.hashrate | hashSuffix}}
-                                </span>
-                                <span class="text-500 text-xs">
-                                    Error:
-                                    <span class="text-{{info.hashrateMonitor.errorCount === 0 ? 'green' : 'red'}}-500">
-                                        {{info.hashrateMonitor.errorCount}}
-                                    </span>
-                                </span>
-                            </ng-container>
-                            <ng-template #noHashrateMonitor>
+                            <span class="text-900 font-medium text-2xl">
                                 {{info.hashRate | hashSuffix}}
-                            </ng-template>
+                            </span>
+                            <span class="text-500 text-xs" 
+                                pTooltip="Hash errors as reported by the ASIC. A small number errors every few seconds is normal. Frequency changes, agressive overclocking, low voltage or a bad power supply can significantly increase the error rate."
+                                tooltipPosition="bottom">
+                                Error: {{info.hashrateMonitor.errorCount}}
+                            </span>
                         </div>
 
                         <div>
@@ -382,8 +363,8 @@
                     <div class="col-fixed-width text-500">
                         <span>Difficulty</span>
                     </div>
-                    <div>
-                        {{ info.networkDifficulty }}
+                    <div *ngIf="info.networkDifficulty">
+                        {{ info.networkDifficulty | diffSuffix }}
                     </div>
                 </div>
 
@@ -426,7 +407,7 @@
                                 <span class="text-xs md:hidden">{{ normalizeHashrate(domain) | hashSuffix }}</span>
                             </td>
                             <td class="text-center cursor-pointer text-{{getDomainErrorColor(info, asic)}}-500" pTooltip="{{ normalizeHashrate(asic.error) | hashSuffix }}" tooltipPosition="bottom">
-                                {{getDomainErrorPercentage(info, asic) | number: '1.0-0'}} %
+                                {{getDomainErrorPercentage(info, asic) | number: '1.2-2'}} %
                             </td>
                         </tr>
                     </tbody>

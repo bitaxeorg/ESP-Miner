@@ -419,30 +419,30 @@ bool self_test(void * pvParameters)
     //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, &job);
     ASIC_send_work(GLOBAL_STATE, &job);
     
-    double start = esp_timer_get_time();
-    double sum = 0;
-    double duration = 0;
-    double hash_rate = 0;
-    double hashtest_timeout = 5;
+    uint32_t start_ms = esp_timer_get_time() / 1000;
+    uint32_t duration_ms = 0;
+    uint32_t counter = 0;
+    float hashrate = 0;
+    uint32_t hashtest_ms = 5000;
 
-    while (duration < hashtest_timeout) {
+    while (duration_ms < hashtest_ms) {
         task_result * asic_result = ASIC_process_work(GLOBAL_STATE);
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
-            sum += DIFFICULTY;
-            
-            hash_rate = (sum * 4294967296) / (duration * 1000000000);
+            counter += DIFFICULTY;
+            duration_ms = (esp_timer_get_time() / 1000) - start_ms;
+            hashrate = hashCounterToHashrate(duration_ms, counter) / 1e9f;
+
             ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
-            ESP_LOGI(TAG, "%f Gh/s  , duration %f",hash_rate, duration);
+            ESP_LOGI(TAG, "%f Gh/s  , duration %dms", hashrate, duration_ms);
         }
-        duration = (double) (esp_timer_get_time() - start) / 1000000;
     }
 
     float target_hashrate = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate * GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target;
-    ESP_LOGI(TAG, "Hashrate: %f, target: %f (%f%% of %f)", hash_rate, target_hashrate, GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target, GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
+    ESP_LOGI(TAG, "Hashrate: %f, target: %f (%f%% of %f)", hashrate, target_hashrate, GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target, GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
 
-    if (hash_rate < target_hashrate) {
+    if (hashrate < target_hashrate) {
         display_msg("HASHRATE:FAIL", GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
     }

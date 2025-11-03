@@ -11,7 +11,6 @@ interface IHashrateMonitorAsic {
 
 interface IHashrateMonitor {
     asics: IHashrateMonitorAsic[];
-    hashrate: number;
     errorCount: number;
 }
 
@@ -84,7 +83,7 @@ export interface ISystemInfo {
 
     blockHeight?: number,
     scriptsig?: string,
-    networkDifficulty?: string,
+    networkDifficulty?: number,
 
     hashrateMonitor: IHashrateMonitor,
     blockFound: number,
