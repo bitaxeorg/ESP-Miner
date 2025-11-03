@@ -28,8 +28,8 @@ static const char *TAG = "TPS546";
 
 static uint8_t DEVICE_ID_TPS546D24A[] = {0x54, 0x49, 0x54, 0x6D, 0x24, 0x41};
 static uint8_t DEVICE_ID_TPS546D24S[] = {0x54, 0x49, 0x54, 0x6D, 0x24, 0x62};
-static uint8_t DEVICE_ID_TPS546B24A[] = {0x54, 0x49, 0x54, 0x6B, 0x24, 0x41};
-static uint8_t DEVICE_ID_TPS546B24S[] = {0x54, 0x49, 0x54, 0x6B, 0x24, 0x62};
+// static uint8_t DEVICE_ID_TPS546B24A[] = {0x54, 0x49, 0x54, 0x6B, 0x24, 0x41};
+// static uint8_t DEVICE_ID_TPS546B24S[] = {0x54, 0x49, 0x54, 0x6B, 0x24, 0x62};
 
 static i2c_master_dev_handle_t tps546_i2c_handle;
 
@@ -351,10 +351,11 @@ esp_err_t TPS546_init(TPS546_CONFIG config)
     for (int attempt = 0; attempt < max_attempts; ++attempt) {
         esp_err_t err = smb_read_block(PMBUS_IC_DEVICE_ID, id, 6);  // ensure this API consumes the length byte internally
         if (err == ESP_OK) {
-            if (memcmp(id, DEVICE_ID_TPS546D24A, 6) == 0 ||
-                memcmp(id, DEVICE_ID_TPS546D24S, 6) == 0 ||
-                memcmp(id, DEVICE_ID_TPS546B24A, 6) == 0 ||
-                memcmp(id, DEVICE_ID_TPS546B24S, 6) == 0) {
+            if (memcmp(id, DEVICE_ID_TPS546D24A, 6) == 0
+             || memcmp(id, DEVICE_ID_TPS546D24S, 6) == 0
+            //  || memcmp(id, DEVICE_ID_TPS546B24A, 6) == 0
+            //  || memcmp(id, DEVICE_ID_TPS546B24S, 6) == 0
+                ) {
                 id_matched = true;  // got a real response
                 break;
             }
