@@ -593,30 +593,24 @@ export class HomeComponent implements OnInit, OnDestroy {
     return info.hashrateMonitor.asics.length;
   }
 
-  public getAsicDomainsAmount(info: ISystemInfo, asicCount: number): number {
-    return info.hashrateMonitor.asics[asicCount].domains.length;
+  public getAsicDomainsAmount(info: ISystemInfo): number {
+    return info.hashrateMonitor.asics[0]?.domains?.length ?? 0;
   }
 
-  public getHighestAsicDomainPercentage(asics: { total: number, domains: number[] }[]): number {
-    let highest = 0;
+  public getHeatmapColor(info: ISystemInfo, domainHashrate: number): string {
+    const ratio = Math.max(0, Math.min(2, (domainHashrate / info.expectedHashrate) * this.getAsicsAmount(info)) * this.getAsicDomainsAmount(info));
+    const deviation = Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
+    const t = 1 - Math.pow(1 - deviation, 5);
+    const target = ratio > 1 ? 255 : 0; // gradient from 0: black, 1: primary-color, 2: white
+    
+    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
+    const { r, g, b } = this.hexToRgb(primaryColor);
 
-    for (const asic of asics) {
-      for (const domain of asic.domains) {
-        const percentage = (domain * 100) / asic.total;
-        if (percentage > highest) {
-          highest = percentage;
-        }
-      }
-    }
+    const finalR = (r * (1 - t) + target * t) | 0;
+    const finalG = (g * (1 - t) + target * t) | 0;
+    const finalB = (b * (1 - t) + target * t) | 0;
 
-    return highest;
-  }
-
-  public calculateAsicDomainIntensity(info: ISystemInfo, asicCount: number, domain: number): number {
-    const highestPercentage = this.getHighestAsicDomainPercentage(info.hashrateMonitor.asics);
-    const domainPercentage = (domain * 100) / info.hashrateMonitor.asics[asicCount].total;
-
-    return domainPercentage / highestPercentage;
+    return `rgb(${finalR}, ${finalG}, ${finalB})`;
   }
 
   public normalizeHashrate(hashrate: number): number {

@@ -5,7 +5,7 @@ interface ISharesRejectedStat {
 
 interface IHashrateMonitorAsic {
     total: number;
-    domains: number[];
+    domains?: number[];
     error: number;
 }
 
