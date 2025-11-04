@@ -4,10 +4,10 @@
 
 TEST_CASE("Test double_sha256_bin", "[utils]")
 {
-    uint8_t hash[32];
-    char output[65];
     const char input[] = "hello";
-    double_sha256_bin(input, 5, result);
+    uint8_t hash[32];
+    double_sha256_bin((uint8_t *)input, 5, hash);
+    char output[65];
     bin2hex(hash, 32, output, 65);
     TEST_ASSERT_EQUAL_STRING("9595c9df90075148eb06860365df33584b75bff782a510c6cd4883a419833d50", output);
 }
