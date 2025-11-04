@@ -93,18 +93,18 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
     uint8_t merkle_root[32];
     calculate_merkle_root_hash(coinbase_tx_hash, (uint8_t(*)[32])notification->merkle_branches, notification->n_merkle_branches, merkle_root);
 
-    bm_job *new_job = malloc(sizeof(bm_job));
+    bm_job *queued_next_job = malloc(sizeof(bm_job));
 
-    if (new_job == NULL) {
+    if (queued_next_job == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for new job");
         return;
     }
 
-    construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask, difficulty, new_job);
+    construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask, difficulty, queued_next_job);
 
-    new_job->extranonce2 = strdup(extranonce_2_str);
-    new_job->jobid = strdup(notification->job_id);
-    new_job->version_mask = GLOBAL_STATE->version_mask;
+    queued_next_job->extranonce2 = strdup(extranonce_2_str);
+    queued_next_job->jobid = strdup(notification->job_id);
+    queued_next_job->version_mask = GLOBAL_STATE->version_mask;
 
-    queue_enqueue(&GLOBAL_STATE->ASIC_jobs_queue, new_job);
+    queue_enqueue(&GLOBAL_STATE->ASIC_jobs_queue, queued_next_job);
 }
