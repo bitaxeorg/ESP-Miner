@@ -65,13 +65,13 @@ bm_job construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], co
     uint8_t midstate_data[64];
 
     // copy 68 bytes header data into midstate (and deal with endianess)
-    memcpy(midstate_data, &new_job.version, 4);       // copy version
-    reverse_32bit_words(new_job.prev_block_hash, midstate_data + 4);
-    memcpy(midstate_data + 36, merkle_root, 28);      // copy the original word order merkle_root
+    memcpy(midstate_data, &new_job.version, 4);                      // copy version
+    reverse_32bit_words(new_job.prev_block_hash, midstate_data + 4); // copy prev_block_hash in reverse word order
+    memcpy(midstate_data + 36, merkle_root, 28);                     // copy the original word order merkle_root
 
     uint8_t midstate[32];
-    midstate_sha256_bin(midstate_data, 64, midstate); // make the midstate hash
-    reverse_32bit_words(midstate, new_job.midstate);        // reverse the midstate words for the BM job packet
+    midstate_sha256_bin(midstate_data, 64, midstate);                // make the midstate hash
+    reverse_32bit_words(midstate, new_job.midstate);                 // reverse the midstate words for the BM job packet
 
     if (version_mask != 0)
     {
