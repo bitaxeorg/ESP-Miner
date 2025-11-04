@@ -163,11 +163,40 @@ static lv_obj_t * create_scr_asic_status(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_welcome(SystemModule * module) {
-    lv_obj_t * scr = create_flex_screen(3);
+static lv_obj_t * create_screen_with_qr(SystemModule * module, int expected_lines, lv_obj_t ** out_text_cont) {
+    lv_obj_t * scr = lv_obj_create(NULL);
+    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(scr, 2, LV_PART_MAIN);
 
-    lv_obj_t *label1 = lv_label_create(scr);
-    lv_obj_set_width(label1, LV_HOR_RES);
+    lv_obj_t * text_cont = lv_obj_create(scr);
+    lv_obj_set_flex_flow(text_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(text_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_grow(text_cont, 1);
+    lv_obj_set_height(text_cont, LV_VER_RES);
+
+    // Give text a bit more space on larger displays
+    if (screen_lines > expected_lines) lv_obj_set_style_pad_row(text_cont, 1, LV_PART_MAIN);
+
+    lv_obj_t * qr = lv_qrcode_create(scr);
+    lv_qrcode_set_size(qr, 32);
+    lv_qrcode_set_dark_color(qr, lv_color_black());
+    lv_qrcode_set_light_color(qr, lv_color_white());
+
+    char data[64];
+    snprintf(data, sizeof(data), "WIFI:T:;S:%s;P:;;", module->ap_ssid);
+    lv_qrcode_update(qr, data, strlen(data));
+
+    *out_text_cont = text_cont;
+    return scr;
+}
+
+static lv_obj_t * create_scr_welcome(SystemModule * module) {
+    lv_obj_t * text_cont;
+    lv_obj_t * scr = create_screen_with_qr(module, 3, &text_cont);
+
+    lv_obj_t *label1 = lv_label_create(text_cont);
+    lv_obj_set_width(label1, lv_pct(100));
     lv_obj_set_style_anim_duration(label1, 15000, LV_PART_MAIN);
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(label1, "Welcome to your new Bitaxe! Connect to the configuration Wi-Fi and connect the Bitaxe to your network.");
@@ -175,10 +204,10 @@ static lv_obj_t * create_scr_welcome(SystemModule * module) {
     // add a bit of padding, it looks nicer this way
     lv_obj_set_style_pad_bottom(label1, 4, LV_PART_MAIN);
 
-    lv_obj_t *label2 = lv_label_create(scr);
-    lv_label_set_text(label2, "Wi-Fi (for setup):");
+    lv_obj_t *label2 = lv_label_create(text_cont);
+    lv_label_set_text(label2, "Wi-Fi (setup):");
 
-    lv_obj_t *label3 = lv_label_create(scr);
+    lv_obj_t *label3 = lv_label_create(text_cont);
     lv_label_set_text(label3, module->ap_ssid);
 
     return scr;
@@ -199,21 +228,22 @@ static lv_obj_t * create_scr_firmware(SystemModule * module) {
 }
 
 static lv_obj_t * create_scr_connection(SystemModule * module) {
-    lv_obj_t * scr = create_flex_screen(4);
+    lv_obj_t * text_cont;
+    lv_obj_t * scr = create_screen_with_qr(module, 4, &text_cont);
 
-    lv_obj_t *label1 = lv_label_create(scr);
-    lv_obj_set_width(label1, LV_HOR_RES);
+    lv_obj_t *label1 = lv_label_create(text_cont);
+    lv_obj_set_width(label1, lv_pct(100));
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text_fmt(label1, "Wi-Fi: %s", module->ssid);
 
-    connection_wifi_status_label = lv_label_create(scr);
-    lv_obj_set_width(connection_wifi_status_label, LV_HOR_RES);
+    connection_wifi_status_label = lv_label_create(text_cont);
+    lv_obj_set_width(connection_wifi_status_label, lv_pct(100));
     lv_label_set_long_mode(connection_wifi_status_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
-    lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, "Wi-Fi (for setup):");
+    lv_obj_t *label3 = lv_label_create(text_cont);
+    lv_label_set_text(label3, "Wi-Fi (setup):");
 
-    lv_obj_t *label4 = lv_label_create(scr);
+    lv_obj_t *label4 = lv_label_create(text_cont);
     lv_label_set_text(label4, module->ap_ssid);
 
     return scr;
