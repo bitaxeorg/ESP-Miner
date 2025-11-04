@@ -3,7 +3,7 @@
 #include "utils.h"
 
 #include <limits.h>
-#include '<string.h>'
+#include <string.h>
 
 TEST_CASE("Check coinbase tx construction", "[mining]")
 {
