@@ -2,10 +2,13 @@
 #include "utils.h"
 #include <string.h>
 
-TEST_CASE("Test double sha", "[utils]")
+TEST_CASE("Test double_sha256_bin", "[utils]")
 {
-    const char *input = "68656c6c6f";
-    char *output = double_sha256(input);
+    uint8_t hash[32];
+    char output[65];
+    const uint8_t *input = { 0x68, 0x65, 0x6c, 0x6c, 0x6f };
+    double_sha256_bin(input, 5, result);
+    bin2hex(hash, 32, output, 65);
     TEST_ASSERT_EQUAL_STRING("9595c9df90075148eb06860365df33584b75bff782a510c6cd4883a419833d50", output);
 }
 
