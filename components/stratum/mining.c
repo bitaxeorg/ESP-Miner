@@ -46,57 +46,53 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
 }
 
 // take a mining_notify struct with ascii hex strings and convert it to a bm_job struct
-bm_job construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], const uint32_t version_mask, const uint32_t difficulty)
+void construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], const uint32_t version_mask, const uint32_t difficulty, bm_job *new_job)
 {
-    bm_job new_job;
-
-    new_job.version = params->version;
-    new_job.target = params->target;
-    new_job.ntime = params->ntime;
-    new_job.starting_nonce = 0;
-    new_job.pool_diff = difficulty;
-    reverse_32bit_words(merkle_root, new_job.merkle_root);
+    new_job->version = params->version;
+    new_job->target = params->target;
+    new_job->ntime = params->ntime;
+    new_job->starting_nonce = 0;
+    new_job->pool_diff = difficulty;
+    reverse_32bit_words(merkle_root, new_job->merkle_root);
 
     uint8_t prev_block_hash[32];
     hex2bin(params->prev_block_hash, prev_block_hash, 32);
-    reverse_byte_order(prev_block_hash, new_job.prev_block_hash);
+    reverse_byte_order(prev_block_hash, new_job->prev_block_hash);
 
     // make the midstate hash
     uint8_t midstate_data[64];
 
     // copy 68 bytes header data into midstate (and deal with endianess)
-    memcpy(midstate_data, &new_job.version, 4);                      // copy version
-    reverse_32bit_words(new_job.prev_block_hash, midstate_data + 4); // copy prev_block_hash in reverse word order
+    memcpy(midstate_data, &new_job->version, 4);                      // copy version
+    reverse_32bit_words(new_job->prev_block_hash, midstate_data + 4); // copy prev_block_hash in reverse word order
     memcpy(midstate_data + 36, merkle_root, 28);                     // copy the original word order merkle_root
 
     uint8_t midstate[32];
     midstate_sha256_bin(midstate_data, 64, midstate);                // make the midstate hash
-    reverse_32bit_words(midstate, new_job.midstate);                 // reverse the midstate words for the BM job packet
+    reverse_32bit_words(midstate, new_job->midstate);                 // reverse the midstate words for the BM job packet
 
     if (version_mask != 0)
     {
-        uint32_t rolled_version = increment_bitmask(new_job.version, version_mask);
+        uint32_t rolled_version = increment_bitmask(new_job->version, version_mask);
         memcpy(midstate_data, &rolled_version, 4);
         midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, new_job.midstate1);
+        reverse_32bit_words(midstate, new_job->midstate1);
 
         rolled_version = increment_bitmask(rolled_version, version_mask);
         memcpy(midstate_data, &rolled_version, 4);
         midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, new_job.midstate2);
+        reverse_32bit_words(midstate, new_job->midstate2);
 
         rolled_version = increment_bitmask(rolled_version, version_mask);
         memcpy(midstate_data, &rolled_version, 4);
         midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, new_job.midstate3);
-        new_job.num_midstates = 4;
+        reverse_32bit_words(midstate, new_job->midstate3);
+        new_job->num_midstates = 4;
     }
     else
     {
-        new_job.num_midstates = 1;
+        new_job->num_midstates = 1;
     }
-
-    return new_job;
 }
 
 void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[static length * 2 + 1])

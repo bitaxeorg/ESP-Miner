@@ -395,7 +395,8 @@ bool self_test(void * pvParameters)
     uint8_t merkle_root[32];
     calculate_merkle_root_hash(coinbase_tx_hash, merkles, num_merkles, merkle_root);
 
-    bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
+    bm_job job = {0};
+    construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000, &job);
 
     ESP_LOGI(TAG, "Sending work");
 
