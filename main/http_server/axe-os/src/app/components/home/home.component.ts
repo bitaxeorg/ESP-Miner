@@ -520,6 +520,20 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.shareRejectReasonsService.getExplanation(reason);
   }
 
+  getPoolProtocolType(info: ISystemInfo): string {
+    // AF_INET = 2 (IPv4), AF_INET6 = 10 (IPv6) on ESP32
+    const AF_INET = 2;
+    const AF_INET6 = 10;
+
+    if (info.poolAddrFamily === AF_INET) {
+      return 'IPv4';
+    } else if (info.poolAddrFamily === AF_INET6) {
+      return 'IPv6';
+    }
+
+    return '';
+  }
+
   getSortedRejectionReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
     return [...(info.sharesRejectedReasons ?? [])].sort((a, b) => b.count - a.count);
   }
@@ -631,7 +645,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const deviation = Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
     const t = 1 - Math.pow(1 - deviation, 5);
     const target = ratio > 1 ? 255 : 0; // gradient from 0: black, 1: primary-color, 2: white
-    
+
     const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
     const { r, g, b } = this.hexToRgb(primaryColor);
 

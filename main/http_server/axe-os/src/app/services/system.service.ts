@@ -72,6 +72,7 @@ export class SystemService {
         poolDifficulty: 1000,
         responseTime: 10,
         isUsingFallbackStratum: false,
+        poolAddrFamily: 2,
         frequency: 485,
         version: "v2.9.0",
         axeOSVersion: "v2.9.0",

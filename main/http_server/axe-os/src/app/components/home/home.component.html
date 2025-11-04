@@ -24,7 +24,7 @@
                             <span class="text-900 font-medium text-2xl">
                                 {{info.hashRate | hashSuffix}}
                             </span>
-                            <span class="text-500 text-xs" 
+                            <span class="text-500 text-xs"
                                 pTooltip="Hash errors as reported by the ASIC. A small number errors every few seconds is normal. Frequency changes, agressive overclocking, low voltage or a bad power supply can significantly increase the error rate."
                                 tooltipPosition="bottom">
                                 Error: {{info.hashrateMonitor.errorCount}}
@@ -322,7 +322,12 @@
         <div class="col-12 md:col-4">
             <div class="card">
                 <div class="flex flex-nowrap justify-content-between mb-3 relative">
-                    <h4 class="mb-0">Pool</h4>
+                    <h4 class="mb-0">
+                        Pool
+                        <span *ngIf="getPoolProtocolType(info)" class="text-500 text-sm font-normal ml-2">
+                            ({{ activePoolLabel }} - {{ getPoolProtocolType(info) }})
+                        </span>
+                    </h4>
                     <p-dropdown
                         [options]="(pools$ | async) ?? []"
                         [(ngModel)]="activePoolLabel"

@@ -61,6 +61,7 @@ typedef struct
     double response_time;
     bool use_fallback_stratum;
     bool is_using_fallback;
+    int pool_addr_family;
     bool overheat_mode;
     uint16_t power_fault;
     uint32_t lastClockSync;

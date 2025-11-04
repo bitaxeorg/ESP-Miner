@@ -442,6 +442,9 @@ void stratum_task(void * pvParameters)
             ESP_LOGE(TAG, "Fail to setsockopt SO_RCVTIMEO ");
         }
 
+        // Store the resolved address family
+        GLOBAL_STATE->SYSTEM_MODULE.pool_addr_family = conn_info.addr_family;
+
         stratum_reset_uid(GLOBAL_STATE);
         cleanQueue(GLOBAL_STATE);
 
