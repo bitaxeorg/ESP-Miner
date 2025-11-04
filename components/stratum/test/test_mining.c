@@ -6,10 +6,10 @@
 
 TEST_CASE("Check coinbase tx construction", "[mining]")
 {
-    const char *coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff20020862062f503253482f04b8864e5008e969579199999999072f736c7573682f0000000001";
-    const char *coinbase_2 = "1976a914d23fcdf86f7e756a64a7a9688ef9903327048ed988ac00000000";
-    const char *extranonce = "00f2052a";
-    const char *extranonce_2 = "01000000";
+    const char *coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff20020862062f503253482f04b8864e5008";
+    const char *coinbase_2 = "072f736c7573682f000000000100f2052a010000001976a914d23fcdf86f7e756a64a7a9688ef9903327048ed988ac00000000";
+    const char *extranonce = "e9695791";
+    const char *extranonce_2 = "99999999";    
     uint8_t coinbase_tx_hash[32];
     calculate_coinbase_tx_hash(coinbase_1, coinbase_2, extranonce, extranonce_2, coinbase_tx_hash);
 
