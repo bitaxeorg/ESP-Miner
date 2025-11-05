@@ -245,7 +245,6 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             if (ip_acquire_timer != NULL) {
         }
 
-        
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
         ESP_LOGI(TAG, "Connected to SSID: %s", GLOBAL_STATE->SYSTEM_MODULE.ssid);
         strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
