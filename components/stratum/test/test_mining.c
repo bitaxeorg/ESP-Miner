@@ -99,9 +99,8 @@ TEST_CASE("Validate bm job construction", "[mining]")
     uint8_t expected_midstate_bin[32];
     hex2bin("91DFEA528A9F73683D0D495DD6DD7415E1CA21CB411759E3E05D7D5FF285314D", expected_midstate_bin, 32);
     // bytes are reversed for the midstate on the bm job command packet
-    uint8_t expected_midstate_bin_reversed[32];
-    reverse_32bit_words(expected_midstate_bin, expected_midstate_bin_reversed);
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_midstate_bin_reversed, job.midstate, 32);
+    reverse_endianness_per_word(expected_midstate_bin);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_midstate_bin, job.midstate, 32);
 }
 
 TEST_CASE("Validate version mask incrementing", "[mining]")
