@@ -412,11 +412,11 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (module->ap_enabled) {
-        if (strcmp(module->wifi_status, lv_label_get_text(connection_wifi_status_label)) != 0) {
+    bool is_wifi_status_changed = strcmp(module->wifi_status, lv_label_get_text(connection_wifi_status_label)) != 0;
+    if (module->ap_enabled || is_wifi_status_changed) {
+        if (is_wifi_status_changed) {
             lv_label_set_text(connection_wifi_status_label, module->wifi_status);
         }
-
         screen_show(SCR_CONNECTION);
         return;
     }
