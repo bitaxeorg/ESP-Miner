@@ -94,7 +94,7 @@ void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t des
 
 void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32])
 {
-    uint32_t *s = (uint32_t *)src;
+    const uint32_t *s = (const uint32_t *)src;
     uint32_t *d = (uint32_t *)dest;
     
     d[0] = s[7];
@@ -107,16 +107,18 @@ void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32])
     d[7] = s[0];    
 }
 
-void reverse_byte_order(const uint8_t src[32], uint8_t dest[32])
+void reverse_endianness_per_word(uint8_t data[32])
 {
-    dest[ 0] = src[31]; dest[ 1] = src[30]; dest[ 2] = src[29]; dest[ 3] = src[28];
-    dest[ 4] = src[27]; dest[ 5] = src[26]; dest[ 6] = src[25]; dest[ 7] = src[24];
-    dest[ 8] = src[23]; dest[ 9] = src[22]; dest[10] = src[21]; dest[11] = src[20];
-    dest[12] = src[19]; dest[13] = src[18]; dest[14] = src[17]; dest[15] = src[16];
-    dest[16] = src[15]; dest[17] = src[14]; dest[18] = src[13]; dest[19] = src[12];
-    dest[20] = src[11]; dest[21] = src[10]; dest[22] = src[ 9]; dest[23] = src[ 8];
-    dest[24] = src[ 7]; dest[25] = src[ 6]; dest[26] = src[ 5]; dest[27] = src[ 4];
-    dest[28] = src[ 3]; dest[29] = src[ 2]; dest[30] = src[ 1]; dest[31] = src[ 0];
+    uint32_t *d = (uint32_t *)data;
+
+    d[0] = __builtin_bswap32(d[0]);
+    d[1] = __builtin_bswap32(d[1]);
+    d[2] = __builtin_bswap32(d[2]);
+    d[3] = __builtin_bswap32(d[3]);
+    d[4] = __builtin_bswap32(d[4]);
+    d[5] = __builtin_bswap32(d[5]);
+    d[6] = __builtin_bswap32(d[6]);
+    d[7] = __builtin_bswap32(d[7]);
 }
 
 // static const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;

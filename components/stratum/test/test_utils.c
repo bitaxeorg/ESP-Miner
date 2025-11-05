@@ -41,25 +41,33 @@ TEST_CASE("reverse_32bit_words", "[utils]")
     uint8_t actual[32];
     reverse_32bit_words(input, actual);
 
-    uint8_t expected[32] = {28, 29, 30, 31, 24, 25, 26, 27, 
-                            20, 21, 22, 23, 16, 17, 18, 19, 
-                            12, 13, 14, 15,  8,  9, 10, 11, 
-                             4,  5,  6,  7,  0,  1,  2,  3};
+    uint8_t expected[32] = {28, 29, 30, 31,
+                            24, 25, 26, 27,
+                            20, 21, 22, 23,
+                            16, 17, 18, 19,
+                            12, 13, 14, 15,
+                             8,  9, 10, 11,
+                             4,  5,  6,  7,
+                             0,  1,  2,  3};
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, 32);
 }
 
-TEST_CASE("reverse_byte_order", "[utils]")
+TEST_CASE("reverse_endianness_per_word", "[utils]")
 {
     uint8_t input[32];
     for (int i = 0; i < 32; i++) input[i] = i;
 
     uint8_t actual[32];
-    reverse_byte_order(input, actual);
+    reverse_endianness_per_word(input, actual);
 
-    uint8_t expected[32] = {31, 30, 29, 28, 27, 26, 25, 24, 
-                            23, 22, 21, 20, 19, 18, 17, 16, 
-                            15, 14, 13, 12, 11, 10,  9,  8, 
-                             7,  6,  5,  4,  3,  2,  1,  0};
+    uint8_t expected[32] = { 3,  2,  1,  0,
+                             7,  6,  5,  4,
+                            11, 10,  9,  8,
+                            15, 14, 13, 12,
+                            19, 18, 17, 16,
+                            23, 22, 21, 20,
+                            27, 26, 25, 24,
+                            31, 30, 29, 28};
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, 32);
 }
 
