@@ -324,6 +324,18 @@
                 <div class="flex flex-nowrap justify-content-between mb-3 relative">
                     <h4 class="mb-0">
                         Pool
+                        <a
+                            *ngIf="(quickLink$ | async) as quickLink"
+                            [href]="quickLink"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="ml-1"
+                            [attr.aria-label]="'Open pool dashboard in new tab'"
+                            pTooltip="Open pool dashboard"
+                            tooltipPosition="top"
+                        >
+                            <i class="pi pi-external-link"></i>
+                        </a>
                     </h4>
                     <p-dropdown
                         [options]="(pools$ | async) ?? []"
@@ -340,20 +352,11 @@
                         <span>URL <i class="pi pi-info-circle text-xs px-1" pTooltip="{{ getPoolProtocolType(info) }}" tooltipPosition="top"></i></span>
                     </div>
                     <div>
-                        <a [href]="quickLink$ | async" target="_blank" class="underline break-all">
+                        <span>
                             {{ activePoolURL }}:{{activePoolPort}}
-                        </a>
+                        </span>
                     </div>
                 </div>
-
-                <!--<div class="flex flex-nowrap">
-                    <div class="col-fixed-width text-500">
-                        <span>Port</span>
-                    </div>
-                    <div>
-                        {{ activePoolPort }}
-                    </div>
-                </div>-->
 
                 <div class="flex flex-nowrap ellipsis-magic overflow-hidden" pTooltip="{{activePoolUser}}" tooltipPosition="top">
                     <div class="col-fixed-width text-500">
