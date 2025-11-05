@@ -341,19 +341,19 @@
                     </div>
                     <div>
                         <a [href]="quickLink$ | async" target="_blank" class="underline break-all">
-                            {{ activePoolURL }}
+                            {{ activePoolURL }}:{{activePoolPort}}
                         </a>
                     </div>
                 </div>
 
-                <div class="flex flex-nowrap">
+                <!--<div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
                         <span>Port</span>
                     </div>
                     <div>
                         {{ activePoolPort }}
                     </div>
-                </div>
+                </div>-->
 
                 <div class="flex flex-nowrap ellipsis-magic overflow-hidden" pTooltip="{{activePoolUser}}" tooltipPosition="top">
                     <div class="col-fixed-width text-500">
