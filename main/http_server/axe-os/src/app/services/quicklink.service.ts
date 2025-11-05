@@ -44,6 +44,6 @@ export class QuicklinkService {
           }
         }
 
-        return stratumURL.startsWith('http') ? stratumURL : `http://${stratumURL}`;
+        return undefined;
     }
 }
