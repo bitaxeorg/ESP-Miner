@@ -8,8 +8,7 @@
 #define TMP1075_HIGH_LIMIT 0x03       ///< High limit register
 #define TMP1075_DEVICE_ID 0x0F        ///< Device ID register
 
-bool TMP1075_installed(int);
-uint8_t TMP1075_read_temperature(int);
-esp_err_t TMP1075_init(void);
+float TMP1075_read_temperature(int);
+esp_err_t TMP1075_init(int temp_offset_param);
 
 #endif /* TMP1075_H_ */

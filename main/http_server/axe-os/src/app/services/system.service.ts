@@ -72,6 +72,7 @@ export class SystemService {
         poolDifficulty: 1000,
         responseTime: 10,
         isUsingFallbackStratum: false,
+        poolAddrFamily: 2,
         frequency: 485,
         version: "v2.9.0",
         axeOSVersion: "v2.9.0",
@@ -87,6 +88,7 @@ export class SystemService {
         temptarget: 60,
         statsFrequency: 30,
         fanrpm: 3583,
+        fan2rpm: 4146,
 
         boardtemp1: 30,
         boardtemp2: 40,
@@ -94,7 +96,7 @@ export class SystemService {
 
         blockHeight: 811111,
         scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",
-        networkDifficulty: "25.3T",
+        networkDifficulty: 155970000000000,
         hashrateMonitor: {
           asics: [{
             total: 441.2579,
@@ -134,6 +136,7 @@ export class SystemService {
     const currentData = [2284.375,2284.375,2253.125,2284.375,2253.125,2231.25,2284.375,2253.125,2253.125,2284.375];
     const fanSpeedData = [48,52,50,52,53,54,50,50,48,48];
     const fanRpmData = [4032,3545,3904,3691,3564,3554,3691,3573,3701,4044];
+    const fan2RpmData = [3545,3904,3691,3564,3554,3691,3573,3701,4044, 4032];
     const wifiRssiData = [-35,-34,-33,-34,-34,-34,-33,-35,-33,-34];
     const freeHeapData = [214504,212504,213504,210504,207504,209504,203504,202504,201504,200504];
     const timestampData = [13131,18126,23125,28125,33125,38125,43125,48125,53125,58125];
@@ -154,6 +157,7 @@ export class SystemService {
           case eChartLabel.current:      statisticsList[i][j] = currentData[i];      break;
           case eChartLabel.fanSpeed:     statisticsList[i][j] = fanSpeedData[i];     break;
           case eChartLabel.fanRpm:       statisticsList[i][j] = fanRpmData[i];       break;
+          case eChartLabel.fan2Rpm:      statisticsList[i][j] = fan2RpmData[i];       break;
           case eChartLabel.wifiRssi:     statisticsList[i][j] = wifiRssiData[i];     break;
           case eChartLabel.freeHeap:     statisticsList[i][j] = freeHeapData[i];     break;
           default:

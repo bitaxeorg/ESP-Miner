@@ -17,7 +17,7 @@ static const char *TAG = "asic";
 
 uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
 {
-    ESP_LOGI(TAG, "Initializing %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+    ESP_LOGI(TAG, "Initializing %dx %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -124,10 +124,10 @@ double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
             // no version-rolling so same Nonce Space is splitted between Small Cores
             return (NONCE_SPACE / (double) (GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * 1000)) / (double) GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
         case BM1366:
-            return 2000;
+            return 2000 / GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
         case BM1368:
         case BM1370:
-            return 500;
+            return 500 / GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     }
     return 500;
 }

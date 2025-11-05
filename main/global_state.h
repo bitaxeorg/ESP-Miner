@@ -6,7 +6,6 @@
 #include "asic_task.h"
 #include "common.h"
 #include "power_management_task.h"
-#include "statistics_task.h"
 #include "hashrate_monitor_task.h"
 #include "serial.h"
 #include "stratum_api.h"
@@ -27,12 +26,7 @@ typedef struct {
 
 typedef struct
 {
-    double duration_start;
-    int historical_hashrate_rolling_index;
-    double historical_hashrate_time_stamps[HISTORY_LENGTH];
-    double historical_hashrate[HISTORY_LENGTH];
-    int historical_hashrate_init;
-    double current_hashrate;
+    float current_hashrate;
     int64_t start_time;
     uint64_t shares_accepted;
     uint64_t shares_rejected;
@@ -67,6 +61,7 @@ typedef struct
     double response_time;
     bool use_fallback_stratum;
     bool is_using_fallback;
+    int pool_addr_family;
     bool overheat_mode;
     uint16_t power_fault;
     uint32_t lastClockSync;
@@ -97,7 +92,6 @@ typedef struct
     AsicTaskModule ASIC_TASK_MODULE;
     PowerManagementModule POWER_MANAGEMENT_MODULE;
     SelfTestModule SELF_TEST_MODULE;
-    StatisticsModule STATISTICS_MODULE;
     HashrateMonitorModule HASHRATE_MONITOR_MODULE;
 
     char * extranonce_str;
@@ -123,6 +117,7 @@ typedef struct
 
     int block_height;
     char * scriptsig;
+    uint64_t network_nonce_diff;
     char network_diff_string[DIFF_STRING_SIZE];
 } GlobalState;
 

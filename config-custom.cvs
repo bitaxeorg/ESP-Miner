@@ -37,19 +37,23 @@ asic_enable,data,u16,0
 EMC2101,data,u16,1
 # EMC2103 (0,1)
 EMC2103,data,u16,0
+# EMC2302 (0,1)
+EMC2302,data,u16,0
 # EMC Internal Temperature Sensor (0,1)
 emc_int_temp,data,u16,0
 # EMC Ideality Factor (0,8-55, See EMC2102.h)
 emc_ideality_f,data,u16,0
 # EMC Beta Compensation (0-8, See EMC2102.h)
 emc_beta_comp,data,u16,0
-# EMC Temperature Offset
-emc_temp_offset,data,i32,0
+# Temperature Offset
+temp_offset,data,i32,0
 # DS4432U (0,1)
 DS4432U,data,u16,0
 # INA260 (0,1)
 INA260,data,u16,0
 # TPS546 (0,1)
 TPS546,data,u16,1
+# TMP1075 (0,1)
+TMP1075,data,u16,1
 # Self-test Power Consumption Target (> 0)
 power_cons_tgt,data,u16,12
