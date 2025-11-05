@@ -54,11 +54,10 @@ TEST_CASE("reverse_32bit_words", "[utils]")
 
 TEST_CASE("reverse_endianness_per_word", "[utils]")
 {
-    uint8_t input[32];
-    for (int i = 0; i < 32; i++) input[i] = i;
+    uint8_t data[32];
+    for (int i = 0; i < 32; i++) data[i] = i;
 
-    uint8_t actual[32];
-    reverse_endianness_per_word(input, actual);
+    reverse_endianness_per_word(data);
 
     uint8_t expected[32] = { 3,  2,  1,  0,
                              7,  6,  5,  4,
@@ -68,7 +67,7 @@ TEST_CASE("reverse_endianness_per_word", "[utils]")
                             23, 22, 21, 20,
                             27, 26, 25, 24,
                             31, 30, 29, 28};
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, 32);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, data, 32);
 }
 
 TEST_CASE("networkDifficulty", "[utils]")
