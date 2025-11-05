@@ -2,6 +2,9 @@
 #define DISPLAY_H_
 
 #define DEFAULT_DISPLAY "SSD1306 (128x32)"
+#define LCD_SH1107_I2C_CMD                   0X00
+#define LCD_SH1107_PARAM_SET_DISP_OFFSET     0xD3
+#define LCD_SH1107_PARAM_DEFAULT_DISP_OFFSET 0x60
 
 typedef enum
 {
