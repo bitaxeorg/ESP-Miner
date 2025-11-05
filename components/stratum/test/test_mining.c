@@ -100,7 +100,7 @@ TEST_CASE("Validate bm job construction", "[mining]")
     hex2bin("91DFEA528A9F73683D0D495DD6DD7415E1CA21CB411759E3E05D7D5FF285314D", expected_midstate_bin, 32);
     // bytes are reversed for the midstate on the bm job command packet
     uint8_t expected_midstate_bin_reversed[32];
-    reverse_byte_order(expected_midstate_bin, expected_midstate_bin_reversed);
+    reverse_32bit_words(expected_midstate_bin, expected_midstate_bin_reversed);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_midstate_bin_reversed, job.midstate, 32);
 }
 
@@ -136,7 +136,7 @@ TEST_CASE("Validate version mask incrementing", "[mining]")
 //     uint8_t expected_midstate_bin[32];
 //     hex2bin("5FD281AF6A1750EAEE502C04067738BD46C82FC22112FFE797CE7F035D276126", expected_midstate_bin, 32);
 //     // bytes are reversed for the midstate on the bm job command packet
-//     reverse_byte_order(expected_midstate_bin, 32);
+//     reverse_32bit_words(expected_midstate_bin, 32);
 //     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_midstate_bin, job.midstate, 32);
 //     TEST_ASSERT_EQUAL_UINT32(0x1705ae3a, job.target);
 //     TEST_ASSERT_EQUAL_UINT32(0x6470e2a1, job.ntime);
