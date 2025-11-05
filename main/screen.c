@@ -417,6 +417,7 @@ static void screen_update_cb(lv_timer_t * timer)
         if (is_wifi_status_changed) {
             lv_label_set_text(connection_wifi_status_label, module->wifi_status);
         }
+
         screen_show(SCR_CONNECTION);
         return;
     }
