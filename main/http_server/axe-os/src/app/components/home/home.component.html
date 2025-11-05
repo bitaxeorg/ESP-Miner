@@ -427,12 +427,11 @@
                     <thead>
                         <tr>
                             <th class="text-left">#</th>
-                            <th *ngIf="getAsicsAmount(info) === 1 && getAsicDomainsAmount(info, 0) === 1; else multiDomain">
-                                Domain
-                            </th>
-                            <ng-template #multiDomain>
-                                <th colspan="4">Domains</th>
-                            </ng-template>
+                            <ng-container *ngIf="getAsicDomainsAmount(info) as asicDomainsAmount">
+                                <th *ngIf="asicDomainsAmount > 0" [attr.colspan]="asicDomainsAmount">
+                                    {{ asicDomainsAmount == 1 ? "Domain" : "Domains" }}
+                                </th>
+                            </ng-container>
                             <th>Error</th>
                         </tr>
                     </thead>
@@ -441,8 +440,8 @@
                             <td class="text-500 text-left cursor-pointer" pTooltip="ASIC {{ i + 1 }}" tooltipPosition="bottom">
                                 {{ i + 1 }}
                             </td>
-                            <td *ngFor="let domain of asic.domains; let j = index"
-                                [style.background]="getHeatmapColor(info, i, j)"
+                            <td *ngFor="let domain of asic.domains"
+                                [style.background]="getHeatmapColor(info, normalizeHashrate(domain))"
                                 [style.height]="(getAsicsAmount(info) <= 2 ? '2rem' : null)"
                                 class="text-center cursor-pointer"
                                 pTooltip="{{ normalizeHashrate(domain) | hashSuffix }}"

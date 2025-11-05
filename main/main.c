@@ -69,7 +69,10 @@ void app_main(void)
     // init AP and connect to wifi
     wifi_init(&GLOBAL_STATE);
 
-    SYSTEM_init_peripherals(&GLOBAL_STATE);
+    if (SYSTEM_init_peripherals(&GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init peripherals");
+        return;
+    }
 
     if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating power management task");
