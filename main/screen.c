@@ -37,7 +37,6 @@ extern const lv_img_dsc_t osmu_logo;
 static lv_obj_t * screens[MAX_SCREENS];
 static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000, 10000, 10000};
 
-static screen_t current_screen = -1;
 static int current_screen_time_ms;
 static int current_screen_delay_ms;
 
@@ -104,6 +103,14 @@ static int8_t current_rssi_value;
 static int current_block_height;
 
 static bool self_test_finished;
+
+static screen_t get_current_screen() {
+    lv_obj_t * active_screen = lv_screen_active();
+    for (screen_t scr = 0; scr < MAX_SCREENS; scr++) {
+        if (screens[scr] == active_screen) return scr;
+    }
+    return -1;
+}
 
 static lv_obj_t * create_flex_screen(int expected_lines) {
     lv_obj_t * scr = lv_obj_create(NULL);
@@ -351,25 +358,28 @@ static lv_obj_t * create_scr_wifi() {
     return scr;
 }
 
-static void screen_show(screen_t screen)
+static bool screen_show(screen_t screen)
 {
     if (SCR_CAROUSEL_START > screen) {
         lv_display_trigger_activity(NULL);
     }
 
+    bool is_valid = true;
+    screen_t current_screen = get_current_screen();
     if (current_screen != screen) {
         lv_obj_t * scr = screens[screen];
 
-        if (scr && lvgl_port_lock(0)) {
+        is_valid = lv_obj_is_valid(scr);
+        if (is_valid && lvgl_port_lock(0)) {
             bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
             lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
             lvgl_port_unlock();
         }
 
-        current_screen = screen;
         current_screen_time_ms = 0;
         current_screen_delay_ms = delays_ms[screen];
     }
+    return is_valid;
 }
 
 static void screen_update_cb(lv_timer_t * timer)
@@ -386,7 +396,7 @@ static void screen_update_cb(lv_timer_t * timer)
         // display timeout
         const uint32_t display_timeout = display_timeout_config * 60 * 1000;
 
-        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= current_screen)) {
+        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen())) {
             display_on(false);
         } else {
             display_on(true);
@@ -448,6 +458,8 @@ static void screen_update_cb(lv_timer_t * timer)
         }
 
         screen_show(SCR_CONNECTION);
+
+        delays_ms[SCR_CONNECTION] = 0; // Remove delay so whenever the user disables the AP with long press, it goes straight back to carousel
         return;
     }
 
@@ -564,7 +576,7 @@ static void screen_update_cb(lv_timer_t * timer)
     }
 
     if (module->block_found) {
-        if (current_screen != SCR_STATS) {
+        if (get_current_screen() != SCR_STATS) {
             screen_show(SCR_STATS);
         }
 
@@ -581,13 +593,15 @@ static void screen_update_cb(lv_timer_t * timer)
 
 void screen_next()
 {
-    screen_t next_scr = current_screen + 1;
+    screen_t next_scr = get_current_screen();
+    do {
+        next_scr++;
 
-    if (next_scr == MAX_SCREENS) {
-        next_scr = SCR_CAROUSEL_START;
-    }
+        if (next_scr == MAX_SCREENS) {
+            next_scr = SCR_CAROUSEL_START;
+        }
 
-    screen_show(next_scr);
+    } while (!screen_show(next_scr));
 }
 
 static void uptime_update_cb(lv_timer_t * timer)
