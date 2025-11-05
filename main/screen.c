@@ -184,7 +184,7 @@ static lv_obj_t * create_screen_with_qr(SystemModule * module, int expected_line
     lv_qrcode_set_light_color(qr, lv_color_white());
 
     char data[64];
-    snprintf(data, sizeof(data), "WIFI:T:;S:%s;P:;;", module->ap_ssid);
+    snprintf(data, sizeof(data), "WIFI:S:%s;;", module->ap_ssid);
     lv_qrcode_update(qr, data, strlen(data));
 
     *out_text_cont = text_cont;
@@ -205,7 +205,7 @@ static lv_obj_t * create_scr_welcome(SystemModule * module) {
     lv_obj_set_style_pad_bottom(label1, 4, LV_PART_MAIN);
 
     lv_obj_t *label2 = lv_label_create(text_cont);
-    lv_label_set_text(label2, "Wi-Fi (setup):");
+    lv_label_set_text(label2, "Setup Wi-Fi:");
 
     lv_obj_t *label3 = lv_label_create(text_cont);
     lv_label_set_text(label3, module->ap_ssid);
@@ -241,7 +241,7 @@ static lv_obj_t * create_scr_connection(SystemModule * module) {
     lv_label_set_long_mode(connection_wifi_status_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     lv_obj_t *label3 = lv_label_create(text_cont);
-    lv_label_set_text(label3, "Wi-Fi (setup):");
+    lv_label_set_text(label3, "Setup Wi-Fi:");
 
     lv_obj_t *label4 = lv_label_create(text_cont);
     lv_label_set_text(label4, module->ap_ssid);
