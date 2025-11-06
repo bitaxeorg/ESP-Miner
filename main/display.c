@@ -27,6 +27,7 @@
 #define LCD_PARAM_BITS         8
 
 static const char * TAG = "display";
+static const char * LVGL_TAG = "lvgl";
 
 static esp_lcd_panel_handle_t panel_handle = NULL;
 static bool display_state_on = false;
@@ -59,6 +60,29 @@ static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
 
     free(display_config_name);
     return ESP_FAIL;
+}
+
+static void my_log_cb(lv_log_level_t level, const char * buf)
+{
+    switch (level) {
+        case LV_LOG_LEVEL_TRACE:
+            ESP_LOGV(LVGL_TAG, "%s", buf);
+            break;
+        case LV_LOG_LEVEL_INFO:
+            ESP_LOGI(LVGL_TAG, "%s", buf);
+            break;
+        case LV_LOG_LEVEL_WARN:
+            ESP_LOGW(LVGL_TAG, "%s", buf);
+            break;
+        case LV_LOG_LEVEL_ERROR:
+            ESP_LOGE(LVGL_TAG, "%s", buf);
+            break;
+        case LV_LOG_LEVEL_USER:
+            ESP_LOGI(LVGL_TAG, "%s", buf);
+            break;
+        case LV_LOG_LEVEL_NONE:
+            break;
+    }
 }
 
 esp_err_t display_init(void * pvParameters)
@@ -142,6 +166,8 @@ esp_err_t display_init(void * pvParameters)
 
     ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL init failed");
 
+    lv_log_register_print_cb(my_log_cb);
+
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,
         .panel_handle = panel_handle,
@@ -158,7 +184,7 @@ esp_err_t display_init(void * pvParameters)
     };
 
     lv_disp_t * disp = lvgl_port_add_disp(&disp_cfg);
-     if (!disp) { // Check if disp is NULL
+    if (!disp) { // Check if disp is NULL
         ESP_LOGE(TAG, "lvgl_port_add_disp failed!");
         // Potential cleanup
         // if (panel_handle) esp_lcd_panel_del(panel_handle);

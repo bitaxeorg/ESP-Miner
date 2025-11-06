@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "freertos/timers.h"
 #include "lwip/err.h"
 #include "lwip/lwip_napt.h"
 #include "lwip/sys.h"
@@ -51,6 +52,8 @@
 #endif
 
 static const char * TAG = "connect";
+
+static TimerHandle_t ip_acquire_timer = NULL;
 
 static bool is_scanning = false;
 static uint16_t ap_number = 0;
@@ -135,6 +138,16 @@ esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
     return ESP_OK;
 }
 
+static void ip_timeout_callback(TimerHandle_t xTimer)
+{
+    GlobalState *GLOBAL_STATE = (GlobalState *)pvTimerGetTimerID(xTimer);
+    if (!GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
+        ESP_LOGI(TAG, "Timeout waiting for IP address. Disconnecting...");
+        strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "IP Acquire Timeout");
+        esp_wifi_disconnect();
+    }
+}
+
 static void event_handler(void * arg, esp_event_base_t event_base, int32_t event_id, void * event_data)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)arg;
@@ -161,8 +174,15 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         }
 
         if (event_id == WIFI_EVENT_STA_CONNECTED) {
-            ESP_LOGI(TAG, "Connected!");
-            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
+            ESP_LOGI(TAG, "Acquiring IP...");
+            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Acquiring IP...");
+
+            if (ip_acquire_timer == NULL) {
+                ip_acquire_timer = xTimerCreate("ip_acquire_timer", pdMS_TO_TICKS(30000), pdFALSE, (void *)GLOBAL_STATE, ip_timeout_callback);
+            }
+            if (ip_acquire_timer != NULL) {
+                xTimerStart(ip_acquire_timer, 0);
+            }            
         }
 
         if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
@@ -189,6 +209,10 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             s_retry_num++;
             ESP_LOGI(TAG, "Retrying Wi-Fi connection...");
             esp_wifi_connect();
+
+            if (ip_acquire_timer != NULL) {
+                xTimerStop(ip_acquire_timer, 0);
+            }            
         }
         
         if (event_id == WIFI_EVENT_AP_START) {
@@ -217,9 +241,14 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         ESP_LOGI(TAG, "IPv4 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str);
         s_retry_num = 0;
 
+        xTimerStop(ip_acquire_timer, 0);
+            if (ip_acquire_timer != NULL) {
+        }
+
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
 
         ESP_LOGI(TAG, "Connected to SSID: %s", GLOBAL_STATE->SYSTEM_MODULE.ssid);
+        strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
 
         wifi_softap_off();
         
