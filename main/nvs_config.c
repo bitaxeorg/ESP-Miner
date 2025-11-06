@@ -119,14 +119,14 @@ static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
         if (nvs_find_key(handle, setting->nvs_key_name, NULL) == ESP_ERR_NVS_NOT_FOUND) {
             uint16_t val;
             ret = nvs_get_u16(handle, FALLBACK_KEY_ASICFREQUENCY, &val);
-            if (ret == ESP_OK) setting->value.f = (float) val;
+            if (ret == ESP_OK) nvs_set_float(setting->nvs_key_name, (float) val);
         }
     }
     if (key == NVS_CONFIG_MANUAL_FAN_SPEED) {
         if (nvs_find_key(handle, setting->nvs_key_name, NULL) == ESP_ERR_NVS_NOT_FOUND) {
             uint16_t val;
             ret = nvs_get_u16(handle, FALLBACK_KEY_FANSPEED, &val);
-            if (ret == ESP_OK) setting->value.u16 = val;
+            if (ret == ESP_OK) nvs_set_u16(setting->nvs_key_name, val);
         }
     }
 }
