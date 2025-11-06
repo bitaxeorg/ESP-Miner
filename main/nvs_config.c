@@ -69,7 +69,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_DISPLAY_TIMEOUT]                       = {.nvs_key_name = "displayTimeout",  .type = TYPE_I32,   .default_value = {.i32 = -1},                                          .rest_name = "displayTimeout",                     .min = -1, .max = UINT16_MAX},
 
     [NVS_CONFIG_AUTO_FAN_SPEED]                        = {.nvs_key_name = "autofanspeed",    .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "autofanspeed",                       .min = 0,  .max = 1},
-    [NVS_CONFIG_FAN_SPEED]                             = {.nvs_key_name = "fanspeed",        .type = TYPE_U16,   .default_value = {.u16 = 100},                                         .rest_name = "fanspeed",                           .min = 0,  .max = 100},
+    [NVS_CONFIG_MANUAL_FAN_SPEED]                      = {.nvs_key_name = "fanspeed",        .type = TYPE_U16,   .default_value = {.u16 = 100},                                         .rest_name = "manualFanSpeed",                     .min = 0,  .max = 100},
     [NVS_CONFIG_MIN_FAN_SPEED]                         = {.nvs_key_name = "minfanspeed",     .type = TYPE_U16,   .default_value = {.u16 = 25},                                          .rest_name = "minFanSpeed",                        .min = 0,  .max = 99},
     [NVS_CONFIG_TEMP_TARGET]                           = {.nvs_key_name = "temptarget",      .type = TYPE_U16,   .default_value = {.u16 = 60},                                          .rest_name = "temptarget",                         .min = 35, .max = 66},
     [NVS_CONFIG_OVERHEAT_MODE]                         = {.nvs_key_name = "overheat_mode",   .type = TYPE_BOOL,                                                                         .rest_name = "overheat_mode",                      .min = 0,  .max = 0},
@@ -104,6 +104,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
 Settings *nvs_config_get_settings(NvsConfigKey key)
 {
     if (key < 0 || key >= NVS_CONFIG_COUNT) {
+        ESP_LOGE(TAG, "Invalid key enum %d", key);
         return NULL;
     }
     return &settings[key];
@@ -246,6 +247,7 @@ char *nvs_config_get_string(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
     if (!setting || setting->type != TYPE_STR) {
+        ESP_LOGE(TAG, "Wrong type for %s (str)", setting->nvs_key_name);
         return NULL;
     }
     return strdup(setting->value.str);
@@ -262,6 +264,7 @@ uint16_t nvs_config_get_u16(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
     if (!setting || setting->type != TYPE_U16) {
+        ESP_LOGE(TAG, "Wrong type for %s (u16)", setting->nvs_key_name);
         return 0;
     }
     return setting->value.u16;
@@ -277,6 +280,7 @@ int32_t nvs_config_get_i32(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
     if (!setting || setting->type != TYPE_I32) {
+        ESP_LOGE(TAG, "Wrong type for %s (i32)", setting->nvs_key_name);
         return 0;
     }
     return setting->value.i32;
@@ -292,6 +296,7 @@ uint64_t nvs_config_get_u64(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
     if (!setting || setting->type != TYPE_U64) {
+        ESP_LOGE(TAG, "Wrong type for %s (u64)", setting->nvs_key_name);
         return 0;
     }
     return setting->value.u64;
@@ -307,6 +312,7 @@ float nvs_config_get_float(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
     if (!setting || setting->type != TYPE_FLOAT) {
+        ESP_LOGE(TAG, "Wrong type for %s (float)", setting->nvs_key_name);
         return 0;
     }
     return setting->value.f;
@@ -323,6 +329,7 @@ bool nvs_config_get_bool(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
     if (!setting || setting->type != TYPE_BOOL) {
+        ESP_LOGE(TAG, "Wrong type for %s (bool)", setting->nvs_key_name);
         return false;
     }
     return setting->value.b;

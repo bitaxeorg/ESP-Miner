@@ -20,6 +20,7 @@
 #include "asic_reset.h"
 #include "driver/uart.h"
 
+#define EPSILON 0.0001f
 #define POLL_RATE 1800
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
@@ -144,7 +145,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             last_known_asic_freq = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY); 
             last_known_asic_freq_float = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT);
             nvs_config_set_bool(NVS_CONFIG_AUTO_FAN_SPEED, false);
-            nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
+            nvs_config_set_u16(NVS_CONFIG_MANUAL_FAN_SPEED, 100);
             nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, true);
             ESP_LOGW(TAG, "Entering safe mode due to overheat condition. System operation halted.");
             
@@ -282,10 +283,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 }
             }
         } else { // Manual fan speed
-            float fan_perc = nvs_config_get_float(NVS_CONFIG_FAN_SPEED);
-            if (power_management->fan_perc != fan_perc) {
+            uint16_t fan_perc = nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED);
+            if (fabs(power_management->fan_perc - fan_perc) > EPSILON) {
+                ESP_LOGI(TAG, "Setting manual fan speed to %d%%", fan_perc);
                 power_management->fan_perc = fan_perc;
-                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_perc / 100) != ESP_OK) {
+                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_perc / 100.0f) != ESP_OK) {
                     exit(EXIT_FAILURE);
                 }
             }

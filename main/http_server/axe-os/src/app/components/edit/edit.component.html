@@ -87,15 +87,15 @@
             <label class="hidden md:flex md:col-2 md:m-0 hover-next-input">Fan Speed</label>
             <div class="col-12 md:col-10">
                 <label class="block mb-1">
-                    <span class="md:hidden mr-1">Fan Speed:</span>{{form.controls['fanspeed'].value}} %
-                    <b *ngIf="form.controls['fanspeed'].value < 33" class="text-primary">
+                    <span class="md:hidden mr-1">Fan Speed:</span>{{form.controls['manualFanSpeed'].value}} %
+                    <b *ngIf="form.controls['manualFanSpeed'].value < 33" class="text-primary">
                         Danger: Could Cause Overheating
                     </b>
-                    <b *ngIf="form.controls['fanspeed'].value == 100" class="text-orange-500 ml-2">
+                    <b *ngIf="form.controls['manualFanSpeed'].value == 100" class="text-orange-500 ml-2">
                         S19 Simulator
                     </b>
                 </label>
-                <p-slider formControlName="fanspeed"></p-slider>
+                <p-slider formControlName="manualFanSpeed"></p-slider>
             </div>
         </div>
     </div>
