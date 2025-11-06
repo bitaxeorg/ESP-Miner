@@ -65,12 +65,7 @@ void POWER_MANAGEMENT_init_frequency(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
-    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT);
-    if (frequency < 0) { // fallback if the float value is not yet set
-        frequency = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY);
-
-        nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, frequency);
-    }
+    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = frequency;
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = expected_hashrate(GLOBAL_STATE, frequency);
@@ -104,10 +99,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
-    
-    uint16_t last_known_asic_volt = 0;
-    uint16_t last_known_asic_freq = 0;
-    float last_known_asic_freq_float = 0.0;
+
+    uint16_t last_known_asic_voltage = 0;
+    float last_known_asic_frequency = 0.0;
 
     while (1) {
 
@@ -141,9 +135,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             ESP_LOGI(TAG, "Setting RST pin to low due to overheat condition");
             ESP_ERROR_CHECK(asic_hold_reset_low());
 
-            last_known_asic_volt = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
-            last_known_asic_freq = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY); 
-            last_known_asic_freq_float = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT);
+            last_known_asic_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+            last_known_asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
             nvs_config_set_bool(NVS_CONFIG_AUTO_FAN_SPEED, false);
             nvs_config_set_u16(NVS_CONFIG_MANUAL_FAN_SPEED, 100);
             nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, true);
@@ -181,16 +174,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             }
             ESP_LOGI(TAG, "Temperature normalized after %d cooling cycles. Reinitializing ASIC...", cooling_cycles);
             
-            uint16_t reduced_voltage = last_known_asic_volt > ASIC_REDUCTION ? last_known_asic_volt - ASIC_REDUCTION : 1000;
-            uint16_t reduced_freq = last_known_asic_freq > ASIC_REDUCTION ? last_known_asic_freq - ASIC_REDUCTION : 400;
-            float reduced_freq_float = last_known_asic_freq_float > ASIC_REDUCTION ? last_known_asic_freq_float - ASIC_REDUCTION : 400.0;
+            uint16_t reduced_voltage = last_known_asic_voltage > ASIC_REDUCTION ? last_known_asic_voltage - ASIC_REDUCTION : 1000;
+            float reduced_asic_frequency = last_known_asic_frequency > ASIC_REDUCTION ? last_known_asic_frequency - ASIC_REDUCTION : 400.0;
             
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, reduced_voltage);
-            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, reduced_freq);
-            nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT, reduced_freq_float);
+            nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, reduced_asic_frequency);
             
             ESP_LOGI(TAG, "Restoring core voltage to %umV = %.3fV (reduced from %umV = %.3fV)...",
-                     reduced_voltage, reduced_voltage/1000.0, last_known_asic_volt, last_known_asic_volt/1000.0);
+                     reduced_voltage, reduced_voltage/1000.0, last_known_asic_voltage, last_known_asic_voltage/1000.0);
             VCORE_set_voltage(GLOBAL_STATE, (double)reduced_voltage / 1000.0);
             vTaskDelay(500 / portTICK_PERIOD_MS); // Wait for voltage to stabilize
             
@@ -212,10 +203,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             if (chip_count > 0) {
                 // Frequency reduction will now be applied by normal power management loop
                 nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, false);
-                ESP_LOGI(TAG, "Resuming normal operation. Reduced frequency (%.0f MHz) will be applied automatically.",
-                         reduced_freq_float);
+                ESP_LOGI(TAG, "Resuming normal operation. Reduced frequency (%.0f MHz) will be applied automatically.", reduced_asic_frequency);
             }
-            
         }
 
         //enable the PID auto control for the FAN if set
@@ -294,7 +283,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
-        float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT);
+        float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);

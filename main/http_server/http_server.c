@@ -730,7 +730,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER);
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER);
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY);
-    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY_FLOAT);
+    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
     uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
