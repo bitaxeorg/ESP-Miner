@@ -382,7 +382,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 }
                 //ESP_LOGI(TAG, "Setting fan speed to %d%%", fan_speed);
                 nvs_config_set_bool(NVS_CONFIG_AUTO_FAN_SPEED, false);
-                nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, fan_speed);
+                nvs_config_set_u16(NVS_CONFIG_MANUAL_FAN_SPEED, fan_speed);
             }
             break;
         case BAP_PARAM_AUTO_FAN_SPEED:

@@ -1,3 +1,5 @@
+<ng-template #noValue>--</ng-template>
+
 <div class="card">
     <h2>Swarm</h2>
 
@@ -162,11 +164,16 @@
                                 </span>
                             </div>
                             <div>
-                                <span class="text-500 cursor-pointer mr-2" *ngIf="axe.vrTemp" [ngClass]="{'text-orange-500': axe.vrTemp > 90}" pTooltip="Voltage Regulator Temperature" tooltipPosition="top">
+                                <span *ngIf="axe.vrTemp" class="text-500 cursor-pointer mr-2" [ngClass]="{'text-red-500': axe.vrTemp > 105}" pTooltip="Voltage Regulator Temperature" tooltipPosition="top">
                                     {{axe.vrTemp | number: '1.0-1'}} °C
                                 </span>
-                                <span class="cursor-pointer" [ngClass]="{'text-orange-500': axe.temp > 68}" pTooltip="ASIC Temperature" tooltipPosition="top">
-                                    {{axe.temp | number: '1.0-1'}} °C
+                                <span *ngIf="axe.temp2 > 0" class="cursor-pointer mr-2" [ngClass]="{'text-red-500': axe.temp2 > 70}" pTooltip="ASIC Temperature 2" tooltipPosition="top">
+                                    {{axe.temp2 | number: '1.0-1'}} °C
+                                </span>
+                                <span class="cursor-pointer" [ngClass]="{'text-red-500': axe.temp > 70}" pTooltip="ASIC Temperature{{ axe.temp2 > 0 ? ' 1' : '' }}" tooltipPosition="top">
+                                    <ng-container *ngIf="axe.temp > 0; else noValue">
+                                        {{axe.temp | number: '1.0-1'}} °C
+                                    </ng-container>
                                 </span>
                             </div>
                             <span class="cursor-pointer" pTooltip="Power" tooltipPosition="top">
@@ -244,10 +251,15 @@
                             </td>
                             <td>{{axe.power | number: '1.1-1'}} W</td>
                             <td>
-                                <p class="cursor-pointer m-0" [ngClass]="{'text-orange-500': axe.temp > 68}" pTooltip="ASIC Temperature" tooltipPosition="top">
-                                    {{axe.temp | number: '1.0-1'}} °C
+                                <p class="cursor-pointer m-0" [ngClass]="{'text-red-500': axe.temp > 70}" pTooltip="ASIC Temperature{{ axe.temp2 > 0 ? ' 1' : '' }}" tooltipPosition="top">
+                                    <ng-container *ngIf="axe.temp > 0; else noValue">
+                                        {{axe.temp | number: '1.0-1'}} °C
+                                    </ng-container>
                                 </p>
-                                <p class="text-500 cursor-pointer m-0" *ngIf="axe.vrTemp" [ngClass]="{'text-orange-500': axe.vrTemp > 90}" pTooltip="Voltage Regulator Temperature" tooltipPosition="top">
+                                <p *ngIf="axe.temp2 > 0" class="cursor-pointer m-0" [ngClass]="{'text-red-500': axe.temp2 > 70}" pTooltip="ASIC Temperature 2" tooltipPosition="top">
+                                    {{axe.temp2 | number: '1.0-1'}} °C
+                                </p>
+                                <p *ngIf="axe.vrTemp" class="text-500 cursor-pointer m-0" [ngClass]="{'text-red-500': axe.vrTemp > 105}" pTooltip="Voltage Regulator Temperature" tooltipPosition="top">
                                     {{axe.vrTemp | number: '1.0-1'}} °C
                                 </p>
                             </td>

@@ -13,7 +13,7 @@ export class HashSuffixPipe implements PipeTransform {
 
   public transform(value: number, args?: any): string {
 
-    if (value == null || value < 0) {
+    if (value == null || value <= 0 || isNaN(value)) {
       return '0';
     }
 
@@ -27,7 +27,7 @@ export class HashSuffixPipe implements PipeTransform {
     const suffix = suffixes[power];
 
     if (args?.tickmark) {
-      return scaledValue + suffix;      
+      return scaledValue + suffix;
     }
 
     if (scaledValue < 10) {

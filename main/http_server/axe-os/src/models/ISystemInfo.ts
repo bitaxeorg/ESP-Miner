@@ -71,6 +71,7 @@ export interface ISystemInfo {
     autofanspeed: number,
     minFanSpeed: number,
     fanspeed: number,
+    manualFanSpeed: number,
     temptarget: number,
     fanrpm: number,
     fan2rpm: number,

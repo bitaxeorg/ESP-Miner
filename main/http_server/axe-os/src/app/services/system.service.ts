@@ -85,6 +85,7 @@ export class SystemService {
         autofanspeed: 1,
         minFanSpeed: 25,
         fanspeed: 50,
+        manualFanSpeed: 70,
         temptarget: 60,
         statsFrequency: 30,
         fanrpm: 3583,
