@@ -147,12 +147,6 @@ esp_err_t display_init(void * pvParameters)
             break;
         case SH1107:
             ESP_RETURN_ON_ERROR(esp_lcd_new_panel_sh1107(io_handle, &panel_config, &panel_handle), TAG, "No display found");
-
-            uint8_t display_offset = nvs_config_get_u16(NVS_CONFIG_DISPLAY_OFFSET);
-            if (display_offset != LCD_SH1107_PARAM_DEFAULT_DISP_OFFSET) {
-                esp_lcd_panel_io_tx_param(io_handle, LCD_SH1107_I2C_CMD, (uint8_t[]) { LCD_SH1107_PARAM_SET_DISP_OFFSET, display_offset }, 2);
-            }
-
             break;
         default:
             return ESP_FAIL;
@@ -166,6 +160,14 @@ esp_err_t display_init(void * pvParameters)
         bool invert_screen = nvs_config_get_bool(NVS_CONFIG_INVERT_SCREEN);
         ESP_RETURN_ON_ERROR(esp_lcd_panel_invert_color(panel_handle, invert_screen), TAG, "Panel invert failed");
         // ESP_RETURN_ON_ERROR(esp_lcd_panel_mirror(panel_handle, false, false), TAG, "Panel mirror failed");
+
+        if (GLOBAL_STATE->DISPLAY_CONFIG.display == SH1107) {
+            uint8_t display_offset = nvs_config_get_u16(NVS_CONFIG_DISPLAY_OFFSET);
+            if (display_offset != LCD_SH1107_PARAM_DEFAULT_DISP_OFFSET) {
+                ESP_LOGI(TAG, "SH1107 Display Offset: 0x%02x", display_offset);
+                esp_lcd_panel_io_tx_param(io_handle, LCD_SH1107_I2C_CMD, (uint8_t[]) { LCD_SH1107_PARAM_SET_DISP_OFFSET, display_offset }, 2);
+            }
+        }
     }
 
     ESP_LOGI(TAG, "Initialize LVGL");
