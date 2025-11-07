@@ -28,8 +28,8 @@
     #define FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE 0
 #endif
 
-#define FALLBACK_KEY_ASICFREQUENCY "asicfrequency"
-#define FALLBACK_KEY_FANSPEED "fanspeed"
+#define FALLBACK_KEY_ASICFREQUENCY "asicfrequency" // Since v2.10.0 (https://github.com/bitaxeorg/ESP-Miner/pull/1051)
+#define FALLBACK_KEY_FANSPEED "fanspeed"           // Since v2.11.0 (https://github.com/bitaxeorg/ESP-Miner/pull/1331)
 
 typedef struct {
     NvsConfigKey key;
@@ -120,6 +120,7 @@ static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
             uint16_t val;
             ret = nvs_get_u16(handle, FALLBACK_KEY_ASICFREQUENCY, &val);
             if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "Migrating NVS config %s to %s (%d)", FALLBACK_KEY_ASICFREQUENCY, setting->nvs_key_name, val);
                 char buf[32];
                 snprintf(buf, sizeof(buf), "%d", val);
                 nvs_set_str(handle, setting->nvs_key_name, buf);
@@ -130,7 +131,10 @@ static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
         if (nvs_find_key(handle, setting->nvs_key_name, NULL) == ESP_ERR_NVS_NOT_FOUND) {
             uint16_t val;
             ret = nvs_get_u16(handle, FALLBACK_KEY_FANSPEED, &val);
-            if (ret == ESP_OK) nvs_set_u16(handle, setting->nvs_key_name, val);
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "Migrating NVS config %s to %s (%d)", NVS_CONFIG_MANUAL_FAN_SPEED, setting->nvs_key_name, val);
+                nvs_set_u16(handle, setting->nvs_key_name, val);
+            }
         }
     }
 }
