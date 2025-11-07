@@ -5,7 +5,7 @@ interface ISharesRejectedStat {
 
 interface IHashrateMonitorAsic {
     total: number;
-    domains: number[];
+    domains?: number[];
     error: number;
 }
 
@@ -62,6 +62,7 @@ export interface ISystemInfo {
     poolDifficulty: number,
     responseTime: number,
     isUsingFallbackStratum: boolean,
+    poolAddrFamily: number,
     frequency: number,
     version: string,
     axeOSVersion: string,
@@ -70,6 +71,7 @@ export interface ISystemInfo {
     autofanspeed: number,
     minFanSpeed: number,
     fanspeed: number,
+    manualFanSpeed: number,
     temptarget: number,
     fanrpm: number,
     fan2rpm: number,

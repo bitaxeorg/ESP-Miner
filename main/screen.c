@@ -37,7 +37,6 @@ extern const lv_img_dsc_t osmu_logo;
 static lv_obj_t * screens[MAX_SCREENS];
 static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000, 10000, 10000};
 
-static screen_t current_screen = -1;
 static int current_screen_time_ms;
 static int current_screen_delay_ms;
 
@@ -105,6 +104,14 @@ static int current_block_height;
 
 static bool self_test_finished;
 
+static screen_t get_current_screen() {
+    lv_obj_t * active_screen = lv_screen_active();
+    for (screen_t scr = 0; scr < MAX_SCREENS; scr++) {
+        if (screens[scr] == active_screen) return scr;
+    }
+    return -1;
+}
+
 static lv_obj_t * create_flex_screen(int expected_lines) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
@@ -163,11 +170,40 @@ static lv_obj_t * create_scr_asic_status(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_welcome(SystemModule * module) {
-    lv_obj_t * scr = create_flex_screen(3);
+static lv_obj_t * create_screen_with_qr(SystemModule * module, int expected_lines, lv_obj_t ** out_text_cont) {
+    lv_obj_t * scr = lv_obj_create(NULL);
+    lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(scr, 2, LV_PART_MAIN);
 
-    lv_obj_t *label1 = lv_label_create(scr);
-    lv_obj_set_width(label1, LV_HOR_RES);
+    lv_obj_t * text_cont = lv_obj_create(scr);
+    lv_obj_set_flex_flow(text_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(text_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_grow(text_cont, 1);
+    lv_obj_set_height(text_cont, LV_VER_RES);
+
+    // Give text a bit more space on larger displays
+    if (screen_lines > expected_lines) lv_obj_set_style_pad_row(text_cont, 1, LV_PART_MAIN);
+
+    lv_obj_t * qr = lv_qrcode_create(scr);
+    lv_qrcode_set_size(qr, 32);
+    lv_qrcode_set_dark_color(qr, lv_color_black());
+    lv_qrcode_set_light_color(qr, lv_color_white());
+
+    char data[64];
+    snprintf(data, sizeof(data), "WIFI:S:%s;;", module->ap_ssid);
+    lv_qrcode_update(qr, data, strlen(data));
+
+    *out_text_cont = text_cont;
+    return scr;
+}
+
+static lv_obj_t * create_scr_welcome(SystemModule * module) {
+    lv_obj_t * text_cont;
+    lv_obj_t * scr = create_screen_with_qr(module, 3, &text_cont);
+
+    lv_obj_t *label1 = lv_label_create(text_cont);
+    lv_obj_set_width(label1, lv_pct(100));
     lv_obj_set_style_anim_duration(label1, 15000, LV_PART_MAIN);
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(label1, "Welcome to your new Bitaxe! Connect to the configuration Wi-Fi and connect the Bitaxe to your network.");
@@ -175,10 +211,10 @@ static lv_obj_t * create_scr_welcome(SystemModule * module) {
     // add a bit of padding, it looks nicer this way
     lv_obj_set_style_pad_bottom(label1, 4, LV_PART_MAIN);
 
-    lv_obj_t *label2 = lv_label_create(scr);
-    lv_label_set_text(label2, "Wi-Fi (for setup):");
+    lv_obj_t *label2 = lv_label_create(text_cont);
+    lv_label_set_text(label2, "Setup Wi-Fi:");
 
-    lv_obj_t *label3 = lv_label_create(scr);
+    lv_obj_t *label3 = lv_label_create(text_cont);
     lv_label_set_text(label3, module->ap_ssid);
 
     return scr;
@@ -199,21 +235,22 @@ static lv_obj_t * create_scr_firmware(SystemModule * module) {
 }
 
 static lv_obj_t * create_scr_connection(SystemModule * module) {
-    lv_obj_t * scr = create_flex_screen(4);
+    lv_obj_t * text_cont;
+    lv_obj_t * scr = create_screen_with_qr(module, 4, &text_cont);
 
-    lv_obj_t *label1 = lv_label_create(scr);
-    lv_obj_set_width(label1, LV_HOR_RES);
+    lv_obj_t *label1 = lv_label_create(text_cont);
+    lv_obj_set_width(label1, lv_pct(100));
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text_fmt(label1, "Wi-Fi: %s", module->ssid);
 
-    connection_wifi_status_label = lv_label_create(scr);
-    lv_obj_set_width(connection_wifi_status_label, LV_HOR_RES);
+    connection_wifi_status_label = lv_label_create(text_cont);
+    lv_obj_set_width(connection_wifi_status_label, lv_pct(100));
     lv_label_set_long_mode(connection_wifi_status_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
-    lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, "Wi-Fi (for setup):");
+    lv_obj_t *label3 = lv_label_create(text_cont);
+    lv_label_set_text(label3, "Setup Wi-Fi:");
 
-    lv_obj_t *label4 = lv_label_create(scr);
+    lv_obj_t *label4 = lv_label_create(text_cont);
     lv_label_set_text(label4, module->ap_ssid);
 
     return scr;
@@ -321,25 +358,28 @@ static lv_obj_t * create_scr_wifi() {
     return scr;
 }
 
-static void screen_show(screen_t screen)
+static bool screen_show(screen_t screen)
 {
     if (SCR_CAROUSEL_START > screen) {
         lv_display_trigger_activity(NULL);
     }
 
+    bool is_valid = true;
+    screen_t current_screen = get_current_screen();
     if (current_screen != screen) {
         lv_obj_t * scr = screens[screen];
 
-        if (scr && lvgl_port_lock(0)) {
+        is_valid = lv_obj_is_valid(scr);
+        if (is_valid && lvgl_port_lock(0)) {
             bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
             lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
             lvgl_port_unlock();
         }
 
-        current_screen = screen;
         current_screen_time_ms = 0;
         current_screen_delay_ms = delays_ms[screen];
     }
+    return is_valid;
 }
 
 static void screen_update_cb(lv_timer_t * timer)
@@ -356,7 +396,7 @@ static void screen_update_cb(lv_timer_t * timer)
         // display timeout
         const uint32_t display_timeout = display_timeout_config * 60 * 1000;
 
-        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= current_screen)) {
+        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen())) {
             display_on(false);
         } else {
             display_on(true);
@@ -412,12 +452,15 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (module->ap_enabled) {
-        if (strcmp(module->wifi_status, lv_label_get_text(connection_wifi_status_label)) != 0) {
+    bool is_wifi_status_changed = strcmp(module->wifi_status, lv_label_get_text(connection_wifi_status_label)) != 0;
+    if (module->ap_enabled || is_wifi_status_changed) {
+        if (is_wifi_status_changed) {
             lv_label_set_text(connection_wifi_status_label, module->wifi_status);
         }
 
         screen_show(SCR_CONNECTION);
+
+        delays_ms[SCR_CONNECTION] = 0; // Remove delay so whenever the user disables the AP with long press, it goes straight back to carousel
         return;
     }
 
@@ -534,7 +577,7 @@ static void screen_update_cb(lv_timer_t * timer)
     }
 
     if (module->block_found) {
-        if (current_screen != SCR_STATS) {
+        if (get_current_screen() != SCR_STATS) {
             screen_show(SCR_STATS);
         }
 
@@ -551,13 +594,15 @@ static void screen_update_cb(lv_timer_t * timer)
 
 void screen_next()
 {
-    screen_t next_scr = current_screen + 1;
+    screen_t next_scr = get_current_screen();
+    do {
+        next_scr++;
 
-    if (next_scr == MAX_SCREENS) {
-        next_scr = SCR_CAROUSEL_START;
-    }
+        if (next_scr == MAX_SCREENS) {
+            next_scr = SCR_CAROUSEL_START;
+        }
 
-    screen_show(next_scr);
+    } while (!screen_show(next_scr));
 }
 
 static void uptime_update_cb(lv_timer_t * timer)
