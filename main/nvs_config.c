@@ -162,10 +162,10 @@ static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
 static void nvs_config_apply_fallback(NvsConfigKey key, Settings * setting)
 {
     if (key == NVS_CONFIG_ASIC_FREQUENCY) {
-        nvs_set_u16(handle, FALLBACK_KEY_ASICFREQUENCY, (uint16_t) setting->value.f);
+        nvs_set_u16(handle, FALLBACK_KEY_ASICFREQUENCY, (uint16_t) setting->value[0].f);
     }
     if (key == NVS_CONFIG_MANUAL_FAN_SPEED) {
-        nvs_set_u16(handle, FALLBACK_KEY_FANSPEED, setting->value.u16);
+        nvs_set_u16(handle, FALLBACK_KEY_FANSPEED, setting->value[0].u16);
     }
 }
 
