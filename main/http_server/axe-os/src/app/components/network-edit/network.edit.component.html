@@ -1,7 +1,12 @@
 <form *ngIf="form" [formGroup]="form">
     <div class="card">
         <div class="field grid p-fluid">
-            <label for="hostname" class="col-12 md:col-2 md:m-0">Hostname</label>
+            <label for="hostname" class="col-12 md:col-2 md:m-0">
+                <tooltip-text-icon
+                    text="Hostname"
+                    tooltip="Name of the device on your local network"
+                />
+            </label>
             <div class="col-12 md:col-10">
                 <input pInputText id="hostname" type="text" formControlName="hostname" />
             </div>

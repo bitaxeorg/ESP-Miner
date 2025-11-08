@@ -291,7 +291,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
                     
                     bap_global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
-                    nvs_config_set_u16(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
+                    nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, target_frequency);
                     
                     char freq_str[32];
                     snprintf(freq_str, sizeof(freq_str), "%.2f", target_frequency);

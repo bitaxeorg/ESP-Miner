@@ -29,6 +29,9 @@
     #define FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE 0
 #endif
 
+#define FALLBACK_KEY_ASICFREQUENCY "asicfrequency" // Since v2.10.0 (https://github.com/bitaxeorg/ESP-Miner/pull/1051)
+#define FALLBACK_KEY_FANSPEED "fanspeed"           // Since v2.11.0 (https://github.com/bitaxeorg/ESP-Miner/pull/1331)
+
 typedef struct {
     NvsConfigKey key;
     ConfigType type;
@@ -60,18 +63,18 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE] = {.nvs_key_name = "stratumfbxnsub",  .type = TYPE_BOOL,  .default_value = {.b   = (bool)FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE}, .rest_name = "fallbackStratumExtranonceSubscribe", .min = 0,  .max = 1},
     [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstartum",    .type = TYPE_BOOL,                                                                         .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
 
-    [NVS_CONFIG_ASIC_FREQUENCY]                        = {.nvs_key_name = "asicfrequency",   .type = TYPE_U16,   .default_value = {.u16 = CONFIG_ASIC_FREQUENCY}},
-    [NVS_CONFIG_ASIC_FREQUENCY_FLOAT]                  = {.nvs_key_name = "asicfrequency_f", .type = TYPE_FLOAT, .default_value = {.f   = -1},                                          .rest_name = "frequency",                          .min = 1,  .max = UINT16_MAX},
+    [NVS_CONFIG_ASIC_FREQUENCY]                        = {.nvs_key_name = "asicfrequency_f", .type = TYPE_FLOAT, .default_value = {.f   = CONFIG_ASIC_FREQUENCY},                       .rest_name = "frequency",                          .min = 1,  .max = UINT16_MAX},
     [NVS_CONFIG_ASIC_VOLTAGE]                          = {.nvs_key_name = "asicvoltage",     .type = TYPE_U16,   .default_value = {.u16 = CONFIG_ASIC_VOLTAGE},                         .rest_name = "coreVoltage",                        .min = 1,  .max = UINT16_MAX},
     [NVS_CONFIG_OVERCLOCK_ENABLED]                     = {.nvs_key_name = "oc_enabled",      .type = TYPE_BOOL,                                                                         .rest_name = "overclockEnabled",                   .min = 0,  .max = 1},
     
     [NVS_CONFIG_DISPLAY]                               = {.nvs_key_name = "display",         .type = TYPE_STR,   .default_value = {.str = DEFAULT_DISPLAY},                             .rest_name = "display",                            .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_ROTATION]                              = {.nvs_key_name = "rotation",        .type = TYPE_U16,                                                                          .rest_name = "rotation",                           .min = 0,  .max = 270},
     [NVS_CONFIG_INVERT_SCREEN]                         = {.nvs_key_name = "invertscreen",    .type = TYPE_BOOL,                                                                         .rest_name = "invertscreen",                       .min = 0,  .max = 1},
+    [NVS_CONFIG_DISPLAY_OFFSET]                        = {.nvs_key_name = "displayOffset",   .type = TYPE_U16,   .default_value = {.u16 = LCD_SH1107_PARAM_DEFAULT_DISP_OFFSET },       .rest_name = "displayOffset",                      .min = 0,  .max = UINT8_MAX},
     [NVS_CONFIG_DISPLAY_TIMEOUT]                       = {.nvs_key_name = "displayTimeout",  .type = TYPE_I32,   .default_value = {.i32 = -1},                                          .rest_name = "displayTimeout",                     .min = -1, .max = UINT16_MAX},
 
     [NVS_CONFIG_AUTO_FAN_SPEED]                        = {.nvs_key_name = "autofanspeed",    .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "autofanspeed",                       .min = 0,  .max = 1},
-    [NVS_CONFIG_MANUAL_FAN_SPEED]                      = {.nvs_key_name = "fanspeed",        .type = TYPE_U16,   .default_value = {.u16 = 100},                                         .rest_name = "manualFanSpeed",                     .min = 0,  .max = 100},
+    [NVS_CONFIG_MANUAL_FAN_SPEED]                      = {.nvs_key_name = "manualfanspeed",  .type = TYPE_U16,   .default_value = {.u16 = 100},                                         .rest_name = "manualFanSpeed",                     .min = 0,  .max = 100},
     [NVS_CONFIG_MIN_FAN_SPEED]                         = {.nvs_key_name = "minfanspeed",     .type = TYPE_U16,   .default_value = {.u16 = 25},                                          .rest_name = "minFanSpeed",                        .min = 0,  .max = 99},
     [NVS_CONFIG_TEMP_TARGET]                           = {.nvs_key_name = "temptarget",      .type = TYPE_U16,   .default_value = {.u16 = 60},                                          .rest_name = "temptarget",                         .min = 35, .max = 66},
     [NVS_CONFIG_OVERHEAT_MODE]                         = {.nvs_key_name = "overheat_mode",   .type = TYPE_BOOL,                                                                         .rest_name = "overheat_mode",                      .min = 0,  .max = 0},
@@ -127,6 +130,43 @@ static void get_nvs_key_name(const Settings * setting, const int index, char des
     } else {
         strncpy(dest, setting->nvs_key_name, NVS_KEY_NAME_MAX_SIZE);
     }
+}      
+
+static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
+{
+    esp_err_t ret;
+    if (key == NVS_CONFIG_ASIC_FREQUENCY) {
+        if (nvs_find_key(handle, setting->nvs_key_name, NULL) == ESP_ERR_NVS_NOT_FOUND) {
+            uint16_t val;
+            ret = nvs_get_u16(handle, FALLBACK_KEY_ASICFREQUENCY, &val);
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "Migrating NVS config %s to %s (%d)", FALLBACK_KEY_ASICFREQUENCY, setting->nvs_key_name, val);
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%d", val);
+                nvs_set_str(handle, setting->nvs_key_name, buf);
+            }
+        }
+    }
+    if (key == NVS_CONFIG_MANUAL_FAN_SPEED) {
+        if (nvs_find_key(handle, setting->nvs_key_name, NULL) == ESP_ERR_NVS_NOT_FOUND) {
+            uint16_t val;
+            ret = nvs_get_u16(handle, FALLBACK_KEY_FANSPEED, &val);
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "Migrating NVS config %s to %s (%d)", FALLBACK_KEY_FANSPEED, setting->nvs_key_name, val);
+                nvs_set_u16(handle, setting->nvs_key_name, val);
+            }
+        }
+    }
+}
+
+static void nvs_config_apply_fallback(NvsConfigKey key, Settings * setting)
+{
+    if (key == NVS_CONFIG_ASIC_FREQUENCY) {
+        nvs_set_u16(handle, FALLBACK_KEY_ASICFREQUENCY, (uint16_t) setting->value.f);
+    }
+    if (key == NVS_CONFIG_MANUAL_FAN_SPEED) {
+        nvs_set_u16(handle, FALLBACK_KEY_FANSPEED, setting->value.u16);
+    }
 }
 
 static void nvs_task(void *pvParameters)
@@ -171,6 +211,9 @@ static void nvs_task(void *pvParameters)
                         ret = nvs_set_u16(handle, key, setting->value[update.index].b ? 1 : 0);
                         break;
                 }
+
+                nvs_config_apply_fallback(update.key, setting);
+
                 if (ret == ESP_OK) {
                     ret = nvs_commit(handle);
                     if (ret != ESP_OK) {
@@ -212,8 +255,11 @@ esp_err_t nvs_config_init(void)
     }
 
     // Load all
-    for (NvsConfigKey i = 0; i < NVS_CONFIG_COUNT; i++) {
-        Settings *setting = &settings[i];
+    for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
+        Settings *setting = &settings[key];
+
+        nvs_config_init_fallback(key, setting);
+
         esp_err_t ret;
 
         int count = get_array_size(setting);

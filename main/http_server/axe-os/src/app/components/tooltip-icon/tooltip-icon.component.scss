@@ -1,0 +1,45 @@
+.tooltip-icon {
+    appearance: none;
+    border: none;
+    outline: none;
+    background: none;
+    cursor: pointer;
+}
+
+.tooltip-mobile {
+    &-backdrop {
+        background-color: rgba(0, 0, 0, 0.5);
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        position: fixed;
+        z-index: 9;
+        display: flex;
+        align-items: flex-end;
+    }
+
+    &-content {
+        width: 100%;
+        background: var(--surface-d);
+        color: #fff;
+        padding: 1.5rem 4rem 1.5rem 1.5rem;
+        border-radius: 1.5rem 1.5rem 0 0;
+        position: relative;
+        white-space: normal;
+    }
+
+    &-close {
+        width: 20px;
+        height: 20px;
+        position: absolute;
+        right: 1.5rem;
+        top: 1.5rem;
+        border: none;
+        background: var(--button-bg);
+        font-size: 18px;
+        line-height: 18px;
+        display: flex;
+        justify-content: center;
+    }
+}

@@ -92,22 +92,18 @@
                     <span class="text-500">rejected</span>
                 </div>
                 <div *ngIf="info.sharesRejected > 0">
-                    <div *ngFor="let sharesRejectedReason of getSortedRejectionReasons(info); trackBy: trackByReason">
-                        <span
-                        class="inline-block"
-                        pTooltip="{{ getRejectionExplanation(sharesRejectedReason.message) }}"
-                        [tooltipDisabled]="!getRejectionExplanation(sharesRejectedReason.message)"
-                        tooltipPosition="bottom"
-                        >
+                    <ng-container *ngFor="let sharesRejectedReason of getSortedRejectionReasons(info); trackBy: trackByReason">
                         <span class="text-red-500 font-medium">
                             {{ sharesRejectedReason.count | number: '1.0-0' }}
                         </span>
                         <span class="text-500">
                             {{ sharesRejectedReason.message }}
                         </span>
-                        ({{getShareRejectionPercentage(sharesRejectedReason, info) | number: '1.2-2'}} %)
-                        </span>
-                    </div>
+                        <tooltip-text-icon
+                            [text]="'(' + (getShareRejectionPercentage(sharesRejectedReason, info) | number:'1.2-2') + ' %)'"
+                            [tooltip]="getRejectionExplanation(sharesRejectedReason.message)"
+                            [split]=false />
+                    </ng-container>
                 </div>
             </div>
         </div>
@@ -347,7 +343,10 @@
 
                 <div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
-                        <span>URL <i class="pi pi-info-circle text-xs px-1" pTooltip="{{ getPoolProtocolType(info) }}" tooltipPosition="top"></i></span>
+                        <tooltip-text-icon
+                            text="URL"
+                            tooltip="{{ getPoolProtocolType(info) }}"
+                        />
                     </div>
                     <div>
                         <span>
@@ -356,9 +355,12 @@
                     </div>
                 </div>
 
-                <div class="flex flex-nowrap ellipsis-magic overflow-hidden" pTooltip="{{activePoolUser}}" tooltipPosition="top">
+                <div class="flex flex-nowrap ellipsis-magic overflow-hidden">
                     <div class="col-fixed-width text-500">
-                        <span>User</span>
+                        <tooltip-text-icon
+                            text="User"
+                            tooltip="{{ activePoolUser }}"
+                        />
                     </div>
 
                     <span class="start" sensitive-data>
@@ -371,7 +373,10 @@
 
                 <div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
-                        <span class="white-space-nowrap">Time <i class="pi pi-info-circle text-xs px-1" pTooltip="Time it takes for the pool to respond to a share"></i></span>
+                        <tooltip-text-icon
+                            text="Time"
+                            tooltip="Time it takes for the pool to respond to a share"
+                        />
                     </div>
                     <div>
                         {{ info.responseTime }} ms

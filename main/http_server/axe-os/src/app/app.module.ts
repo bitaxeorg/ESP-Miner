@@ -15,6 +15,8 @@ import { PoolComponent } from './components/pool/pool.component';
 import { NetworkEditComponent } from './components/network-edit/network.edit.component';
 import { HomeComponent } from './components/home/home.component';
 import { ModalComponent } from './components/modal/modal.component';
+import { TooltipIconComponent } from './components/tooltip-icon/tooltip-icon.component';
+import { TooltipTextIconComponent } from './components/tooltip-text-icon/tooltip-text-icon.component';
 import { ConfettiComponent } from './components/confetti/confetti.component';
 import { LogsComponent } from './components/logs/logs.component';
 import { SystemComponent } from './components/system/system.component';
@@ -43,6 +45,8 @@ const components = [
   NetworkEditComponent,
   HomeComponent,
   ModalComponent,
+  TooltipIconComponent,
+  TooltipTextIconComponent,
   ConfettiComponent,
   NetworkComponent,
   SettingsComponent,
