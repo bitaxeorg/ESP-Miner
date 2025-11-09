@@ -7,7 +7,7 @@ struct StatisticsData
 {
     uint32_t timestamp;
     float hashrate;
-    uint32_t errorCount;
+    float errorPercentage;
     float chipTemperature;
     float vrTemperature;
     float power;

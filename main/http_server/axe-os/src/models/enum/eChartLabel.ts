@@ -1,7 +1,7 @@
 export enum eChartLabel {
     hashrate = 'Hashrate',
     asicTemp = 'ASIC Temp',
-    errorCount = 'Error Count',
+    errorPercentage = 'Error Percentage',
     vrTemp = 'VR Temp',
     asicVoltage = 'ASIC Voltage',
     voltage = 'Voltage',

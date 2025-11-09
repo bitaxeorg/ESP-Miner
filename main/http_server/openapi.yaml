@@ -129,6 +129,7 @@ components:
         - frequency
         - hashRate
         - expectedHashrate
+        - errorPercentage
         - hostname
         - idfVersion
         - invertscreen
@@ -242,6 +243,9 @@ components:
         hashRate:
           type: number
           description: Current hashrate
+        errorPercentage:
+          description: Hash error percentage
+          type: number
         hostname:
           type: string
           description: Device hostname
@@ -378,9 +382,6 @@ components:
               description: Hashrate register value per ASIC
               items:
                 $ref: '#/components/schemas/HashrateMonitorAsic'
-            errorCount:
-              description: Hash error counter total
-              type: number
 
     Settings:
       type: object

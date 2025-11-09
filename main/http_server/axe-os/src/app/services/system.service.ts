@@ -37,6 +37,7 @@ export class SystemService {
         nominalVoltage: 5,
         hashRate: 475,
         expectedHashrate: 420,
+        errorPercentage: 0.2,
         bestDiff: 238214491,
         bestSessionDiff: 21212121,
         freeHeap: 200504,
@@ -102,10 +103,9 @@ export class SystemService {
           asics: [{
             total: 441.2579,
             domains: [114.9901, 98.6658, 103.8136, 122.7133],
-            error: 1.7166,
+            errorCount: 4,
           }],
           hashrate: 441.2579,
-          errorCount: 0,
         },
         blockFound: 0,
       }

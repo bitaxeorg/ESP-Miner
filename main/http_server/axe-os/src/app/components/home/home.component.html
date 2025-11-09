@@ -27,7 +27,7 @@
                             <span class="text-500 text-xs"
                                 pTooltip="Hash errors as reported by the ASIC. A small number errors every few seconds is normal. Frequency changes, agressive overclocking, low voltage or a bad power supply can significantly increase the error rate."
                                 tooltipPosition="bottom">
-                                Error: {{info.hashrateMonitor.errorCount}}
+                                Error: {{info.errorPercentage | number: '1.2-2'}}%
                             </span>
                         </div>
 
@@ -440,7 +440,7 @@
                                     {{ asicDomainsAmount == 1 ? "Domain" : "Domains" }}
                                 </th>
                             </ng-container>
-                            <th>Error</th>
+                            <th>Error Count</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -456,8 +456,8 @@
                                 tooltipPosition="bottom">
                                 <span class="text-xs md:hidden">{{ normalizeHashrate(domain) | hashSuffix }}</span>
                             </td>
-                            <td class="text-center cursor-pointer text-{{getDomainErrorColor(info, asic)}}-500" pTooltip="{{ normalizeHashrate(asic.error) | hashSuffix }}" tooltipPosition="bottom">
-                                {{getDomainErrorPercentage(info, asic) | number: '1.2-2'}} %
+                            <td class="text-center cursor-pointer">
+                                {{asic.errorCount}}
                             </td>
                         </tr>
                     </tbody>

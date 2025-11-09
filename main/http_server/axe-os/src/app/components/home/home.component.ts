@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
+import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
@@ -697,7 +698,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   static getDataForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
       case eChartLabel.hashrate:           return info.hashRate;
-      case eChartLabel.errorCount:         return info.hashrateMonitor?.errorCount;
+      case eChartLabel.errorPercentage:    return info.errorPercentage;
       case eChartLabel.asicTemp:           return info.temp;
       case eChartLabel.vrTemp:             return info.vrTemp;
       case eChartLabel.asicVoltage:        return info.coreVoltageActual;
@@ -715,6 +716,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   static getSettingsForLabel(label: eChartLabel): {suffix: string; precision: number} {
     switch (label) {
+      case eChartLabel.errorPercentage:  return {suffix: ' %', precision: 2};
       case eChartLabel.asicTemp:
       case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};
       case eChartLabel.asicVoltage:
@@ -722,21 +724,23 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.power:            return {suffix: ' W', precision: 1};
       case eChartLabel.current:          return {suffix: ' A', precision: 1};
       case eChartLabel.fanSpeed:         return {suffix: ' %', precision: 1};
-      case eChartLabel.fanRpm:           return {suffix: ' rpm', precision: 0};
+      case eChartLabel.fanRpm:
+      case eChartLabel.fan2Rpm:          return {suffix: ' rpm', precision: 0};
       case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
       default:                           return {suffix: '', precision: 0};
     }
   }
 
+  static formatter = new Intl.NumberFormat('en-US', { useGrouping: false });
   static cbFormatValue(value: number, datasetLabel: eChartLabel, args?: any): string {
     switch (datasetLabel) {
       case eChartLabel.hashrate:
         return HashSuffixPipe.transform(value, args);
       case eChartLabel.freeHeap:
-        return (value / 1000) + ' kB';
+        return ByteSuffixPipe.transform(value, args);
       default:
         const settings = HomeComponent.getSettingsForLabel(datasetLabel);
-        return value.toFixed(settings.precision) + settings.suffix;
+        return (args?.tickmark ? this.formatter.format(value) : value.toFixed(settings.precision)) + settings.suffix;
     }
   }
 

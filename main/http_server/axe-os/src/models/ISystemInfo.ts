@@ -6,12 +6,11 @@ interface ISharesRejectedStat {
 interface IHashrateMonitorAsic {
     total: number;
     domains?: number[];
-    error: number;
+    errorCount: number;
 }
 
 interface IHashrateMonitor {
     asics: IHashrateMonitorAsic[];
-    errorCount: number;
 }
 
 export interface ISystemInfo {
@@ -29,6 +28,7 @@ export interface ISystemInfo {
     nominalVoltage: number,
     hashRate: number,
     expectedHashrate: number,
+    errorPercentage: number,
     bestDiff: number,
     bestSessionDiff: number,
     freeHeap: number,

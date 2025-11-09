@@ -15,7 +15,6 @@ typedef struct {
     measurement_t** domain_measurements;
     measurement_t* error_measurement;
 
-    int error_count;
     bool is_initialized;
 } HashrateMonitorModule;
 
