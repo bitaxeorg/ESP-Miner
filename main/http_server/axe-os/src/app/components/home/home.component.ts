@@ -731,7 +731,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  static formatter = new Intl.NumberFormat('en-US', { useGrouping: false });
   static cbFormatValue(value: number, datasetLabel: eChartLabel, args?: any): string {
     switch (datasetLabel) {
       case eChartLabel.hashrate:
@@ -740,7 +739,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         return ByteSuffixPipe.transform(value, args);
       default:
         const settings = HomeComponent.getSettingsForLabel(datasetLabel);
-        return (args?.tickmark ? this.formatter.format(value) : value.toFixed(settings.precision)) + settings.suffix;
+        return value.toLocaleString(undefined, { useGrouping: false, maximumFractionDigits: args?.tickmark ? undefined : settings.precision }) + settings.suffix;
     }
   }
 

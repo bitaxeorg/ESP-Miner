@@ -27,7 +27,7 @@ export class HashSuffixPipe implements PipeTransform {
     const suffix = suffixes[power];
 
     if (args?.tickmark) {
-      return scaledValue + suffix;
+      return scaledValue.toLocaleString(undefined, { useGrouping: false }) + suffix;
     }
 
     if (scaledValue < 10) {

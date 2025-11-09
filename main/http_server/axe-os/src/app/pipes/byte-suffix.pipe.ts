@@ -27,7 +27,7 @@ export class ByteSuffixPipe implements PipeTransform {
     const suffix = suffixes[power];
 
     if (args?.tickmark) {
-      return scaledValue + suffix;
+      return scaledValue.toLocaleString(undefined, { useGrouping: false }) + suffix;
     }
     
     if (scaledValue < 10) {
@@ -38,6 +38,4 @@ export class ByteSuffixPipe implements PipeTransform {
 
     return scaledValue.toFixed(0) + suffix;
   }
-
-
 }
