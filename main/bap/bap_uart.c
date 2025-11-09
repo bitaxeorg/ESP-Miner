@@ -225,7 +225,7 @@ esp_err_t BAP_start_uart_receive_task(void) {
 }
 
 esp_err_t BAP_uart_init(void) {
-    ESP_LOGI(TAG, "Initializing BAP UART interface");
+    //ESP_LOGI(TAG, "Initializing BAP UART interface");
     
     if (GPIO_BAP_TX > 47 || GPIO_BAP_RX > 47) {
         ESP_LOGE(TAG, "Invalid GPIO pins: TX=%d, RX=%d", GPIO_BAP_TX, GPIO_BAP_RX);
@@ -259,7 +259,6 @@ esp_err_t BAP_uart_init(void) {
         return ret;
     }
     
-    ESP_LOGI(TAG, "BAP UART interface initialized successfully");
     
     BaseType_t task_result = xTaskCreateWithCaps(
         uart_send_task,
@@ -276,6 +275,6 @@ esp_err_t BAP_uart_init(void) {
         return ESP_ERR_NO_MEM;
     }
     
-    ESP_LOGI(TAG, "UART send task created successfully");
+    //ESP_LOGI(TAG, "UART send task created successfully");
     return ESP_OK;
 }

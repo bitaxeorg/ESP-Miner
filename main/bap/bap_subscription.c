@@ -259,8 +259,8 @@ static void mode_management_task(void *pvParameters) {
     GlobalState *state = (GlobalState *)pvParameters;
     bool was_connected = false;
     bool subscription_task_started = false;
-    
-    ESP_LOGI(TAG, "BAP mode management task started");
+    // will go into log dev mode
+    //ESP_LOGI(TAG, "BAP mode management task started");
     
     while (1) {
         bool is_connected = state->SYSTEM_MODULE.is_connected;
@@ -272,14 +272,14 @@ static void mode_management_task(void *pvParameters) {
             vTaskDelay(pdMS_TO_TICKS(5000));
         } else if (!was_connected && is_connected) {
             // Transition from AP to connected mode
-            ESP_LOGI(TAG, "WiFi connected - switching to normal BAP mode");
+            //ESP_LOGI(TAG, "WiFi connected - switching to normal BAP mode");
             
             // Start subscription task for connected mode
             if (!subscription_task_started) {
                 esp_err_t ret = BAP_start_subscription_task(state);
                 if (ret == ESP_OK) {
                     subscription_task_started = true;
-                    ESP_LOGI(TAG, "Subscription task started for connected mode");
+                    //ESP_LOGI(TAG, "Subscription task started for connected mode");
                 } else {
                     ESP_LOGE(TAG, "Failed to start subscription task");
                 }
@@ -292,7 +292,7 @@ static void mode_management_task(void *pvParameters) {
             vTaskDelay(pdMS_TO_TICKS(1000));
         } else if (was_connected && !is_connected) {
             // Transition from connected to AP mode (connection lost)
-            ESP_LOGI(TAG, "WiFi disconnected - switching to AP mode");
+            //ESP_LOGI(TAG, "WiFi disconnected - switching to AP mode");
             was_connected = false;
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
@@ -317,7 +317,7 @@ esp_err_t BAP_start_mode_management_task(GlobalState *state) {
         MALLOC_CAP_SPIRAM
     );
 
-    ESP_LOGI(TAG, "BAP mode management task started");
+    //ESP_LOGI(TAG, "BAP mode management task started");
     return ESP_OK;
 }
 

@@ -86,8 +86,6 @@ void app_main(void)
     if (bap_ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize BAP interface: %d", bap_ret);
         // Continue anyway, as BAP is not critical for core functionality
-    } else {
-        ESP_LOGI(TAG, "BAP interface initialized successfully");
     }
 
     while (!GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
