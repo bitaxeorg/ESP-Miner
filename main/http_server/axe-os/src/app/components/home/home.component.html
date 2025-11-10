@@ -446,7 +446,7 @@
                         </thead>
                         <tbody>
                             <tr class="cursor-pointer" *ngFor="let asic of info.hashrateMonitor.asics; let i = index"
-                                    pTooltip="{{ asicAmount > 1 ? 'ASIC {{ i + 1 }} ' : ''}} Error count: {{ asic.errorCount }}"
+                                    [pTooltip]="(asicAmount > 1 ? 'ASIC ' + (i + 1) + ' - ' : '') + 'Error count: ' + asic.errorCount"
                                     tooltipPosition="bottom">
                                 <td *ngIf="asicAmount > 1" class="text-500 text-left">
                                     {{ i + 1 }}
