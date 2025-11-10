@@ -6,7 +6,6 @@
 #include "system.h"
 #include "common.h"
 #include "asic.h"
-#include "nvs_config.h"
 #include "utils.h"
 
 #define EPSILON 0.0001f
@@ -16,9 +15,6 @@
 #define HASHRATE_UNIT 0x100000uLL // Hashrate register unit (2^24 hashes)
 
 static const char *TAG = "hashrate_monitor";
-
-static float last_frequency;
-static uint16_t last_voltage;
 
 static float sum_hashrates(measurement_t * measurement, int asic_count)
 {
@@ -121,15 +117,6 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
     if (asic_nr >= asic_count) {
         ESP_LOGE(TAG, "Asic nr out of bounds [%d]", asic_nr);
         return;
-    }
-
-    // Reset statistics on start and when frequency or voltage changes
-    float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
-    uint16_t asic_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
-    if (fabs(last_frequency - asic_frequency) > EPSILON || last_voltage != asic_voltage) {
-        clear_measurements(GLOBAL_STATE);
-        last_frequency = asic_frequency;
-        last_voltage = asic_voltage;
     }
 
     switch(register_type) {
