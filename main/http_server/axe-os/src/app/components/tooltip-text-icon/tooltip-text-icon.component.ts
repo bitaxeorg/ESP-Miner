@@ -15,17 +15,22 @@ export class TooltipTextIconComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     const safeText = (this.text ?? '').trim();
 
-    if ('text' in changes && safeText) {
-      const words = safeText.split(/\s+/);
-
+    const updateWords = (text: string) => {
+      const words = text.split(/\s+/);
       if (words.length > 1) {
         this.preLastWords = words.slice(0, words.length - 1).join(' ');
         this.lastWord = words[words.length - 1];
       } else {
         this.preLastWords = '';
-        this.lastWord = safeText;
+        this.lastWord = text;
       }
-    } else {
+    };
+
+    if ('text' in changes && safeText) {
+      updateWords(safeText);
+    } else if ('tooltip' in changes && this.tooltip && safeText) {
+      updateWords(safeText);
+    } else if (!safeText) {
       this.preLastWords = '';
       this.lastWord = '';
     }
