@@ -91,8 +91,8 @@
                     <span class="text-red-500 font-medium">0 </span>
                     <span class="text-500">rejected</span>
                 </div>
-                <div *ngIf="info.sharesRejected > 0">
-                    <ng-container *ngFor="let sharesRejectedReason of getSortedRejectionReasons(info); trackBy: trackByReason">
+                <ng-container *ngIf="info.sharesRejected > 0">
+                    <div *ngFor="let sharesRejectedReason of getSortedRejectionReasons(info); trackBy: trackByReason">
                         <span class="text-red-500 font-medium">
                             {{ sharesRejectedReason.count | number: '1.0-0' }}
                         </span>
@@ -103,8 +103,8 @@
                             [text]="'(' + (getShareRejectionPercentage(sharesRejectedReason, info) | number:'1.2-2') + ' %)'"
                             [tooltip]="getRejectionExplanation(sharesRejectedReason.message)"
                             [split]=false />
-                    </ng-container>
-                </div>
+                    </div>
+                </ng-container>
             </div>
         </div>
 
