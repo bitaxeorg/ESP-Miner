@@ -1,10 +1,14 @@
 #include <string.h>
 #include <esp_heap_caps.h>
+#include <math.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "system.h"
 #include "common.h"
 #include "asic.h"
+#include "nvs_config.h"
+
+#define EPSILON 0.0001f
 
 #define POLL_RATE 5000
 #define EMA_ALPHA 12
@@ -14,7 +18,8 @@
 
 static const char *TAG = "hashrate_monitor";
 
-static float frequency_value;
+static float last_frequency;
+static uint16_t last_voltage;
 
 static float sum_hashrates(measurement_t * measurement, int asic_count)
 {
@@ -136,7 +141,6 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
 
     GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
     HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
-    PowerManagementModule * POWER_MANAGEMENT_MODULE = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
 
@@ -145,10 +149,13 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
         return;
     }
 
-    // Reset statistics on start and when frequency changes
-    if (POWER_MANAGEMENT_MODULE->frequency_value != frequency_value) {
+    // Reset statistics on start and when frequency or voltage changes
+    float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
+    uint16_t asic_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+    if (fabs(last_frequency - asic_frequency) > EPSILON || last_voltage != asic_voltage) {
         clear_measurements(GLOBAL_STATE);
-        frequency_value = POWER_MANAGEMENT_MODULE->frequency_value;
+        last_frequency = asic_frequency;
+        last_voltage = asic_voltage;
     }
 
     switch(register_type) {
