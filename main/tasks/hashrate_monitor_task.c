@@ -28,15 +28,6 @@ static float sum_hashrates(measurement_t * measurement, int asic_count)
     return total;
 }
 
-static uint32_t sum_values(measurement_t * measurement, int asic_count)
-{
-    if (asic_count == 1) return measurement[0].value;
-
-    uint32_t total = 0;
-    for (int asic_nr = 0; asic_nr < asic_count; asic_nr++) total += measurement[asic_nr].value;
-    return total;
-}
-
 static void clear_measurements(GlobalState * GLOBAL_STATE)
 {
     HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
@@ -44,19 +35,15 @@ static void clear_measurements(GlobalState * GLOBAL_STATE)
 
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
-    float expected_hashrate = POWER_MANAGEMENT_MODULE->expected_hashrate;
-
-    memset(HASHRATE_MONITOR_MODULE->total_measurement, 0, asic_count * sizeof(measurement_t));
-    if (hash_domains > 0) {
-        memset(HASHRATE_MONITOR_MODULE->domain_measurements[0], 0, asic_count * hash_domains * sizeof(measurement_t));
-    }
-    memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
+    float expected_asic_hashrate = POWER_MANAGEMENT_MODULE->expected_hashrate / asic_count;
+    float expected_domain_hashrate = expected_asic_hashrate / hash_domains;
 
     for (int asic_nr = 0; asic_nr < asic_count; asic_nr++) {
-        HASHRATE_MONITOR_MODULE->total_measurement[asic_nr].expected_hashrate = expected_hashrate / asic_count;
+        HASHRATE_MONITOR_MODULE->total_measurement[asic_nr] = (measurement_t) { .expected_hashrate = expected_asic_hashrate };
         for (int hash_domain = 0; hash_domain < hash_domains; hash_domain++) {
-            HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][hash_domain].expected_hashrate = expected_hashrate / asic_count / hash_domains;
+            HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][hash_domain] = (measurement_t) { .expected_hashrate = expected_domain_hashrate };
         }
+        HASHRATE_MONITOR_MODULE->error_measurement[asic_nr] = (measurement_t) { 0 };
     }
 }
 
@@ -88,10 +75,16 @@ static void update_hash_counter(uint32_t time_ms, uint32_t value, measurement_t 
 
         float hashrate = hash_counter_to_ghs(duration_ms, counter);
 
-        if (measurement->expected_hashrate > 0.0 && measurement->hashrate == 0.0) {
-            measurement->hashrate = hashrate == 0.0 ? 0.0 : measurement->expected_hashrate;
+        if (measurement->expected_hashrate > 0.0) {
+            if (measurement->hashrate == 0.0) {
+                // Initialise EMA with expected_hashrate
+                measurement->hashrate = hashrate == 0.0 ? 0.0 : measurement->expected_hashrate;
+            }
+            measurement->hashrate = ((measurement->hashrate * (EMA_ALPHA - 1)) + hashrate) / EMA_ALPHA;
         }
-        measurement->hashrate = ((measurement->hashrate * (EMA_ALPHA - 1)) + hashrate) / EMA_ALPHA;
+        else {
+            measurement->hashrate = hashrate;
+        }
     }
 
     measurement->value = value;

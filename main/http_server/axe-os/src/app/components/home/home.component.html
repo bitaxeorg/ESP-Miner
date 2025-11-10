@@ -38,7 +38,7 @@
                             </span>
                         </div>
                         <div class="text-500 text-xs" *ngIf="info.expectedHashrate">
-                            Expected: {{info.expectedHashrate | hashSuffix}}
+                            Expected: {{info.expectedHashrate | hashSuffix: { tickmark: true } }}
                         </div>
                     </ng-container>
 
@@ -434,30 +434,26 @@
                 <table class="heatmap text-{{getAsicsAmount(info) <= 2 ? 'sm' : 'xs'}}">
                     <thead>
                         <tr>
-                            <th class="text-left">#</th>
+                            <th class="text-left">ASIC</th>
                             <ng-container *ngIf="getAsicDomainsAmount(info) as asicDomainsAmount">
                                 <th *ngIf="asicDomainsAmount > 0" [attr.colspan]="asicDomainsAmount">
                                     {{ asicDomainsAmount == 1 ? "Domain" : "Domains" }}
                                 </th>
                             </ng-container>
-                            <th>Error Count</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr *ngFor="let asic of info.hashrateMonitor.asics; let i = index">
+                        <tr *ngFor="let asic of info.hashrateMonitor.asics; let i = index"
+                                pTooltip="Error counter: {{ asic.errorCount }}"
+                                tooltipPosition="bottom">
                             <td class="text-500 text-left cursor-pointer" pTooltip="ASIC {{ i + 1 }}" tooltipPosition="bottom">
                                 {{ i + 1 }}
                             </td>
                             <td *ngFor="let domain of asic.domains"
                                 [style.background]="getHeatmapColor(info, normalizeHashrate(domain))"
                                 [style.height]="(getAsicsAmount(info) <= 2 ? '2rem' : null)"
-                                class="text-center cursor-pointer"
-                                pTooltip="{{ normalizeHashrate(domain) | hashSuffix }}"
-                                tooltipPosition="bottom">
-                                <span class="text-xs md:hidden">{{ normalizeHashrate(domain) | hashSuffix }}</span>
-                            </td>
-                            <td class="text-center cursor-pointer">
-                                {{asic.errorCount}}
+                                class="text-center cursor-pointer">
+                                <span class="text-xs">{{ normalizeHashrate(domain) | hashSuffix }}</span>
                             </td>
                         </tr>
                     </tbody>

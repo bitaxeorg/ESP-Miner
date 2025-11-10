@@ -40,17 +40,10 @@
     width: 100%;
     border-collapse: separate;
     border-spacing: 1px;
+    table-layout: fixes;
 
-    td {
-        width: 16%;
+    th {
         padding: 0;
-
-        &:first-child {
-            width: 10%;
-        }
-        &:last-child {
-            width: 26%;
-        }
     }
 
     &[style*="background"] {
