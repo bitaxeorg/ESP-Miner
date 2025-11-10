@@ -35,7 +35,7 @@ double networkDifficulty(uint32_t nBits);
 
 void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 
-float hashCounterToHashrate(uint32_t duration_ms, uint32_t counter);
+float hashCounterToGhs(uint32_t duration_ms, uint32_t counter);
 
 #define STRATUM_DEFAULT_VERSION_MASK 0x1fffe000
 

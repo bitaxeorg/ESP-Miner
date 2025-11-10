@@ -14,7 +14,7 @@ export class ByteSuffixPipe implements PipeTransform {
   public transform(value: number, args?: any): string {
 
     if (value == null || value < 0) {
-      return '0';
+      return '0 B';
     }
 
     const suffixes = [' B', ' kB', ' MB', ' GB', ' TB', ' PB', ' EB'];

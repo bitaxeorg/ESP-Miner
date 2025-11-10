@@ -24,10 +24,11 @@
                             <span class="text-900 font-medium text-2xl">
                                 {{info.hashRate | hashSuffix}}
                             </span>
-                            <span class="text-500 text-xs"
-                                pTooltip="Hash errors as reported by the ASIC. A small number errors every few seconds is normal. Frequency changes, agressive overclocking, low voltage or a bad power supply can significantly increase the error rate."
-                                tooltipPosition="bottom">
-                                Error: {{info.errorPercentage | number: '1.2-2'}}%
+                            <span class="text-500 text-xs">
+                                <tooltip-text-icon
+                                    text="Error: {{info.errorPercentage | number: '1.2-2'}}%"
+                                    tooltip="Hash errors as reported by the ASIC. A small number errors every few seconds is normal. Frequency changes, agressive overclocking, low voltage or a bad power supply can significantly increase the error rate."
+                                />
                             </span>
                         </div>
 
@@ -431,33 +432,35 @@
             <div class="card">
                 <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis">Hashrate Registers</h4>
 
-                <table class="heatmap text-{{getAsicsAmount(info) <= 2 ? 'sm' : 'xs'}}">
-                    <thead>
-                        <tr>
-                            <th class="text-left">ASIC</th>
-                            <ng-container *ngIf="getAsicDomainsAmount(info) as asicDomainsAmount">
-                                <th *ngIf="asicDomainsAmount > 0" [attr.colspan]="asicDomainsAmount">
-                                    {{ asicDomainsAmount == 1 ? "Domain" : "Domains" }}
-                                </th>
-                            </ng-container>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr *ngFor="let asic of info.hashrateMonitor.asics; let i = index"
-                                pTooltip="Error count: {{ asic.errorCount }}"
-                                tooltipPosition="bottom">
-                            <td class="text-500 text-left cursor-pointer" pTooltip="ASIC {{ i + 1 }}" tooltipPosition="bottom">
-                                {{ i + 1 }}
-                            </td>
-                            <td *ngFor="let domain of asic.domains"
-                                [style.background]="getHeatmapColor(info, normalizeHashrate(domain))"
-                                [style.height]="(getAsicsAmount(info) <= 2 ? '2rem' : null)"
-                                class="text-center cursor-pointer">
-                                <span class="text-xs">{{ normalizeHashrate(domain) | hashSuffix }}</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <ng-container *ngIf="getAsicsAmount(info) as asicAmount">
+                    <table class="heatmap text-{{asicAmount <= 2 ? 'sm' : 'xs'}}">
+                        <thead>
+                            <tr>
+                                <th class="text-left">ASIC</th>
+                                <ng-container *ngIf="getAsicDomainsAmount(info) as asicDomainsAmount">
+                                    <th *ngIf="asicDomainsAmount > 0" [attr.colspan]="asicDomainsAmount">
+                                        {{ asicDomainsAmount == 1 ? "Domain" : "Domains" }}
+                                    </th>
+                                </ng-container>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let asic of info.hashrateMonitor.asics; let i = index"
+                                    pTooltip="{{ asicAmount > 1 ? 'ASIC {{ i + 1 }} ' : ''}} Error count: {{ asic.errorCount }}"
+                                    tooltipPosition="bottom">
+                                <td class="text-500 text-left cursor-pointer">
+                                    {{ i + 1 }}
+                                </td>
+                                <td *ngFor="let domain of asic.domains"
+                                    [style.background]="getHeatmapColor(info, normalizeHashrate(domain))"
+                                    [style.height]="(asicAmount <= 2 ? '2rem' : null)"
+                                    class="text-center cursor-pointer">
+                                    <span class="text-xs">{{ normalizeHashrate(domain) | hashSuffix }}</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </ng-container>
             </div>
         </div>
     </div>

@@ -332,8 +332,10 @@ void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits)
     }
 }
 
-float hashCounterToHashrate(uint32_t duration_ms, uint32_t counter)
+float hashCounterToGhs(uint32_t duration_ms, uint32_t counter)
 {
     if (duration_ms == 0) return 0.0f;
-    return counter / (duration_ms / 1000.0) * (float)HASH_CNT_LSB; // Make sure it stays in float
+    float seconds = duration_ms / 1000.0;
+    float hashrate = counter / seconds * (float)HASH_CNT_LSB; // Make sure it stays in float
+    return hashrate / 1e9f; // Convert to Gh/s
 }

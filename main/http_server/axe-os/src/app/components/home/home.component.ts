@@ -644,7 +644,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public getHeatmapColor(info: ISystemInfo, domainHashrate: number): string {
     const ratio = Math.max(0, Math.min(2, (domainHashrate / info.expectedHashrate) * this.getAsicsAmount(info)) * this.getAsicDomainsAmount(info));
     const deviation = Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
-    const t = 1 - Math.pow(1 - deviation, 5);
+    const t = 1 - Math.pow(1 - deviation, 3);
     const target = ratio > 1 ? 255 : 0; // gradient from 0: black, 1: primary-color, 2: white
 
     const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();

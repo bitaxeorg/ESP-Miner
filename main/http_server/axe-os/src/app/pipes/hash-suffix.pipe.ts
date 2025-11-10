@@ -14,7 +14,7 @@ export class HashSuffixPipe implements PipeTransform {
   public transform(value: number, args?: any): string {
 
     if (value == null || value <= 0 || isNaN(value)) {
-      return '0';
+      return '0 H/s';
     }
 
     const suffixes = [' H/s', ' Kh/s', ' Mh/s', ' Gh/s', ' Th/s', ' Ph/s', ' Eh/s'];

@@ -7,13 +7,12 @@
 #include "common.h"
 #include "asic.h"
 #include "nvs_config.h"
+#include "utils.h"
 
 #define EPSILON 0.0001f
 
 #define POLL_RATE 5000
-#define EMA_ALPHA 12
 
-#define HASH_CNT_LSB 0x100000000uLL // Hash counters are incremented on difficulty 1 (2^32 hashes)
 #define HASHRATE_UNIT 0x100000uLL // Hashrate register unit (2^24 hashes)
 
 static const char *TAG = "hashrate_monitor";
@@ -36,28 +35,15 @@ static float sum_hashrates(measurement_t * measurement, int asic_count)
 static void clear_measurements(GlobalState * GLOBAL_STATE)
 {
     HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
-    PowerManagementModule * POWER_MANAGEMENT_MODULE = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
-    float expected_asic_hashrate = POWER_MANAGEMENT_MODULE->expected_hashrate / asic_count;
-    float expected_domain_hashrate = expected_asic_hashrate / hash_domains;
 
-    for (int asic_nr = 0; asic_nr < asic_count; asic_nr++) {
-        HASHRATE_MONITOR_MODULE->total_measurement[asic_nr] = (measurement_t) { .expected_hashrate = expected_asic_hashrate };
-        for (int hash_domain = 0; hash_domain < hash_domains; hash_domain++) {
-            HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][hash_domain] = (measurement_t) { .expected_hashrate = expected_domain_hashrate };
-        }
-        HASHRATE_MONITOR_MODULE->error_measurement[asic_nr] = (measurement_t) { 0 };
+    memset(HASHRATE_MONITOR_MODULE->total_measurement, 0, asic_count * sizeof(measurement_t));
+    if (hash_domains > 0) {
+        memset(HASHRATE_MONITOR_MODULE->domain_measurements[0], 0, asic_count * hash_domains * sizeof(measurement_t));
     }
-}
-
-static float hash_counter_to_ghs(uint32_t duration_ms, uint32_t counter)
-{
-    if (duration_ms == 0) return 0.0f;
-    float seconds = duration_ms / 1000.0;
-    float hashrate = counter / seconds * (float)HASH_CNT_LSB; // Make sure it stays in float
-    return hashrate / 1e9f; // Convert to Gh/s
+    memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
 }
 
 static void update_hashrate(uint32_t value, measurement_t * measurement, int asic_nr)
@@ -77,19 +63,7 @@ static void update_hash_counter(uint32_t time_ms, uint32_t value, measurement_t 
     if (previous_time_ms != 0) {
         uint32_t duration_ms = time_ms - previous_time_ms;
         uint32_t counter = value - measurement->value; // Compute counter difference, handling uint32_t wraparound
-
-        float hashrate = hash_counter_to_ghs(duration_ms, counter);
-
-        if (measurement->expected_hashrate > 0.0) {
-            if (measurement->hashrate == 0.0) {
-                // Initialise EMA with expected_hashrate
-                measurement->hashrate = hashrate == 0.0 ? 0.0 : measurement->expected_hashrate;
-            }
-            measurement->hashrate = ((measurement->hashrate * (EMA_ALPHA - 1)) + hashrate) / EMA_ALPHA;
-        }
-        else {
-            measurement->hashrate = hashrate;
-        }
+        measurement->hashrate = hashCounterToGhs(duration_ms, counter);
     }
 
     measurement->value = value;
