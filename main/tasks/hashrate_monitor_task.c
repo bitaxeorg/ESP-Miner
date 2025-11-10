@@ -138,7 +138,6 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
             update_hash_counter(time_ms, value, &HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][3]);
             break;
         case REGISTER_ERROR_COUNT:
-            ESP_LOGI(TAG, "Error counter %d on ASIC %d", value, asic_nr);
             update_hash_counter(time_ms, value, &HASHRATE_MONITOR_MODULE->error_measurement[asic_nr]);
             break;
         case REGISTER_INVALID:
