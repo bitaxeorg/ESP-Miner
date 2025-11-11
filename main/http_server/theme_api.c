@@ -3,8 +3,9 @@
 #include "esp_log.h"
 #include "nvs_config.h"
 #include "cJSON.h"
+#include "http_server.h"
 
-//static const char *TAG = "theme_api";
+static int theme_prebuffer_len = 256;
 
 // Helper function to set CORS headers
 static esp_err_t set_cors_headers(httpd_req_t *req)
@@ -29,32 +30,8 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     set_cors_headers(req);
 
-    char *scheme = nvs_config_get_string(NVS_CONFIG_THEME_SCHEME, "dark");
-    char *colors = nvs_config_get_string(NVS_CONFIG_THEME_COLORS, 
-        "{"
-        "\"--primary-color\":\"#F80421\","
-        "\"--primary-color-text\":\"#ffffff\","
-        "\"--highlight-bg\":\"#F80421\","
-        "\"--highlight-text-color\":\"#ffffff\","
-        "\"--focus-ring\":\"0 0 0 0.2rem rgba(248,4,33,0.2)\","
-        "\"--slider-bg\":\"#dee2e6\","
-        "\"--slider-range-bg\":\"#F80421\","
-        "\"--slider-handle-bg\":\"#F80421\","
-        "\"--progressbar-bg\":\"#dee2e6\","
-        "\"--progressbar-value-bg\":\"#F80421\","
-        "\"--checkbox-border\":\"#F80421\","
-        "\"--checkbox-bg\":\"#F80421\","
-        "\"--checkbox-hover-bg\":\"#df031d\","
-        "\"--button-bg\":\"#F80421\","
-        "\"--button-hover-bg\":\"#df031d\","
-        "\"--button-focus-shadow\":\"0 0 0 2px #ffffff, 0 0 0 4px #F80421\","
-        "\"--togglebutton-bg\":\"#F80421\","
-        "\"--togglebutton-border\":\"1px solid #F80421\","
-        "\"--togglebutton-hover-bg\":\"#df031d\","
-        "\"--togglebutton-hover-border\":\"1px solid #df031d\","
-        "\"--togglebutton-text-color\":\"#ffffff\""
-        "}"
-    );
+    char *scheme = nvs_config_get_string(NVS_CONFIG_THEME_SCHEME);
+    char *colors = nvs_config_get_string(NVS_CONFIG_THEME_COLORS);
 
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "colorScheme", scheme);
@@ -65,15 +42,14 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
         cJSON_AddItemToObject(root, "accentColors", colors_json);
     }
 
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
+    esp_err_t res = HTTP_send_json(req, root, &theme_prebuffer_len);
 
     free(scheme);
     free(colors);
-    free((char *)response);
+
     cJSON_Delete(root);
 
-    return ESP_OK;
+    return res;
 }
 
 // POST /api/theme handler

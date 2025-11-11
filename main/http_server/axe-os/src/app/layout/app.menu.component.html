@@ -1,18 +1,3 @@
-<ng-container *ngIf="isMobile()">
-    <ul *ngIf="info$ | async as info" class="flex lg:hidden list-none absolute flex p-0 mt-0 mr-4 mt-3 gap-4 right-0 top-0">
-        <li>
-            <a routerLink="network" class="block">
-                <wifi-icon [rssi]="info.wifiRSSI" />
-            </a>
-        </li>
-        <li>
-            <a class="block text-white" (click)="restart()">
-                <i class="pi pi-refresh text-xl block"></i>
-            </a>
-        </li>
-    </ul>
-</ng-container>
-
 <ul class="layout-menu">
     <ng-container *ngFor="let item of model; let i = index;">
         <li app-menuitem *ngIf="!item.separator" [item]="item" [index]="i" [root]="true"></li>

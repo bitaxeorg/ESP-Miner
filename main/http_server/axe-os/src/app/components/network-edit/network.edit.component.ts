@@ -57,7 +57,7 @@ export class NetworkEditComponent implements OnInit {
 
     const form = this.form.getRawValue();
 
-    // Allow an empty wifi password
+    // Allow an empty Wi-Fi password
     form.wifiPass = form.wifiPass == null ? '' : form.wifiPass;
 
     if (form.wifiPass === '*****') {
@@ -100,7 +100,7 @@ export class NetworkEditComponent implements OnInit {
           // Sort networks by signal strength (highest first)
           const networks = response.networks.sort((a, b) => b.rssi - a.rssi);
 
-          // filter out poor wifi connections
+          // filter out poor Wi-Fi connections
           const poorNetworks = networks.filter(network => network.rssi >= -80);
 
           // Remove duplicate Network Names and show highest signal strength only

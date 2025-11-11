@@ -30,3 +30,23 @@
         flex-shrink: 0;
     }
 }
+
+.code {
+    line-break: anywhere;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.heatmap {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 1px;
+    table-layout: fixes;
+
+    th {
+        padding: 0;
+    }
+
+    &[style*="background"] {
+        transition: background 250ms;
+    }
+}

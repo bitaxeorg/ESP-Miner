@@ -44,7 +44,7 @@ export class DialogService {
         [label]="option.label"
         (onClick)="config.data.onSelect(option.value)"
         styleClass="w-full text-left flex align-items-baseline"
-        pTooltip="{{option.label}} ({{option.rssi}}dBm)"
+        pTooltip="{{option.label}} ({{option.rssi}} dBm)"
         tooltipPosition="bottom"
       >
         <wifi-icon [rssi]="option.rssi" class="flex-order-2" />

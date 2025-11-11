@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include "esp_log.h"
 #include "esp_timer.h"
+#include <esp_heap_caps.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "statistics_task.h"
@@ -10,83 +11,103 @@
 #include "power.h"
 #include "connect.h"
 #include "vcore.h"
+#include "bm1370.h"
 
 #define DEFAULT_POLL_RATE 5000
 
 static const char * TAG = "statistics_task";
 
-static StatisticsNodePtr statisticsDataStart = NULL;
-static StatisticsNodePtr statisticsDataEnd = NULL;
+static StatisticsDataPtr statisticsBuffer;
+static uint16_t statisticsDataStart;
+static uint16_t statisticsDataSize;
 static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 
 static const uint16_t maxDataCount = 720;
-static uint16_t currentDataCount;
 static uint16_t statsFrequency;
 
-StatisticsNodePtr addStatisticData(StatisticsNodePtr data)
+void createStatisticsBuffer()
 {
-    if ((NULL == data) || (0 == statsFrequency)) {
-        return NULL;
-    }
-
-    StatisticsNodePtr newData = NULL;
-
-    // create new data block or reuse first data block
-    if (currentDataCount < maxDataCount) {
-        newData = (StatisticsNodePtr)malloc(sizeof(struct StatisticsData));
-        currentDataCount++;
-    } else {
-        newData = statisticsDataStart;
-    }
-
-    // set data
-    if (NULL != newData) {
+    if (NULL == statisticsBuffer) {
         pthread_mutex_lock(&statisticsDataLock);
 
-        if (NULL == statisticsDataStart) {
-            statisticsDataStart = newData; // set first new data block
-        } else {
-            if ((statisticsDataStart == newData) && (NULL != statisticsDataStart->next)) {
-                statisticsDataStart = statisticsDataStart->next; // move DataStart to next (first data block reused)
+        if (NULL == statisticsBuffer) {
+            statisticsBuffer = (StatisticsDataPtr)heap_caps_malloc(sizeof(struct StatisticsData) * maxDataCount, MALLOC_CAP_SPIRAM);
+            if (NULL == statisticsBuffer) {
+                ESP_LOGW(TAG, "Not enough memory for the statistics data buffer!");
             }
         }
 
-        *newData = *data;
-        newData->next = NULL;
+        pthread_mutex_unlock(&statisticsDataLock);
+    }
+}
 
-        if ((NULL != statisticsDataEnd) && (newData != statisticsDataEnd)) {
-            statisticsDataEnd->next = newData; // link data block
+void removeStatisticsBuffer()
+{
+    if (NULL != statisticsBuffer) {
+        pthread_mutex_lock(&statisticsDataLock);
+
+        if (NULL != statisticsBuffer) {
+            heap_caps_free(statisticsBuffer);
+
+            statisticsBuffer = NULL;
+            statisticsDataStart = 0;
+            statisticsDataSize = 0;
         }
-        statisticsDataEnd = newData; // set DataEnd to new data
 
         pthread_mutex_unlock(&statisticsDataLock);
     }
-
-    return newData;
 }
 
-StatisticsNextNodePtr statisticData(StatisticsNodePtr nodeIn, StatisticsNodePtr dataOut)
+bool addStatisticData(StatisticsDataPtr data)
 {
-    if ((NULL == nodeIn) || (NULL == dataOut) || (0 == statsFrequency)) {
-        return NULL;
+    bool result = false;
+
+    if (NULL == data) {
+        return result;
     }
 
-    StatisticsNextNodePtr nextNode = NULL;
+    createStatisticsBuffer();
 
     pthread_mutex_lock(&statisticsDataLock);
 
-    *dataOut = *nodeIn;
-    nextNode = nodeIn->next;
+    if (NULL != statisticsBuffer) {
+        statisticsDataSize++;
+
+        if (maxDataCount < statisticsDataSize) {
+            statisticsDataSize = maxDataCount;
+            statisticsDataStart++;
+            statisticsDataStart = statisticsDataStart % maxDataCount;
+        }
+
+        const uint16_t last = (statisticsDataStart + statisticsDataSize - 1) % maxDataCount;
+        statisticsBuffer[last] = *data;
+        result = true;
+    }
 
     pthread_mutex_unlock(&statisticsDataLock);
 
-    return nextNode;
+    return result;
 }
 
-void statistics_init(void * pvParameters)
+bool getStatisticData(uint16_t index, StatisticsDataPtr dataOut)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-    GLOBAL_STATE->STATISTICS_MODULE.statisticsList = &statisticsDataStart;
+    bool result = false;
+
+    if ((NULL == statisticsBuffer) || (NULL == dataOut) || (maxDataCount <= index)) {
+        return result;
+    }
+
+    pthread_mutex_lock(&statisticsDataLock);
+
+    if ((NULL != statisticsBuffer) && (index < statisticsDataSize)) {
+        index = (statisticsDataStart + index) % maxDataCount;
+        *dataOut = statisticsBuffer[index];
+        result = true;
+    }
+
+    pthread_mutex_unlock(&statisticsDataLock);
+
+    return result;
 }
 
 void statistics_task(void * pvParameters)
@@ -101,28 +122,35 @@ void statistics_task(void * pvParameters)
     TickType_t taskWakeTime = xTaskGetTickCount();
 
     while (1) {
-        const int64_t currentTime = esp_timer_get_time() / 1000;
-        statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY, 0) * 1000;
-        const int64_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
+        const int32_t currentTime = esp_timer_get_time() / 1000;
+        statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY) * 1000;
 
-        if ((0 != statsFrequency) && (currentTime > waitingTime)) {
-            int8_t wifiRSSI = -90;
-            get_wifi_current_rssi(&wifiRSSI);
+        if (0 != statsFrequency) {
+            const int32_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
 
-            statsData.timestamp = currentTime;
-            statsData.hashrate = sys_module->current_hashrate;
-            statsData.chipTemperature = power_management->chip_temp_avg;
-            statsData.vrTemperature = power_management->vr_temp;
-            statsData.power = power_management->power;
-            statsData.voltage = power_management->voltage;
-            statsData.current = Power_get_current(GLOBAL_STATE);
-            statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
-            statsData.fanSpeed = power_management->fan_perc;
-            statsData.fanRPM = power_management->fan_rpm;
-            statsData.wifiRSSI = wifiRSSI;
-            statsData.freeHeap = esp_get_free_heap_size();
+            if (currentTime > waitingTime) {
+                int8_t wifiRSSI = -90;
+                get_wifi_current_rssi(&wifiRSSI);
 
-            addStatisticData(&statsData);
+                statsData.timestamp = currentTime;
+                statsData.hashrate = sys_module->current_hashrate;
+                statsData.errorPercentage = sys_module->error_percentage;
+                statsData.chipTemperature = power_management->chip_temp_avg;
+                statsData.vrTemperature = power_management->vr_temp;
+                statsData.power = power_management->power;
+                statsData.voltage = power_management->voltage;
+                statsData.current = Power_get_current(GLOBAL_STATE);
+                statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
+                statsData.fanSpeed = power_management->fan_perc;
+                statsData.fanRPM = power_management->fan_rpm;
+                statsData.fan2RPM = power_management->fan2_rpm;
+                statsData.wifiRSSI = wifiRSSI;
+                statsData.freeHeap = esp_get_free_heap_size();
+
+                addStatisticData(&statsData);
+            }
+        } else {
+            removeStatisticsBuffer();
         }
 
         vTaskDelayUntil(&taskWakeTime, DEFAULT_POLL_RATE / portTICK_PERIOD_MS); // taskWakeTime is automatically updated

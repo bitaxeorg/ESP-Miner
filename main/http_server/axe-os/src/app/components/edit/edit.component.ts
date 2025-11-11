@@ -17,8 +17,7 @@ const STATS_FREQUENCY_STEPS = [0, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 *
 
 @Component({
   selector: 'app-edit',
-  templateUrl: './edit.component.html',
-  styleUrls: ['./edit.component.scss']
+  templateUrl: './edit.component.html'
 })
 
 export class EditComponent implements OnInit, OnDestroy, OnChanges {
@@ -166,7 +165,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           frequency: [info.frequency, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
           minfanspeed: [info.minFanSpeed, [Validators.required]],
-          fanspeed: [info.fanspeed, [Validators.required]],
+          manualFanSpeed: [info.manualFanSpeed, [Validators.required]],
           temptarget: [info.temptarget, [Validators.required]],
           overheat_mode: [info.overheat_mode, [Validators.required]],
           statsFrequency: [info.statsFrequency, [
@@ -183,10 +182,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
         takeUntil(this.destroy$)
       ).subscribe(autofanspeed => {
         if (autofanspeed) {
-          this.form.controls['fanspeed'].disable();
+          this.form.controls['manualFanSpeed'].disable();
           this.form.controls['temptarget'].enable();
         } else {
-          this.form.controls['fanspeed'].enable();
+          this.form.controls['manualFanSpeed'].enable();
           this.form.controls['temptarget'].disable();
         }
       });
@@ -339,7 +338,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       'coreVoltage',
       'frequency',
       'autofanspeed',
-      'fanspeed',
+      'manualFanSpeed',
       'temptarget',
       'overheat_mode',
       'statsFrequency'

@@ -1,75 +1,48 @@
 table {
-    width: 100%;
-    border: 1px solid #304562;
+    border-collapse: collapse;
 }
-
-th {
-    text-align: left;
-    background-color: #1f2d40;
-    padding: 0;
-
-    > div {
-        height: 100%;
-        padding: 0.5rem 1rem;
-        gap: 0.75rem;
-    }
-
-    .pi {
-        opacity: 0.7;
-        height: 1em;
-        line-height: 1;
-
-        &.pi-sort-amount-up-alt,
-        &.pi-sort-amount-down {
-            opacity: 1;
-        }
-    }
-}
-
 th,
 td {
-    border-bottom: 1px solid #304562;
-}
+    padding: 0 0.5rem 0.5rem;
+    white-space: nowrap;
+    text-align: left;
+    vertical-align: top;
 
+    &:first-child {
+        padding-left: 0;
+    }
+    &:last-child {
+        padding-right: 0;
+        text-align: right;
+    }
+}
 td {
-    padding: 1rem;
+    padding-top: 0.5rem;
+
+    p {
+        line-height: 1.4;
+    }
 }
+tbody tr {
+    border-top: 1px solid var(--surface-border);
 
-th > div {
-    min-width: 100px;
-    padding-right: 0.5rem;
-}
-
-a {
-    color: white;
-}
-
-.table-container {
-    width: 100%;
-    overflow-x: auto;
-    margin: 0;
-
-    table {
-        min-width: 100%;
-        white-space: nowrap;
-
-        th, td {
-            padding: 0.5rem;
-            text-align: left;
-        }
+    &:last-child td {
+        padding-bottom: 0;
     }
 }
 
-.refresh-button {
-  display: grid;
-  place-items: center;
+.button-text {
+    min-width: 8rem;
+}
 
-  > span:first-child {
-    visibility: hidden;
-    grid-area: 1 / 1;
-  }
-
-  > span:last-child {
-    grid-area: 1 / 1;
-  }
+::ng-deep {
+    .p-button.button-icon {
+        width: 2.2rem;
+        height: 2.2rem;
+        margin-top: 0.25rem;
+    }
+    .p-button.button-icon-small {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
 }

@@ -1,4 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { LayoutService } from '../../layout/service/app.layout.service';
 import { ThemeService } from '../../services/theme.service';
 
@@ -216,6 +218,8 @@ export class ThemeConfigComponent implements OnInit {
     }
   ];
 
+  private destroy$ = new Subject<void>();
+
   constructor(
     public layoutService: LayoutService,
     private themeService: ThemeService
@@ -224,23 +228,27 @@ export class ThemeConfigComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Load saved theme settings from NVS
-    this.themeService.getThemeSettings().subscribe(
-      settings => {
-        if (settings) {
-          // Apply saved color scheme
-          if (settings.colorScheme) {
-            this.selectedScheme = settings.colorScheme;
+    this.themeService.getThemeSettings()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (settings) => {
+          if (settings) {
+            if (settings.colorScheme) {
+              this.selectedScheme = settings.colorScheme;
+            }
+            if (settings.accentColors) {
+              this.applyThemeColors(settings.accentColors);
+              this.currentColor = settings.accentColors['--primary-color'];
+            }
           }
-          // Apply accent colors if they exist
-          if (settings.accentColors) {
-            this.applyThemeColors(settings.accentColors);
-            this.currentColor = settings.accentColors['--primary-color'];
-          }
-        }
-      },
-      error => console.error('Error loading theme settings:', error)
-    );
+        },
+        error: (error) => console.error('Error loading theme settings:', error)
+      });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   private applyThemeColors(colors: { [key: string]: string }) {
@@ -254,26 +262,24 @@ export class ThemeConfigComponent implements OnInit {
     const config = { ...this.layoutService.config() };
     config.colorScheme = scheme;
     this.layoutService.config.set(config);
-    // Save color scheme to NVS
-    this.themeService.saveThemeSettings({
-      colorScheme: scheme
-    }).subscribe(
-      () => { },
-      error => console.error('Error saving theme settings:', error)
-    );
+
+    this.themeService.saveThemeSettings({ colorScheme: scheme })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        error: (error) => console.error('Error saving theme settings:', error)
+      });
   }
 
   changeTheme(theme: ThemeOption) {
-    // Update CSS variables
     this.applyThemeColors(theme.accentColors);
     this.currentColor = theme.primaryColor;
-    // Save theme settings to NVS
+
     this.themeService.saveThemeSettings({
       colorScheme: this.selectedScheme,
       accentColors: theme.accentColors
-    }).subscribe(
-      () => { },
-      error => console.error('Error saving theme settings:', error)
-    );
+    }).pipe(takeUntil(this.destroy$))
+      .subscribe({
+        error: (error) => console.error('Error saving theme settings:', error)
+      });
   }
 }

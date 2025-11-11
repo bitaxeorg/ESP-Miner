@@ -48,7 +48,7 @@ int log_to_queue(const char *format, va_list args)
     }
 
     // Print to standard output
-    printf("%s", log_buffer);
+    fputs(log_buffer, stdout);
 
     // Send to queue for WebSocket broadcasting
     if (xQueueSendToBack(log_queue, &log_buffer, pdMS_TO_TICKS(100)) != pdPASS) {
@@ -200,7 +200,7 @@ void websocket_task(void *pvParameters)
     ESP_LOGI(TAG, "websocket_task starting");
     httpd_handle_t https_handle = (httpd_handle_t)pvParameters;
 
-    log_queue = xQueueCreate(MESSAGE_QUEUE_SIZE, sizeof(char*));
+    log_queue = xQueueCreateWithCaps(MESSAGE_QUEUE_SIZE, sizeof(char*), MALLOC_CAP_SPIRAM);
     if (log_queue == NULL) {
         ESP_LOGE(TAG, "Error creating queue");
         vTaskDelete(NULL);

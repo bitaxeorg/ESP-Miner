@@ -9,12 +9,18 @@ static const char * TAG = "EMC2103";
 
 static i2c_master_dev_handle_t EMC2103_dev_handle;
 
+static int temp_offset;
+
 /**
  * @brief Initialize the EMC2103 sensor.
  *
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
-esp_err_t EMC2103_init() {
+esp_err_t EMC2103_init(int temp_offset_param)
+{
+    ESP_LOGI(TAG, "Initializing EMC2103 (Temperature offset: %d° C)", temp_offset_param);
+    
+    temp_offset = temp_offset_param;
 
     if (i2c_bitaxe_add_device(EMC2103_I2CADDR_DEFAULT, &EMC2103_dev_handle, TAG) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add device");
@@ -98,6 +104,47 @@ uint16_t EMC2103_get_fan_speed(void)
     return RPM;
 }
 
+static float get_external_temp(int i, uint8_t msb_register, uint8_t lsb_register)
+{
+    uint8_t temp_msb = 0, temp_lsb = 0;
+    esp_err_t err;
+
+    // Read temperature 1
+    err = i2c_bitaxe_register_read(EMC2103_dev_handle, msb_register, &temp_msb, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read external temperature %d MSB: %s", i, esp_err_to_name(err));
+        return -1;
+    }
+    
+    err = i2c_bitaxe_register_read(EMC2103_dev_handle, lsb_register, &temp_lsb, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read external temperature %d LSB: %s", i, esp_err_to_name(err));
+        return -1;
+    }
+
+    // Combine MSB and LSB, and then right shift to get 11 bits
+    uint16_t reading = (temp_msb << 8) | temp_lsb;
+
+    if (reading == EMC2103_TEMP_DIODE_FAULT) {
+        ESP_LOGE(TAG, "EMC2103 TEMP_DIODE%d_FAULT: %04X", i, reading);
+    }
+
+    reading >>= 5;  // Now, `reading` contains an 11-bit signed value
+
+    // Cast `reading` to a signed 16-bit integer
+    int16_t signed_reading = (int16_t)reading;
+
+    // If the 11th bit (sign bit in 11-bit data) is set, extend the sign
+    if (signed_reading & 0x0400) {
+        signed_reading |= 0xF800;  // Set upper bits to extend the sign
+    }
+
+    // Convert the signed reading to temperature in Celsius
+    float result = (float)signed_reading / 8.0f;
+
+    return result + temp_offset;
+}
+
 /**
  * @brief Get the external temperature in Celsius.
  *
@@ -105,148 +152,15 @@ uint16_t EMC2103_get_fan_speed(void)
  */
 float EMC2103_get_external_temp(void)
 {
-    uint8_t temp_msb = 0, temp_lsb = 0;
-    uint16_t reading;
-    float temp1 = 0.0f, temp2 = 0.0f;
-    esp_err_t err;
-
-    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP1_MSB, &temp_msb, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read external temperature 1 MSB: %s", esp_err_to_name(err));
-        return 0.0f;
-    }
-    
-    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP1_LSB, &temp_lsb, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read external temperature 1 LSB: %s", esp_err_to_name(err));
-        return 0.0f;
-    }
-
-    //print the temps
-    //ESP_LOGI(TAG, "Temp1 MSB: %02X Temp1 LSB: %02X", temp_msb, temp_lsb);
-    
-    // Combine MSB and LSB, and then right shift to get 11 bits
-    reading = (temp_msb << 8) | temp_lsb;
-
-    if (reading == EMC2103_TEMP_DIODE_FAULT) {
-        ESP_LOGE(TAG, "EMC2103 TEMP_DIODE1_FAULT: %04X", reading);
-    }
-
-    reading >>= 5;  // Now, `reading` contains an 11-bit signed value
-
-    // Cast `reading` to a signed 16-bit integer
-    int16_t signed_reading = (int16_t)reading;
-
-    // If the 11th bit (sign bit in 11-bit data) is set, extend the sign
-    if (signed_reading & 0x0400) {
-        signed_reading |= 0xF800;  // Set upper bits to extend the sign
-    }
-
-    // Convert the signed reading to temperature in Celsius
-    temp1 = (float)signed_reading / 8.0;
-
-    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP2_MSB, &temp_msb, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read external temperature 2 MSB: %s", esp_err_to_name(err));
-        return temp1; // Return temp1 if we can't read temp2
-    }
-    
-    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP2_LSB, &temp_lsb, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read external temperature 2 LSB: %s", esp_err_to_name(err));
-        return temp1; // Return temp1 if we can't read temp2
-    }
-
-    //print the temps
-    //ESP_LOGI(TAG, "Temp2 MSB: %02X Temp2 LSB: %02X", temp_msb, temp_lsb);
-    
-    // Combine MSB and LSB, and then right shift to get 11 bits
-    reading = (temp_msb << 8) | temp_lsb;
-    if (reading == EMC2103_TEMP_DIODE_FAULT) {
-        ESP_LOGE(TAG, "EMC2103 TEMP_DIODE2_FAULT: %04X", reading);
-    }
-    reading >>= 5;  // Now, `reading` contains an 11-bit signed value
-
-    // Cast `reading` to a signed 16-bit integer
-    signed_reading = (int16_t)reading;
-
-    // If the 11th bit (sign bit in 11-bit data) is set, extend the sign
-    if (signed_reading & 0x0400) {
-        signed_reading |= 0xF800;  // Set upper bits to extend the sign
-    }
-
-    // Convert the signed reading to temperature in Celsius
-    temp2 = (float)signed_reading / 8.0;
-
-
-    //debug the temps
-    //ESP_LOGI(TAG, "Temp1: %.2f Temp2: %.2f", temp1, temp2);
-
-    return temp1;
+    return get_external_temp(1, EMC2103_EXTERNAL_TEMP1_MSB, EMC2103_EXTERNAL_TEMP1_LSB);
 }
 
 /**
- * @brief Get both external temperatures in Celsius.
+ * @brief Get the external temperature 2 in Celsius.
  *
- * @return EMC2103_temps_t Structure containing both temp1 and temp2 in Celsius.
+ * @return float The external temperature 2 in Celsius.
  */
-EMC2103_temps_t EMC2103_get_external_temps(void)
+float EMC2103_get_external_temp2(void)
 {
-    EMC2103_temps_t temps = {0.0f, 0.0f};
-    uint8_t temp_msb = 0, temp_lsb = 0;
-    uint16_t reading;
-    esp_err_t err;
-
-    // Read temperature 1
-    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP1_MSB, &temp_msb, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read external temperature 1 MSB: %s", esp_err_to_name(err));
-        return temps;
-    }
-    
-    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP1_LSB, &temp_lsb, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read external temperature 1 LSB: %s", esp_err_to_name(err));
-        return temps;
-    }
-
-    // Process temperature 1
-    reading = (temp_msb << 8) | temp_lsb;
-    if (reading == EMC2103_TEMP_DIODE_FAULT) {
-        ESP_LOGE(TAG, "EMC2103 TEMP_DIODE1_FAULT: %04X", reading);
-    }
-    reading >>= 5;
-    int16_t signed_reading = (int16_t)reading;
-    if (signed_reading & 0x0400) {
-        signed_reading |= 0xF800;
-    }
-    temps.temp1 = (float)signed_reading / 8.0;
-
-    // Read temperature 2
-    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP2_MSB, &temp_msb, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read external temperature 2 MSB: %s", esp_err_to_name(err));
-        return temps; // Return with only temp1 valid
-    }
-    
-    err = i2c_bitaxe_register_read(EMC2103_dev_handle, EMC2103_EXTERNAL_TEMP2_LSB, &temp_lsb, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read external temperature 2 LSB: %s", esp_err_to_name(err));
-        return temps; // Return with only temp1 valid
-    }
-
-    reading = (temp_msb << 8) | temp_lsb;
-    if (reading == EMC2103_TEMP_DIODE_FAULT) {
-        ESP_LOGE(TAG, "EMC2103 TEMP_DIODE2_FAULT: %04X", reading);
-    }
-    reading >>= 5;
-    signed_reading = (int16_t)reading;
-    if (signed_reading & 0x0400) {
-        signed_reading |= 0xF800;
-    }
-    temps.temp2 = (float)signed_reading / 8.0;
-
-    ESP_LOGI(TAG, "Temp1: %.2f Temp2: %.2f", temps.temp1, temps.temp2);
-
-    return temps;
+    return get_external_temp(2, EMC2103_EXTERNAL_TEMP2_MSB, EMC2103_EXTERNAL_TEMP2_LSB);
 }

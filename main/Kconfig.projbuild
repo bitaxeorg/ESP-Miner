@@ -37,6 +37,16 @@ menu "Bitaxe Configuration"
             default 48
             help
                 GPIO pin for I2C clock line (SCL).
+        config GPIO_BAP_RX
+            int "I2C BAP Pin"
+            default 40
+            help
+                GPIO pin for BAP receiving line.
+        config GPIO_BAP_TX
+            int "I2C BAP Pin"
+            default 39
+            help
+                GPIO pin for BAP transmitting line.
             
     endmenu
     

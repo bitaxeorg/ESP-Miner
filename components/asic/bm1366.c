@@ -34,19 +34,48 @@
 
 #define MISC_CONTROL 0x18
 
+static const register_type_t REGISTER_MAP[] = {
+    [0x4C] = REGISTER_ERROR_COUNT,
+    [0x88] = REGISTER_DOMAIN_0_COUNT,
+    [0x89] = REGISTER_DOMAIN_1_COUNT,
+    [0x8A] = REGISTER_DOMAIN_2_COUNT,
+    [0x8B] = REGISTER_DOMAIN_3_COUNT,
+    [0x8C] = REGISTER_TOTAL_COUNT
+};
+
 typedef struct __attribute__((__packed__))
 {
-    uint16_t preamble;
-    uint32_t nonce;
-    uint8_t midstate_num;
-    uint8_t job_id;
-    uint16_t version;
-    uint8_t crc;
+    uint32_t nonce;                   // 2-5
+    uint8_t midstate_num;             // 6
+    uint8_t id;                       // 7
+    uint16_t version;                 // 8-9
+} bm1366_asic_result_job_t;
+
+typedef struct __attribute__((__packed__))
+{
+    uint32_t value;                   // 2-5
+    uint8_t asic_address;             // 6
+    uint8_t register_address;         // 7
+    uint16_t                  : 16;   // 8-9
+} bm1366_asic_result_cmd_t;
+
+typedef struct __attribute__((__packed__))
+{
+    uint16_t preamble;                // 0-1
+    union {
+        bm1366_asic_result_job_t job; // 2-9
+        bm1366_asic_result_cmd_t cmd; // 2-9
+    };
+    uint8_t crc             : 5;      // 10:0-5
+    uint8_t                 : 2;      // 10:6-7
+    uint8_t is_job_response : 1;      // 10:8
 } bm1366_asic_result_t;
 
 static const char * TAG = "bm1366";
 
 static task_result result;
+
+static int address_interval;
 
 /// @brief
 /// @param ftdi
@@ -58,8 +87,7 @@ static void _send_BM1366(uint8_t header, uint8_t * data, uint8_t data_len, bool 
     packet_type_t packet_type = (header & TYPE_JOB) ? JOB_PACKET : CMD_PACKET;
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
-    // allocate memory for buffer
-    unsigned char * buf = malloc(total_length);
+    uint8_t buf[total_length];
 
     // add the preamble
     buf[0] = 0x55;
@@ -85,22 +113,17 @@ static void _send_BM1366(uint8_t header, uint8_t * data, uint8_t data_len, bool 
 
     // send serial data
     SERIAL_send(buf, total_length, debug);
-
-    free(buf);
 }
 
 static void _send_simple(uint8_t * data, uint8_t total_length)
 {
-    unsigned char * buf = malloc(total_length);
+    uint8_t buf[total_length];
     memcpy(buf, data, total_length);
     SERIAL_send(buf, total_length, BM1366_SERIALTX_DEBUG);
-
-    free(buf);
 }
 
 static void _send_chain_inactive(void)
 {
-
     unsigned char read_address[2] = {0x00, 0x00};
     // send serial data
     _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_INACTIVE), read_address, 2, BM1366_SERIALTX_DEBUG);
@@ -108,6 +131,7 @@ static void _send_chain_inactive(void)
 
 static void _set_chip_address(uint8_t chipAddr)
 {
+    ESP_LOGI(TAG, "Set chip address: 0x%02x", chipAddr);
 
     unsigned char read_address[2] = {chipAddr, 0x00};
     // send serial data
@@ -166,7 +190,7 @@ uint8_t BM1366_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     _send_chain_inactive();
 
     // split the chip address space evenly
-    uint8_t address_interval = (uint8_t) (256 / chip_counter);
+    address_interval = 256 / chip_counter;
     for (uint8_t i = 0; i < chip_counter; i++) {
         //{ 0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C };
         _set_chip_address(i * address_interval);
@@ -256,7 +280,6 @@ static uint8_t id = 0;
 
 void BM1366_send_work(void * pvParameters, bm_job * next_bm_job)
 {
-
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     BM1366_job job;
@@ -292,28 +315,56 @@ task_result * BM1366_process_work(void * pvParameters)
 {
     bm1366_asic_result_t asic_result = {0};
 
+    memset(&result, 0, sizeof(task_result));
+
     if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
         return NULL;
     }
 
-    uint8_t job_id = asic_result.job_id & 0xf8;
-    uint8_t core_id = (uint8_t)((ntohl(asic_result.nonce) >> 25) & 0x7f); // BM1366 has 112 cores, so it should be coded on 7 bits
-    uint8_t small_core_id = asic_result.job_id & 0x07; // BM1366 has 8 small cores, so it should be coded on 3 bits
-    uint32_t version_bits = (ntohs(asic_result.version) << 13); // shift the 16 bit value left 13
-    ESP_LOGI(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
+    if (!asic_result.is_job_response) {
+        result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
+        if (result.register_type == REGISTER_INVALID) {
+            ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
+            return NULL;
+        }
+        result.asic_nr = asic_result.cmd.asic_address / address_interval;
+        result.value = ntohl(asic_result.cmd.value);
+        
+        return &result;
+    }
+
+    uint8_t job_id = asic_result.job.id & 0xf8;
+    uint32_t nonce_h = ntohl(asic_result.job.nonce);
+    uint8_t asic_nr = (uint8_t)((nonce_h >> 17) & 0xff) / address_interval; // Asic address is encoded in the next 8 bits
+    uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f); // BM1366 has 112 cores, so it should be coded on 7 bits
+    uint8_t small_core_id = asic_result.job.id & 0x07; // BM1366 has 8 small cores, so it should be coded on 3 bits
+    uint32_t version_bits = (ntohs(asic_result.job.version) << 13); // shift the 16 bit value left 13
+    ESP_LOGI(TAG, "Job ID: %02X, Asic nr: %d, Core: %d/%d, Ver: %08" PRIX32, job_id, asic_nr, core_id, small_core_id, version_bits);
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     if (GLOBAL_STATE->valid_jobs[job_id] == 0) {
-        ESP_LOGW(TAG, "Invalid job found, 0x%02X", job_id);
+        ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
         return NULL;
     }
 
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
 
     result.job_id = job_id;
-    result.nonce = asic_result.nonce;
+    result.nonce = asic_result.job.nonce;
     result.rolled_version = rolled_version;
+    result.asic_nr = asic_nr;
 
     return &result;
+}
+
+void BM1366_read_registers(void)
+{
+    int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
+    for (int reg = 0; reg < size; reg++) {
+        if (REGISTER_MAP[reg] != REGISTER_INVALID) {
+            _send_BM1366((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1366_SERIALTX_DEBUG);
+            vTaskDelay(1 / portTICK_PERIOD_MS);
+        }
+    }
 }

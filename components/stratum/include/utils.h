@@ -4,11 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-int hex2char(uint8_t x, char *c);
-
 size_t bin2hex(const uint8_t *buf, size_t buflen, char *hex, size_t hexlen);
 
-uint8_t hex2val(char c);
 void flip80bytes(void *dest_p, const void *src_p);
 void flip32bytes(void *dest_p, const void *src_p);
 
@@ -19,10 +16,10 @@ void print_hex(const uint8_t *b, size_t len,
 
 char *double_sha256(const char *hex_string);
 
-uint8_t *double_sha256_bin(const uint8_t *data, const size_t data_len);
+void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32]);
 
-void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest);
-void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest);
+void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32]);
+void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32]);
 
 void swap_endian_words(const char *hex, uint8_t *output);
 
@@ -33,6 +30,12 @@ double le256todouble(const void *target);
 void prettyHex(unsigned char *buf, int len);
 
 uint32_t flip32(uint32_t val);
+
+double networkDifficulty(uint32_t nBits);
+
+void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
+
+float hashCounterToGhs(uint32_t duration_ms, uint32_t counter);
 
 #define STRATUM_DEFAULT_VERSION_MASK 0x1fffe000
 

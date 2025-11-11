@@ -9,12 +9,18 @@ static const char * TAG = "EMC2101";
 
 static i2c_master_dev_handle_t emc2101_dev_handle;
 
+static int temp_offset;
+
 /**
  * @brief Initialize the EMC2101 sensor.
  *
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
-esp_err_t EMC2101_init() {
+esp_err_t EMC2101_init(int temp_offset_param)
+{
+    ESP_LOGI(TAG, "Initializing EMC2101 (Temperature offset: %d° C)", temp_offset_param);
+
+    temp_offset = temp_offset_param;
 
     if (i2c_bitaxe_add_device(EMC2101_I2CADDR_DEFAULT, &emc2101_dev_handle, TAG) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add device");
@@ -49,7 +55,6 @@ esp_err_t EMC2101_init() {
     // ESP_ERROR_CHECK(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_REG_DATA_RATE, EMC2101_DEFAULT_DATARATE));
 
     return ESP_OK;
-
 }
 
 esp_err_t EMC2101_set_ideality_factor(uint8_t ideality){
@@ -115,13 +120,13 @@ float EMC2101_get_external_temp(void)
     err = i2c_bitaxe_register_read(emc2101_dev_handle, EMC2101_EXTERNAL_TEMP_MSB, &temp_msb, 1);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read external temperature MSB: %s", esp_err_to_name(err));
-        return 0.0f;
+        return -1;
     }
     
     err = i2c_bitaxe_register_read(emc2101_dev_handle, EMC2101_EXTERNAL_TEMP_LSB, &temp_lsb, 1);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read external temperature LSB: %s", esp_err_to_name(err));
-        return 0.0f;
+        return -1;
     }
     
     // Combine MSB and LSB, and then right shift to get 11 bits
@@ -146,10 +151,10 @@ float EMC2101_get_external_temp(void)
     // Convert the signed reading to temperature in Celsius
     float result = (float)signed_reading / 8.0;
 
-    return result;
+    return result + temp_offset;
 }
 
-uint8_t EMC2101_get_internal_temp(void)
+float EMC2101_get_internal_temp(void)
 {
     uint8_t temp = 0;
     esp_err_t err;
@@ -157,7 +162,7 @@ uint8_t EMC2101_get_internal_temp(void)
     err = i2c_bitaxe_register_read(emc2101_dev_handle, EMC2101_INTERNAL_TEMP, &temp, 1);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read internal temperature: %s", esp_err_to_name(err));
-        return 0;
+        return -1;
     }
-    return temp;
+    return (float) temp + temp_offset;
 }

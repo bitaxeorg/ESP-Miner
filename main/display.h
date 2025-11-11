@@ -1,6 +1,11 @@
 #ifndef DISPLAY_H_
 #define DISPLAY_H_
 
+#define DEFAULT_DISPLAY "SSD1306 (128x32)"
+#define LCD_SH1107_I2C_CMD                   0X00
+#define LCD_SH1107_PARAM_SET_DISP_OFFSET     0xD3
+#define LCD_SH1107_PARAM_DEFAULT_DISP_OFFSET 0x60
+
 typedef enum
 {
     NONE,
@@ -18,7 +23,7 @@ typedef struct {
 
 static const DisplayConfig display_configs[] = {
     { .name = "NONE",             .display = NONE,                                },
-    { .name = "SSD1306 (128x32)", .display = SSD1306, .h_res = 128, .v_res = 32,  },
+    { .name = DEFAULT_DISPLAY,    .display = SSD1306, .h_res = 128, .v_res = 32,  },
     { .name = "SSD1309 (128x64)", .display = SSD1309, .h_res = 128, .v_res = 64,  },
     { .name = "SH1107 (64x128)",  .display = SH1107,  .h_res = 64,  .v_res = 128, },
     { .name = "SH1107 (128x128)", .display = SH1107,  .h_res = 128, .v_res = 128, },
@@ -26,5 +31,6 @@ static const DisplayConfig display_configs[] = {
 
 esp_err_t display_init(void * pvParameters);
 esp_err_t display_on(bool display_on);
+const DisplayConfig * get_display_config(const char * name);
 
 #endif /* DISPLAY_H_ */

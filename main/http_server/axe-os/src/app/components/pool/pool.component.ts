@@ -17,8 +17,8 @@ export class PoolComponent implements OnInit {
   public savedChanges: boolean = false;
 
   public pools: PoolType[] = ['stratum', 'fallbackStratum'];
-  public showPassword = {'stratum': false, 'fallbackStratum': false};
-  public showAdvancedOptions = {'stratum': false, 'fallbackStratum': false};
+  public showPassword = { 'stratum': false, 'fallbackStratum': false };
+  public showAdvancedOptions = { 'stratum': false, 'fallbackStratum': false };
 
   @Input() uri = '';
 
@@ -27,7 +27,7 @@ export class PoolComponent implements OnInit {
     private systemService: SystemService,
     private toastr: ToastrService,
     private loadingService: LoadingService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.systemService.getInfo(this.uri)
@@ -38,8 +38,7 @@ export class PoolComponent implements OnInit {
         this.form = this.fb.group({
           stratumURL: [info.stratumURL, [
             Validators.required,
-            Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
-            Validators.pattern(/^[^:]*$/),
+            Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
           ]],
           stratumPort: [info.stratumPort, [
             Validators.required,
@@ -53,7 +52,7 @@ export class PoolComponent implements OnInit {
           stratumPassword: ['*****', [Validators.required]],
 
           fallbackStratumURL: [info.fallbackStratumURL, [
-            Validators.pattern(/^(?!.*stratum\+tcp:\/\/).*$/),
+            Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
           ]],
           fallbackStratumPort: [info.fallbackStratumPort, [
             Validators.required,
@@ -109,5 +108,36 @@ export class PoolComponent implements OnInit {
           this.toastr.error(errorMessage);
         }
       });
+  }
+
+  private extractPort(url: string): { cleanUrl: string, port?: number } {
+    const match = url.match(/:(\d{1,5})$/);
+    if (match) {
+      const port = parseInt(match[1], 10);
+      return { cleanUrl: url.slice(0, match.index), port };
+    }
+    return { cleanUrl: url };
+  }
+
+  public onUrlChange(poolType: PoolType) {
+    const urlControl = this.form.get(`${poolType}URL`);
+    const portControl = this.form.get(`${poolType}Port`);
+    if (!urlControl || !portControl) return;
+
+    let urlValue = urlControl.value || '';
+
+    if (!urlValue) return;
+
+    const prefix = 'stratum+tcp://';
+    if (urlValue.startsWith(prefix)) {
+      urlValue = urlValue.slice(prefix.length);
+    }
+
+    const { cleanUrl, port } = this.extractPort(urlValue);
+
+    if (port !== undefined) {
+      portControl.setValue(port);
+    }
+    urlControl.setValue(cleanUrl);
   }
 }

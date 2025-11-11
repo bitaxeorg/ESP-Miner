@@ -1,6 +1,9 @@
 #ifndef LV_CONF_H
 #define LV_CONF_H
 
+#define LV_USE_LOG 1
+#define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
+
 #define LV_COLOR_DEPTH 1
 
 #define LV_USE_OS LV_OS_FREERTOS
@@ -9,7 +12,7 @@
 #define LV_DRAW_SW_SUPPORT_RGB565A8               0
 #define LV_DRAW_SW_SUPPORT_RGB888                 0
 #define LV_DRAW_SW_SUPPORT_XRGB8888               0
-#define LV_DRAW_SW_SUPPORT_ARGB8888               0
+#define LV_DRAW_SW_SUPPORT_ARGB8888               1
 #define LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED 0
 #define LV_DRAW_SW_SUPPORT_L8                     0
 #define LV_DRAW_SW_SUPPORT_AL88                   0
@@ -34,7 +37,7 @@
 #define LV_USE_BUTTON       0
 #define LV_USE_BUTTONMATRIX 0
 #define LV_USE_CALENDAR     0
-#define LV_USE_CANVAS       0
+#define LV_USE_CANVAS       1
 #define LV_USE_CHART        0
 #define LV_USE_CHECKBOX     0
 #define LV_USE_DROPDOWN     0
@@ -62,9 +65,14 @@
 #define LV_USE_THEME_SIMPLE  0
 #define LV_USE_THEME_MONO    0
 
+#define LV_USE_QRCODE 1
+
 #define LV_USE_OBSERVER 0
 
 #define LV_BUILD_EXAMPLES 0
 #define LV_BUILD_DEMOS    0
+
+#define LV_MEM_POOL_INCLUDE     "esp_heap_caps.h"
+#define LV_MEM_POOL_ALLOC(size) heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA)
 
 #endif /* LV_CONF_H */

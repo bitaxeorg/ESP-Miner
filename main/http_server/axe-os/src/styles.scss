@@ -31,6 +31,21 @@ p-chart>div {
     }
 }
 
+.hover-next-input:hover + * {
+    .p-dropdown {
+        border-color: var(--checkbox-hover-bg);
+    }
+    .p-slider {
+        .p-slider-handle {
+            border-color: var(--checkbox-hover-bg);
+            background-color: var(--checkbox-hover-bg);
+        }
+        .p-slider-range {
+            background-color: var(--checkbox-hover-bg);
+        }
+    }
+}
+
 /* PrimeNG Component Theme Overrides */
 .p-slider {
     .p-slider-range {
@@ -39,16 +54,46 @@ p-chart>div {
     .p-slider-handle {
         background: var(--slider-handle-bg);
         border: 2px solid var(--slider-handle-bg);
+
+        &:focus {
+            box-shadow: var(--focus-ring);
+        }
     }
 }
 
 .p-checkbox {
-    .p-checkbox-box {
+    &:not(.p-checkbox-disabled) {
+        .p-checkbox-box {
+            &.p-focus,
+            &:hover {
+                border-color: var(--checkbox-hover-bg);
+            }
+
+            &.p-highlight {
+                border-color: var(--checkbox-border);
+                background: var(--checkbox-bg);
+
+                &:hover {
+                    background: var(--checkbox-hover-bg);
+                    border-color: var(--checkbox-hover-bg);
+                }
+            }
+        }
+    }
+}
+
+.p-radiobutton {
+    .p-radiobutton-box {
+        &:not(.p-disabled):not(.p-highlight):hover,
+        &:not(.p-disabled).p-focus {
+            border-color: var(--checkbox-hover-bg);
+        }
+
         &.p-highlight {
             border-color: var(--checkbox-border);
             background: var(--checkbox-bg);
 
-            &:hover {
+            &:not(.p-disabled):hover {
                 background: var(--checkbox-hover-bg);
                 border-color: var(--checkbox-hover-bg);
             }
@@ -132,7 +177,8 @@ button.color-dot {
 
     &:hover,
     &:focus,
-    &.p-dropdown-open {
+    &.p-dropdown-open,
+    &:not(.p-disabled).p-focus {
         border-color: var(--togglebutton-hover-bg) !important;
     }
 
@@ -140,6 +186,8 @@ button.color-dot {
         background: var(--surface-overlay) !important;
 
         .p-dropdown-items {
+            padding: 0;
+
             .p-dropdown-item {
                 &:hover {
                     background: var(--highlight-bg) !important;
@@ -151,6 +199,21 @@ button.color-dot {
                     color: var(--highlight-text-color) !important;
                 }
             }
+        }
+    }
+
+    .p-overlay {
+        left: -1px !important;
+        right: -1px !important;
+    }
+
+    &--small {
+        .p-dropdown-label,
+        .p-dropdown-item {
+            font-size: small;
+        }
+        .p-dropdown-label {
+            padding: 0.3rem 0 0.3rem 0.7rem;
         }
     }
 }
@@ -186,4 +249,8 @@ button.color-dot {
         @extend h2;
         margin: 0;
     }
+}
+
+.line-break-anywhere {
+    line-break: anywhere;
 }

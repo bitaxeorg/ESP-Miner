@@ -2,8 +2,20 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "mbedtls/sha256.h"
+
+#define HASH_CNT_LSB 0x100000000uLL // 2^32 hashes for difficulty 1
+
+static const char hex_table[] = "0123456789abcdef";
+
+static const uint8_t hex_val_table[256] = {
+    ['0'] = 0, ['1'] = 1, ['2'] = 2, ['3'] = 3, ['4'] = 4,
+    ['5'] = 5, ['6'] = 6, ['7'] = 7, ['8'] = 8, ['9'] = 9,
+    ['a'] = 10, ['b'] = 11, ['c'] = 12, ['d'] = 13, ['e'] = 14, ['f'] = 15,
+    ['A'] = 10, ['B'] = 11, ['C'] = 12, ['D'] = 13, ['E'] = 14, ['F'] = 15
+};
 
 #ifndef bswap_16
 #define bswap_16(a) ((((uint16_t)(a) << 8) & 0xff00) | (((uint16_t)(a) >> 8) & 0xff))
@@ -59,82 +71,31 @@ void flip32bytes(void *dest_p, const void *src_p)
         dest[i] = swab32(src[i]);
 }
 
-int hex2char(uint8_t x, char *c)
-{
-    if (x <= 9)
-    {
-        *c = x + '0';
-    }
-    else if (x <= 15)
-    {
-        *c = x - 10 + 'a';
-    }
-    else
-    {
-        return -1;
-    }
-
-    return 0;
-}
-
 size_t bin2hex(const uint8_t *buf, size_t buflen, char *hex, size_t hexlen)
 {
-    if ((hexlen + 1) < buflen * 2)
-    {
+    if (hexlen < buflen * 2) {
         return 0;
     }
 
-    for (size_t i = 0; i < buflen; i++)
-    {
-        if (hex2char(buf[i] >> 4, &hex[2 * i]) < 0)
-        {
-            return 0;
-        }
-        if (hex2char(buf[i] & 0xf, &hex[2 * i + 1]) < 0)
-        {
-            return 0;
-        }
+    for (size_t i = 0; i < buflen; i++) {
+        hex[2 * i] = hex_table[buf[i] >> 4];
+        hex[2 * i + 1] = hex_table[buf[i] & 0x0F];
     }
-
     hex[2 * buflen] = '\0';
     return 2 * buflen;
-}
-
-uint8_t hex2val(char c)
-{
-    if (c >= '0' && c <= '9')
-    {
-        return c - '0';
-    }
-    else if (c >= 'a' && c <= 'f')
-    {
-        return c - 'a' + 10;
-    }
-    else if (c >= 'A' && c <= 'F')
-    {
-        return c - 'A' + 10;
-    }
-    else
-    {
-        return 0;
-    }
 }
 
 size_t hex2bin(const char *hex, uint8_t *bin, size_t bin_len)
 {
     size_t len = 0;
 
-    while (*hex && len < bin_len)
-    {
-        bin[len] = hex2val(*hex++) << 4;
-
-        if (!*hex)
-        {
-            len++;
+    while (len < bin_len && hex[0]) {
+        if (!hex[1]) {
+            bin[len++] = hex_val_table[(unsigned char)hex[0]] << 4;
             break;
         }
-
-        bin[len++] |= hex2val(*hex++);
+        bin[len++] = (hex_val_table[(unsigned char)hex[0]] << 4) | hex_val_table[(unsigned char)hex[1]];
+        hex += 2;
     }
 
     return len;
@@ -183,18 +144,15 @@ char *double_sha256(const char *hex_string)
     return output_hash;
 }
 
-uint8_t *double_sha256_bin(const uint8_t *data, const size_t data_len)
+void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32])
 {
     uint8_t first_hash_output[32];
-    uint8_t *second_hash_output = malloc(32);
 
     mbedtls_sha256(data, data_len, first_hash_output, 0);
-    mbedtls_sha256(first_hash_output, 32, second_hash_output, 0);
-
-    return second_hash_output;
+    mbedtls_sha256(first_hash_output, 32, dest, 0);
 }
 
-void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest)
+void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32])
 {
     // mbedtls_sha256(data, data_len, dest, 0);
 
@@ -212,7 +170,7 @@ void single_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest
     memcpy(dest, hash, 32);
 }
 
-void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t *dest)
+void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32])
 {
     mbedtls_sha256_context midstate;
 
@@ -302,4 +260,82 @@ uint32_t flip32(uint32_t val)
     ret |= (val & 0xFF0000) >> 8;
     ret |= (val & 0xFF000000) >> 24;
     return ret;
+}
+
+/* Calculate the network difficulty from nBits */
+double networkDifficulty(uint32_t nBits)
+{
+    uint32_t mantissa = nBits & 0x007fffff;  // Extract the mantissa from nBits
+    uint8_t exponent = (nBits >> 24) & 0xff; // Extract the exponent from nBits
+
+    double target = (double) mantissa * pow(256, (exponent - 3)); // Calculate the target value
+
+    double difficulty = (pow(2, 208) * 65535) / target; // Calculate the difficulty
+
+    return difficulty;
+}
+
+/* Convert a uint64_t value into a truncated string for displaying with its
+ * associated suitable for Mega, Giga etc. Buf array needs to be long enough */
+void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits)
+{
+    const double dkilo = 1000.0;
+    const uint64_t kilo = 1000ull;
+    const uint64_t mega = 1000000ull;
+    const uint64_t giga = 1000000000ull;
+    const uint64_t tera = 1000000000000ull;
+    const uint64_t peta = 1000000000000000ull;
+    const uint64_t exa = 1000000000000000000ull;
+    char suffix[2] = "";
+    bool decimal = true;
+    double dval;
+
+    if (val >= exa) {
+        val /= peta;
+        dval = (double) val / dkilo;
+        strcpy(suffix, "E");
+    } else if (val >= peta) {
+        val /= tera;
+        dval = (double) val / dkilo;
+        strcpy(suffix, "P");
+    } else if (val >= tera) {
+        val /= giga;
+        dval = (double) val / dkilo;
+        strcpy(suffix, "T");
+    } else if (val >= giga) {
+        val /= mega;
+        dval = (double) val / dkilo;
+        strcpy(suffix, "G");
+    } else if (val >= mega) {
+        val /= kilo;
+        dval = (double) val / dkilo;
+        strcpy(suffix, "M");
+    } else if (val >= kilo) {
+        dval = (double) val / dkilo;
+        strcpy(suffix, "k");
+    } else {
+        dval = val;
+        decimal = false;
+    }
+
+    if (!sigdigits) {
+        if (decimal)
+            snprintf(buf, bufsiz, "%.2f%s", dval, suffix);
+        else
+            snprintf(buf, bufsiz, "%d%s", (unsigned int) dval, suffix);
+    } else {
+        /* Always show sigdigits + 1, padded on right with zeroes
+         * followed by suffix */
+        int ndigits = sigdigits - 1 - (dval > 0.0 ? floor(log10(dval)) : 0);
+
+        snprintf(buf, bufsiz, "%*.*f%s", sigdigits + 1, ndigits, dval, suffix);
+    }
+}
+
+float hashCounterToGhs(uint32_t duration_ms, uint32_t counter)
+{
+    if (duration_ms == 0) return 0.0f;
+    float seconds = duration_ms / 1000.0;
+    float hashrate = counter / seconds * (float)HASH_CNT_LSB; // Make sure it stays in float
+    return hashrate / 1e9f; // Convert to Gh/s
 }

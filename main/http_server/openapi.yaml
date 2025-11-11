@@ -83,6 +83,24 @@ components:
             * 12 - WPA3_EXT_PSK (deprecated, use WPA3_PSK)
           examples:
             - 3
+    HashrateMonitorAsic:
+      type: object
+      required:
+        - total
+        - domains
+        - error
+      properties:
+        total:
+          type: number
+          description: Hashrate
+        domains:
+          type: array
+          description: Hashrate per domain
+          items:
+            type: string
+        error:
+          description: Error hashrate
+          type: number
 
     SystemInfo:
       type: object
@@ -106,9 +124,12 @@ components:
         - temptarget
         - rotation
         - freeHeap
+        - freeHeapInternal
+        - freeHeapSpiram
         - frequency
         - hashRate
         - expectedHashrate
+        - errorPercentage
         - hostname
         - idfVersion
         - invertscreen
@@ -129,6 +150,8 @@ components:
         - sharesRejectedReasons
         - smallCoreCount
         - ssid
+        - ipv4
+        - ipv6
         - stratumExtranonceSubscribe
         - stratumPort
         - stratumSuggestedDifficulty
@@ -145,6 +168,11 @@ components:
         - wifiRSSI
         - displayTimeout
         - statsFrequency
+        - blockHeight
+        - scriptsig
+        - networkDifficulty
+        - blockFound
+        - hashrateMonitor
       properties:
         ASICModel:
           type: string
@@ -156,10 +184,10 @@ components:
           type: number
           description: Automatic fan speed control (0=manual, 1=auto)
         bestDiff:
-          type: string
+          type: number
           description: Best difficulty achieved
         bestSessionDiff:
-          type: string
+          type: number
           description: Best difficulty achieved in current session
         boardVersion:
           type: string
@@ -203,12 +231,21 @@ components:
         freeHeap:
           type: number
           description: Available heap memory in bytes
+        freeHeapInternal:
+          type: number
+          description: Available internal heap memory in bytes
+        freeHeapSpiram:
+          type: number
+          description: Available Spiram heap memory in bytes
         frequency:
           type: number
           description: ASIC frequency in MHz
         hashRate:
           type: number
-          description: Current hash rate
+          description: Current hashrate
+        errorPercentage:
+          description: Hash error percentage
+          type: number
         hostname:
           type: string
           description: Device hostname
@@ -271,6 +308,12 @@ components:
         ssid:
           type: string
           description: Connected WiFi network SSID
+        ipv4:
+          type: string
+          description: IPv4 address
+        ipv6:
+          type: string
+          description: IPv6 address
         stratumExtranonceSubscribe:
           type: boolean
           description: Enable pool extranonce subscription
@@ -319,10 +362,33 @@ components:
         statsFrequency:
           type: number
           description: Statistics frequency in seconds
+        blockHeight:
+          type: integer
+          description: Current block height
+        scriptsig:
+          type: string
+          description: Scriptsig extracted from coinbase transaction
+        networkDifficulty:
+          type: number
+          description: Current network difficulty
+        blockFound:
+          type: number
+          description: Whether a block was found (0=no, 1=yes)
+        hashrateMonitor:
+          type: object
+          properties:
+            asics:
+              type: array
+              description: Hashrate register value per ASIC
+              items:
+                $ref: '#/components/schemas/HashrateMonitorAsic'
 
     Settings:
       type: object
       properties:
+        useFallbackStratum:
+          type: number
+          description: Forces the use the fallback stratum pool
         stratumURL:
           type: string
           description: Primary stratum server URL
@@ -595,6 +661,16 @@ paths:
       summary: Get system statistics
       description: Returns system statistics
       operationId: getSystemStatistics
+      parameters:
+        - in: query
+          name: columns
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+            example: hashrate,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap
+          description: List of labels for which data should be retrieved
       tags:
         - system
       responses:
@@ -617,40 +693,6 @@ paths:
                     description: Labels for statistics data value index
                     items:
                       type: string
-                  statistics:
-                    type: array
-                    description: Statistics data point(s)
-                    items:
-                      type: array
-                      description: Statistics data values(s)
-                      items:
-                        type: number
-        '401':
-          description: Unauthorized - Client not in allowed network range
-        '500':
-          description: Internal server error
-
-  /api/system/statistics/dashboard:
-    get:
-      summary: Get system statistics for dashboard
-      description: Returns system statistics for dashboard
-      operationId: getSystemStatisticsDashboard
-      tags:
-        - system
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - currentTimestamp
-                  - statistics
-                properties:
-                  currentTimestamp:
-                    type: number
-                    description: Current timestamp as a reference
                   statistics:
                     type: array
                     description: Statistics data point(s)

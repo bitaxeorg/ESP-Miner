@@ -7,17 +7,17 @@ export class HashSuffixPipe implements PipeTransform {
 
   private static _this = new HashSuffixPipe();
 
-  public static transform(value: number): string {
-    return this._this.transform(value);
+  public static transform(value: number, args?: any): string {
+    return this._this.transform(value, args);
   }
 
-  public transform(value: number): string {
+  public transform(value: number, args?: any): string {
 
-    if (value == null || value < 0) {
-      return '0';
+    if (value == null || value <= 0 || isNaN(value)) {
+      return '0 H/s';
     }
 
-    const suffixes = [' H/s', ' KH/s', ' MH/s', ' GH/s', ' TH/s', ' PH/s', ' EH/s'];
+    const suffixes = [' H/s', ' Kh/s', ' Mh/s', ' Gh/s', ' Th/s', ' Ph/s', ' Eh/s'];
 
     let power = Math.floor(Math.log10(value) / 3);
     if (power < 0) {
@@ -25,6 +25,10 @@ export class HashSuffixPipe implements PipeTransform {
     }
     const scaledValue = value / Math.pow(1000, power);
     const suffix = suffixes[power];
+
+    if (args?.tickmark) {
+      return scaledValue.toLocaleString(undefined, { useGrouping: false }) + suffix;
+    }
 
     if (scaledValue < 10) {
       return scaledValue.toFixed(2) + suffix;
@@ -34,6 +38,4 @@ export class HashSuffixPipe implements PipeTransform {
 
     return scaledValue.toFixed(0) + suffix;
   }
-
-
 }

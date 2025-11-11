@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "freertos/timers.h"
 #include "lwip/err.h"
 #include "lwip/lwip_napt.h"
 #include "lwip/sys.h"
@@ -51,6 +52,8 @@
 #endif
 
 static const char * TAG = "connect";
+
+static TimerHandle_t ip_acquire_timer = NULL;
 
 static bool is_scanning = false;
 static uint16_t ap_number = 0;
@@ -135,6 +138,16 @@ esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count)
     return ESP_OK;
 }
 
+static void ip_timeout_callback(TimerHandle_t xTimer)
+{
+    GlobalState *GLOBAL_STATE = (GlobalState *)pvTimerGetTimerID(xTimer);
+    if (!GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
+        ESP_LOGI(TAG, "Timeout waiting for IP address. Disconnecting...");
+        strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "IP Acquire Timeout");
+        esp_wifi_disconnect();
+    }
+}
+
 static void event_handler(void * arg, esp_event_base_t event_base, int32_t event_id, void * event_data)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)arg;
@@ -161,8 +174,15 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         }
 
         if (event_id == WIFI_EVENT_STA_CONNECTED) {
-            ESP_LOGI(TAG, "Connected!");
-            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
+            ESP_LOGI(TAG, "Acquiring IP...");
+            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Acquiring IP...");
+
+            if (ip_acquire_timer == NULL) {
+                ip_acquire_timer = xTimerCreate("ip_acquire_timer", pdMS_TO_TICKS(30000), pdFALSE, (void *)GLOBAL_STATE, ip_timeout_callback);
+            }
+            if (ip_acquire_timer != NULL) {
+                xTimerStart(ip_acquire_timer, 0);
+            }            
         }
 
         if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
@@ -189,6 +209,10 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             s_retry_num++;
             ESP_LOGI(TAG, "Retrying Wi-Fi connection...");
             esp_wifi_connect();
+
+            if (ip_acquire_timer != NULL) {
+                xTimerStop(ip_acquire_timer, 0);
+            }            
         }
         
         if (event_id == WIFI_EVENT_AP_START) {
@@ -214,14 +238,57 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         ip_event_got_ip_t * event = (ip_event_got_ip_t *) event_data;
         snprintf(GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str, IP4ADDR_STRLEN_MAX, IPSTR, IP2STR(&event->ip_info.ip));
 
-        ESP_LOGI(TAG, "IP Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str);
+        ESP_LOGI(TAG, "IPv4 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str);
         s_retry_num = 0;
+
+        xTimerStop(ip_acquire_timer, 0);
+            if (ip_acquire_timer != NULL) {
+        }
 
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
 
         ESP_LOGI(TAG, "Connected to SSID: %s", GLOBAL_STATE->SYSTEM_MODULE.ssid);
+        strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
 
         wifi_softap_off();
+        
+        // Create IPv6 link-local address after WiFi connection
+        esp_netif_t *netif = event->esp_netif;
+        esp_err_t ipv6_err = esp_netif_create_ip6_linklocal(netif);
+        if (ipv6_err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create IPv6 link-local address: %s", esp_err_to_name(ipv6_err));
+        }
+    }
+
+    if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
+        ip_event_got_ip6_t * event = (ip_event_got_ip6_t *) event_data;
+        
+        // Convert IPv6 address to string
+        char ipv6_str[INET6_ADDRSTRLEN];
+        inet_ntop(AF_INET6, &event->ip6_info.ip, ipv6_str, sizeof(ipv6_str));
+        
+        // Check if it's a link-local address (fe80::/10)
+        if ((event->ip6_info.ip.addr[0] & 0xFFC0) == 0xFE80) {
+            // For link-local addresses, append zone identifier using netif index
+            int netif_index = esp_netif_get_netif_impl_index(event->esp_netif);
+            if (netif_index >= 0) {
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str,
+                        sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str),
+                        "%s%%%d", ipv6_str, netif_index);
+                ESP_LOGI(TAG, "IPv6 Link-Local Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
+            } else {
+                strncpy(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str, ipv6_str,
+                       sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1);
+                GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1] = '\0';
+                ESP_LOGW(TAG, "IPv6 Link-Local Address: %s (could not get interface index)", ipv6_str);
+            }
+        } else {
+            // Global or ULA address - no zone identifier needed
+            strncpy(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str, ipv6_str,
+                   sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1);
+            GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1] = '\0';
+            ESP_LOGI(TAG, "IPv6 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
+        }
     }
 }
 
@@ -319,6 +386,11 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
 
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_sta_config));
 
+    // IPv6 link-local address will be created after WiFi connection
+    
+    // Start DHCP client for IPv4
+    esp_netif_dhcpc_start(esp_netif_sta);
+
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
     return esp_netif_sta;
@@ -328,7 +400,7 @@ void wifi_init(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
-    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
+    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
     // copy the wifi ssid to the global state
     strncpy(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid));
     GLOBAL_STATE->SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid)-1] = 0;
@@ -340,8 +412,11 @@ void wifi_init(void * pvParameters)
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
+    esp_event_handler_instance_t instance_got_ip6;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, GLOBAL_STATE, &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, GLOBAL_STATE, &instance_got_ip));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_GOT_IP6, &event_handler, GLOBAL_STATE, &instance_got_ip6));
+    
 
     /* Initialize Wi-Fi */
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -365,7 +440,7 @@ void wifi_init(void * pvParameters)
         return;
     } else {
 
-        char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, CONFIG_ESP_WIFI_PASSWORD);
+        char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS);
 
         /* Initialize STA */
         ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
@@ -379,7 +454,7 @@ void wifi_init(void * pvParameters)
         /* Disable power savings for best performance */
         ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
-        char * hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
+        char * hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
 
         /* Set Hostname */
         esp_err_t err = esp_netif_set_hostname(esp_netif_sta, hostname);
