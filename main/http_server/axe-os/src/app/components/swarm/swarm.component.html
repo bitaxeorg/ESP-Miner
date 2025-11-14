@@ -99,9 +99,14 @@
                                             ●
                                         </span>
                                     </div>
-                                    <a [href]="'http://' + axe.IP" target="_blank" class="text-800" pTooltip="IP" tooltipPosition="top">
-                                        {{axe.IP}}
-                                    </a>
+                                    <div class="white-space-nowrap">
+                                        <a [href]="'http://' + axe.IP" target="_blank" class="text-800" pTooltip="IP" tooltipPosition="top">
+                                            {{axe.IP}}
+                                        </a>
+                                        <span *ngIf="isThisDevice(axe.IP)" class="ml-1 cursor-pointer" pTooltip="This device" tooltipPosition="top">
+                                            <i class="pi pi-star-fill text-xs"></i>
+                                        </span>
+                                    </div>
                                 </div>
                                 <span class="text-500 cursor-pointer" pTooltip="Version" tooltipPosition="top">
                                     {{axe.version}}
@@ -228,6 +233,9 @@
                             </td>
                             <td>
                                 <a [href]="'http://' + axe.IP" target="_blank" class="text-800">{{axe.IP}}</a>
+                                <span *ngIf="isThisDevice(axe.IP)" class="ml-2 cursor-pointer" pTooltip="This device" tooltipPosition="top">
+                                    <i class="pi pi-star-fill text-xs"></i>
+                                </span>
                             </td>
                             <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
                             <td>
