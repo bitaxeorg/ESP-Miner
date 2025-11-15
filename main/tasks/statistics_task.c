@@ -23,7 +23,6 @@ static uint16_t statisticsDataSize;
 static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 
 static const uint16_t maxDataCount = 720;
-static uint16_t statsFrequency;
 
 void createStatisticsBuffer()
 {
@@ -123,7 +122,8 @@ void statistics_task(void * pvParameters)
 
     while (1) {
         const int32_t currentTime = esp_timer_get_time() / 1000;
-        statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY) * 1000;
+        const uint16_t configStatsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY);
+        const uint32_t statsFrequency = configStatsFrequency * 1000;
 
         if (0 != statsFrequency) {
             const int32_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
