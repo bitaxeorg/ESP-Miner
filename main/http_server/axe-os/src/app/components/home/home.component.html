@@ -33,10 +33,9 @@
                         </div>
 
                         <div>
-                            Average:
-                            <span class="text-green-500 font-medium">
-                                {{getHashrateAverage() | hashSuffix}}
-                            </span>
+                            1m: <span class="text-green-500 font-medium">{{info.hashRate_1m | hashSuffix}}</span>
+                            10m: <span class="text-green-500 font-medium">{{info.hashRate_10m | hashSuffix}}</span>
+                            1h: <span class="text-green-500 font-medium">{{info.hashRate_1h | hashSuffix}}</span>
                         </div>
                         <div class="text-500 text-xs" *ngIf="info.expectedHashrate">
                             Expected: {{info.expectedHashrate | hashSuffix: { tickmark: true } }}

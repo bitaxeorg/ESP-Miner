@@ -27,6 +27,9 @@ typedef struct {
 typedef struct
 {
     float current_hashrate;
+    float hashrate_1m;
+    float hashrate_10m;
+    float hashrate_1h;
     float error_percentage;
     int64_t start_time;
     uint64_t shares_accepted;

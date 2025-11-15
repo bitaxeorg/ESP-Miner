@@ -1,5 +1,8 @@
 export enum eChartLabel {
     hashrate = 'Hashrate',
+    hashrate_1m = 'Hashrate 1m',
+    hashrate_10m = 'Hashrate 10m',
+    hashrate_1h = 'Hashrate 1h',
     asicTemp = 'ASIC Temp',
     errorPercentage = 'Error %',
     vrTemp = 'VR Temp',

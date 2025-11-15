@@ -36,6 +36,9 @@ export class SystemService {
         maxPower: 25,
         nominalVoltage: 5,
         hashRate: 475,
+        hashRate_1m: 476,
+        hashRate_10m: 477,
+        hashRate_1h: 478,
         expectedHashrate: 420,
         errorPercentage: 0.2,
         bestDiff: 238214491,
@@ -150,6 +153,9 @@ export class SystemService {
       for(let j: number = 0; j < columnList.length; j++) {
         switch (chartLabelValue(columnList[j])) {
           case eChartLabel.hashrate:     statisticsList[i][j] = hashrateData[i];     break;
+          case eChartLabel.hashrate_1m:  statisticsList[i][j] = hashrateData[i];     break;
+          case eChartLabel.hashrate_10m: statisticsList[i][j] = hashrateData[i];     break;
+          case eChartLabel.hashrate_1h:  statisticsList[i][j] = hashrateData[i];     break;
           case eChartLabel.power:        statisticsList[i][j] = powerData[i];        break;
           case eChartLabel.asicTemp:     statisticsList[i][j] = asicTempData[i];     break;
           case eChartLabel.vrTemp:       statisticsList[i][j] = vrTempData[i];       break;
