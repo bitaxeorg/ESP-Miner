@@ -23,7 +23,7 @@ static uint16_t statisticsDataSize;
 static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 
 static const uint16_t maxDataCount = 720;
-static uint16_t statsFrequency;
+static uint32_t statsFrequency;
 
 void createStatisticsBuffer()
 {
