@@ -114,7 +114,7 @@ else()
     # Custom command that only runs when source files change
     add_custom_command(
         OUTPUT ${WEB_UI_STAMP} ${WEB_UI_OUTPUT}
-        COMMAND ${NPM_EXECUTABLE} ci
+        COMMAND ${NPM_EXECUTABLE} i
         COMMAND ${NPM_EXECUTABLE} run build
         COMMAND ${CMAKE_COMMAND} -E touch ${WEB_UI_STAMP}
         WORKING_DIRECTORY ${WEB_SRC_DIR}
