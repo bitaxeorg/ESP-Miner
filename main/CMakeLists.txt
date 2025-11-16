@@ -94,11 +94,7 @@ else()
 
     # Collect all frontend source files to track dependencies
     file(GLOB_RECURSE WEB_UI_SOURCES
-        "${WEB_SRC_DIR}/src/*.ts"
-        "${WEB_SRC_DIR}/src/*.html"
-        "${WEB_SRC_DIR}/src/*.scss"
-        "${WEB_SRC_DIR}/src/*.css"
-        "${WEB_SRC_DIR}/src/*.json"
+        "${WEB_SRC_DIR}/src/*.*"
     )
 
     # Also track build configuration files
