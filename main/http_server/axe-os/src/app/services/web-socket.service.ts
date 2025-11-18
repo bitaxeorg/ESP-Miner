@@ -9,8 +9,9 @@ export class WebsocketService {
   public ws$: WebSocketSubject<string>;
 
   constructor() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     this.ws$ = webSocket({
-      url: `ws://${window.location.host}/api/ws`,
+      url: `${protocol}//${window.location.host}/api/ws`,
       deserializer: (e: MessageEvent) => { return e.data }
     });
   }
