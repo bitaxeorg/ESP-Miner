@@ -28,6 +28,7 @@ typedef enum {
 } screen_t;
 
 #define SCREEN_UPDATE_MS 500
+#define BUTTON_WAKE_MS 5000
 
 #define SCR_CAROUSEL_START SCR_URLS
 
@@ -386,22 +387,28 @@ static void screen_update_cb(lv_timer_t * timer)
 {
     int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT);
 
+    bool enable_display = false;
+    uint32_t inactive_time = lv_display_get_inactive_time(NULL);
+    screen_t current_screen = get_current_screen();
+
     if (0 > display_timeout_config) {
         // display always on
-        display_on(true);
+        enable_display = true;
     } else if (0 == display_timeout_config) {
-        // display off
-        display_on(false);
+        // display off, except pre-carousel screens or button press
+        if (current_screen < SCR_CAROUSEL_START || inactive_time < BUTTON_WAKE_MS) {
+            enable_display = true;
+        }
     } else {
         // display timeout
         const uint32_t display_timeout = display_timeout_config * 60 * 1000;
 
-        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen())) {
-            display_on(false);
-        } else {
-            display_on(true);
+        if (inactive_time < display_timeout || current_screen < SCR_CAROUSEL_START) {
+            enable_display = true;
         }
     }
+
+    display_on(enable_display);
 
     if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
         SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
