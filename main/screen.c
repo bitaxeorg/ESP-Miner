@@ -391,10 +391,10 @@ static void screen_update_cb(lv_timer_t * timer)
     uint32_t inactive_time = lv_display_get_inactive_time(NULL);
     screen_t current_screen = get_current_screen();
 
-    if (0 > display_timeout_config) {
+    if (display_timeout_config < 0) {
         // display always on
         enable_display = true;
-    } else if (0 == display_timeout_config) {
+    } else if (display_timeout_config == 0) {
         // display off, except pre-carousel screens or button press
         if (current_screen < SCR_CAROUSEL_START || inactive_time < BUTTON_WAKE_MS) {
             enable_display = true;
