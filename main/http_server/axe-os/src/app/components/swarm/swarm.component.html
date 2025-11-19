@@ -7,7 +7,7 @@
         <div class="grid">
             <div class="col-6 xl:col-3" *ngFor="let metric of [
                 { label: 'Total Devices', value: swarm.length },
-                { label: 'Total Hashrate', value: totals.hashRate * 1000000000 | hashSuffix},
+                { label: 'Total Hashrate', value: totals.hashRate | hashSuffix},
                 { label: 'Total Power', value: (totals.power | number: '1.1-1')  + ' W' },
                 { label: 'Best Diff', value: totals.bestDiff | diffSuffix }
             ]">
@@ -150,7 +150,7 @@
                         </div>
                         <div class="flex flex-column text-right white-space-nowrap cursor-pointer">
                             <span pTooltip="Hashrate" tooltipPosition="top">
-                                {{axe.hashRate * 1000000000 | hashSuffix}}
+                                {{axe.hashRate | hashSuffix}}
                             </span>
                             <div>
                                 <span class="text-500 cursor-pointer mr-2" pTooltip="Shares Rejected" tooltipPosition="top">
@@ -237,7 +237,7 @@
                                     <i class="pi pi-star-fill text-xs"></i>
                                 </span>
                             </td>
-                            <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
+                            <td>{{axe.hashRate | hashSuffix}}</td>
                             <td>
                                 <p class="cursor-pointer m-0" pTooltip="Shares Accepted" tooltipPosition="top">
                                     {{axe.sharesAccepted | number: '1.0-0'}}
