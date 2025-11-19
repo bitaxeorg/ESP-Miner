@@ -315,7 +315,6 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
 
         stats.statistics.forEach(element => {
-          element[idxHashrate] = this.normalizeHashrate(element[idxHashrate]);
           switch (chartLabelValue(chartY1DataLabel)) {
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
@@ -364,8 +363,6 @@ export class HomeComponent implements OnInit, OnDestroy {
         return this.systemService.getInfo()
       }),
       map(info => {
-        info.hashRate = this.normalizeHashrate(info.hashRate);
-        info.expectedHashrate = this.normalizeHashrate(info.expectedHashrate);
         info.voltage = info.voltage / 1000;
         info.current = info.current / 1000;
         info.coreVoltageActual = info.coreVoltageActual / 1000;
@@ -556,7 +553,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       if (hashrate > 0) {
-        return power / (hashrate / 1_000_000_000_000); // Convert to J/Th
+        return power / (hashrate / 1_000); // Convert to J/Th (hashrate is in GH/s)
       } else {
         return power; // in this case better than infinity or NaN
       }
@@ -592,7 +589,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (info.power_fault || hashrate <= 0) {
       return 0;
     }
-    return info.power / (hashrate / 1_000_000_000_000);
+    return info.power / (hashrate / 1_000);
   }
 
   public getHashrateAverage(): number {
@@ -620,7 +617,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   public getDomainErrorPercentage(info: ISystemInfo, asic: { error: number }): number {
-    return asic.error ? (this.normalizeHashrate(asic.error) * 100 / info.expectedHashrate) : 0;
+    return asic.error ? (asic.error * 100 / info.expectedHashrate) : 0;
   }
 
   public getDomainErrorColor(info: ISystemInfo, asic: { error: number }): string {
@@ -655,10 +652,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     const finalB = (b * (1 - t) + target * t) | 0;
 
     return `rgb(${finalR}, ${finalG}, ${finalB})`;
-  }
-
-  public normalizeHashrate(hashrate: number): number {
-    return hashrate * 1_000_000_000;
   }
 
   public clearDataPoints() {
