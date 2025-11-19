@@ -452,10 +452,10 @@
                                     {{ i + 1 }}
                                 </td>
                                 <td *ngFor="let domain of asic.domains"
-                                    [style.background]="getHeatmapColor(info, normalizeHashrate(domain))"
+                                    [style.background]="getHeatmapColor(info, domain)"
                                     [style.height]="(asicAmount <= 2 ? '2rem' : null)"
                                     class="text-center">
-                                    <span class="text-xs">{{ normalizeHashrate(domain) | hashSuffix }}</span>
+                                    <span class="text-xs">{{ domain | hashSuffix }}</span>
                                 </td>
                             </tr>
                         </tbody>
