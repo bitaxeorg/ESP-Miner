@@ -224,11 +224,13 @@ static uint32_t extract_origin_ip_addr(char *origin)
             ip_str[ip_len] = '\0'; // Null-terminate the string
 
             // Convert to IP address (will fail for hostnames, this is expected)
-            origin_ip_addr = inet_addr(ip_str);
-            if (origin_ip_addr == INADDR_NONE) {
-                ESP_LOGD(CORS_TAG, "Origin contains hostname: %s", ip_str);
-            } else {
+            struct in_addr parsed;
+            if (inet_pton(AF_INET, ip_str, &parsed) == 1) {
+                origin_ip_addr = parsed.s_addr;
                 ESP_LOGD(CORS_TAG, "Extracted IP address from origin: %s", ip_str);
+            } else {
+                origin_ip_addr = 0;
+                ESP_LOGD(CORS_TAG, "Origin contains hostname or invalid IP: %s", ip_str);
             }
         } else {
             ESP_LOGW(CORS_TAG, "Origin host string is too long: %s", ip_start);
@@ -255,7 +257,12 @@ esp_err_t is_network_allowed(httpd_req_t * req)
         return ESP_FAIL;
     }
 
-    uint32_t request_ip_addr = addr.sin6_addr.un.u32_addr[3];
+    uint32_t request_ip_addr = 0;
+    if (IN6_IS_ADDR_V4MAPPED(&addr.sin6_addr)) {
+        request_ip_addr = addr.sin6_addr.un.u32_addr[3];
+    } else {
+        request_ip_addr = 0;
+    }
 
     // Check for X-Forwarded-For header (reverse proxy)
     char forwarded_ip[128];
@@ -269,12 +276,19 @@ esp_err_t is_network_allowed(httpd_req_t * req)
         }
         char *ip_start = forwarded_ip;
         while (*ip_start == ' ') ip_start++;
-        
-        uint32_t forwarded_addr = inet_addr(ip_start);
-        if (forwarded_addr != INADDR_NONE && forwarded_addr != 0) {
-            request_ip_addr = forwarded_addr;
-            behind_reverse_proxy = true;
-            ESP_LOGD(CORS_TAG, "Using X-Forwarded-For IP: %s", ip_start);
+
+        // Only trust X-Forwarded-For if the immediate peer (proxy) is inside private network
+        if (request_ip_addr != 0 && ip_in_private_range(request_ip_addr) == ESP_OK) {
+            struct in_addr parsed;
+            if (inet_pton(AF_INET, ip_start, &parsed) == 1 && parsed.s_addr != 0 && parsed.s_addr != INADDR_NONE) {
+                request_ip_addr = parsed.s_addr;
+                behind_reverse_proxy = true;
+                ESP_LOGD(CORS_TAG, "Using X-Forwarded-For IP: %s", ip_start);
+            } else {
+                ESP_LOGW(CORS_TAG, "X-Forwarded-For contained invalid/non-IPv4 client: %s", ip_start);
+            }
+        } else {
+            ESP_LOGW(CORS_TAG, "Ignoring X-Forwarded-For header because connecting peer is not trusted/private");
         }
     }
 
