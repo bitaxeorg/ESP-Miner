@@ -368,7 +368,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   {
      // live data
     this.info$ = interval(5000).pipe(
-      startWith(() => this.systemService.getInfo()),
+      startWith(0), // Emit immediately on subscription
       switchMap(() => {
         return this.systemService.getInfo()
       }),

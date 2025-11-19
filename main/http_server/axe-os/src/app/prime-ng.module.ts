@@ -11,6 +11,8 @@ import { InputTextModule } from 'primeng/inputtext';
 import { SidebarModule } from 'primeng/sidebar';
 import { SliderModule } from 'primeng/slider';
 import { InputTextareaModule } from 'primeng/inputtextarea';
+import { TableModule } from 'primeng/table';
+import { ProgressBarModule } from 'primeng/progressbar';
 
 const primeNgModules = [
     SidebarModule,
@@ -25,6 +27,8 @@ const primeNgModules = [
     InputGroupAddonModule,
     RadioButtonModule,
     InputTextareaModule,
+    TableModule,
+    ProgressBarModule,
 ];
 
 @NgModule({

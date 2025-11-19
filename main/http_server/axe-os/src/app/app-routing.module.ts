@@ -8,6 +8,7 @@ import { UpdateComponent } from './components/update/update.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
+import { SoloChanceComponent } from './components/solo-chance/solo-chance.component';
 import { DesignComponent } from './components/design/design.component';
 import { PoolComponent } from './components/pool/pool.component';
 import { AppLayoutComponent } from './layout/app.layout.component';
@@ -36,6 +37,11 @@ const routes: Routes = [
         path: '',
         component: HomeComponent,
         title: TITLE_PREFIX,
+      },
+      {
+        path: 'solo-chance',
+        component: SoloChanceComponent,
+        title: `${TITLE_PREFIX} Solo Chance`,
       },
       {
         path: 'logs',
