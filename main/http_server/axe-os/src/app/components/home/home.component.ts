@@ -553,7 +553,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       if (hashrate > 0) {
-        return power / (hashrate / 1_000); // Convert to J/Th (hashrate is in GH/s)
+        return power / (hashrate / 1_000); // Convert to J/Th
       } else {
         return power; // in this case better than infinity or NaN
       }
