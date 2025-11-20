@@ -12,6 +12,7 @@ import { DesignComponent } from './components/design/design.component';
 import { PoolComponent } from './components/pool/pool.component';
 import { AppLayoutComponent } from './layout/app.layout.component';
 import { ApModeGuard } from './guards/ap-mode.guard';
+import { AutotuneComponent } from './components/autotune/autotune.component';
 
 const TITLE_PREFIX = 'AxeOS';
 
@@ -76,6 +77,11 @@ const routes: Routes = [
         path: 'pool',
         component: PoolComponent,
         title: `${TITLE_PREFIX} Pool`,
+      },
+      {
+        path: 'autotune',
+        component: AutotuneComponent,
+        title: `${TITLE_PREFIX} Autotune`,
       }
     ]
   },
@@ -87,3 +93,4 @@ const routes: Routes = [
   exports: [RouterModule]
 })
 export class AppRoutingModule { }
+
