@@ -30,7 +30,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public form: FormGroup;
 
+  public canScan = true;
   public scanning = false;
+
+  public isAccessedByHostname = false;
 
   public refreshIntervalRef!: number;
   public refreshIntervalTime = 30;
@@ -65,8 +68,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
     private httpClient: HttpClient
   ) {
 
+    const ipPattern = '(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)';
+    const hostnamePattern = '(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?';
     this.form = this.fb.group({
-      manualAddIp: [null, [Validators.required, Validators.pattern('(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)')]]
+      manualAddIp: [null, [Validators.required, Validators.pattern(`^(?:${ipPattern}|${hostnamePattern})$`)]]
     });
 
     this.gridView = this.localStorageService.getBool(SWARM_GRID_VIEW);
@@ -91,10 +96,20 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Detect if accessed by hostname or ip
+    const hostname = window.location.hostname;
+    this.isAccessedByHostname = this.isHostname(hostname);
+    this.canScan = !this.isAccessedByHostname;
+
     const swarmData = this.localStorageService.getObject(SWARM_DATA);
 
     if (swarmData == null) {
-      this.scanNetwork();
+      // Add current device to swarm if accessed by hostname
+      if (this.isAccessedByHostname) {
+        this.addCurrentDevice();
+      } else {
+        this.scanNetwork();
+      }
     } else {
       this.swarm = swarmData;
       this.refreshList(true);
@@ -129,6 +144,44 @@ export class SwarmComponent implements OnInit, OnDestroy {
     return `${(int >>> 24) & 255}.${(int >>> 16) & 255}.${(int >>> 8) & 255}.${int & 255}`;
   }
 
+  private isHostname(host: string): boolean {
+    const ipv4Pattern = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    return !ipv4Pattern.test(host);
+  }
+
+  protocol = window.location.protocol;
+
+  public getDeviceUrl(hostOrIp: string): string {
+      // When accessed via https, browsers block mixed content (http requests from https pages)
+    let port = window.location.port ? `:${window.location.port}` : '';
+    if (this.protocol === 'https:') {
+      return `https://${hostOrIp}${port}`;
+    }
+    return `http://${hostOrIp}${port}`;
+  }
+
+  private addCurrentDevice(): void {
+    const currentHost = window.location.hostname;
+    const baseUrl = this.getDeviceUrl(currentHost);
+    
+    forkJoin({
+      info: this.httpClient.get<any>(`${baseUrl}/api/system/info`),
+      asic: this.httpClient.get<any>(`${baseUrl}/api/system/asic`).pipe(catchError(() => of({})))
+    }).subscribe({
+      next: ({ info, asic }) => {
+        if (info.ASICModel || asic.ASICModel) {
+          this.swarm.push(this.fallbackDeviceModel({ IP: currentHost, ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) }));
+          this.sortSwarm();
+          this.localStorageService.setObject(SWARM_DATA, this.swarm);
+          this.calculateTotals();
+        }
+      },
+      error: (error) => {
+        this.toastr.error('Failed to load current device information');
+      }
+    });
+  }
+
   private calculateIpRange(ip: string, netmask: string): { start: number, end: number } {
     const ipInt = this.ipToInt(ip);
     const netmaskInt = this.ipToInt(netmask);
@@ -138,6 +191,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   scanNetwork() {
+    if (!this.canScan) {
+      return;
+    }
+
     this.scanning = true;
 
     const { start, end } = this.calculateIpRange(window.location.hostname, '255.255.255.0');
@@ -163,17 +220,20 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   private getAllDeviceInfo(ips: string[], errorHandler: (error: any, ip: string) => Observable<SwarmDevice[] | null>, fetchAsic: boolean = true) {
     return from(ips).pipe(
-      mergeMap(IP => forkJoin({
-        info: this.httpClient.get<any>(`http://${IP}/api/system/info`),
-        asic: fetchAsic ? this.httpClient.get<any>(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
-      }).pipe(
-        map(({ info, asic }) => {
-          const existingDevice = this.swarm.find(device => device.IP === IP);
-          return this.fallbackDeviceModel({ IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) });
-        }),
-        timeout(5000),
-        catchError(error => errorHandler(error, IP))
-      ),
+      mergeMap(IP => {
+        const baseUrl = this.getDeviceUrl(IP);
+        return forkJoin({
+          info: this.httpClient.get<any>(`${baseUrl}/api/system/info`),
+          asic: fetchAsic ? this.httpClient.get<any>(`${baseUrl}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
+        }).pipe(
+          map(({ info, asic }) => {
+            const existingDevice = this.swarm.find(device => device.IP === IP);
+            return this.fallbackDeviceModel({ IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) });
+          }),
+          timeout(5000),
+          catchError(error => errorHandler(error, IP))
+        );
+      },
         128
       ),
       toArray()
@@ -189,17 +249,25 @@ export class SwarmComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const baseUrl = this.getDeviceUrl(IP);
     forkJoin({
-      info: this.httpClient.get<any>(`http://${IP}/api/system/info`),
-      asic: this.httpClient.get<any>(`http://${IP}/api/system/asic`).pipe(catchError(() => of({})))
-    }).subscribe(({ info, asic }) => {
-      if (!info.ASICModel || !asic.ASICModel) {
-        return;
+      info: this.httpClient.get<any>(`${baseUrl}/api/system/info`),
+      asic: this.httpClient.get<any>(`${baseUrl}/api/system/asic`).pipe(catchError(() => of({})))
+    }).subscribe({
+      next: ({ info, asic }) => {
+        if (!info.ASICModel && !asic.ASICModel) {
+          this.toastr.error('Failed to retrieve device information');
+          return;
+        }
+        this.swarm.push(this.fallbackDeviceModel({ IP, ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) }));
+        this.sortSwarm();
+        this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.calculateTotals();
+        this.toastr.success(`Device ${IP} added successfully`);
+      },
+      error: (error) => {
+        this.toastr.error(`Failed to add device at ${IP}`);
       }
-      this.swarm.push(this.fallbackDeviceModel({ IP, ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) }));
-      this.sortSwarm();
-      this.localStorageService.setObject(SWARM_DATA, this.swarm);
-      this.calculateTotals();
     });
   }
 
@@ -209,7 +277,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public restart(axe: any) {
-    this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}).pipe(
+    const baseUrl = this.getDeviceUrl(axe.IP);
+    this.httpClient.post(`${baseUrl}/api/system/restart`, {}).pipe(
       catchError(error => {
         if (error.status === 0 || error.status === 200 || error.name === 'HttpErrorResponse') {
           return of('success');

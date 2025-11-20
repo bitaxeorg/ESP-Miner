@@ -3,6 +3,17 @@
 <div class="card">
     <h2>Swarm</h2>
 
+    <p-message *ngIf="!canScan && protocol === 'http:'" severity="warn" styleClass="w-full mb-3 py-4 border-round-xl"
+        text="Network scanning is disabled when accessed via hostname or reverse proxy. Add devices manually using their IP address or hostname.">
+    </p-message>
+
+    <p-message *ngIf="!canScan && protocol === 'https:'"
+        severity="warn"
+        styleClass="w-full mb-3 py-4 border-round-xl"
+        text="Network scanning is disabled when accessed via hostname or reverse proxy. Add devices manually using their hostname.
+        When this page is loaded via HTTPS, you can only connect to devices accessible over HTTPS due to browser security (Mixed Content blocking).">
+    </p-message>
+
     <ng-container *ngIf="swarm.length; else noDevices">
         <div class="grid">
             <div class="col-6 xl:col-3" *ngFor="let metric of [
@@ -316,12 +327,17 @@
 
     <ng-template #noDevices>
         <p class="text-500 text-center pt-5">
-            Scan your network for devices or add a device manually by using its IP address.
+            <ng-container *ngIf="canScan; else noScanMessage">
+                Scan your network for devices or add a device manually by using its IP address or hostname.
+            </ng-container>
+            <ng-template #noScanMessage>
+                Network scanning is disabled when accessed via hostname or reverse proxy. Add devices manually using their IP address or hostname.
+            </ng-template>
         </p>
     </ng-template>
 
     <form *ngIf="form" [formGroup]="form" class="card flex flex-column md:flex-row gap-3 mt-5">
-        <button pButton (click)="scanNetwork()" [disabled]="scanning" class="white-space-nowrap w-full md:w-auto block text-center button-text">
+        <button *ngIf="canScan" pButton (click)="scanNetwork()" [disabled]="scanning" class="white-space-nowrap w-full md:w-auto block text-center button-text">
             {{scanning ? 'Scanning...' : 'Auto Scan'}}
         </button>
 
@@ -338,13 +354,13 @@
 
         <div class="md:ml-auto">
             <p-inputGroup>
-                <input pInputText placeholder="Add Device by IP" formControlName="manualAddIp" type="text" class="xl:w-20rem" />
+                <input pInputText placeholder="Add Device (IP or Hostname)" formControlName="manualAddIp" type="text" class="xl:w-20rem" />
                 <button pButton [disabled]="form.invalid" (click)="add()" class="ml-1">Add</button>
             </p-inputGroup>
         </div>
     </form>
 
     <app-modal [headline]="selectedAxeOs?.IP">
-        <app-edit *ngIf="selectedAxeOs" [uri]="'http://' + selectedAxeOs.IP"></app-edit>
+        <app-edit *ngIf="selectedAxeOs" [uri]="getDeviceUrl(selectedAxeOs.IP)"></app-edit>
     </app-modal>
 </div>

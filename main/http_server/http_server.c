@@ -204,31 +204,36 @@ static esp_err_t ip_in_private_range(uint32_t address) {
 
 static uint32_t extract_origin_ip_addr(char *origin)
 {
-    char ip_str[16];
+    char ip_str[64];
     uint32_t origin_ip_addr = 0;
 
     // Find the start of the IP address in the Origin header
-    const char *prefix = "http://";
-    char *ip_start = strstr(origin, prefix);
+    char *ip_start = NULL;
+    if (strncmp(origin, "https://", 8) == 0) {
+        ip_start = origin + 8; // Move past "https://"
+    } else if (strncmp(origin, "http://", 7) == 0) {
+        ip_start = origin + 7; // Move past "http://"
+    }
+    
     if (ip_start) {
-        ip_start += strlen(prefix); // Move past "http://"
-
-        // Extract the IP address portion (up to the next '/')
-        char *ip_end = strchr(ip_start, '/');
+        // Extract the host (up to the next ':' or '/')
+        char *ip_end = strpbrk(ip_start, ":/");
         size_t ip_len = ip_end ? (size_t)(ip_end - ip_start) : strlen(ip_start);
         if (ip_len < sizeof(ip_str)) {
             strncpy(ip_str, ip_start, ip_len);
             ip_str[ip_len] = '\0'; // Null-terminate the string
 
-            // Convert the IP address string to uint32_t
-            origin_ip_addr = inet_addr(ip_str);
-            if (origin_ip_addr == INADDR_NONE) {
-                ESP_LOGW(CORS_TAG, "Invalid IP address: %s", ip_str);
+            // Convert to IP address (will fail for hostnames, this is expected)
+            struct in_addr parsed;
+            if (inet_pton(AF_INET, ip_str, &parsed) == 1) {
+                origin_ip_addr = parsed.s_addr;
+                ESP_LOGD(CORS_TAG, "Extracted IP address from origin: %s", ip_str);
             } else {
-                ESP_LOGD(CORS_TAG, "Extracted IP address %lu", origin_ip_addr);
+                origin_ip_addr = 0;
+                ESP_LOGD(CORS_TAG, "Origin contains hostname or invalid IP: %s", ip_str);
             }
         } else {
-            ESP_LOGW(CORS_TAG, "IP address string is too long: %s", ip_start);
+            ESP_LOGW(CORS_TAG, "Origin host string is too long: %s", ip_start);
         }
     }
 
@@ -252,13 +257,50 @@ esp_err_t is_network_allowed(httpd_req_t * req)
         return ESP_FAIL;
     }
 
-    uint32_t request_ip_addr = addr.sin6_addr.un.u32_addr[3];
+    uint32_t request_ip_addr = 0;
+    if (IN6_IS_ADDR_V4MAPPED(&addr.sin6_addr)) {
+        request_ip_addr = addr.sin6_addr.un.u32_addr[3];
+    } else {
+        request_ip_addr = 0;
+    }
+
+    // Check for X-Forwarded-For header (reverse proxy)
+    char forwarded_ip[128];
+    bool behind_reverse_proxy = false;
+    
+    if (httpd_req_get_hdr_value_str(req, "X-Forwarded-For", forwarded_ip, sizeof(forwarded_ip)) == ESP_OK) {
+        // X-Forwarded-For can contain multiple IPs (client, proxy1, proxy2), first IP is the original client
+        char *comma = strchr(forwarded_ip, ',');
+        if (comma) {
+            *comma = '\0';
+        }
+        char *ip_start = forwarded_ip;
+        while (*ip_start == ' ') ip_start++;
+
+        // Only trust X-Forwarded-For if the immediate peer (proxy) is inside private network
+        if (request_ip_addr != 0 && ip_in_private_range(request_ip_addr) == ESP_OK) {
+            struct in_addr parsed;
+            if (inet_pton(AF_INET, ip_start, &parsed) == 1 && parsed.s_addr != 0 && parsed.s_addr != INADDR_NONE) {
+                request_ip_addr = parsed.s_addr;
+                behind_reverse_proxy = true;
+                ESP_LOGD(CORS_TAG, "Using X-Forwarded-For IP: %s", ip_start);
+            } else {
+                ESP_LOGW(CORS_TAG, "X-Forwarded-For contained invalid/non-IPv4 client: %s", ip_start);
+            }
+        } else {
+            ESP_LOGW(CORS_TAG, "Ignoring X-Forwarded-For header because connecting peer is not trusted/private");
+        }
+    }
 
     // // Convert to IPv6 string
     // inet_ntop(AF_INET, &addr.sin6_addr, ipstr, sizeof(ipstr));
 
     // Convert to IPv4 string
     inet_ntop(AF_INET, &request_ip_addr, ipstr, sizeof(ipstr));
+    
+    if (!behind_reverse_proxy) {
+        ESP_LOGD(CORS_TAG, "Direct connection from IP: %s", ipstr);
+    }
 
     // Attempt to get the Origin header.
     char origin[128];
@@ -266,6 +308,14 @@ esp_err_t is_network_allowed(httpd_req_t * req)
     if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK) {
         ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
         origin_ip_addr = extract_origin_ip_addr(origin);
+        
+        // If Origin is a hostname, allow it if request IP is private
+        if (origin_ip_addr == 0 || origin_ip_addr == INADDR_NONE) {
+            ESP_LOGD(CORS_TAG, "Origin is hostname, checking request IP only");
+            if (ip_in_private_range(request_ip_addr) == ESP_OK) {
+                return ESP_OK;
+            }
+        }
     } else {
         ESP_LOGD(CORS_TAG, "No origin header found.");
         origin_ip_addr = request_ip_addr;
