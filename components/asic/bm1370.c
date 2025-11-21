@@ -309,8 +309,8 @@ void BM1370_send_work(void * pvParameters, bm_job * next_bm_job)
     memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
     memcpy(&job.nbits, &next_bm_job->target, 4);
     memcpy(&job.ntime, &next_bm_job->ntime, 4);
-    memcpy(job.merkle_root, next_bm_job->merkle_root_be, 32);
-    memcpy(job.prev_block_hash, next_bm_job->prev_block_hash_be, 32);
+    memcpy(job.merkle_root, next_bm_job->merkle_root, 32);
+    memcpy(job.prev_block_hash, next_bm_job->prev_block_hash, 32);
     memcpy(&job.version, &next_bm_job->version, 4);
 
     if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {

@@ -87,30 +87,24 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
     //print generated extranonce_2
     //ESP_LOGI(TAG, "Generated extranonce_2: %s", extranonce_2_str);
 
-    char *coinbase_tx = construct_coinbase_tx(notification->coinbase_1, notification->coinbase_2, GLOBAL_STATE->extranonce_str, extranonce_2_str);
-    if (coinbase_tx == NULL) {
-        ESP_LOGE(TAG, "Failed to construct coinbase_tx");
-        return;
-    }
+    uint8_t coinbase_tx_hash[32];
+    calculate_coinbase_tx_hash(notification->coinbase_1, notification->coinbase_2, GLOBAL_STATE->extranonce_str, extranonce_2_str, coinbase_tx_hash);
 
-    char merkle_root[65];
-    calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])notification->merkle_branches, notification->n_merkle_branches, merkle_root);
-
-    bm_job next_job = construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask, difficulty);
+    uint8_t merkle_root[32];
+    calculate_merkle_root_hash(coinbase_tx_hash, (uint8_t(*)[32])notification->merkle_branches, notification->n_merkle_branches, merkle_root);
 
     bm_job *queued_next_job = malloc(sizeof(bm_job));
+
     if (queued_next_job == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for queued_next_job");
-        free(coinbase_tx);
+        ESP_LOGE(TAG, "Failed to allocate memory for new job");
         return;
     }
 
-    memcpy(queued_next_job, &next_job, sizeof(bm_job));
+    construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask, difficulty, queued_next_job);
+
     queued_next_job->extranonce2 = strdup(extranonce_2_str);
     queued_next_job->jobid = strdup(notification->job_id);
     queued_next_job->version_mask = GLOBAL_STATE->version_mask;
 
     queue_enqueue(&GLOBAL_STATE->ASIC_jobs_queue, queued_next_job);
-
-    free(coinbase_tx);
 }
