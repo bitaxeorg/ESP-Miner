@@ -71,6 +71,12 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolLabel!: PoolLabel;
   public responseTime!: number;
 
+  public hashrateAverages: { label: string, key: 'hashRate_1m' | 'hashRate_10m' | 'hashRate_1h' }[] = [
+    { label: '1m', key: 'hashRate_1m' },
+    { label: '10m', key: 'hashRate_10m' },
+    { label: '1h', key: 'hashRate_1h' }
+  ];
+
   @ViewChild('chart')
   private chart?: UIChart
 
