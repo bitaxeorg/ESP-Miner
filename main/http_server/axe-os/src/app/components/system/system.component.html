@@ -8,5 +8,9 @@
                 <td class="vertical-align-top line-break-anywhere pr-2" [ngClass]="(row.class || '') + ' ' + (row.valueClass || '')" [attr.sensitive-data]="row.isSensitiveData ? '' : null" [pTooltip]="row.tooltip">{{ row.value }}</td>
             </tr>
         </table>
+
+        <button pButton class="btn btn-primary mt-5" (click)="identifyDevice()">
+            Identify device
+        </button>
     </div>
 </div>

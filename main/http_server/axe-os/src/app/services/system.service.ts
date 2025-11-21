@@ -183,6 +183,10 @@ export class SystemService {
     return this.httpClient.post(`${uri}/api/system/restart`, {}, {responseType: 'text'});
   }
 
+  public identify(uri: string = '') {
+    return this.httpClient.post(`${uri}/api/system/identify`, {}, {responseType: 'text'});
+  }
+
   public updateSystem(uri: string = '', update: any) {
     if (environment.production) {
       return this.httpClient.patch(`${uri}/api/system`, update);
@@ -190,7 +194,6 @@ export class SystemService {
       return of(true);
     }
   }
-
 
   private otaUpdate(file: File | Blob, url: string) {
     return new Observable<HttpEvent<string>>((subscriber) => {

@@ -678,6 +678,47 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     return ESP_OK;
 }
 
+static void identify_mode_off_timer_cb(TimerHandle_t xTimer) {
+    GLOBAL_STATE->SYSTEM_MODULE.is_identify_mode = false;
+    ESP_LOGI(TAG, "Identify mode disabled after timeout");
+}
+
+static esp_err_t POST_identify(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Identify mode enabled for 30s");
+
+    GLOBAL_STATE->SYSTEM_MODULE.is_identify_mode = true;
+
+    TimerHandle_t timer = xTimerCreate("IdentifyOffTimer",
+        pdMS_TO_TICKS(30000),
+        pdFALSE,
+        NULL,
+        identify_mode_off_timer_cb
+    );
+
+    if (timer != NULL) {
+        xTimerStart(timer, 0);
+    } else {
+        ESP_LOGE(TAG, "Failed to create identify mode timer");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to create identify mode timer");
+        return ESP_OK;
+    }
+
+    httpd_resp_send(req, "Hi! displayed for 30 seconds.", HTTPD_RESP_USE_STRLEN);
+
+    return ESP_OK;
+}
+
 static esp_err_t POST_restart(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1217,6 +1258,13 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &wifi_scan_get_uri);
+
+    httpd_uri_t system_identify_uri = {
+        .uri = "/api/system/identify", .method = HTTP_POST, 
+        .handler = POST_identify, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_identify_uri);
 
     httpd_uri_t system_restart_uri = {
         .uri = "/api/system/restart", .method = HTTP_POST, 
