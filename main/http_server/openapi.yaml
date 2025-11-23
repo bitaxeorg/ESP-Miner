@@ -536,6 +536,7 @@ components:
 
 paths:
   /api/system/wifi/scan:
+    deprecated: true
     get:
       summary: Scan for available WiFi networks
       description: Returns a list of available WiFi networks in range
@@ -563,6 +564,7 @@ paths:
 
   /api/system/info:
     get:
+      deprecated: true
       summary: Get system information
       description: Returns current system status and information
       operationId: getSystemInfo
@@ -582,6 +584,7 @@ paths:
 
   /api/system/asic:
     get:
+      deprecated: true
       summary: Get ASIC settings information
       description: Returns current ASIC model and corresponding available frequency and voltage options
       operationId: getAsicSettings
@@ -657,6 +660,7 @@ paths:
           description: Internal server error
 
   /api/system/statistics:
+    deprecated: true
     get:
       summary: Get system statistics
       description: Returns system statistics
@@ -707,6 +711,7 @@ paths:
           description: Internal server error
 
   /api/system/restart:
+    deprecated: true
     post:
       summary: Restart the system
       description: Triggers a system restart
@@ -723,6 +728,7 @@ paths:
 
   /api/system:
     patch:
+      deprecated: true
       summary: Update system settings
       description: Updates system configuration settings
       operationId: updateSystemSettings
@@ -745,6 +751,7 @@ paths:
           description: Internal server error
 
   /api/system/OTA:
+    deprecated: true
     post:
       summary: Update system firmware
       description: Upload and apply new firmware via OTA update
@@ -769,6 +776,7 @@ paths:
           description: Internal server error
 
   /api/system/OTAWWW:
+    deprecated: true
     post:
       summary: Update web interface
       description: Upload and apply new web interface files
