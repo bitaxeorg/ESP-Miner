@@ -883,6 +883,20 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     return res;
 }
 
+// api v2
+static esp_err_t GET_system_board(httpd_req_t * req)
+{
+    
+}
+static esp_err_t GET_system_status(httpd_req_t * req)
+{
+    
+}
+static esp_err_t GET_system_config(httpd_req_t * req)
+{
+    
+}
+
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1273,6 +1287,17 @@ esp_err_t start_rest_server(void * pvParameters)
         .is_websocket = true
     };
     httpd_register_uri_handler(server, &ws);
+
+
+    // api v2
+    /* URI handler for fetching system status */
+    httpd_uri_t system_status_get_uri = {
+        .uri = "/api/v2/status", 
+        .method = HTTP_GET, 
+        .handler = GET_system_status, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_status_get_uri);
 
     if (enter_recovery) {
         /* Make default route serve Recovery */
