@@ -886,15 +886,167 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 // api v2
 static esp_err_t GET_system_board(httpd_req_t * req)
 {
-    
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON * root = cJSON_CreateObject();
+
+
+    esp_err_t res = HTTP_send_json(req, root, &system_info_prebuffer_len);
+
+    cJSON_Delete(root);
+
+    return res;
 }
 static esp_err_t GET_system_status(httpd_req_t * req)
 {
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL);
+    char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL);
+    char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER);
+    char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER);
+
+    cJSON * root = cJSON_CreateObject();
+
+    cJSON * mining = cJSON_CreateObject();
+    cJSON_AddNumberToObject(mining, "hashrate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
+    cJSON_AddNumberToObject(mining, "expected_hashrate", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
+    cJSON_AddNumberToObject(mining, "error_percentage", GLOBAL_STATE->SYSTEM_MODULE.error_percentage);
+    cJSON_AddNumberToObject(mining, "best_diff", GLOBAL_STATE->SYSTEM_MODULE.best_nonce_diff);
+    cJSON_AddNumberToObject(mining, "best_session_diff", GLOBAL_STATE->SYSTEM_MODULE.best_session_nonce_diff);
+
+    cJSON *hashrate_monitor = cJSON_CreateObject();
+    cJSON_AddItemToObject(mining, "hashrate_monitor", hashrate_monitor);
+
+    cJSON *asics_array = cJSON_CreateArray();
+    cJSON_AddItemToObject(hashrate_monitor, "asics", asics_array);
+
+    if (GLOBAL_STATE->HASHRATE_MONITOR_MODULE.is_initialized) {
+        for (int asic_nr = 0; asic_nr < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; asic_nr++) {
+            cJSON *asic = cJSON_CreateObject();
+            cJSON_AddItemToArray(asics_array, asic);
+            cJSON_AddNumberToObject(asic, "total", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[asic_nr].hashrate);
+
+            int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
+            if (hash_domains > 0) {
+                cJSON* hash_domain_array = cJSON_CreateArray();
+                for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
+                    cJSON *hashrate = cJSON_CreateNumber(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[asic_nr][domain_nr].hashrate);
+                    cJSON_AddItemToArray(hash_domain_array, hashrate);
+                }
+                cJSON_AddItemToObject(asic, "domains", hash_domain_array);
+            }
+
+            cJSON_AddNumberToObject(asic, "error_count", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_measurement[asic_nr].value);
+        }
+    }
+
+    cJSON * shares = cJSON_CreateObject();
+    cJSON_AddItemToObject(mining, "shares", shares);
+    cJSON_AddNumberToObject(shares, "accepted", GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
+    cJSON_AddNumberToObject(shares, "rejected", GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
+
+    cJSON *error_array = cJSON_CreateArray();
+    cJSON_AddItemToObject(shares, "rejected_reasons", error_array);
+
+    for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+        cJSON *error_obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(error_obj, "message", GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].message);
+        cJSON_AddNumberToObject(error_obj, "count", GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].count);
+        cJSON_AddItemToArray(error_array, error_obj);
+    }
+
+    cJSON * pool = cJSON_CreateObject();
+    cJSON_AddItemToObject(mining, "pool", pool);
+    cJSON_AddNumberToObject(pool, "pool_difficulty", GLOBAL_STATE->pool_difficulty);
+    cJSON_AddNumberToObject(pool, "pool_addr_family", GLOBAL_STATE->SYSTEM_MODULE.pool_addr_family);
+    cJSON_AddStringToObject(pool, "stratum_url", stratumURL);
+    cJSON_AddNumberToObject(pool, "stratum_port", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT));
+    cJSON_AddStringToObject(pool, "stratum_user", stratumUser);
+    cJSON_AddNumberToObject(pool, "stratum_suggested_difficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY));
+    cJSON_AddNumberToObject(pool, "stratum_extranonce_subscribe", nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE));
+    cJSON_AddStringToObject(pool, "fallback_stratum_url", fallbackStratumURL);
+    cJSON_AddNumberToObject(pool, "fallback_stratum_port", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT));
+    cJSON_AddStringToObject(pool, "fallback_stratum_user", fallbackStratumUser);
+    cJSON_AddNumberToObject(pool, "fallback_stratum_suggested_difficulty", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY));
+    cJSON_AddNumberToObject(pool, "fallback_stratum_extranonce_subscribe", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
+    cJSON_AddNumberToObject(pool, "response_time", GLOBAL_STATE->SYSTEM_MODULE.response_time);
+
+
+
+    cJSON * current_job = cJSON_CreateObject();
+    cJSON_AddItemToObject(mining, "current_job", current_job);
+    if (GLOBAL_STATE->block_height > 0) {
+        cJSON_AddNumberToObject(current_job, "height", GLOBAL_STATE->block_height);
+        cJSON_AddStringToObject(current_job, "scriptsig", GLOBAL_STATE->scriptsig);
+        cJSON_AddNumberToObject(current_job, "network_difficulty", GLOBAL_STATE->network_nonce_diff);
+    }
+
+    cJSON * power = cJSON_CreateObject();
+
+    cJSON_AddNumberToObject(power, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
+    cJSON_AddNumberToObject(power, "input_voltage", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
+    cJSON_AddNumberToObject(power, "current", Power_get_current(GLOBAL_STATE));
+    cJSON_AddNumberToObject(power, "core_voltage_actual", VCORE_get_voltage_mv(GLOBAL_STATE));
+
+
+
+    cJSON_AddItemToObject(root, "mining", mining);
+    cJSON_AddItemToObject(root, "power", power);
+
+
+    free(stratumURL);
+    free(fallbackStratumURL);
+    free(stratumUser);
+    free(fallbackStratumUser);
+
+    esp_err_t res = HTTP_send_json(req, root, &system_info_prebuffer_len);
     
+    cJSON_Delete(root);
+
+    return res;
 }
 static esp_err_t GET_system_config(httpd_req_t * req)
 {
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON * root = cJSON_CreateObject();
     
+    esp_err_t res = HTTP_send_json(req, root, &system_info_prebuffer_len);
+
+    cJSON_Delete(root);
+
+    return res;
 }
 
 static esp_err_t GET_system_statistics(httpd_req_t * req)
