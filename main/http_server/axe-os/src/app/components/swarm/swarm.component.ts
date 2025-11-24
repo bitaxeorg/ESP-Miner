@@ -463,4 +463,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
         return undefined;
     }
   }
+
+  isThisDevice(IP: string): boolean {
+    return IP === window.location.hostname;
+  }
 }
