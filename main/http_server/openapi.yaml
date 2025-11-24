@@ -536,7 +536,6 @@ components:
 
 paths:
   /api/system/wifi/scan:
-    deprecated: true
     get:
       summary: Scan for available WiFi networks
       description: Returns a list of available WiFi networks in range
@@ -660,7 +659,6 @@ paths:
           description: Internal server error
 
   /api/system/statistics:
-    deprecated: true
     get:
       summary: Get system statistics
       description: Returns system statistics
@@ -711,7 +709,6 @@ paths:
           description: Internal server error
 
   /api/system/restart:
-    deprecated: true
     post:
       summary: Restart the system
       description: Triggers a system restart
@@ -751,7 +748,6 @@ paths:
           description: Internal server error
 
   /api/system/OTA:
-    deprecated: true
     post:
       summary: Update system firmware
       description: Upload and apply new firmware via OTA update
@@ -776,7 +772,6 @@ paths:
           description: Internal server error
 
   /api/system/OTAWWW:
-    deprecated: true
     post:
       summary: Update web interface
       description: Upload and apply new web interface files
