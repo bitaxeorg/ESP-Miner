@@ -696,6 +696,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.hashrate_1m:
       case eChartLabel.hashrate_10m:
       case eChartLabel.hashrate_1h:      return info.expectedHashrate;
+      case eChartLabel.errorPercentage:  return 1;
       case eChartLabel.asicTemp:         return this.maxTemp;
       case eChartLabel.vrTemp:           return this.maxTemp + 25;
       case eChartLabel.asicVoltage:      return info.coreVoltage;

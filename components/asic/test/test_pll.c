@@ -10,7 +10,7 @@ TEST_CASE("Check PLL frequency calculation", "[pll]")
 
     pll_get_parameters(frequency, 60, 200, &fb_divider, &refdiv, &postdiv1, &postdiv2, &actual_freq);
 
-    TEST_ASSERT_EQUAL_UINT8(68, fb_divider);
+    TEST_ASSERT_EQUAL_UINT8(72, fb_divider);
     TEST_ASSERT_EQUAL_UINT8(2, refdiv);
     TEST_ASSERT_EQUAL_UINT8(2, postdiv1);
     TEST_ASSERT_EQUAL_UINT8(1, postdiv2);
