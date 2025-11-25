@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 // Wrapper for SHA256 to match libbase58's expected signature
 static bool my_sha256(void *digest, const void *data, size_t datasz) {
@@ -125,12 +126,8 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
         
         size_t out_idx = strlen(output);
         for (size_t i = offset; i < script_len && out_idx < output_len - 1; i++) {
-            char c = script[i];
-            if (c >= 32 && c <= 126) {
-                output[out_idx++] = c;
-            } else {
-                output[out_idx++] = '.';
-            }
+            unsigned char c = script[i];
+            output[out_idx++] = isprint(c) ? c : '.';
         }
         output[out_idx] = '\0';
         return;
@@ -204,11 +201,9 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
                 
                 // Filter non-printable characters
                 for (int i = 0; i < scriptsig_length; i++) {
-                    unsigned char c = (unsigned char)tag[i];
-                    if (c < 32 || c > 126) {
+                    if (!isprint((unsigned char)tag[i])) {
                         tag[i] = '.';
-                    }
-                }
+                    }                }
                 tag[scriptsig_length] = '\0';
                 result->scriptsig = tag;
             } else {
