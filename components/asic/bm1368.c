@@ -270,7 +270,7 @@ task_result * BM1368_process_work(void * pvParameters)
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
-        result.asic_nr = asic_result.cmd.asic_address;
+        result.asic_nr = asic_result.cmd.asic_address / address_interval;
         result.value = ntohl(asic_result.cmd.value);
         
         return &result;
