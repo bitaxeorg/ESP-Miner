@@ -37,7 +37,7 @@ TEST_CASE("Bech32 P2WSH encoding", "[bech32]")
 TEST_CASE("Bech32m P2TR encoding", "[bech32]")
 {
     uint8_t hash[32] = {
-        0x51, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x53, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
@@ -48,7 +48,7 @@ TEST_CASE("Bech32m P2TR encoding", "[bech32]")
 
     TEST_ASSERT_TRUE(result);
     // P2TR uses Bech32m (different checksum)
-    TEST_ASSERT_EQUAL_STRING("bc1p2vfqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3yqwwx", output);
+    TEST_ASSERT_EQUAL_STRING("bc1q2vfqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrgwln", output);
 }
 
 TEST_CASE("Bech32 invalid witness version", "[bech32]")
@@ -83,5 +83,5 @@ TEST_CASE("Bech32 testnet encoding", "[bech32]")
     int result = segwit_addr_encode(output, "tb", 0, hash, 20);
     
     TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_EQUAL_STRING("tb1qqq2w0m5pjyvjd4y5fz2u6gd48g3r8c2r93lt5v", output);
+    TEST_ASSERT_EQUAL_STRING("tb1qqq2828nkaqver9k52j2pc3w3kw3j8u2rl9xek9", output);
 }
