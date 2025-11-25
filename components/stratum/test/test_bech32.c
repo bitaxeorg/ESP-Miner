@@ -48,7 +48,7 @@ TEST_CASE("Bech32m P2TR encoding", "[bech32]")
 
     TEST_ASSERT_TRUE(result);
     // P2TR uses Bech32m (different checksum)
-    TEST_ASSERT_EQUAL_STRING("bc1q2vfqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfrgwln", output);
+    TEST_ASSERT_EQUAL_STRING("bc1p2vfqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr5g880", output);
 }
 
 TEST_CASE("Bech32 invalid witness version", "[bech32]")
