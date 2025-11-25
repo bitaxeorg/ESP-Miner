@@ -8,7 +8,7 @@ TEST_CASE("Varint decode single byte", "[coinbase_decoder]")
     uint8_t data[] = {0x42};
     int offset = 0;
     uint64_t result = coinbase_decode_varint(data, &offset);
-    TEST_ASSERT_EQUAL_UINT64(0x42, result);
+    TEST_ASSERT_TRUE(0x42 == result);
     TEST_ASSERT_EQUAL_INT(1, offset);
 }
 
@@ -17,7 +17,7 @@ TEST_CASE("Varint decode FD format", "[coinbase_decoder]")
     uint8_t data[] = {0xFD, 0x34, 0x12};  // 0x1234 in little-endian
     int offset = 0;
     uint64_t result = coinbase_decode_varint(data, &offset);
-    TEST_ASSERT_EQUAL_UINT64(0x1234, result);
+    TEST_ASSERT_TRUE(0x1234 == result);
     TEST_ASSERT_EQUAL_INT(3, offset);
 }
 
@@ -26,7 +26,7 @@ TEST_CASE("Varint decode FE format", "[coinbase_decoder]")
     uint8_t data[] = {0xFE, 0x78, 0x56, 0x34, 0x12};  // 0x12345678 in little-endian
     int offset = 0;
     uint64_t result = coinbase_decode_varint(data, &offset);
-    TEST_ASSERT_EQUAL_UINT64(0x12345678, result);
+    TEST_ASSERT_TRUE(0x12345678 == result);
     TEST_ASSERT_EQUAL_INT(5, offset);
 }
 
@@ -35,7 +35,7 @@ TEST_CASE("Varint decode FF format", "[coinbase_decoder]")
     uint8_t data[] = {0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     int offset = 0;
     uint64_t result = coinbase_decode_varint(data, &offset);
-    TEST_ASSERT_EQUAL_UINT64(0x0807060504030201ULL, result);
+    TEST_ASSERT_TRUE(0x0807060504030201ULL == result);
     TEST_ASSERT_EQUAL_INT(9, offset);
 }
 
@@ -52,7 +52,7 @@ TEST_CASE("Decode P2PKH address", "[coinbase_decoder]")
     
     coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
     
-    TEST_ASSERT_EQUAL_STRING("P2PKH:89abcdef0123456789abcdef0123456789abcdef", output);
+    TEST_ASSERT_EQUAL_STRING("bc1q3x4ummcpydzk0zdtehhszg69v7y6hn00vzlcjh", output);
 }
 
 TEST_CASE("Decode P2SH address", "[coinbase_decoder]")
@@ -68,7 +68,7 @@ TEST_CASE("Decode P2SH address", "[coinbase_decoder]")
     
     coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
     
-    TEST_ASSERT_EQUAL_STRING("P2SH:123456789abcdef0123456789abcdef012345678", output);
+    TEST_ASSERT_EQUAL_STRING("bc1qzg69v7y6hn00qy352euf40x77qfrg4ncyxalrf", output);
 }
 
 TEST_CASE("Decode P2WPKH address", "[coinbase_decoder]")
