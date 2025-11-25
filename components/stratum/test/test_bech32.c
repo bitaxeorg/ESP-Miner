@@ -3,8 +3,8 @@
 #include "unity.h"
 #include "segwit_addr.h"
 
-// Test P2WPKH encoding (witness v0, 20 bytes)
-void test_bech32_p2wpkh_encoding(void) {
+TEST_CASE("Bech32 P2WPKH encoding", "[bech32]")
+{
     uint8_t hash[20] = {
         0x80, 0xbd, 0xed, 0x37, 0xe3, 0xf8, 0x6a, 0x1a, 
         0x54, 0x6e, 0x09, 0x9b, 0x15, 0xe2, 0xb0, 0x28, 
@@ -18,8 +18,8 @@ void test_bech32_p2wpkh_encoding(void) {
     TEST_ASSERT_EQUAL_STRING("bc1qsz776dlrlp4p54rwpxd3tc4s9p2a8ppuceyvdc", output);
 }
 
-// Test P2WSH encoding (witness v0, 32 bytes)
-void test_bech32_p2wsh_encoding(void) {
+TEST_CASE("Bech32 P2WSH encoding", "[bech32]")
+{
     uint8_t hash[32] = {
         0x18, 0x63, 0x14, 0x3c, 0x14, 0xc5, 0x16, 0x68,
         0x04, 0xbd, 0x19, 0x20, 0x33, 0x56, 0xda, 0x13,
@@ -34,8 +34,8 @@ void test_bech32_p2wsh_encoding(void) {
     TEST_ASSERT_EQUAL_STRING("bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3", output);
 }
 
-// Test P2TR encoding (witness v1, 32 bytes) - Bech32m
-void test_bech32m_p2tr_encoding(void) {
+TEST_CASE("Bech32m P2TR encoding", "[bech32]")
+{
     uint8_t hash[32] = {
         0x53, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -51,8 +51,8 @@ void test_bech32m_p2tr_encoding(void) {
     TEST_ASSERT_EQUAL_STRING("bc1p2vfqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3yqwwx", output);
 }
 
-// Test invalid witness version
-void test_bech32_invalid_version(void) {
+TEST_CASE("Bech32 invalid witness version", "[bech32]")
+{
     uint8_t hash[20] = {0x00};
     char output[90];
     
@@ -61,8 +61,8 @@ void test_bech32_invalid_version(void) {
     TEST_ASSERT_FALSE(result);
 }
 
-// Test invalid program length for v0
-void test_bech32_invalid_v0_length(void) {
+TEST_CASE("Bech32 invalid v0 length", "[bech32]")
+{
     uint8_t hash[25] = {0x00};
     char output[90];
     
@@ -71,8 +71,8 @@ void test_bech32_invalid_v0_length(void) {
     TEST_ASSERT_FALSE(result);
 }
 
-// Test testnet encoding
-void test_bech32_testnet(void) {
+TEST_CASE("Bech32 testnet encoding", "[bech32]")
+{
     uint8_t hash[20] = {
         0x00, 0x14, 0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91,
         0x96, 0xd4, 0x54, 0x94, 0x1c, 0x45, 0xd1, 0xb3,

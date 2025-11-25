@@ -17,8 +17,8 @@ void setUp(void) {
 void tearDown(void) {
 }
 
-// Test P2PKH encoding (version 0x00)
-void test_base58_p2pkh_encoding(void) {
+TEST_CASE("Base58 P2PKH encoding", "[base58]")
+{
     // 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa (Genesis address)
     // Hash160: 62e907b15cbf27d5425399ebf6f0fb50ebb88f18
     uint8_t hash[20] = {
@@ -34,8 +34,8 @@ void test_base58_p2pkh_encoding(void) {
     TEST_ASSERT_EQUAL_STRING("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", output);
 }
 
-// Test P2SH encoding (version 0x05)
-void test_base58_p2sh_encoding(void) {
+TEST_CASE("Base58 P2SH encoding", "[base58]")
+{
     // 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy
     // Hash160: b472a266d0bd89c13706a4132ccfb16f7c3b9fcb
     uint8_t hash[20] = {
@@ -51,8 +51,8 @@ void test_base58_p2sh_encoding(void) {
     TEST_ASSERT_EQUAL_STRING("3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", output);
 }
 
-// Test buffer too small
-void test_base58_buffer_too_small(void) {
+TEST_CASE("Base58 buffer too small", "[base58]")
+{
     uint8_t hash[20] = {0};
     char output[10]; // Too small
     size_t outsz = sizeof(output);
