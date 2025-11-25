@@ -121,7 +121,7 @@ typedef struct
     bool psram_is_available;
 
     int block_height;
-    char * scriptsig;
+    char scriptsig[128];
     uint64_t network_nonce_diff;
     char network_diff_string[DIFF_STRING_SIZE];
 } GlobalState;
