@@ -85,17 +85,3 @@ void test_bech32_testnet(void) {
     TEST_ASSERT_TRUE(result);
     TEST_ASSERT_EQUAL_STRING("tb1qqq2w0m5pjyvjd4y5fz2u6gd48g3r8c2r93lt5v", output);
 }
-
-// Main test runner
-void app_main(void) {
-    UNITY_BEGIN();
-    
-    RUN_TEST(test_bech32_p2wpkh_encoding);
-    RUN_TEST(test_bech32_p2wsh_encoding);
-    RUN_TEST(test_bech32m_p2tr_encoding);
-    RUN_TEST(test_bech32_invalid_version);
-    RUN_TEST(test_bech32_invalid_v0_length);
-    RUN_TEST(test_bech32_testnet);
-    
-    UNITY_END();
-}

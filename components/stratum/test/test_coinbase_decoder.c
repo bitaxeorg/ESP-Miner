@@ -112,24 +112,3 @@ void test_decode_p2tr_address(void) {
     
     TEST_ASSERT_EQUAL_STRING("P2TR:ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100", output);
 }
-
-
-// Main test runner
-void app_main(void) {
-    UNITY_BEGIN();
-    
-    // Varint tests
-    RUN_TEST(test_decode_varint_single_byte);
-    RUN_TEST(test_decode_varint_fd_format);
-    RUN_TEST(test_decode_varint_fe_format);
-    RUN_TEST(test_decode_varint_ff_format);
-    
-    // Address decoding tests
-    RUN_TEST(test_decode_p2pkh_address);
-    RUN_TEST(test_decode_p2sh_address);
-    RUN_TEST(test_decode_p2wpkh_address);
-    RUN_TEST(test_decode_p2wsh_address);
-    RUN_TEST(test_decode_p2tr_address);
-    
-    UNITY_END();
-}

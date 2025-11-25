@@ -61,11 +61,3 @@ void test_base58_buffer_too_small(void) {
     
     TEST_ASSERT_FALSE(result);
 }
-
-void app_main(void) {
-    UNITY_BEGIN();
-    RUN_TEST(test_base58_p2pkh_encoding);
-    RUN_TEST(test_base58_p2sh_encoding);
-    RUN_TEST(test_base58_buffer_too_small);
-    UNITY_END();
-}
