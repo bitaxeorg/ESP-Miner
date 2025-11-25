@@ -1,0 +1,71 @@
+#include <stdio.h>
+#include <string.h>
+#include "unity.h"
+#include "libbase58.h"
+#include "utils.h"
+
+// Wrapper for SHA256 to match libbase58's expected signature
+static bool my_sha256(void *digest, const void *data, size_t datasz) {
+    single_sha256_bin(data, datasz, digest);
+    return true;
+}
+
+void setUp(void) {
+    b58_sha256_impl = my_sha256;
+}
+
+void tearDown(void) {
+}
+
+// Test P2PKH encoding (version 0x00)
+void test_base58_p2pkh_encoding(void) {
+    // 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa (Genesis address)
+    // Hash160: 62e907b15cbf27d5425399ebf6f0fb50ebb88f18
+    uint8_t hash[20] = {
+        0x62, 0xe9, 0x07, 0xb1, 0x5c, 0xbf, 0x27, 0xd5, 0x42, 0x53,
+        0x99, 0xeb, 0xf6, 0xf0, 0xfb, 0x50, 0xeb, 0xb8, 0x8f, 0x18
+    };
+    char output[50];
+    size_t outsz = sizeof(output);
+    
+    bool result = b58check_enc(output, &outsz, 0x00, hash, 20);
+    
+    TEST_ASSERT_TRUE(result);
+    TEST_ASSERT_EQUAL_STRING("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", output);
+}
+
+// Test P2SH encoding (version 0x05)
+void test_base58_p2sh_encoding(void) {
+    // 3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy
+    // Hash160: b472a266d0bd89c13706a4132ccfb16f7c3b9fcb
+    uint8_t hash[20] = {
+        0xb4, 0x72, 0xa2, 0x66, 0xd0, 0xbd, 0x89, 0xc1, 0x37, 0x06,
+        0xa4, 0x13, 0x2c, 0xcf, 0xb1, 0x6f, 0x7c, 0x3b, 0x9f, 0xcb
+    };
+    char output[50];
+    size_t outsz = sizeof(output);
+    
+    bool result = b58check_enc(output, &outsz, 0x05, hash, 20);
+    
+    TEST_ASSERT_TRUE(result);
+    TEST_ASSERT_EQUAL_STRING("3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", output);
+}
+
+// Test buffer too small
+void test_base58_buffer_too_small(void) {
+    uint8_t hash[20] = {0};
+    char output[10]; // Too small
+    size_t outsz = sizeof(output);
+    
+    bool result = b58check_enc(output, &outsz, 0x00, hash, 20);
+    
+    TEST_ASSERT_FALSE(result);
+}
+
+void app_main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_base58_p2pkh_encoding);
+    RUN_TEST(test_base58_p2sh_encoding);
+    RUN_TEST(test_base58_buffer_too_small);
+    UNITY_END();
+}
