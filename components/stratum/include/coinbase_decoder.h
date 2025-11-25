@@ -9,6 +9,18 @@
 
 #define MAX_ADDRESS_STRING_LEN 128
 
+// Bitcoin Script Opcodes
+#define OP_0            0x00
+#define OP_PUSHDATA_20  0x14  // Push next 20 bytes
+#define OP_PUSHDATA_32  0x20  // Push next 32 bytes
+#define OP_1            0x51
+#define OP_RETURN       0x6a
+#define OP_DUP          0x76
+#define OP_EQUAL        0x87
+#define OP_EQUALVERIFY  0x88
+#define OP_HASH160      0xa9
+#define OP_CHECKSIG     0xac
+
 /**
  * @brief Decode Bitcoin varint from binary data
  * 

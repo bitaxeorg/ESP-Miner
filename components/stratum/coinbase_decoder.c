@@ -53,8 +53,8 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
     ensure_base58_init();
     
     // P2PKH: OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
-    if (script_len == 25 && script[0] == 0x76 && script[1] == 0xa9 && 
-        script[2] == 0x14 && script[23] == 0x88 && script[24] == 0xac) {
+    if (script_len == 25 && script[0] == OP_DUP && script[1] == OP_HASH160 && 
+        script[2] == OP_PUSHDATA_20 && script[23] == OP_EQUALVERIFY && script[24] == OP_CHECKSIG) {
         size_t b58sz = output_len;
         // 0x00 is version for Mainnet P2PKH
         if (b58check_enc(output, &b58sz, 0x00, script + 3, 20)) {
@@ -67,7 +67,7 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
     }
     
     // P2SH: OP_HASH160 <20 bytes> OP_EQUAL
-    if (script_len == 23 && script[0] == 0xa9 && script[1] == 0x14 && script[22] == 0x87) {
+    if (script_len == 23 && script[0] == OP_HASH160 && script[1] == OP_PUSHDATA_20 && script[22] == OP_EQUAL) {
         size_t b58sz = output_len;
         // 0x05 is version for Mainnet P2SH
         if (b58check_enc(output, &b58sz, 0x05, script + 2, 20)) {
@@ -80,7 +80,7 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
     }
     
     // P2WPKH: OP_0 <20 bytes>
-    if (script_len == 22 && script[0] == 0x00 && script[1] == 0x14) {
+    if (script_len == 22 && script[0] == OP_0 && script[1] == OP_PUSHDATA_20) {
         if (segwit_addr_encode(output, "bc", 0, script + 2, 20)) {
             return;
         }
@@ -91,7 +91,7 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
     }
     
     // P2WSH: OP_0 <32 bytes>
-    if (script_len == 34 && script[0] == 0x00 && script[1] == 0x20) {
+    if (script_len == 34 && script[0] == OP_0 && script[1] == OP_PUSHDATA_32) {
         if (segwit_addr_encode(output, "bc", 0, script + 2, 32)) {
             return;
         }
@@ -102,7 +102,7 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
     }
     
     // P2TR: OP_1 <32 bytes>
-    if (script_len == 34 && script[0] == 0x51 && script[1] == 0x20) {
+    if (script_len == 34 && script[0] == OP_1 && script[1] == OP_PUSHDATA_32) {
         if (segwit_addr_encode(output, "bc", 1, script + 2, 32)) {
             return;
         }
@@ -113,7 +113,7 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
     }
 
     // OP_RETURN: OP_RETURN <data>
-    if (script_len > 0 && script[0] == 0x6a) {
+    if (script_len > 0 && script[0] == OP_RETURN) {
         snprintf(output, output_len, "OP_RETURN: ");
         size_t offset = 1;
         
