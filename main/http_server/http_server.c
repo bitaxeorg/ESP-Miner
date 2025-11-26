@@ -896,14 +896,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
             cJSON_AddNumberToObject(asic, "total", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[asic_nr].hashrate);
 
             int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
-            if (hash_domains > 0) {
-                cJSON* hash_domain_array = cJSON_CreateArray();
-                for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
-                    cJSON *hashrate = cJSON_CreateNumber(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[asic_nr][domain_nr].hashrate);
-                    cJSON_AddItemToArray(hash_domain_array, hashrate);
-                }
-                cJSON_AddItemToObject(asic, "domains", hash_domain_array);
+            cJSON* hash_domain_array = cJSON_CreateArray();
+            for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
+                cJSON *hashrate = cJSON_CreateNumber(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[asic_nr][domain_nr].hashrate);
+                cJSON_AddItemToArray(hash_domain_array, hashrate);
             }
+            cJSON_AddItemToObject(asic, "domains", hash_domain_array);
 
             cJSON_AddNumberToObject(asic, "errorCount", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_measurement[asic_nr].value);
         }
