@@ -678,11 +678,6 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     return ESP_OK;
 }
 
-static void identify_mode_off_timer_cb(TimerHandle_t xTimer) {
-    GLOBAL_STATE->SYSTEM_MODULE.is_identify_mode = false;
-    ESP_LOGI(TAG, "Identify mode disabled after timeout");
-}
-
 static esp_err_t POST_identify(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -697,24 +692,13 @@ static esp_err_t POST_identify(httpd_req_t * req)
 
     ESP_LOGI(TAG, "Identify mode enabled for 30s");
 
-    GLOBAL_STATE->SYSTEM_MODULE.is_identify_mode = true;
-
-    TimerHandle_t timer = xTimerCreate("IdentifyOffTimer",
-        pdMS_TO_TICKS(30000),
-        pdFALSE,
-        NULL,
-        identify_mode_off_timer_cb
-    );
-
-    if (timer != NULL) {
-        xTimerStart(timer, 0);
+    if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
+        GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
+        httpd_resp_send(req, "The device no longer says \"Hi!\".", HTTPD_RESP_USE_STRLEN);
     } else {
-        ESP_LOGE(TAG, "Failed to create identify mode timer");
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to create identify mode timer");
-        return ESP_OK;
+        GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 30000;
+        httpd_resp_send(req, "The device says \"Hi!\" for 30 seconds.", HTTPD_RESP_USE_STRLEN);
     }
-
-    httpd_resp_send(req, "Hi! displayed for 30 seconds.", HTTPD_RESP_USE_STRLEN);
 
     return ESP_OK;
 }
