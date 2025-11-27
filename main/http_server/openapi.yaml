@@ -806,3 +806,188 @@ paths:
           description: Unauthorized - Client not in allowed network range
         '500':
           description: Internal server error
+
+  /api/system/autotune:
+    post:
+      summary: Update autotuning configuration
+      description: Updates the current autotuning settings via a JSON body. Requires valid authentication.
+      tags:
+        - Autotune
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                power_limit:
+                  type: number
+                  description: Power limit (in watts)
+                  minimum: 0
+                  maximum: 1000
+                fan_limit:
+                  type: number
+                  description: Fan speed limit (%)
+                  minimum: 0
+                  maximum: 100
+                max_voltage_asic:
+                  type: number
+                  description: Maximum voltage for ASIC chips (volts)
+                  minimum: 0.5
+                  maximum: 20
+                max_frequency_asic:
+                  type: number
+                  description: Maximum frequency for ASIC chips (MHz)
+                  minimum: 100
+                  maximum: 5000
+                max_temp_asic:
+                  type: number
+                  description: Maximum temperature for ASIC chips (°C)
+                  minimum: 30
+                  maximum: 90
+                auto_tune_hashrate:
+                  type: boolean
+                  description: Whether autotuning is enabled to optimize hashrate
+                overshot_power_limit:
+                  type: number
+                  description: Power limit during overshot conditions (watts)
+                  minimum: 0
+                  maximum: 1000
+                overshot_fanspeed:
+                  type: number
+                  description: Fan speed limit during overshot conditions (%)
+                  minimum: 0
+                  maximum: 100
+                max_temp_vr:
+                  type: number
+                  description: Maximum temperature for VR (°C)
+                  minimum: 40
+                  maximum: 95
+              required:
+                - power_limit
+                - fan_limit
+                - max_voltage_asic
+                - max_frequency_asic
+                - max_temp_asic
+                - auto_tune_hashrate
+                - overshot_power_limit
+                - overshot_fanspeed
+                - max_temp_vr
+            example:
+              power_limit: 120.5
+              fan_limit: 80
+              max_voltage_asic: 1.3
+              max_frequency_asic: 2400
+              max_temp_asic: 75
+              auto_tune_hashrate: true
+              overshot_power_limit: 160
+              overshot_fanspeed: 90
+              max_temp_vr: 80
+
+      responses:
+        '204':
+          description: Settings updated successfully (no content returned)
+        '400':
+          description: Invalid JSON or missing required field.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid JSON"
+        '401':
+          description: Unauthorized access — authentication failed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Unauthorized"
+        '500':
+          description: Internal server error (e.g., failed to parse body, disk issue).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal Server Error"
+      
+    get:
+      summary: Get current autotuning configuration
+      description: Returns the current power, fan, temperature, and frequency limits used in autotuning.
+      tags:
+        - Autotune
+      responses:
+        '200':
+          description: Successful response with autotuning settings in JSON format
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  power_limit:
+                    type: number
+                    description: Power limit (in watts)
+                  fan_limit:
+                    type: number
+                    description: Fan speed limit (%)
+                  max_voltage_asic:
+                    type: number
+                    description: Maximum voltage for ASIC chips (volts)
+                  max_frequency_asic:
+                    type: number
+                    description: Maximum frequency for ASIC chips (MHz)
+                  max_temp_asic:
+                    type: number
+                    description: Maximum temperature for ASIC chips (°C)
+                  auto_tune_hashrate:
+                    type: boolean
+                    description: Whether autotuning is enabled to optimize hashrate
+                  overshot_power_limit:
+                    type: number
+                    description: Power limit during overshot conditions (watts)
+                  overshot_fanspeed:
+                    type: number
+                    description: Fan speed limit during overshot conditions (%)
+                  max_temp_vr:
+                    type: number
+                    description: Maximum temperature for VR (°C)
+                required:
+                  - power_limit
+                  - fan_limit
+                  - max_voltage_asic
+                  - max_frequency_asic
+                  - max_temp_asic
+                  - auto_tune_hashrate
+                  - overshot_power_limit
+                  - overshot_fanspeed
+                  - max_temp_vr
+
+        '401':
+          description: Unauthorized access — authentication failed or missing.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Unauthorized"
+      
+        '500':
+          description: Internal server error (e.g., JSON parsing failure, network issue)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal Server Error"
+
