@@ -1315,7 +1315,7 @@ esp_err_t start_rest_server(void * pvParameters)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 22;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
 
