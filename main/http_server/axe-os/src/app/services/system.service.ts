@@ -78,6 +78,7 @@ export class SystemService {
         version: "v2.9.0",
         axeOSVersion: "v2.9.0",
         idfVersion: "v5.1.2",
+        resetReason: "Power-on reset",
         boardVersion: "204",
         display: "SSD1306 (128x32)",
         rotation: 0,
