@@ -1,5 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Observable, Subject, combineLatest, switchMap, shareReplay, first, takeUntil, map, timer } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { ToastrService } from 'ngx-toastr';
 import { SystemService } from 'src/app/services/system.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
@@ -35,6 +37,7 @@ export class SystemComponent implements OnInit, OnDestroy {
   constructor(
     private systemService: SystemService,
     private loadingService: LoadingService,
+    private toastr: ToastrService,
   ) {
     this.info$ = timer(0, 5000).pipe(
       switchMap(() => this.systemService.getInfo()),
@@ -100,5 +103,18 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
       { label: 'ESP-IDF Version', value: data.info.idfVersion },
     ];
+  }
+
+  identifyDevice(): void {
+    this.systemService.identify()
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => {
+          this.toastr.success('The device says "Hi!" for 30 seconds.');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error(`Could not identify device. ${err.message}`);
+        }
+      });
   }
 }

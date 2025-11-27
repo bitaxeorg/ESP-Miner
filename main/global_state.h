@@ -47,6 +47,7 @@ typedef struct
     char ap_ssid[32];
     bool ap_enabled;
     bool is_connected;
+    bool is_identify_mode;
     char * pool_url;
     char * fallback_pool_url;
     uint16_t pool_port;

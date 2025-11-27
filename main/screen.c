@@ -17,6 +17,7 @@ typedef enum {
     SCR_ASIC_STATUS,
     SCR_WELCOME,
     SCR_FIRMWARE,
+    SCR_IDENTIFY,
     SCR_CONNECTION,
     SCR_BITAXE_LOGO,
     SCR_OSMU_LOGO,
@@ -33,9 +34,10 @@ typedef enum {
 
 extern const lv_img_dsc_t bitaxe_logo;
 extern const lv_img_dsc_t osmu_logo;
+extern const lv_img_dsc_t identify_text;
 
 static lv_obj_t * screens[MAX_SCREENS];
-static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000, 10000, 10000};
+static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000, 10000, 10000};
 
 static int current_screen_time_ms;
 static int current_screen_delay_ms;
@@ -284,6 +286,18 @@ static lv_obj_t * create_scr_osmu_logo() {
     return scr;
 }
 
+static lv_obj_t * create_scr_identify() {
+    lv_obj_t * scr = lv_obj_create(NULL);
+
+    lv_obj_set_style_bg_color(scr, lv_color_make(0, 0, 0), LV_STATE_DEFAULT);
+    
+    lv_obj_t *img = lv_img_create(scr);
+    lv_img_set_src(img, &identify_text);
+    lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
+
+    return scr;
+}
+
 static lv_obj_t * create_scr_urls(SystemModule * module) {
     lv_obj_t * scr = create_flex_screen(4);
 
@@ -461,6 +475,11 @@ static void screen_update_cb(lv_timer_t * timer)
         screen_show(SCR_CONNECTION);
 
         delays_ms[SCR_CONNECTION] = 0; // Remove delay so whenever the user disables the AP with long press, it goes straight back to carousel
+        return;
+    }
+
+    if (module->is_identify_mode) {
+        screen_show(SCR_IDENTIFY);
         return;
     }
 
@@ -650,6 +669,7 @@ esp_err_t screen_start(void * pvParameters)
             screens[SCR_ASIC_STATUS] = create_scr_asic_status(module);
             screens[SCR_WELCOME] = create_scr_welcome(module);
             screens[SCR_FIRMWARE] = create_scr_firmware(module);
+            screens[SCR_IDENTIFY] = create_scr_identify();
             screens[SCR_CONNECTION] = create_scr_connection(module);
             screens[SCR_BITAXE_LOGO] = create_scr_bitaxe_logo(GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version);
             screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
