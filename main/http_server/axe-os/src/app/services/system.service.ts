@@ -1,12 +1,13 @@
 import { HttpClient, HttpParams, HttpEvent } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { delay, Observable, of } from 'rxjs';
+import { delay, Observable, of, timeout } from 'rxjs';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { ISystemASIC } from 'src/models/ISystemASIC';
+import { IAutotuneSettings } from 'src/models/IAutotuneSettings';
 
 import { environment } from '../../environments/environment';
 
@@ -257,7 +258,7 @@ export class SystemService {
 
   public getAutotune() {
     if (environment.production) {
-      return this.httpClient.get<any>('/api/system/autotune');
+      return this.httpClient.get<IAutotuneSettings>('/api/system/autotune').pipe(timeout(5000));
     }
 
     // Mock data for development

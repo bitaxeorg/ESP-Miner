@@ -5,6 +5,7 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { ToastrService } from 'ngx-toastr';
+import { forkJoin } from 'rxjs';
 
 interface SliderConfig {
   formControlName: string;
@@ -106,69 +107,66 @@ export class AutotuneComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
+    this.autotuneForm = this.fb.group({
+      power_limit: [null, [Validators.required, Validators.min(1)]],
+      fan_limit: [null, [Validators.required, Validators.min(0)]],
+      osh_pow_limit: [null],
+      osh_fan_limit: [null],
+      max_volt_asic: [null, [Validators.required, Validators.min(1)]],
+      max_freq_asic: [null, [Validators.required, Validators.min(1)]],
+      max_temp_asic: [null, [Validators.required, Validators.min(1)]],
+      max_temp_vr: [null],
+      auto_tune: [false]
+    });
+
     this.loadAutotuneSettings();
   }
 
   private loadAutotuneSettings(): void {
+    forkJoin({
+      info: this.systemService.getInfo(),
+      asic: this.systemService.getAsicSettings(),
+      autotune: this.systemService.getAutotune()
+    }).pipe(
+      this.loadingService.lockUIUntilComplete()
+    ).subscribe({
+      next: ({ info, asic, autotune }) => {
+        this.updateSliderMinForPid(info);
 
-    this.systemService.getInfo()
-      .pipe(this.loadingService.lockUIUntilComplete())
-      .subscribe({
-        next: (info) => {
-          // Update the slider config with dynamic minimum value if PID is active
-          this.updateSliderMinForPid(info);
-        },
-        error: () => {
-          this.toastr.error('Failed to load getInfo settings');
-        }
-      });
+        const maxVoltage = asic.defaultVoltage * 1.25;
+        const maxFrequency = asic.defaultFrequency * 2;
 
-    this.systemService.getAsicSettings()
-      .pipe(this.loadingService.lockUIUntilComplete())
-      .subscribe({
-        next: (asic) => {
-          // Update the slider config with dynamic minimum value if PID is active
-          const maxVoltage = asic.defaultVoltage * 1.25;
-          const maxFrequency = asic.defaultFrequency * 2;
-          this.sliderConfigs.forEach(config => {
-            if (config.formControlName === 'max_volt_asic') {
-              config.max = maxVoltage;
-            }
-            if (config.formControlName === 'max_freq_asic') {
-              config.max = maxFrequency;
-            }
-          });
-        },
-        error: () => {
-          this.toastr.error('Failed to load getAsicSettings');
-        }
-      });
+        this.sliderConfigs = this.sliderConfigs.map(config => {
+          if (config.formControlName === 'max_volt_asic') {
+            return { ...config, max: maxVoltage };
+          }
+          if (config.formControlName === 'max_freq_asic') {
+            return { ...config, max: maxFrequency };
+          }
+          return config;
+        });
 
-    this.systemService.getAutotune()
-      .pipe(this.loadingService.lockUIUntilComplete())
-      .subscribe({
-        next: autotune => {
-          this.autotuneForm = this.fb.group({
-            power_limit: [autotune.power_limit, [Validators.required, Validators.min(1)]],
-            fan_limit: [autotune.fan_limit, [Validators.required, Validators.min(0)]],
-            osh_pow_limit: [parseFloat(autotune.osh_pow_limit.toFixed(2))],
-            osh_fan_limit: [autotune.osh_fan_limit],
-            max_volt_asic: [autotune.max_volt_asic, [Validators.required, Validators.min(1)]],
-            max_freq_asic: [autotune.max_freq_asic, [Validators.required, Validators.min(1)]],
-            max_temp_asic: [autotune.max_temp_asic, [Validators.required, Validators.min(1)]],
-            max_temp_vr: [autotune.max_temp_vr],
-            auto_tune: [autotune.auto_tune ?? false]
-          });
-        },
-        error: () => {
-          this.toastr.error('Failed to load autotune settings');
-        }
-      });
+        this.autotuneForm.patchValue({
+          power_limit: autotune.power_limit,
+          fan_limit: autotune.fan_limit,
+          osh_pow_limit: parseFloat(autotune.osh_pow_limit.toFixed(2)),
+          osh_fan_limit: autotune.osh_fan_limit,
+          max_volt_asic: autotune.max_volt_asic,
+          max_freq_asic: autotune.max_freq_asic,
+          max_temp_asic: autotune.max_temp_asic,
+          max_temp_vr: autotune.max_temp_vr,
+          auto_tune: autotune.auto_tune ?? false
+        });
+      },
+      error: () => {
+        this.toastr.error('Failed to load autotune settings');
+      }
+    });
   }
 
   public updateAutotune(): void {
     this.systemService.updateAutotune(this.autotuneForm.value).subscribe({
-      next: () => this.toastr.success('Autotune settings saved!'),
+      next: () => this.toastr.success('Autotune settings saved'),
       error: (err: HttpErrorResponse) => this.toastr.error(`Could not save autotune settings. ${err.message}`)
     });
   }
