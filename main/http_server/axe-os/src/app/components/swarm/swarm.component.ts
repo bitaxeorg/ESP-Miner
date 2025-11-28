@@ -187,7 +187,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     // Check if IP already exists
     if (this.swarm.some(item => item.IP === IP)) {
-      this.toastr.warning('This IP address already exists in the swarm.');
+      this.toastr.warning('Device already added to the swarm.', `Device at ${IP}`);
       return;
     }
 
@@ -210,22 +210,22 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.modalComponent.isVisible = true;
   }
 
-  public restart(axe: any) {
-    this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}, { responseType: 'text' }).pipe(
-      timeout(800), // Fail if no response in 800ms
+  public postAction(axe: any, action: string) {
+    this.httpClient.post(`http://${axe.IP}/api/system/${action}`, {}, { responseType: 'text' }).pipe(
+      timeout(800),
       catchError(error => {
-        let errorMsg = 'Failed to restart device';
+        let errorMsg = `Failed to ${action} device`;
         if (error.name === 'TimeoutError') {
           errorMsg = 'Request timed out';
         } else if (error.message) {
           errorMsg += `: ${error.message}`;
         }
-        this.toastr.error(errorMsg, `Device ${axe.IP}`);
-        return of(null); // Or throwError if you want to propagate further
+        this.toastr.error(errorMsg, `Device at ${axe.IP}`);
+        return of(null);
       })
     ).subscribe(res => {
       if (res !== null) {
-        this.toastr.success(res, `Device ${axe.IP}`);
+        this.toastr.success(res, `Device at ${axe.IP}`);
       }
     });
   }
@@ -236,29 +236,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.calculateTotals();
   }
 
-  public identify(axe: any) {
-    this.httpClient.post(`http://${axe.IP}/api/system/identify`, {}, { responseType: 'text' }).pipe(
-      timeout(800), // Fail if no response in 800ms
-      catchError(error => {
-        let errorMsg = 'Failed to identify device';
-        if (error.name === 'TimeoutError') {
-          errorMsg = 'Request timed out';
-        } else if (error.message) {
-          errorMsg += `: ${error.message}`;
-        }
-        this.toastr.error(errorMsg, `Device ${axe.IP}`);
-        return of(null); // Or throwError if you want to propagate further
-      })
-    ).subscribe(res => {
-      if (res !== null) {
-        this.toastr.success(res, `Device ${axe.IP}`);
-      }
-    });
-  }
-
   public refreshErrorHandler = (error: any, ip: string) => {
     const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
-    this.toastr.error(`Failed to get info from ${ip}. ${errorMessage}`);
+    this.toastr.error(`Failed to get info: ${errorMessage}`, `Device at ${ip}`);
     const existingDevice = this.swarm.find(axeOs => axeOs.IP === ip);
     return of({
       ...existingDevice,
