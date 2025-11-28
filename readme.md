@@ -64,6 +64,7 @@ Available API endpoints:
 **POST**
 
 * `/api/system/restart` Restart the system
+* `/api/system/identify` Identify the device
 * `/api/system/OTA` Update system firmware
 * `/api/system/OTAWWW` Update AxeOS
 
@@ -92,6 +93,9 @@ curl http://YOUR-BITAXE-IP/api/system/wifi/scan
 
 # Restart the system
 curl -X POST http://YOUR-BITAXE-IP/api/system/restart
+
+# Let the device say Hi!
+curl -X POST http://YOUR-BITAXE-IP/api/system/identify
 
 # Update system firmware
 curl -X POST \
