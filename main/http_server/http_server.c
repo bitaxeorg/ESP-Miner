@@ -14,6 +14,7 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_spiffs.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "esp_vfs.h"
@@ -747,6 +748,28 @@ static esp_err_t POST_restart(httpd_req_t * req)
     return ESP_OK;
 }
 
+static const char* esp_reset_reason_to_string(esp_reset_reason_t reason) {
+    switch (reason) {
+        case ESP_RST_UNKNOWN:    return "Reset reason can not be determined";
+        case ESP_RST_POWERON:    return "Reset due to power-on event";
+        case ESP_RST_EXT:        return "Reset by external pin (not applicable for ESP32)";
+        case ESP_RST_SW:         return "Software reset via esp_restart";
+        case ESP_RST_PANIC:      return "Software reset due to exception/panic";
+        case ESP_RST_INT_WDT:    return "Reset (software or hardware) due to interrupt watchdog";
+        case ESP_RST_TASK_WDT:   return "Reset due to task watchdog";
+        case ESP_RST_WDT:        return "Reset due to other watchdogs";
+        case ESP_RST_DEEPSLEEP:  return "Reset after exiting deep sleep mode";
+        case ESP_RST_BROWNOUT:   return "Brownout reset (software or hardware)";
+        case ESP_RST_SDIO:       return "Reset over SDIO";
+        case ESP_RST_USB:        return "Reset by USB peripheral";
+        case ESP_RST_JTAG:       return "Reset by JTAG";
+        case ESP_RST_EFUSE:      return "Reset due to efuse error";
+        case ESP_RST_PWR_GLITCH: return "Reset due to power glitch detected";
+        case ESP_RST_CPU_LOCKUP: return "Reset due to CPU lock up (double exception)";
+        default:                 return "Unknown reset";
+    }
+}
+
 /* Simple handler for getting system handler */
 static esp_err_t GET_system_info(httpd_req_t * req)
 {
@@ -851,6 +874,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
+    cJSON_AddStringToObject(root, "resetReason", esp_reset_reason_to_string(esp_reset_reason()));
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
     cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE));

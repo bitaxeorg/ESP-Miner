@@ -144,6 +144,7 @@ components:
         - poolDifficulty
         - power
         - power_fault
+        - resetReason
         - runningPartition
         - sharesAccepted
         - sharesRejected
@@ -288,6 +289,9 @@ components:
         power_fault:
           type: string
           description: Voltage regulator fault reason, if any
+        resetReason:
+          type: string
+          description: Reason for the last system reset
         runningPartition:
           type: string
           description: Currently active OTA partition
