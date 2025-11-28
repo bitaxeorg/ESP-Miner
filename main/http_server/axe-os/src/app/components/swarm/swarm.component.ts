@@ -211,18 +211,21 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public restart(axe: any) {
-    this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}).pipe(
+    this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}, { responseType: 'text' }).pipe(
+      timeout(800), // Fail if no response in 800ms
       catchError(error => {
-        if (error.status === 0 || error.status === 200 || error.name === 'HttpErrorResponse') {
-          return of('success');
-        } else {
-          this.toastr.error(`Failed to restart device at ${axe.IP}`);
-          return of(null);
+        let errorMsg = 'Failed to restart device';
+        if (error.name === 'TimeoutError') {
+          errorMsg = 'Request timed out';
+        } else if (error.message) {
+          errorMsg += `: ${error.message}`;
         }
+        this.toastr.error(errorMsg, `Device ${axe.IP}`);
+        return of(null); // Or throwError if you want to propagate further
       })
     ).subscribe(res => {
-      if (res !== null && res == 'success') {
-        this.toastr.success(`Device at ${axe.IP} restarted`);
+      if (res !== null) {
+        this.toastr.success(res, `Device ${axe.IP}`);
       }
     });
   }
@@ -234,21 +237,24 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public identify(axe: any) {
-    this.httpClient.post(`http://${axe.IP}/api/system/identify`, {}).pipe(
+    this.httpClient.post(`http://${axe.IP}/api/system/identify`, {}, { responseType: 'text' }).pipe(
+      timeout(800), // Fail if no response in 800ms
       catchError(error => {
-        if (error.status === 0 || error.status === 200 || error.name === 'HttpErrorResponse') {
-          return of('success');
-        } else {
-          this.toastr.error(`Failed to identify device at ${axe.IP}`);
-          return of(null);
+        let errorMsg = 'Failed to identify device';
+        if (error.name === 'TimeoutError') {
+          errorMsg = 'Request timed out';
+        } else if (error.message) {
+          errorMsg += `: ${error.message}`;
         }
+        this.toastr.error(errorMsg, `Device ${axe.IP}`);
+        return of(null); // Or throwError if you want to propagate further
       })
     ).subscribe(res => {
-      if (res !== null && res == 'success') {
-        this.toastr.success(`Device at ${axe.IP} says "Hi!" for 30 seconds`);
+      if (res !== null) {
+        this.toastr.success(res, `Device ${axe.IP}`);
       }
     });
-  }
+  }  
 
   public refreshErrorHandler = (error: any, ip: string) => {
     const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';

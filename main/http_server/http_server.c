@@ -692,6 +692,8 @@ static esp_err_t POST_identify(httpd_req_t * req)
 
     ESP_LOGI(TAG, "Identify mode enabled for 30s");
 
+    httpd_resp_set_type(req, "text/plain");
+
     if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
         httpd_resp_send(req, "The device no longer says \"Hi!\".", HTTPD_RESP_USE_STRLEN);
@@ -716,6 +718,8 @@ static esp_err_t POST_restart(httpd_req_t * req)
     }
 
     ESP_LOGI(TAG, "Restarting System because of API Request");
+
+    httpd_resp_set_type(req, "text/plain");
 
     // Send HTTP response before restarting
     const char* resp_str = "System will restart shortly.";
