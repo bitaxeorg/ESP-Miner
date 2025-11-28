@@ -1,10 +1,9 @@
 #loading {
     background-color: var(--maskbg);
-    left: calc(4rem + var(--sidebar-width));
 
     bottom: 0;
     position: fixed;
-    z-index: 99999999999999999999;
+    z-index: 9999;
 
     --padding: 2rem;
 

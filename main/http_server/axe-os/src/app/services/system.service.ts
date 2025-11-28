@@ -81,6 +81,7 @@ export class SystemService {
         version: "v2.9.0",
         axeOSVersion: "v2.9.0",
         idfVersion: "v5.1.2",
+        resetReason: "Power-on reset",
         boardVersion: "204",
         display: "SSD1306 (128x32)",
         rotation: 0,
@@ -189,6 +190,10 @@ export class SystemService {
     return this.httpClient.post(`${uri}/api/system/restart`, {}, {responseType: 'text'});
   }
 
+  public identify(uri: string = '') {
+    return this.httpClient.post(`${uri}/api/system/identify`, {}, {responseType: 'text'});
+  }
+
   public updateSystem(uri: string = '', update: any) {
     if (environment.production) {
       return this.httpClient.patch(`${uri}/api/system`, update);
@@ -196,7 +201,6 @@ export class SystemService {
       return of(true);
     }
   }
-
 
   private otaUpdate(file: File | Blob, url: string) {
     return new Observable<HttpEvent<string>>((subscriber) => {

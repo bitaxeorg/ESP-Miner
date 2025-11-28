@@ -117,27 +117,39 @@
                             </div>
                             <div class="flex align-items-center mb-1 gap-3 md:gap-2">
                                 <p-button
-                                    icon="pi pi-pencil text-sm flex align-items-center justify-content-center"
+                                    icon="pi pi-pencil text-sm"
                                     pp-button
                                     pTooltip="Edit"
                                     tooltipPosition="top"
                                     severity="secondary"
+                                    class="inline-block"
                                     styleClass="button-icon-small"
                                     (click)="edit(axe)" />
                                 <p-button
-                                    icon="pi pi-refresh text-sm flex align-items-center justify-content-center"
+                                    icon="pi pi-refresh text-sm"
                                     pp-button
                                     pTooltip="Restart"
                                     tooltipPosition="top"
                                     severity="secondary"
+                                    class="inline-block"
                                     styleClass="button-icon-small"
                                     (click)="restart(axe)" />
                                 <p-button
-                                    icon="pi pi-trash text-sm flex align-items-center justify-content-center"
+                                    icon="pi pi-lightbulb text-sm"
+                                    pp-button
+                                    pTooltip="Identify"
+                                    tooltipPosition="top"
+                                    severity="secondary"
+                                    class="inline-block"
+                                    styleClass="button-icon-small"
+                                    (click)="identify(axe)" />
+                                <p-button
+                                    icon="pi pi-trash text-sm"
                                     pp-button
                                     pTooltip="Remove"
                                     tooltipPosition="top"
                                     severity="secondary"
+                                    class="inline-block"
                                     styleClass="button-icon-small"
                                     (click)="remove(axe)" />
                                 <i
@@ -273,24 +285,41 @@
                             </td>
                             <td>{{axe.poolDifficulty}}</td>
                             <td>{{axe.version}}</td>
-                            <td>
+                            <td class="flex align-items-center mb-1 gap-3 md:gap-2">
                                 <p-button
-                                    icon="pi pi-pencil flex align-items-center justify-content-center"
+                                    icon="pi pi-pencil"
                                     pp-button
+                                    pTooltip="Edit"
+                                    tooltipPosition="top"
                                     severity="secondary"
+                                    class="inline-block"
                                     styleClass="button-icon"
                                     (click)="edit(axe)" />
                                 <p-button
-                                    icon="pi pi-refresh flex align-items-center justify-content-center"
+                                    icon="pi pi-refresh"
                                     pp-button
+                                    pTooltip="Restart"
+                                    tooltipPosition="top"
                                     severity="secondary"
                                     styleClass="button-icon"
-                                    class="mx-2"
+                                    class="inline-block"
                                     (click)="restart(axe)" />
                                 <p-button
-                                    icon="pi pi-trash flex align-items-center justify-content-center"
+                                    icon="pi pi-lightbulb"
                                     pp-button
+                                    pTooltip="Identify"
+                                    tooltipPosition="top"
                                     severity="secondary"
+                                    class="inline-block"
+                                    styleClass="button-icon"
+                                    (click)="identify(axe)" />
+                                <p-button
+                                    icon="pi pi-trash"
+                                    pp-button
+                                    pTooltip="Remove"
+                                    tooltipPosition="top"
+                                    severity="secondary"
+                                    class="inline-block"
                                     styleClass="button-icon"
                                     (click)="remove(axe)" />
                             </td>

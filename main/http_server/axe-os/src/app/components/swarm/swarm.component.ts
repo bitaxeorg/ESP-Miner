@@ -1,10 +1,11 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, ViewChild, HostListener } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable, Subscription } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { LayoutService } from "../../layout/service/app.layout.service";
+import { SystemService } from 'src/app/services/system.service';
 import { ModalComponent } from '../modal/modal.component';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 
@@ -62,6 +63,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     private toastr: ToastrService,
     private localStorageService: LocalStorageService,
     public layoutService: LayoutService,
+    private systemService: SystemService,
     private httpClient: HttpClient
   ) {
 
@@ -229,6 +231,23 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.swarm = this.swarm.filter(axe => axe.IP !== axeOs.IP);
     this.localStorageService.setObject(SWARM_DATA, this.swarm);
     this.calculateTotals();
+  }
+
+  public identify(axe: any) {
+    this.httpClient.post(`http://${axe.IP}/api/system/identify`, {}).pipe(
+      catchError(error => {
+        if (error.status === 0 || error.status === 200 || error.name === 'HttpErrorResponse') {
+          return of('success');
+        } else {
+          this.toastr.error(`Failed to identify device at ${axe.IP}`);
+          return of(null);
+        }
+      })
+    ).subscribe(res => {
+      if (res !== null && res == 'success') {
+        this.toastr.success(`Device at ${axe.IP} says "Hi!" for 30 seconds`);
+      }
+    });
   }
 
   public refreshErrorHandler = (error: any, ip: string) => {

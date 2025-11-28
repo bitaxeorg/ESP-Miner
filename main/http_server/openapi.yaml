@@ -147,6 +147,7 @@ components:
         - poolDifficulty
         - power
         - power_fault
+        - resetReason
         - runningPartition
         - sharesAccepted
         - sharesRejected
@@ -300,6 +301,9 @@ components:
         power_fault:
           type: string
           description: Voltage regulator fault reason, if any
+        resetReason:
+          type: string
+          description: Reason for the last system reset
         runningPartition:
           type: string
           description: Currently active OTA partition
@@ -728,6 +732,21 @@ paths:
       responses:
         '200':
           description: System restart initiated
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/identify:
+    post:
+      summary: Identify the device
+      description: Let the device say Hi!
+      operationId: identifySystem
+      tags:
+        - system
+      responses:
+        '200':
+          description: Device identify initiated
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
