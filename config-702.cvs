@@ -19,7 +19,7 @@ asicfrequency,data,u16,490
 asicvoltage,data,u16,1166
 asicmodel,data,string,BM1368
 devicemodel,data,string,suprahex
-boardversion,data,string,701
+boardversion,data,string,702
 rotation,data,u16,0
 autofanspeed,data,u16,1
 fanspeed,data,u16,100
