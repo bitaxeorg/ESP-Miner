@@ -254,7 +254,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
         this.toastr.success(res, `Device ${axe.IP}`);
       }
     });
-  }  
+  }
 
   public refreshErrorHandler = (error: any, ip: string) => {
     const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
