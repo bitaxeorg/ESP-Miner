@@ -6,7 +6,7 @@
 #include "common.h"
 
 uint8_t ASIC_init(GlobalState * GLOBAL_STATE);
-task_result * ASIC_process_work(GlobalState * GLOBAL_STATE);
+bool ASIC_process_work(GlobalState * GLOBAL_STATE, task_result * result, int64_t *result_receive_time_us);
 int ASIC_set_max_baud(GlobalState * GLOBAL_STATE);
 void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job);
 void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask);

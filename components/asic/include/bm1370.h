@@ -27,7 +27,7 @@ void BM1370_set_version_mask(uint32_t version_mask);
 int BM1370_set_max_baud(void);
 int BM1370_set_default_baud(void);
 void BM1370_send_hash_frequency(float frequency);
-task_result * BM1370_process_work(void * GLOBAL_STATE);
+bool BM1370_process_work(void * GLOBAL_STATE, task_result * result, int64_t *result_receive_time_us);
 void BM1370_read_registers(void);
 
 #endif /* BM1370_H_ */

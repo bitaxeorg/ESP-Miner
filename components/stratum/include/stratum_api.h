@@ -93,7 +93,8 @@ int STRATUM_V1_extranonce_subscribe(int socket, int send_uid);
 
 int STRATUM_V1_submit_share(int socket, int send_uid, const char *username, const char *job_id,
                             const char *extranonce_2, const uint32_t ntime, const uint32_t nonce,
-                            const uint32_t version_bits);
+                            const uint32_t version_bits,
+                            int64_t * result_submit_time_us);
 
 double STRATUM_V1_get_response_time_ms(int request_id);
 

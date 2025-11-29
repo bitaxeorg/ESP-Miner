@@ -414,6 +414,9 @@ int STRATUM_V1_authorize(int socket, int send_uid, const char * username, const 
     return write(socket, authorize_msg, strlen(authorize_msg));
 }
 
+#define SUBMIT_BUF_SIZE  256
+static char submit_buf[SUBMIT_BUF_SIZE] __attribute__((aligned(4)));
+
 /// @param socket Socket to write to
 /// @param send_uid Message ID
 /// @param username The client’s user name.
@@ -423,16 +426,21 @@ int STRATUM_V1_authorize(int socket, int send_uid, const char * username, const 
 /// @param nonce The hex-encoded nonce value to use in the block header.
 /// @param version_bits The hex-encoded version bits set by miner (BIP310).
 int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, const char * job_id,
-                            const char * extranonce_2, const uint32_t ntime,
-                            const uint32_t nonce, const uint32_t version_bits)
+                            const char * extranonce_2, uint32_t ntime,
+                            uint32_t nonce, uint32_t version_bits,
+                            int64_t * result_submit_time_us)
 {
-    char submit_msg[BUFFER_SIZE];
-    sprintf(submit_msg,
-            "{\"id\": %d, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%08lx\", \"%08lx\", \"%08lx\"]}\n",
-            send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);
-    debug_stratum_tx(submit_msg);
+    int len = snprintf(submit_buf, SUBMIT_BUF_SIZE,
+        "{\"id\":%d,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%08lx\",\"%08lx\",\"%08lx\"]}\n",
+        send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);    
+    
+    *result_submit_time_us = esp_timer_get_time();
 
-    return write(socket, submit_msg, strlen(submit_msg));
+    int result = (len > 0) ? write(socket, submit_buf, len) : -1;
+
+    debug_stratum_tx(submit_buf);
+        
+    return result;
 }
 
 int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * version_mask)

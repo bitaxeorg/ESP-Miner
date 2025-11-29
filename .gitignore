@@ -34,3 +34,4 @@ managed_components/*
 .DS_Store
 Thumbs.db
 debug.log
+.cache

@@ -32,17 +32,17 @@ uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
     return ESP_OK;
 }
 
-task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
+bool ASIC_process_work(GlobalState * GLOBAL_STATE, task_result * result, int64_t *result_receive_time_us)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            return BM1397_process_work(GLOBAL_STATE);
+            return BM1397_process_work(GLOBAL_STATE, result, result_receive_time_us);
         case BM1366:
-            return BM1366_process_work(GLOBAL_STATE);
+            return BM1366_process_work(GLOBAL_STATE, result, result_receive_time_us);
         case BM1368:
-            return BM1368_process_work(GLOBAL_STATE);
+            return BM1368_process_work(GLOBAL_STATE, result, result_receive_time_us);
         case BM1370:
-            return BM1370_process_work(GLOBAL_STATE);
+            return BM1370_process_work(GLOBAL_STATE, result, result_receive_time_us);
     }
     return NULL;
 }

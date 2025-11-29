@@ -46,13 +46,14 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
 }
 
 // take a mining_notify struct with ascii hex strings and convert it to a bm_job struct
-void construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], const uint32_t version_mask, const uint32_t difficulty, bm_job *new_job)
+void construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], const uint32_t version_mask, const uint32_t difficulty, const char * user, bm_job *new_job)
 {
     new_job->version = params->version;
     new_job->target = params->target;
     new_job->ntime = params->ntime;
     new_job->starting_nonce = 0;
     new_job->pool_diff = difficulty;
+    new_job->user = user;
     reverse_32bit_words(merkle_root, new_job->merkle_root);
 
     uint8_t prev_block_hash[32];
