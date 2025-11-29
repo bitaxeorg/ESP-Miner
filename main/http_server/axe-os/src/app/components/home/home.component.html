@@ -155,6 +155,13 @@
                                 {{info.bestDiff | diffSuffix}}
                             </span>
                             <span class="text-500 text-lg">all-time best</span>
+                            <span class="text-lg font-medium mb-3" *ngIf="info.networkDifficulty">
+                                <tooltip-text-icon
+                                    [text]="'(' + getNetworkDifficultyPercentage(info) + '%)'"
+                                    tooltip="Chance to find a Block"
+                                    [split]="false"
+                                />
+                            </span>
                         </div>
                     </div>
                 </div>

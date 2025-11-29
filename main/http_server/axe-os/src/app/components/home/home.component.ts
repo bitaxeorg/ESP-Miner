@@ -626,6 +626,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.calculateEfficiency(info, 'expectedHashrate');
   }
 
+  public getNetworkDifficultyPercentage(info: ISystemInfo): string {
+    if (!info.networkDifficulty || info.networkDifficulty === 0) return '0';
+    const percentage = (info.bestDiff / info.networkDifficulty) * 100;
+    // Show 2 significant digits
+    return percentage.toPrecision(2);
+  }
+
   public getShareRejectionPercentage(sharesRejectedReason: { count: number }, info: ISystemInfo): number {
     const totalShares = info.sharesAccepted + info.sharesRejected;
     if (totalShares <= 0) {
