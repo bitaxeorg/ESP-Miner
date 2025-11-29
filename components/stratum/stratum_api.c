@@ -395,9 +395,10 @@ int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, con
         "{\"id\":%d,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%08lx\",\"%08lx\",\"%08lx\"]}\n",
         send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);    
     
-    int result = (len > 0) ? write(socket, submit_buf, len) : -1;
-    
     *result_submit_time_us = esp_timer_get_time();
+
+    int result = (len > 0) ? write(socket, submit_buf, len) : -1;
+
     debug_stratum_tx(submit_buf, send_uid);
         
     return result;
