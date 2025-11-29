@@ -252,11 +252,11 @@ void BM1368_send_work(void * pvParameters, bm_job * next_bm_job)
     _send_BM1368((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1368_job), BM1368_DEBUG_WORK);
 }
 
-bool BM1368_process_work(void * pvParameters, task_result * result, int64_t *result_receive_time_us)
+bool BM1368_process_work(void * pvParameters, task_result * result)
 {
     bm1368_asic_result_t asic_result = {0};
 
-    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), result_receive_time_us) == ESP_FAIL) {
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result->receive_time_us) == ESP_FAIL) {
         return false;
     }
 

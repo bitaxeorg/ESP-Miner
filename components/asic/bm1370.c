@@ -329,14 +329,14 @@ void BM1370_send_work(void * pvParameters, bm_job * next_bm_job)
     _send_BM1370((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1370_job), BM1370_DEBUG_WORK);
 }
 
-bool BM1370_process_work(void * pvParameters, task_result * result, int64_t *result_receive_time_us)
+bool BM1370_process_work(void * pvParameters, task_result * result)
 {
     bm1370_asic_result_t asic_result = {0};
 
-    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), result_receive_time_us) == ESP_FAIL) {
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result->receive_time_us) == ESP_FAIL) {
         return false;
     }
-    
+
     if (!asic_result.is_job_response) {
         result->register_type = REGISTER_MAP[asic_result.cmd.register_address];
         if (result->register_type == REGISTER_INVALID) {

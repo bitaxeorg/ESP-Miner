@@ -18,8 +18,6 @@ void ASIC_result_task(void *pvParameters)
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
     task_result result;
-    int64_t result_receive_time_us;
-    int64_t result_submit_time_us;
 
     while (1)
     {
@@ -31,7 +29,7 @@ void ASIC_result_task(void *pvParameters)
 
         memset(&result, 0, sizeof(result));
         
-        if (!ASIC_process_work(GLOBAL_STATE, &result, &result_receive_time_us)) {
+        if (!ASIC_process_work(GLOBAL_STATE, &result)) {
             continue;
         }
 
@@ -55,6 +53,11 @@ void ASIC_result_task(void *pvParameters)
 
         // Only submit shares that meet or exceed the pool difficulty
         if (nonce_diff >= active_job->pool_diff) {
+            // Store share ID for response latency tracking
+            GLOBAL_STATE->SYSTEM_MODULE.last_share_submit_id = GLOBAL_STATE->send_uid;
+            
+            int64_t result_submit_time_us;
+
             int ret = STRATUM_V1_submit_share(
                 GLOBAL_STATE->sock,
                 GLOBAL_STATE->send_uid++,
@@ -66,7 +69,14 @@ void ASIC_result_task(void *pvParameters)
                 result.rolled_version ^ active_job->version,
                 &result_submit_time_us);
 
-            ESP_LOGI(TAG, "Share submit latency: %" PRId64 " µs", result_submit_time_us - result_receive_time_us);
+            // Store submit time in global state for response latency tracking
+            GLOBAL_STATE->SYSTEM_MODULE.last_share_submit_time_us = result_submit_time_us;
+
+            // Calculate and store submit latency using the same timestamps
+            uint32_t share_submit_latency_us = result_submit_time_us - result.receive_time_us;
+            GLOBAL_STATE->SYSTEM_MODULE.share_submit_latency_us = share_submit_latency_us;
+
+            ESP_LOGI(TAG, "Share submit latency: %u µs", share_submit_latency_us);
             if (ret < 0) {
                 ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
                 stratum_close_connection(GLOBAL_STATE);

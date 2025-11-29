@@ -415,9 +415,7 @@ bool self_test(void * pvParameters)
 
         memset(&result, 0, sizeof(result));
 
-        int64_t result_receive_time_us;
-
-        if (ASIC_process_work(GLOBAL_STATE, &result, &result_receive_time_us)) {
+        if (ASIC_process_work(GLOBAL_STATE, &result)) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, result.nonce, result.rolled_version);
             counter += DIFFICULTY;

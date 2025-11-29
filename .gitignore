@@ -35,3 +35,4 @@ managed_components/*
 Thumbs.db
 debug.log
 .cache
+.vscode/settings.json

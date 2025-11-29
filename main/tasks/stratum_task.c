@@ -461,24 +461,20 @@ void stratum_task(void * pvParameters)
         int authorize_message_id = GLOBAL_STATE->send_uid++;
         //mining.authorize - ID: 3
         STRATUM_V1_authorize(GLOBAL_STATE->sock, authorize_message_id, username, password);
-        STRATUM_V1_stamp_tx(authorize_message_id);
 
         // Everything is set up, lets make sure we don't abandon work unnecessarily.
         GLOBAL_STATE->abandon_work = 0;
 
         while (1) {
             char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->sock);
+
+            stratum_api_v1_message.receive_time_us = esp_timer_get_time();
+
             if (!line) {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
                 retry_attempts++;
                 stratum_close_connection(GLOBAL_STATE);
                 break;
-            }
-
-            double response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id);
-            if (response_time_ms >= 0) {
-                ESP_LOGI(TAG, "Stratum response time: %.2f ms", response_time_ms);
-                GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
             }
 
             STRATUM_V1_parse(&stratum_api_v1_message, line);
@@ -524,6 +520,19 @@ void stratum_task(void * pvParameters)
                 stratum_close_connection(GLOBAL_STATE);
                 break;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
+                int last_share_id = GLOBAL_STATE->SYSTEM_MODULE.last_share_submit_id;
+                int64_t last_share_time_us = GLOBAL_STATE->SYSTEM_MODULE.last_share_submit_time_us;
+                
+                if (stratum_api_v1_message.message_id == last_share_id &&
+                    last_share_id == GLOBAL_STATE->SYSTEM_MODULE.last_share_submit_id &&
+                    last_share_time_us > 0) {
+
+                    uint32_t share_response_latency_us = stratum_api_v1_message.receive_time_us - last_share_time_us;
+                    GLOBAL_STATE->SYSTEM_MODULE.share_response_latency_us = share_response_latency_us;
+
+                    ESP_LOGI(TAG, "Stratum response time: %u µs (%.2f ms)", share_response_latency_us, share_response_latency_us / 1000.0);
+                }
+
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "message result accepted");
                     SYSTEM_notify_accepted_share(GLOBAL_STATE);

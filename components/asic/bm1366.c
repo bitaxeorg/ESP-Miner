@@ -309,11 +309,11 @@ void BM1366_send_work(void * pvParameters, bm_job * next_bm_job)
     _send_BM1366((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1366_job), BM1366_DEBUG_WORK);
 }
 
-bool BM1366_process_work(void * pvParameters, task_result * result, int64_t *result_receive_time_us)
+bool BM1366_process_work(void * pvParameters, task_result * result)
 {
     bm1366_asic_result_t asic_result = {0};
 
-    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), result_receive_time_us) == ESP_FAIL) {
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result->receive_time_us) == ESP_FAIL) {
         return false;
     }
 

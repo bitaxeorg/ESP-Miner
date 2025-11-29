@@ -27,6 +27,8 @@ typedef struct
     register_type_t register_type;
     uint8_t asic_nr;
     uint32_t value;
+    // ----
+    int64_t receive_time_us;
 } task_result;
 
 

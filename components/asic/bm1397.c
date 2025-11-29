@@ -293,11 +293,11 @@ void BM1397_send_work(void *pvParameters, bm_job *next_bm_job)
     _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job_packet), BM1397_DEBUG_WORK);
 }
 
-bool BM1397_process_work(void *pvParameters, task_result * result, int64_t *result_receive_time_us)
+bool BM1397_process_work(void *pvParameters, task_result * result)
 {
     bm1397_asic_result_t asic_result;
 
-    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), result_receive_time_us) == ESP_FAIL) {
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result->receive_time_us) == ESP_FAIL) {
         return false;
     }
 

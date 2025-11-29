@@ -63,6 +63,7 @@ typedef struct
     // result
     bool response_success;
     char * error_str;
+    int64_t receive_time_us;
 } StratumApiV1Message;
 
 typedef struct {
@@ -79,8 +80,6 @@ int STRATUM_V1_subscribe(int socket, int send_uid, const char * model);
 
 void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
 
-void STRATUM_V1_stamp_tx(int request_id);
-
 void STRATUM_V1_free_mining_notify(mining_notify *params);
 
 int STRATUM_V1_authorize(int socket, int send_uid, const char *username, const char *pass);
@@ -95,7 +94,5 @@ int STRATUM_V1_submit_share(int socket, int send_uid, const char *username, cons
                             const char *extranonce_2, const uint32_t ntime, const uint32_t nonce,
                             const uint32_t version_bits,
                             int64_t * result_submit_time_us);
-
-double STRATUM_V1_get_response_time_ms(int request_id);
 
 #endif // STRATUM_API_H
