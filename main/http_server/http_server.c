@@ -53,6 +53,9 @@ static const char * CORS_TAG = "CORS";
 static char axeOSVersion[32];
 
 static const char * STATS_LABEL_HASHRATE = "hashrate";
+static const char * STATS_LABEL_HASHRATE_1m = "hashrate_1m";
+static const char * STATS_LABEL_HASHRATE_10m = "hashrate_10m";
+static const char * STATS_LABEL_HASHRATE_1h = "hashrate_1h";
 static const char * STATS_LABEL_ERROR_PERCENTAGE = "errorPercentage";
 static const char * STATS_LABEL_ASIC_TEMP = "asicTemp";
 static const char * STATS_LABEL_VR_TEMP = "vrTemp";
@@ -76,6 +79,9 @@ static int api_common_prebuffer_len = 256;
 typedef enum
 {
     SRC_HASHRATE,
+    SRC_HASHRATE_1m,
+    SRC_HASHRATE_10m,
+    SRC_HASHRATE_1h,
     SRC_ERROR_PERCENTAGE,
     SRC_ASIC_TEMP,
     SRC_VR_TEMP,
@@ -95,6 +101,9 @@ DataSource strToDataSource(const char * sourceStr)
 {
     if (NULL != sourceStr) {
         if (strcmp(sourceStr, STATS_LABEL_HASHRATE) == 0)     return SRC_HASHRATE;
+        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_1m) == 0)  return SRC_HASHRATE_1m;
+        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_10m) == 0) return SRC_HASHRATE_10m;
+        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_1h) == 0)  return SRC_HASHRATE_1h;
         if (strcmp(sourceStr, STATS_LABEL_ERROR_PERCENTAGE) == 0)  return SRC_ERROR_PERCENTAGE;
         if (strcmp(sourceStr, STATS_LABEL_VOLTAGE) == 0)      return SRC_VOLTAGE;
         if (strcmp(sourceStr, STATS_LABEL_POWER) == 0)        return SRC_POWER;
@@ -814,6 +823,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "maxPower", GLOBAL_STATE->DEVICE_CONFIG.family.max_power);
     cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage);
     cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
+    cJSON_AddNumberToObject(root, "hashRate_1m", GLOBAL_STATE->SYSTEM_MODULE.hashrate_1m);
+    cJSON_AddNumberToObject(root, "hashRate_10m", GLOBAL_STATE->SYSTEM_MODULE.hashrate_10m);
+    cJSON_AddNumberToObject(root, "hashRate_1h", GLOBAL_STATE->SYSTEM_MODULE.hashrate_1h);
     cJSON_AddNumberToObject(root, "expectedHashrate", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
     cJSON_AddNumberToObject(root, "errorPercentage", GLOBAL_STATE->SYSTEM_MODULE.error_percentage);
     cJSON_AddNumberToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_nonce_diff);
@@ -920,14 +932,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
             cJSON_AddNumberToObject(asic, "total", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[asic_nr].hashrate);
 
             int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
-            if (hash_domains > 0) {
-                cJSON* hash_domain_array = cJSON_CreateArray();
-                for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
-                    cJSON *hashrate = cJSON_CreateNumber(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[asic_nr][domain_nr].hashrate);
-                    cJSON_AddItemToArray(hash_domain_array, hashrate);
-                }
-                cJSON_AddItemToObject(asic, "domains", hash_domain_array);
+            cJSON* hash_domain_array = cJSON_CreateArray();
+            for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
+                cJSON *hashrate = cJSON_CreateNumber(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[asic_nr][domain_nr].hashrate);
+                cJSON_AddItemToArray(hash_domain_array, hashrate);
             }
+            cJSON_AddItemToObject(asic, "domains", hash_domain_array);
 
             cJSON_AddNumberToObject(asic, "errorCount", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_measurement[asic_nr].value);
         }
@@ -998,6 +1008,9 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
 
     cJSON * labelArray = cJSON_CreateArray();
     if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE)); }
+    if (dataSelection[SRC_HASHRATE_1m]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_1m)); }
+    if (dataSelection[SRC_HASHRATE_10m]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_10m)); }
+    if (dataSelection[SRC_HASHRATE_1h]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_1h)); }
     if (dataSelection[SRC_ERROR_PERCENTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ERROR_PERCENTAGE)); }
     if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_TEMP)); }
     if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VR_TEMP)); }
@@ -1021,6 +1034,9 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     while (getStatisticData(index++, &statsData)) {
         cJSON * valueArray = cJSON_CreateArray();
         if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate)); }
+        if (dataSelection[SRC_HASHRATE_1m]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate_1m)); }
+        if (dataSelection[SRC_HASHRATE_10m]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate_10m)); }
+        if (dataSelection[SRC_HASHRATE_1h]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate_1h)); }
         if (dataSelection[SRC_ERROR_PERCENTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.errorPercentage)); }
         if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature)); }
         if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature)); }

@@ -194,7 +194,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
     forkJoin({
       info: this.httpClient.get<any>(`http://${IP}/api/system/info`),
       asic: this.httpClient.get<any>(`http://${IP}/api/system/asic`).pipe(catchError(() => of({})))
-    }).subscribe(({ info, asic }) => {
+    }).pipe(
+      timeout(5000),
+      catchError(error => this.refreshErrorHandler(error, IP))
+    ).subscribe(({ info, asic }) => {
       if (!info.ASICModel || !asic.ASICModel) {
         return;
       }
