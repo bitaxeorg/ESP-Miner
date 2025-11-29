@@ -361,15 +361,20 @@ bool self_test(void * pvParameters)
     notify_message.target = 0x1705ae3a;
     notify_message.ntime = 0x647025b5;
 
-    const char * coinbase_tx = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfab"
-                               "e6d6d5cbab26a2599e92916edec"
-                               "5657a94a0708ddb970f5c45b5d12905085617eff8e010000000000000031650707758de07b010000000000001cfd703"
-                               "8212f736c7573682f0000000003"
-                               "79ad0c2a000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c29525"
-                               "34b424c4f434b3ae725d3994b81"
-                               "1572c1f345deb98b56b465ef8e153ecbbd27fa37bf1b005161380000000000000000266a24aa21a9ed63b06a7946b19"
-                               "0a3fda1d76165b25c9b883bcc66"
-                               "21b040773050ee2a1bb18f1800000000";
+    char extranonce_2_str[17];
+    extranonce_2_generate(1, 8, extranonce_2_str);
+
+    uint8_t coinbase_tx_hash[32];
+    calculate_coinbase_tx_hash("01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfab" 
+                               "e6d6d5cbab26a2599e92916edec5657a94a0708ddb970f5c45b5d",
+                               "31650707758de07b010000000000001cfd7038212f736c7573682f000000000379ad0c2a000000001976a9147c154ed"
+                               "1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3ae725d3994b811572"
+                               "c1f345deb98b56b465ef8e153ecbbd27fa37bf1b005161380000000000000000266a24aa21a9ed63b06a7946b190a3f"
+                               "da1d76165b25c9b883bcc6621b040773050ee2a1bb18f1800000000",
+                               "12905085617eff8e",
+                               extranonce_2_str,
+                               coinbase_tx_hash);
+
     uint8_t merkles[13][32];
     int num_merkles = 13;
 
@@ -387,11 +392,11 @@ bool self_test(void * pvParameters)
     hex2bin("c4f5ab01913fc186d550c1a28f3f3e9ffaca2016b961a6a751f8cca0089df924", merkles[11], 32);
     hex2bin("cff737e1d00176dd6bbfa73071adbb370f227cfb5fba186562e4060fcec877e1", merkles[12], 32);
 
-    char merkle_root[65];
-    
-    calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles, merkle_root);
+    uint8_t merkle_root[32];
+    calculate_merkle_root_hash(coinbase_tx_hash, merkles, num_merkles, merkle_root);
 
-    bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
+    bm_job job = {0};
+    construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000, &job);
 
     ESP_LOGI(TAG, "Sending work");
 

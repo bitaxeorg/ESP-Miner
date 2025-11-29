@@ -1,3 +1,3 @@
 idf_component_register(SRC_DIRS "."
                        INCLUDE_DIRS "."
-                       REQUIRES cmock stratum bm1397)
+                       REQUIRES cmock stratum asic)

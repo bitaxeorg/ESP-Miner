@@ -71,6 +71,12 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolLabel!: PoolLabel;
   public responseTime!: number;
 
+  public hashrateAverages: { label: string, key: 'hashRate_1m' | 'hashRate_10m' | 'hashRate_1h' }[] = [
+    { label: '1m', key: 'hashRate_1m' },
+    { label: '10m', key: 'hashRate_10m' },
+    { label: '1h', key: 'hashRate_1h' }
+  ];
+
   @ViewChild('chart')
   private chart?: UIChart
 
@@ -315,7 +321,6 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
 
         stats.statistics.forEach(element => {
-          element[idxHashrate] = this.normalizeHashrate(element[idxHashrate]);
           switch (chartLabelValue(chartY1DataLabel)) {
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
@@ -355,6 +360,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
   }
 
+  private isHashrateAxis(label: eChartLabel | undefined) {
+    return label == eChartLabel.hashrate || label == eChartLabel.hashrate_1m || label == eChartLabel.hashrate_10m || label == eChartLabel.hashrate_1h;
+  }
+
   private startGetLiveData()
   {
      // live data
@@ -364,8 +373,6 @@ export class HomeComponent implements OnInit, OnDestroy {
         return this.systemService.getInfo()
       }),
       map(info => {
-        info.hashRate = this.normalizeHashrate(info.hashRate);
-        info.expectedHashrate = this.normalizeHashrate(info.expectedHashrate);
         info.voltage = info.voltage / 1000;
         info.current = info.current / 1000;
         info.coreVoltageActual = info.coreVoltageActual / 1000;
@@ -398,8 +405,16 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.chartData.datasets[0].hidden = (chartY1DataLabel === eChartLabel.none);
           this.chartData.datasets[1].hidden = (chartY2DataLabel === eChartLabel.none);
 
-          this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartY1DataLabel, info);
-          this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartY2DataLabel, info);
+          // Align both axis if they're hashrates. TODO: for others, such as temperatures as well
+          if (this.isHashrateAxis(chartY1DataLabel) && this.isHashrateAxis(chartY2DataLabel)) {
+            this.chartOptions.scales.y.suggestedMin = this.chartOptions.scales.y2.suggestedMin = Math.min(...this.chartY1Data, ...this.chartY2Data);
+            this.chartOptions.scales.y.suggestedMax = this.chartOptions.scales.y2.suggestedMax = Math.max(...this.chartY1Data, ...this.chartY2Data);
+          } else {
+            this.chartOptions.scales.y.suggestedMin = undefined;
+            this.chartOptions.scales.y2.suggestedMin = undefined;
+            this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartY1DataLabel, info);
+            this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartY2DataLabel, info);
+          }
 
           this.chartOptions.scales.y.display = (chartY1DataLabel != eChartLabel.none);
           this.chartOptions.scales.y2.display = (chartY2DataLabel != eChartLabel.none);
@@ -556,7 +571,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       if (hashrate > 0) {
-        return power / (hashrate / 1_000_000_000_000); // Convert to J/Th
+        return power / (hashrate / 1_000); // Convert to J/Th
       } else {
         return power; // in this case better than infinity or NaN
       }
@@ -592,7 +607,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (info.power_fault || hashrate <= 0) {
       return 0;
     }
-    return info.power / (hashrate / 1_000_000_000_000);
+    return info.power / (hashrate / 1_000);
   }
 
   public getHashrateAverage(): number {
@@ -620,7 +635,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   public getDomainErrorPercentage(info: ISystemInfo, asic: { error: number }): number {
-    return asic.error ? (this.normalizeHashrate(asic.error) * 100 / info.expectedHashrate) : 0;
+    return asic.error ? (asic.error * 100 / info.expectedHashrate) : 0;
   }
 
   public getDomainErrorColor(info: ISystemInfo, asic: { error: number }): string {
@@ -657,10 +672,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     return `rgb(${finalR}, ${finalG}, ${finalB})`;
   }
 
-  public normalizeHashrate(hashrate: number): number {
-    return hashrate * 1_000_000_000;
-  }
-
   public clearDataPoints() {
     this.dataLabel.length = 0;
     this.hashrateData.length = 0;
@@ -681,7 +692,11 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public getSuggestedMaxForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
-      case eChartLabel.hashrate:         return info.expectedHashrate;
+      case eChartLabel.hashrate:
+      case eChartLabel.hashrate_1m:
+      case eChartLabel.hashrate_10m:
+      case eChartLabel.hashrate_1h:      return info.expectedHashrate;
+      case eChartLabel.errorPercentage:  return 1;
       case eChartLabel.asicTemp:         return this.maxTemp;
       case eChartLabel.vrTemp:           return this.maxTemp + 25;
       case eChartLabel.asicVoltage:      return info.coreVoltage;
@@ -698,6 +713,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   static getDataForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
       case eChartLabel.hashrate:           return info.hashRate;
+      case eChartLabel.hashrate_1m:        return info.hashRate_1m;
+      case eChartLabel.hashrate_10m:       return info.hashRate_10m;
+      case eChartLabel.hashrate_1h:        return info.hashRate_1h;
       case eChartLabel.errorPercentage:    return info.errorPercentage;
       case eChartLabel.asicTemp:           return info.temp;
       case eChartLabel.vrTemp:             return info.vrTemp;
@@ -734,6 +752,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   static cbFormatValue(value: number, datasetLabel: eChartLabel, args?: any): string {
     switch (datasetLabel) {
       case eChartLabel.hashrate:
+      case eChartLabel.hashrate_1m:
+      case eChartLabel.hashrate_10m:
+      case eChartLabel.hashrate_1h:
         return HashSuffixPipe.transform(value, args);
       case eChartLabel.freeHeap:
         return ByteSuffixPipe.transform(value, args);

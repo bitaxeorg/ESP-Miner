@@ -309,8 +309,8 @@ void BM1370_send_work(void * pvParameters, bm_job * next_bm_job)
     memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
     memcpy(&job.nbits, &next_bm_job->target, 4);
     memcpy(&job.ntime, &next_bm_job->ntime, 4);
-    memcpy(job.merkle_root, next_bm_job->merkle_root_be, 32);
-    memcpy(job.prev_block_hash, next_bm_job->prev_block_hash_be, 32);
+    memcpy(job.merkle_root, next_bm_job->merkle_root, 32);
+    memcpy(job.prev_block_hash, next_bm_job->prev_block_hash, 32);
     memcpy(&job.version, &next_bm_job->version, 4);
 
     if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
@@ -383,7 +383,7 @@ void BM1370_read_registers(void)
     int size = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
     for (int reg = 0; reg < size; reg++) {
         if (REGISTER_MAP[reg] != REGISTER_INVALID) {
-            _send_BM1370((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1370_SERIALTX_DEBUG);
+            _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1370_SERIALTX_DEBUG);
             vTaskDelay(1 / portTICK_PERIOD_MS);
         }
     }
