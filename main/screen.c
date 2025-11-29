@@ -492,14 +492,14 @@ static void screen_update_cb(lv_timer_t * timer)
     }
 
     bool is_wifi_status_changed = strcmp(module->wifi_status, lv_label_get_text(connection_wifi_status_label)) != 0;
-    if (module->ap_enabled || is_wifi_status_changed) {
-        if (is_wifi_status_changed) {
-            lv_label_set_text(connection_wifi_status_label, module->wifi_status);
-        }
-
+    if (is_wifi_status_changed) {
+        lv_label_set_text(connection_wifi_status_label, module->wifi_status);
         screen_show(SCR_CONNECTION);
+        return;
+    }
 
-        delays_ms[SCR_CONNECTION] = 0; // Remove delay so whenever the user disables the AP with long press, it goes straight back to carousel
+    if (module->ap_enabled || !module->is_connected) {
+        screen_show(SCR_CONNECTION);
         return;
     }
 
