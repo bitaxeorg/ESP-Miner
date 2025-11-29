@@ -630,7 +630,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (!info.networkDifficulty || info.networkDifficulty === 0) return '0';
     const percentage = (info.bestDiff / info.networkDifficulty) * 100;
     // Show 2 significant digits
-    return percentage.toPrecision(2);
+    return percentage < 10 ? percentage.toPrecision(2) : percentage.toFixed(1);
   }
 
   public getShareRejectionPercentage(sharesRejectedReason: { count: number }, info: ISystemInfo): number {
