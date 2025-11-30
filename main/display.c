@@ -259,6 +259,22 @@ esp_err_t display_on(bool display_on)
     return ESP_OK;
 }
 
+esp_err_t display_set_invert(bool invert)
+{
+    if (NULL != panel_handle) {
+        esp_err_t err = esp_lcd_panel_invert_color(panel_handle, invert);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Panel invert failed: %s", esp_err_to_name(err));
+            // Non-fatal: continue execution even if inversion fails
+        }
+    }
+
+    // Trigger display activity to keep screen active and ensure updates
+    lv_display_trigger_activity(NULL);
+
+    return ESP_OK;
+}
+
 const DisplayConfig * get_display_config(const char * name)
 {
     for (int i = 0 ; i < ARRAY_SIZE(display_configs); i++) {

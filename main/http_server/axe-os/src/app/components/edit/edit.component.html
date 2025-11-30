@@ -139,10 +139,22 @@
         </div>
 
         <div class="field-checkbox grid mt-2 mb-0">
-            <div class="col-1 md:col-10 md:flex-order-2">
-                <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen" [binary]="true"></p-checkbox>
+            <div class="col-12 md:col-6">
+                <div class="grid">
+                    <div class="col-2 md:col-2">
+                        <p-checkbox name="alertenable" formControlName="alertenable" inputId="alertenable" [binary]="true"></p-checkbox>
+                    </div>
+                    <label for="alertenable" class="col-10 m-0 pl-0 md:col-10 md:p-2">Alerts: Wake & Flash</label>
+                </div>
             </div>
-            <label for="invertscreen" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Invert Display Colors</label>
+            <div class="col-12 md:col-6">
+                <div class="grid">
+                    <div class="col-2 md:col-2">
+                        <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen" [binary]="true"></p-checkbox>
+                    </div>
+                    <label for="invertscreen" class="col-10 m-0 pl-0 md:col-10 md:p-2">Invert Display Colors</label>
+                </div>
+            </div>
         </div>
     </div>
 

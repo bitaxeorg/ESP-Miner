@@ -51,6 +51,7 @@ typedef struct
     bool ap_enabled;
     bool is_connected;
     int identify_mode_time_ms;
+    bool alert_mode_active;
     char * pool_url;
     char * fallback_pool_url;
     uint16_t pool_port;

@@ -156,6 +156,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           display: [info.display, [Validators.required]],
           rotation: [info.rotation, [Validators.required]],
           invertscreen: [info.invertscreen == 1],
+          alertenable: [info.alertenable == 1],
           displayTimeout: [info.displayTimeout, [
             Validators.required,
             Validators.min(-1),
