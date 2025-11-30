@@ -17,6 +17,7 @@ export interface ISystemInfo {
     display: string;
     rotation: number;
     invertscreen: number;
+    alertenable: number;
     displayTimeout: number;
     power: number,
     voltage: number,

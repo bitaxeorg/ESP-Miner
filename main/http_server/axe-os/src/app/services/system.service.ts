@@ -89,6 +89,7 @@ export class SystemService {
         display: "SSD1306 (128x32)",
         rotation: 0,
         invertscreen: 0,
+        alertenable: 0,
         displayTimeout: -1,
         autofanspeed: 1,
         minFanSpeed: 25,

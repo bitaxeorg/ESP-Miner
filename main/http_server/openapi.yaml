@@ -136,6 +136,7 @@ components:
         - hostname
         - idfVersion
         - invertscreen
+        - alertenable
         - isPSRAMAvailable
         - isUsingFallbackStratum
         - macAddr
@@ -268,6 +269,9 @@ components:
         invertscreen:
           type: number
           description: Screen invert setting (0=normal, 1=inverted)
+        alertenable:
+          type: number
+          description: Screen alert enable setting (0=disabled, 1=enabled)
         isPSRAMAvailable:
           type: number
           description: Whether PSRAM is available (0=no, 1=yes)
@@ -508,6 +512,12 @@ components:
           enum: [0, 1]
           examples:
             - 0
+        alertenable:
+          type: integer
+          description: Whether to enable screen alerts (wake & flash) for critical events (0=disabled, 1=enabled)
+          enum: [0, 1]
+          examples:
+            - 1
         autofanspeed:
           type: integer
           description: Whether to enable automatic fan speed control (0=manual, 1=auto)

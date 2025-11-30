@@ -105,6 +105,7 @@ static int8_t current_rssi_value;
 static int current_block_height;
 
 static bool self_test_finished;
+static bool alert_invert_state = false;
 
 static screen_t get_current_screen() {
     lv_obj_t * active_screen = lv_screen_active();
@@ -112,6 +113,25 @@ static screen_t get_current_screen() {
         if (screens[scr] == active_screen) return scr;
     }
     return -1;
+}
+
+static void alert_mode_start() {
+    //Don't set alert mode if the option is not enabled!
+    if (nvs_config_get_bool(NVS_CONFIG_ALERT_ENABLE)) {
+        GLOBAL_STATE->SYSTEM_MODULE.alert_mode_active = true;
+    }
+}
+
+static void alert_mode_end() {
+
+    //Reset this even if the setting was disabled!
+    if (GLOBAL_STATE->SYSTEM_MODULE.alert_mode_active) {
+        GLOBAL_STATE->SYSTEM_MODULE.alert_mode_active = false;
+        alert_invert_state = false;
+        // Restore user's original inversion setting
+        bool user_invert_setting = nvs_config_get_bool(NVS_CONFIG_INVERT_SCREEN);
+        display_set_invert(user_invert_setting);
+    }
 }
 
 static lv_obj_t * create_flex_screen(int expected_lines) {
@@ -411,9 +431,23 @@ void screen_next()
 
 static void screen_update_cb(lv_timer_t * timer)
 {
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    bool is_identify_mode = module->identify_mode_time_ms > 0;
+
+    // Handle alert mode inversion toggle every 500ms
+    if (module->alert_mode_active && nvs_config_get_bool(NVS_CONFIG_ALERT_ENABLE)) {
+        alert_invert_state = !alert_invert_state;
+        bool user_invert_setting = nvs_config_get_bool(NVS_CONFIG_INVERT_SCREEN);
+        // Toggle between user's setting and inverted setting
+        display_set_invert(alert_invert_state ? !user_invert_setting : user_invert_setting);
+    }
+
     int32_t display_timeout_config = nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT);
 
-    if (0 > display_timeout_config) {
+    if ((module->alert_mode_active && nvs_config_get_bool(NVS_CONFIG_ALERT_ENABLE)) || is_identify_mode) {
+        // Alert mode or identify mode always forces display on
+        display_on(true);
+    } else if (0 > display_timeout_config) {
         // display always on
         display_on(true);
     } else if (0 == display_timeout_config) {
@@ -432,26 +466,23 @@ static void screen_update_cb(lv_timer_t * timer)
 
     if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
         SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
-        
+
         lv_label_set_text(self_test_message_label, self_test->message);
-        
+
         if (self_test->is_finished && !self_test_finished) {
             self_test_finished = true;
             lv_label_set_text(self_test_result_label, self_test->result);
             lv_label_set_text(self_test_finished_label, self_test->finished);
         }
-        
+
         screen_show(SCR_SELF_TEST);
         return;
     }
-
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     if (module->identify_mode_time_ms > 0) {
         module->identify_mode_time_ms -= SCREEN_UPDATE_MS;
     }
 
-    bool is_identify_mode = module->identify_mode_time_ms > 0;
     if (is_identify_mode == lv_obj_has_flag(identify_image, LV_OBJ_FLAG_HIDDEN)) {
         lv_obj_set_flag(identify_image, LV_OBJ_FLAG_HIDDEN, !is_identify_mode);
         lv_obj_set_style_bg_opa(lv_layer_top(), is_identify_mode ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_MAIN);
@@ -474,6 +505,10 @@ static void screen_update_cb(lv_timer_t * timer)
         lv_label_set_text(asic_status_label, module->asic_status);
 
         screen_show(SCR_ASIC_STATUS);
+
+        // Activate alert mode for ASIC errors
+        alert_mode_start();
+
         return;
     }
 
@@ -483,6 +518,10 @@ static void screen_update_cb(lv_timer_t * timer)
         }
 
         screen_show(SCR_OVERHEAT);
+
+        // Activate alert mode for overheat
+        alert_mode_start();
+
         return;
     }
 
@@ -617,6 +656,10 @@ static void screen_update_cb(lv_timer_t * timer)
         }
 
         lv_display_trigger_activity(NULL);
+
+        // Activate alert mode on block found
+        alert_mode_start();
+
         return;
     }
 
@@ -627,13 +670,20 @@ static void screen_update_cb(lv_timer_t * timer)
     screen_next();
 }
 
-void screen_button_press() 
+void screen_button_press()
 {
-    if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
+    if (GLOBAL_STATE->SYSTEM_MODULE.alert_mode_active) {
+        alert_mode_end();
+    } else if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
     } else {
         screen_next();
     }
+}
+
+void screen_trigger_alert(void)
+{
+    alert_mode_start();
 }
 
 static void uptime_update_cb(lv_timer_t * timer)
@@ -673,6 +723,9 @@ esp_err_t screen_start(void * pvParameters)
 
         GLOBAL_STATE = (GlobalState *) pvParameters;
         SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;
+
+        // Initialize alert state
+        SYSTEM_MODULE->alert_mode_active = false;
 
         if (SYSTEM_MODULE->is_screen_active) {
 

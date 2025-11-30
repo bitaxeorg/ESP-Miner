@@ -895,6 +895,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "display", display);
     cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION));
     cJSON_AddNumberToObject(root, "invertscreen", nvs_config_get_bool(NVS_CONFIG_INVERT_SCREEN));
+    cJSON_AddNumberToObject(root, "alertenable", nvs_config_get_bool(NVS_CONFIG_ALERT_ENABLE));
     cJSON_AddNumberToObject(root, "displayTimeout", nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT));
 
     cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED));
@@ -1323,9 +1324,9 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_register_uri_handler(server, &system_restart_uri);
 
     httpd_uri_t system_restart_options_uri = {
-        .uri = "/api/system/restart", 
-        .method = HTTP_OPTIONS, 
-        .handler = handle_options_request, 
+        .uri = "/api/system/restart",
+        .method = HTTP_OPTIONS,
+        .handler = handle_options_request,
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &system_restart_options_uri);
