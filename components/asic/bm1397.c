@@ -77,7 +77,6 @@ typedef struct __attribute__((__packed__))
 static const char * TAG = "bm1397";
 
 static uint32_t prev_nonce = 0;
-static task_result result;
 
 static int address_interval;
 
@@ -294,26 +293,25 @@ void BM1397_send_work(void *pvParameters, bm_job *next_bm_job)
     _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job_packet), BM1397_DEBUG_WORK);
 }
 
-task_result *BM1397_process_work(void *pvParameters)
+bool BM1397_process_work(void *pvParameters, task_result * result)
 {
-    bm1397_asic_result_t asic_result = {0};
+    bm1397_asic_result_t asic_result;
 
-    memset(&result, 0, sizeof(task_result));
-
-    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
-        return NULL;
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result->receive_time_us) == ESP_FAIL) {
+        return false;
     }
 
     if (!asic_result.is_job_response) {
-        result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
-        if (result.register_type == REGISTER_INVALID) {
+        result->register_type = REGISTER_MAP[asic_result.cmd.register_address];
+        if (result->register_type == REGISTER_INVALID) {
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
-            return NULL;
+            return false;
         }
-        result.asic_nr = asic_result.cmd.asic_address / address_interval;
-        result.value = ntohl(asic_result.cmd.value);
 
-        return &result;
+        result->asic_nr = asic_result.cmd.asic_address / address_interval;
+        result->value = ntohl(asic_result.cmd.value);
+
+        return true;
     }
 
     uint8_t nonce_found = 0;
@@ -326,7 +324,7 @@ task_result *BM1397_process_work(void *pvParameters)
     if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0)
     {
         ESP_LOGW(TAG, "Invalid job nonce found, id=%d", rx_job_id);
-        return NULL;
+        return false;
     }
 
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->version;
@@ -346,12 +344,12 @@ task_result *BM1397_process_work(void *pvParameters)
     else if (asic_result.job.nonce == first_nonce)
     {
         // stop if we've already seen this nonce
-        return NULL;
+        return false;
     }
 
     if (asic_result.job.nonce == prev_nonce)
     {
-        return NULL;
+        return false;
     }
     else
     {
@@ -361,17 +359,17 @@ task_result *BM1397_process_work(void *pvParameters)
     uint32_t nonce_h = ntohl(asic_result.job.nonce);
     uint8_t asic_nr = (uint8_t)((nonce_h >> 17) & 0xff) / address_interval;
 
-    result.job_id = rx_job_id;
-    result.nonce = asic_result.job.nonce;
-    result.rolled_version = rolled_version;
-    result.asic_nr = asic_nr;
+    result->job_id = rx_job_id;
+    result->nonce = asic_result.job.nonce;
+    result->rolled_version = rolled_version;
+    result->asic_nr = asic_nr;
 
     uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
     uint8_t small_core_id = asic_result.job.id & 0x0f;
 
     ESP_LOGI(TAG, "Job ID: %02X, Asic nr: %d, Core: %d/%d, Ver: %08" PRIX32, rx_job_id, asic_nr, core_id, small_core_id, rolled_version);    
 
-    return &result;
+    return true;
 }
 
 void BM1397_read_registers(void)

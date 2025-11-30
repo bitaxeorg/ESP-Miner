@@ -94,7 +94,7 @@ TEST_CASE("Validate bm job construction", "[mining]")
     uint8_t merkle_root[32];
     hex2bin("cd1be82132ef0d12053dcece1fa0247fcfdb61d4dbd3eb32ea9ef9b4c604a846", merkle_root, 32);
     bm_job job = { 0 };
-    construct_bm_job(&notify_message, merkle_root, 0, 1000, &job);
+    construct_bm_job(&notify_message, merkle_root, 0, 1000, "user", &job);
 
     uint8_t expected_midstate_bin[32];
     hex2bin("91DFEA528A9F73683D0D495DD6DD7415E1CA21CB411759E3E05D7D5FF285314D", expected_midstate_bin, 32);
@@ -132,7 +132,7 @@ TEST_CASE("Validate version mask incrementing", "[mining]")
 //     char merkle_root[65]
 //     calculate_merkle_root_hash(coinbase_tx, (uint8_t(*)[32])params->merkle_branches, params->n_merkle_branches, merkle_root);
 //     bm_job job = { 0 };
-//     construct_bm_job(params, merkle_root, 1000, &job);
+//     construct_bm_job(params, merkle_root, 1000, "user", &job);
 
 //     uint8_t expected_midstate_bin[32];
 //     hex2bin("5FD281AF6A1750EAEE502C04067738BD46C82FC22112FFE797CE7F035D276126", expected_midstate_bin, 32);
@@ -180,7 +180,7 @@ TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
     uint8_t merkle_root[32];
     hex2bin("6d0359c451434605c52a5a9ce074340be47c2c63840731f9edf1db3f26b1cdd9a9f16f64", merkle_root, 32);
     bm_job job = { 0 };
-    construct_bm_job(&notify_message, merkle_root, 0, 1000, &job);
+    construct_bm_job(&notify_message, merkle_root, 0, 1000, "user", &job);
 
     uint32_t nonce = 0x276E8947;
     double diff = test_nonce_value(&job, nonce, 0);
@@ -226,7 +226,7 @@ TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
     TEST_ASSERT_EQUAL_STRING("5bdc1968499c3393873edf8e07a1c3a50a97fc3a9d1a376bbf77087dd63778eb", merkle_root);
 
     bm_job job = { 0 };
-    construct_bm_job(&notify_message, merkle_root_hash, 0, 1000, &job);
+    construct_bm_job(&notify_message, merkle_root_hash, 0, 1000, "user", &job);
 
     uint32_t nonce = 0x0a029ed1;
     double diff = test_nonce_value(&job, nonce, 0);

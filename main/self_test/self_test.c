@@ -396,7 +396,7 @@ bool self_test(void * pvParameters)
     calculate_merkle_root_hash(coinbase_tx_hash, merkles, num_merkles, merkle_root);
 
     bm_job job = {0};
-    construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000, &job);
+    construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000, "user", &job);
 
     ESP_LOGI(TAG, "Sending work");
 
@@ -409,16 +409,20 @@ bool self_test(void * pvParameters)
     float hashrate = 0;
     uint32_t hashtest_ms = 5000;
 
+    task_result result;
+
     while (duration_ms < hashtest_ms) {
-        task_result * asic_result = ASIC_process_work(GLOBAL_STATE);
-        if (asic_result != NULL) {
+
+        memset(&result, 0, sizeof(result));
+
+        if (ASIC_process_work(GLOBAL_STATE, &result)) {
             // check the nonce difficulty
-            double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
+            double nonce_diff = test_nonce_value(&job, result.nonce, result.rolled_version);
             counter += DIFFICULTY;
             duration_ms = (esp_timer_get_time() / 1000) - start_ms;
             hashrate = hashCounterToGhs(duration_ms, counter);
 
-            ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
+            ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", result.nonce, nonce_diff);
             ESP_LOGI(TAG, "%f Gh/s  , duration %dms", hashrate, duration_ms);
         }
     }

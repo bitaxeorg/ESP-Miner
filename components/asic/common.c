@@ -4,6 +4,7 @@
 #include "common.h"
 #include "serial.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "crc.h"
 
 #define PREAMBLE 0xAA55
@@ -88,9 +89,11 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
     return chip_counter;
 }
 
-esp_err_t receive_work(uint8_t * buffer, int buffer_size)
+esp_err_t receive_work(uint8_t * buffer, int buffer_size, int64_t *result_receive_time_us)
 {
     int received = SERIAL_rx(buffer, buffer_size, 10000);
+
+    *result_receive_time_us = esp_timer_get_time();
 
     if (received < 0) {
         ESP_LOGE(TAG, "UART error in serial RX");

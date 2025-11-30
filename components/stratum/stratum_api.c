@@ -22,56 +22,6 @@ static const char * TAG = "stratum_api";
 
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
-static int last_parsed_request_id = -1;
-
-static RequestTiming request_timings[MAX_REQUEST_IDS];
-static bool initialized = false;
-
-static void init_request_timings() {
-    if (!initialized) {
-        for (int i = 0; i < MAX_REQUEST_IDS; i++) {
-            request_timings[i].timestamp_us = 0;
-            request_timings[i].tracking = false;
-        }
-        initialized = true;
-    }
-}
-
-static RequestTiming* get_request_timing(int request_id) {
-    if (request_id < 0) return NULL;
-    int index = request_id % MAX_REQUEST_IDS;
-    return &request_timings[index];
-}
-
-void STRATUM_V1_stamp_tx(int request_id)
-{
-    init_request_timings();
-    if (request_id >= 1) {
-        RequestTiming *timing = get_request_timing(request_id);
-        if (timing) {
-            timing->timestamp_us = esp_timer_get_time();
-            timing->tracking = true;
-        }
-    }
-}
-
-double STRATUM_V1_get_response_time_ms(int request_id)
-{
-    init_request_timings();
-    if (request_id < 0) return -1.0;
-    
-    RequestTiming *timing = get_request_timing(request_id);
-    if (!timing || !timing->tracking) {
-        return -1.0;
-    }
-    
-    double response_time = (esp_timer_get_time() - timing->timestamp_us) / 1000.0;
-    timing->tracking = false;
-    return response_time;
-}
-
-static void debug_stratum_tx(const char *);
-int _parse_stratum_subscribe_result_message(const char * result_json_str, char ** extranonce, int * extranonce2_len);
 
 void STRATUM_V1_initialize_buffer()
 {
@@ -117,9 +67,6 @@ static void realloc_json_buffer(size_t len)
 
 char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
 {
-    if (json_rpc_buffer == NULL) {
-        STRATUM_V1_initialize_buffer();
-    }
     char *line, *tok = NULL;
     char recv_buffer[BUFFER_SIZE];
     int nbytes;
@@ -164,7 +111,6 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
     if (id_json != NULL && cJSON_IsNumber(id_json)) {
         parsed_id = id_json->valueint;
     }
-    last_parsed_request_id = parsed_id;
     message->message_id = parsed_id;
 
     cJSON * method_json = cJSON_GetObjectItem(json, "method");
@@ -374,82 +320,8 @@ int _parse_stratum_subscribe_result_message(const char * result_json_str, char *
     return 0;
 }
 
-int STRATUM_V1_subscribe(int socket, int send_uid, const char * model)
+static void debug_stratum_tx(const char * msg, int send_uid)
 {
-    // Subscribe
-    char subscribe_msg[BUFFER_SIZE];
-    const esp_app_desc_t *app_desc = esp_app_get_description();
-    const char *version = app_desc->version;	
-    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe/%s/%s\"]}\n", send_uid, model, version);
-    debug_stratum_tx(subscribe_msg);
-
-    return write(socket, subscribe_msg, strlen(subscribe_msg));
-}
-
-int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty)
-{
-    char difficulty_msg[BUFFER_SIZE];
-    sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%ld]}\n", send_uid, difficulty);
-    debug_stratum_tx(difficulty_msg);
-
-    return write(socket, difficulty_msg, strlen(difficulty_msg));
-}
-
-int STRATUM_V1_extranonce_subscribe(int socket, int send_uid)
-{
-    char extranonce_msg[BUFFER_SIZE];
-    sprintf(extranonce_msg, "{\"id\": %d, \"method\": \"mining.extranonce.subscribe\", \"params\": []}\n", send_uid);
-    debug_stratum_tx(extranonce_msg);
-
-    return write(socket, extranonce_msg, strlen(extranonce_msg));
-}
-
-int STRATUM_V1_authorize(int socket, int send_uid, const char * username, const char * pass)
-{
-    char authorize_msg[BUFFER_SIZE];
-    sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"%s\"]}\n", send_uid, username,
-            pass);
-    debug_stratum_tx(authorize_msg);
-
-    return write(socket, authorize_msg, strlen(authorize_msg));
-}
-
-/// @param socket Socket to write to
-/// @param send_uid Message ID
-/// @param username The client’s user name.
-/// @param job_id The job ID for the work being submitted.
-/// @param extranonce_2 The hex-encoded value of extra nonce 2.
-/// @param ntime The hex-encoded time value use in the block header.
-/// @param nonce The hex-encoded nonce value to use in the block header.
-/// @param version_bits The hex-encoded version bits set by miner (BIP310).
-int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, const char * job_id,
-                            const char * extranonce_2, const uint32_t ntime,
-                            const uint32_t nonce, const uint32_t version_bits)
-{
-    char submit_msg[BUFFER_SIZE];
-    sprintf(submit_msg,
-            "{\"id\": %d, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%08lx\", \"%08lx\", \"%08lx\"]}\n",
-            send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);
-    debug_stratum_tx(submit_msg);
-
-    return write(socket, submit_msg, strlen(submit_msg));
-}
-
-int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * version_mask)
-{
-    char configure_msg[BUFFER_SIZE * 2];
-    sprintf(configure_msg,
-            "{\"id\": %d, \"method\": \"mining.configure\", \"params\": [[\"version-rolling\"], {\"version-rolling.mask\": "
-            "\"ffffffff\"}]}\n",
-            send_uid);
-    debug_stratum_tx(configure_msg);
-
-    return write(socket, configure_msg, strlen(configure_msg));
-}
-
-static void debug_stratum_tx(const char * msg)
-{
-    STRATUM_V1_stamp_tx(last_parsed_request_id);
     //remove the trailing newline
     char * newline = strchr(msg, '\n');
     if (newline != NULL) {
@@ -461,4 +333,85 @@ static void debug_stratum_tx(const char * msg)
     if (newline != NULL) {
         *newline = '\n';
     }
+}
+
+int STRATUM_V1_subscribe(int socket, int send_uid, const char * model)
+{
+    // Subscribe
+    char subscribe_msg[BUFFER_SIZE];
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    const char *version = app_desc->version;	
+    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitaxe/%s/%s\"]}\n", send_uid, model, version);
+    debug_stratum_tx(subscribe_msg, send_uid);
+
+    return write(socket, subscribe_msg, strlen(subscribe_msg));
+}
+
+int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty)
+{
+    char difficulty_msg[BUFFER_SIZE];
+    sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%ld]}\n", send_uid, difficulty);
+    debug_stratum_tx(difficulty_msg, send_uid);
+
+    return write(socket, difficulty_msg, strlen(difficulty_msg));
+}
+
+int STRATUM_V1_extranonce_subscribe(int socket, int send_uid)
+{
+    char extranonce_msg[BUFFER_SIZE];
+    sprintf(extranonce_msg, "{\"id\": %d, \"method\": \"mining.extranonce.subscribe\", \"params\": []}\n", send_uid);
+    debug_stratum_tx(extranonce_msg, send_uid);
+
+    return write(socket, extranonce_msg, strlen(extranonce_msg));
+}
+
+int STRATUM_V1_authorize(int socket, int send_uid, const char * username, const char * pass)
+{
+    char authorize_msg[BUFFER_SIZE];
+    sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"%s\"]}\n", send_uid, username,
+            pass);
+    debug_stratum_tx(authorize_msg, send_uid);
+
+    return write(socket, authorize_msg, strlen(authorize_msg));
+}
+
+#define SUBMIT_BUF_SIZE  256
+static char submit_buf[SUBMIT_BUF_SIZE] __attribute__((aligned(4)));
+
+/// @param socket Socket to write to
+/// @param send_uid Message ID
+/// @param username The client’s user name.
+/// @param job_id The job ID for the work being submitted.
+/// @param extranonce_2 The hex-encoded value of extra nonce 2.
+/// @param ntime The hex-encoded time value use in the block header.
+/// @param nonce The hex-encoded nonce value to use in the block header.
+/// @param version_bits The hex-encoded version bits set by miner (BIP310).
+int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, const char * job_id,
+                            const char * extranonce_2, uint32_t ntime,
+                            uint32_t nonce, uint32_t version_bits,
+                            int64_t * result_submit_time_us)
+{
+    int len = snprintf(submit_buf, SUBMIT_BUF_SIZE,
+        "{\"id\":%d,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%08lx\",\"%08lx\",\"%08lx\"]}\n",
+        send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);    
+    
+    *result_submit_time_us = esp_timer_get_time();
+
+    int result = (len > 0) ? write(socket, submit_buf, len) : -1;
+
+    debug_stratum_tx(submit_buf, send_uid);
+        
+    return result;
+}
+
+int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * version_mask)
+{
+    char configure_msg[BUFFER_SIZE * 2];
+    sprintf(configure_msg,
+            "{\"id\": %d, \"method\": \"mining.configure\", \"params\": [[\"version-rolling\"], {\"version-rolling.mask\": "
+            "\"ffffffff\"}]}\n",
+            send_uid);
+    debug_stratum_tx(configure_msg, send_uid);
+
+    return write(socket, configure_msg, strlen(configure_msg));
 }

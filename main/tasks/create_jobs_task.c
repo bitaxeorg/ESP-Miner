@@ -100,7 +100,9 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
         return;
     }
 
-    construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask, difficulty, queued_next_job);
+    const char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+
+    construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask, difficulty, user, queued_next_job);
 
     queued_next_job->extranonce2 = strdup(extranonce_2_str);
     queued_next_job->jobid = strdup(notification->job_id);

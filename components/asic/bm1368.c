@@ -74,8 +74,6 @@ typedef struct __attribute__((__packed__))
 
 static const char * TAG = "bm1368";
 
-static task_result result;
-
 static int address_interval;
 
 static void _send_BM1368(uint8_t header, uint8_t * data, uint8_t data_len, bool debug)
@@ -254,26 +252,24 @@ void BM1368_send_work(void * pvParameters, bm_job * next_bm_job)
     _send_BM1368((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1368_job), BM1368_DEBUG_WORK);
 }
 
-task_result * BM1368_process_work(void * pvParameters)
+bool BM1368_process_work(void * pvParameters, task_result * result)
 {
     bm1368_asic_result_t asic_result = {0};
 
-    memset(&result, 0, sizeof(task_result));
-
-    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
-        return NULL;
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result->receive_time_us) == ESP_FAIL) {
+        return false;
     }
 
     if (!asic_result.is_job_response) {
-        result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
-        if (result.register_type == REGISTER_INVALID) {
+        result->register_type = REGISTER_MAP[asic_result.cmd.register_address];
+        if (result->register_type == REGISTER_INVALID) {
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
-            return NULL;
+            return false;
         }
-        result.asic_nr = asic_result.cmd.asic_address / address_interval;
-        result.value = ntohl(asic_result.cmd.value);
+        result->asic_nr = asic_result.cmd.asic_address / address_interval;
+        result->value = ntohl(asic_result.cmd.value);
         
-        return &result;
+        return true;
     }
 
     uint8_t job_id = (asic_result.job.id & 0xf0) >> 1;
@@ -288,17 +284,17 @@ task_result * BM1368_process_work(void * pvParameters)
 
     if (GLOBAL_STATE->valid_jobs[job_id] == 0) {
         ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
-        return NULL;
+        return false;
     }
 
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
 
-    result.job_id = job_id;
-    result.nonce = asic_result.job.nonce;
-    result.rolled_version = rolled_version;
-    result.asic_nr = asic_nr;
+    result->job_id = job_id;
+    result->nonce = asic_result.job.nonce;
+    result->rolled_version = rolled_version;
+    result->asic_nr = asic_nr;
 
-    return &result;
+    return true;
 }
 
 void BM1368_read_registers(void)
