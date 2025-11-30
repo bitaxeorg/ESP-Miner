@@ -1,5 +1,11 @@
 <ng-template #noValue>--</ng-template>
 
+<ng-template #powerFault>
+    <span class="text-red-500">
+        Not available - Power fault
+    </span>
+</ng-template>
+
 <ng-container *ngIf="info$ | async as info">
     <ng-container *ngFor="let message of messages">
         <p-message
@@ -17,37 +23,94 @@
         <div class="col-12 md:col-6 xl:col-3">
             <div class="card mb-0">
                 <div class="flex flex-column justify-content-between">
-                    <span class="block text-500 font-medium mb-3">Hashrate</span>
+                    <span class="block text-lg font-medium mb-3">Hashrate</span>
 
                     <ng-container *ngIf="!info.power_fault; else powerFault">
-                        <div class="flex align-items-baseline gap-2 mb-3">
-                            <span class="text-900 font-medium text-2xl">
+                        <div class="flex align-items-center justify-content-between gap-2 mb-3">
+                            <span class="text-900 font-medium text-2xl white-space-nowrap">
                                 {{info.hashRate | hashSuffix}}
                             </span>
-                            <span class="text-500 text-xs">
-                                <tooltip-text-icon
-                                    text="Error: {{info.errorPercentage | number: '1.2-2'}}%"
-                                    tooltip="Hash error percentage as reported by the ASIC. A small amount of errors every few seconds is normal. Frequency changes, agressive overclocking, undervoltage or a bad power supply can significantly increase the error rate."
-                                />
+                            <table class="text-xs">
+                                <thead>
+                                    <tr>
+                                        <th class="p-0 text-400 font-normal line-height-1 cursor-pointer" pTooltip="Hash error percentage as reported by the ASIC. A small amount of errors every few seconds is normal. Frequency changes, agressive overclocking, undervoltage or a bad power supply can significantly increase the error rate.">
+                                            Error
+                                        </th>
+                                        <th *ngIf="info.expectedHashrate" class="p-0 pl-3 text-400 font-normal line-height-1">
+                                            Expected
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="p-0 text-center text-800 line-height-1">
+                                            {{info.errorPercentage | number: '1.2-2'}}%
+                                        </td>
+                                        <td *ngIf="info.expectedHashrate" class="p-0 pl-3 text-center text-800 line-height-1 white-space-nowrap">
+                                            {{info.expectedHashrate | hashSuffix: { tickmark: true } }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <table class="px-1 border-1 border-50 border-round-xs">
+                            <thead>
+                                <tr>
+                                    <th *ngFor="let i of hashrateAverages" class="p-0 text-500 font-normal line-height-1">
+                                        {{i.label}}
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td *ngFor="let i of hashrateAverages" class="p-0 text-center text-green-500 font-medium">
+                                        {{ info[i.key] | hashSuffix }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </ng-container>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 md:col-6 xl:col-3">
+            <div class="card mb-0">
+                <div class="flex flex-column justify-content-between">
+                    <span class="block text-lg font-medium mb-3">Efficiency</span>
+
+                    <ng-container *ngIf="!info.power_fault; else powerFault">
+                        <div class="flex align-items-center justify-content-between gap-2 mb-3">
+                            <span class="text-900 font-medium text-2xl white-space-nowrap">
+                                {{getEfficiency(info) | number: '1.2-2'}} J/Th
                             </span>
+                            <table class="text-xs">
+                                <thead>
+                                    <tr>
+                                        <th class="p-0 text-400 font-normal line-height-1">
+                                            Expected
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="p-0 text-center text-800 line-height-1 white-space-nowrap">
+                                            {{getExpectedEfficiency(info) | number: '1.2-2'}} J/Th
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
 
                         <div>
-                            Average:
-                            <span class="text-green-500 font-medium">
-                                {{getHashrateAverage() | hashSuffix}}
+                            <span class="text-green-500 font-medium white-space-nowrap">
+                                {{getEfficiencyAverage() | number: '1.2-2'}} J/Th
                             </span>
-                        </div>
-                        <div class="text-500 text-xs" *ngIf="info.expectedHashrate">
-                            Expected: {{info.expectedHashrate | hashSuffix: { tickmark: true } }}
+                            <span class="text-500">
+                                Average
+                            </span>
                         </div>
                     </ng-container>
-
-                    <ng-template #powerFault>
-                        <span class="text-red-500">
-                            Not available - Power fault
-                        </span>
-                    </ng-template>
                 </div>
             </div>
         </div>
@@ -55,36 +118,9 @@
             <div class="card mb-0">
                 <div class="flex justify-content-between mb-3">
                     <div>
-                        <span class="block text-500 font-medium mb-3">Efficiency</span>
-                        <div class="text-900 font-medium text-2xl flex align-items-center gap-2">
-                            <span *ngIf="!info.power_fault">
-                                {{getEfficiency(info) | number: '1.2-2'}} J/Th
-                            </span>
-                            <span *ngIf="info.power_fault" class="text-red-500">
-                                Not available - Power fault
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <ng-container *ngIf="!info.power_fault">
-                    Average:
-                    <span class="text-green-500 font-medium">
-                        {{getEfficiencyAverage() | number: '1.2-2'}} J/Th
-                    </span>
-                </ng-container>
-
-                <div class="text-500 text-xs" *ngIf="!info.power_fault && info.expectedHashrate">
-                    Expected: {{getExpectedEfficiency(info) | number: '1.2-2'}} J/Th
-                </div>
-            </div>
-        </div>
-        <div class="col-12 md:col-6 xl:col-3">
-            <div class="card mb-0">
-                <div class="flex justify-content-between mb-3">
-                    <div>
-                        <span class="block text-500 font-medium mb-3">Shares</span>
-                        <div class="text-900 font-medium text-2xl">{{info.sharesAccepted | number: '1.0-0'}}
+                        <span class="block text-lg font-medium mb-3">Shares</span>
+                        <div class="text-900 font-medium text-2xl">
+                            {{info.sharesAccepted | number: '1.0-0'}}
                         </div>
                     </div>
                 </div>
@@ -113,14 +149,28 @@
             <div class="card mb-0">
                 <div class="flex justify-content-between mb-3">
                     <div>
-                        <span class="block text-500 font-medium mb-3">Best Difficulty</span>
-                        <div class="text-900 font-medium text-2xl">{{info.bestDiff | diffSuffix}}
+                        <span class="block text-lg font-medium mb-3">Best Difficulty</span>
+                        <div class="text-900 font-medium text-2xl">
+                            <span class="cursor-pointer" pTooltip="{{info.bestDiff | number:'1.0-0'}}" tooltipPosition="bottom">
+                                {{info.bestDiff | diffSuffix}}
+                            </span>
                             <span class="text-500 text-lg">all-time best</span>
+                            <span class="text-lg font-medium mb-3" *ngIf="info.networkDifficulty">
+                                <tooltip-text-icon
+                                    [text]="'(' + getNetworkDifficultyPercentage(info) + '%)'"
+                                    tooltip="Chance to find a Block"
+                                    [split]="false"
+                                />
+                            </span>
                         </div>
                     </div>
                 </div>
-                <span class="text-900 font-medium">{{info.bestSessionDiff | diffSuffix}} </span>
-                <span class="text-500">since system boot</span>
+                <div>
+                    <span class="text-900 font-medium cursor-pointer" pTooltip="{{info.bestSessionDiff | number:'1.0-0'}}" tooltipPosition="bottom">
+                        {{info.bestSessionDiff | diffSuffix}}
+                    </span>
+                    <span class="text-500">since system boot</span>
+                </div>
             </div>
         </div>
 
@@ -412,7 +462,7 @@
                     <div class="col-fixed-width text-500">
                         <span>Difficulty</span>
                     </div>
-                    <div *ngIf="info.networkDifficulty">
+                    <div *ngIf="info.networkDifficulty" class="cursor-pointer" pTooltip="{{info.networkDifficulty | number:'1.0-0'}}" tooltipPosition="bottom">
                         {{ info.networkDifficulty | diffSuffix }}
                     </div>
                 </div>

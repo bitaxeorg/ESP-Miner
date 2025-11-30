@@ -133,7 +133,7 @@
                                     severity="secondary"
                                     class="inline-block"
                                     styleClass="button-icon-small"
-                                    (click)="restart(axe)" />
+                                    (click)="postAction(axe, 'restart')" />
                                 <p-button
                                     icon="pi pi-lightbulb text-sm"
                                     pp-button
@@ -142,7 +142,7 @@
                                     severity="secondary"
                                     class="inline-block"
                                     styleClass="button-icon-small"
-                                    (click)="identify(axe)" />
+                                    (click)="postAction(axe, 'identify')" />
                                 <p-button
                                     icon="pi pi-trash text-sm"
                                     pp-button
@@ -303,7 +303,7 @@
                                     severity="secondary"
                                     styleClass="button-icon"
                                     class="inline-block"
-                                    (click)="restart(axe)" />
+                                    (click)="postAction(axe, 'restart')" />
                                 <p-button
                                     icon="pi pi-lightbulb"
                                     pp-button
@@ -312,7 +312,7 @@
                                     severity="secondary"
                                     class="inline-block"
                                     styleClass="button-icon"
-                                    (click)="identify(axe)" />
+                                    (click)="postAction(axe, 'identify')" />
                                 <p-button
                                     icon="pi pi-trash"
                                     pp-button

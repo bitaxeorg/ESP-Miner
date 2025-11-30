@@ -310,9 +310,9 @@ task_result *BM1397_process_work(void *pvParameters)
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
-        result.asic_nr = asic_result.cmd.asic_address;
+        result.asic_nr = asic_result.cmd.asic_address / address_interval;
         result.value = ntohl(asic_result.cmd.value);
-        
+
         return &result;
     }
 
@@ -358,10 +358,18 @@ task_result *BM1397_process_work(void *pvParameters)
         prev_nonce = asic_result.job.nonce;
     }
 
+    uint32_t nonce_h = ntohl(asic_result.job.nonce);
+    uint8_t asic_nr = (uint8_t)((nonce_h >> 17) & 0xff) / address_interval;
+
     result.job_id = rx_job_id;
     result.nonce = asic_result.job.nonce;
     result.rolled_version = rolled_version;
-    result.asic_nr = 0; // TODO
+    result.asic_nr = asic_nr;
+
+    uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
+    uint8_t small_core_id = asic_result.job.id & 0x0f;
+
+    ESP_LOGI(TAG, "Job ID: %02X, Asic nr: %d, Core: %d/%d, Ver: %08" PRIX32, rx_job_id, asic_nr, core_id, small_core_id, rolled_version);    
 
     return &result;
 }
