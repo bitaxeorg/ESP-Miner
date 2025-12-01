@@ -174,7 +174,7 @@ void respectLimits()
     }
 }
 
-void check_dead_cores()
+bool check_dead_cores()
 {
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
@@ -190,25 +190,24 @@ void check_dead_cores()
         last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
         last_core_voltage_auto += AUTO_TUNE.step_volt;
         lastVoltageSet = true;
+        ESP_LOGI(TAG,"Core died, increase voltage");
     }
+    return core_died;
 }
 
 void dowork()
 {
-    // Check if error increased since last voltage/frequency set
-    bool error_increased = error_increased_since_last_set();
-
-    // If error did increase, switch the setting
-    if (error_increased) {
-        lastVoltageSet = !lastVoltageSet;
-    }
-    
-    check_dead_cores();
-
     if (critical_limithit()) {
         last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
         last_core_voltage_auto -= AUTO_TUNE.step_volt;
-    } else if (can_increase_values()) {
+    } else if (!check_dead_cores() && can_increase_values()) {
+        // Check if error increased since last voltage/frequency set
+        bool error_increased = error_increased_since_last_set();
+
+        // If error did increase, switch the setting
+        if (error_increased) {
+            lastVoltageSet = !lastVoltageSet;
+        }
         increase_values();
     }
 
