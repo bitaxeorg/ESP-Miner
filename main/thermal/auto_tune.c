@@ -39,8 +39,6 @@ bool history_initialized = false;
 bool lastVoltageSet = false;
 const int waitTime = 30;
 int waitCounter = 0;
-float freq_step;
-float volt_step;
 GlobalState * GLOBAL_STATE;
 
 #define MIN_FREQ 400
@@ -160,11 +158,10 @@ static inline float clamp(float val, float min, float max)
 void increase_values()
 {
     if (!lastVoltageSet) {
-        last_asic_frequency_auto += freq_step;
+        last_asic_frequency_auto += AUTO_TUNE.autotune_step_frequency;;
     } else {
-        last_core_voltage_auto += volt_step;
+        last_core_voltage_auto += AUTO_TUNE.step_volt;
     }
-    //enforce_voltage_frequency_ratio();
 }
 
 void respectLimits()
@@ -177,21 +174,36 @@ void respectLimits()
     }
 }
 
+void check_dead_cores()
+{
+    int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    int domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
+    bool core_died = false;
+    for(int i = 0; i < asic_count; i++) {
+        for(int d = 0; d < domains; d++) {
+            if(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][d].hashrate <= 1.0f)
+                core_died = true;
+        }
+    }
+    if(core_died)
+    {
+        last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
+        last_core_voltage_auto += AUTO_TUNE.step_volt;
+        lastVoltageSet = true;
+    }
+}
+
 void dowork()
 {
-    freq_step = AUTO_TUNE.autotune_step_frequency;
-    volt_step = AUTO_TUNE.step_volt;
-
-    // Update hashrate history with current value
-    
-
-    // Check if hashrate increased since last voltage/frequency set
+    // Check if error increased since last voltage/frequency set
     bool error_increased = error_increased_since_last_set();
 
-    // If hashrate didn't increase, switch the setting
+    // If error did increase, switch the setting
     if (error_increased) {
         lastVoltageSet = !lastVoltageSet;
     }
+    
+    check_dead_cores();
 
     if (critical_limithit()) {
         last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
