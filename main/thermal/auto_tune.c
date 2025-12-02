@@ -180,8 +180,13 @@ bool check_dead_cores()
     int domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
     bool core_died = false;
     for(int i = 0; i < asic_count; i++) {
+        float avg_hash = 0;
         for(int d = 0; d < domains; d++) {
-            if(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][d].hashrate <= 1.0f)
+            avg_hash += GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][d].hashrate;
+        }
+        avg_hash /= domains;
+        for(int d = 0; d < domains; d++) {
+            if(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][d].hashrate <= avg_hash * 0.7f)
                 core_died = true;
         }
     }
