@@ -186,13 +186,13 @@ bool check_dead_cores()
         }
         avg_hash /= domains;
         for(int d = 0; d < domains; d++) {
-            if(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][d].hashrate <= avg_hash * 0.7f)
+            if(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][d].hashrate <= avg_hash * 0.6f)
                 core_died = true;
         }
     }
     if(core_died)
     {
-        last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
+        last_asic_frequency_auto -= 1.f;
         last_core_voltage_auto += AUTO_TUNE.step_volt;
         lastVoltageSet = true;
         ESP_LOGI(TAG,"Core died, increase voltage");
@@ -203,7 +203,7 @@ bool check_dead_cores()
 void dowork()
 {
     if (critical_limithit()) {
-        last_asic_frequency_auto -= AUTO_TUNE.autotune_step_frequency;
+        last_asic_frequency_auto -= 1.f;
         last_core_voltage_auto -= AUTO_TUNE.step_volt;
     } else if (!check_dead_cores() && can_increase_values()) {
         // Check if error increased since last voltage/frequency set
@@ -255,6 +255,7 @@ void auto_tune()
 
     case working:
         if (limithit() && !critical_limithit()) {
+            check_dead_cores();
             break; // Added this line to stop adjusting when limit is hit
 
         } else {
