@@ -62,7 +62,7 @@
 
 esp_err_t EMC2103_set_fan_speed(float);
 uint16_t EMC2103_get_fan_speed(void);
-esp_err_t EMC2103_init();
+esp_err_t EMC2103_init(int temp_offset_param);
 float EMC2103_get_external_temp(void);
 float EMC2103_get_external_temp2(void);
 esp_err_t EMC2103_set_ideality_factor(uint8_t);
