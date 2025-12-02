@@ -27,6 +27,9 @@ typedef struct {
 typedef struct
 {
     float current_hashrate;
+    float hashrate_1m;
+    float hashrate_10m;
+    float hashrate_1h;
     float error_percentage;
     int64_t start_time;
     uint64_t shares_accepted;
@@ -47,6 +50,7 @@ typedef struct
     char ap_ssid[32];
     bool ap_enabled;
     bool is_connected;
+    int identify_mode_time_ms;
     char * pool_url;
     char * fallback_pool_url;
     uint16_t pool_port;

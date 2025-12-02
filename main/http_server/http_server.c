@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <limits.h>
+#include <math.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <esp_heap_caps.h>
@@ -14,6 +15,7 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_spiffs.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "esp_vfs.h"
@@ -52,6 +54,9 @@ static const char * CORS_TAG = "CORS";
 static char axeOSVersion[32];
 
 static const char * STATS_LABEL_HASHRATE = "hashrate";
+static const char * STATS_LABEL_HASHRATE_1m = "hashrate_1m";
+static const char * STATS_LABEL_HASHRATE_10m = "hashrate_10m";
+static const char * STATS_LABEL_HASHRATE_1h = "hashrate_1h";
 static const char * STATS_LABEL_ERROR_PERCENTAGE = "errorPercentage";
 static const char * STATS_LABEL_ASIC_TEMP = "asicTemp";
 static const char * STATS_LABEL_VR_TEMP = "vrTemp";
@@ -75,6 +80,9 @@ static int api_common_prebuffer_len = 256;
 typedef enum
 {
     SRC_HASHRATE,
+    SRC_HASHRATE_1m,
+    SRC_HASHRATE_10m,
+    SRC_HASHRATE_1h,
     SRC_ERROR_PERCENTAGE,
     SRC_ASIC_TEMP,
     SRC_VR_TEMP,
@@ -94,6 +102,9 @@ DataSource strToDataSource(const char * sourceStr)
 {
     if (NULL != sourceStr) {
         if (strcmp(sourceStr, STATS_LABEL_HASHRATE) == 0)     return SRC_HASHRATE;
+        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_1m) == 0)  return SRC_HASHRATE_1m;
+        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_10m) == 0) return SRC_HASHRATE_10m;
+        if (strcmp(sourceStr, STATS_LABEL_HASHRATE_1h) == 0)  return SRC_HASHRATE_1h;
         if (strcmp(sourceStr, STATS_LABEL_ERROR_PERCENTAGE) == 0)  return SRC_ERROR_PERCENTAGE;
         if (strcmp(sourceStr, STATS_LABEL_VOLTAGE) == 0)      return SRC_VOLTAGE;
         if (strcmp(sourceStr, STATS_LABEL_POWER) == 0)        return SRC_POWER;
@@ -121,6 +132,18 @@ esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_
     if (len > *prebuffer_len) *prebuffer_len = len * 1.2;
     free((void *)response);
     return res;
+}
+
+static const double FACTOR = 10000000.0;
+
+cJSON* cJSON_AddFloatToObject(cJSON * const object, const char * const name, const float number) {
+    double d_value = round((double)number * FACTOR) / FACTOR;
+    return cJSON_AddNumberToObject(object, name, d_value);
+}
+
+cJSON* cJSON_CreateFloat(float number) {
+    double d_value = round((double)number * FACTOR) / FACTOR;
+    return cJSON_CreateNumber(d_value);
 }
 
 /* Handler for WiFi scan endpoint */
@@ -678,6 +701,33 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     return ESP_OK;
 }
 
+static esp_err_t POST_identify(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Identify mode enabled for 30s");
+
+    httpd_resp_set_type(req, "text/plain");
+
+    if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
+        GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
+        httpd_resp_send(req, "The device no longer says \"Hi!\".", HTTPD_RESP_USE_STRLEN);
+    } else {
+        GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 30000;
+        httpd_resp_send(req, "The device says \"Hi!\" for 30 seconds.", HTTPD_RESP_USE_STRLEN);
+    }
+
+    return ESP_OK;
+}
+
 static esp_err_t POST_restart(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -692,6 +742,8 @@ static esp_err_t POST_restart(httpd_req_t * req)
 
     ESP_LOGI(TAG, "Restarting System because of API Request");
 
+    httpd_resp_set_type(req, "text/plain");
+
     // Send HTTP response before restarting
     const char* resp_str = "System will restart shortly.";
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
@@ -704,6 +756,28 @@ static esp_err_t POST_restart(httpd_req_t * req)
 
     // This return statement will never be reached, but it's good practice to include it
     return ESP_OK;
+}
+
+static const char* esp_reset_reason_to_string(esp_reset_reason_t reason) {
+    switch (reason) {
+        case ESP_RST_UNKNOWN:    return "Reset reason can not be determined";
+        case ESP_RST_POWERON:    return "Reset due to power-on event";
+        case ESP_RST_EXT:        return "Reset by external pin (not applicable for ESP32)";
+        case ESP_RST_SW:         return "Software reset via esp_restart";
+        case ESP_RST_PANIC:      return "Software reset due to exception/panic";
+        case ESP_RST_INT_WDT:    return "Reset (software or hardware) due to interrupt watchdog";
+        case ESP_RST_TASK_WDT:   return "Reset due to task watchdog";
+        case ESP_RST_WDT:        return "Reset due to other watchdogs";
+        case ESP_RST_DEEPSLEEP:  return "Reset after exiting deep sleep mode";
+        case ESP_RST_BROWNOUT:   return "Brownout reset (software or hardware)";
+        case ESP_RST_SDIO:       return "Reset over SDIO";
+        case ESP_RST_USB:        return "Reset by USB peripheral";
+        case ESP_RST_JTAG:       return "Reset by JTAG";
+        case ESP_RST_EFUSE:      return "Reset due to efuse error";
+        case ESP_RST_PWR_GLITCH: return "Reset due to power glitch detected";
+        case ESP_RST_CPU_LOCKUP: return "Reset due to CPU lock up (double exception)";
+        default:                 return "Unknown reset";
+    }
 }
 
 /* Simple handler for getting system handler */
@@ -741,17 +815,20 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     get_wifi_current_rssi(&wifi_rssi);
 
     cJSON * root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
-    cJSON_AddNumberToObject(root, "voltage", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
-    cJSON_AddNumberToObject(root, "current", Power_get_current(GLOBAL_STATE));
-    cJSON_AddNumberToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
-    cJSON_AddNumberToObject(root, "temp2", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
-    cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
+    cJSON_AddFloatToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
+    cJSON_AddFloatToObject(root, "voltage", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
+    cJSON_AddFloatToObject(root, "current", Power_get_current(GLOBAL_STATE));
+    cJSON_AddFloatToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
+    cJSON_AddFloatToObject(root, "temp2", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
+    cJSON_AddFloatToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
     cJSON_AddNumberToObject(root, "maxPower", GLOBAL_STATE->DEVICE_CONFIG.family.max_power);
     cJSON_AddNumberToObject(root, "nominalVoltage", GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage);
-    cJSON_AddNumberToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
-    cJSON_AddNumberToObject(root, "expectedHashrate", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
-    cJSON_AddNumberToObject(root, "errorPercentage", GLOBAL_STATE->SYSTEM_MODULE.error_percentage);
+    cJSON_AddFloatToObject(root, "hashRate", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
+    cJSON_AddFloatToObject(root, "hashRate_1m", GLOBAL_STATE->SYSTEM_MODULE.hashrate_1m);
+    cJSON_AddFloatToObject(root, "hashRate_10m", GLOBAL_STATE->SYSTEM_MODULE.hashrate_10m);
+    cJSON_AddFloatToObject(root, "hashRate_1h", GLOBAL_STATE->SYSTEM_MODULE.hashrate_1h);
+    cJSON_AddFloatToObject(root, "expectedHashrate", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
+    cJSON_AddFloatToObject(root, "errorPercentage", GLOBAL_STATE->SYSTEM_MODULE.error_percentage);
     cJSON_AddNumberToObject(root, "bestDiff", GLOBAL_STATE->SYSTEM_MODULE.best_nonce_diff);
     cJSON_AddNumberToObject(root, "bestSessionDiff", GLOBAL_STATE->SYSTEM_MODULE.best_session_nonce_diff);
     cJSON_AddNumberToObject(root, "poolDifficulty", GLOBAL_STATE->pool_difficulty);
@@ -810,6 +887,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
+    cJSON_AddStringToObject(root, "resetReason", esp_reset_reason_to_string(esp_reset_reason()));
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
     cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE));
@@ -821,7 +899,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "autofanspeed", nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED));
 
-    cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
+    cJSON_AddFloatToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "manualFanSpeed", nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED));
     cJSON_AddNumberToObject(root, "minFanSpeed", nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED));
     cJSON_AddNumberToObject(root, "temptarget", nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET));
@@ -852,17 +930,15 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         for (int asic_nr = 0; asic_nr < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; asic_nr++) {
             cJSON *asic = cJSON_CreateObject();
             cJSON_AddItemToArray(asics_array, asic);
-            cJSON_AddNumberToObject(asic, "total", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[asic_nr].hashrate);
+            cJSON_AddFloatToObject(asic, "total", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.total_measurement[asic_nr].hashrate);
 
             int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
-            if (hash_domains > 0) {
-                cJSON* hash_domain_array = cJSON_CreateArray();
-                for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
-                    cJSON *hashrate = cJSON_CreateNumber(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[asic_nr][domain_nr].hashrate);
-                    cJSON_AddItemToArray(hash_domain_array, hashrate);
-                }
-                cJSON_AddItemToObject(asic, "domains", hash_domain_array);
+            cJSON* hash_domain_array = cJSON_CreateArray();
+            for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
+                cJSON *hashrate = cJSON_CreateFloat(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[asic_nr][domain_nr].hashrate);
+                cJSON_AddItemToArray(hash_domain_array, hashrate);
             }
+            cJSON_AddItemToObject(asic, "domains", hash_domain_array);
 
             cJSON_AddNumberToObject(asic, "errorCount", GLOBAL_STATE->HASHRATE_MONITOR_MODULE.error_measurement[asic_nr].value);
         }
@@ -933,6 +1009,9 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
 
     cJSON * labelArray = cJSON_CreateArray();
     if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE)); }
+    if (dataSelection[SRC_HASHRATE_1m]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_1m)); }
+    if (dataSelection[SRC_HASHRATE_10m]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_10m)); }
+    if (dataSelection[SRC_HASHRATE_1h]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_HASHRATE_1h)); }
     if (dataSelection[SRC_ERROR_PERCENTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ERROR_PERCENTAGE)); }
     if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_TEMP)); }
     if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VR_TEMP)); }
@@ -955,15 +1034,18 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
 
     while (getStatisticData(index++, &statsData)) {
         cJSON * valueArray = cJSON_CreateArray();
-        if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.hashrate)); }
-        if (dataSelection[SRC_ERROR_PERCENTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.errorPercentage)); }
-        if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.chipTemperature)); }
-        if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.vrTemperature)); }
+        if (dataSelection[SRC_HASHRATE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.hashrate)); }
+        if (dataSelection[SRC_HASHRATE_1m]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.hashrate_1m)); }
+        if (dataSelection[SRC_HASHRATE_10m]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.hashrate_10m)); }
+        if (dataSelection[SRC_HASHRATE_1h]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.hashrate_1h)); }
+        if (dataSelection[SRC_ERROR_PERCENTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.errorPercentage)); }
+        if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.chipTemperature)); }
+        if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.vrTemperature)); }
         if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); }
-        if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.voltage)); }
-        if (dataSelection[SRC_POWER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.power)); }
-        if (dataSelection[SRC_CURRENT]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.current)); }
-        if (dataSelection[SRC_FAN_SPEED]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanSpeed)); }
+        if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.voltage)); }
+        if (dataSelection[SRC_POWER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.power)); }
+        if (dataSelection[SRC_CURRENT]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.current)); }
+        if (dataSelection[SRC_FAN_SPEED]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.fanSpeed)); }
         if (dataSelection[SRC_FAN_RPM]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fanRPM)); }
         if (dataSelection[SRC_FAN2_RPM]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fan2RPM)); }
         if (dataSelection[SRC_WIFI_RSSI]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI)); }
@@ -1217,6 +1299,21 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &wifi_scan_get_uri);
+
+    httpd_uri_t system_identify_uri = {
+        .uri = "/api/system/identify", .method = HTTP_POST, 
+        .handler = POST_identify, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_identify_uri);
+
+    httpd_uri_t system_identify_options_uri = {
+        .uri = "/api/system/identify", 
+        .method = HTTP_OPTIONS, 
+        .handler = handle_options_request, 
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &system_identify_options_uri);
 
     httpd_uri_t system_restart_uri = {
         .uri = "/api/system/restart", .method = HTTP_POST, 

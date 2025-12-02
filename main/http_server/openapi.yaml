@@ -128,6 +128,9 @@ components:
         - freeHeapSpiram
         - frequency
         - hashRate
+        - hashRate_1m
+        - hashRate_10m
+        - hashRate_1h
         - expectedHashrate
         - errorPercentage
         - hostname
@@ -144,6 +147,7 @@ components:
         - poolDifficulty
         - power
         - power_fault
+        - resetReason
         - runningPartition
         - sharesAccepted
         - sharesRejected
@@ -243,6 +247,15 @@ components:
         hashRate:
           type: number
           description: Current hashrate
+        hashRate_1m:
+          type: number
+          description: Current hashrate 1m average
+        hashRate_10m:
+          type: number
+          description: Current hashrate 10m average
+        hashRate_1h:
+          type: number
+          description: Current hashrate 1h average
         errorPercentage:
           description: Hash error percentage
           type: number
@@ -288,6 +301,9 @@ components:
         power_fault:
           type: string
           description: Voltage regulator fault reason, if any
+        resetReason:
+          type: string
+          description: Reason for the last system reset
         runningPartition:
           type: string
           description: Currently active OTA partition
@@ -669,7 +685,7 @@ paths:
             type: array
             items:
               type: string
-            example: hashrate,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap
+            example: hashrate,hashrate_1m,hashrate_10m,hashrate_1h,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap
           description: List of labels for which data should be retrieved
       tags:
         - system
@@ -716,6 +732,21 @@ paths:
       responses:
         '200':
           description: System restart initiated
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/identify:
+    post:
+      summary: Identify the device
+      description: Let the device say Hi!
+      operationId: identifySystem
+      tags:
+        - system
+      responses:
+        '200':
+          description: Device identify initiated
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

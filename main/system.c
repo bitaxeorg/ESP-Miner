@@ -105,7 +105,6 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
 
     // Initialize the core voltage regulator
     ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
 
     ESP_RETURN_ON_ERROR(Thermal_init(&GLOBAL_STATE->DEVICE_CONFIG), TAG, "Thermal init failed!");
 
@@ -116,7 +115,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
 
     ESP_RETURN_ON_ERROR(display_init(GLOBAL_STATE), TAG, "Display init failed!");
 
-    ESP_RETURN_ON_ERROR(input_init(screen_next, toggle_wifi_softap), TAG, "Input init failed!");
+    ESP_RETURN_ON_ERROR(input_init(screen_button_press, toggle_wifi_softap), TAG, "Input init failed!");
 
     ESP_RETURN_ON_ERROR(screen_start(GLOBAL_STATE), TAG, "Screen start failed!");
 

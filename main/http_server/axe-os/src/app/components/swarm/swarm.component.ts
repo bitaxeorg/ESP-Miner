@@ -1,10 +1,11 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, ViewChild, HostListener } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable, Subscription } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { LayoutService } from "../../layout/service/app.layout.service";
+import { SystemService } from 'src/app/services/system.service';
 import { ModalComponent } from '../modal/modal.component';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 
@@ -62,6 +63,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     private toastr: ToastrService,
     private localStorageService: LocalStorageService,
     public layoutService: LayoutService,
+    private systemService: SystemService,
     private httpClient: HttpClient
   ) {
 
@@ -185,14 +187,17 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     // Check if IP already exists
     if (this.swarm.some(item => item.IP === IP)) {
-      this.toastr.warning('This IP address already exists in the swarm.');
+      this.toastr.warning('Device already added to the swarm.', `Device at ${IP}`);
       return;
     }
 
     forkJoin({
       info: this.httpClient.get<any>(`http://${IP}/api/system/info`),
       asic: this.httpClient.get<any>(`http://${IP}/api/system/asic`).pipe(catchError(() => of({})))
-    }).subscribe(({ info, asic }) => {
+    }).pipe(
+      timeout(5000),
+      catchError(error => this.refreshErrorHandler(error, IP))
+    ).subscribe(({ info, asic }) => {
       if (!info.ASICModel || !asic.ASICModel) {
         return;
       }
@@ -208,19 +213,22 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.modalComponent.isVisible = true;
   }
 
-  public restart(axe: any) {
-    this.httpClient.post(`http://${axe.IP}/api/system/restart`, {}).pipe(
+  public postAction(axe: any, action: string) {
+    this.httpClient.post(`http://${axe.IP}/api/system/${action}`, {}, { responseType: 'text' }).pipe(
+      timeout(800),
       catchError(error => {
-        if (error.status === 0 || error.status === 200 || error.name === 'HttpErrorResponse') {
-          return of('success');
-        } else {
-          this.toastr.error(`Failed to restart device at ${axe.IP}`);
-          return of(null);
+        let errorMsg = `Failed to ${action} device`;
+        if (error.name === 'TimeoutError') {
+          errorMsg = 'Request timed out';
+        } else if (error.message) {
+          errorMsg += `: ${error.message}`;
         }
+        this.toastr.error(errorMsg, `Device at ${axe.IP}`);
+        return of(null);
       })
     ).subscribe(res => {
-      if (res !== null && res == 'success') {
-        this.toastr.success(`Device at ${axe.IP} restarted`);
+      if (res !== null) {
+        this.toastr.success(res, `Device at ${axe.IP}`);
       }
     });
   }
@@ -233,7 +241,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   public refreshErrorHandler = (error: any, ip: string) => {
     const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
-    this.toastr.error(`Failed to get info from ${ip}. ${errorMessage}`);
+    this.toastr.error(`Failed to get info: ${errorMessage}`, `Device at ${ip}`);
     const existingDevice = this.swarm.find(axeOs => axeOs.IP === ip);
     return of({
       ...existingDevice,
@@ -462,5 +470,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
       default:
         return undefined;
     }
+  }
+
+  isThisDevice(IP: string): boolean {
+    return IP === window.location.hostname;
   }
 }
