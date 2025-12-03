@@ -403,10 +403,7 @@ components:
           type: integer
           minimum: 0
           maximum: 2
-          enum:
-            - 0
-            - 1
-            - 2
+          enum: [0, 1, 2]
           description: |
             Share submission mode:
             * 0 - FULL: Submit all shares to pool
