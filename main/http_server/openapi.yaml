@@ -404,9 +404,9 @@ components:
           minimum: 0
           maximum: 2
           enum:
-            - 0  # FULL - Submit all shares to pool
-            - 1  # ONLY_ON_BLOCK - Only submit shares that meet block difficulty
-            - 2  # REDUCED - Submit shares at a reduced rate
+            - 0
+            - 1
+            - 2
           description: |
             Share submission mode:
             * 0 - FULL: Submit all shares to pool
