@@ -18,6 +18,7 @@ static const char *TAG = "asic_result";
 #define SHARE_SUBMIT_MODE_REDUCED 2
 
 static uint32_t reduced_mode_share_counter = 0;
+static uint16_t previous_submit_mode = SHARE_SUBMIT_MODE_FULL;
 #define REDUCED_MODE_SUBMIT_EVERY_N 10
 
 void ASIC_result_task(void *pvParameters)
@@ -65,6 +66,12 @@ void ASIC_result_task(void *pvParameters)
         {
             uint16_t submit_mode = nvs_config_get_u16(NVS_CONFIG_SHARE_SUBMIT_MODE);
             
+            if (submit_mode == SHARE_SUBMIT_MODE_REDUCED && previous_submit_mode != SHARE_SUBMIT_MODE_REDUCED)
+            {
+                reduced_mode_share_counter = 0;
+            }
+            previous_submit_mode = submit_mode;
+            
             if (submit_mode == SHARE_SUBMIT_MODE_FULL)
             {
                 should_submit = true;
@@ -85,6 +92,11 @@ void ASIC_result_task(void *pvParameters)
                     should_submit = true;
                     reduced_mode_share_counter = 0;
                 }
+            }
+            else
+            {
+                ESP_LOGW(TAG, "Invalid submit_mode %d, defaulting to FULL", submit_mode);
+                should_submit = true;
             }
         }
 
