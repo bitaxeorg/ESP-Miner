@@ -26,7 +26,7 @@ void create_jobs_task(void *pvParameters)
     {
         mining_notify *mining_notification = (mining_notify *)queue_dequeue(&GLOBAL_STATE->stratum_queue);
         if (mining_notification == NULL) {
-            ESP_LOGE(TAG, "Failed to dequeue mining notification");
+            ESP_LOGW(TAG, "stratum_queue is empty");
             vTaskDelay(100 / portTICK_PERIOD_MS); // Wait a bit before trying again
             continue;
         }
