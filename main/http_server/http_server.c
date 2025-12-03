@@ -908,6 +908,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY));
 
+    cJSON_AddNumberToObject(root, "shareSubmitMode", nvs_config_get_u16(NVS_CONFIG_SHARE_SUBMIT_MODE));
+
     cJSON_AddNumberToObject(root, "blockFound", GLOBAL_STATE->SYSTEM_MODULE.block_found);
 
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {

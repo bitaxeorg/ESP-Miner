@@ -44,6 +44,11 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   public displays = ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
   public rotations = [0, 90, 180, 270];
+  public shareSubmitModes = [
+    { name: "Full", value: 0 },
+    { name: "Only on Block", value: 1 },
+    { name: "Reduced", value: 2 }
+  ];
   public displayTimeoutControl: FormControl;
   public statsFrequencyControl: FormControl;
 
@@ -172,7 +177,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
             Validators.required,
             Validators.min(0),
             Validators.max(this.statsFrequencyMaxValue)
-          ]]
+          ]],
+          shareSubmitMode: [info.shareSubmitMode || 0, [Validators.required]]
         });
 
         this.formSubject.next(this.form);
@@ -341,7 +347,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       'manualFanSpeed',
       'temptarget',
       'overheat_mode',
-      'statsFrequency'
+      'statsFrequency',
+      'shareSubmitMode'
     ];
   }
 

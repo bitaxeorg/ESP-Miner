@@ -13,6 +13,13 @@
 
 static const char *TAG = "asic_result";
 
+#define SHARE_SUBMIT_MODE_FULL 0
+#define SHARE_SUBMIT_MODE_ONLY_ON_BLOCK 1
+#define SHARE_SUBMIT_MODE_REDUCED 2
+
+static uint32_t reduced_mode_share_counter = 0;
+#define REDUCED_MODE_SUBMIT_EVERY_N 10
+
 void ASIC_result_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
@@ -53,7 +60,35 @@ void ASIC_result_task(void *pvParameters)
         //log the ASIC response
         ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid, asic_result->asic_nr, asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
 
+        bool should_submit = false;
         if (nonce_diff >= active_job->pool_diff)
+        {
+            uint16_t submit_mode = nvs_config_get_u16(NVS_CONFIG_SHARE_SUBMIT_MODE);
+            
+            if (submit_mode == SHARE_SUBMIT_MODE_FULL)
+            {
+                should_submit = true;
+            }
+            else if (submit_mode == SHARE_SUBMIT_MODE_ONLY_ON_BLOCK)
+            {
+                double network_diff = networkDifficulty(active_job->target);
+                if (nonce_diff > network_diff)
+                {
+                    should_submit = true;
+                }
+            }
+            else if (submit_mode == SHARE_SUBMIT_MODE_REDUCED)
+            {
+                reduced_mode_share_counter++;
+                if (reduced_mode_share_counter >= REDUCED_MODE_SUBMIT_EVERY_N)
+                {
+                    should_submit = true;
+                    reduced_mode_share_counter = 0;
+                }
+            }
+        }
+
+        if (should_submit)
         {
             char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
             int ret = STRATUM_V1_submit_share(

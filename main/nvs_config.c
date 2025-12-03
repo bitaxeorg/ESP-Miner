@@ -103,6 +103,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_TPS546]                                = {.nvs_key_name = "TPS546",          .type = TYPE_BOOL},
     [NVS_CONFIG_TMP1075]                               = {.nvs_key_name = "TMP1075",         .type = TYPE_BOOL},
     [NVS_CONFIG_POWER_CONSUMPTION_TARGET]              = {.nvs_key_name = "power_cons_tgt",  .type = TYPE_U16},
+    [NVS_CONFIG_SHARE_SUBMIT_MODE]                    = {.nvs_key_name = "shareSubmitMode", .type = TYPE_U16,   .default_value = {.u16 = 0},                                          .rest_name = "shareSubmitMode",                     .min = 0,  .max = 2},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
