@@ -177,6 +177,7 @@ components:
         - networkDifficulty
         - blockFound
         - hashrateMonitor
+        - shareSubmitMode
       properties:
         ASICModel:
           type: string
@@ -398,6 +399,19 @@ components:
               description: Hashrate register value per ASIC
               items:
                 $ref: '#/components/schemas/HashrateMonitorAsic'
+        shareSubmitMode:
+          type: integer
+          minimum: 0
+          maximum: 2
+          enum:
+            - 0  # FULL - Submit all shares to pool
+            - 1  # ONLY_ON_BLOCK - Only submit shares that meet block difficulty
+            - 2  # REDUCED - Submit shares at a reduced rate
+          description: |
+            Share submission mode:
+            * 0 - FULL: Submit all shares to pool
+            * 1 - ONLY_ON_BLOCK: Only submit shares that meet block difficulty
+            * 2 - REDUCED: Submit shares at a reduced rate
 
     Settings:
       type: object
@@ -541,6 +555,18 @@ components:
           minimum: 0
           examples:
             - 120
+        shareSubmitMode:
+          type: integer
+          description: |
+            Share submission mode:
+            * 0 - FULL: Submit all shares to pool
+            * 1 - ONLY_ON_BLOCK: Only submit shares that meet block difficulty
+            * 2 - REDUCED: Submit shares at a reduced rate
+          minimum: 0
+          maximum: 2
+          enum: [0, 1, 2]
+          examples:
+            - 0
       additionalProperties: true
 
   responses:
