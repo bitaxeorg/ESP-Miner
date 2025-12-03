@@ -186,7 +186,7 @@ bool check_dead_cores()
         }
         avg_hash /= domains;
         for(int d = 0; d < domains; d++) {
-            if(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][d].hashrate <= avg_hash * 0.6f)
+            if(GLOBAL_STATE->HASHRATE_MONITOR_MODULE.domain_measurements[i][d].hashrate <= avg_hash * 0.1f)
                 core_died = true;
         }
     }
@@ -203,7 +203,7 @@ bool check_dead_cores()
 void dowork()
 {
     if (critical_limithit()) {
-        last_asic_frequency_auto -= 1.f;
+        last_asic_frequency_auto -= AUTO_TUNE.step_freq;
         last_core_voltage_auto -= AUTO_TUNE.step_volt;
     } else if (!check_dead_cores() && can_increase_values()) {
         // Check if error increased since last voltage/frequency set
