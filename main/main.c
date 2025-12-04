@@ -3,7 +3,6 @@
 #include "esp_psram.h"
 
 #include "asic_result_task.h"
-#include "asic_task.h"
 #include "create_jobs_task.h"
 #include "hashrate_monitor_task.h"
 #include "statistics_task.h"
@@ -90,7 +89,6 @@ void app_main(void)
     }
 
     queue_init(&GLOBAL_STATE.stratum_queue);
-    queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
 
     if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
         return;
@@ -101,9 +99,6 @@ void app_main(void)
     }
     if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum miner task");
-    }
-    if (xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating asic task");
     }
     if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating asic result task");
