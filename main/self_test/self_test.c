@@ -97,14 +97,18 @@ static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 
 static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 {
-    uint16_t target_power = GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
-    uint16_t margin = POWER_CONSUMPTION_MARGIN;
+    float target_power = (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
+    float margin = (float)POWER_CONSUMPTION_MARGIN;
 
     float power = Power_get_power(GLOBAL_STATE);
     ESP_LOGI(TAG, "Power: %f", power);
-    if (power > target_power - margin && power < target_power + margin) {
+
+    if (power <= target_power + margin) {
         return ESP_OK;
     }
+
+    ESP_LOGE(TAG, "POWER test failed! measured %f, target %f +/- %f", power, target_power, margin);
+    display_msg("POWER:FAIL", GLOBAL_STATE);
     return ESP_FAIL;
 }
 
