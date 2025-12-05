@@ -63,7 +63,7 @@ typedef struct
     uint16_t fallback_pool_difficulty;
     bool pool_extranonce_subscribe;
     bool fallback_pool_extranonce_subscribe;
-    double response_time;
+    float response_time;
     bool use_fallback_stratum;
     bool is_using_fallback;
     int pool_addr_family;

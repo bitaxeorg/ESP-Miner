@@ -429,18 +429,18 @@
                             tooltip="Time it takes for the pool to respond to a share"
                         />
                     </div>
-                    <div>
-                        {{ info.responseTime }} ms
-                    </div>
+                    <ng-container *ngIf="info.responseTime > 0; else noValue">
+                        {{ info.responseTime | number:'1.1-1' }} ms
+                    </ng-container>
                 </div>
 
                 <div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
                         <span>Difficulty</span>
                     </div>
-                    <div>
+                    <ng-container *ngIf="info.poolDifficulty > 0; else noValue">
                         {{ info.poolDifficulty }}
-                    </div>
+                    </ng-container>
                 </div>
             </div>
         </div>
