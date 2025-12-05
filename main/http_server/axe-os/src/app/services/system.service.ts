@@ -4,9 +4,12 @@ import { delay, Observable, of, timeout } from 'rxjs';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
-import { ISystemInfo } from 'src/models/ISystemInfo';
-import { ISystemStatistics } from 'src/models/ISystemStatistics';
-import { ISystemASIC } from 'src/models/ISystemASIC';
+import {
+  SystemInfo as ISystemInfo,
+  SystemStatistics as ISystemStatistics,
+  SystemASIC as ISystemASIC,
+  SystemASICASICModelEnum
+} from 'src/app/generated';
 
 import { environment } from '../../environments/environment';
 
@@ -65,7 +68,7 @@ export class SystemService {
         ],
         uptimeSeconds: 38,
         smallCoreCount: 672,
-        ASICModel: "BM1370",
+        ASICModel: "BM1370" as SystemASICASICModelEnum,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
@@ -255,7 +258,7 @@ export class SystemService {
 
     // Mock data for development
     return of({
-      ASICModel: "BM1370",
+      ASICModel: "BM1370" as SystemASICASICModelEnum,
       deviceModel: "Gamma",
       swarmColor: "purple",
       asicCount: 1,

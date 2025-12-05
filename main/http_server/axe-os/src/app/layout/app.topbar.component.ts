@@ -4,7 +4,7 @@ import { ToastrService } from 'ngx-toastr';
 import { SystemService } from 'src/app/services/system.service';
 import { LayoutService } from './service/app.layout.service';
 import { SensitiveData } from 'src/app/services/sensitive-data.service';
-import { ISystemInfo } from 'src/models/ISystemInfo';
+import { SystemInfo as ISystemInfo } from 'src/app/generated';
 import { MenuItem } from 'primeng/api';
 
 @Component({
