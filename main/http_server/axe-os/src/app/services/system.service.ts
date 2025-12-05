@@ -4,9 +4,12 @@ import { delay, Observable, of, timeout } from 'rxjs';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
-import { ISystemInfo } from 'src/models/ISystemInfo';
-import { ISystemStatistics } from 'src/models/ISystemStatistics';
-import { ISystemASIC } from 'src/models/ISystemASIC';
+import {
+  SystemInfo as ISystemInfo,
+  SystemStatistics as ISystemStatistics,
+  SystemASIC as ISystemASIC,
+  SystemASICASICModelEnum
+} from 'src/app/generated';
 
 import { environment } from '../../environments/environment';
 
@@ -65,20 +68,25 @@ export class SystemService {
         ],
         uptimeSeconds: 38,
         smallCoreCount: 672,
-        ASICModel: "BM1370",
+        ASICModel: "BM1370" as SystemASICASICModelEnum,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         stratumSuggestedDifficulty: 1000,
-        stratumExtranonceSubscribe: 0,
+        stratumExtranonceSubscribe: false,
         fallbackStratumURL: "test.public-pool.io",
         fallbackStratumPort: 21497,
         fallbackStratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         fallbackStratumSuggestedDifficulty: 1000,
-        fallbackStratumExtranonceSubscribe: 0,
+        fallbackStratumExtranonceSubscribe: false,
         poolDifficulty: 1000,
         responseTime: 10,
-        isUsingFallbackStratum: false,
+        isPSRAMAvailable: 1,
+        minimumFanSpeed: 20,
+        overclockEnabled: 0,
+        power_fault: "",
+        runningPartition: "factory",
+        isUsingFallbackStratum: 0,
         poolAddrFamily: 2,
         frequency: 485,
         version: "v2.12.0",
@@ -251,7 +259,7 @@ export class SystemService {
 
     // Mock data for development
     return of({
-      ASICModel: "BM1370",
+      ASICModel: "BM1370" as SystemASICASICModelEnum,
       deviceModel: "Gamma",
       swarmColor: "purple",
       asicCount: 1,
