@@ -79,6 +79,34 @@ menu "Stratum Configuration"
         default 21496
         help
             The stratum server port to connect to.
+    
+    choice
+        prompt "Stratum TLS mode"
+        default STRATUM_TLS_DISABLED
+        help
+            Select how TLS is used for stratum connections.
+
+        config STRATUM_TLS_DISABLED
+            bool "Disabled"
+
+        config STRATUM_TLS_BUNDLED
+            bool "Enabled (bundled CA certificate)"
+
+        config STRATUM_TLS_CUSTOM
+            bool "Enabled (user-provided/custom CA certificate)"
+    endchoice
+
+    config STRATUM_TLS
+        int
+        default 0 if STRATUM_TLS_DISABLED
+        default 1 if STRATUM_TLS_BUNDLED
+        default 2 if STRATUM_TLS_CUSTOM
+    
+    config STRATUM_CERT
+        string "Stratum Certificate"
+        default "x"
+        help
+            The certificate to use with the stratum connection.
 
     config EXTRANONCE_SUBSCRIBE
         bool "Pool extranonce subscribe"
@@ -98,6 +126,34 @@ menu "Stratum Configuration"
         default 3333
         help
             The stratum server port to connect to if the primary fails.
+    
+    choice
+        prompt "Fallback Stratum TLS mode"
+        default FALLBACK_STRATUM_TLS_DISABLED
+        help
+            Select how TLS is used for stratum connections.
+
+        config FALLBACK_STRATUM_TLS_DISABLED
+            bool "Disabled"
+
+        config FALLBACK_STRATUM_TLS_BUNDLED
+            bool "Enabled (bundled CA certificate)"
+
+        config FALLBACK_STRATUM_TLS_CUSTOM
+            bool "Enabled (user-provided/custom CA certificate)"
+    endchoice
+
+    config FALLBACK_STRATUM_TLS
+        int
+        default 0 if FALLBACK_STRATUM_TLS_DISABLED
+        default 1 if FALLBACK_STRATUM_TLS_BUNDLED
+        default 2 if FALLBACK_STRATUM_TLS_CUSTOM
+    
+    config FALLBACK_STRATUM_CERT
+        string "Fallback Stratum Certificate"
+        default "x"
+        help
+            The certificate to use with the stratum connection if the primary fails.
 
     config FALLBACK_EXTRANONCE_SUBSCRIBE
         bool "Fallback pool extranonce subscribe"
