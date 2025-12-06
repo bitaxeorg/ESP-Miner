@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
+#include "esp_idf_version.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
@@ -16,6 +17,15 @@
 #include "connect.h"
 #include "global_state.h"
 #include "nvs_config.h"
+
+// ESP-IDF 6.0 compatibility: WiFi interface constants were renamed
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+    #define COMPAT_WIFI_IF_STA WIFI_IF_STA
+    #define COMPAT_WIFI_IF_AP  WIFI_IF_AP
+#else
+    #define COMPAT_WIFI_IF_STA ESP_IF_WIFI_STA
+    #define COMPAT_WIFI_IF_AP  ESP_IF_WIFI_AP
+#endif
 
 // Maximum number of access points to scan
 #define MAX_AP_COUNT 20
@@ -297,7 +307,7 @@ esp_netif_t * wifi_init_softap(char * ap_ssid)
     esp_netif_t * esp_netif_ap = esp_netif_create_default_wifi_ap();
 
     uint8_t mac[6];
-    esp_wifi_get_mac(ESP_IF_WIFI_AP, mac);
+    esp_wifi_get_mac(COMPAT_WIFI_IF_AP, mac);
     // Format the last 4 bytes of the MAC address as a hexadecimal string
     snprintf(ap_ssid, 32, "Bitaxe_%02X%02X", mac[4], mac[5]);
 
@@ -311,7 +321,7 @@ esp_netif_t * wifi_init_softap(char * ap_ssid)
     wifi_ap_config.ap.authmode = WIFI_AUTH_OPEN;
     wifi_ap_config.ap.pmf_cfg.required = false;
 
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_ap_config));
+    ESP_ERROR_CHECK(esp_wifi_set_config(COMPAT_WIFI_IF_AP, &wifi_ap_config));
 
     return esp_netif_ap;
 }
@@ -384,7 +394,7 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
     // strncpy((char *) wifi_sta_config.sta.password, wifi_pass, 63);
     // wifi_sta_config.sta.password[63] = '\0';
 
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_sta_config));
+    ESP_ERROR_CHECK(esp_wifi_set_config(COMPAT_WIFI_IF_STA, &wifi_sta_config));
 
     // IPv6 link-local address will be created after WiFi connection
     

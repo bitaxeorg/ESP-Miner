@@ -59,7 +59,6 @@ INCLUDE_DIRS
 
 PRIV_REQUIRES
     "app_update"
-    "driver"
     "esp_adc"
     "esp_app_format"
     "esp_event"
@@ -68,14 +67,26 @@ PRIV_REQUIRES
     "esp_psram"
     "esp_timer"
     "esp_wifi"
-    "json"
     "nvs_flash"
     "spiffs"
     "vfs"
-    "esp_driver_i2c"
 
 EMBED_FILES "http_server/recovery_page.html"
 )
+
+# ESP-IDF 6.0+ uses separate driver components, 5.x uses unified "driver"
+# ESP-IDF 6.0 renamed json to cjson
+if(IDF_VERSION_MAJOR GREATER_EQUAL 6)
+    idf_component_get_property(uart_lib esp_driver_uart COMPONENT_LIB)
+    idf_component_get_property(gpio_lib esp_driver_gpio COMPONENT_LIB)
+    idf_component_get_property(i2c_lib esp_driver_i2c COMPONENT_LIB)
+    idf_component_get_property(json_lib cjson COMPONENT_LIB)
+    target_link_libraries(${COMPONENT_LIB} PRIVATE ${uart_lib} ${gpio_lib} ${i2c_lib} ${json_lib})
+else()
+    idf_component_get_property(driver_lib driver COMPONENT_LIB)
+    idf_component_get_property(json_lib json COMPONENT_LIB)
+    target_link_libraries(${COMPONENT_LIB} PRIVATE ${driver_lib} ${json_lib})
+endif()
 
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_INCLUDE_SIMPLE=1" APPEND)
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH=\"${CMAKE_SOURCE_DIR}/main/lv_conf.h\"" APPEND)
