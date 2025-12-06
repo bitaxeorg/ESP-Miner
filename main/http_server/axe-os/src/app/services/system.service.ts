@@ -78,7 +78,7 @@ export class SystemService {
         fallbackStratumExtranonceSubscribe: 0,
         poolDifficulty: 1000,
         responseTime: 10,
-        isUsingFallbackStratum: false,
+        isUsingFallbackStratum: 0,
         poolAddrFamily: 2,
         frequency: 485,
         version: "v2.12.0",
