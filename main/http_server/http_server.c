@@ -44,6 +44,7 @@
 #include "theme_api.h"  // Add theme API include
 #include "axe-os/api/system/asic_settings.h"
 #include "display.h"
+#include "mdns.h"
 #include "http_server.h"
 #include "system.h"
 #include "websocket.h"
@@ -261,6 +262,26 @@ static uint32_t extract_origin_ip_addr(char *origin)
     return origin_ip_addr;
 }
 
+// Helper function to normalize hostname by stripping ".local" suffix if present
+// This prevents Avahi from creating duplicate ".local.local" hostnames
+static void normalize_hostname(char *hostname, size_t max_len) {
+    if (hostname == NULL || strlen(hostname) == 0) {
+        return;
+    }
+
+    size_t len = strlen(hostname);
+    const char *suffix = ".local";
+    size_t suffix_len = strlen(suffix);
+
+    // Check if hostname ends with ".local" (case-insensitive)
+    if (len > suffix_len &&
+        strcasecmp(hostname + len - suffix_len, suffix) == 0) {
+        // Strip the ".local" suffix
+        hostname[len - suffix_len] = '\0';
+        ESP_LOGD(TAG, "Normalized hostname from '%s.local' to '%s'", hostname, hostname);
+    }
+}
+
 esp_err_t is_network_allowed(httpd_req_t * req)
 {
     if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
@@ -298,7 +319,35 @@ esp_err_t is_network_allowed(httpd_req_t * req)
     }
 
     if (ip_in_private_range(origin_ip_addr) == ESP_OK && ip_in_private_range(request_ip_addr) == ESP_OK) {
+        ESP_LOGD(CORS_TAG, "Origin and IP both in private range. Allowing.");
         return ESP_OK;
+    }
+
+    // Check if Origin header matches the avahi hostname    
+    if (httpd_req_get_hdr_value_len(req, "Origin") > 0) {
+        httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin));
+        ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
+        char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+        ESP_LOGD(CORS_TAG, "Configured hostname: %s", hostname);
+        char expected[256];
+        snprintf(expected, sizeof(expected), "http://%s.local", hostname);
+        ESP_LOGD(CORS_TAG, "Expected origin with .local: %s", expected);
+        if (strcmp(origin, expected) == 0) {
+            free(hostname);
+            ESP_LOGD(CORS_TAG, "Request from avahi hostname - allowing access");
+            return ESP_OK;
+        }
+        // Also check without .local suffix
+        snprintf(expected, sizeof(expected), "http://%s", hostname);
+        ESP_LOGD(CORS_TAG, "Expected origin without .local: %s", expected);
+        if (strcmp(origin, expected) == 0) {
+            free(hostname);
+            ESP_LOGD(CORS_TAG, "Request from hostname - allowing access");
+            return ESP_OK;
+        }
+        free(hostname);
+    } else {
+        ESP_LOGD(CORS_TAG, "No Origin header found");
     }
 
     ESP_LOGI(CORS_TAG, "Client is NOT in the private ip ranges or same range as server.");
@@ -631,7 +680,21 @@ bool check_settings_and_update(const cJSON * const root)
 
             switch(setting->type) {
                 case TYPE_STR:
-                    nvs_config_set_string(key, item->valuestring);
+
+                    if (key == NVS_CONFIG_HOSTNAME)
+                    {
+                        char normalized_hostname[64];
+                        strlcpy(normalized_hostname, item->valuestring, sizeof(normalized_hostname));
+                        normalize_hostname(normalized_hostname, sizeof(normalized_hostname));
+                        nvs_config_set_string(key, normalized_hostname);
+                        update_mdns_hostname(normalized_hostname);
+                        ESP_LOGI(TAG, "Updated hostname to: %s", normalized_hostname);
+                    }
+                    else
+                    {
+                        nvs_config_set_string(key, item->valuestring);
+                    }
+
                     break;
                 case TYPE_U16:
                     nvs_config_set_u16(key, (uint16_t)item->valueint);
@@ -799,7 +862,23 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     }
 
     char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
-    char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    char * hostname_base = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    char mdns_hostname[64] = {0};
+    char hostname[64];
+    if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
+        esp_err_t mdns_err = mdns_hostname_get(mdns_hostname);
+        ESP_LOGI(TAG, "mdns_hostname_get returned %d, hostname: %s", mdns_err, mdns_hostname);
+        if (mdns_err == ESP_OK && strlen(mdns_hostname) > 0) {
+            snprintf(hostname, sizeof(hostname), "%s.local", mdns_hostname);
+            ESP_LOGI(TAG, "Using mDNS hostname: %s", hostname);
+        } else {
+            strcpy(hostname, hostname_base);
+            ESP_LOGI(TAG, "Using base hostname: %s", hostname);
+        }
+    } else {
+        strcpy(hostname, hostname_base);
+        ESP_LOGI(TAG, "Device not connected, using base hostname: %s", hostname);
+    }
     char * ipv4 = GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str;
     char * ipv6 = GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str;
     char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL);
@@ -816,6 +895,15 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     int8_t wifi_rssi = -90;
     get_wifi_current_rssi(&wifi_rssi);
+
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    char ip_str[16] = "";
+    if (netif != NULL) {
+        esp_netif_ip_info_t ip_info;
+        if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
+            inet_ntop(AF_INET, &ip_info.ip, ip_str, sizeof(ip_str));
+        }
+    }
 
     cJSON * root = cJSON_CreateObject();
     cJSON_AddFloatToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
@@ -856,6 +944,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "ipv6", ipv6);
     cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
     cJSON_AddNumberToObject(root, "wifiRSSI", wifi_rssi);
+    cJSON_AddStringToObject(root, "ip", ip_str);
     cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
     cJSON_AddNumberToObject(root, "sharesAccepted", GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
     cJSON_AddNumberToObject(root, "sharesRejected", GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
@@ -948,7 +1037,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     }
 
     free(ssid);
-    free(hostname);
+    free(hostname_base);
     free(stratumURL);
     free(fallbackStratumURL);
     free(stratumUser);

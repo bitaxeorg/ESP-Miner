@@ -1,6 +1,7 @@
 #include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
+#include "mdns.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -60,10 +61,79 @@ static uint16_t ap_number = 0;
 static wifi_ap_record_t ap_info[MAX_AP_COUNT];
 static int s_retry_num = 0;
 static int clients_connected_to_ap = 0;
+static bool mdns_initialized = false;
 
 static const char *get_wifi_reason_string(int reason);
 static void wifi_softap_on(void);
 static void wifi_softap_off(void);
+
+static void initialize_mdns(GlobalState *GLOBAL_STATE) {
+    if (mdns_initialized) {
+        return;
+    }
+
+    char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    esp_err_t err = mdns_init();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "mDNS/Avahi initialization failed: %s", esp_err_to_name(err));
+        ESP_LOGW(TAG, "Device will not be discoverable via mDNS/Bonjour/Avahi");
+    } else {
+        ESP_LOGI(TAG, "mDNS/Avahi initialized successfully - device discoverable on network");
+
+        /* Set mDNS hostname */
+        err = mdns_hostname_set(hostname);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "mDNS hostname setup failed: %s", esp_err_to_name(err));
+            ESP_LOGW(TAG, "Device hostname not set for mDNS discovery");
+        } else {
+            ESP_LOGI(TAG, "mDNS hostname set to: %s.local", hostname);
+            ESP_LOGI(TAG, "Access device at: http://%s.local", hostname);
+        }
+
+        /* Set mDNS instance name */
+        uint8_t mac[6];
+        esp_wifi_get_mac(WIFI_IF_STA, mac);
+        char mac_suffix[6];
+        snprintf(mac_suffix, sizeof(mac_suffix), "%02X%02X", mac[4], mac[5]);
+
+        char instance_name[64];
+        snprintf(instance_name, sizeof(instance_name), "Bitaxe %s %s (%s)",
+                 GLOBAL_STATE->DEVICE_CONFIG.family.name,
+                 GLOBAL_STATE->DEVICE_CONFIG.board_version,
+                 mac_suffix);
+        
+        /* Add HTTP service */
+        err = mdns_service_add(instance_name, "_http", "_tcp", 80, NULL, 0);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "mDNS HTTP service registration failed: %s", esp_err_to_name(err));
+            ESP_LOGW(TAG, "HTTP service not advertised via mDNS");
+        } else {
+            ESP_LOGI(TAG, "mDNS HTTP service registered: _http._tcp port 80");
+            ESP_LOGI(TAG, "Discover with: avahi-browse _http._tcp");
+            ESP_LOGI(TAG, "mDNS instance: %s", instance_name);
+        }
+
+        ESP_LOGI(TAG, "mDNS/Avahi setup complete - device ready for network discovery");
+        mdns_initialized = true;
+    }
+    free(hostname);
+}
+
+esp_err_t update_mdns_hostname(const char *new_hostname) {
+    if (new_hostname == NULL || strlen(new_hostname) == 0) {
+        ESP_LOGW(TAG, "Invalid hostname provided for mDNS update");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t err = mdns_hostname_set(new_hostname);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to update mDNS hostname to: %s, error: %s", new_hostname, esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "mDNS hostname updated to: %s", new_hostname);
+    return ESP_OK;
+}
 
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
@@ -258,6 +328,8 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         if (ipv6_err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to create IPv6 link-local address: %s", esp_err_to_name(ipv6_err));
         }
+
+        initialize_mdns(GLOBAL_STATE);
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
@@ -289,6 +361,8 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1] = '\0';
             ESP_LOGI(TAG, "IPv6 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
         }
+
+        initialize_mdns(GLOBAL_STATE);
     }
 }
 
