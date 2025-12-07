@@ -84,7 +84,7 @@ static void display_msg(char * msg, GlobalState * GLOBAL_STATE)
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 {
     uint16_t fan_speed = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
-    ESP_LOGI(TAG, "fanSpeed: %d", fan_speed);
+    ESP_LOGI(TAG, "fanSpeed: %d RPM", fan_speed);
     if (fan_speed > FAN_SPEED_TARGET_MIN) {
         return ESP_OK;
     }
@@ -97,21 +97,25 @@ static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 
 static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 {
-    uint16_t target_power = GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
-    uint16_t margin = POWER_CONSUMPTION_MARGIN;
+    float target_power = (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
+    float margin = (float)POWER_CONSUMPTION_MARGIN;
 
     float power = Power_get_power(GLOBAL_STATE);
-    ESP_LOGI(TAG, "Power: %f", power);
-    if (power > target_power - margin && power < target_power + margin) {
+    ESP_LOGI(TAG, "Power: %.2f W", power);
+
+    if (power <= target_power + margin) {
         return ESP_OK;
     }
+
+    ESP_LOGE(TAG, "POWER test failed! measured %.2f W, target %.2f W +/- %.2f W", power, target_power, margin);
+    display_msg("POWER:FAIL", GLOBAL_STATE);
     return ESP_FAIL;
 }
 
 static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 {
     uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
-    ESP_LOGI(TAG, "Voltage: %u", core_voltage);
+    ESP_LOGI(TAG, "Voltage: %u mV", core_voltage);
 
     if (core_voltage > CORE_VOLTAGE_TARGET_MIN && core_voltage < CORE_VOLTAGE_TARGET_MAX) {
         return ESP_OK;
@@ -431,7 +435,7 @@ bool self_test(void * pvParameters)
                                 * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count
                                 / 1000.0f;
 
-    ESP_LOGI(TAG, "Hashrate: %f, Expected: %f", hashrate, expected_hashrate_mhs);
+    ESP_LOGI(TAG, "Hashrate: %.2f Gh/s, Expected: %.2f Gh/s", hashrate, expected_hashrate_mhs);
 
     if (hashrate < expected_hashrate_mhs) {
         display_msg("HASHRATE:FAIL", GLOBAL_STATE);
@@ -443,7 +447,7 @@ bool self_test(void * pvParameters)
 
 
     float asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
-    ESP_LOGI(TAG, "ASIC Temp %f", asic_temp);
+    ESP_LOGI(TAG, "ASIC Temp: %.2f C", asic_temp);
 
     // detect open circiut / no result
     if(asic_temp == -1.0 || asic_temp == 127.0){
@@ -457,7 +461,7 @@ bool self_test(void * pvParameters)
 
     // TODO: Maybe make a test equivalent for test values
     if (test_power_consumption(GLOBAL_STATE) != ESP_OK) {
-        ESP_LOGE(TAG, "Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
+        ESP_LOGE(TAG, "Power Draw Failed, target %.2f W", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
         display_msg("POWER:FAIL", GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
     }

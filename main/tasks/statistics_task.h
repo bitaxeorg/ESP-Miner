@@ -24,6 +24,7 @@ struct StatisticsData
     uint16_t fan2RPM;
     int8_t wifiRSSI;
     uint32_t freeHeap;
+    float responseTime;
 };
 
 bool getStatisticData(uint16_t index, StatisticsDataPtr dataOut);

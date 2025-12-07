@@ -438,6 +438,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         info.coreVoltage = parseFloat(info.coreVoltage.toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
         info.temp2 = parseFloat(info.temp2.toFixed(1));
+        info.responseTime = parseFloat(info.responseTime.toFixed(1));
 
         return info;
       }),
@@ -713,6 +714,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fanSpeed:         return 100;
       case eChartLabel.fanRpm:           return 7000;
       case eChartLabel.fan2Rpm:          return 7000;
+      case eChartLabel.responseTime:     return 50;
       case eChartLabel.frequency:        return 0;
       default:                           return 0;
     }
@@ -736,6 +738,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fan2Rpm:            return info.fan2rpm;
       case eChartLabel.wifiRssi:           return info.wifiRSSI;
       case eChartLabel.freeHeap:           return info.freeHeap;
+      case eChartLabel.responseTime:       return info.responseTime;
       case eChartLabel.frequency:          return info.frequency;
       default:                             return 0.0;
     }
@@ -754,6 +757,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fanRpm:
       case eChartLabel.fan2Rpm:          return {suffix: ' rpm', precision: 0};
       case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
+      case eChartLabel.responseTime:     return {suffix: ' ms', precision: 1};
       case eChartLabel.frequency:        return {suffix: ' MHz', precision: 1};
       default:                           return {suffix: '', precision: 0};
     }

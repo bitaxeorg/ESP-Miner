@@ -149,6 +149,7 @@ void statistics_task(void * pvParameters)
                 statsData.fan2RPM = power_management->fan2_rpm;
                 statsData.wifiRSSI = wifiRSSI;
                 statsData.freeHeap = esp_get_free_heap_size();
+                statsData.responseTime = sys_module->response_time;
                 statsData.frequency = power_management->frequency_value;
                 statsData.core_voltage = power_management->core_voltage;
 
