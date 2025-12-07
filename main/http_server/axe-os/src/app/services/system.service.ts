@@ -82,6 +82,7 @@ export class SystemService {
         isUsingFallbackStratum: false,
         poolAddrFamily: 2,
         frequency: 485,
+        frequencySet: 450,
         version: "v2.12.0",
         axeOSVersion: "v2.12.0",
         idfVersion: "v5.5.1",
