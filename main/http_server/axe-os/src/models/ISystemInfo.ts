@@ -82,6 +82,7 @@ export interface ISystemInfo {
     fan2rpm: number,
     statsFrequency: number,
     coreVoltageActual: number,
+    coreVoltageSet: number,
 
     boardtemp1?: number,
     boardtemp2?: number,

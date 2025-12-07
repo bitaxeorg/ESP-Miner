@@ -708,6 +708,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.asicTemp:         return this.maxTemp;
       case eChartLabel.vrTemp:           return this.maxTemp + 25;
       case eChartLabel.asicVoltage:      return info.coreVoltage;
+      case eChartLabel.asicVoltageSet:   return info.coreVoltageSet;
       case eChartLabel.voltage:          return info.nominalVoltage + .5;
       case eChartLabel.power:            return this.maxPower;
       case eChartLabel.current:          return this.maxPower / info.coreVoltage;
@@ -730,6 +731,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.asicTemp:           return info.temp;
       case eChartLabel.vrTemp:             return info.vrTemp;
       case eChartLabel.asicVoltage:        return info.coreVoltageActual;
+      case eChartLabel.asicVoltageSet:     return info.coreVoltageSet;
       case eChartLabel.voltage:            return info.voltage;
       case eChartLabel.power:              return info.power;
       case eChartLabel.current:            return info.current;
@@ -750,7 +752,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.asicTemp:
       case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};
       case eChartLabel.asicVoltage:
-      case eChartLabel.voltage:          return {suffix: ' V', precision: 3};
+      case eChartLabel.voltage:
+      case eChartLabel.asicVoltageSet:   return {suffix: ' V', precision: 3};
       case eChartLabel.power:            return {suffix: ' W', precision: 1};
       case eChartLabel.current:          return {suffix: ' A', precision: 1};
       case eChartLabel.fanSpeed:         return {suffix: ' %', precision: 1};

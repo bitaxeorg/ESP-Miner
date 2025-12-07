@@ -62,6 +62,7 @@ static const char * STATS_LABEL_ERROR_PERCENTAGE = "errorPercentage";
 static const char * STATS_LABEL_ASIC_TEMP = "asicTemp";
 static const char * STATS_LABEL_VR_TEMP = "vrTemp";
 static const char * STATS_LABEL_ASIC_VOLTAGE = "asicVoltage";
+static const char * STATS_LABEL_ASIC_VOLTAGE_SET = "asicVoltageSet";
 static const char * STATS_LABEL_VOLTAGE = "voltage";
 static const char * STATS_LABEL_POWER = "power";
 static const char * STATS_LABEL_CURRENT = "current";
@@ -90,6 +91,7 @@ typedef enum
     SRC_ASIC_TEMP,
     SRC_VR_TEMP,
     SRC_ASIC_VOLTAGE,
+    SRC_ASIC_VOLTAGE_SET,
     SRC_VOLTAGE,
     SRC_POWER,
     SRC_CURRENT,
@@ -100,6 +102,7 @@ typedef enum
     SRC_FREE_HEAP,
     SRC_RESPONSE_TIME,
     SRC_FREQUENCY,
+    SRC_VOLTAGE_SET,
     SRC_NONE // last
 } DataSource;
 
@@ -117,6 +120,7 @@ DataSource strToDataSource(const char * sourceStr)
         if (strcmp(sourceStr, STATS_LABEL_ASIC_TEMP) == 0)    return SRC_ASIC_TEMP;
         if (strcmp(sourceStr, STATS_LABEL_VR_TEMP) == 0)      return SRC_VR_TEMP;
         if (strcmp(sourceStr, STATS_LABEL_ASIC_VOLTAGE) == 0) return SRC_ASIC_VOLTAGE;
+        if (strcmp(sourceStr, STATS_LABEL_ASIC_VOLTAGE_SET) == 0) return SRC_ASIC_VOLTAGE_SET;
         if (strcmp(sourceStr, STATS_LABEL_FAN_SPEED) == 0)    return SRC_FAN_SPEED;
         if (strcmp(sourceStr, STATS_LABEL_FAN_RPM) == 0)      return SRC_FAN_RPM;
         if (strcmp(sourceStr, STATS_LABEL_FAN2_RPM) == 0)     return SRC_FAN2_RPM;
@@ -852,6 +856,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
     cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "coreVoltageSet", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.core_voltage);
     cJSON_AddNumberToObject(root, "frequency", frequency);
     cJSON_AddNumberToObject(root, "frequencySet", nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY));
     cJSON_AddStringToObject(root, "ssid", ssid);
@@ -1025,6 +1030,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VR_TEMP)); }
     if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_VOLTAGE)); }
     if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VOLTAGE)); }
+    if (dataSelection[SRC_VOLTAGE_SET]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_VOLTAGE_SET)); }
     if (dataSelection[SRC_POWER]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_POWER)); }
     if (dataSelection[SRC_CURRENT]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_CURRENT)); }
     if (dataSelection[SRC_FAN_SPEED]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_FAN_SPEED)); }
@@ -1052,6 +1058,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.chipTemperature)); }
         if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.vrTemperature)); }
         if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); }
+        if (dataSelection[SRC_ASIC_VOLTAGE_SET]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.core_voltage)); }
         if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.voltage)); }
         if (dataSelection[SRC_POWER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.power)); }
         if (dataSelection[SRC_CURRENT]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.current)); }
