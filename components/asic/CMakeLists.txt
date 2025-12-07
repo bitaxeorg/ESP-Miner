@@ -14,11 +14,19 @@ SRCS
 INCLUDE_DIRS 
     "include"
 
-REQUIRES 
+REQUIRES
     "freertos"
-    "driver"
     "stratum"
 )
+
+# ESP-IDF 6.0+ uses separate driver components, 5.x uses unified "driver"
+if(IDF_VERSION_MAJOR GREATER_EQUAL 6)
+    idf_component_get_property(uart_lib esp_driver_uart COMPONENT_LIB)
+    target_link_libraries(${COMPONENT_LIB} PUBLIC ${uart_lib})
+else()
+    idf_component_get_property(driver_lib driver COMPONENT_LIB)
+    target_link_libraries(${COMPONENT_LIB} PUBLIC ${driver_lib})
+endif()
 
 
 # Include the header files from "main" directory
