@@ -1,6 +1,10 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
+#include "tinyusb.h"
+#include "tinyusb_default_config.h"
+#include "tinyusb_cdc_acm.h"
+#include "tinyusb_console.h"
 
 #include "asic_result_task.h"
 #include "asic_task.h"
@@ -28,7 +32,24 @@ static const char * TAG = "bitaxe";
 
 void app_main(void)
 {
+    tinyusb_config_t tusb_cfg = TINYUSB_DEFAULT_CONFIG();
+    ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
+
+    tinyusb_config_cdcacm_t acm_cfg = {
+        .cdc_port = TINYUSB_CDC_ACM_0,
+        .callback_rx = NULL,
+        .callback_rx_wanted_char = NULL,
+        .callback_line_state_changed = NULL,
+        .callback_line_coding_changed = NULL,
+    };
+    ESP_ERROR_CHECK(tinyusb_cdcacm_init(&acm_cfg));
+
+    // Redirect stdout/stderr to USB CDC for serial logging (idf.py monitor)
+    ESP_ERROR_CHECK(tinyusb_console_init(TINYUSB_CDC_ACM_0));
+
+    // Now logging will go to USB CDC
     ESP_LOGI(TAG, "Welcome to the bitaxe - FOSS || GTFO!");
+    ESP_LOGI(TAG, "USB CDC initialized with VID:0x1209 PID:0x6102");
 
     if (!esp_psram_is_initialized()) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32 device!");
