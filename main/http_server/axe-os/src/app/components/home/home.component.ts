@@ -441,6 +441,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         info.temp = parseFloat(info.temp.toFixed(1));
         info.temp2 = parseFloat(info.temp2.toFixed(1));
         info.responseTime = parseFloat(info.responseTime.toFixed(1));
+        info.frequency = parseFloat(info.frequency.toFixed(2));
 
         return info;
       }),
