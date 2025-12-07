@@ -377,6 +377,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         info.current = info.current / 1000;
         info.coreVoltageActual = info.coreVoltageActual / 1000;
         info.coreVoltage = info.coreVoltage / 1000;
+        info.coreVoltageSet = info.coreVoltageSet / 1000;
         return info;
       }),
       tap(info => {
@@ -436,6 +437,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         info.current = parseFloat(info.current.toFixed(1));
         info.coreVoltageActual = parseFloat(info.coreVoltageActual.toFixed(2));
         info.coreVoltage = parseFloat(info.coreVoltage.toFixed(2));
+        info.coreVoltageSet = parseFloat(info.coreVoltageSet.toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
         info.temp2 = parseFloat(info.temp2.toFixed(1));
         info.responseTime = parseFloat(info.responseTime.toFixed(1));
