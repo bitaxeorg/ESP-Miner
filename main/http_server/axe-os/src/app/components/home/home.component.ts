@@ -323,6 +323,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         stats.statistics.forEach(element => {
           switch (chartLabelValue(chartY1DataLabel)) {
             case eChartLabel.asicVoltage:
+            case eChartLabel.asicVoltageSet:
             case eChartLabel.voltage:
             case eChartLabel.current:
               element[idxChartY1Data] = element[idxChartY1Data] / 1000;
@@ -332,6 +333,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
           switch (chartLabelValue(chartY2DataLabel)) {
             case eChartLabel.asicVoltage:
+            case eChartLabel.asicVoltageSet:
             case eChartLabel.voltage:
             case eChartLabel.current:
               element[idxChartY2Data] = element[idxChartY2Data] / 1000;
