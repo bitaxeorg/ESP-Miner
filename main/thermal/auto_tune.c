@@ -225,6 +225,19 @@ void dowork()
 
 void auto_tune()
 {
+    bool pid_active = nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED);
+    if(!pid_active)
+    {
+        int manspeed = nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED);
+        if(manspeed > AUTO_TUNE.fan_limit)
+            AUTO_TUNE.fan_limit = manspeed + 1;
+    }
+    else
+    {
+        int targettemp = nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET);
+        if(targettemp > AUTO_TUNE.max_temp_asic)
+            AUTO_TUNE.max_temp_asic = targettemp + 1;
+    }
     current_hashrate_auto = GLOBAL_STATE->SYSTEM_MODULE.current_hashrate;
     update_hashrate_history(current_hashrate_auto);
 
