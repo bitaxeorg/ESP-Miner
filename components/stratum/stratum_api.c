@@ -103,10 +103,15 @@ esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert)
                 break;
             case CUSTOM_CRT:
                 ESP_LOGI(TAG, "Using custom cert");
+                if (cert == NULL_DESC_TYPE) {
+                    ESP_LOGE(TAG, "Error: no TLS certificate");
+                    return NULL;
+                }
                 esp_transport_ssl_set_cert_data(transport, cert, strlen(cert));
                 break;
             default:
                 ESP_LOGE(TAG, "Invalid TLS mode");
+                esp_transport_destroy(transport);
                 return NULL;
         }
     }
