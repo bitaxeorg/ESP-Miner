@@ -160,7 +160,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
     cJSON * json = cJSON_Parse(stratum_json);
 
     cJSON * id_json = cJSON_GetObjectItem(json, "id");
-    int64_t parsed_id = -1;
+    int parsed_id = -1;
     if (id_json != NULL && cJSON_IsNumber(id_json)) {
         parsed_id = id_json->valueint;
     }
@@ -182,6 +182,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             result = MINING_SET_EXTRANONCE;
         } else if (strcmp("client.reconnect", method_json->valuestring) == 0) {
             result = CLIENT_RECONNECT;
+        } else if (strcmp("mining.ping", method_json->valuestring) == 0) {
+            result = MINING_PING;
         } else {
             ESP_LOGI(TAG, "unhandled method in stratum message: %s", stratum_json);
         }
@@ -412,6 +414,15 @@ int STRATUM_V1_authorize(int socket, int send_uid, const char * username, const 
     debug_stratum_tx(authorize_msg);
 
     return write(socket, authorize_msg, strlen(authorize_msg));
+}
+
+int STRATUM_V1_pong(int socket, int message_id)
+{
+    char pong_msg[BUFFER_SIZE];
+    snprintf(pong_msg, sizeof(pong_msg), "{\"id\":%d,\"method\":\"pong\",\"params\":[]}\n", message_id);
+    debug_stratum_tx(pong_msg);
+    
+    return write(socket, pong_msg, strlen(pong_msg));
 }
 
 /// @param socket Socket to write to
