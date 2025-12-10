@@ -80,33 +80,24 @@ export class PoolComponent implements OnInit {
           fallbackStratumPassword: ['*****', [Validators.required]]
         });
 
-        // Add conditional validation for primary stratumCert
-        this.form.get('stratumTLS')?.valueChanges.subscribe(value => {
-          const certControl = this.form.get('stratumCert');
-          if (value === 2) { // Only validate certificate when "Custom CA" (value 2) is selected
-            certControl?.setValidators([
-              Validators.required,
-              this.pemCertificateValidator()
-            ]);
-          } else {
-            certControl?.clearValidators();
-          }
-          certControl?.updateValueAndValidity();
-        });
+        const setupTlsValidation = (tlsControlName: string, certControlName: string) => {
+          this.form.get(tlsControlName)?.valueChanges.subscribe(value => {
+            const certControl = this.form.get(certControlName);
+            if (value === 2) {
+              certControl?.setValidators([
+                Validators.required,
+                this.pemCertificateValidator()
+              ]);
+            } else {
+              certControl?.clearValidators();
+            }
+            certControl?.updateValueAndValidity();
+          });
+        };
 
-        // Add conditional validation for fallback stratumCert
-        this.form.get('fallbackStratumTLS')?.valueChanges.subscribe(value => {
-          const certControl = this.form.get('fallbackStratumCert');
-          if (value === 2) { // Only validate certificate when "Custom CA" (value 2) is selected
-            certControl?.setValidators([
-              Validators.required,
-              this.pemCertificateValidator()
-            ]);
-          } else {
-            certControl?.clearValidators();
-          }
-          certControl?.updateValueAndValidity();
-        });
+        // Setup tls validation
+        setupTlsValidation('stratumTLS', 'stratumCert');
+        setupTlsValidation('fallbackStratumTLS', 'fallbackStratumCert');
 
         // Trigger initial validation
         this.form.get('stratumTLS')?.updateValueAndValidity();
@@ -181,11 +172,11 @@ export class PoolComponent implements OnInit {
       { prefix: 'stratum+ssl://', tlsMode: true }
     ] as const;
 
-    let isTlsMode = false;
+    let isTlsMode = 0;
     const matched = prefixes.find(({ prefix }) => urlValue.startsWith(prefix));
     if (matched) {
       urlValue = urlValue.slice(matched.prefix.length);
-      isTlsMode = matched.tlsMode;
+      isTlsMode = +matched.tlsMode;
     }
 
     const { cleanUrl, port } = this.extractPort(urlValue);
@@ -227,10 +218,13 @@ export class PoolComponent implements OnInit {
 
   private pemCertificateValidator(): ValidatorFn {
     return (control: AbstractControl): ValidationErrors | null => {
-      if (!control.value?.trim()) return null;
+      const value = control.value?.trim();
+      if (!value) return null;
 
-      const pemRegex = /^-----BEGIN CERTIFICATE-----\s*([\s\S]*?)\s*-----END CERTIFICATE-----$/;
-      return pemRegex.test(control.value?.trim()) ? null : { invalidCertificate: true };
+      const pemChainRegex =
+        /^(?:-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----\s*)+$/;
+
+      return pemChainRegex.test(value) ? null : { invalidCertificate: true };
     };
   }
 
