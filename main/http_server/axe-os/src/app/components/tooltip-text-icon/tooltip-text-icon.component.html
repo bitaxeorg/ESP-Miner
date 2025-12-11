@@ -3,13 +3,13 @@
         <span *ngIf="preLastWords">{{ preLastWords }}&nbsp;</span>
 
         <span class="white-space-nowrap">
-            {{ lastWord }}<tooltip-icon [tooltip]="tooltip" />
+            {{ lastWord }}<tooltip-icon [tooltip]="tooltip" [icon]="icon" />
         </span>
     </ng-container>
 
     <ng-template #noSplit>
         <span class="white-space-nowrap">
-            {{ text }}<tooltip-icon [tooltip]="tooltip" />
+            {{ text }}<tooltip-icon [tooltip]="tooltip" [icon]="icon" />
         </span>
     </ng-template>
 </ng-container>

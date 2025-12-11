@@ -8,8 +8,12 @@ import { Component, Input, HostListener } from '@angular/core';
 export class TooltipIconComponent {
   @Input() tooltip: string = '';
   @Input() size: string = 'xs';
+  @Input() icon: string = '';
 
   showMobileTooltip = false;
-  tooltipIconClass = `pi pi-question-circle text-${this.size} pl-1 pr-2 tooltip-icon`;
   isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+  get tooltipIconClass(): string {
+    return `pi ${this.icon} text-${this.size} pl-1 pr-2 tooltip-icon`;
+  }
 }
