@@ -775,6 +775,16 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
+  getAddressPart(user: string): string {
+    const dotIndex = user.lastIndexOf('.');
+    return dotIndex !== -1 ? user.substring(0, dotIndex) : user;
+  }
+
+  getSuffixPart(user: string): string {
+    const dotIndex = user.lastIndexOf('.');
+    return dotIndex !== -1 ? '.' + user.substring(dotIndex + 1) : '';
+  }
+
   dataSourceLabels(info: ISystemInfo) {
     return Object.entries(eChartLabel)
       .filter(([key, ]) => key !== 'vrTemp' || info.vrTemp)

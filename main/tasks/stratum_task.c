@@ -9,6 +9,7 @@
 #include <esp_sntp.h>
 #include <sys/time.h>
 #include <stdbool.h>
+#include <string.h>
 #include "utils.h"
 #include "coinbase_decoder.h"
 
@@ -294,12 +295,18 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
         free(result.scriptsig);
     }
         
-    // Log outputs
-    if (result.output_count > 0) {
+    // Update coinbase outputs
+    if (result.output_count != GLOBAL_STATE->coinbase_output_count ||
+        memcmp(result.outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result.output_count) != 0) {
+        GLOBAL_STATE->coinbase_output_count = result.output_count;
+        memcpy(GLOBAL_STATE->coinbase_outputs, result.outputs, sizeof(coinbase_output_t) * result.output_count);
         ESP_LOGI(TAG, "Coinbase outputs: %d", result.output_count);
         for (int i = 0; i < result.output_count; i++) {
-            ESP_LOGI(TAG, "  Output %d: %llu sat -> %s", 
-                    i, result.outputs[i].value_satoshis, result.outputs[i].address);
+            if (result.outputs[i].value_satoshis > 0) {
+                ESP_LOGI(TAG, "  Output %d: %s (%llu sat)", i, result.outputs[i].address, result.outputs[i].value_satoshis);
+            } else {
+                ESP_LOGI(TAG, "  Output %d: %s", i, result.outputs[i].address);
+            }
         }
     }
 }

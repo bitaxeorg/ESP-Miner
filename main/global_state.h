@@ -9,6 +9,7 @@
 #include "hashrate_monitor_task.h"
 #include "serial.h"
 #include "stratum_api.h"
+#include "coinbase_decoder.h"
 #include "work_queue.h"
 #include "device_config.h"
 #include "display.h"
@@ -122,6 +123,8 @@ typedef struct
 
     int block_height;
     char scriptsig[128];
+    coinbase_output_t coinbase_outputs[10];
+    int coinbase_output_count;
     uint64_t network_nonce_diff;
     char network_diff_string[DIFF_STRING_SIZE];
 } GlobalState;

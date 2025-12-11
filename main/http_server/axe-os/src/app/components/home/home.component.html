@@ -406,20 +406,15 @@
                     </div>
                 </div>
 
-                <div class="flex flex-nowrap ellipsis-magic overflow-hidden">
+                <div class="flex flex-nowrap align-items-baseline">
                     <div class="col-fixed-width text-500">
-                        <tooltip-text-icon
-                            text="User"
-                            tooltip="{{ activePoolUser }}"
-                        />
+                        User
                     </div>
 
-                    <span class="start" sensitive-data>
-                        {{ activePoolUser.substring(0, activePoolUser.length - 20) }}
-                    </span>
-                    <span class="end" sensitive-data>
-                        {{ activePoolUser.substring(activePoolUser.length - 20) }}
-                    </span>
+                    <div  pTooltip="{{ activePoolUser }}">
+                        <span class="code font-bold" sensitive-data>{{ getAddressPart(activePoolUser) | address }}</span>
+                        <span>{{ getSuffixPart(activePoolUser) }}</span>
+                    </div>
                 </div>
 
                 <div class="flex flex-nowrap">
@@ -471,8 +466,27 @@
                     <div class="col-fixed-width text-500">
                         <span>Scriptsig</span>
                     </div>
-                    <div class="code">
+                    <div class="code text-sm">
                         {{ info.scriptsig }}
+                    </div>
+                </div>
+                <div class="flex flex-nowrap align-items-baseline">
+                    <div class="col-fixed-width text-500">
+                        <span>Outputs</span>
+                    </div>
+                    <div class="w-full">
+                        <div *ngFor="let output of info.coinbaseOutputs; let i = index" class="flex text-sm justify-content-between">
+                            @if (output.value > 0) {
+                                @if (output.address === getAddressPart(activePoolUser)) {
+                                    <span class="code font-bold" pTooltip="{{ output.address }}" tooltipPosition="top" sensitive-data>{{ output.address | address }} <i class="pi pi-star-fill text-xs"></i></span>
+                                } @else {
+                                    <span class="code" pTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
+                                }
+                                <span>{{ output.value | number }}</span>
+                            } @else {
+                                <span class="code">{{ output.address }}</span>
+                            }
+                        </div>
                     </div>
                 </div>
             </div>

@@ -91,6 +91,7 @@ export interface ISystemInfo {
     blockHeight?: number,
     scriptsig?: string,
     networkDifficulty?: number,
+    coinbaseOutputs?: { value: number, address: string }[],
 
     hashrateMonitor: IHashrateMonitor,
     blockFound: number,
