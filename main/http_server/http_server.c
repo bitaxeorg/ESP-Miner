@@ -41,6 +41,7 @@
 #include "asic.h"
 #include "TPS546.h"
 #include "statistics_task.h"
+#include "auto_tune.h"
 #include "theme_api.h"  // Add theme API include
 #include "axe-os/api/system/asic_settings.h"
 #include "display.h"
@@ -61,6 +62,7 @@ static const char * STATS_LABEL_ERROR_PERCENTAGE = "errorPercentage";
 static const char * STATS_LABEL_ASIC_TEMP = "asicTemp";
 static const char * STATS_LABEL_VR_TEMP = "vrTemp";
 static const char * STATS_LABEL_ASIC_VOLTAGE = "asicVoltage";
+static const char * STATS_LABEL_ASIC_VOLTAGE_SET = "asicVoltageSet";
 static const char * STATS_LABEL_VOLTAGE = "voltage";
 static const char * STATS_LABEL_POWER = "power";
 static const char * STATS_LABEL_CURRENT = "current";
@@ -70,6 +72,7 @@ static const char * STATS_LABEL_FAN2_RPM = "fan2Rpm";
 static const char * STATS_LABEL_WIFI_RSSI = "wifiRssi";
 static const char * STATS_LABEL_FREE_HEAP = "freeHeap";
 static const char * STATS_LABEL_RESPONSE_TIME = "responseTime";
+static const char * STATS_LABEL_FREQUENCY = "frequency";
 
 static const char * STATS_LABEL_TIMESTAMP = "timestamp";
 
@@ -88,6 +91,7 @@ typedef enum
     SRC_ASIC_TEMP,
     SRC_VR_TEMP,
     SRC_ASIC_VOLTAGE,
+    SRC_ASIC_VOLTAGE_SET,
     SRC_VOLTAGE,
     SRC_POWER,
     SRC_CURRENT,
@@ -97,6 +101,7 @@ typedef enum
     SRC_WIFI_RSSI,
     SRC_FREE_HEAP,
     SRC_RESPONSE_TIME,
+    SRC_FREQUENCY,
     SRC_NONE // last
 } DataSource;
 
@@ -114,12 +119,14 @@ DataSource strToDataSource(const char * sourceStr)
         if (strcmp(sourceStr, STATS_LABEL_ASIC_TEMP) == 0)    return SRC_ASIC_TEMP;
         if (strcmp(sourceStr, STATS_LABEL_VR_TEMP) == 0)      return SRC_VR_TEMP;
         if (strcmp(sourceStr, STATS_LABEL_ASIC_VOLTAGE) == 0) return SRC_ASIC_VOLTAGE;
+        if (strcmp(sourceStr, STATS_LABEL_ASIC_VOLTAGE_SET) == 0) return SRC_ASIC_VOLTAGE_SET;
         if (strcmp(sourceStr, STATS_LABEL_FAN_SPEED) == 0)    return SRC_FAN_SPEED;
         if (strcmp(sourceStr, STATS_LABEL_FAN_RPM) == 0)      return SRC_FAN_RPM;
         if (strcmp(sourceStr, STATS_LABEL_FAN2_RPM) == 0)     return SRC_FAN2_RPM;
         if (strcmp(sourceStr, STATS_LABEL_WIFI_RSSI) == 0)    return SRC_WIFI_RSSI;
         if (strcmp(sourceStr, STATS_LABEL_FREE_HEAP) == 0)    return SRC_FREE_HEAP;
         if (strcmp(sourceStr, STATS_LABEL_RESPONSE_TIME) == 0) return SRC_RESPONSE_TIME;
+        if (strcmp(sourceStr, STATS_LABEL_FREQUENCY) == 0)    return SRC_FREQUENCY;
     }
     return SRC_NONE;
 }
@@ -807,7 +814,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER);
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER);
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY);
-    float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
+    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
 
     uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
@@ -848,7 +855,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
     cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "coreVoltageSet", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.core_voltage);
     cJSON_AddNumberToObject(root, "frequency", frequency);
+    cJSON_AddNumberToObject(root, "frequencySet", nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY));
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
     cJSON_AddStringToObject(root, "hostname", hostname);
@@ -1020,6 +1029,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VR_TEMP)); }
     if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_VOLTAGE)); }
     if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_VOLTAGE)); }
+    if (dataSelection[SRC_ASIC_VOLTAGE_SET]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_ASIC_VOLTAGE_SET)); }
     if (dataSelection[SRC_POWER]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_POWER)); }
     if (dataSelection[SRC_CURRENT]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_CURRENT)); }
     if (dataSelection[SRC_FAN_SPEED]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_FAN_SPEED)); }
@@ -1028,6 +1038,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     if (dataSelection[SRC_WIFI_RSSI]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_WIFI_RSSI)); }
     if (dataSelection[SRC_FREE_HEAP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_FREE_HEAP)); }
     if (dataSelection[SRC_RESPONSE_TIME]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_RESPONSE_TIME)); }
+    if (dataSelection[SRC_FREQUENCY]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_FREQUENCY)); }
     cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_TIMESTAMP));
 
     cJSON_AddItemToObject(root, "labels", labelArray);
@@ -1046,6 +1057,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         if (dataSelection[SRC_ASIC_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.chipTemperature)); }
         if (dataSelection[SRC_VR_TEMP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.vrTemperature)); }
         if (dataSelection[SRC_ASIC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.coreVoltageActual)); }
+        if (dataSelection[SRC_ASIC_VOLTAGE_SET]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.core_voltage)); }
         if (dataSelection[SRC_VOLTAGE]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.voltage)); }
         if (dataSelection[SRC_POWER]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.power)); }
         if (dataSelection[SRC_CURRENT]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.current)); }
@@ -1055,6 +1067,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         if (dataSelection[SRC_WIFI_RSSI]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI)); }
         if (dataSelection[SRC_FREE_HEAP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap)); }
         if (dataSelection[SRC_RESPONSE_TIME]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.responseTime)); }
+        if (dataSelection[SRC_FREQUENCY]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.frequency)); }
         cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
 
         cJSON_AddItemToArray(statsArray, valueArray);
@@ -1227,6 +1240,110 @@ esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
     return ESP_OK;
 }
 
+esp_err_t GET_autotune_info(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    httpd_resp_set_type(req, "application/json");
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, nvs_config_get_settings(NVS_CONFIG_KEY_POWER_LIMIT)->nvs_key_name, AUTO_TUNE.power_limit);
+    cJSON_AddNumberToObject(root, nvs_config_get_settings(NVS_CONFIG_KEY_FAN_LIMIT)->nvs_key_name, AUTO_TUNE.fan_limit);
+    cJSON_AddNumberToObject(root, nvs_config_get_settings(NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC)->nvs_key_name, AUTO_TUNE.max_voltage_asic);
+    cJSON_AddNumberToObject(root, nvs_config_get_settings(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC)->nvs_key_name, AUTO_TUNE.max_frequency_asic);
+    cJSON_AddNumberToObject(root, nvs_config_get_settings(NVS_CONFIG_KEY_MAX_TEMP_ASIC)->nvs_key_name, AUTO_TUNE.max_temp_asic);
+    cJSON_AddBoolToObject(root, nvs_config_get_settings(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE)->nvs_key_name, AUTO_TUNE.auto_tune_hashrate);
+    cJSON_AddNumberToObject(root, nvs_config_get_settings(NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT)->nvs_key_name, AUTO_TUNE.overshot_power_limit);
+    cJSON_AddNumberToObject(root, nvs_config_get_settings(NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT)->nvs_key_name, AUTO_TUNE.overshot_fanspeed);
+    cJSON_AddNumberToObject(root, nvs_config_get_settings(NVS_CONFIG_KEY_MAX_TEMP_VR)->nvs_key_name, AUTO_TUNE.max_temp_vr);
+
+    const char *response = cJSON_Print(root);
+    httpd_resp_sendstr(req, response);
+    free((void *)response);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+esp_err_t POST_autotune_update(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    int total_len = req->content_len;
+    char buf[512];
+    int received = 0, cur_len = 0;
+    if (total_len >= sizeof(buf)) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_OK;
+    }
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len - cur_len);
+        if (received <= 0) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive data");
+            return ESP_OK;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
+    cJSON *item;
+    if ((item = cJSON_GetObjectItem(root, nvs_config_get_settings(NVS_CONFIG_KEY_POWER_LIMIT)->nvs_key_name)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.power_limit = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_POWER_LIMIT, (uint16_t)AUTO_TUNE.power_limit);
+    }
+    if ((item = cJSON_GetObjectItem(root, nvs_config_get_settings(NVS_CONFIG_KEY_FAN_LIMIT)->nvs_key_name)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.fan_limit = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_FAN_LIMIT, (uint16_t)AUTO_TUNE.fan_limit);
+    }
+    if ((item = cJSON_GetObjectItem(root, nvs_config_get_settings(NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC)->nvs_key_name)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_voltage_asic = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_VOLTAGE_ASIC, (uint16_t)AUTO_TUNE.max_voltage_asic);
+    }
+    if ((item = cJSON_GetObjectItem(root, nvs_config_get_settings(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC)->nvs_key_name)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_frequency_asic = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_FREQUENCY_ASIC, (uint16_t)AUTO_TUNE.max_frequency_asic);
+    }
+    if ((item = cJSON_GetObjectItem(root, nvs_config_get_settings(NVS_CONFIG_KEY_MAX_TEMP_ASIC)->nvs_key_name)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_temp_asic = item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_TEMP_ASIC, (uint16_t)AUTO_TUNE.max_temp_asic);
+    }
+        if ((item = cJSON_GetObjectItem(root, nvs_config_get_settings(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE)->nvs_key_name)) && cJSON_IsBool(item)) {
+        AUTO_TUNE.auto_tune_hashrate = item->valueint;
+        nvs_config_set_bool(NVS_CONFIG_KEY_AUTO_TUNE_ENABLE, (bool)AUTO_TUNE.auto_tune_hashrate);
+    }
+    if ((item = cJSON_GetObjectItem(root, nvs_config_get_settings(NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT)->nvs_key_name)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.overshot_power_limit = item->valuedouble;
+        nvs_config_set_float(NVS_CONFIG_KEY_OVERSHOT_POWER_LIMIT, AUTO_TUNE.overshot_power_limit);
+    }
+    if ((item = cJSON_GetObjectItem(root, nvs_config_get_settings(NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT)->nvs_key_name)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.overshot_fanspeed = (uint16_t)item->valuedouble;
+        nvs_config_set_u16(NVS_CONFIG_KEY_OVERSHOT_FAN_LIMIT, (uint16_t)AUTO_TUNE.overshot_fanspeed);
+    }
+     if ((item = cJSON_GetObjectItem(root, nvs_config_get_settings(NVS_CONFIG_KEY_MAX_TEMP_VR)->nvs_key_name)) && cJSON_IsNumber(item)) {
+        AUTO_TUNE.max_temp_vr = (uint16_t)item->valueint;
+        nvs_config_set_u16(NVS_CONFIG_KEY_MAX_TEMP_VR, (uint16_t)AUTO_TUNE.max_temp_vr);
+    }
+
+    cJSON_Delete(root);
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -1251,7 +1368,7 @@ esp_err_t start_rest_server(void * pvParameters)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 22;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
 
@@ -1367,6 +1484,21 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
 
+    httpd_uri_t autotune_get_uri = {
+        .uri = "/api/system/autotune",
+        .method = HTTP_GET,
+        .handler = GET_autotune_info,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &autotune_get_uri);
+
+    httpd_uri_t autotune_post_uri = {
+        .uri = "/api/system/autotune",
+        .method = HTTP_POST,
+        .handler = POST_autotune_update,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &autotune_post_uri);
     httpd_uri_t ws = {
         .uri = "/api/ws", 
         .method = HTTP_GET, 

@@ -7,6 +7,7 @@ import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { ISystemASIC } from 'src/models/ISystemASIC';
+import { IAutotuneSettings } from 'src/models/IAutotuneSettings';
 
 import { environment } from '../../environments/environment';
 
@@ -48,6 +49,7 @@ export class SystemService {
         freeHeapSpiram: 200504,
         coreVoltage: 1200,
         coreVoltageActual: 1200,
+        coreVoltageSet: 1200,
         hostname: "Bitaxe",
         macAddr: "2C:54:91:88:C9:E3",
         ssid: "default",
@@ -81,6 +83,7 @@ export class SystemService {
         isUsingFallbackStratum: false,
         poolAddrFamily: 2,
         frequency: 485,
+        frequencySet: 450,
         version: "v2.12.0",
         axeOSVersion: "v2.12.0",
         idfVersion: "v5.5.1",
@@ -268,5 +271,28 @@ export class SystemService {
 
   public updateSwarm(uri: string = '', swarmConfig: any) {
     return this.httpClient.patch(`${uri}/api/swarm`, swarmConfig);
+  }
+
+  public getAutotune() {
+    if (environment.production) {
+      return this.httpClient.get<IAutotuneSettings>('/api/system/autotune').pipe(timeout(5000));
+    }
+
+    // Mock data for development
+    return of({
+      power_limit: 20,
+      fan_limit: 75,
+      max_volt_asic: 1400,
+      max_freq_asic: 1000,
+      max_temp_asic: 65,
+      max_temp_vr: 85,
+      auto_tune: false,
+      osh_pow_limit: 0.2,
+      osh_fan_limit: 5,
+    }).pipe(delay(1000));
+  }
+
+  public updateAutotune(data: any) {
+    return this.httpClient.post('/api/system/autotune', data);
   }
 }
