@@ -34,8 +34,11 @@
                     tooltipPosition="bottom"
                     [pTooltip]="info.networkMode === 'wifi' ? 'Wi-Fi RSSI: ' + info.wifiRSSI + ' dBm' : 'Ethernet-over-USB'"
                 >
-                    <wifi-icon *ngIf="info.networkMode === 'wifi'" [rssi]="info.wifiRSSI" />
-                    <i *ngIf="info.networkMode === 'usb'" class="pi pi-sitemap text-white block" style="font-size: 1.4rem;"></i>
+                    @if (info.networkMode === 'wifi') {
+                        <wifi-icon [rssi]="info.wifiRSSI" />
+                    } @else {
+                        <i class="pi pi-sitemap text-white block" style="font-size: 1.4rem;"></i>
+                    }
                 </a>
             </li>
             <li>

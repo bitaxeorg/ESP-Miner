@@ -85,23 +85,19 @@ export class SystemComponent implements OnInit, OnDestroy {
   }
 
   getSystemRows(data: CombinedData): TableRow[] {
-    const rows: TableRow[] = [
+    return [
       { label: 'Device Model', value: data.asic.deviceModel || 'Other', valueClass: 'text-' + data.asic.swarmColor + '-500' },
       { label: 'Board Version', value: data.info.boardVersion },
       { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds) },
       { label: 'Reset Reason', value: data.info.resetReason, class: 'pb-3' },
       { label: 'Network Mode', value: data.info.networkMode === 'wifi' ? 'Wi-Fi' : 'Ethernet-over-USB' },
-    ];
 
-    if (data.info.networkMode === 'wifi') {
-      rows.push(
+      ...(data.info.networkMode === 'wifi' ? [
         { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitiveData: true },
         { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + ' dBm', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) }
-      );
-    }
+      ] : []),
 
-    rows.push(
       { label: 'Network Status', value: data.info.networkStatus || 'Unknown' },
       { label: 'IPv4 Address', value: data.info.ipv4 },
       { label: 'IPv6 Address', value: data.info.ipv6, class: 'pb-3', isSensitiveData: true },
@@ -112,9 +108,7 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Firmware Version', value: data.info.version },
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
       { label: 'ESP-IDF Version', value: data.info.idfVersion }
-    );
-
-    return rows;
+    ];
   }
 
   identifyDevice(): void {
