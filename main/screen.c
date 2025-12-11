@@ -423,7 +423,8 @@ static void screen_update_cb(lv_timer_t * timer)
         // display timeout
         const uint32_t display_timeout = display_timeout_config * 60 * 1000;
 
-        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen())) {
+        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen()) &&
+             lv_obj_has_flag(identify_image, LV_OBJ_FLAG_HIDDEN)) {
             display_on(false);
         } else {
             display_on(true);
