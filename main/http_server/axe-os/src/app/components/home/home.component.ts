@@ -538,20 +538,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.shareRejectReasonsService.getExplanation(reason);
   }
 
-  getPoolProtocolType(info: ISystemInfo): string {
-    // AF_INET = 2 (IPv4), AF_INET6 = 10 (IPv6) on ESP32
-    const AF_INET = 2;
-    const AF_INET6 = 10;
-
-    if (info.poolAddrFamily === AF_INET) {
-      return 'IPv4';
-    } else if (info.poolAddrFamily === AF_INET6) {
-      return 'IPv6';
-    }
-
-    return '';
-  }
-
   getSortedRejectionReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
     return [...(info.sharesRejectedReasons ?? [])].sort((a, b) => b.count - a.count);
   }

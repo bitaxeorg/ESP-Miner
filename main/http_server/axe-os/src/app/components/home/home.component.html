@@ -394,15 +394,13 @@
 
                 <div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
-                        <tooltip-text-icon
-                            text="URL"
-                            tooltip="{{ getPoolProtocolType(info) }}"
-                        />
+                        <span>URL</span>
                     </div>
                     <div>
-                        <span>
-                            {{ activePoolURL }}:{{activePoolPort}}
-                        </span>
+                        <tooltip-text-icon
+                            text="{{ activePoolURL }}:{{activePoolPort}}"
+                            tooltip="{{ info.poolConnectionInfo }}"
+                        />
                     </div>
                 </div>
 
@@ -412,7 +410,7 @@
                     </div>
 
                     <div pTooltip="{{ activePoolUser }}" tooltipPosition="top">
-                        <span class="code font-bold" sensitive-data>{{ getAddressPart(activePoolUser) | address }}</span>
+                        <span class="text-monospace font-bold" sensitive-data>{{ getAddressPart(activePoolUser) | address }}</span>
                         <span>{{ getSuffixPart(activePoolUser) }}</span>
                     </div>
                 </div>
@@ -478,7 +476,7 @@
                     <div class="col-fixed-width text-500">
                         <span>Scriptsig</span>
                     </div>
-                    <div class="code text-sm">
+                    <div class="text-monospace text-sm">
                         {{ info.scriptsig }}
                     </div>
                 </div>
@@ -501,13 +499,13 @@
                         <div *ngFor="let output of info.coinbaseOutputs; let i = index" class="flex text-sm justify-content-between">
                             @if (output.value > 0) {
                                 @if (output.address === getAddressPart(activePoolUser)) {
-                                    <span class="code font-bold" pTooltip="{{ output.address }}" tooltipPosition="top" sensitive-data>{{ output.address | address }} <i class="pi pi-star-fill text-xs"></i></span>
+                                    <span class="text-monospace font-bold" pTooltip="{{ output.address }}" tooltipPosition="top" sensitive-data>{{ output.address | address }} <i class="pi pi-star-fill text-xs"></i></span>
                                 } @else {
-                                    <span class="code" pTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
+                                    <span class="text-monospace" pTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
                                 }
                                 <span>{{ output.value | sats }}</span>
                             } @else {
-                                <span class="code">{{ output.address }}</span>
+                                <span class="text-monospace">{{ output.address }}</span>
                             }
                         </div>
                     </div>
