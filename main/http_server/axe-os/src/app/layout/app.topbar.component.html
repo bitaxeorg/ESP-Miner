@@ -32,9 +32,13 @@
                 <a routerLink="network"
                     class="block py-2"
                     tooltipPosition="bottom"
-                    pTooltip="Wi-Fi RSSI: {{info.wifiRSSI}} dBm"
+                    [pTooltip]="info.networkMode === 'wifi' ? 'Wi-Fi RSSI: ' + info.wifiRSSI + ' dBm' : 'Ethernet-over-USB'"
                 >
-                    <wifi-icon [rssi]="info.wifiRSSI" />
+                    @if (info.networkMode === 'wifi') {
+                        <wifi-icon [rssi]="info.wifiRSSI" />
+                    } @else {
+                        <i class="pi pi-sitemap text-white block" style="font-size: 1.4rem;"></i>
+                    }
                 </a>
             </li>
             <li>

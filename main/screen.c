@@ -1,8 +1,5 @@
 #include <string.h>
-#include "esp_log.h"
 #include "esp_err.h"
-#include "esp_check.h"
-#include "lvgl.h"
 #include "esp_lvgl_port.h"
 #include "global_state.h"
 #include "screen.h"
@@ -20,16 +17,16 @@ typedef enum {
     SCR_CONNECTION,
     SCR_BITAXE_LOGO,
     SCR_OSMU_LOGO,
-    SCR_URLS,
+    SCR_POOL,
     SCR_STATS,
     SCR_MINING,
-    SCR_WIFI,
+    SCR_NETWORK,
     MAX_SCREENS,
 } screen_t;
 
 #define SCREEN_UPDATE_MS 500
 
-#define SCR_CAROUSEL_START SCR_URLS
+#define SCR_CAROUSEL_START SCR_POOL
 
 extern const lv_img_dsc_t bitaxe_logo;
 extern const lv_img_dsc_t osmu_logo;
@@ -61,19 +58,21 @@ static lv_obj_t *mining_scriptsig_label;
 static lv_obj_t *firmware_update_scr_filename_label;
 static lv_obj_t *firmware_update_scr_status_label;
 
-static lv_obj_t *connection_wifi_status_label;
+static lv_obj_t *connection_network_status_label;
 
-static lv_obj_t *urls_ip_addr_label;
-static lv_obj_t *urls_mining_url_label;
+static lv_obj_t *pool_url_label;
+static lv_obj_t *pool_difficulty_label;
+static lv_obj_t *pool_response_time_label;
 
 static lv_obj_t *stats_hashrate_label;
 static lv_obj_t *stats_efficiency_label;
 static lv_obj_t *stats_difficulty_label;
 static lv_obj_t *stats_temp_label;
 
-static lv_obj_t *wifi_rssi_value_label;
-static lv_obj_t *wifi_signal_strength_label;
-static lv_obj_t *wifi_uptime_label;
+static lv_obj_t *network_ip_addr_label;
+static lv_obj_t *network_wifi_rssi_value_label;
+static lv_obj_t *network_wifi_signal_strength_label;
+static lv_obj_t *network_uptime_label;
 
 static lv_obj_t *notification_label;
 static lv_obj_t *identify_image;
@@ -103,6 +102,8 @@ static uint64_t current_shares_rejected;
 static uint64_t current_work_received;
 static int8_t current_rssi_value;
 static int current_block_height;
+static double current_pool_response_time;
+static int current_pool_difficulty;
 
 static bool self_test_finished;
 
@@ -236,18 +237,28 @@ static lv_obj_t * create_scr_firmware() {
     return scr;
 }
 
-static lv_obj_t * create_scr_connection(const char * ssid, const char * ap_ssid) {
+// Connection screen - works for both WiFi and USB modes
+static lv_obj_t * create_scr_connection(const char * ssid, const char * ap_ssid, NetworkMode network_mode) {
     lv_obj_t * text_cont;
     lv_obj_t * scr = create_screen_with_qr(ap_ssid, 4, &text_cont);
 
     lv_obj_t *label1 = lv_label_create(text_cont);
     lv_obj_set_width(label1, lv_pct(100));
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text_fmt(label1, "Wi-Fi: %s", ssid);
+    
+    // Show network type - either WiFi SSID or "Ethernet-over-USB"
+    switch(network_mode) {
+        case NETWORK_MODE_WIFI:
+            lv_label_set_text_fmt(label1, "Wi-Fi: %s", ssid);
+            break;
+        case NETWORK_MODE_USB:
+            lv_label_set_text(label1, "Ethernet-over-USB");
+            break;
+    }
 
-    connection_wifi_status_label = lv_label_create(text_cont);
-    lv_obj_set_width(connection_wifi_status_label, lv_pct(100));
-    lv_label_set_long_mode(connection_wifi_status_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    connection_network_status_label = lv_label_create(text_cont);
+    lv_obj_set_width(connection_network_status_label, lv_pct(100));
+    lv_label_set_long_mode(connection_network_status_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     lv_obj_t *label3 = lv_label_create(text_cont);
     lv_label_set_text(label3, "Setup Wi-Fi:");
@@ -286,20 +297,21 @@ static lv_obj_t * create_scr_osmu_logo() {
     return scr;
 }
 
-static lv_obj_t * create_scr_urls() {
+static lv_obj_t * create_scr_pool() {
     lv_obj_t * scr = create_flex_screen(4);
 
     lv_obj_t *label1 = lv_label_create(scr);
-    lv_label_set_text(label1, "Stratum Host:");
+    lv_label_set_text(label1, "Pool Host:");
 
-    urls_mining_url_label = lv_label_create(scr);
-    lv_obj_set_width(urls_mining_url_label, LV_HOR_RES);
-    lv_label_set_long_mode(urls_mining_url_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    pool_url_label = lv_label_create(scr);
+    lv_obj_set_width(pool_url_label, LV_HOR_RES);
+    lv_label_set_long_mode(pool_url_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
-    lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, "IP Address:");
+    pool_difficulty_label = lv_label_create(scr);
+    lv_label_set_text(pool_difficulty_label, "Difficulty: --");
 
-    urls_ip_addr_label = lv_label_create(scr);
+    pool_response_time_label = lv_label_create(scr);
+    lv_label_set_text(pool_response_time_label, "Time: --");
 
     return scr;
 }
@@ -342,20 +354,22 @@ static lv_obj_t * create_scr_mining() {
     return scr;
 }
 
-static lv_obj_t * create_scr_wifi() {
-    lv_obj_t * scr = create_flex_screen(4);
+static lv_obj_t * create_scr_network(NetworkMode network_mode) {
+    lv_obj_t * scr = create_flex_screen(network_mode == NETWORK_MODE_WIFI ? 4 : 2);
 
-    lv_obj_t *title_label = lv_label_create(scr);
-    lv_label_set_text(title_label, "Wi-Fi Signal");
+    network_ip_addr_label = lv_label_create(scr);
+    lv_label_set_text(network_ip_addr_label, "IP: --");
 
-    wifi_rssi_value_label = lv_label_create(scr);
-    lv_label_set_text(wifi_rssi_value_label, "RSSI: -- dBm");
+    if (network_mode == NETWORK_MODE_WIFI) {
+        network_wifi_rssi_value_label = lv_label_create(scr);
+        lv_label_set_text(network_wifi_rssi_value_label, "RSSI: --");
+    
+        network_wifi_signal_strength_label = lv_label_create(scr);
+        lv_label_set_text(network_wifi_signal_strength_label, "Signal: --");
+    }
 
-    wifi_signal_strength_label = lv_label_create(scr);
-    lv_label_set_text(wifi_signal_strength_label, "Signal: --%%");
-
-    wifi_uptime_label = lv_label_create(scr);
-    lv_label_set_text(wifi_uptime_label, "Uptime: --");
+    network_uptime_label = lv_label_create(scr);
+    lv_label_set_text(network_uptime_label, "Uptime: --");
 
     return scr;
 }
@@ -486,20 +500,26 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (module->ssid[0] == '\0') {
+    // Show welcome screen only if not connected (works for both WiFi and USB)
+    if (module->ssid[0] == '\0' && module->network_mode == NETWORK_MODE_WIFI) {
         screen_show(SCR_WELCOME);
         return;
     }
 
-    bool is_wifi_status_changed = strcmp(module->wifi_status, lv_label_get_text(connection_wifi_status_label)) != 0;
-    if (module->ap_enabled || is_wifi_status_changed) {
-        if (is_wifi_status_changed) {
-            lv_label_set_text(connection_wifi_status_label, module->wifi_status);
+    bool is_network_status_changed = strcmp(module->network_status, lv_label_get_text(connection_network_status_label)) != 0;
+    if (module->ap_enabled || is_network_status_changed) {
+        if (is_network_status_changed) {
+            lv_label_set_text(connection_network_status_label, module->network_status);
         }
 
         screen_show(SCR_CONNECTION);
 
-        delays_ms[SCR_CONNECTION] = 0; // Remove delay so whenever the user disables the AP with long press, it goes straight back to carousel
+        // Keep delay at 1s when connected, 0 when AP enabled (for immediate carousel exit on long press)
+        if (module->ap_enabled) {
+            delays_ms[SCR_CONNECTION] = 0;
+        } else if (module->is_connected) {
+            delays_ms[SCR_CONNECTION] = 1000;  // Hold for 1 second after connecting
+        }
         return;
     }
 
@@ -510,12 +530,22 @@ static void screen_update_cb(lv_timer_t * timer)
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
     char *pool_url = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
-    if (strcmp(lv_label_get_text(urls_mining_url_label), pool_url) != 0) {
-        lv_label_set_text(urls_mining_url_label, pool_url);
+    if (strcmp(lv_label_get_text(pool_url_label), pool_url) != 0) {
+        lv_label_set_text(pool_url_label, pool_url);
     }
 
-    if (strcmp(lv_label_get_text(urls_ip_addr_label), module->ip_addr_str) != 0) {
-        lv_label_set_text(urls_ip_addr_label, module->ip_addr_str);
+    if (current_pool_response_time != module->response_time) {
+        if (module->response_time > 0) {
+            lv_label_set_text_fmt(pool_response_time_label, "Response: %.1fms", module->response_time);
+        } else {
+            lv_label_set_text(pool_response_time_label, "Response: -- ms");
+        }
+        current_pool_response_time = module->response_time;
+    }
+
+    if (current_pool_difficulty != module->pool_difficulty) {
+        lv_label_set_text_fmt(pool_difficulty_label, "Difficulty: %d", module->pool_difficulty);
+        current_pool_difficulty = module->pool_difficulty;
     }
 
     if (current_hashrate != module->current_hashrate) {
@@ -562,31 +592,34 @@ static void screen_update_cb(lv_timer_t * timer)
         lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->scriptsig);
     }
 
-    // Update WiFi RSSI periodically
-    int8_t rssi_value = -128;
-    if (module->is_connected) {
-        get_wifi_current_rssi(&rssi_value);
+    // Update Network screen: IP address and WiFi-specific fields
+    if (strcmp(lv_label_get_text(network_ip_addr_label), module->ip_addr_str) != 0) {
+        lv_label_set_text_fmt(network_ip_addr_label, "IP: %s", module->ip_addr_str);
     }
 
-    if (rssi_value != current_rssi_value) {
-        if (rssi_value > -50) {
-            lv_label_set_text(wifi_signal_strength_label, "Signal: Excellent");
-        } else if (rssi_value > -60) {
-            lv_label_set_text(wifi_signal_strength_label, "Signal: Good");
-        } else if (rssi_value > -70) {
-            lv_label_set_text(wifi_signal_strength_label, "Signal: Fair");
-        } else if (rssi_value > -128){
-            lv_label_set_text(wifi_signal_strength_label, "Signal: Weak");
-        } else {
-            lv_label_set_text(wifi_signal_strength_label, "Signal: --");
+    if (module->network_mode == NETWORK_MODE_WIFI && module->is_connected) {
+        int8_t rssi_value = -128;
+        get_wifi_current_rssi(&rssi_value);
+        if (rssi_value != current_rssi_value) {
+            if (rssi_value > -50) {
+                lv_label_set_text(network_wifi_signal_strength_label, "Signal: Excellent");
+            } else if (rssi_value > -60) {
+                lv_label_set_text(network_wifi_signal_strength_label, "Signal: Good");
+            } else if (rssi_value > -70) {
+                lv_label_set_text(network_wifi_signal_strength_label, "Signal: Fair");
+            } else if (rssi_value > -128){
+                lv_label_set_text(network_wifi_signal_strength_label, "Signal: Weak");
+            } else {
+                lv_label_set_text(network_wifi_signal_strength_label, "Signal: --");
+            }
+    
+            if (rssi_value > -128) {
+                lv_label_set_text_fmt(network_wifi_rssi_value_label, "RSSI: %d dBm", rssi_value);
+            } else {
+                lv_label_set_text(network_wifi_rssi_value_label, "RSSI: --");
+            }
+            current_rssi_value = rssi_value;
         }
-
-        if (rssi_value > -128) {
-            lv_label_set_text_fmt(wifi_rssi_value_label, "RSSI: %d dBm", rssi_value);
-        } else {
-            lv_label_set_text(wifi_rssi_value_label, "RSSI: -- dBm");
-        }
-        current_rssi_value = rssi_value;
     }
 
     uint32_t shares_accepted = module->shares_accepted;
@@ -638,30 +671,28 @@ void screen_button_press()
 
 static void uptime_update_cb(lv_timer_t * timer)
 {
-    if (wifi_uptime_label) {
-        char uptime[50];
-        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
+    char uptime[50];
+    uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
 
-        uint32_t days = uptime_seconds / (24 * 3600);
-        uptime_seconds %= (24 * 3600);
-        uint32_t hours = uptime_seconds / 3600;
-        uptime_seconds %= 3600;
-        uint32_t minutes = uptime_seconds / 60;
-        uptime_seconds %= 60;
+    uint32_t days = uptime_seconds / (24 * 3600);
+    uptime_seconds %= (24 * 3600);
+    uint32_t hours = uptime_seconds / 3600;
+    uptime_seconds %= 3600;
+    uint32_t minutes = uptime_seconds / 60;
+    uptime_seconds %= 60;
 
-        if (days > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
-        } else if (hours > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
-        } else if (minutes > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
-        } else {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
-        }
+    if (days > 0) {
+        snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
+    } else if (hours > 0) {
+        snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
+    } else if (minutes > 0) {
+        snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
+    } else {
+        snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
+    }
 
-        if (strcmp(lv_label_get_text(wifi_uptime_label), uptime) != 0) {
-            lv_label_set_text(wifi_uptime_label, uptime);
-        }
+    if (strcmp(lv_label_get_text(network_uptime_label), uptime) != 0) {
+        lv_label_set_text(network_uptime_label, uptime);
     }
 }
 
@@ -681,13 +712,13 @@ esp_err_t screen_start(void * pvParameters)
             screens[SCR_ASIC_STATUS] = create_scr_asic_status();
             screens[SCR_WELCOME] = create_scr_welcome(SYSTEM_MODULE->ap_ssid);
             screens[SCR_FIRMWARE] = create_scr_firmware();
-            screens[SCR_CONNECTION] = create_scr_connection(SYSTEM_MODULE->ssid, SYSTEM_MODULE->ap_ssid);
+            screens[SCR_CONNECTION] = create_scr_connection(SYSTEM_MODULE->ssid, SYSTEM_MODULE->ap_ssid, SYSTEM_MODULE->network_mode);
             screens[SCR_BITAXE_LOGO] = create_scr_bitaxe_logo(GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version);
             screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
-            screens[SCR_URLS] = create_scr_urls();
+            screens[SCR_POOL] = create_scr_pool();
             screens[SCR_STATS] = create_scr_stats();
             screens[SCR_MINING] = create_scr_mining();
-            screens[SCR_WIFI] = create_scr_wifi();
+            screens[SCR_NETWORK] = create_scr_network(SYSTEM_MODULE->network_mode);
 
             scr_create_overlay();
 

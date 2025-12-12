@@ -14,6 +14,8 @@
 #include "esp_wifi_types_generic.h"
 
 #include "connect.h"
+#include "connect_wifi.h"
+#include "usb_net.h"
 #include "global_state.h"
 #include "nvs_config.h"
 
@@ -62,8 +64,6 @@ static int s_retry_num = 0;
 static int clients_connected_to_ap = 0;
 
 static const char *get_wifi_reason_string(int reason);
-static void wifi_softap_on(void);
-static void wifi_softap_off(void);
 
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
@@ -143,7 +143,7 @@ static void ip_timeout_callback(TimerHandle_t xTimer)
     GlobalState *GLOBAL_STATE = (GlobalState *)pvTimerGetTimerID(xTimer);
     if (!GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
         ESP_LOGI(TAG, "Timeout waiting for IP address. Disconnecting...");
-        strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "IP Acquire Timeout");
+        strcpy(GLOBAL_STATE->SYSTEM_MODULE.network_status, "IP Acquire Timeout");
         esp_wifi_disconnect();
     }
 }
@@ -169,13 +169,13 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
         if (event_id == WIFI_EVENT_STA_START) {
             ESP_LOGI(TAG, "Connecting...");
-            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connecting...");
+            strcpy(GLOBAL_STATE->SYSTEM_MODULE.network_status, "Connecting...");
             esp_wifi_connect();
         }
 
         if (event_id == WIFI_EVENT_STA_CONNECTED) {
             ESP_LOGI(TAG, "Acquiring IP...");
-            strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Acquiring IP...");
+            strcpy(GLOBAL_STATE->SYSTEM_MODULE.network_status, "Acquiring IP...");
 
             if (ip_acquire_timer == NULL) {
                 ip_acquire_timer = xTimerCreate("ip_acquire_timer", pdMS_TO_TICKS(30000), pdFALSE, (void *)GLOBAL_STATE, ip_timeout_callback);
@@ -196,12 +196,12 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
 
             if (clients_connected_to_ap > 0) {
                 ESP_LOGI(TAG, "Client(s) connected to AP, not retrying...");
-                sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Config AP connected!");
+                sprintf(GLOBAL_STATE->SYSTEM_MODULE.network_status, "Config AP connected!");
                 return;
             }
 
-            sprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
-            ESP_LOGI(TAG, "Wi-Fi status: %s", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
+            sprintf(GLOBAL_STATE->SYSTEM_MODULE.network_status, "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
+            ESP_LOGI(TAG, "Wi-Fi status: %s", GLOBAL_STATE->SYSTEM_MODULE.network_status);
 
             // Wait a little
             vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -248,9 +248,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
 
         ESP_LOGI(TAG, "Connected to SSID: %s", GLOBAL_STATE->SYSTEM_MODULE.ssid);
-        strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
-
-        wifi_softap_off();
+        strcpy(GLOBAL_STATE->SYSTEM_MODULE.network_status, "Connected!");
         
         // Create IPv6 link-local address after WiFi connection
         esp_netif_t *netif = event->esp_netif;
@@ -321,154 +319,97 @@ void toggle_wifi_softap(void)
     wifi_mode_t mode = WIFI_MODE_NULL;
     ESP_ERROR_CHECK(esp_wifi_get_mode(&mode));
 
-    if (mode == WIFI_MODE_APSTA) {
-        wifi_softap_off();
-    } else {
-        wifi_softap_on();
+    switch (mode) {
+        case WIFI_MODE_NULL:
+            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+            break;
+        case WIFI_MODE_STA:
+            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+            break;
+        case WIFI_MODE_AP:
+            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_NULL));
+            break;
+        case WIFI_MODE_APSTA:
+            ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+            break;
+        default:
+            break;
     }
 }
 
-static void wifi_softap_off(void)
+void connect_init(void *pvParameters)
 {
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-}
+    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
-static void wifi_softap_on(void)
-{
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-}
-
-/* Initialize wifi station */
-esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
-{
-    esp_netif_t * esp_netif_sta = esp_netif_create_default_wifi_sta();
-
-    /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
-    * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
-    * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
-    * WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK standards.
-    */
-    wifi_auth_mode_t authmode;
-
-    if (strlen(wifi_pass) == 0) {
-        ESP_LOGI(TAG, "No Wi-Fi password provided, using open network");
-        authmode = WIFI_AUTH_OPEN;
-    } else {
-        ESP_LOGI(TAG, "Wi-Fi Password provided, using WPA2");
-        authmode = WIFI_AUTH_WPA2_PSK;
-    }
-
-    wifi_config_t wifi_sta_config = {
-        .sta =
-            {
-                .threshold.authmode = authmode,
-                .btm_enabled = 1,
-                .rm_enabled = 1,
-                .scan_method = WIFI_ALL_CHANNEL_SCAN,
-                .sort_method = WIFI_CONNECT_AP_BY_SIGNAL,
-                .pmf_cfg =
-                    {
-                        .capable = true,
-                        .required = false
-                    },
-        },
-    };
-
-    strncpy((char *) wifi_sta_config.sta.ssid, wifi_ssid, sizeof(wifi_sta_config.sta.ssid));
-    wifi_sta_config.sta.ssid[sizeof(wifi_sta_config.sta.ssid) - 1] = '\0';
-
-    if (authmode != WIFI_AUTH_OPEN) {
-        strncpy((char *) wifi_sta_config.sta.password, wifi_pass, sizeof(wifi_sta_config.sta.password));
-        wifi_sta_config.sta.password[sizeof(wifi_sta_config.sta.password) - 1] = '\0';
-    }
-    // strncpy((char *) wifi_sta_config.sta.password, wifi_pass, 63);
-    // wifi_sta_config.sta.password[63] = '\0';
-
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_sta_config));
-
-    // IPv6 link-local address will be created after WiFi connection
-    
-    // Start DHCP client for IPv4
-    esp_netif_dhcpc_start(esp_netif_sta);
-
-    ESP_LOGI(TAG, "wifi_init_sta finished.");
-
-    return esp_netif_sta;
-}
-
-void wifi_init(void * pvParameters)
-{
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
-    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
-    // copy the wifi ssid to the global state
-    strncpy(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid));
-    GLOBAL_STATE->SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid)-1] = 0;
-
+    // Copy WiFi SSID to global state
+    char *wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
+    strncpy(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid) - 1);
+    GLOBAL_STATE->SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid) - 1] = '\0';
     free(wifi_ssid);
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
-    esp_event_handler_instance_t instance_got_ip6;
+    esp_event_handler_instance_t instance_any_id, instance_got_ip, instance_got_ip6;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, GLOBAL_STATE, &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, GLOBAL_STATE, &instance_got_ip));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_GOT_IP6, &event_handler, GLOBAL_STATE, &instance_got_ip6));
-    
 
-    /* Initialize Wi-Fi */
+    // Initialize Wi-Fi
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    wifi_softap_on();
+    // Configure and start SoftAP
+    ESP_ERROR_CHECK(esp_wifi_set_mode(
+        GLOBAL_STATE->SYSTEM_MODULE.network_mode == NETWORK_MODE_WIFI
+            ? WIFI_MODE_APSTA
+            : WIFI_MODE_AP));
 
-    /* Initialize AP */
+    // Initialize SoftAP
     wifi_init_softap(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid);
 
-    /* Skip connection if SSID is null */
-    if (strlen(GLOBAL_STATE->SYSTEM_MODULE.ssid) == 0) {
-        ESP_LOGI(TAG, "No WiFi SSID provided, skipping connection");
+    // Configure STA BEFORE starting WiFi to avoid race condition
+    if (GLOBAL_STATE->SYSTEM_MODULE.network_mode == NETWORK_MODE_WIFI) {
+        ESP_LOGI(TAG, "Network mode: WiFi");
 
-        /* Start WiFi */
-        ESP_ERROR_CHECK(esp_wifi_start());
-
-        /* Disable power savings for best performance */
-        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
-
-        return;
-    } else {
-
-        char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS);
-
-        /* Initialize STA */
-        ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-        esp_netif_t * esp_netif_sta = wifi_init_sta(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_pass);
-
-        free(wifi_pass);
-
-        /* Start Wi-Fi */
-        ESP_ERROR_CHECK(esp_wifi_start());
-
-        /* Disable power savings for best performance */
-        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
-
-        char * hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
-
-        /* Set Hostname */
-        esp_err_t err = esp_netif_set_hostname(esp_netif_sta, hostname);
-        if (err != ERR_OK) {
-            ESP_LOGW(TAG, "esp_netif_set_hostname failed: %s", esp_err_to_name(err));
+        // Skip connection if SSID is null
+        if (strlen(GLOBAL_STATE->SYSTEM_MODULE.ssid) == 0) {
+            ESP_LOGI(TAG, "No WiFi SSID provided, running in AP-only mode");
         } else {
-            ESP_LOGI(TAG, "ESP_WIFI setting hostname to: %s", hostname);
+            ESP_LOGI(TAG, "Configuring Wi-Fi STA");
+            connect_wifi_init(GLOBAL_STATE);
         }
+    }
 
-        free(hostname);
+    // Start Wi-Fi
+    ESP_ERROR_CHECK(esp_wifi_start());
+    // Disable power savings for best performance
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
-        ESP_LOGI(TAG, "wifi_init_sta finished.");
+    if (GLOBAL_STATE->SYSTEM_MODULE.network_mode == NETWORK_MODE_USB) {
+        ESP_LOGI(TAG, "Network mode: Ethernet-over-USB");
+        usb_net_init(GLOBAL_STATE);
+    }
 
-        return;
+    ESP_LOGI(TAG, "Network initialization complete");
+}
+
+void connect_await_connection(void *pvParameters)
+{
+    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+
+    // Wait for connection to be established
+    ESP_LOGI(TAG, "Waiting for network connection...");
+    while (!GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+
+    // Disable AP after connection is established
+    ESP_LOGI(TAG, "Connection established, disabling AP");
+    if (GLOBAL_STATE->SYSTEM_MODULE.network_mode == NETWORK_MODE_WIFI) {
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    } else if (GLOBAL_STATE->SYSTEM_MODULE.network_mode == NETWORK_MODE_USB) {
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_NULL));
     }
 }
 

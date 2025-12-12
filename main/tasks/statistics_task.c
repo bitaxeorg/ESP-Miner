@@ -130,7 +130,9 @@ void statistics_task(void * pvParameters)
 
             if (currentTime > waitingTime) {
                 int8_t wifiRSSI = -90;
-                get_wifi_current_rssi(&wifiRSSI);
+                if (sys_module->network_mode == NETWORK_MODE_WIFI) {
+                    get_wifi_current_rssi(&wifiRSSI);
+                }
 
                 statsData.timestamp = currentTime;
                 statsData.hashrate = sys_module->current_hashrate;

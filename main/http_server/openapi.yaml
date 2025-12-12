@@ -173,7 +173,8 @@ components:
         - axeOSVersion
         - voltage
         - vrTemp
-        - wifiStatus
+        - networkMode
+        - networkStatus
         - wifiRSSI
         - displayTimeout
         - statsFrequency
@@ -389,9 +390,12 @@ components:
         vrTemp:
           type: number
           description: Voltage regulator temperature
-        wifiStatus:
+        networkMode:
           type: string
-          description: WiFi connection status
+          description: Network mode (wifi or usb)
+        networkStatus:
+          type: string
+          description: Network connection status
         wifiRSSI:
           type: number
           description: WiFi signal strength
