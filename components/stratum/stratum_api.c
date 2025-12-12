@@ -492,7 +492,7 @@ int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, cons
             send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);
     debug_stratum_tx(submit_msg);
 
-    int ret = esp_transport_write(transport, submit_msg, strlen(submit_msg), TRANSPORT_TIMEOUT_MS)
+    int ret = esp_transport_write(transport, submit_msg, strlen(submit_msg), TRANSPORT_TIMEOUT_MS);
 
     stamp_tx(send_uid);
 
