@@ -533,7 +533,7 @@ void stratum_task(void * pvParameters)
                 GLOBAL_STATE->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
                 free(old_extranonce_str);
             } else if (stratum_api_v1_message.method == MINING_PING) { 
-                STRATUM_V1_pong(GLOBAL_STATE->sock, stratum_api_v1_message.message_id);
+                STRATUM_V1_pong(GLOBAL_STATE->transport, stratum_api_v1_message.message_id);
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
                 ESP_LOGE(TAG, "Pool requested client reconnect...");
                 stratum_close_connection(GLOBAL_STATE);
