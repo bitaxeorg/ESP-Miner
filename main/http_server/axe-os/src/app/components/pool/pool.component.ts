@@ -21,6 +21,8 @@ export class PoolComponent implements OnInit {
   public form!: FormGroup;
   public savedChanges: boolean = false;
 
+  public readonly DEFAULT_BITCOIN_ADDRESS = 'bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq';
+
   public pools: PoolType[] = ['stratum', 'fallbackStratum'];
   public showPassword = { 'stratum': false, 'fallbackStratum': false };
   public showAdvancedOptions = { 'stratum': false, 'fallbackStratum': false };
@@ -230,5 +232,14 @@ export class PoolComponent implements OnInit {
 
   trackByFn(index: number, option: ITlsOption): number {
     return option.value;
+  }
+
+  isUsingDefaultAddress(pool: PoolType): boolean {
+    const userValue = this.form?.get(pool + 'User')?.value || '';
+    return userValue.includes(this.DEFAULT_BITCOIN_ADDRESS);
+  }
+
+  isAnyPoolUsingDefaultAddress(): boolean {
+    return this.pools.some(pool => this.isUsingDefaultAddress(pool));
   }
 }
