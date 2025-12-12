@@ -68,7 +68,7 @@ export interface ISystemInfo {
     fallbackStratumExtranonceSubscribe: number,
     poolDifficulty: number,
     responseTime: number,
-    isUsingFallbackStratum: boolean,
+    isUsingFallbackStratum: number,
     poolConnectionInfo: string,
     frequency: number,
     version: string,

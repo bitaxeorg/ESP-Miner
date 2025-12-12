@@ -422,12 +422,12 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         this.chart?.refresh();
 
-        const isFallback = info.isUsingFallbackStratum;
+        const isFallbackPool = !!info.isUsingFallbackStratum;
 
-        this.activePoolLabel = isFallback ? 'Fallback' : 'Primary';
-        this.activePoolURL = isFallback ? info.fallbackStratumURL : info.stratumURL;
-        this.activePoolUser = isFallback ? info.fallbackStratumUser : info.stratumUser;
-        this.activePoolPort = isFallback ? info.fallbackStratumPort : info.stratumPort;
+        this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
+        this.activePoolURL = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
+        this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
+        this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
         this.responseTime = info.responseTime;
       }),
       map(info => {
@@ -453,8 +453,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.quickLink$ = this.info$.pipe(
       map(info => {
-        const url = info.isUsingFallbackStratum ? info.fallbackStratumURL : info.stratumURL;
-        const user = info.isUsingFallbackStratum ? info.fallbackStratumUser : info.stratumUser;
+        const isFallbackPool = !!info.isUsingFallbackStratum;
+        const url = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
+        const user = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
         return this.quickLinkService.getQuickLink(url, user);
       })
     );
@@ -585,7 +586,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(info.overheat_mode === 1, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
-    updateMessage(info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
+    updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
   }
 
