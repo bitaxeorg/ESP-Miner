@@ -426,19 +426,24 @@
                         {{ info.responseTime }} ms
                     </div>
                 </div>
-                <div class="flex flex-nowrap">
-                    <div class="col-fixed-width text-500">
-                        <tooltip-text-icon
-                            text="Share"
-                            tooltip="Bitcoin block reward share percentage to user address. 100% is pure solo mining, above 95% is solo mining with a pool fee."
-                        />
-                    </div>
-                    <ng-container *ngIf="getPayoutPercentage(info) as percentage">
-                        <div *ngIf="percentage !== -1; else noValue" [style.color]="percentage < 95 ? 'red' : 'inherit'">
+                <div class="flex flex-nowrap" *ngIf="getPayoutPercentage(info) as percentage">
+                    <ng-container *ngIf="percentage >= 95">
+                        <div class="col-fixed-width text-500">
+                            Fee
+                        </div>
+                        <div [style.color]="percentage < 100 ? 'inherit' : 'green'">
+                            {{ 100 - percentage | number:'1.0-1' }}%
+                        </div>
+                    </ng-container>
+                    <ng-container *ngIf="percentage < 95">
+                        <div class="col-fixed-width text-500">
+                            <tooltip-text-icon text="Share" tooltip="Percentage of the bitcoin block reward that is paid out directly to your address." />
+                        </div>
+                        <div *ngIf="percentage !== -1; else noValue" style.color="red">
                             {{ percentage | number:'1.0-1' }}%
                         </div>
                     </ng-container>
-                </div>                
+                </div>
                 <div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
                         <span>Difficulty</span>
@@ -482,10 +487,7 @@
                 </div>
                 <div class="flex flex-nowrap justify-content-between">
                     <div class="col-fixed-width text-500">
-                        <tooltip-text-icon
-                            text="Value"
-                            tooltip="Total value of the coinbase transaction"
-                        />
+                        Value
                     </div>
                     <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
                         {{ info.coinbaseValueTotalSatoshis | sats }}
