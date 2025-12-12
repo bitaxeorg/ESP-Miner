@@ -181,6 +181,9 @@ components:
         - scriptsig
         - networkDifficulty
         - blockFound
+        - coinbaseOutputs
+        - coinbaseValueTotalSatoshis
+        - coinbaseValueUserSatoshis
         - hashrateMonitor
       properties:
         ASICModel:
@@ -413,6 +416,27 @@ components:
         blockFound:
           type: number
           description: Whether a block was found (0=no, 1=yes)
+        coinbaseOutputs:
+          type: array
+          description: Coinbase transaction outputs
+          items:
+            type: object
+            required:
+              - value
+              - address
+            properties:
+              value:
+                type: integer
+                description: Output value in satoshis
+              address:
+                type: string
+                description: Output address
+        coinbaseValueTotalSatoshis:
+          type: integer
+          description: Total value of coinbase transaction in satoshis
+        coinbaseValueUserSatoshis:
+          type: integer
+          description: User's portion of coinbase value in satoshis
         hashrateMonitor:
           type: object
           required:

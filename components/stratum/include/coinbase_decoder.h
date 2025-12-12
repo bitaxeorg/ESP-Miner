@@ -8,6 +8,7 @@
 #include "stratum_api.h"
 
 #define MAX_ADDRESS_STRING_LEN 128
+#define MAX_COINBASE_TX_OUTPUTS 100
 
 // Bitcoin Script Opcodes
 #define OP_0            0x00
@@ -79,8 +80,9 @@ typedef struct {
     double network_difficulty;
     uint32_t block_height;
     char *scriptsig; // Allocated, must be freed by caller
-    coinbase_output_t outputs[10];
+    coinbase_output_t outputs[MAX_COINBASE_TX_OUTPUTS];
     int output_count;
+    uint64_t total_value_satoshis;
 } mining_notification_result_t;
 
 /**

@@ -27,7 +27,8 @@ type MessageType =
   | 'POWER_FAULT'
   | 'FREQUENCY_LOW'
   | 'FALLBACK_STRATUM'
-  | 'VERSION_MISMATCH';
+  | 'VERSION_MISMATCH'
+  | 'NOT_SOLO_MINING';
 
 interface ISystemMessage {
   type: MessageType;
@@ -581,6 +582,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.calculateAverage(efficiencies);
   }
 
+  getPayoutPercentage(info: ISystemInfo) {
+    if (info.coinbaseValueUserSatoshis && info.coinbaseValueTotalSatoshis) {
+      return info.coinbaseValueUserSatoshis / info.coinbaseValueTotalSatoshis * 100;
+    }
+    return -1;
+  }
+
   public handleSystemMessages(info: ISystemInfo) {
     const updateMessage = (
       condition: boolean,
@@ -601,6 +609,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
+    let coinbasePayoutPercentage = this.getPayoutPercentage(info);
+    updateMessage(coinbasePayoutPercentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the coinbase reward is only ${coinbasePayoutPercentage.toFixed(1)}%`);
   }
 
   private calculateEfficiency(info: ISystemInfo, key: 'hashRate' | 'expectedHashrate'): number {

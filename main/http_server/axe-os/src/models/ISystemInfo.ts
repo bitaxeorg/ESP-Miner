@@ -92,6 +92,8 @@ export interface ISystemInfo {
     scriptsig?: string,
     networkDifficulty?: number,
     coinbaseOutputs?: { value: number, address: string }[],
+    coinbaseValueTotalSatoshis?: number,
+    coinbaseValueUserSatoshis?: number,
 
     hashrateMonitor: IHashrateMonitor,
     blockFound: number,

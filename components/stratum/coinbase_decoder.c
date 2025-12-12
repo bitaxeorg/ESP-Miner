@@ -145,10 +145,13 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
                                  int extranonce2_len,
                                  mining_notification_result_t *result) {
     if (!notification || !extranonce1 || !result) return ESP_ERR_INVALID_ARG;
-    
+
+    // Initialize result
+    result->total_value_satoshis = 0;
+
     // 1. Calculate difficulty
     result->network_difficulty = networkDifficulty(notification->target);
-    
+
     // 2. Parse Coinbase 1 for ScriptSig info
     int coinbase_1_len = strlen(notification->coinbase_1) / 2;
     int coinbase_1_offset = 41; // Skip version (4), inputcount (1), prevhash (32), vout (4)
@@ -255,30 +258,34 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
     result->output_count = 0;
     
     // Parse each output
-    for (uint64_t i = 0; i < num_outputs && offset < coinbase_2_len && i < 10; i++) {
+    for (uint64_t i = 0; i < num_outputs && offset < coinbase_2_len; i++) {
         // Read value (8 bytes, little-endian)
         if (offset + 8 > coinbase_2_len) break;
-        
+
         uint64_t value_satoshis = 0;
         for (int j = 0; j < 8; j++) {
             value_satoshis |= ((uint64_t)coinbase_2_bin[offset + j]) << (j * 8);
         }
         offset += 8;
-        
+
         // Read scriptPubKey length
         if (offset >= coinbase_2_len) break;
         uint64_t script_len = coinbase_decode_varint(coinbase_2_bin, &offset);
-        
+
         // Read scriptPubKey
         if (offset + script_len > coinbase_2_len) break;
-        
-        // Fill output structure
-        result->outputs[i].value_satoshis = value_satoshis;
-        coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, 
-                                                   result->outputs[i].address, MAX_ADDRESS_STRING_LEN);
-        
+
+        // Add to total value
+        result->total_value_satoshis += value_satoshis;
+
+        if (i < MAX_COINBASE_TX_OUTPUTS) {
+            result->outputs[i].value_satoshis = value_satoshis;
+            coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len,
+                                                        result->outputs[i].address, MAX_ADDRESS_STRING_LEN);
+            result->output_count++;
+        }
+
         offset += script_len;
-        result->output_count++;
     }
     
     free(coinbase_2_bin);

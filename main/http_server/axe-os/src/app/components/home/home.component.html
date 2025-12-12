@@ -424,16 +424,28 @@
                             tooltip="Time it takes for the pool to respond to a share"
                         />
                     </div>
-                    <div>
+                    <div *ngIf="info.responseTime > 0; else noValue">
                         {{ info.responseTime }} ms
                     </div>
                 </div>
-
+                <div class="flex flex-nowrap">
+                    <div class="col-fixed-width text-500">
+                        <tooltip-text-icon
+                            text="Share"
+                            tooltip="Bitcoin block reward share percentage to user address. 100% is pure solo mining, above 95% is solo mining with a pool fee."
+                        />
+                    </div>
+                    <ng-container *ngIf="getPayoutPercentage(info) as percentage">
+                        <div *ngIf="percentage !== -1; else noValue" [style.color]="percentage < 95 ? 'red' : 'inherit'">
+                            {{ percentage | number:'1.0-1' }}%
+                        </div>
+                    </ng-container>
+                </div>                
                 <div class="flex flex-nowrap">
                     <div class="col-fixed-width text-500">
                         <span>Difficulty</span>
                     </div>
-                    <div>
+                    <div *ngIf="info.poolDifficulty > 0; else noValue">
                         {{ info.poolDifficulty }}
                     </div>
                 </div>
@@ -470,11 +482,22 @@
                         {{ info.scriptsig }}
                     </div>
                 </div>
+                <div class="flex flex-nowrap justify-content-between">
+                    <div class="col-fixed-width text-500">
+                        <tooltip-text-icon
+                            text="Value"
+                            tooltip="Total value of the coinbase transaction"
+                        />
+                    </div>
+                    <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
+                        {{ info.coinbaseValueTotalSatoshis | sats }}
+                    </ng-container>
+                </div>                
                 <div class="flex flex-nowrap align-items-baseline">
                     <div class="col-fixed-width text-500">
                         <span>Outputs</span>
                     </div>
-                    <div class="w-full">
+                    <div class="w-full overflow-auto">
                         <div *ngFor="let output of info.coinbaseOutputs; let i = index" class="flex text-sm justify-content-between">
                             @if (output.value > 0) {
                                 @if (output.address === getAddressPart(activePoolUser)) {
@@ -482,7 +505,7 @@
                                 } @else {
                                     <span class="code" pTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
                                 }
-                                <span>{{ output.value | number }}</span>
+                                <span>{{ output.value | sats }}</span>
                             } @else {
                                 <span class="code">{{ output.address }}</span>
                             }

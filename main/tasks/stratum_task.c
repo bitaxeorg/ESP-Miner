@@ -12,6 +12,7 @@
 #include <string.h>
 #include "utils.h"
 #include "coinbase_decoder.h"
+#include <esp_heap_caps.h>
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
@@ -265,50 +266,69 @@ void stratum_primary_heartbeat(void * pvParameters)
 
 static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
 {
-    mining_notification_result_t result = {0};
-    
+    mining_notification_result_t *result = heap_caps_malloc(sizeof(mining_notification_result_t), MALLOC_CAP_SPIRAM);
+    if (!result) {
+        ESP_LOGE(TAG, "Failed to allocate result in PSRAM");
+        return;
+    }
+    memset(result, 0, sizeof(mining_notification_result_t));
+
     if (coinbase_process_notification(mining_notification,
                                      GLOBAL_STATE->extranonce_str,
                                      GLOBAL_STATE->extranonce_2_len,
-                                     &result) != ESP_OK) {
+                                     result) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to process mining notification");
+        free(result);
         return;
     }
-        
+
     // Update network difficulty
-    GLOBAL_STATE->network_nonce_diff = (uint64_t) result.network_difficulty;
-    suffixString(result.network_difficulty, GLOBAL_STATE->network_diff_string, DIFF_STRING_SIZE, 0);
-        
+    GLOBAL_STATE->network_nonce_diff = (uint64_t) result->network_difficulty;
+    suffixString(result->network_difficulty, GLOBAL_STATE->network_diff_string, DIFF_STRING_SIZE, 0);
+
     // Update block height
-    if (result.block_height != GLOBAL_STATE->block_height) {
-        ESP_LOGI(TAG, "Block height %d", result.block_height);
-        GLOBAL_STATE->block_height = result.block_height;
+    if (result->block_height != GLOBAL_STATE->block_height) {
+        ESP_LOGI(TAG, "Block height %d", result->block_height);
+        GLOBAL_STATE->block_height = result->block_height;
     }
-        
+
     // Update scriptsig
-    if (result.scriptsig) {
-        if (strcmp(result.scriptsig, GLOBAL_STATE->scriptsig) != 0) {
-            ESP_LOGI(TAG, "Scriptsig: %s", result.scriptsig);
-            strncpy(GLOBAL_STATE->scriptsig, result.scriptsig, sizeof(GLOBAL_STATE->scriptsig) - 1);
+    if (result->scriptsig) {
+        if (strcmp(result->scriptsig, GLOBAL_STATE->scriptsig) != 0) {
+            ESP_LOGI(TAG, "Scriptsig: %s", result->scriptsig);
+            strncpy(GLOBAL_STATE->scriptsig, result->scriptsig, sizeof(GLOBAL_STATE->scriptsig) - 1);
             GLOBAL_STATE->scriptsig[sizeof(GLOBAL_STATE->scriptsig) - 1] = '\0';
         }
-        free(result.scriptsig);
+        free(result->scriptsig);
     }
-        
+
     // Update coinbase outputs
-    if (result.output_count != GLOBAL_STATE->coinbase_output_count ||
-        memcmp(result.outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result.output_count) != 0) {
-        GLOBAL_STATE->coinbase_output_count = result.output_count;
-        memcpy(GLOBAL_STATE->coinbase_outputs, result.outputs, sizeof(coinbase_output_t) * result.output_count);
-        ESP_LOGI(TAG, "Coinbase outputs: %d", result.output_count);
-        for (int i = 0; i < result.output_count; i++) {
-            if (result.outputs[i].value_satoshis > 0) {
-                ESP_LOGI(TAG, "  Output %d: %s (%llu sat)", i, result.outputs[i].address, result.outputs[i].value_satoshis);
+    if (result->output_count != GLOBAL_STATE->coinbase_output_count ||
+        memcmp(result->outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {
+
+        char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+        uint64_t user_output_value = 0;
+
+        GLOBAL_STATE->coinbase_output_count = result->output_count;
+        memcpy(GLOBAL_STATE->coinbase_outputs, result->outputs, sizeof(coinbase_output_t) * result->output_count);
+        GLOBAL_STATE->coinbase_value_total_satoshis = result->total_value_satoshis;
+        ESP_LOGI(TAG, "Coinbase outputs: %d, total value: %llu sat", result->output_count, result->total_value_satoshis);
+        for (int i = 0; i < result->output_count; i++) {
+            if (result->outputs[i].value_satoshis > 0) {
+                if (strncmp(user, result->outputs[i].address, strlen(result->outputs[i].address)) == 0) {
+                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat) *", i, result->outputs[i].address, result->outputs[i].value_satoshis);
+                    user_output_value += result->outputs[i].value_satoshis;
+                } else {
+                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat)", i, result->outputs[i].address, result->outputs[i].value_satoshis);
+                }
             } else {
-                ESP_LOGI(TAG, "  Output %d: %s", i, result.outputs[i].address);
+                ESP_LOGI(TAG, "  Output %d: %s", i, result->outputs[i].address);
             }
         }
+        GLOBAL_STATE->coinbase_value_user_satoshis = user_output_value;
     }
+
+    free(result);
 }
 
 void stratum_task(void * pvParameters)

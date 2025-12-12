@@ -930,6 +930,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
             cJSON_AddItemToArray(outputs_array, output_obj);
         }
         cJSON_AddItemToObject(root, "coinbaseOutputs", outputs_array);
+        cJSON_AddNumberToObject(root, "coinbaseValueTotalSatoshis", GLOBAL_STATE->coinbase_value_total_satoshis);
+        cJSON_AddNumberToObject(root, "coinbaseValueUserSatoshis", GLOBAL_STATE->coinbase_value_user_satoshis);
     }
 
     cJSON *hashrate_monitor = cJSON_CreateObject();
