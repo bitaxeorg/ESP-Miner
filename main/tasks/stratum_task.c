@@ -319,7 +319,7 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
         for (int i = 0; i < result->output_count; i++) {
             if (result->outputs[i].value_satoshis > 0) {
                 if (strncmp(user, result->outputs[i].address, strlen(result->outputs[i].address)) == 0) {
-                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat) *", i, result->outputs[i].address, result->outputs[i].value_satoshis);
+                    ESP_LOGI(TAG, "  Output %d: %s (%llu sat) (Your payout address)", i, result->outputs[i].address, result->outputs[i].value_satoshis);
                     user_output_value += result->outputs[i].value_satoshis;
                 } else {
                     ESP_LOGI(TAG, "  Output %d: %s (%llu sat)", i, result->outputs[i].address, result->outputs[i].value_satoshis);
