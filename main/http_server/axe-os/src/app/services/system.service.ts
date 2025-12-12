@@ -71,15 +71,19 @@ export class SystemService {
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         stratumSuggestedDifficulty: 1000,
         stratumExtranonceSubscribe: 0,
+        stratumTLS: 0,
+        stratumCert: "",
         fallbackStratumURL: "test.public-pool.io",
         fallbackStratumPort: 21497,
         fallbackStratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         fallbackStratumSuggestedDifficulty: 1000,
         fallbackStratumExtranonceSubscribe: 0,
+        fallbackStratumTLS: 0,
+        fallbackStratumCert: "",
         poolDifficulty: 1000,
         responseTime: 10,
         isUsingFallbackStratum: false,
-        poolAddrFamily: 2,
+        poolConnectionInfo: "IPv4 (TLS)",
         frequency: 485,
         version: "v2.12.0",
         axeOSVersion: "v2.12.0",
@@ -147,6 +151,7 @@ export class SystemService {
     const fan2RpmData = [3545,3904,3691,3564,3554,3691,3573,3701,4044, 4032];
     const wifiRssiData = [-35,-34,-33,-34,-34,-34,-33,-35,-33,-34];
     const freeHeapData = [214504,212504,213504,210504,207504,209504,203504,202504,201504,200504];
+    const responseTimeData = [15.1,14.5,14.3,15.1,13.1,16.1,28.6,18.4,17.7,17.6,18.0,15.5];
     const timestampData = [13131,18126,23125,28125,33125,38125,43125,48125,53125,58125];
 
     columnList.push("timestamp");
@@ -168,9 +173,10 @@ export class SystemService {
           case eChartLabel.current:      statisticsList[i][j] = currentData[i];      break;
           case eChartLabel.fanSpeed:     statisticsList[i][j] = fanSpeedData[i];     break;
           case eChartLabel.fanRpm:       statisticsList[i][j] = fanRpmData[i];       break;
-          case eChartLabel.fan2Rpm:      statisticsList[i][j] = fan2RpmData[i];       break;
+          case eChartLabel.fan2Rpm:      statisticsList[i][j] = fan2RpmData[i];      break;
           case eChartLabel.wifiRssi:     statisticsList[i][j] = wifiRssiData[i];     break;
           case eChartLabel.freeHeap:     statisticsList[i][j] = freeHeapData[i];     break;
+          case eChartLabel.responseTime: statisticsList[i][j] = responseTimeData[i]; break;
           default:
             if (columnList[j] === "timestamp") {
               statisticsList[i][j] = timestampData[i];

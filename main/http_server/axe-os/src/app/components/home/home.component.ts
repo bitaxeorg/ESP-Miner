@@ -438,6 +438,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         info.coreVoltage = parseFloat(info.coreVoltage.toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
         info.temp2 = parseFloat(info.temp2.toFixed(1));
+        info.responseTime = parseFloat(info.responseTime.toFixed(1));
 
         return info;
       }),
@@ -534,20 +535,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
-  }
-
-  getPoolProtocolType(info: ISystemInfo): string {
-    // AF_INET = 2 (IPv4), AF_INET6 = 10 (IPv6) on ESP32
-    const AF_INET = 2;
-    const AF_INET6 = 10;
-
-    if (info.poolAddrFamily === AF_INET) {
-      return 'IPv4';
-    } else if (info.poolAddrFamily === AF_INET6) {
-      return 'IPv6';
-    }
-
-    return '';
   }
 
   getSortedRejectionReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
@@ -713,6 +700,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fanSpeed:         return 100;
       case eChartLabel.fanRpm:           return 7000;
       case eChartLabel.fan2Rpm:          return 7000;
+      case eChartLabel.responseTime:     return 50;
       default:                           return 0;
     }
   }
@@ -735,6 +723,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fan2Rpm:            return info.fan2rpm;
       case eChartLabel.wifiRssi:           return info.wifiRSSI;
       case eChartLabel.freeHeap:           return info.freeHeap;
+      case eChartLabel.responseTime:       return info.responseTime;
       default:                             return 0.0;
     }
   }
@@ -752,6 +741,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fanRpm:
       case eChartLabel.fan2Rpm:          return {suffix: ' rpm', precision: 0};
       case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
+      case eChartLabel.responseTime:     return {suffix: ' ms', precision: 1};
       default:                           return {suffix: '', precision: 0};
     }
   }

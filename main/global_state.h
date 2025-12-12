@@ -12,6 +12,7 @@
 #include "work_queue.h"
 #include "device_config.h"
 #include "display.h"
+#include "esp_transport.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
@@ -65,8 +66,14 @@ typedef struct
     bool fallback_pool_extranonce_subscribe;
     float response_time;
     bool use_fallback_stratum;
+    uint16_t pool_is_tls;
+    uint16_t fallback_pool_is_tls;
+    uint16_t pool_tls;
+    uint16_t fallback_pool_tls;
+    char * pool_cert;
+    char * fallback_pool_cert;
     bool is_using_fallback;
-    int pool_addr_family;
+    char pool_connection_info[64];
     bool overheat_mode;
     uint16_t power_fault;
     uint32_t lastClockSync;
@@ -111,8 +118,8 @@ typedef struct
     uint32_t version_mask;
     bool new_stratum_version_rolling_msg;
 
-    int sock;
-
+    esp_transport_handle_t transport;
+    
     // A message ID that must be unique per request that expects a response.
     // For requests not expecting a response (called notifications), this is null.
     int send_uid;

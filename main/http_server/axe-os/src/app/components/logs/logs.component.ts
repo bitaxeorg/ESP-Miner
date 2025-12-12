@@ -74,7 +74,7 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
           const currentFilter = this.form?.get('filter')?.value;
 
           if (!currentFilter || val.includes(currentFilter)) {
-            this.logs.push({ className, text: val });
+            this.logs.push({ className: `max-w-full font-monospace ${className}`, text: val });
           }
 
           if (this.logs.length > 256) {

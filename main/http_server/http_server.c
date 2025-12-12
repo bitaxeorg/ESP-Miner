@@ -69,6 +69,7 @@ static const char * STATS_LABEL_FAN_RPM = "fanRpm";
 static const char * STATS_LABEL_FAN2_RPM = "fan2Rpm";
 static const char * STATS_LABEL_WIFI_RSSI = "wifiRssi";
 static const char * STATS_LABEL_FREE_HEAP = "freeHeap";
+static const char * STATS_LABEL_RESPONSE_TIME = "responseTime";
 
 static const char * STATS_LABEL_TIMESTAMP = "timestamp";
 
@@ -95,6 +96,7 @@ typedef enum
     SRC_FAN2_RPM,
     SRC_WIFI_RSSI,
     SRC_FREE_HEAP,
+    SRC_RESPONSE_TIME,
     SRC_NONE // last
 } DataSource;
 
@@ -117,6 +119,7 @@ DataSource strToDataSource(const char * sourceStr)
         if (strcmp(sourceStr, STATS_LABEL_FAN2_RPM) == 0)     return SRC_FAN2_RPM;
         if (strcmp(sourceStr, STATS_LABEL_WIFI_RSSI) == 0)    return SRC_WIFI_RSSI;
         if (strcmp(sourceStr, STATS_LABEL_FREE_HEAP) == 0)    return SRC_FREE_HEAP;
+        if (strcmp(sourceStr, STATS_LABEL_RESPONSE_TIME) == 0) return SRC_RESPONSE_TIME;
     }
     return SRC_NONE;
 }
@@ -803,9 +806,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * fallbackStratumURL = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL);
     char * stratumUser = nvs_config_get_string(NVS_CONFIG_STRATUM_USER);
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER);
+    char * stratumCert = nvs_config_get_string(NVS_CONFIG_STRATUM_CERT);
+    char * fallbackStratumCert = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_CERT);
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
-
+    
     uint8_t mac[6];
     esp_wifi_get_mac(WIFI_IF_STA, mac);
     char formattedMac[18];
@@ -834,7 +839,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "poolDifficulty", GLOBAL_STATE->pool_difficulty);
 
     cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
-    cJSON_AddNumberToObject(root, "poolAddrFamily", GLOBAL_STATE->SYSTEM_MODULE.pool_addr_family);
+    cJSON_AddStringToObject(root, "poolConnectionInfo", GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info);
 
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
 
@@ -875,11 +880,15 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
     cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY));
     cJSON_AddNumberToObject(root, "stratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE));
+    cJSON_AddNumberToObject(root, "stratumTLS", nvs_config_get_u16(NVS_CONFIG_STRATUM_TLS));
+    cJSON_AddStringToObject(root, "stratumCert", stratumCert);
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
     cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT));
     cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
     cJSON_AddNumberToObject(root, "fallbackStratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY));
     cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
+    cJSON_AddNumberToObject(root, "fallbackStratumTLS", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS));
+    cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
     cJSON_AddFloatToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
 
     cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
@@ -948,6 +957,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(hostname);
     free(stratumURL);
     free(fallbackStratumURL);
+    free(stratumCert);
+    free(fallbackStratumCert);
     free(stratumUser);
     free(fallbackStratumUser);
     free(display);
@@ -1024,6 +1035,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     if (dataSelection[SRC_FAN2_RPM]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_FAN2_RPM)); }
     if (dataSelection[SRC_WIFI_RSSI]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_WIFI_RSSI)); }
     if (dataSelection[SRC_FREE_HEAP]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_FREE_HEAP)); }
+    if (dataSelection[SRC_RESPONSE_TIME]) { cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_RESPONSE_TIME)); }
     cJSON_AddItemToArray(labelArray, cJSON_CreateString(STATS_LABEL_TIMESTAMP));
 
     cJSON_AddItemToObject(root, "labels", labelArray);
@@ -1050,6 +1062,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
         if (dataSelection[SRC_FAN2_RPM]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.fan2RPM)); }
         if (dataSelection[SRC_WIFI_RSSI]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.wifiRSSI)); }
         if (dataSelection[SRC_FREE_HEAP]) { cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.freeHeap)); }
+        if (dataSelection[SRC_RESPONSE_TIME]) { cJSON_AddItemToArray(valueArray, cJSON_CreateFloat(statsData.responseTime)); }
         cJSON_AddItemToArray(valueArray, cJSON_CreateNumber(statsData.timestamp));
 
         cJSON_AddItemToArray(statsArray, valueArray);
