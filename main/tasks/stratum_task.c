@@ -160,6 +160,42 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
     return ESP_OK;
 }
 
+static void set_socket_options(esp_transport_handle_t transport)
+{
+    int sock = esp_transport_get_socket(transport);
+    if (sock >= 0) {
+        // Set send and receive timeouts
+        if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tcp_snd_timeout, sizeof(tcp_snd_timeout)) < 0) {
+            ESP_LOGE(TAG, "Failed to set SO_SNDTIMEO");
+        }
+        if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tcp_rcv_timeout, sizeof(tcp_rcv_timeout)) < 0) {
+            ESP_LOGE(TAG, "Failed to set SO_RCVTIMEO");
+        }
+
+        // Enable keepalive
+        int keepalive = 1;
+        if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive)) < 0) {
+            ESP_LOGE(TAG, "Failed to set SO_KEEPALIVE");
+        }
+
+        // Set keepalive parameters (adjust values as needed)
+        int keepidle = 60;  // TCP_KEEPIDLE: seconds before sending keepalive
+        int keepintvl = 10; // TCP_KEEPINTVL: seconds between keepalive probes
+        int keepcnt = 3;    // TCP_KEEPCNT: number of keepalive probes
+        if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, sizeof(keepidle)) < 0) {
+            ESP_LOGE(TAG, "Failed to set TCP_KEEPIDLE");
+        }
+        if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl, sizeof(keepintvl)) < 0) {
+            ESP_LOGE(TAG, "Failed to set TCP_KEEPINTVL");
+        }
+        if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt, sizeof(keepcnt)) < 0) {
+            ESP_LOGE(TAG, "Failed to set TCP_KEEPCNT");
+        }
+    } else {
+        ESP_LOGE(TAG, "Failed to get socket from transport");
+    }
+}
+
 bool is_wifi_connected() {
     wifi_ap_record_t ap_info;
     if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
@@ -192,6 +228,7 @@ void stratum_close_connection(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGE(TAG, "Shutting down socket and restarting...");
     esp_transport_close(GLOBAL_STATE->transport);
+    GLOBAL_STATE->transport = NULL;
     cleanQueue(GLOBAL_STATE);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
@@ -235,13 +272,14 @@ void stratum_primary_heartbeat(void * pvParameters)
         }
 
         esp_err_t err = esp_transport_connect(transport, primary_stratum_url, primary_stratum_port, TRANSPORT_TIMEOUT_MS);
-        if (err != ESP_OK) 
-        {
+        if (err != ESP_OK) {
             ESP_LOGD(TAG, "Heartbeat. Failed connect check: %s:%d (errno %d: %s)", primary_stratum_url, primary_stratum_port, err, strerror(err));
             esp_transport_close(transport);
             vTaskDelay(60000 / portTICK_PERIOD_MS);
             continue;
         }
+
+        set_socket_options(transport);
 
         int send_uid = 1;
         STRATUM_V1_subscribe(transport, send_uid++, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
@@ -442,6 +480,8 @@ void stratum_task(void * pvParameters)
             vTaskDelay(5000 / portTICK_PERIOD_MS);
             continue;
         }
+
+        set_socket_options(GLOBAL_STATE->transport);
 
         const char* protocol = (conn_info.addr_family == AF_INET6) ? "IPv6" : "IPv4";
         const char *tls_status;
