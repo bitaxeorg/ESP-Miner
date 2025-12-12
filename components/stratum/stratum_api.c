@@ -491,7 +491,7 @@ int STRATUM_V1_pong(esp_transport_handle_t transport, int message_id)
         message_id);
     debug_stratum_tx(pong_msg);
     
-    return esp_transport_write(transport, socket, pong_msg, strlen(pong_msg), TRANSPORT_TIMEOUT_MS);
+    return esp_transport_write(transport, pong_msg, strlen(pong_msg), TRANSPORT_TIMEOUT_MS);
 }
 
 /// @param transport Transport to write to
