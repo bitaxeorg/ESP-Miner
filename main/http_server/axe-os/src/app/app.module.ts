@@ -32,6 +32,8 @@ import { ANSIPipe } from './pipes/ansi.pipe';
 import { DateAgoPipe } from './pipes/date-ago.pipe';
 import { HashSuffixPipe } from './pipes/hash-suffix.pipe';
 import { DiffSuffixPipe } from './pipes/diff-suffix.pipe';
+import { AddressPipe } from './pipes/address.pipe';
+import { SatsPipe } from './pipes/sats.pipe';
 import { PrimeNGModule } from './prime-ng.module';
 import { MessageModule } from 'primeng/message';
 import { TooltipModule } from 'primeng/tooltip';
@@ -67,6 +69,8 @@ const components = [
     SettingsComponent,
     HashSuffixPipe,
     DiffSuffixPipe,
+    AddressPipe,
+    SatsPipe,
     ThemeConfigComponent,
     DesignComponent,
     PoolComponent,
