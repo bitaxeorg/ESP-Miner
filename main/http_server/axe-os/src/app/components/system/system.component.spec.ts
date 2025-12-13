@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { SystemComponent } from './system.component';
+import { provideHttpClient } from '@angular/common/http';
+import { provideToastr } from 'ngx-toastr';
 
 describe('SystemComponent', () => {
   let component: SystemComponent;
@@ -8,7 +10,8 @@ describe('SystemComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SystemComponent]
+      declarations: [SystemComponent],
+      providers: [provideHttpClient(), provideToastr()]
     })
     .compileComponents();
 
