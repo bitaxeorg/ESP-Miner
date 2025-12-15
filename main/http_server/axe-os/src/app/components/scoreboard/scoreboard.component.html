@@ -35,11 +35,11 @@
                             <span *ngIf="entry.rank >= 3" class="text-500 text-xs">{{ entry.rank + 1 }}</span>
                         </td>
                         <td pTooltip="{{ entry.difficulty }}" tooltipPosition="top" class="text-900">{{ entry.difficulty | diffSuffix }}</td>
-                        <td class="code">{{ entry.job_id }}</td>
-                        <td class="code">{{ entry.extranonce2 }}</td>
+                        <td class="font-monospace">{{ entry.job_id }}</td>
+                        <td class="font-monospace">{{ entry.extranonce2 }}</td>
                         <td pTooltip="{{ entry.since | dateAgo: {intervals: 2} }} ago" tooltipPosition="top">{{ entry.ntime * 1000 | date:'yyyy-MM-dd HH:mm:ss' }}</td>
-                        <td class="code">{{ entry.nonce }}</td>
-                        <td class="code">{{ entry.version_bits }}</td>
+                        <td class="font-monospace">{{ entry.nonce }}</td>
+                        <td class="font-monospace">{{ entry.version_bits }}</td>
                     </tr>
                 </tbody>
             </table>
