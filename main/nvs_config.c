@@ -366,7 +366,7 @@ void nvs_config_set_string(NvsConfigKey key, const char *value)
 {
     Settings *setting = nvs_config_get_settings(key);
     // Skip if invalid, wrong type, or value unchanged
-    if (!setting || setting->type != TYPE_STR || (setting->value.str && strcmp(setting->value.str, value) == 0)) return;
+    if (!setting || setting->type != TYPE_STR || (setting->value[0].str && strcmp(setting->value[0].str, value) == 0)) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value) };
     if (!update.value.str) return;
@@ -375,6 +375,9 @@ void nvs_config_set_string(NvsConfigKey key, const char *value)
 
 void nvs_config_set_string_indexed(NvsConfigKey key, int index, const char *value)
 {
+    Settings *setting = nvs_config_get_settings(key);
+    if (!setting || setting->type != TYPE_STR || (setting->value[index].str && strcmp(setting->value[index].str, value) == 0)) return;
+
     ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value), .index = index };
     if (!update.value.str) return;
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
@@ -393,7 +396,7 @@ uint16_t nvs_config_get_u16(NvsConfigKey key)
 void nvs_config_set_u16(NvsConfigKey key, uint16_t value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_U16 || setting->value.u16 == value) return;
+    if (!setting || setting->type != TYPE_U16 || setting->value[0].u16 == value) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_U16, .value.u16 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
@@ -412,7 +415,7 @@ int32_t nvs_config_get_i32(NvsConfigKey key)
 void nvs_config_set_i32(NvsConfigKey key, int32_t value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_I32 || setting->value.i32 == value) return;
+    if (!setting || setting->type != TYPE_I32 || setting->value[0].i32 == value) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_I32, .value.i32 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
@@ -431,7 +434,7 @@ uint64_t nvs_config_get_u64(NvsConfigKey key)
 void nvs_config_set_u64(NvsConfigKey key, uint64_t value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_U64 || setting->value.u64 == value) return;
+    if (!setting || setting->type != TYPE_U64 || setting->value[0].u64 == value) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_U64, .value.u64 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
@@ -451,12 +454,11 @@ void nvs_config_set_float(NvsConfigKey key, float value)
 {
     Settings *setting = nvs_config_get_settings(key);
     // Skip if invalid, wrong type, or value unchanged (use epsilon for float comparison)
-    if (!setting || setting->type != TYPE_FLOAT || fabsf(setting->value.f - value) < 0.001f) return;
+    if (!setting || setting->type != TYPE_FLOAT || fabsf(setting->value[0].f - value) < 0.001f) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_FLOAT, .value.f = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
 }
-
 
 bool nvs_config_get_bool(NvsConfigKey key)
 {
@@ -471,7 +473,7 @@ bool nvs_config_get_bool(NvsConfigKey key)
 void nvs_config_set_bool(NvsConfigKey key, bool value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_BOOL || setting->value.b == value) return;
+    if (!setting || setting->type != TYPE_BOOL || setting->value[0].b == value) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_BOOL, .value.b = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
