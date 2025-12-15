@@ -210,10 +210,10 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
       // Calculate probability using Poisson distribution
       const probability = 1 - Math.exp(-expectedOccurrences);
       
-      if (probability >= 0.0001) {
-        return `${(probability * 100).toFixed(2)}%`;
+      if (probability >= 0.00000001) {
+        return `${(probability * 100).toPrecision(2)}%`;
       } else {
-        return '<0.01%';
+        return '<0.000001%';
       }
     }
   }
