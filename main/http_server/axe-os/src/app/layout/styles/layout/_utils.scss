@@ -41,20 +41,20 @@
 
 .sensitive-data-hidden {
     [sensitive-data] {
-        font-size: 0;
+        color: transparent;
         pointer-events: none;
-
-        &::before,
-        &.p-inputtext {
-            font-size: $scale;
-        }
+        position: relative;
 
         &.p-inputtext {
             -webkit-text-security: disc;
+            color: var(--text-color); 
         }
 
         &::before {
             content: '••••••';
+            color: var(--text-color); 
+            position: absolute;
+            left: 0;
         }
     }
 }
