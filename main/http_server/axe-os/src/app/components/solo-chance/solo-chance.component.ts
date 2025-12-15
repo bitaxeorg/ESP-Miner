@@ -63,7 +63,7 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
   }
 
   private generateRows(info: ISystemInfo): void {
-    const hashRate = info.hashRate_1m; // in GH/s
+    const hashRate = info.expectedHashrate; // in GH/s
     
     const difficulties: Array<{ value: number; label?: string; type: DifficultyRow['type']; tooltip?: string;  }> = [];
     
