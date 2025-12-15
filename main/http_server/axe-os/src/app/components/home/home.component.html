@@ -426,7 +426,8 @@
                         {{ info.responseTime }} ms
                     </div>
                 </div>
-                <div class="flex flex-nowrap" *ngIf="getPayoutPercentage(info) as percentage">
+                <div class="flex flex-nowrap">
+                    @let percentage = getPayoutPercentage(info);
                     <ng-container *ngIf="percentage >= 95">
                         <div class="col-fixed-width text-500">
                             <tooltip-text-icon text="Fee" tooltip="Percentage of the bitcoin block reward that will be paid out to the pool if you find a block." />
@@ -497,7 +498,7 @@
                     <div class="col-fixed-width text-500">
                         <span>Outputs</span>
                     </div>
-                    <div class="w-full overflow-auto">
+                    <div class="w-full overflow-auto" [style.max-height]="'6.5rem'">
                         <div *ngFor="let output of info.coinbaseOutputs; let i = index" class="flex justify-content-between">
                             @if (output.value > 0) {
                                 @if (output.address === getAddressPart(activePoolUser)) {

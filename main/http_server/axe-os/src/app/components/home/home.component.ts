@@ -569,8 +569,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   getPayoutPercentage(info: ISystemInfo) {
-    if (info.coinbaseValueUserSatoshis && info.coinbaseValueTotalSatoshis) {
-      return info.coinbaseValueUserSatoshis / info.coinbaseValueTotalSatoshis * 100;
+    if (info.coinbaseValueTotalSatoshis) {
+      return (info.coinbaseValueUserSatoshis ?? 0) / info.coinbaseValueTotalSatoshis * 100;
     }
     return -1;
   }
@@ -596,7 +596,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
     let percentage = this.getPayoutPercentage(info);
-    updateMessage(percentage > -1 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the coinbase reward is only ${percentage.toFixed(1)}%`);
+    updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the coinbase reward is only ${percentage.toFixed(1)}%`);
+    updateMessage(percentage === 0, 'NOT_SOLO_MINING', 'warn', `You don't have a share in the coinbase reward`);
   }
 
   private calculateEfficiency(info: ISystemInfo, key: 'hashRate' | 'expectedHashrate'): number {
