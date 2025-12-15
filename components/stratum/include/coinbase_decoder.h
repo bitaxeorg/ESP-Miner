@@ -8,7 +8,7 @@
 #include "stratum_api.h"
 
 #define MAX_ADDRESS_STRING_LEN 128
-#define MAX_COINBASE_TX_OUTPUTS 10
+#define MAX_COINBASE_TX_OUTPUTS 6
 
 // Bitcoin Script Opcodes
 #define OP_0            0x00
