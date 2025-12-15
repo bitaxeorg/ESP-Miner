@@ -77,7 +77,7 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
     if (expectedReachedDifficulty) {
       difficulties.push({
         value: expectedReachedDifficulty,
-        label: '📊 Uptime',
+        label: '⌚ Uptime',
         type: 'uptime',
         tooltip: 'Expected difficulty reached with current hashrate and uptime',
       });
