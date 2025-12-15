@@ -1,84 +1,28 @@
 :host {
-  ::ng-deep {
-    .p-datatable {
-      // Table header styling
-      .p-datatable-thead > tr > th {
-        background-color: #1f2d40; // $shade800
-        color: rgba(255, 255, 255, 0.87); // $shade000
-        border: 1px solid #304562; // $shade600
-        border-width: 0 0 1px 0;
+  .table-container {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .solo-chance-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    // Table header styling
+    thead tr th {
+      padding: 1rem;
+      font-weight: 600;
+      text-align: left;
+      border-bottom: 1px solid;
+      border-color: dimgray;
+    }
+
+    // Table body styling
+    tbody tr {
+      td {
         padding: 1rem;
-        font-weight: 600;
-      }
-
-      // Table body styling
-      .p-datatable-tbody > tr {
-        background-color: #1f2d40; // $shade800
-        color: rgba(255, 255, 255, 0.87); // $shade000
-        
-        // Alternating row colors
-        &:nth-child(even) {
-          background-color: #253144; // $tableBodyRowEvenBg
-        }
-        
-        // Hover effect
-        &:hover {
-          background-color: rgba(255, 255, 255, 0.03); // $hoverBg
-        }
-        
-        td {
-          border: 1px solid #304562; // $shade600
-          border-width: 0 0 1px 0;
-          padding: 1rem;
-        }
-
-        // Pool badge
-        &.pool-row .badge {
-          background-color: #2196f3; // blue
-          color: white;
-          padding: 0.25rem 0.5rem;
-          font-size: 0.75rem;
-          font-weight: 600;
-          border-radius: 0.25rem;
-          white-space: nowrap;
-        }
-
-        // Session best badge
-        &.session-row .badge {
-          background-color: #4caf50; // green
-          color: white;
-          padding: 0.25rem 0.5rem;
-          font-size: 0.75rem;
-          font-weight: 600;
-          border-radius: 0.25rem;
-          white-space: nowrap;
-        }
-
-        // All-time best badge
-        &.best-row .badge {
-          background-color: #fbc02d; // yellow
-          color: #121212; // dark text for yellow
-          padding: 0.25rem 0.5rem;
-          font-size: 0.75rem;
-          font-weight: 600;
-          border-radius: 0.25rem;
-          white-space: nowrap;
-        }
-
-        // Network badge
-        &.network-row {
-          font-weight: 600;
-          
-          .badge {
-            background-color: #b340fa; // purple
-            color: white;
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            border-radius: 0.25rem;
-            white-space: nowrap;
-          }
-        }
+        border-bottom: 1px solid;
+        border-color: dimgray;
       }
     }
   }

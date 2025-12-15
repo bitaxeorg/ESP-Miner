@@ -7,7 +7,8 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 interface DifficultyRow {
   difficulty: number;
   label?: string;
-  type?: 'fixed' | 'pool' | 'session' | 'best' | 'network';
+  type?: 'fixed' | 'pool' | 'session' | 'best' | 'network' | 'expected';
+  tooltip?: string;
   timeToFind: number;
   tenMin: string;
   hour: string;
@@ -29,21 +30,11 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
 
   // Time periods in seconds
   private readonly TIME_10MIN = 600;
-  private readonly TIME_HOUR = 3600;
-  private readonly TIME_DAY = 86400;
-  private readonly TIME_WEEK = 604800;
-  private readonly TIME_MONTH = 2592000;
-  private readonly TIME_YEAR = 31536000;
-
-  // Fixed difficulty milestones
-  private readonly FIXED_DIFFICULTIES = [
-    1,
-    1_000,
-    1_000_000,
-    1_000_000_000,
-    1_000_000_000_000,
-    1e15
-  ];
+  private readonly TIME_HOUR  = this.TIME_10MIN * 6;
+  private readonly TIME_DAY   = this.TIME_HOUR * 24;
+  private readonly TIME_WEEK  = this.TIME_DAY * 7;
+  private readonly TIME_YEAR  = this.TIME_DAY * 365.2425;
+  private readonly TIME_MONTH = this.TIME_YEAR / 12;
 
   constructor(
     private systemService: SystemService,
@@ -72,22 +63,33 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
   }
 
   private generateRows(info: ISystemInfo): void {
-    const hashRate = info.hashRate; // in GH/s
+    const hashRate = info.hashRate_1m; // in GH/s
     
-    // Create array of all difficulties
-    const difficulties: Array<{ value: number; label?: string; type: DifficultyRow['type'] }> = [];
+    const difficulties: Array<{ value: number; label?: string; type: DifficultyRow['type']; tooltip?: string;  }> = [];
     
-    // Add fixed difficulties
-    this.FIXED_DIFFICULTIES.forEach(diff => {
-      difficulties.push({ value: diff, type: 'fixed' });
-    });
+    let diff = 1;
+    while (diff < (info.networkDifficulty ?? 1e14)) {
+      difficulties.push({value: diff, type: 'fixed'});
+      diff *= 1e3;
+    }
     
+    const expectedReachedDifficulty = this.calculateExpectedReachedDifficulty(hashRate, info.uptimeSeconds);
+    if (expectedReachedDifficulty) {
+      difficulties.push({
+        value: expectedReachedDifficulty,
+        label: '📊 Expected',
+        type: 'expected',
+        tooltip: 'Expected difficulty reached with current hashrate and uptime',
+      });
+    }
+
     // Add dynamic difficulties
     if (info.poolDifficulty > 0) {
       difficulties.push({ 
         value: info.poolDifficulty, 
         label: '🎯 Pool', 
-        type: 'pool' 
+        type: 'pool',
+        tooltip: 'Your current pool difficulty setting',
       });
     }
     
@@ -95,15 +97,17 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
       difficulties.push({ 
         value: info.bestSessionDiff, 
         label: '🏆 Session Best', 
-        type: 'session' 
+        type: 'session',
+        tooltip: 'Best difficulty found since system boot',
       });
     }
     
     if (info.bestDiff > 0) {
       difficulties.push({ 
         value: info.bestDiff, 
-        label: '🏆 All-time Best', 
-        type: 'best' 
+        label: '🥇 All-time Best', 
+        type: 'best',
+        tooltip: 'Best difficulty ever found by this device',
       });
     }
     
@@ -111,7 +115,8 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
       difficulties.push({ 
         value: info.networkDifficulty, 
         label: '🎰 Network', 
-        type: 'network' 
+        type: 'network',
+        tooltip: 'Current Bitcoin network difficulty (finding this = solo block!)',
       });
     }
     
@@ -119,8 +124,8 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
     difficulties.sort((a, b) => a.value - b.value);
     
     // Remove duplicates - if a labeled row has the same difficulty as a fixed row, keep only the labeled one
-    const uniqueDifficulties: Array<{ value: number; label?: string; type: DifficultyRow['type'] }> = [];
-    const seenDifficulties = new Map<number, { value: number; label?: string; type: DifficultyRow['type'] }>();
+    const uniqueDifficulties: Array<{ value: number; label?: string; tooltip?: string; type: DifficultyRow['type'] }> = [];
+    const seenDifficulties = new Map<number, { value: number; label?: string; tooltip?: string; type: DifficultyRow['type'] }>();
     
     difficulties.forEach(item => {
       const existing = seenDifficulties.get(item.value);
@@ -143,6 +148,7 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
       return {
         difficulty: diff.value,
         label: diff.label,
+        tooltip: diff.tooltip,
         type: diff.type,
         timeToFind,
         tenMin: this.formatProbability(diff.value, hashRate, this.TIME_10MIN),
@@ -233,23 +239,9 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Get CSS class for row based on type
-   * @param row Difficulty row
-   * @returns CSS class name
-   */
-  public getRowClass(row: DifficultyRow): string {
-    switch (row.type) {
-      case 'pool':
-        return 'pool-row';
-      case 'session':
-        return 'session-row';
-      case 'best':
-        return 'best-row';
-      case 'network':
-        return 'network-row';
-      default:
-        return '';
-    }
+  private calculateExpectedReachedDifficulty(hashRate: number, uptimeSeconds: number): number {
+    const hashesPerSecond = hashRate * 1e9; // Convert GH/s to H/s
+    const totalHashes = hashesPerSecond * uptimeSeconds;
+    return totalHashes / Math.pow(2, 32);
   }
 }

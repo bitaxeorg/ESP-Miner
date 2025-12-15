@@ -4,94 +4,85 @@
             <div class="card">
                 <h2 class="mb-3">Solo Chance</h2>
                 <p class="text-500 mb-4">
-                    This table shows the probability of finding shares at various difficulty levels based on your current hashrate 
-                    of <strong>{{ info.hashRate | hashSuffix }}</strong>. 
-                    Values showing "×" indicate the expected number of shares you would find in that time period.
+                    The probability of finding shares at various difficulty levels based on your current hashrate of <strong>{{ info.hashRate_1m | hashSuffix }}</strong>. 
                 </p>
 
-                <p-table 
-                    [value]="rows" 
-                    [scrollable]="true"
-                    styleClass="p-datatable-sm"
-                    responsiveLayout="scroll">
-                    <ng-template pTemplate="header">
-                        <tr>
-                            <th>Difficulty</th>
-                            <th>
-                                <tooltip-text-icon
-                                    text="Time to Find"
-                                    tooltip="Expected time to find one share at current hashrate"
-                                />
-                            </th>
-                            <th class="text-center">
-                                <tooltip-text-icon
-                                    text="10 min"
-                                    tooltip="Probability or expected count in 10 minutes (average Bitcoin block time)"
-                                />
-                            </th>
-                            <th class="text-center">
-                                <tooltip-text-icon
-                                    text="1 Hour"
-                                    tooltip="Probability or expected count in 1 hour"
-                                />
-                            </th>
-                            <th class="text-center">
-                                <tooltip-text-icon
-                                    text="1 Day"
-                                    tooltip="Probability or expected count in 24 hours"
-                                />
-                            </th>
-                            <th class="text-center">
-                                <tooltip-text-icon
-                                    text="1 Week"
-                                    tooltip="Probability or expected count in 7 days"
-                                />
-                            </th>
-                            <th class="text-center">
-                                <tooltip-text-icon
-                                    text="1 Month"
-                                    tooltip="Probability or expected count in 30 days"
-                                />
-                            </th>
-                            <th class="text-center">
-                                <tooltip-text-icon
-                                    text="1 Year"
-                                    tooltip="Probability or expected count in 365 days"
-                                />
-                            </th>
-                        </tr>
-                    </ng-template>
-                    <ng-template pTemplate="body" let-row>
-                        <tr [ngClass]="getRowClass(row)">
-                            <td>
-                                <div class="flex align-items-center gap-2">
+                <div class="table-container">
+                    <table class="solo-chance-table">
+                        <thead class="font-600">
+                            <tr>
+                                <th>Difficulty</th> 
+                                <th>
+                                    <tooltip-text-icon
+                                        text="Type"
+                                        tooltip="Special difficulty types and their meanings"
+                                    />
+                                </th>
+                                <th>
+                                    <tooltip-text-icon
+                                        text="Time to Find"
+                                        tooltip="Expected time to find one share at current hashrate"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="10 min"
+                                        tooltip="Probability or expected count in 10 minutes (average Bitcoin block time)"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="1 Hour"
+                                        tooltip="Probability or expected count in 1 hour"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="1 Day"
+                                        tooltip="Probability or expected count in 24 hours"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="1 Week"
+                                        tooltip="Probability or expected count in 7 days"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="1 Month"
+                                        tooltip="Probability or expected count in 30 days"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="1 Year"
+                                        tooltip="Probability or expected count in 365 days"
+                                    />
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let row of rows">
+                                <td>
                                     <span class="font-medium">{{ row.difficulty | diffSuffix }}</span>
-                                    <span *ngIf="row.label" class="badge">{{ row.label }}</span>
-                                </div>
-                            </td>
-                            <td>{{ formatDuration(row.timeToFind) }}</td>
-                            <td class="text-center">{{ row.tenMin }}</td>
-                            <td class="text-center">{{ row.hour }}</td>
-                            <td class="text-center">{{ row.day }}</td>
-                            <td class="text-center">{{ row.week }}</td>
-                            <td class="text-center">{{ row.month }}</td>
-                            <td class="text-center">{{ row.year }}</td>
-                        </tr>
-                    </ng-template>
-                </p-table>
-
-                <div class="mt-4 text-500 text-sm">
-                    <p class="mb-2"><strong>Legend:</strong></p>
-                    <ul class="ml-3">
-                        <li>🎯 <strong>Pool</strong> - Your current pool difficulty setting</li>
-                        <li>🏆 <strong>Session Best</strong> - Best difficulty found since system boot</li>
-                        <li>🏆 <strong>All-time Best</strong> - Best difficulty ever found by this device</li>
-                        <li>🎰 <strong>Network</strong> - Current Bitcoin network difficulty (finding this = solo block!)</li>
-                    </ul>
-                    <p class="mt-3">
-                        <strong>Note:</strong> Values with "×" show expected occurrences (e.g., "2.5×" means you'd expect to find 2-3 shares). 
-                        Percentage values show probability when less than 1 occurrence is expected.
-                    </p>
+                                </td>
+                                <td>
+                                    <div *ngIf="row.label" class="flex align-items-center gap-2">
+                                        <span class="badge">{{ row.label }}</span>
+                                        <tooltip-icon *ngIf="row.tooltip" [tooltip]="row.tooltip"/>
+                                    </div>
+                                </td>
+                                <td>{{ formatDuration(row.timeToFind) }}</td>
+                                <td class="text-center">{{ row.tenMin }}</td>
+                                <td class="text-center">{{ row.hour }}</td>
+                                <td class="text-center">{{ row.day }}</td>
+                                <td class="text-center">{{ row.week }}</td>
+                                <td class="text-center">{{ row.month }}</td>
+                                <td class="text-center">{{ row.year }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
