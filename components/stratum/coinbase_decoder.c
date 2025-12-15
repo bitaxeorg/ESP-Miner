@@ -276,19 +276,28 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
         // Read scriptPubKey
         if (offset + script_len > coinbase_2_len) break;
 
-        char output_address[MAX_ADDRESS_STRING_LEN];
-        coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN);
-        bool is_user_address = value_satoshis > 0 && strncmp(user_address, output_address, strlen(output_address)) == 0;
+        if (value_satoshis > 0) {
+            char output_address[MAX_ADDRESS_STRING_LEN];
+            coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN);
+            bool is_user_address = strncmp(user_address, output_address, strlen(output_address)) == 0;
 
-        // Add to total value
-        result->total_value_satoshis += value_satoshis;
-        if (is_user_address) result->user_value_satoshis += value_satoshis;
+            // Add to total value
+            result->total_value_satoshis += value_satoshis;
+            if (is_user_address) result->user_value_satoshis += value_satoshis;
 
-        if (i < MAX_COINBASE_TX_OUTPUTS) {
-            strncpy(result->outputs[i].address, output_address, MAX_ADDRESS_STRING_LEN);
-            result->outputs[i].value_satoshis = value_satoshis;
-            result->outputs[i].is_user_output = is_user_address;
-            result->output_count++;
+            if (i < MAX_COINBASE_TX_OUTPUTS) {
+                strncpy(result->outputs[i].address, output_address, MAX_ADDRESS_STRING_LEN);
+                result->outputs[i].value_satoshis = value_satoshis;
+                result->outputs[i].is_user_output = is_user_address;
+                result->output_count++;
+            }
+        } else {
+            if (i < MAX_COINBASE_TX_OUTPUTS) {
+                coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, result->outputs[i].address, MAX_ADDRESS_STRING_LEN);
+                result->outputs[i].value_satoshis = 0;
+                result->outputs[i].is_user_output = false;
+                result->output_count++;
+            }
         }
 
         offset += script_len;
