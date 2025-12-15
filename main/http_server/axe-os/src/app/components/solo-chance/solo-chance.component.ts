@@ -7,7 +7,7 @@ import { ISystemInfo } from 'src/models/ISystemInfo';
 interface DifficultyRow {
   difficulty: number;
   label?: string;
-  type?: 'fixed' | 'pool' | 'session' | 'best' | 'network' | 'expected';
+  type?: 'fixed' | 'pool' | 'session' | 'best' | 'network' | 'uptime';
   tooltip?: string;
   timeToFind: number;
   tenMin: string;
@@ -77,8 +77,8 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
     if (expectedReachedDifficulty) {
       difficulties.push({
         value: expectedReachedDifficulty,
-        label: '📊 Expected',
-        type: 'expected',
+        label: '📊 Uptime',
+        type: 'uptime',
         tooltip: 'Expected difficulty reached with current hashrate and uptime',
       });
     }
@@ -143,14 +143,12 @@ export class SoloChanceComponent implements OnInit, OnDestroy {
     
     // Generate rows
     this.rows = uniqueDifficulties.map(diff => {
-      const timeToFind = this.calculateTimeToFind(diff.value, hashRate);
-      
       return {
         difficulty: diff.value,
         label: diff.label,
         tooltip: diff.tooltip,
         type: diff.type,
-        timeToFind,
+        timeToFind: this.calculateTimeToFind(diff.value, hashRate),
         tenMin: this.formatProbability(diff.value, hashRate, this.TIME_10MIN),
         hour: this.formatProbability(diff.value, hashRate, this.TIME_HOUR),
         day: this.formatProbability(diff.value, hashRate, this.TIME_DAY),
