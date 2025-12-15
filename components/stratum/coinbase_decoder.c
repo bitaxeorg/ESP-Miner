@@ -143,6 +143,7 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
 esp_err_t coinbase_process_notification(const mining_notify *notification,
                                  const char *extranonce1,
                                  int extranonce2_len,
+                                 const char *user_address,
                                  mining_notification_result_t *result) {
     if (!notification || !extranonce1 || !result) return ESP_ERR_INVALID_ARG;
 
@@ -275,13 +276,18 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
         // Read scriptPubKey
         if (offset + script_len > coinbase_2_len) break;
 
+        char output_address[MAX_ADDRESS_STRING_LEN];
+        coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN);
+        bool is_user_address = value_satoshis > 0 && strncmp(user_address, output_address, strlen(output_address)) == 0;
+
         // Add to total value
         result->total_value_satoshis += value_satoshis;
+        if (is_user_address) result->user_value_satoshis += value_satoshis;
 
         if (i < MAX_COINBASE_TX_OUTPUTS) {
+            strncpy(result->outputs[i].address, output_address, MAX_ADDRESS_STRING_LEN);
             result->outputs[i].value_satoshis = value_satoshis;
-            coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len,
-                                                        result->outputs[i].address, MAX_ADDRESS_STRING_LEN);
+            result->outputs[i].is_user_output = is_user_address;
             result->output_count++;
         }
 

@@ -276,9 +276,12 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
     }
     memset(result, 0, sizeof(mining_notification_result_t));
 
+    const char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+
     if (coinbase_process_notification(mining_notification,
                                      GLOBAL_STATE->extranonce_str,
                                      GLOBAL_STATE->extranonce_2_len,
+                                     user,
                                      result) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to process mining notification");
         free(result);
@@ -309,18 +312,15 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
     if (result->output_count != GLOBAL_STATE->coinbase_output_count ||
         memcmp(result->outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {
 
-        char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-        uint64_t user_output_value = 0;
-
         GLOBAL_STATE->coinbase_output_count = result->output_count;
         memcpy(GLOBAL_STATE->coinbase_outputs, result->outputs, sizeof(coinbase_output_t) * result->output_count);
         GLOBAL_STATE->coinbase_value_total_satoshis = result->total_value_satoshis;
+        GLOBAL_STATE->coinbase_value_user_satoshis = result->user_value_satoshis;
         ESP_LOGI(TAG, "Coinbase outputs: %d, total value: %llu sat", result->output_count, result->total_value_satoshis);
         for (int i = 0; i < result->output_count; i++) {
             if (result->outputs[i].value_satoshis > 0) {
-                if (strncmp(user, result->outputs[i].address, strlen(result->outputs[i].address)) == 0) {
+                if (result->outputs[i].is_user_output) {
                     ESP_LOGI(TAG, "  Output %d: %s (%llu sat) (Your payout address)", i, result->outputs[i].address, result->outputs[i].value_satoshis);
-                    user_output_value += result->outputs[i].value_satoshis;
                 } else {
                     ESP_LOGI(TAG, "  Output %d: %s (%llu sat)", i, result->outputs[i].address, result->outputs[i].value_satoshis);
                 }
@@ -328,7 +328,6 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
                 ESP_LOGI(TAG, "  Output %d: %s", i, result->outputs[i].address);
             }
         }
-        GLOBAL_STATE->coinbase_value_user_satoshis = user_output_value;
     }
 
     free(result);
