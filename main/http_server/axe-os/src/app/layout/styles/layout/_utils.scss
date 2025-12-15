@@ -44,6 +44,8 @@
         color: transparent;
         pointer-events: none;
         position: relative;
+        display: inline-block;
+        white-space: nowrap;        
 
         &.p-inputtext {
             -webkit-text-security: disc;
@@ -51,10 +53,14 @@
         }
 
         &::before {
-            content: '••••••';
+            content: '••••••••••••••••••••••••••••••••••••••••••';
             color: var(--text-color); 
             position: absolute;
             left: 0;
+            width: 100%;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
         }
     }
 }

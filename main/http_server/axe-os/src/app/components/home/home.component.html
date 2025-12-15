@@ -409,9 +409,9 @@
                         User
                     </div>
 
-                    <div pTooltip="{{ activePoolUser }}" tooltipPosition="top" sensitive-data>
-                        <span class="text-monospace font-bold">{{ getAddressPart(activePoolUser) | address }}</span>
-                        <span>{{ getSuffixPart(activePoolUser) }}</span>
+                    <div pTooltip="{{ activePoolUser }}" tooltipPosition="top">
+                        <span sensitive-data class="text-monospace font-bold">{{ getAddressPart(activePoolUser) | address }}</span>
+                        <span sensitive-data>{{ getSuffixPart(activePoolUser) }}</span>
                     </div>
                 </div>
 
@@ -502,7 +502,7 @@
                         <div *ngFor="let output of info.coinbaseOutputs; let i = index" class="flex justify-content-between">
                             @if (output.value > 0) {
                                 @if (output.address === getAddressPart(activePoolUser)) {
-                                    <span class="text-monospace text-sm font-bold" pTooltip="Your payout address" tooltipPosition="top" sensitive-data>{{ output.address | address }} <i class="pi pi-star-fill text-xs"></i></span>
+                                    <span><span class="text-monospace text-sm font-bold" pTooltip="Your payout address" tooltipPosition="top" sensitive-data>{{ output.address | address }}</span>&nbsp;<i class="pi pi-star-fill text-xs"></i></span>
                                 } @else {
                                     <span class="text-monospace text-sm" pTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
                                 }
