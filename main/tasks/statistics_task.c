@@ -23,7 +23,6 @@ static uint16_t statisticsDataSize;
 static pthread_mutex_t statisticsDataLock = PTHREAD_MUTEX_INITIALIZER;
 
 static const uint16_t maxDataCount = 720;
-static uint16_t statsFrequency;
 
 void createStatisticsBuffer()
 {
@@ -117,14 +116,14 @@ void statistics_task(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-    HashrateMonitorModule * hashrate_monitor = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
     struct StatisticsData statsData = {};
 
     TickType_t taskWakeTime = xTaskGetTickCount();
 
     while (1) {
         const int32_t currentTime = esp_timer_get_time() / 1000;
-        statsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY) * 1000;
+        const uint16_t configStatsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY);
+        const uint32_t statsFrequency = configStatsFrequency * 1000;
 
         if (0 != statsFrequency) {
             const int32_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
@@ -135,7 +134,10 @@ void statistics_task(void * pvParameters)
 
                 statsData.timestamp = currentTime;
                 statsData.hashrate = sys_module->current_hashrate;
-                statsData.errorCount = hashrate_monitor->error_count;
+                statsData.hashrate_1m = sys_module->hashrate_1m;
+                statsData.hashrate_10m = sys_module->hashrate_10m;
+                statsData.hashrate_1h = sys_module->hashrate_1h;
+                statsData.errorPercentage = sys_module->error_percentage;
                 statsData.chipTemperature = power_management->chip_temp_avg;
                 statsData.vrTemperature = power_management->vr_temp;
                 statsData.power = power_management->power;
@@ -147,6 +149,7 @@ void statistics_task(void * pvParameters)
                 statsData.fan2RPM = power_management->fan2_rpm;
                 statsData.wifiRSSI = wifiRSSI;
                 statsData.freeHeap = esp_get_free_heap_size();
+                statsData.responseTime = sys_module->response_time;
 
                 addStatisticData(&statsData);
             }

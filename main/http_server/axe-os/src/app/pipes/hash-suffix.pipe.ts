@@ -14,8 +14,11 @@ export class HashSuffixPipe implements PipeTransform {
   public transform(value: number, args?: any): string {
 
     if (value == null || value <= 0 || isNaN(value)) {
-      return '0';
+      return '0 H/s';
     }
+
+    // Normalize GH/s to H/s
+    value = value * 1_000_000_000;
 
     const suffixes = [' H/s', ' Kh/s', ' Mh/s', ' Gh/s', ' Th/s', ' Ph/s', ' Eh/s'];
 
@@ -27,7 +30,7 @@ export class HashSuffixPipe implements PipeTransform {
     const suffix = suffixes[power];
 
     if (args?.tickmark) {
-      return scaledValue + suffix;
+      return scaledValue.toLocaleString(undefined, { useGrouping: false }) + suffix;
     }
 
     if (scaledValue < 10) {

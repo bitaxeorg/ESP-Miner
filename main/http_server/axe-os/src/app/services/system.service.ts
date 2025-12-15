@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams, HttpEvent } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { delay, Observable, of } from 'rxjs';
+import { delay, Observable, of, timeout } from 'rxjs';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
@@ -22,7 +22,7 @@ export class SystemService {
 
   public getInfo(uri: string = ''): Observable<ISystemInfo> {
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/info`) as Observable<ISystemInfo>;
+      return this.httpClient.get<ISystemInfo>(`${uri}/api/system/info`).pipe(timeout(5000));
     }
 
     // Mock data for development
@@ -37,7 +37,11 @@ export class SystemService {
         maxPower: 25,
         nominalVoltage: 5,
         hashRate: 475,
+        hashRate_1m: 476,
+        hashRate_10m: 477,
+        hashRate_1h: 478,
         expectedHashrate: 420,
+        errorPercentage: 0.2,
         bestDiff: 238214491,
         bestSessionDiff: 21212121,
         freeHeap: 200504,
@@ -55,30 +59,38 @@ export class SystemService {
         wifiRSSI: -32,
         apEnabled: 0,
         sharesAccepted: 1,
-        sharesRejected: 0,
-        sharesRejectedReasons: [],
+        sharesRejected: 10,
+        sharesRejectedReasons: [
+          { message: "Above target", count: 8 },
+          { message: "Duplicate share", count: 2 }
+        ],
         uptimeSeconds: 38,
         smallCoreCount: 672,
-        ASICModel: "BM1366",
+        ASICModel: "BM1370",
         stratumURL: "public-pool.io",
         stratumPort: 21496,
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         stratumSuggestedDifficulty: 1000,
         stratumExtranonceSubscribe: 0,
+        stratumTLS: 0,
+        stratumCert: "",
         fallbackStratumURL: "test.public-pool.io",
         fallbackStratumPort: 21497,
         fallbackStratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         fallbackStratumSuggestedDifficulty: 1000,
         fallbackStratumExtranonceSubscribe: 0,
+        fallbackStratumTLS: 0,
+        fallbackStratumCert: "",
         poolDifficulty: 1000,
         responseTime: 10,
         isUsingFallbackStratum: false,
-        poolAddrFamily: 2,
+        poolConnectionInfo: "IPv4 (TLS)",
         frequency: 485,
-        version: "v2.9.0",
-        axeOSVersion: "v2.9.0",
-        idfVersion: "v5.1.2",
-        boardVersion: "204",
+        version: "v2.12.0",
+        axeOSVersion: "v2.12.0",
+        idfVersion: "v5.5.1",
+        resetReason: "Power-on reset",
+        boardVersion: "602",
         display: "SSD1306 (128x32)",
         rotation: 0,
         invertscreen: 0,
@@ -103,10 +115,9 @@ export class SystemService {
           asics: [{
             total: 441.2579,
             domains: [114.9901, 98.6658, 103.8136, 122.7133],
-            error: 1.7166,
+            errorCount: 4,
           }],
           hashrate: 441.2579,
-          errorCount: 0,
         },
         blockFound: 0,
       }
@@ -125,7 +136,7 @@ export class SystemService {
 
     if (environment.production) {
       const options = { params: new HttpParams().set('columns', columnList.join(',')) };
-      return this.httpClient.get(`${uri}/api/system/statistics`, options) as Observable<ISystemStatistics>;
+      return this.httpClient.get<ISystemStatistics>(`${uri}/api/system/statistics`, options).pipe(timeout(5000));
     }
 
     // Mock data for development
@@ -141,6 +152,7 @@ export class SystemService {
     const fan2RpmData = [3545,3904,3691,3564,3554,3691,3573,3701,4044, 4032];
     const wifiRssiData = [-35,-34,-33,-34,-34,-34,-33,-35,-33,-34];
     const freeHeapData = [214504,212504,213504,210504,207504,209504,203504,202504,201504,200504];
+    const responseTimeData = [15.1,14.5,14.3,15.1,13.1,16.1,28.6,18.4,17.7,17.6,18.0,15.5];
     const timestampData = [13131,18126,23125,28125,33125,38125,43125,48125,53125,58125];
 
     columnList.push("timestamp");
@@ -151,6 +163,9 @@ export class SystemService {
       for(let j: number = 0; j < columnList.length; j++) {
         switch (chartLabelValue(columnList[j])) {
           case eChartLabel.hashrate:     statisticsList[i][j] = hashrateData[i];     break;
+          case eChartLabel.hashrate_1m:  statisticsList[i][j] = hashrateData[i];     break;
+          case eChartLabel.hashrate_10m: statisticsList[i][j] = hashrateData[i];     break;
+          case eChartLabel.hashrate_1h:  statisticsList[i][j] = hashrateData[i];     break;
           case eChartLabel.power:        statisticsList[i][j] = powerData[i];        break;
           case eChartLabel.asicTemp:     statisticsList[i][j] = asicTempData[i];     break;
           case eChartLabel.vrTemp:       statisticsList[i][j] = vrTempData[i];       break;
@@ -159,9 +174,10 @@ export class SystemService {
           case eChartLabel.current:      statisticsList[i][j] = currentData[i];      break;
           case eChartLabel.fanSpeed:     statisticsList[i][j] = fanSpeedData[i];     break;
           case eChartLabel.fanRpm:       statisticsList[i][j] = fanRpmData[i];       break;
-          case eChartLabel.fan2Rpm:      statisticsList[i][j] = fan2RpmData[i];       break;
+          case eChartLabel.fan2Rpm:      statisticsList[i][j] = fan2RpmData[i];      break;
           case eChartLabel.wifiRssi:     statisticsList[i][j] = wifiRssiData[i];     break;
           case eChartLabel.freeHeap:     statisticsList[i][j] = freeHeapData[i];     break;
+          case eChartLabel.responseTime: statisticsList[i][j] = responseTimeData[i]; break;
           default:
             if (columnList[j] === "timestamp") {
               statisticsList[i][j] = timestampData[i];
@@ -213,6 +229,10 @@ export class SystemService {
     return this.httpClient.post(`${uri}/api/system/restart`, {}, {responseType: 'text'});
   }
 
+  public identify(uri: string = '') {
+    return this.httpClient.post(`${uri}/api/system/identify`, {}, {responseType: 'text'});
+  }
+
   public updateSystem(uri: string = '', update: any) {
     if (environment.production) {
       return this.httpClient.patch(`${uri}/api/system`, update);
@@ -220,7 +240,6 @@ export class SystemService {
       return of(true);
     }
   }
-
 
   private otaUpdate(file: File | Blob, url: string) {
     return new Observable<HttpEvent<string>>((subscriber) => {
@@ -261,13 +280,13 @@ export class SystemService {
 
   public getAsicSettings(uri: string = ''): Observable<ISystemASIC> {
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/asic`) as Observable<ISystemASIC>;
+      return this.httpClient.get<ISystemASIC>(`${uri}/api/system/asic`).pipe(timeout(5000));
     }
 
     // Mock data for development
     return of({
-      ASICModel: "BM1366",
-      deviceModel: "Ultra",
+      ASICModel: "BM1370",
+      deviceModel: "Gamma",
       swarmColor: "purple",
       asicCount: 1,
       defaultFrequency: 485,
@@ -278,7 +297,7 @@ export class SystemService {
   }
 
   public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
-    return this.httpClient.get(`${uri}/api/swarm/info`) as Observable<{ ip: string }[]>;
+    return this.httpClient.get<{ ip: string }[]>(`${uri}/api/swarm/info`).pipe(timeout(5000));
   }
 
   public updateSwarm(uri: string = '', swarmConfig: any) {

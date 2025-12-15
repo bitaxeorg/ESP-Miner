@@ -7,7 +7,7 @@
         <div class="grid">
             <div class="col-6 xl:col-3" *ngFor="let metric of [
                 { label: 'Total Devices', value: swarm.length },
-                { label: 'Total Hashrate', value: totals.hashRate * 1000000000 | hashSuffix},
+                { label: 'Total Hashrate', value: totals.hashRate | hashSuffix},
                 { label: 'Total Power', value: (totals.power | number: '1.1-1')  + ' W' },
                 { label: 'Best Diff', value: totals.bestDiff | diffSuffix }
             ]">
@@ -99,9 +99,14 @@
                                             ●
                                         </span>
                                     </div>
-                                    <a [href]="'http://' + axe.IP" target="_blank" class="text-800" pTooltip="IP" tooltipPosition="top">
-                                        {{axe.IP}}
-                                    </a>
+                                    <div class="white-space-nowrap">
+                                        <a [href]="'http://' + axe.IP" target="_blank" class="text-800" pTooltip="IP" tooltipPosition="top">
+                                            {{axe.IP}}
+                                        </a>
+                                        <span *ngIf="isThisDevice(axe.IP)" class="ml-1 cursor-pointer" pTooltip="This device" tooltipPosition="top">
+                                            <i class="pi pi-star-fill text-xs"></i>
+                                        </span>
+                                    </div>
                                 </div>
                                 <span class="text-500 cursor-pointer" pTooltip="Version" tooltipPosition="top">
                                     {{axe.version}}
@@ -112,27 +117,39 @@
                             </div>
                             <div class="flex align-items-center mb-1 gap-3 md:gap-2">
                                 <p-button
-                                    icon="pi pi-pencil text-sm flex align-items-center justify-content-center"
+                                    icon="pi pi-pencil text-sm"
                                     pp-button
                                     pTooltip="Edit"
                                     tooltipPosition="top"
                                     severity="secondary"
+                                    class="inline-block"
                                     styleClass="button-icon-small"
                                     (click)="edit(axe)" />
                                 <p-button
-                                    icon="pi pi-refresh text-sm flex align-items-center justify-content-center"
+                                    icon="pi pi-refresh text-sm"
                                     pp-button
                                     pTooltip="Restart"
                                     tooltipPosition="top"
                                     severity="secondary"
+                                    class="inline-block"
                                     styleClass="button-icon-small"
-                                    (click)="restart(axe)" />
+                                    (click)="postAction(axe, 'restart')" />
                                 <p-button
-                                    icon="pi pi-trash text-sm flex align-items-center justify-content-center"
+                                    icon="pi pi-lightbulb text-sm"
+                                    pp-button
+                                    pTooltip="Identify"
+                                    tooltipPosition="top"
+                                    severity="secondary"
+                                    class="inline-block"
+                                    styleClass="button-icon-small"
+                                    (click)="postAction(axe, 'identify')" />
+                                <p-button
+                                    icon="pi pi-trash text-sm"
                                     pp-button
                                     pTooltip="Remove"
                                     tooltipPosition="top"
                                     severity="secondary"
+                                    class="inline-block"
                                     styleClass="button-icon-small"
                                     (click)="remove(axe)" />
                                 <i
@@ -145,7 +162,7 @@
                         </div>
                         <div class="flex flex-column text-right white-space-nowrap cursor-pointer">
                             <span pTooltip="Hashrate" tooltipPosition="top">
-                                {{axe.hashRate * 1000000000 | hashSuffix}}
+                                {{axe.hashRate | hashSuffix}}
                             </span>
                             <div>
                                 <span class="text-500 cursor-pointer mr-2" pTooltip="Shares Rejected" tooltipPosition="top">
@@ -228,8 +245,11 @@
                             </td>
                             <td>
                                 <a [href]="'http://' + axe.IP" target="_blank" class="text-800">{{axe.IP}}</a>
+                                <span *ngIf="isThisDevice(axe.IP)" class="ml-2 cursor-pointer" pTooltip="This device" tooltipPosition="top">
+                                    <i class="pi pi-star-fill text-xs"></i>
+                                </span>
                             </td>
-                            <td>{{axe.hashRate * 1000000000 | hashSuffix}}</td>
+                            <td>{{axe.hashRate | hashSuffix}}</td>
                             <td>
                                 <p class="cursor-pointer m-0" pTooltip="Shares Accepted" tooltipPosition="top">
                                     {{axe.sharesAccepted | number: '1.0-0'}}
@@ -265,24 +285,41 @@
                             </td>
                             <td>{{axe.poolDifficulty}}</td>
                             <td>{{axe.version}}</td>
-                            <td>
+                            <td class="flex align-items-center mb-1 gap-3 md:gap-2">
                                 <p-button
-                                    icon="pi pi-pencil flex align-items-center justify-content-center"
+                                    icon="pi pi-pencil"
                                     pp-button
+                                    pTooltip="Edit"
+                                    tooltipPosition="top"
                                     severity="secondary"
+                                    class="inline-block"
                                     styleClass="button-icon"
                                     (click)="edit(axe)" />
                                 <p-button
-                                    icon="pi pi-refresh flex align-items-center justify-content-center"
+                                    icon="pi pi-refresh"
                                     pp-button
+                                    pTooltip="Restart"
+                                    tooltipPosition="top"
                                     severity="secondary"
                                     styleClass="button-icon"
-                                    class="mx-2"
-                                    (click)="restart(axe)" />
+                                    class="inline-block"
+                                    (click)="postAction(axe, 'restart')" />
                                 <p-button
-                                    icon="pi pi-trash flex align-items-center justify-content-center"
+                                    icon="pi pi-lightbulb"
                                     pp-button
+                                    pTooltip="Identify"
+                                    tooltipPosition="top"
                                     severity="secondary"
+                                    class="inline-block"
+                                    styleClass="button-icon"
+                                    (click)="postAction(axe, 'identify')" />
+                                <p-button
+                                    icon="pi pi-trash"
+                                    pp-button
+                                    pTooltip="Remove"
+                                    tooltipPosition="top"
+                                    severity="secondary"
+                                    class="inline-block"
                                     styleClass="button-icon"
                                     (click)="remove(axe)" />
                             </td>

@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include "display.h"
 #include "theme_api.h"
 #include "scoreboard.h"
@@ -46,7 +47,7 @@ static nvs_handle_t handle;
 
 static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_WIFI_SSID]                             = {.nvs_key_name = "wifissid",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_SSID},                .rest_name = "ssid",                               .min = 1,  .max = 32},
-    [NVS_CONFIG_WIFI_PASS]                             = {.nvs_key_name = "wifipass",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_PASSWORD},            .rest_name = "wifiPass",                           .min = 1,  .max = 63},
+    [NVS_CONFIG_WIFI_PASS]                             = {.nvs_key_name = "wifipass",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_PASSWORD},            .rest_name = "wifiPass",                           .min = 0,  .max = 63},
     [NVS_CONFIG_HOSTNAME]                              = {.nvs_key_name = "hostname",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_LWIP_LOCAL_HOSTNAME},          .rest_name = "hostname",                           .min = 1,  .max = 32},
 
     [NVS_CONFIG_STRATUM_URL]                           = {.nvs_key_name = "stratumurl",      .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_URL},                  .rest_name = "stratumURL",                         .min = 0,  .max = NVS_STR_LIMIT},
@@ -55,12 +56,16 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_STRATUM_PASS]                          = {.nvs_key_name = "stratumpass",     .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_PW},                   .rest_name = "stratumPassword",                    .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_STRATUM_DIFFICULTY]                    = {.nvs_key_name = "stratumdiff",     .type = TYPE_U16,   .default_value = {.u16 = CONFIG_STRATUM_DIFFICULTY},                   .rest_name = "stratumSuggestedDifficulty",         .min = 0,  .max = UINT16_MAX},
     [NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE]          = {.nvs_key_name = "stratumxnsub",    .type = TYPE_BOOL,  .default_value = {.b   = (bool)STRATUM_EXTRANONCE_SUBSCRIBE},          .rest_name = "stratumExtranonceSubscribe",         .min = 0,  .max = 1},
+    [NVS_CONFIG_STRATUM_TLS]                           = {.nvs_key_name = "stratumtls",      .type = TYPE_U16,   .default_value = {.u16 = (uint16_t)CONFIG_STRATUM_TLS},                .rest_name = "stratumTLS",                         .min = 0,  .max = 3},
+    [NVS_CONFIG_STRATUM_CERT]                          = {.nvs_key_name = "stratumcert",     .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_CERT},                 .rest_name = "stratumCert",                        .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_FALLBACK_STRATUM_URL]                  = {.nvs_key_name = "fbstratumurl",    .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_URL},         .rest_name = "fallbackStratumURL",                 .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_FALLBACK_STRATUM_PORT]                 = {.nvs_key_name = "fbstratumport",   .type = TYPE_U16,   .default_value = {.u16 = CONFIG_FALLBACK_STRATUM_PORT},                .rest_name = "fallbackStratumPort",                .min = 0,  .max = UINT16_MAX},
     [NVS_CONFIG_FALLBACK_STRATUM_USER]                 = {.nvs_key_name = "fbstratumuser",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_USER},        .rest_name = "fallbackStratumUser",                .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_FALLBACK_STRATUM_PASS]                 = {.nvs_key_name = "fbstratumpass",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_PW},          .rest_name = "fallbackStratumPassword",            .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY]           = {.nvs_key_name = "fbstratumdiff",   .type = TYPE_U16,   .default_value = {.u16 = CONFIG_FALLBACK_STRATUM_DIFFICULTY},          .rest_name = "fallbackStratumSuggestedDifficulty", .min = 0,  .max = UINT16_MAX},
     [NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE] = {.nvs_key_name = "stratumfbxnsub",  .type = TYPE_BOOL,  .default_value = {.b   = (bool)FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE}, .rest_name = "fallbackStratumExtranonceSubscribe", .min = 0,  .max = 1},
+    [NVS_CONFIG_FALLBACK_STRATUM_TLS]                  = {.nvs_key_name = "fbstratumtls",    .type = TYPE_U16,   .default_value = {.u16 = (uint16_t)CONFIG_FALLBACK_STRATUM_TLS},       .rest_name = "fallbackStratumTLS",                 .min = 0,  .max = 3},
+    [NVS_CONFIG_FALLBACK_STRATUM_CERT]                 = {.nvs_key_name = "fbstratumcert",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_CERT},        .rest_name = "fallbackStratumCert",                .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstartum",    .type = TYPE_BOOL,                                                                         .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
 
     [NVS_CONFIG_ASIC_FREQUENCY]                        = {.nvs_key_name = "asicfrequency_f", .type = TYPE_FLOAT, .default_value = {.f   = CONFIG_ASIC_FREQUENCY},                       .rest_name = "frequency",                          .min = 1,  .max = UINT16_MAX},
@@ -359,6 +364,10 @@ char *nvs_config_get_string_indexed(NvsConfigKey key, int index)
 
 void nvs_config_set_string(NvsConfigKey key, const char *value)
 {
+    Settings *setting = nvs_config_get_settings(key);
+    // Skip if invalid, wrong type, or value unchanged
+    if (!setting || setting->type != TYPE_STR || (setting->value.str && strcmp(setting->value.str, value) == 0)) return;
+
     ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value) };
     if (!update.value.str) return;
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
@@ -383,6 +392,9 @@ uint16_t nvs_config_get_u16(NvsConfigKey key)
 
 void nvs_config_set_u16(NvsConfigKey key, uint16_t value)
 {
+    Settings *setting = nvs_config_get_settings(key);
+    if (!setting || setting->type != TYPE_U16 || setting->value.u16 == value) return;
+
     ConfigUpdate update = { .key = key, .type = TYPE_U16, .value.u16 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
 }
@@ -399,6 +411,9 @@ int32_t nvs_config_get_i32(NvsConfigKey key)
 
 void nvs_config_set_i32(NvsConfigKey key, int32_t value)
 {
+    Settings *setting = nvs_config_get_settings(key);
+    if (!setting || setting->type != TYPE_I32 || setting->value.i32 == value) return;
+
     ConfigUpdate update = { .key = key, .type = TYPE_I32, .value.i32 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
 }
@@ -415,6 +430,9 @@ uint64_t nvs_config_get_u64(NvsConfigKey key)
 
 void nvs_config_set_u64(NvsConfigKey key, uint64_t value)
 {
+    Settings *setting = nvs_config_get_settings(key);
+    if (!setting || setting->type != TYPE_U64 || setting->value.u64 == value) return;
+
     ConfigUpdate update = { .key = key, .type = TYPE_U64, .value.u64 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
 }
@@ -431,6 +449,10 @@ float nvs_config_get_float(NvsConfigKey key)
 
 void nvs_config_set_float(NvsConfigKey key, float value)
 {
+    Settings *setting = nvs_config_get_settings(key);
+    // Skip if invalid, wrong type, or value unchanged (use epsilon for float comparison)
+    if (!setting || setting->type != TYPE_FLOAT || fabsf(setting->value.f - value) < 0.001f) return;
+
     ConfigUpdate update = { .key = key, .type = TYPE_FLOAT, .value.f = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
 }
@@ -448,6 +470,9 @@ bool nvs_config_get_bool(NvsConfigKey key)
 
 void nvs_config_set_bool(NvsConfigKey key, bool value)
 {
+    Settings *setting = nvs_config_get_settings(key);
+    if (!setting || setting->type != TYPE_BOOL || setting->value.b == value) return;
+
     ConfigUpdate update = { .key = key, .type = TYPE_BOOL, .value.b = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
 }

@@ -84,7 +84,7 @@ static void display_msg(char * msg, GlobalState * GLOBAL_STATE)
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 {
     uint16_t fan_speed = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
-    ESP_LOGI(TAG, "fanSpeed: %d", fan_speed);
+    ESP_LOGI(TAG, "fanSpeed: %d RPM", fan_speed);
     if (fan_speed > FAN_SPEED_TARGET_MIN) {
         return ESP_OK;
     }
@@ -97,21 +97,25 @@ static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 
 static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 {
-    uint16_t target_power = GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
-    uint16_t margin = POWER_CONSUMPTION_MARGIN;
+    float target_power = (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
+    float margin = (float)POWER_CONSUMPTION_MARGIN;
 
     float power = Power_get_power(GLOBAL_STATE);
-    ESP_LOGI(TAG, "Power: %f", power);
-    if (power > target_power - margin && power < target_power + margin) {
+    ESP_LOGI(TAG, "Power: %.2f W", power);
+
+    if (power <= target_power + margin) {
         return ESP_OK;
     }
+
+    ESP_LOGE(TAG, "POWER test failed! measured %.2f W, target %.2f W +/- %.2f W", power, target_power, margin);
+    display_msg("POWER:FAIL", GLOBAL_STATE);
     return ESP_FAIL;
 }
 
 static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 {
     uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
-    ESP_LOGI(TAG, "Voltage: %u", core_voltage);
+    ESP_LOGI(TAG, "Voltage: %u mV", core_voltage);
 
     if (core_voltage > CORE_VOLTAGE_TARGET_MIN && core_voltage < CORE_VOLTAGE_TARGET_MAX) {
         return ESP_OK;
@@ -361,15 +365,20 @@ bool self_test(void * pvParameters)
     notify_message.target = 0x1705ae3a;
     notify_message.ntime = 0x647025b5;
 
-    const char * coinbase_tx = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfab"
-                               "e6d6d5cbab26a2599e92916edec"
-                               "5657a94a0708ddb970f5c45b5d12905085617eff8e010000000000000031650707758de07b010000000000001cfd703"
-                               "8212f736c7573682f0000000003"
-                               "79ad0c2a000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c29525"
-                               "34b424c4f434b3ae725d3994b81"
-                               "1572c1f345deb98b56b465ef8e153ecbbd27fa37bf1b005161380000000000000000266a24aa21a9ed63b06a7946b19"
-                               "0a3fda1d76165b25c9b883bcc66"
-                               "21b040773050ee2a1bb18f1800000000";
+    char extranonce_2_str[17];
+    extranonce_2_generate(1, 8, extranonce_2_str);
+
+    uint8_t coinbase_tx_hash[32];
+    calculate_coinbase_tx_hash("01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfab" 
+                               "e6d6d5cbab26a2599e92916edec5657a94a0708ddb970f5c45b5d",
+                               "31650707758de07b010000000000001cfd7038212f736c7573682f000000000379ad0c2a000000001976a9147c154ed"
+                               "1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3ae725d3994b811572"
+                               "c1f345deb98b56b465ef8e153ecbbd27fa37bf1b005161380000000000000000266a24aa21a9ed63b06a7946b190a3f"
+                               "da1d76165b25c9b883bcc6621b040773050ee2a1bb18f1800000000",
+                               "12905085617eff8e",
+                               extranonce_2_str,
+                               coinbase_tx_hash);
+
     uint8_t merkles[13][32];
     int num_merkles = 13;
 
@@ -387,11 +396,11 @@ bool self_test(void * pvParameters)
     hex2bin("c4f5ab01913fc186d550c1a28f3f3e9ffaca2016b961a6a751f8cca0089df924", merkles[11], 32);
     hex2bin("cff737e1d00176dd6bbfa73071adbb370f227cfb5fba186562e4060fcec877e1", merkles[12], 32);
 
-    char merkle_root[65];
-    
-    calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles, merkle_root);
+    uint8_t merkle_root[32];
+    calculate_merkle_root_hash(coinbase_tx_hash, merkles, num_merkles, merkle_root);
 
-    bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000);
+    bm_job job = {0};
+    construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000, &job);
 
     ESP_LOGI(TAG, "Sending work");
 
@@ -411,7 +420,7 @@ bool self_test(void * pvParameters)
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
             counter += DIFFICULTY;
             duration_ms = (esp_timer_get_time() / 1000) - start_ms;
-            hashrate = hashCounterToHashrate(duration_ms, counter) / 1e9f;
+            hashrate = hashCounterToGhs(duration_ms, counter);
 
             ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
             ESP_LOGI(TAG, "%f Gh/s  , duration %dms", hashrate, duration_ms);
@@ -426,7 +435,7 @@ bool self_test(void * pvParameters)
                                 * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count
                                 / 1000.0f;
 
-    ESP_LOGI(TAG, "Hashrate: %f, Expected: %f", hashrate, expected_hashrate_mhs);
+    ESP_LOGI(TAG, "Hashrate: %.2f Gh/s, Expected: %.2f Gh/s", hashrate, expected_hashrate_mhs);
 
     if (hashrate < expected_hashrate_mhs) {
         display_msg("HASHRATE:FAIL", GLOBAL_STATE);
@@ -438,7 +447,7 @@ bool self_test(void * pvParameters)
 
 
     float asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
-    ESP_LOGI(TAG, "ASIC Temp %f", asic_temp);
+    ESP_LOGI(TAG, "ASIC Temp: %.2f C", asic_temp);
 
     // detect open circiut / no result
     if(asic_temp == -1.0 || asic_temp == 127.0){
@@ -452,7 +461,7 @@ bool self_test(void * pvParameters)
 
     // TODO: Maybe make a test equivalent for test values
     if (test_power_consumption(GLOBAL_STATE) != ESP_OK) {
-        ESP_LOGE(TAG, "Power Draw Failed, target %.2f", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
+        ESP_LOGE(TAG, "Power Draw Failed, target %.2f W", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
         display_msg("POWER:FAIL", GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
     }

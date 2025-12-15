@@ -62,6 +62,14 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->pool_port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT);
     module->fallback_pool_port = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT);
 
+    // set the pool tls
+    module->pool_tls = nvs_config_get_u16(NVS_CONFIG_STRATUM_TLS);
+    module->fallback_pool_tls = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS);
+
+    // set the pool cert
+    module->pool_cert = nvs_config_get_string(NVS_CONFIG_STRATUM_CERT);
+    module->fallback_pool_cert = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_CERT);
+
     // set the pool user
     module->pool_user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER);
     module->fallback_pool_user = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER);
@@ -84,8 +92,8 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     // set based on config
     module->is_using_fallback = module->use_fallback_stratum;
 
-    // Initialize pool address family
-    module->pool_addr_family = 0;
+    // Initialize pool connection info
+    strcpy(module->pool_connection_info, "Not Connected");
 
     // Initialize overheat_mode
     module->overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
@@ -105,7 +113,6 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
 
     // Initialize the core voltage regulator
     ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
 
     ESP_RETURN_ON_ERROR(Thermal_init(&GLOBAL_STATE->DEVICE_CONFIG), TAG, "Thermal init failed!");
 
@@ -116,7 +123,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
 
     ESP_RETURN_ON_ERROR(display_init(GLOBAL_STATE), TAG, "Display init failed!");
 
-    ESP_RETURN_ON_ERROR(input_init(screen_next, toggle_wifi_softap), TAG, "Input init failed!");
+    ESP_RETURN_ON_ERROR(input_init(screen_button_press, toggle_wifi_softap), TAG, "Input init failed!");
 
     ESP_RETURN_ON_ERROR(screen_start(GLOBAL_STATE), TAG, "Screen start failed!");
 
@@ -190,9 +197,9 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t 
     }
 
     double network_diff = networkDifficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
-    if (diff > network_diff) {
+    if (diff >= network_diff) {
         module->block_found = true;
-        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f > %f", diff, network_diff);
+        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f >= %f", diff, network_diff);
     }
 
     if ((uint64_t) diff <= module->best_nonce_diff) {

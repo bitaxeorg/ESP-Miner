@@ -7,14 +7,14 @@ export class ByteSuffixPipe implements PipeTransform {
 
   private static _this = new ByteSuffixPipe();
 
-  public static transform(value: number): string {
-    return this._this.transform(value);
+  public static transform(value: number, args?: any): string {
+    return this._this.transform(value, args);
   }
 
-  public transform(value: number): string {
+  public transform(value: number, args?: any): string {
 
     if (value == null || value < 0) {
-      return '0';
+      return '0 B';
     }
 
     const suffixes = [' B', ' kB', ' MB', ' GB', ' TB', ' PB', ' EB'];
@@ -26,6 +26,10 @@ export class ByteSuffixPipe implements PipeTransform {
     const scaledValue = value / Math.pow(1000, power);
     const suffix = suffixes[power];
 
+    if (args?.tickmark) {
+      return scaledValue.toLocaleString(undefined, { useGrouping: false }) + suffix;
+    }
+    
     if (scaledValue < 10) {
       return scaledValue.toFixed(2) + suffix;
     } else if (scaledValue < 100) {
@@ -34,6 +38,4 @@ export class ByteSuffixPipe implements PipeTransform {
 
     return scaledValue.toFixed(0) + suffix;
   }
-
-
 }

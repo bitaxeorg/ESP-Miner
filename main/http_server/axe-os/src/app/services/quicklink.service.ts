@@ -32,6 +32,7 @@ export class QuicklinkService {
       { search: 'solo.stratum.braiins.com', url: `https://solo.braiins.com/stats/${user}` },
       { search: 'parasite.wtf', url: `https://parasite.space/user/${user}` },
       { regex: /^(eu|au)?solo[46]?.ckpool\.org/, url: `https://$1solostats.ckpool.org/users/${user}` },
+      { search: 'atlaspool.io', url: `https://atlaspool.io/dashboard.html?wallet=${user}` },
     ];
 
     for (const pool of pools) {

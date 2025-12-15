@@ -13,6 +13,7 @@
 #include "device_config.h"
 #include "display.h"
 #include "scoreboard.h"
+#include "esp_transport.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
@@ -28,6 +29,10 @@ typedef struct {
 typedef struct
 {
     float current_hashrate;
+    float hashrate_1m;
+    float hashrate_10m;
+    float hashrate_1h;
+    float error_percentage;
     int64_t start_time;
     uint64_t shares_accepted;
     uint64_t shares_rejected;
@@ -47,6 +52,7 @@ typedef struct
     char ap_ssid[32];
     bool ap_enabled;
     bool is_connected;
+    int identify_mode_time_ms;
     char * pool_url;
     char * fallback_pool_url;
     uint16_t pool_port;
@@ -61,8 +67,14 @@ typedef struct
     bool fallback_pool_extranonce_subscribe;
     double response_time;
     bool use_fallback_stratum;
+    uint16_t pool_is_tls;
+    uint16_t fallback_pool_is_tls;
+    uint16_t pool_tls;
+    uint16_t fallback_pool_tls;
+    char * pool_cert;
+    char * fallback_pool_cert;
     bool is_using_fallback;
-    int pool_addr_family;
+    char pool_connection_info[64];
     bool overheat_mode;
     uint16_t power_fault;
     uint32_t lastClockSync;
@@ -108,8 +120,8 @@ typedef struct
     uint32_t version_mask;
     bool new_stratum_version_rolling_msg;
 
-    int sock;
-
+    esp_transport_handle_t transport;
+    
     // A message ID that must be unique per request that expects a response.
     // For requests not expecting a response (called notifications), this is null.
     int send_uid;

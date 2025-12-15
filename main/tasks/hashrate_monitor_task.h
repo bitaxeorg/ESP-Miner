@@ -7,7 +7,6 @@ typedef struct {
     uint32_t value;
     uint32_t time_ms;
     float hashrate;
-    float expected_hashrate;
 } measurement_t;
 
 typedef struct {
@@ -15,7 +14,6 @@ typedef struct {
     measurement_t** domain_measurements;
     measurement_t* error_measurement;
 
-    int error_count;
     bool is_initialized;
 } HashrateMonitorModule;
 

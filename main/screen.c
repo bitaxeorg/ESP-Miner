@@ -33,6 +33,7 @@ typedef enum {
 
 extern const lv_img_dsc_t bitaxe_logo;
 extern const lv_img_dsc_t osmu_logo;
+extern const lv_img_dsc_t identify_text;
 
 static lv_obj_t * screens[MAX_SCREENS];
 static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000, 10000, 10000};
@@ -75,6 +76,7 @@ static lv_obj_t *wifi_signal_strength_label;
 static lv_obj_t *wifi_uptime_label;
 
 static lv_obj_t *notification_label;
+static lv_obj_t *identify_image;
 
 static float current_hashrate;
 static float current_power;
@@ -139,7 +141,7 @@ static lv_obj_t * create_scr_self_test() {
     return scr;
 }
 
-static lv_obj_t * create_scr_overheat(SystemModule * module) {
+static lv_obj_t * create_scr_overheat() {
     lv_obj_t * scr = create_flex_screen(4);
 
     lv_obj_t *label1 = lv_label_create(scr);
@@ -158,7 +160,7 @@ static lv_obj_t * create_scr_overheat(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_asic_status(SystemModule * module) {
+static lv_obj_t * create_scr_asic_status() {
     lv_obj_t * scr = create_flex_screen(2);
 
     lv_obj_t *label1 = lv_label_create(scr);
@@ -170,7 +172,7 @@ static lv_obj_t * create_scr_asic_status(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_screen_with_qr(SystemModule * module, int expected_lines, lv_obj_t ** out_text_cont) {
+static lv_obj_t * create_screen_with_qr(const char * ap_ssid, int expected_lines, lv_obj_t ** out_text_cont) {
     lv_obj_t * scr = lv_obj_create(NULL);
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -191,16 +193,16 @@ static lv_obj_t * create_screen_with_qr(SystemModule * module, int expected_line
     lv_qrcode_set_light_color(qr, lv_color_white());
 
     char data[64];
-    snprintf(data, sizeof(data), "WIFI:S:%s;;", module->ap_ssid);
+    snprintf(data, sizeof(data), "WIFI:S:%s;;", ap_ssid);
     lv_qrcode_update(qr, data, strlen(data));
 
     *out_text_cont = text_cont;
     return scr;
 }
 
-static lv_obj_t * create_scr_welcome(SystemModule * module) {
+static lv_obj_t * create_scr_welcome(const char * ap_ssid) {
     lv_obj_t * text_cont;
-    lv_obj_t * scr = create_screen_with_qr(module, 3, &text_cont);
+    lv_obj_t * scr = create_screen_with_qr(ap_ssid, 3, &text_cont);
 
     lv_obj_t *label1 = lv_label_create(text_cont);
     lv_obj_set_width(label1, lv_pct(100));
@@ -215,12 +217,12 @@ static lv_obj_t * create_scr_welcome(SystemModule * module) {
     lv_label_set_text(label2, "Setup Wi-Fi:");
 
     lv_obj_t *label3 = lv_label_create(text_cont);
-    lv_label_set_text(label3, module->ap_ssid);
+    lv_label_set_text(label3, ap_ssid);
 
     return scr;
 }
 
-static lv_obj_t * create_scr_firmware(SystemModule * module) {
+static lv_obj_t * create_scr_firmware() {
     lv_obj_t * scr = create_flex_screen(3);
 
     lv_obj_t *label1 = lv_label_create(scr);
@@ -234,14 +236,14 @@ static lv_obj_t * create_scr_firmware(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_connection(SystemModule * module) {
+static lv_obj_t * create_scr_connection(const char * ssid, const char * ap_ssid) {
     lv_obj_t * text_cont;
-    lv_obj_t * scr = create_screen_with_qr(module, 4, &text_cont);
+    lv_obj_t * scr = create_screen_with_qr(ap_ssid, 4, &text_cont);
 
     lv_obj_t *label1 = lv_label_create(text_cont);
     lv_obj_set_width(label1, lv_pct(100));
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text_fmt(label1, "Wi-Fi: %s", module->ssid);
+    lv_label_set_text_fmt(label1, "Wi-Fi: %s", ssid);
 
     connection_wifi_status_label = lv_label_create(text_cont);
     lv_obj_set_width(connection_wifi_status_label, lv_pct(100));
@@ -251,7 +253,7 @@ static lv_obj_t * create_scr_connection(SystemModule * module) {
     lv_label_set_text(label3, "Setup Wi-Fi:");
 
     lv_obj_t *label4 = lv_label_create(text_cont);
-    lv_label_set_text(label4, module->ap_ssid);
+    lv_label_set_text(label4, ap_ssid);
 
     return scr;
 }
@@ -284,7 +286,7 @@ static lv_obj_t * create_scr_osmu_logo() {
     return scr;
 }
 
-static lv_obj_t * create_scr_urls(SystemModule * module) {
+static lv_obj_t * create_scr_urls() {
     lv_obj_t * scr = create_flex_screen(4);
 
     lv_obj_t *label1 = lv_label_create(scr);
@@ -358,6 +360,18 @@ static lv_obj_t * create_scr_wifi() {
     return scr;
 }
 
+static void scr_create_overlay()
+{
+    identify_image = lv_img_create(lv_layer_top());
+    lv_img_set_src(identify_image, &identify_text);
+    lv_obj_align(identify_image, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_add_flag(identify_image, LV_OBJ_FLAG_HIDDEN);
+
+    notification_label = lv_label_create(lv_layer_top());
+    lv_label_set_text(notification_label, "");
+    lv_obj_align(notification_label, LV_ALIGN_TOP_RIGHT, 0, 0);
+}
+
 static bool screen_show(screen_t screen)
 {
     if (SCR_CAROUSEL_START > screen) {
@@ -380,6 +394,19 @@ static bool screen_show(screen_t screen)
         current_screen_delay_ms = delays_ms[screen];
     }
     return is_valid;
+}
+
+void screen_next()
+{
+    screen_t next_scr = get_current_screen();
+    do {
+        next_scr++;
+
+        if (next_scr == MAX_SCREENS) {
+            next_scr = SCR_CAROUSEL_START;
+        }
+
+    } while (!screen_show(next_scr));
 }
 
 static void screen_update_cb(lv_timer_t * timer)
@@ -418,18 +445,30 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update) {
-        if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
-            lv_label_set_text(firmware_update_scr_filename_label, GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename);
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    if (module->identify_mode_time_ms > 0) {
+        module->identify_mode_time_ms -= SCREEN_UPDATE_MS;
+    }
+
+    bool is_identify_mode = module->identify_mode_time_ms > 0;
+    if (is_identify_mode == lv_obj_has_flag(identify_image, LV_OBJ_FLAG_HIDDEN)) {
+        lv_obj_set_flag(identify_image, LV_OBJ_FLAG_HIDDEN, !is_identify_mode);
+        lv_obj_set_style_bg_opa(lv_layer_top(), is_identify_mode ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(lv_layer_top(), is_identify_mode ? lv_color_black() : lv_color_white(), LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(notification_label, is_identify_mode ? lv_color_white() : lv_color_black(), LV_PART_MAIN);
+    }
+
+    if (module->is_firmware_update) {
+        if (strcmp(module->firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_filename_label, module->firmware_update_filename);
         }
-        if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
-            lv_label_set_text(firmware_update_scr_status_label, GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status);
+        if (strcmp(module->firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_status_label, module->firmware_update_status);
         }
         screen_show(SCR_FIRMWARE);
         return;
     }
-
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     if (module->asic_status) {
         lv_label_set_text(asic_status_label, module->asic_status);
@@ -525,7 +564,7 @@ static void screen_update_cb(lv_timer_t * timer)
 
     // Update WiFi RSSI periodically
     int8_t rssi_value = -128;
-    if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
+    if (module->is_connected) {
         get_wifi_current_rssi(&rssi_value);
     }
 
@@ -565,15 +604,11 @@ static void screen_update_cb(lv_timer_t * timer)
 
         lv_label_set_text(notification_label, notifications[state]);
 
-        lv_obj_remove_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
-
         current_shares_accepted = shares_accepted;
         current_shares_rejected = shares_rejected;
         current_work_received = work_received;
     } else {
-        if (!lv_obj_has_flag(notification_label, LV_OBJ_FLAG_HIDDEN)) {
-            lv_obj_add_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
-        }
+        lv_label_set_text(notification_label, "");
     }
 
     if (module->block_found) {
@@ -592,17 +627,13 @@ static void screen_update_cb(lv_timer_t * timer)
     screen_next();
 }
 
-void screen_next()
+void screen_button_press() 
 {
-    screen_t next_scr = get_current_screen();
-    do {
-        next_scr++;
-
-        if (next_scr == MAX_SCREENS) {
-            next_scr = SCR_CAROUSEL_START;
-        }
-
-    } while (!screen_show(next_scr));
+    if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
+        GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
+    } else {
+        screen_next();
+    }
 }
 
 static void uptime_update_cb(lv_timer_t * timer)
@@ -641,27 +672,24 @@ esp_err_t screen_start(void * pvParameters)
         screen_lines = lv_display_get_vertical_resolution(NULL) / 8;
 
         GLOBAL_STATE = (GlobalState *) pvParameters;
+        SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;
 
-        if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
-            SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+        if (SYSTEM_MODULE->is_screen_active) {
 
             screens[SCR_SELF_TEST] = create_scr_self_test();
-            screens[SCR_OVERHEAT] = create_scr_overheat(module);
-            screens[SCR_ASIC_STATUS] = create_scr_asic_status(module);
-            screens[SCR_WELCOME] = create_scr_welcome(module);
-            screens[SCR_FIRMWARE] = create_scr_firmware(module);
-            screens[SCR_CONNECTION] = create_scr_connection(module);
+            screens[SCR_OVERHEAT] = create_scr_overheat();
+            screens[SCR_ASIC_STATUS] = create_scr_asic_status();
+            screens[SCR_WELCOME] = create_scr_welcome(SYSTEM_MODULE->ap_ssid);
+            screens[SCR_FIRMWARE] = create_scr_firmware();
+            screens[SCR_CONNECTION] = create_scr_connection(SYSTEM_MODULE->ssid, SYSTEM_MODULE->ap_ssid);
             screens[SCR_BITAXE_LOGO] = create_scr_bitaxe_logo(GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version);
             screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
-            screens[SCR_URLS] = create_scr_urls(module);
+            screens[SCR_URLS] = create_scr_urls();
             screens[SCR_STATS] = create_scr_stats();
             screens[SCR_MINING] = create_scr_mining();
             screens[SCR_WIFI] = create_scr_wifi();
 
-            notification_label = lv_label_create(lv_layer_top());
-            lv_label_set_text(notification_label, "");
-            lv_obj_align(notification_label, LV_ALIGN_TOP_RIGHT, 0, 0);
-            lv_obj_add_flag(notification_label, LV_OBJ_FLAG_HIDDEN);
+            scr_create_overlay();
 
             lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);
 

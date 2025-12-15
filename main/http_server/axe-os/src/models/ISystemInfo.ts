@@ -6,12 +6,11 @@ interface ISharesRejectedStat {
 interface IHashrateMonitorAsic {
     total: number;
     domains?: number[];
-    error: number;
+    errorCount: number;
 }
 
 interface IHashrateMonitor {
     asics: IHashrateMonitorAsic[];
-    errorCount: number;
 }
 
 export interface ISystemInfo {
@@ -28,7 +27,11 @@ export interface ISystemInfo {
     maxPower: number,
     nominalVoltage: number,
     hashRate: number,
+    hashRate_1m: number,
+    hashRate_10m: number,
+    hashRate_1h: number,
     expectedHashrate: number,
+    errorPercentage: number,
     bestDiff: number,
     bestSessionDiff: number,
     freeHeap: number,
@@ -54,19 +57,24 @@ export interface ISystemInfo {
     stratumUser: string,
     stratumSuggestedDifficulty: number,
     stratumExtranonceSubscribe: number,
+    stratumTLS: number,
+    stratumCert: string,
     fallbackStratumURL: string,
     fallbackStratumPort: number,
+    fallbackStratumTLS: number,
+    fallbackStratumCert: string,
     fallbackStratumUser: string,
     fallbackStratumSuggestedDifficulty: number,
     fallbackStratumExtranonceSubscribe: number,
     poolDifficulty: number,
     responseTime: number,
     isUsingFallbackStratum: boolean,
-    poolAddrFamily: number,
+    poolConnectionInfo: string,
     frequency: number,
     version: string,
     axeOSVersion: string,
     idfVersion: string,
+    resetReason: string,
     boardVersion: string,
     autofanspeed: number,
     minFanSpeed: number,

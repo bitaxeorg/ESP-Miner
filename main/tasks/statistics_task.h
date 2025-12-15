@@ -7,7 +7,10 @@ struct StatisticsData
 {
     uint32_t timestamp;
     float hashrate;
-    uint32_t errorCount;
+    float hashrate_1m;
+    float hashrate_10m;
+    float hashrate_1h;
+    float errorPercentage;
     float chipTemperature;
     float vrTemperature;
     float power;
@@ -19,6 +22,7 @@ struct StatisticsData
     uint16_t fan2RPM;
     int8_t wifiRSSI;
     uint32_t freeHeap;
+    float responseTime;
 };
 
 bool getStatisticData(uint16_t index, StatisticsDataPtr dataOut);
