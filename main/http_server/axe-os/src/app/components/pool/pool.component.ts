@@ -1,11 +1,16 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ValidatorFn, ValidationErrors, AbstractControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 
 type PoolType = 'stratum' | 'fallbackStratum';
+
+interface ITlsOption {
+  value: number;
+  label: string;
+}
 
 @Component({
   selector: 'app-pool',
@@ -19,6 +24,12 @@ export class PoolComponent implements OnInit {
   public pools: PoolType[] = ['stratum', 'fallbackStratum'];
   public showPassword = { 'stratum': false, 'fallbackStratum': false };
   public showAdvancedOptions = { 'stratum': false, 'fallbackStratum': false };
+
+  public tlsOptions: ITlsOption[] = [
+    { value: 0, label: 'No TLS' },
+    { value: 1, label: 'TLS (System certificate)' },
+    { value: 2, label: 'TLS (Custom CA certificate)' }
+  ];
 
   @Input() uri = '';
 
@@ -50,7 +61,8 @@ export class PoolComponent implements OnInit {
           stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
           stratumUser: [info.stratumUser, [Validators.required]],
           stratumPassword: ['*****', [Validators.required]],
-
+          stratumTLS: [info.stratumTLS || 0],
+          stratumCert: [info.stratumCert],
           fallbackStratumURL: [info.fallbackStratumURL, [
             Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
           ]],
@@ -62,9 +74,34 @@ export class PoolComponent implements OnInit {
           ]],
           fallbackStratumExtranonceSubscribe: [info.fallbackStratumExtranonceSubscribe == 1, [Validators.required]],
           fallbackStratumSuggestedDifficulty: [info.fallbackStratumSuggestedDifficulty, [Validators.required]],
+          fallbackStratumTLS: [info.fallbackStratumTLS || 0],
+          fallbackStratumCert: [info.fallbackStratumCert],
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
           fallbackStratumPassword: ['*****', [Validators.required]]
         });
+
+        const setupTlsValidation = (tlsControlName: string, certControlName: string) => {
+          this.form.get(tlsControlName)?.valueChanges.subscribe(value => {
+            const certControl = this.form.get(certControlName);
+            if (value === 2) {
+              certControl?.setValidators([
+                Validators.required,
+                this.pemCertificateValidator()
+              ]);
+            } else {
+              certControl?.clearValidators();
+            }
+            certControl?.updateValueAndValidity();
+          });
+        };
+
+        // Setup tls validation
+        setupTlsValidation('stratumTLS', 'stratumCert');
+        setupTlsValidation('fallbackStratumTLS', 'fallbackStratumCert');
+
+        // Trigger initial validation
+        this.form.get('stratumTLS')?.updateValueAndValidity();
+        this.form.get('fallbackStratumTLS')?.updateValueAndValidity();
       });
   }
 
@@ -122,15 +159,24 @@ export class PoolComponent implements OnInit {
   public onUrlChange(poolType: PoolType) {
     const urlControl = this.form.get(`${poolType}URL`);
     const portControl = this.form.get(`${poolType}Port`);
-    if (!urlControl || !portControl) return;
+    const tlsControl = this.form.get(`${poolType}TLS`);
+    if (!urlControl || !portControl || !tlsControl) return;
 
-    let urlValue = urlControl.value || '';
+    let urlValue = urlControl.value.trim() || '';
 
     if (!urlValue) return;
 
-    const prefix = 'stratum+tcp://';
-    if (urlValue.startsWith(prefix)) {
-      urlValue = urlValue.slice(prefix.length);
+    const prefixes = [
+      { prefix: 'stratum+tcp://', tlsMode: false },
+      { prefix: 'stratum+tls://', tlsMode: true },
+      { prefix: 'stratum+ssl://', tlsMode: true }
+    ] as const;
+
+    let isTlsMode = 0;
+    const matched = prefixes.find(({ prefix }) => urlValue.startsWith(prefix));
+    if (matched) {
+      urlValue = urlValue.slice(matched.prefix.length);
+      isTlsMode = +matched.tlsMode;
     }
 
     const { cleanUrl, port } = this.extractPort(urlValue);
@@ -139,5 +185,50 @@ export class PoolComponent implements OnInit {
       portControl.setValue(port);
     }
     urlControl.setValue(cleanUrl);
+    tlsControl.setValue(isTlsMode);
+  }
+
+  onCertFileSelected(event: Event, formControlName: string): void {
+    const fileInput = event.target as HTMLInputElement;
+
+    if (fileInput.files && fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        const fileContent = reader.result as string;
+        // Update the corresponding certificate field in the form
+        this.form.get(formControlName)?.setValue(fileContent);
+        this.form.get(formControlName)?.markAsDirty();
+
+        // Reset file input so the same file can be selected again
+        fileInput.value = '';
+      };
+
+      reader.onerror = () => {
+        // Error handling when reading the certificate file
+        this.toastr.error('Failed to read certificate file');
+        fileInput.value = '';
+      };
+
+      // Read the file as text
+      reader.readAsText(file);
+    }
+  }
+
+  private pemCertificateValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value?.trim();
+      if (!value) return null;
+
+      const pemChainRegex =
+        /^(?:-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----\s*)+$/;
+
+      return pemChainRegex.test(value) ? null : { invalidCertificate: true };
+    };
+  }
+
+  trackByFn(index: number, option: ITlsOption): number {
+    return option.value;
   }
 }
