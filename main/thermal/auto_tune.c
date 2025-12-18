@@ -238,7 +238,7 @@ void auto_tune()
         if(targettemp > AUTO_TUNE.max_temp_asic)
             AUTO_TUNE.max_temp_asic = targettemp + 1;
     }
-    current_hashrate_auto = GLOBAL_STATE->SYSTEM_MODULE.current_hashrate;
+    current_hashrate_auto = GLOBAL_STATE->SYSTEM_MODULE.hashrate_10m;
     update_hashrate_history(current_hashrate_auto);
 
     switch (state) {
