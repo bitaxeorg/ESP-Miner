@@ -242,6 +242,7 @@ void usb_net_init(void * pvParameters)
 
     // Start the DHCP client
     ESP_LOGI(TAG, "Starting DHCP client for Ethernet-over-USB");
+    ESP_ERROR_CHECK(esp_netif_set_mac(netif, net_cfg.mac_addr));
     ESP_ERROR_CHECK(esp_netif_dhcpc_start(netif));
 
     ESP_LOGI(TAG, "Ethernet-over-USB initialized successfully - waiting for IP from DHCP");
