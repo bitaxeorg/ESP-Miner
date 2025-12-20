@@ -120,6 +120,8 @@ components:
         - fallbackStratumSuggestedDifficulty
         - fallbackStratumURL
         - fallbackStratumUser
+        - fallbackStratumTLS
+        - fallbackStratumCert
         - fanrpm
         - fan2rpm
         - fanspeed
@@ -165,6 +167,8 @@ components:
         - stratumSuggestedDifficulty
         - stratumURL
         - stratumUser
+        - stratumTLS
+        - stratumCert
         - temp
         - temp2
         - uptimeSeconds
