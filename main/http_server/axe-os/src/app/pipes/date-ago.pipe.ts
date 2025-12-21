@@ -7,8 +7,8 @@ import { Pipe, PipeTransform } from '@angular/core';
 export class DateAgoPipe implements PipeTransform {
   private static _this = new DateAgoPipe();
 
-  public static transform(value: number): string {
-    return this._this.transform(value);
+  public static transform(value: number, args?: any): string {
+    return this._this.transform(value, args);
   }
 
   transform(value: any, args?: any): any {

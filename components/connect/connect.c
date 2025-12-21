@@ -1,16 +1,11 @@
 #include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
-#include "esp_system.h"
 #include "esp_wifi.h"
-#include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
 #include "lwip/err.h"
-#include "lwip/lwip_napt.h"
-#include "lwip/sys.h"
-#include "nvs_flash.h"
 #include "esp_wifi_types_generic.h"
 
 #include "connect.h"
@@ -192,13 +187,15 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
                 return;
             }
 
-            ESP_LOGI(TAG, "Could not connect to '%s' [rssi %d]: reason %d", event->ssid, event->rssi, event->reason);
-
+            ESP_LOGI(TAG, "Could not connect to '%.*s' [rssi %d]: reason %d", event->ssid_len, event->ssid, event->rssi, event->reason);
             if (clients_connected_to_ap > 0) {
                 ESP_LOGI(TAG, "Client(s) connected to AP, not retrying...");
                 snprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, sizeof(GLOBAL_STATE->SYSTEM_MODULE.wifi_status), "Config AP connected!");
                 return;
             }
+
+            GLOBAL_STATE->SYSTEM_MODULE.is_connected = false;
+            wifi_softap_on();
 
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, sizeof(GLOBAL_STATE->SYSTEM_MODULE.wifi_status), "%s (Error %d, retry #%d)", get_wifi_reason_string(event->reason), event->reason, s_retry_num);
             ESP_LOGI(TAG, "Wi-Fi status: %s", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
@@ -292,20 +289,18 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
     }
 }
 
-esp_netif_t * wifi_init_softap(char * ap_ssid)
+esp_netif_t * wifi_init_softap(GlobalState * GLOBAL_STATE)
 {
     esp_netif_t * esp_netif_ap = esp_netif_create_default_wifi_ap();
 
     uint8_t mac[6];
     esp_wifi_get_mac(ESP_IF_WIFI_AP, mac);
     // Format the last 4 bytes of the MAC address as a hexadecimal string
-    snprintf(ap_ssid, 32, "Bitaxe_%02X%02X", mac[4], mac[5]);
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid), "Bitaxe_%02X%02X", mac[4], mac[5]);
 
-    wifi_config_t wifi_ap_config;
-    memset(&wifi_ap_config, 0, sizeof(wifi_ap_config));
-    strncpy((char *) wifi_ap_config.ap.ssid, ap_ssid, sizeof(wifi_ap_config.ap.ssid) - 1);
-    wifi_ap_config.ap.ssid[sizeof(wifi_ap_config.ap.ssid) - 1] = '\0';
-    wifi_ap_config.ap.ssid_len = strlen(ap_ssid);
+    wifi_config_t wifi_ap_config = { 0 };
+    wifi_ap_config.ap.ssid_len = strlen(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid);
+    memcpy(wifi_ap_config.ap.ssid, GLOBAL_STATE->SYSTEM_MODULE.ap_ssid, wifi_ap_config.ap.ssid_len);
     wifi_ap_config.ap.channel = 1;
     wifi_ap_config.ap.max_connection = 10;
     wifi_ap_config.ap.authmode = WIFI_AUTH_OPEN;
@@ -374,8 +369,12 @@ esp_netif_t * wifi_init_sta(const char * wifi_ssid, const char * wifi_pass)
         },
     };
 
-    strncpy((char *) wifi_sta_config.sta.ssid, wifi_ssid, sizeof(wifi_sta_config.sta.ssid));
-    wifi_sta_config.sta.ssid[sizeof(wifi_sta_config.sta.ssid) - 1] = '\0';
+    size_t ssid_len = strlen(wifi_ssid);
+    if (ssid_len > 32) ssid_len = 32;
+    memcpy(wifi_sta_config.sta.ssid, wifi_ssid, ssid_len);
+    if (ssid_len < 32) {
+        wifi_sta_config.sta.ssid[ssid_len] = '\0';
+    }
 
     if (authmode != WIFI_AUTH_OPEN) {
         strncpy((char *) wifi_sta_config.sta.password, wifi_pass, sizeof(wifi_sta_config.sta.password));
@@ -400,13 +399,6 @@ void wifi_init(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
-    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
-    // copy the wifi ssid to the global state
-    strncpy(GLOBAL_STATE->SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid));
-    GLOBAL_STATE->SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ssid)-1] = 0;
-
-    free(wifi_ssid);
-
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
@@ -416,7 +408,6 @@ void wifi_init(void * pvParameters)
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, GLOBAL_STATE, &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, GLOBAL_STATE, &instance_got_ip));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_GOT_IP6, &event_handler, GLOBAL_STATE, &instance_got_ip6));
-    
 
     /* Initialize Wi-Fi */
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -425,7 +416,9 @@ void wifi_init(void * pvParameters)
     wifi_softap_on();
 
     /* Initialize AP */
-    wifi_init_softap(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid);
+    wifi_init_softap(GLOBAL_STATE);
+
+    GLOBAL_STATE->SYSTEM_MODULE.ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
 
     /* Skip connection if SSID is null */
     if (strlen(GLOBAL_STATE->SYSTEM_MODULE.ssid) == 0) {
