@@ -41,12 +41,11 @@ export class DateAgoPipe implements PipeTransform {
             result += counter + ' ' + i + 's'; // plural (2 days ago)
             seconds -= intervals[i] * counter
           }
-          shownIntervals++;
         }
+        if (result) shownIntervals++;
       }
       return result;
     }
     return value;
   }
-
 }
