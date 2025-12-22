@@ -21,6 +21,9 @@
 #include "esp_ota_ops.h"
 #include "esp_wifi.h"
 #include "lwip/inet.h"
+#include <arpa/inet.h>
+#include "lwip/lwip_napt.h"
+#include "lwip/netdb.h"
 #include "lwip/sockets.h"
 
 #include "cJSON.h"
@@ -32,6 +35,7 @@
 #include "theme_api.h"
 #include "axe-os/api/system/asic_settings.h"
 #include "display.h"
+#include "mdns.h"
 #include "http_server.h"
 #include "websocket.h"
 #include "websocket_log.h"
@@ -248,35 +252,58 @@ static esp_err_t ip_in_private_range(uint32_t address) {
 
 static uint32_t extract_origin_ip_addr(char *origin)
 {
-    char ip_str[16];
+    char host_str[128];
     uint32_t origin_ip_addr = 0;
 
-    // Find the start of the IP address in the Origin header
+    // Find the start of the hostname in the Origin header
     const char *prefix = "http://";
-    char *ip_start = strstr(origin, prefix);
-    if (ip_start) {
-        ip_start += strlen(prefix); // Move past "http://"
+    char *host_start = strstr(origin, prefix);
+    if (host_start) {
+        host_start += strlen(prefix); // Move past "http://"
 
-        // Extract the IP address portion (up to the next '/')
-        char *ip_end = strchr(ip_start, '/');
-        size_t ip_len = ip_end ? (size_t)(ip_end - ip_start) : strlen(ip_start);
-        if (ip_len < sizeof(ip_str)) {
-            strncpy(ip_str, ip_start, ip_len);
-            ip_str[ip_len] = '\0'; // Null-terminate the string
+        // Extract the hostname portion (up to the next '/')
+        char *host_end = strchr(host_start, '/');
+        size_t host_len = host_end ? (size_t)(host_end - host_start) : strlen(host_start);
+        if (host_len < sizeof(host_str)) {
+            strncpy(host_str, host_start, host_len);
+            host_str[host_len] = '\0'; // Null-terminate the string
 
-            // Convert the IP address string to uint32_t
-            origin_ip_addr = inet_addr(ip_str);
-            if (origin_ip_addr == INADDR_NONE) {
-                ESP_LOGW(CORS_TAG, "Invalid IP address: %s", ip_str);
-            } else {
+            // Check if it's an IP address or hostname
+            struct in_addr addr;
+            if (inet_pton(AF_INET, host_str, &addr) == 1) {
+                origin_ip_addr = addr.s_addr;
                 ESP_LOGD(CORS_TAG, "Extracted IP address %lu", origin_ip_addr);
+            } else {
+                ESP_LOGD(CORS_TAG, "Origin contains hostname: %s (not an IP)", host_str);
+                // For hostnames, return 0 to indicate it's not an IP address
+                origin_ip_addr = 0;
             }
         } else {
-            ESP_LOGW(CORS_TAG, "IP address string is too long: %s", ip_start);
+            ESP_LOGW(CORS_TAG, "Hostname string is too long: %s", host_start);
         }
     }
 
     return origin_ip_addr;
+}
+
+// Helper function to normalize hostname by stripping ".local" suffix if present
+// This prevents Avahi from creating duplicate ".local.local" hostnames
+static void normalize_hostname(char *hostname, size_t max_len) {
+    if (hostname == NULL || strlen(hostname) == 0) {
+        return;
+    }
+
+    size_t len = strlen(hostname);
+    const char *suffix = ".local";
+    size_t suffix_len = strlen(suffix);
+
+    // Check if hostname ends with ".local" (case-insensitive)
+    if (len > suffix_len &&
+        strcasecmp(hostname + len - suffix_len, suffix) == 0) {
+        // Strip the ".local" suffix
+        hostname[len - suffix_len] = '\0';
+        ESP_LOGD(TAG, "Normalized hostname from '%s.local' to '%s'", hostname, hostname);
+    }
 }
 
 esp_err_t is_network_allowed(httpd_req_t * req)
@@ -315,8 +342,41 @@ esp_err_t is_network_allowed(httpd_req_t * req)
         origin_ip_addr = request_ip_addr;
     }
 
-    if (ip_in_private_range(origin_ip_addr) == ESP_OK && ip_in_private_range(request_ip_addr) == ESP_OK) {
+    if (origin_ip_addr != 0 && ip_in_private_range(origin_ip_addr) == ESP_OK && ip_in_private_range(request_ip_addr) == ESP_OK) {
+        ESP_LOGD(CORS_TAG, "Origin and IP both in private range. Allowing.");
         return ESP_OK;
+    }
+    
+    // If origin contains hostname (origin_ip_addr == 0), proceed to hostname validation
+    if (origin_ip_addr == 0) {
+        ESP_LOGD(CORS_TAG, "Origin contains hostname, proceeding to hostname validation");
+    }
+
+    // Check if Origin header matches the avahi hostname    
+    if (httpd_req_get_hdr_value_len(req, "Origin") > 0) {
+        httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin));
+        ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
+        char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+        ESP_LOGD(CORS_TAG, "Configured hostname: %s", hostname);
+        char expected[256];
+        snprintf(expected, sizeof(expected), "http://%s.local", hostname);
+        ESP_LOGD(CORS_TAG, "Expected origin with .local: %s", expected);
+        if (strcmp(origin, expected) == 0) {
+            free(hostname);
+            ESP_LOGD(CORS_TAG, "Request from avahi hostname - allowing access");
+            return ESP_OK;
+        }
+        // Also check without .local suffix
+        snprintf(expected, sizeof(expected), "http://%s", hostname);
+        ESP_LOGD(CORS_TAG, "Expected origin without .local: %s", expected);
+        if (strcmp(origin, expected) == 0) {
+            free(hostname);
+            ESP_LOGD(CORS_TAG, "Request from hostname - allowing access");
+            return ESP_OK;
+        }
+        free(hostname);
+    } else {
+        ESP_LOGD(CORS_TAG, "No Origin header found");
     }
 
     ESP_LOGI(CORS_TAG, "Client is NOT in the private ip ranges or same range as server.");
@@ -513,9 +573,24 @@ static esp_err_t handle_options_request(httpd_req_t * req)
     return ESP_OK;
 }
 
-bool check_settings_and_update(const cJSON * const root)
+bool check_settings_and_update(const cJSON * const root, char **redirect_url)
 {
     bool result = true;
+    char *old_hostname = NULL;
+    bool hostname_changed = false;
+
+    // Check for hostname change first
+    cJSON *hostname_item = cJSON_GetObjectItem(root, "hostname");
+    if (hostname_item && cJSON_IsString(hostname_item)) {
+        old_hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+        char normalized_new_hostname[64];
+        strlcpy(normalized_new_hostname, hostname_item->valuestring, sizeof(normalized_new_hostname));
+        normalize_hostname(normalized_new_hostname, sizeof(normalized_new_hostname));
+        if (strcmp(old_hostname, normalized_new_hostname) != 0) {
+            hostname_changed = true;
+            ESP_LOGI(TAG, "Hostname change detected: %s -> %s", old_hostname, hostname_item->valuestring);
+        }
+    }
 
     for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
         Settings *setting = nvs_config_get_settings(key);
@@ -614,7 +689,21 @@ bool check_settings_and_update(const cJSON * const root)
 
             switch(setting->type) {
                 case TYPE_STR:
-                    nvs_config_set_string(key, item->valuestring);
+
+                    if (key == NVS_CONFIG_HOSTNAME)
+                    {
+                        char normalized_hostname[64];
+                        strlcpy(normalized_hostname, item->valuestring, sizeof(normalized_hostname));
+                        normalize_hostname(normalized_hostname, sizeof(normalized_hostname));
+                        nvs_config_set_string(key, normalized_hostname);
+                        update_mdns_hostname(normalized_hostname);
+                        ESP_LOGI(TAG, "Updated hostname to: %s", normalized_hostname);
+                    }
+                    else
+                    {
+                        nvs_config_set_string(key, item->valuestring);
+                    }
+
                     break;
                 case TYPE_U16:
                     nvs_config_set_u16(key, (uint16_t)item->valueint);
@@ -633,6 +722,23 @@ bool check_settings_and_update(const cJSON * const root)
                     break;
             }
         }
+    }
+
+    // Set redirect URL if hostname changed
+    if (hostname_changed && redirect_url) {
+        char *current_hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+        if (current_hostname) {
+            *redirect_url = malloc(256);
+            if (*redirect_url) {
+                snprintf(*redirect_url, 256, "http://%s.local", current_hostname);
+                ESP_LOGI(TAG, "Hostname redirect URL set: %s", *redirect_url);
+            }
+            free(current_hostname);
+        }
+    }
+
+    if (old_hostname) {
+        free(old_hostname);
     }
 
     return result;
@@ -682,8 +788,12 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
                             (current_hostname == NULL || strcmp(current_hostname, hostname_item->valuestring) != 0);
     free(current_hostname);
 
-    if (!check_settings_and_update(root)) {
+    char *redirect_url = NULL;
+    if (!check_settings_and_update(root, &redirect_url)) {
         cJSON_Delete(root);
+        if (redirect_url) {
+            free(redirect_url);
+        }
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Wrong API input");
         return ESP_OK;
     }
@@ -695,9 +805,27 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         }
     }
 
-    cJSON_Delete(root);
-    httpd_resp_send_chunk(req, NULL, 0);
-    return ESP_OK;
+    // Create response JSON
+    cJSON *response = cJSON_CreateObject();
+    if (redirect_url) {
+        cJSON_AddStringToObject(response, "status", "success");
+        cJSON *redirect = cJSON_CreateObject();
+        cJSON_AddStringToObject(redirect, "url", redirect_url);
+        cJSON_AddNumberToObject(redirect, "delay", 2000);
+        cJSON_AddStringToObject(redirect, "message", "Hostname updated. Redirecting to new address...");
+        cJSON_AddItemToObject(response, "redirect", redirect);
+        
+        ESP_LOGI(TAG, "Sending hostname change redirect response");
+        esp_err_t res = HTTP_send_json(req, response, &api_common_prebuffer_len);
+        cJSON_Delete(response);
+        free(redirect_url);
+        cJSON_Delete(root);
+        return res;
+    } else {
+        cJSON_Delete(root);
+        httpd_resp_send_chunk(req, NULL, 0);
+        return ESP_OK;
+    }
 }
 
 static esp_err_t POST_identify(httpd_req_t * req)
@@ -879,6 +1007,35 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     }
 
     cJSON * root = system_api_get_full_json(GLOBAL_STATE);
+
+    // Add mDNS-specific fields on top of the base system info
+    char * hostname_base = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    char mdns_hostname[64] = {0};
+    char full_hostname[64];
+    
+    // Get the base hostname from mDNS if available
+    if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
+        esp_err_t mdns_err = mdns_hostname_get(mdns_hostname);
+        ESP_LOGI(TAG, "mdns_hostname_get returned %d, hostname: %s", mdns_err, mdns_hostname);
+        if (mdns_err == ESP_OK && strlen(mdns_hostname) > 0) {
+            snprintf(full_hostname, sizeof(full_hostname), "%s.local", mdns_hostname);
+            ESP_LOGI(TAG, "Using mDNS hostname: %s", full_hostname);
+        } else {
+            strcpy(full_hostname, hostname_base);
+            ESP_LOGI(TAG, "Using base hostname: %s", full_hostname);
+        }
+    } else {
+        strcpy(full_hostname, hostname_base);
+        ESP_LOGI(TAG, "Device not connected, using base hostname: %s", full_hostname);
+    }
+
+    cJSON_AddStringToObject(root, "fullHostname", full_hostname);
+    if (strlen(mdns_hostname) > 0) {
+        cJSON_AddStringToObject(root, "mdnsHostname", mdns_hostname);
+    }
+    cJSON_AddStringToObject(root, "ipv6", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
+
+    free(hostname_base);
 
     esp_err_t res = HTTP_send_json(req, root, &system_info_prebuffer_len);
 
