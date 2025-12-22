@@ -72,7 +72,7 @@ Available API endpoints:
 
 * `/api/system` Update system settings
 
-### API examples in `curl`:
+### API examples in `curl` (works with IP addresses or .local hostnames):
 
 ```bash
 # Get system information
@@ -115,6 +115,56 @@ curl -X PATCH http://YOUR-BITAXE-IP/api/system \
      -H "Content-Type: application/json" \
      -d '{"fanspeed": "desired_speed_value"}'
 ```
+
+## mDNS Support
+
+ESP-Miner now includes comprehensive mDNS (multicast DNS) support for seamless network discovery and device accessibility. This feature enables automatic device discovery on local networks without requiring manual IP address configuration.
+
+### Features
+
+- **Automatic mDNS Initialization**: Device automatically registers with mDNS/Bonjour/Avahi services on network connection
+- **Dynamic Hostname Registration**: Device hostname is registered as `<hostname>.local` (e.g., `bitaxe.local`)
+- **Service Advertisement**: HTTP service is advertised as `_http._tcp` on port 80
+- **Dynamic Hostname Updates**: mDNS hostname updates automatically when device hostname is changed via web interface
+- **Hostname Normalization**: Automatically strips `.local` suffix when setting hostnames to prevent duplicate registrations
+- **CORS Support**: Enhanced CORS handling to allow requests from mDNS hostnames
+- **Hostname Conflict Resolution**: Automatically detects and resolves hostname conflicts by appending MAC address suffix when needed
+- **Enhanced Swarm Discovery**: Swarm mode supports both IP addresses and .local hostnames for seamless network management
+
+### Network Discovery
+
+Once connected to your local network, the device becomes discoverable through:
+
+```bash
+# Using avahi-browse (Linux)
+avahi-browse _http._tcp
+
+# Using dns-sd (macOS)
+dns-sd -B _http._tcp
+
+# Direct access
+http://<hostname>.local
+```
+
+### Configuration
+
+- **Default Hostname**: `bitaxe` (configurable via web interface)
+- **Service Type**: `_http._tcp`
+- **Port**: `80`
+- **Instance Name**: `ESP-Miner Web Server`
+
+### Hostname Conflict Resolution
+
+If multiple devices attempt to use the same hostname, ESP-Miner automatically resolves conflicts by appending a MAC address-derived suffix (e.g., `bitaxe-12ab` if `bitaxe` is taken). This ensures unique network identification without manual intervention.
+
+### Benefits
+
+- **Zero-Configuration Discovery**: Devices automatically appear in network browsers
+- **Cross-Platform Compatibility**: Works with Windows, macOS, Linux, and mobile devices
+- **No IP Address Required**: Access devices using human-readable names
+- **Automatic Resolution**: DNS resolution happens transparently in the background
+- **Zero-Configuration Swarm Management**: Automatic device discovery and management without IP configuration
+- **Enhanced Cross-Platform Compatibility**: Improved support across different network environments and discovery protocols
 
 ## Administration
 
