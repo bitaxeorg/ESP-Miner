@@ -12,6 +12,7 @@ import {
   SystemService as GeneratedSystemService,
   Settings
 } from 'src/app/generated';
+import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
 
 import { environment } from '../../environments/environment';
 
@@ -249,7 +250,7 @@ export class SystemApiService {
     return of('Device identified (mock)');
   }
 
-  public updateSystem(uri: string = '', update: any) {
+  public updateSystem(uri: string = '', update: any): Observable<any | ISystemUpdateResponse> {
     if (environment.production && this.generatedSystemService && !uri) {
       return this.generatedSystemService.updateSystemSettings(update as Settings);
     }
@@ -258,6 +259,16 @@ export class SystemApiService {
       return this.httpClient.patch(`${uri}/api/system`, update);
     }
 
+    if (update.hostname) {
+      return of({
+        status: 'success',
+        redirect: {
+          url: `http://${update.hostname}.local`,
+          delay: 2000,
+          message: 'Hostname updated. Redirecting to new address...'
+        }
+      } as ISystemUpdateResponse);
+    }
     return of(true);
   }
 
