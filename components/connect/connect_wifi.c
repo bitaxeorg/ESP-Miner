@@ -45,8 +45,12 @@ static esp_netif_t *wifi_init_sta(const char *wifi_ssid, const char *wifi_pass)
         },
     };
 
-    strncpy((char *) wifi_sta_config.sta.ssid, wifi_ssid, sizeof(wifi_sta_config.sta.ssid));
-    wifi_sta_config.sta.ssid[sizeof(wifi_sta_config.sta.ssid) - 1] = '\0';
+    size_t ssid_len = strlen(wifi_ssid);
+    if (ssid_len > 32) ssid_len = 32;
+    memcpy(wifi_sta_config.sta.ssid, wifi_ssid, ssid_len);
+    if (ssid_len < 32) {
+        wifi_sta_config.sta.ssid[ssid_len] = '\0';
+    }
 
     if (authmode != WIFI_AUTH_OPEN) {
         strncpy((char *) wifi_sta_config.sta.password, wifi_pass, sizeof(wifi_sta_config.sta.password));

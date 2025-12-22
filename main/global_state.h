@@ -50,11 +50,11 @@ typedef struct
     char best_session_diff_string[DIFF_STRING_SIZE];
     bool block_found;
     NetworkMode network_mode;
-    char ssid[32];
+    char * ssid;
     char network_status[256];
     char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
     char ipv6_addr_str[64]; // IPv6 address string with zone identifier (INET6_ADDRSTRLEN=46 + % + interface=15)
-    char ap_ssid[32];
+    char ap_ssid[12];
     bool ap_enabled;
     bool is_connected;
     int identify_mode_time_ms;

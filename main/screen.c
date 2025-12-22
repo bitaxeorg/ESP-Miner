@@ -437,7 +437,8 @@ static void screen_update_cb(lv_timer_t * timer)
         // display timeout
         const uint32_t display_timeout = display_timeout_config * 60 * 1000;
 
-        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen())) {
+        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen()) &&
+             lv_obj_has_flag(identify_image, LV_OBJ_FLAG_HIDDEN)) {
             display_on(false);
         } else {
             display_on(true);
@@ -507,19 +508,14 @@ static void screen_update_cb(lv_timer_t * timer)
     }
 
     bool is_network_status_changed = strcmp(module->network_status, lv_label_get_text(connection_network_status_label)) != 0;
-    if (module->ap_enabled || is_network_status_changed) {
-        if (is_network_status_changed) {
-            lv_label_set_text(connection_network_status_label, module->network_status);
-        }
-
+    if (is_network_status_changed) {
+        lv_label_set_text(connection_network_status_label, module->network_status);
         screen_show(SCR_CONNECTION);
+        return;
+    }
 
-        // Keep delay at 1s when connected, 0 when AP enabled (for immediate carousel exit on long press)
-        if (module->ap_enabled) {
-            delays_ms[SCR_CONNECTION] = 0;
-        } else if (module->is_connected) {
-            delays_ms[SCR_CONNECTION] = 1000;  // Hold for 1 second after connecting
-        }
+    if (module->ap_enabled || !module->is_connected) {
+        screen_show(SCR_CONNECTION);
         return;
     }
 

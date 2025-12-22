@@ -213,11 +213,9 @@ void BAP_send_subscription_update(GlobalState *state) {
 
                     case BAP_PARAM_WIFI:
                         {
-                            char ssid_str[32];
                             char network_status_str[256];
                             char rssi_str[32];
                             char ip_str[32];
-                            snprintf(ssid_str, sizeof(ssid_str), "%s", state->SYSTEM_MODULE.ssid);
                             snprintf(network_status_str, sizeof(network_status_str), "%s", state->SYSTEM_MODULE.network_status);
                             
                             int8_t current_rssi = -128; // no connection
@@ -227,7 +225,8 @@ void BAP_send_subscription_update(GlobalState *state) {
                             snprintf(rssi_str, sizeof(rssi_str), "%d", current_rssi);
                             
                             snprintf(ip_str, sizeof(ip_str), "%s", state->SYSTEM_MODULE.ip_addr_str);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "wifi_ssid", ssid_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "network_status", network_status_str);
+                            BAP_send_message_with_queue(BAP_CMD_RES, "wifi_ssid", state->SYSTEM_MODULE.ssid);
                             BAP_send_message_with_queue(BAP_CMD_RES, "wifi_rssi", rssi_str);
                             BAP_send_message_with_queue(BAP_CMD_RES, "wifi_ip", ip_str);
                         }

@@ -1,16 +1,11 @@
 #include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
-#include "esp_system.h"
 #include "esp_wifi.h"
-#include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
 #include "lwip/err.h"
-#include "lwip/lwip_napt.h"
-#include "lwip/sys.h"
-#include "nvs_flash.h"
 #include "esp_wifi_types_generic.h"
 
 #include "connect.h"
@@ -192,8 +187,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
                 return;
             }
 
-            ESP_LOGI(TAG, "Could not connect to '%s' [rssi %d]: reason %d", event->ssid, event->rssi, event->reason);
-
+            ESP_LOGI(TAG, "Could not connect to '%.*s' [rssi %d]: reason %d", event->ssid_len, event->ssid, event->rssi, event->reason);
             if (clients_connected_to_ap > 0) {
                 ESP_LOGI(TAG, "Client(s) connected to AP, not retrying...");
                 sprintf(GLOBAL_STATE->SYSTEM_MODULE.network_status, "Config AP connected!");
@@ -290,20 +284,18 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
     }
 }
 
-esp_netif_t * wifi_init_softap(char * ap_ssid)
+esp_netif_t * wifi_init_softap(GlobalState * GLOBAL_STATE)
 {
     esp_netif_t * esp_netif_ap = esp_netif_create_default_wifi_ap();
 
     uint8_t mac[6];
     esp_wifi_get_mac(ESP_IF_WIFI_AP, mac);
     // Format the last 4 bytes of the MAC address as a hexadecimal string
-    snprintf(ap_ssid, 32, "Bitaxe_%02X%02X", mac[4], mac[5]);
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid), "Bitaxe_%02X%02X", mac[4], mac[5]);
 
-    wifi_config_t wifi_ap_config;
-    memset(&wifi_ap_config, 0, sizeof(wifi_ap_config));
-    strncpy((char *) wifi_ap_config.ap.ssid, ap_ssid, sizeof(wifi_ap_config.ap.ssid) - 1);
-    wifi_ap_config.ap.ssid[sizeof(wifi_ap_config.ap.ssid) - 1] = '\0';
-    wifi_ap_config.ap.ssid_len = strlen(ap_ssid);
+    wifi_config_t wifi_ap_config = { 0 };
+    wifi_ap_config.ap.ssid_len = strlen(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid);
+    memcpy(wifi_ap_config.ap.ssid, GLOBAL_STATE->SYSTEM_MODULE.ap_ssid, wifi_ap_config.ap.ssid_len);
     wifi_ap_config.ap.channel = 1;
     wifi_ap_config.ap.max_connection = 10;
     wifi_ap_config.ap.authmode = WIFI_AUTH_OPEN;
@@ -366,7 +358,7 @@ void connect_init(void *pvParameters)
             : WIFI_MODE_AP));
 
     // Initialize SoftAP
-    wifi_init_softap(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid);
+    wifi_init_softap(GLOBAL_STATE);
 
     // Configure STA BEFORE starting WiFi to avoid race condition
     if (GLOBAL_STATE->SYSTEM_MODULE.network_mode == NETWORK_MODE_WIFI) {

@@ -83,7 +83,7 @@ export class SystemService {
         fallbackStratumCert: "",
         poolDifficulty: 1000,
         responseTime: 10,
-        isUsingFallbackStratum: false,
+        isUsingFallbackStratum: 0,
         poolConnectionInfo: "IPv4 (TLS)",
         frequency: 485,
         version: "v2.12.0",
