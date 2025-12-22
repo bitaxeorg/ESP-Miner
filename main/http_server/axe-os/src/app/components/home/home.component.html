@@ -173,7 +173,7 @@
                         {{info.bestSessionDiff | diffSuffix}}
                     </span>
                     <span class="text-500 text-lg">session best</span>
-                    <span class="text-sm font-medium mb-3"> ({{ info.uptimeSeconds | dateAgo: { intervals: 2, strict:true } }})</span>
+                    <span class="text-sm font-medium mb-3"> ({{ info.uptimeSeconds | dateAgo: { intervals: 2, strict:true, short:true } }})</span>
                 </div>
             </div>
         </div>
