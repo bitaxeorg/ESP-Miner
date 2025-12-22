@@ -102,8 +102,8 @@ bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float frequency)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            ESP_LOGE(TAG, "Frequency transition not implemented for BM1397");
-            return false;
+            do_frequency_transition(frequency, BM1397_send_hash_frequency);
+            return true;
         case BM1366:
             do_frequency_transition(frequency, BM1366_send_hash_frequency);
             return true;

@@ -18,6 +18,7 @@ import { ModalComponent } from './components/modal/modal.component';
 import { TooltipIconComponent } from './components/tooltip-icon/tooltip-icon.component';
 import { TooltipTextIconComponent } from './components/tooltip-text-icon/tooltip-text-icon.component';
 import { ConfettiComponent } from './components/confetti/confetti.component';
+import { SnowflakesComponent } from './components/snowflakes/snowflakes.component';
 import { LogsComponent } from './components/logs/logs.component';
 import { SystemComponent } from './components/system/system.component';
 import { UpdateComponent } from './components/update/update.component';
@@ -47,6 +48,7 @@ const components = [
   TooltipIconComponent,
   TooltipTextIconComponent,
   ConfettiComponent,
+  SnowflakesComponent,
   NetworkComponent,
   SettingsComponent,
   LogsComponent,

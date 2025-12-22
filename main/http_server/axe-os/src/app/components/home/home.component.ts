@@ -1,8 +1,9 @@
 import { Component, OnInit, ViewChild, Input, OnDestroy } from '@angular/core';
-import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap, tap, first, Subject, takeUntil } from 'rxjs';
+import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, catchError, of, combineLatest } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
+import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
@@ -23,6 +24,7 @@ import { LocalStorageService } from 'src/app/local-storage.service';
 
 type PoolLabel = 'Primary' | 'Fallback';
 type MessageType =
+  | 'SYSTEM_INFO_ERROR'
   | 'DEVICE_OVERHEAT'
   | 'POWER_FAULT'
   | 'FREQUENCY_LOW'
@@ -33,6 +35,10 @@ interface ISystemMessage {
   type: MessageType;
   severity: 'error' | 'warn' | 'info';
   text: string;
+}
+interface ISystemInfoError {
+  duration: number;
+  startTime: number | null;
 }
 
 const HOME_CHART_DATA_SOURCES = 'HOME_CHART_DATA_SOURCES';
@@ -70,6 +76,17 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolUser!: string;
   public activePoolLabel!: PoolLabel;
   public responseTime!: number;
+
+  public systemInfoError$ = new BehaviorSubject<ISystemInfoError>({
+    duration: 0,
+    startTime: null
+  });
+
+  public hashrateAverages: { label: string, key: 'hashRate_1m' | 'hashRate_10m' | 'hashRate_1h' }[] = [
+    { label: '1m', key: 'hashRate_1m' },
+    { label: '10m', key: 'hashRate_10m' },
+    { label: '1h', key: 'hashRate_1h' }
+  ];
 
   @ViewChild('chart')
   private chart?: UIChart
@@ -287,8 +304,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.chartData.datasets[1].data = this.chartY2Data;
   }
 
-  private loadPreviousData()
-  {
+  private loadPreviousData() {
     const chartY1DataLabel = this.form.get('chartY1Data')?.value;
     const chartY2DataLabel = this.form.get('chartY2Data')?.value;
 
@@ -315,7 +331,6 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
 
         stats.statistics.forEach(element => {
-          element[idxHashrate] = this.normalizeHashrate(element[idxHashrate]);
           switch (chartLabelValue(chartY1DataLabel)) {
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:
@@ -355,17 +370,45 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
   }
 
-  private startGetLiveData()
-  {
-     // live data
+  private isHashrateAxis(label: eChartLabel | undefined) {
+    return label == eChartLabel.hashrate || label == eChartLabel.hashrate_1m || label == eChartLabel.hashrate_10m || label == eChartLabel.hashrate_1h;
+  }
+
+  private startGetLiveData() {
     this.info$ = interval(5000).pipe(
-      startWith(() => this.systemService.getInfo()),
-      switchMap(() => {
-        return this.systemService.getInfo()
-      }),
+      startWith(0),
+      switchMap(() =>
+        this.systemService.getInfo().pipe(
+          tap(() => {
+            const systemInfoError = this.systemInfoError$.value;
+            if (!!systemInfoError.duration) {
+              this.systemInfoError$.next({
+                duration: 0,
+                startTime: null
+              });
+            }
+          }),
+          catchError(() => {
+            const now = Date.now();
+            const systemInfoError = this.systemInfoError$.value;
+
+            if (!systemInfoError.startTime) {
+              this.systemInfoError$.next({
+                duration: 0,
+                startTime: now
+              });
+            } else {
+              this.systemInfoError$.next({
+                duration: (now - systemInfoError.startTime!) / 1000,
+                startTime: systemInfoError.startTime
+              });
+            }
+            return of(null);
+          })
+        )
+      ),
+      filter(info => info !== null),
       map(info => {
-        info.hashRate = this.normalizeHashrate(info.hashRate);
-        info.expectedHashrate = this.normalizeHashrate(info.expectedHashrate);
         info.voltage = info.voltage / 1000;
         info.current = info.current / 1000;
         info.coreVoltageActual = info.coreVoltageActual / 1000;
@@ -398,8 +441,16 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.chartData.datasets[0].hidden = (chartY1DataLabel === eChartLabel.none);
           this.chartData.datasets[1].hidden = (chartY2DataLabel === eChartLabel.none);
 
-          this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartY1DataLabel, info);
-          this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartY2DataLabel, info);
+          // Align both axis if they're hashrates. TODO: for others, such as temperatures as well
+          if (this.isHashrateAxis(chartY1DataLabel) && this.isHashrateAxis(chartY2DataLabel)) {
+            this.chartOptions.scales.y.suggestedMin = this.chartOptions.scales.y2.suggestedMin = Math.min(...this.chartY1Data, ...this.chartY2Data);
+            this.chartOptions.scales.y.suggestedMax = this.chartOptions.scales.y2.suggestedMax = Math.max(...this.chartY1Data, ...this.chartY2Data);
+          } else {
+            this.chartOptions.scales.y.suggestedMin = undefined;
+            this.chartOptions.scales.y2.suggestedMin = undefined;
+            this.chartOptions.scales.y.suggestedMax = this.getSuggestedMaxForLabel(chartY1DataLabel, info);
+            this.chartOptions.scales.y2.suggestedMax = this.getSuggestedMaxForLabel(chartY2DataLabel, info);
+          }
 
           this.chartOptions.scales.y.display = (chartY1DataLabel != eChartLabel.none);
           this.chartOptions.scales.y2.display = (chartY2DataLabel != eChartLabel.none);
@@ -407,12 +458,12 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         this.chart?.refresh();
 
-        const isFallback = info.isUsingFallbackStratum;
+        const isFallbackPool = !!info.isUsingFallbackStratum;
 
-        this.activePoolLabel = isFallback ? 'Fallback' : 'Primary';
-        this.activePoolURL = isFallback ? info.fallbackStratumURL : info.stratumURL;
-        this.activePoolUser = isFallback ? info.fallbackStratumUser : info.stratumUser;
-        this.activePoolPort = isFallback ? info.fallbackStratumPort : info.stratumPort;
+        this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
+        this.activePoolURL = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
+        this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
+        this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
         this.responseTime = info.responseTime;
       }),
       map(info => {
@@ -423,6 +474,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         info.coreVoltage = parseFloat(info.coreVoltage.toFixed(2));
         info.temp = parseFloat(info.temp.toFixed(1));
         info.temp2 = parseFloat(info.temp2.toFixed(1));
+        info.responseTime = parseFloat(info.responseTime.toFixed(1));
 
         return info;
       }),
@@ -437,8 +489,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.quickLink$ = this.info$.pipe(
       map(info => {
-        const url = info.isUsingFallbackStratum ? info.fallbackStratumURL : info.stratumURL;
-        const user = info.isUsingFallbackStratum ? info.fallbackStratumUser : info.stratumUser;
+        const isFallbackPool = !!info.isUsingFallbackStratum;
+        const url = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
+        const user = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
         return this.quickLinkService.getQuickLink(url, user);
       })
     );
@@ -453,14 +506,13 @@ export class HomeComponent implements OnInit, OnDestroy {
           result.push({ label: 'Fallback', value: 'Fallback' });
         }
         return result;
-      })
-    );
+      }));
 
-    this.infoSubscription = this.info$
+    this.infoSubscription = combineLatest([this.info$, this.systemInfoError$])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(info => {
-        this.handleSystemMessages(info);
-        this.setTitle(info);
+      .subscribe(([info, systemInfoError]) => {
+        this.handleSystemMessages(info, systemInfoError);
+        this.setTitle(info, systemInfoError);
       });
   }
 
@@ -486,11 +538,13 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
   }
 
-  private setTitle(info: ISystemInfo) {
+  private setTitle(info: ISystemInfo, systemInfoError: ISystemInfoError) {
     const parts = [this.pageDefaultTitle];
 
     if (info.blockFound) {
       parts.push('Block found 🎉');
+    } else if (!!systemInfoError.duration) {
+      parts.push('Unable to reach the device');
     } else {
       parts.push(
         info.hostname,
@@ -504,7 +558,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.titleService.setTitle(parts.filter(Boolean).join(' • '));
   }
 
-  private hexToRgb(hex: string): {r: number, g: number, b: number} {
+  private hexToRgb(hex: string): { r: number, g: number, b: number } {
     if (hex[0] === '#') hex = hex.slice(1);
     if (hex.length === 3) {
       hex = hex.split('').map((h: string) => h + h).join('');
@@ -519,20 +573,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
-  }
-
-  getPoolProtocolType(info: ISystemInfo): string {
-    // AF_INET = 2 (IPv4), AF_INET6 = 10 (IPv6) on ESP32
-    const AF_INET = 2;
-    const AF_INET6 = 10;
-
-    if (info.poolAddrFamily === AF_INET) {
-      return 'IPv4';
-    } else if (info.poolAddrFamily === AF_INET6) {
-      return 'IPv6';
-    }
-
-    return '';
   }
 
   getSortedRejectionReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
@@ -556,7 +596,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const efficiencies = hashrateData.map((hashrate, index) => {
       const power = powerData[index] || 0;
       if (hashrate > 0) {
-        return power / (hashrate / 1_000_000_000_000); // Convert to J/Th
+        return power / (hashrate / 1_000); // Convert to J/Th
       } else {
         return power; // in this case better than infinity or NaN
       }
@@ -565,25 +605,35 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.calculateAverage(efficiencies);
   }
 
-  public handleSystemMessages(info: ISystemInfo) {
+  public handleSystemMessages(info: ISystemInfo, systemInfoError: ISystemInfoError) {
     const updateMessage = (
       condition: boolean,
       type: MessageType,
       severity: ISystemMessage['severity'],
       text: string
     ) => {
-      const exists = this.messages.some(msg => msg.type === type);
-      if (condition && !exists) {
-        this.messages.push({ type, severity, text });
-      } else if (!condition && exists) {
-        this.messages = this.messages.filter(msg => msg.type !== type);
+      const existingIndex = this.messages.findIndex(msg => msg.type === type);
+
+      if (condition) {
+        if (existingIndex === -1) {
+          this.messages.push({ type, severity, text });
+        } else {
+          if (this.messages[existingIndex].text !== text) {
+            this.messages.splice(existingIndex, 1, { type, severity, text });
+          }
+        }
+      } else {
+        if (existingIndex !== -1) {
+          this.messages.splice(existingIndex, 1);
+        }
       }
     };
 
+    updateMessage(!!systemInfoError.duration, 'SYSTEM_INFO_ERROR', 'error', `Unable to reach the device for ${DateAgoPipe.transform(systemInfoError.duration, { strict: true })}`);
     updateMessage(info.overheat_mode === 1, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
-    updateMessage(info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
+    updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
   }
 
@@ -592,7 +642,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (info.power_fault || hashrate <= 0) {
       return 0;
     }
-    return info.power / (hashrate / 1_000_000_000_000);
+    return info.power / (hashrate / 1_000);
   }
 
   public getHashrateAverage(): number {
@@ -611,6 +661,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.calculateEfficiency(info, 'expectedHashrate');
   }
 
+  public getNetworkDifficultyPercentage(info: ISystemInfo): string {
+    if (!info.networkDifficulty || info.networkDifficulty === 0) return '0';
+    const percentage = (info.bestDiff / info.networkDifficulty) * 100;
+    // Show 2 significant digits
+    return percentage < 10 ? percentage.toPrecision(2) : percentage.toFixed(1);
+  }
+
   public getShareRejectionPercentage(sharesRejectedReason: { count: number }, info: ISystemInfo): number {
     const totalShares = info.sharesAccepted + info.sharesRejected;
     if (totalShares <= 0) {
@@ -620,7 +677,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   public getDomainErrorPercentage(info: ISystemInfo, asic: { error: number }): number {
-    return asic.error ? (this.normalizeHashrate(asic.error) * 100 / info.expectedHashrate) : 0;
+    return asic.error ? (asic.error * 100 / info.expectedHashrate) : 0;
   }
 
   public getDomainErrorColor(info: ISystemInfo, asic: { error: number }): string {
@@ -657,10 +714,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     return `rgb(${finalR}, ${finalG}, ${finalB})`;
   }
 
-  public normalizeHashrate(hashrate: number): number {
-    return hashrate * 1_000_000_000;
-  }
-
   public clearDataPoints() {
     this.dataLabel.length = 0;
     this.hashrateData.length = 0;
@@ -681,7 +734,11 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public getSuggestedMaxForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
-      case eChartLabel.hashrate:         return info.expectedHashrate;
+      case eChartLabel.hashrate:
+      case eChartLabel.hashrate_1m:
+      case eChartLabel.hashrate_10m:
+      case eChartLabel.hashrate_1h:      return info.expectedHashrate;
+      case eChartLabel.errorPercentage:  return 1;
       case eChartLabel.asicTemp:         return this.maxTemp;
       case eChartLabel.vrTemp:           return this.maxTemp + 25;
       case eChartLabel.asicVoltage:      return info.coreVoltage;
@@ -691,6 +748,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fanSpeed:         return 100;
       case eChartLabel.fanRpm:           return 7000;
       case eChartLabel.fan2Rpm:          return 7000;
+      case eChartLabel.responseTime:     return 50;
       default:                           return 0;
     }
   }
@@ -698,6 +756,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   static getDataForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
     switch (label) {
       case eChartLabel.hashrate:           return info.hashRate;
+      case eChartLabel.hashrate_1m:        return info.hashRate_1m;
+      case eChartLabel.hashrate_10m:       return info.hashRate_10m;
+      case eChartLabel.hashrate_1h:        return info.hashRate_1h;
       case eChartLabel.errorPercentage:    return info.errorPercentage;
       case eChartLabel.asicTemp:           return info.temp;
       case eChartLabel.vrTemp:             return info.vrTemp;
@@ -710,6 +771,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fan2Rpm:            return info.fan2rpm;
       case eChartLabel.wifiRssi:           return info.wifiRSSI;
       case eChartLabel.freeHeap:           return info.freeHeap;
+      case eChartLabel.responseTime:       return info.responseTime;
       default:                             return 0.0;
     }
   }
@@ -727,6 +789,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fanRpm:
       case eChartLabel.fan2Rpm:          return {suffix: ' rpm', precision: 0};
       case eChartLabel.wifiRssi:         return {suffix: ' dBm', precision: 0};
+      case eChartLabel.responseTime:     return {suffix: ' ms', precision: 1};
       default:                           return {suffix: '', precision: 0};
     }
   }
@@ -734,6 +797,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   static cbFormatValue(value: number, datasetLabel: eChartLabel, args?: any): string {
     switch (datasetLabel) {
       case eChartLabel.hashrate:
+      case eChartLabel.hashrate_1m:
+      case eChartLabel.hashrate_10m:
+      case eChartLabel.hashrate_1h:
         return HashSuffixPipe.transform(value, args);
       case eChartLabel.freeHeap:
         return ByteSuffixPipe.transform(value, args);

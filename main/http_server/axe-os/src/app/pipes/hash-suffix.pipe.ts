@@ -17,6 +17,9 @@ export class HashSuffixPipe implements PipeTransform {
       return '0 H/s';
     }
 
+    // Normalize GH/s to H/s
+    value = value * 1_000_000_000;
+
     const suffixes = [' H/s', ' Kh/s', ' Mh/s', ' Gh/s', ' Th/s', ' Ph/s', ' Eh/s'];
 
     let power = Math.floor(Math.log10(value) / 3);

@@ -88,7 +88,7 @@ components:
       required:
         - total
         - domains
-        - error
+        - errorCount
       properties:
         total:
           type: number
@@ -97,9 +97,9 @@ components:
           type: array
           description: Hashrate per domain
           items:
-            type: string
-        error:
-          description: Error hashrate
+            type: number
+        errorCount:
+          description: Number of errors
           type: number
 
     SystemInfo:
@@ -114,12 +114,14 @@ components:
         - coreVoltage
         - coreVoltageActual
         - current
+        - display
         - fallbackStratumExtranonceSubscribe
         - fallbackStratumPort
         - fallbackStratumSuggestedDifficulty
         - fallbackStratumURL
         - fallbackStratumUser
         - fanrpm
+        - fan2rpm
         - fanspeed
         - temptarget
         - rotation
@@ -128,6 +130,9 @@ components:
         - freeHeapSpiram
         - frequency
         - hashRate
+        - hashRate_1m
+        - hashRate_10m
+        - hashRate_1h
         - expectedHashrate
         - errorPercentage
         - hostname
@@ -136,14 +141,18 @@ components:
         - isPSRAMAvailable
         - isUsingFallbackStratum
         - macAddr
+        - manualFanSpeed
         - maxPower
-        - minimumFanSpeed
+        - minFanSpeed
         - nominalVoltage
         - overheat_mode
         - overclockEnabled
+        - poolAddrFamily
         - poolDifficulty
         - power
         - power_fault
+        - resetReason
+        - responseTime
         - runningPartition
         - sharesAccepted
         - sharesRejected
@@ -201,6 +210,9 @@ components:
         current:
           type: number
           description: Current draw in milliamps
+        display:
+          type: string
+          description: The configured display
         fallbackStratumExtranonceSubscribe:
           type: boolean
           description: Enable fallback pool extranonce subscription
@@ -219,12 +231,18 @@ components:
         fanrpm:
           type: number
           description: Current fan speed in RPM
+        fan2rpm:
+          type: number
+          description: Current secondary fan speed in RPM
         fanspeed:
           type: number
           description: Current fan speed percentage
         temptarget:
           type: number
           description: Target Temperature for the PID Controller
+        responseTime:
+          type: number
+          description: Pool response time in ms
         rotation:
           type: number
           description: Screen rotation setting (0, 90, 180, 270)
@@ -242,10 +260,22 @@ components:
           description: ASIC frequency in MHz
         hashRate:
           type: number
-          description: Current hashrate
-        errorPercentage:
-          description: Hash error percentage
+          description: Current hashrate in Gh/s
+        hashRate_1m:
           type: number
+          description: Current hashrate 1m average
+        hashRate_10m:
+          type: number
+          description: Current hashrate 10m average
+        hashRate_1h:
+          type: number
+          description: Current hashrate 1h average
+        expectedHashrate:
+          type: number
+          description: Expected hashrate at current voltage/frequency settings, in Gh/s
+        errorPercentage:
+          type: number
+          description: Hash error percentage
         hostname:
           type: string
           description: Device hostname
@@ -264,10 +294,13 @@ components:
         macAddr:
           type: string
           description: Device MAC address
+        manualFanSpeed:
+          type: integer
+          description: Fan speed when auto fan speed is disabled
         maxPower:
           type: integer
           description: Maxmium power draw of the board in watts
-        minimumFanSpeed:
+        minFanSpeed:
           type: integer
           description: Minimum fan speed percentage when using auto fan control
         nominalVoltage:
@@ -279,6 +312,9 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
+        poolAddrFamily:
+          type: integer
+          description: Current pool address family (2 = v4, 10 = v6)
         poolDifficulty:
           type: number
           description: Current pool difficulty
@@ -288,6 +324,9 @@ components:
         power_fault:
           type: string
           description: Voltage regulator fault reason, if any
+        resetReason:
+          type: string
+          description: Reason for the last system reset
         runningPartition:
           type: string
           description: Currently active OTA partition
@@ -376,12 +415,98 @@ components:
           description: Whether a block was found (0=no, 1=yes)
         hashrateMonitor:
           type: object
+          required:
+            - asics
           properties:
             asics:
               type: array
               description: Hashrate register value per ASIC
               items:
                 $ref: '#/components/schemas/HashrateMonitorAsic'
+
+    SystemASIC:
+      type: object
+      required:
+        - ASICModel
+        - swarmColor
+        - asicCount
+        - deviceModel
+        - defaultFrequency
+        - frequencyOptions
+        - defaultVoltage
+        - voltageOptions
+      properties:
+        ASICModel:
+          type: string
+          description: ASIC model identifier
+          enum:
+            - BM1366
+            - BM1368
+            - BM1370
+            - BM1397
+          examples:
+            - "BM1366"
+        deviceModel:
+          type: string
+          description: Device model name
+          examples:
+            - "Ultra"
+        swarmColor:
+          type: string
+          description: Swarm color
+          examples:
+            - "purple"
+        asicCount:
+          type: number
+          description: Number of ASICs detected
+        defaultFrequency:
+          type: number
+          description: Default frequency for the ASIC model in MHz
+          examples:
+            - 450
+        frequencyOptions:
+          type: array
+          description: Available frequency options for the ASIC model in MHz
+          items:
+            type: number
+          examples:
+            - [400, 425, 450, 475, 485, 500, 525, 550, 575]
+        defaultVoltage:
+          type: number
+          description: Default voltage for the ASIC model in millivolts
+          examples:
+            - 1100
+        voltageOptions:
+          type: array
+          description: Available voltage options for the ASIC model in millivolts
+          items:
+            type: number
+          examples:
+            - [1100, 1150, 1200, 1250, 1300]
+
+    SystemStatistics:
+      type: object
+      required:
+        - currentTimestamp
+        - labels
+        - statistics
+      properties:
+        currentTimestamp:
+          type: number
+          description: Current timestamp as a reference
+        labels:
+          type: array
+          description: Labels for statistics data value index
+          items:
+            type: string
+        statistics:
+          type: array
+          description: Statistics data point(s)
+          items:
+            type: array
+            description: Statistics data values(s)
+            items:
+              type: number
 
     Settings:
       type: object
@@ -593,64 +718,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - ASICModel
-                  - swarmColor
-                  - asicCount
-                  - deviceModel
-                  - defaultFrequency
-                  - frequencyOptions
-                  - defaultVoltage
-                  - voltageOptions
-                properties:
-                  ASICModel:
-                    type: string
-                    description: ASIC model identifier
-                    enum:
-                      - BM1366
-                      - BM1368
-                      - BM1370
-                      - BM1397
-                    examples:
-                      - "BM1366"
-                  deviceModel:
-                    type: string
-                    description: Device model name
-                    examples:
-                      - "Ultra"
-                  swarmColor:
-                    type: string
-                    description: Swarm color
-                    examples:
-                      - "purple"
-                  asicCount:
-                    type: number
-                    description: Number of ASICs detected
-                  defaultFrequency:
-                    type: number
-                    description: Default frequency for the ASIC model in MHz
-                    examples:
-                      - 450
-                  frequencyOptions:
-                    type: array
-                    description: Available frequency options for the ASIC model in MHz
-                    items:
-                      type: number
-                    examples:
-                      - [400, 425, 450, 475, 485, 500, 525, 550, 575]
-                  defaultVoltage:
-                    type: number
-                    description: Default voltage for the ASIC model in millivolts
-                    examples:
-                      - 1100
-                  voltageOptions:
-                    type: array
-                    description: Available voltage options for the ASIC model in millivolts
-                    items:
-                      type: number
-                    examples:
-                      - [1100, 1150, 1200, 1250, 1300]
+                $ref: '#/components/schemas/SystemASIC'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
@@ -669,7 +737,7 @@ paths:
             type: array
             items:
               type: string
-            example: hashrate,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap
+            example: hashrate,hashrate_1m,hashrate_10m,hashrate_1h,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap,responseTime
           description: List of labels for which data should be retrieved
       tags:
         - system
@@ -679,28 +747,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - currentTimestamp
-                  - labels
-                  - statistics
-                properties:
-                  currentTimestamp:
-                    type: number
-                    description: Current timestamp as a reference
-                  labels:
-                    type: array
-                    description: Labels for statistics data value index
-                    items:
-                      type: string
-                  statistics:
-                    type: array
-                    description: Statistics data point(s)
-                    items:
-                      type: array
-                      description: Statistics data values(s)
-                      items:
-                        type: number
+                $ref: '#/components/schemas/SystemStatistics'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
@@ -716,6 +763,21 @@ paths:
       responses:
         '200':
           description: System restart initiated
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/identify:
+    post:
+      summary: Identify the device
+      description: Let the device say Hi!
+      operationId: identifySystem
+      tags:
+        - system
+      responses:
+        '200':
+          description: Device identify initiated
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
