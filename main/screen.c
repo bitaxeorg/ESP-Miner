@@ -423,7 +423,8 @@ static void screen_update_cb(lv_timer_t * timer)
         // display timeout
         const uint32_t display_timeout = display_timeout_config * 60 * 1000;
 
-        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen())) {
+        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen()) &&
+             lv_obj_has_flag(identify_image, LV_OBJ_FLAG_HIDDEN)) {
             display_on(false);
         } else {
             display_on(true);
@@ -492,14 +493,14 @@ static void screen_update_cb(lv_timer_t * timer)
     }
 
     bool is_wifi_status_changed = strcmp(module->wifi_status, lv_label_get_text(connection_wifi_status_label)) != 0;
-    if (module->ap_enabled || is_wifi_status_changed) {
-        if (is_wifi_status_changed) {
-            lv_label_set_text(connection_wifi_status_label, module->wifi_status);
-        }
-
+    if (is_wifi_status_changed) {
+        lv_label_set_text(connection_wifi_status_label, module->wifi_status);
         screen_show(SCR_CONNECTION);
+        return;
+    }
 
-        delays_ms[SCR_CONNECTION] = 0; // Remove delay so whenever the user disables the AP with long press, it goes straight back to carousel
+    if (module->ap_enabled || !module->is_connected) {
+        screen_show(SCR_CONNECTION);
         return;
     }
 
