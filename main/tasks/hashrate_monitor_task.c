@@ -1,4 +1,5 @@
 #include <string.h>
+#include <inttypes.h>
 #include <esp_heap_caps.h>
 #include <math.h>
 #include "esp_log.h"
@@ -206,6 +207,9 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
             break;
         case REGISTER_ERROR_COUNT:
             update_hash_counter(&HASHRATE_MONITOR_MODULE->error_measurement[asic_nr], value, time_ms);
+            break;
+        case REGISTER_PLL_PARAM:
+            ESP_LOGD(TAG, "PLL param read asic %d: 0x%08" PRIX32, asic_nr, value);
             break;
         case REGISTER_INVALID:
             ESP_LOGE(TAG, "Invalid register type");
