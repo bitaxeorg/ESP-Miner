@@ -59,7 +59,7 @@ void BAP_send_message(bap_command_t cmd, const char *parameter, const char *valu
         uart_write_bytes(BAP_UART_NUM, message, len);
         xSemaphoreGive(bap_uart_send_mutex);
         
-        ESP_LOGI(TAG, "Sent: %s", message);
+        //ESP_LOGI(TAG, "Sent: %s", message);
     } else {
         ESP_LOGW(TAG, "Failed to take UART mutex for immediate send, message dropped");
     }
