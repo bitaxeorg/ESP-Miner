@@ -111,6 +111,16 @@ target_include_directories(autotune_state PUBLIC
 )
 target_link_libraries(autotune_state PRIVATE pthread)
 
+# Overheat handling (detection + recovery interface)
+add_library(overheat STATIC
+    ${MAIN_DIR}/power_management/overheat.c
+)
+target_include_directories(overheat PUBLIC
+    ${MAIN_DIR}/power_management
+    ${STUB_DIR}
+)
+target_link_libraries(overheat PUBLIC power_management_calc)
+
 # Stratum utilities require mbedtls - will be added when we have mbedtls stub
 # Production code will be compiled and tested as we refactor in later phases
 
@@ -133,11 +143,13 @@ add_executable(run_tests
     test_infrastructure.c
     test_power_management_calc.c
     test_autotune_state.c
+    test_overheat.c
 )
 target_link_libraries(run_tests
     test_helpers
     power_management_calc
     autotune_state
+    overheat
     pthread
 )
 

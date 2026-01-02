@@ -31,6 +31,7 @@ SRCS
     "./tasks/power_management_task.c"
     "./power_management/power_management_calc.c"
     "./power_management/autotune_state.c"
+    "./power_management/overheat.c"
 
 INCLUDE_DIRS
     "."
