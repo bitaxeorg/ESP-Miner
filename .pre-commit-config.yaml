@@ -1,0 +1,81 @@
+# Pre-commit hooks configuration for ACS ESP-Miner
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  - repo: local
+    hooks:
+      # Format C/H files with clang-format
+      - id: clang-format-check
+        name: clang-format check
+        entry: bash -c 'for f in "$@"; do clang-format --dry-run --Werror "$f" || exit 1; done' --
+        language: system
+        files: \.(c|h)$
+        exclude: |
+          (?x)^(
+            test/host/.*|           # Exclude test infrastructure
+            build/.*|               # Exclude build artifacts
+            managed_components/.*   # Exclude managed components
+          )$
+
+      # Static analysis with cppcheck
+      - id: cppcheck
+        name: cppcheck static analysis
+        entry: cppcheck
+        language: system
+        files: \.(c|h)$
+        args:
+          - --error-exitcode=1
+          - --enable=warning,style,performance
+          - --suppress=missingIncludeSystem
+          - --suppress=unusedFunction
+          - --inline-suppr
+          - -I
+          - main/
+          - -I
+          - components/asic/include/
+          - -I
+          - components/stratum/include/
+        exclude: |
+          (?x)^(
+            test/host/.*|           # Exclude test stubs/mocks
+            build/.*|
+            managed_components/.*
+          )$
+
+      # Run host-based unit tests
+      - id: host-tests
+        name: host unit tests
+        entry: ./scripts/run-host-tests.sh
+        language: script
+        pass_filenames: false
+        always_run: true
+
+      # Check for common issues
+      - id: trailing-whitespace
+        name: trailing whitespace
+        entry: bash -c 'grep -l "[[:blank:]]$" "$@" && echo "Files have trailing whitespace" && exit 1 || exit 0' --
+        language: system
+        files: \.(c|h|md|txt|yaml|yml|json)$
+
+      # Ensure files end with newline
+      - id: end-of-file-fixer
+        name: fix end of files
+        entry: bash -c 'for f in "$@"; do if [ -n "$(tail -c 1 "$f")" ]; then echo "" >> "$f"; echo "Fixed: $f"; fi; done' --
+        language: system
+        files: \.(c|h|md|txt|yaml|yml)$
+
+      # Check for merge conflict markers
+      - id: check-merge-conflict
+        name: check for merge conflicts
+        entry: bash -c 'grep -l "^<<<<<<< \|^=======$\|^>>>>>>> " "$@" && exit 1 || exit 0' --
+        language: system
+        files: .*
+
+      # Prevent commits to master/main
+      - id: no-commit-to-branch
+        name: prevent commits to master
+        entry: bash -c 'branch=$(git rev-parse --abbrev-ref HEAD); if [ "$branch" = "master" ] || [ "$branch" = "main" ]; then echo "Direct commits to $branch are not allowed"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
