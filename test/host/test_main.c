@@ -11,6 +11,7 @@
 /* Forward declarations of test suite runners */
 extern void run_infrastructure_tests(void);
 extern void run_power_management_calc_tests(void);
+extern void run_autotune_state_tests(void);
 
 /**
  * @brief Unity setUp function - called before each test
@@ -47,6 +48,7 @@ int main(int argc, char** argv)
     /* Run all test suites */
     run_infrastructure_tests();
     run_power_management_calc_tests();
+    run_autotune_state_tests();
 
     int result = UNITY_END();
 

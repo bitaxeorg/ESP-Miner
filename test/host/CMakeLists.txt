@@ -100,6 +100,17 @@ target_include_directories(power_management_calc PUBLIC
     ${STUB_DIR}
 )
 
+# Autotune State (thread-safe state wrapper)
+add_library(autotune_state STATIC
+    ${MAIN_DIR}/power_management/autotune_state.c
+)
+target_include_directories(autotune_state PUBLIC
+    ${MAIN_DIR}/power_management
+    ${STUB_DIR}
+    ${STUB_DIR}/freertos
+)
+target_link_libraries(autotune_state PRIVATE pthread)
+
 # Stratum utilities require mbedtls - will be added when we have mbedtls stub
 # Production code will be compiled and tested as we refactor in later phases
 
@@ -121,10 +132,12 @@ add_executable(run_tests
     test_main.c
     test_infrastructure.c
     test_power_management_calc.c
+    test_autotune_state.c
 )
 target_link_libraries(run_tests
     test_helpers
     power_management_calc
+    autotune_state
     pthread
 )
 

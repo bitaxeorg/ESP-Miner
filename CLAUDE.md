@@ -105,7 +105,8 @@ typedef struct {
 | Module | Header | Source | Dependencies |
 |--------|--------|--------|--------------|
 | Power Management | `power_management_task.h` | `tasks/power_management_task.c` | EMC2101, INA260, TPS546, nvs_config, vcore |
-| Autotune | (in power_management_task.h) | `tasks/power_management_task.c` | Power Management |
+| Power Calc (Pure) | `power_management/power_management_calc.h` | `power_management/power_management_calc.c` | None (testable) |
+| Autotune State | `power_management/autotune_state.h` | `power_management/autotune_state.c` | FreeRTOS semphr |
 | Database | `database/dataBase.h` | `database/dataBase.c` | SPIFFS, cJSON |
 | BAP Display | `lvglDisplayBAP.h` | `lvglDisplayBAP.c` | UART, nvs_config, GlobalState |
 | HTTP API | `http_server/http_server.h` | `http_server/http_server.c` | esp_http_server, GlobalState |
@@ -131,8 +132,28 @@ idf.py -p /dev/ttyACM0 monitor
 2. Add to `test/CMakeLists.txt`: `TEST_COMPONENTS`
 3. Use Unity macros: `TEST_CASE("description", "[tag]")`
 
-### Future: Host-Based Testing (Planned)
-Host-based tests will be added under `test/host/` with CMake + Unity + hybrid mocking.
+### Host-Based Testing
+
+Host-based tests under `test/host/` run on the development machine without flashing to hardware:
+
+```bash
+# Build and run host tests
+cd test/host
+cmake -B build && cmake --build build && ./build/run_tests
+
+# Or use the convenience script
+./scripts/run-host-tests.sh
+```
+
+**Test Modules**:
+- `test_infrastructure.c` - Validates mock/stub infrastructure (17 tests)
+- `test_power_management_calc.c` - Pure calculation functions (34 tests)
+- `test_autotune_state.c` - Thread-safe state wrapper (18 tests)
+
+**Infrastructure**:
+- `stubs/` - ESP-IDF type stubs (esp_err, esp_log, esp_timer, freertos)
+- `mocks/` - Controllable implementations (mock_nvs with write tracking)
+- `fakes/` - Deterministic implementations (fake_time)
 
 ## Code Patterns
 
@@ -182,7 +203,7 @@ Packet: [0xFF][0xAA][REG][LEN][DATA...][CRC16_HI][CRC16_LO]
 ## Known Issues & Technical Debt
 
 ### Critical
-1. **Race Condition in Autotune**: Multiple tasks access `GlobalState` module structs without proper synchronization
+1. **Race Condition in Autotune**: ~~Multiple tasks access `GlobalState` module structs without proper synchronization~~ **FIXED** in Phase 1.2 - Autotune now uses thread-safe `autotune_state.h` wrapper and pure calculation functions
 2. **Global State Coupling**: All modules depend on monolithic `GlobalState`
 
 ### High Priority

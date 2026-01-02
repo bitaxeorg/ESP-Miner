@@ -20,6 +20,8 @@
 #include "common.h"
 #include "system.h"
 #include "esp_system.h"
+#include "power_management/power_management_calc.h"
+#include "power_management/autotune_state.h"
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_ASIC_RESET  CONFIG_GPIO_ASIC_RESET
 #define GPIO_PLUG_SENSE  CONFIG_GPIO_PLUG_SENSE
@@ -40,6 +42,9 @@
 #define GAMMA_POWER_OFFSET 5
 
 static const char * TAG = "power_management";
+
+/* Thread-safe autotune state - initialized in POWER_MANAGEMENT_task */
+static autotune_state_t s_autotune_state = NULL;
 
 
 
@@ -143,272 +148,196 @@ bool apply_preset(int device_model, const char* preset_name) {
     return true;
 }
 
-// autotune function
+/**
+ * @brief Autotune function using pure calculation functions and thread-safe state
+ *
+ * This refactored version fixes race conditions by:
+ * 1. Capturing all readings atomically at the start
+ * 2. Using thread-safe state for timing and counters
+ * 3. Delegating calculations to pure functions for testability
+ */
 static void autotuneOffset(GlobalState * GLOBAL_STATE)
 {
-    // Access the autotune module
-    AutotuneModule *autotune = &GLOBAL_STATE->AUTOTUNE_MODULE;
-    PowerManagementModule *power = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-    SystemModule *system = &GLOBAL_STATE->SYSTEM_MODULE;
     static const char *autotuneTAG = "autotune";
 
-    // Check if autotune is enabled
+    /* Validate autotune state is initialized */
+    if (!autotune_state_is_valid(s_autotune_state)) {
+        ESP_LOGE(autotuneTAG, "Autotune state not initialized");
+        return;
+    }
+
+    /* Check if autotune is enabled */
     if (nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_FLAG, 1) == 0) {
         ESP_LOGI(autotuneTAG, "Autotune is disabled");
         return;
     }
 
-    // Get current global variables for autotune calculations
-    uint16_t currentDomainVoltage = VCORE_get_voltage_mv(GLOBAL_STATE);  // Domain Voltage in mV
-    uint16_t currentFrequency = (uint16_t)power->frequency_value;        // Frequency in MHz
-    uint8_t currentAsicTemp = (uint8_t)power->chip_temp_avg;            // ASIC Temperature in °C
-    uint8_t currentFanSpeed = (uint8_t)(power->fan_perc);               // Fan Speed in percentage
-    float currentHashrate = system->current_hashrate;                   // Hashrate in GH/s
-    int16_t currentPower = (int16_t)power->power;                       // Power in watts
+    /* Access modules for reading (minimize time holding implicit locks) */
+    AutotuneModule *autotune = &GLOBAL_STATE->AUTOTUNE_MODULE;
+    PowerManagementModule *power = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    SystemModule *system = &GLOBAL_STATE->SYSTEM_MODULE;
 
-    // Early return if temperature is invalid or hashrate is 0
-    if (currentAsicTemp == 255) {
-        ESP_LOGI(autotuneTAG, "Skipping autotune - Temperature sensor not initialized");
-        return;
-    }
+    /*
+     * CRITICAL: Capture all readings atomically at the start.
+     * This prevents race conditions where values change mid-calculation.
+     */
+    uint16_t currentDomainVoltage = VCORE_get_voltage_mv(GLOBAL_STATE);
+    uint16_t currentFrequency = (uint16_t)power->frequency_value;
+    float chipTempAvg = power->chip_temp_avg;
+    float currentHashrate = system->current_hashrate;
+    int16_t currentPower = (int16_t)power->power;
 
-    if (currentHashrate <= 0) {
-        ESP_LOGI(autotuneTAG, "Skipping autotune - Hashrate is 0");
-        return;
-    }
+    /* Calculate target hashrate using pure function */
+    float targetHashrate = pm_calc_target_hashrate(currentFrequency,
+                                                    GLOBAL_STATE->small_core_count,
+                                                    GLOBAL_STATE->asic_count);
 
-    // Get target values from autotune module
-    //int16_t targetPower = autotune->targetPower;                        // Target power in watts
-    uint16_t targetDomainVoltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);     // Target voltage in mV
-    //uint16_t targetFrequency = autotune->targetFrequency;               // Target frequency in MHz
-    //uint8_t targetFanSpeed = autotune->targetFanSpeed;                  // Target fan speed in percentage
-    uint8_t targetAsicTemp = 60;            // Target temperature in °C
-    float targetHashrate = currentFrequency * ((GLOBAL_STATE->small_core_count * GLOBAL_STATE->asic_count) / 1000.0);
+    /* Build input struct for pure calculation function */
+    pm_autotune_input_t input = {
+        .chip_temp = chipTempAvg,
+        .current_hashrate = currentHashrate,
+        .target_hashrate = targetHashrate,
+        .current_frequency = currentFrequency,
+        .current_voltage = currentDomainVoltage,
+        .current_power = currentPower,
+        .uptime_seconds = (esp_timer_get_time() - system->start_time) / 1000000
+    };
 
+    /* Build limits struct from autotune module */
+    pm_autotune_limits_t limits = {
+        .max_frequency = autotune->maxFrequency,
+        .min_frequency = autotune->minFrequency,
+        .max_voltage = autotune->maxDomainVoltage,
+        .min_voltage = autotune->minDomainVoltage,
+        .max_power = autotune->maxPower
+    };
 
-
-    // Log current values
+    /* Log current values */
     ESP_LOGI(autotuneTAG, "Autotune - Current Values:");
     ESP_LOGI(autotuneTAG, "  Domain Voltage: %u mV", currentDomainVoltage);
     ESP_LOGI(autotuneTAG, "  Frequency: %u MHz", currentFrequency);
-    ESP_LOGI(autotuneTAG, "  ASIC Temp: %u °C", currentAsicTemp);
-    ESP_LOGI(autotuneTAG, "  Fan Speed: %u %%", currentFanSpeed);
+    ESP_LOGI(autotuneTAG, "  ASIC Temp: %.1f °C", chipTempAvg);
     ESP_LOGI(autotuneTAG, "  Hashrate: %.2f GH/s", currentHashrate);
     ESP_LOGI(autotuneTAG, "  Power: %d W", currentPower);
-    ESP_LOGI(autotuneTAG, "  Max Power: %d W", GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
-    ESP_LOGI(autotuneTAG, "  Max Domain Voltage: %u mV", GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage);
-    ESP_LOGI(autotuneTAG, "  Max Frequency: %u MHz", GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency);
-    ESP_LOGI(autotuneTAG, "  Min Domain Voltage: %u mV", GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage);
-    ESP_LOGI(autotuneTAG, "  Min Frequency: %u MHz", GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency);
+    ESP_LOGI(autotuneTAG, "  Max Power: %d W", limits.max_power);
+    ESP_LOGI(autotuneTAG, "  Limits: Freq[%u-%u], Volt[%u-%u]",
+             limits.min_frequency, limits.max_frequency,
+             limits.min_voltage, limits.max_voltage);
 
-    // Log target values
     ESP_LOGI(autotuneTAG, "Autotune - Target Values:");
-    //ESP_LOGI(autotuneTAG, "  Target Power: %d W", targetPower);
-    ESP_LOGI(autotuneTAG, "  Target Domain Voltage: %u mV", targetDomainVoltage);
-    //ESP_LOGI(autotuneTAG, "  Target Frequency: %u MHz", targetFrequency);
-    //ESP_LOGI(autotuneTAG, "  Target Fan Speed: %u %%", targetFanSpeed);
-    ESP_LOGI(autotuneTAG, "  Target Temperature: %u °C", targetAsicTemp);
+    ESP_LOGI(autotuneTAG, "  Target Temperature: %u °C", PM_AUTOTUNE_TARGET_TEMP);
     ESP_LOGI(autotuneTAG, "  Target Hashrate: %.2f GH/s", targetHashrate);
 
-    
-    // Timing mechanism for normal operation
-    static TickType_t lastAutotuneTime = 0;
-    TickType_t currentTime = xTaskGetTickCount();
-    uint32_t uptimeSeconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
-    
-    // Check if we need to wait for initial warmup (15 minutes)
-    if (uptimeSeconds < 900 && currentAsicTemp < targetAsicTemp) { // 15 minutes = 900 seconds
-        ESP_LOGI(autotuneTAG, "Autotune - Waiting for initial warmup period (%lu seconds remaining)", 900 - uptimeSeconds);
-        return;
-    }
-    
-    // Determine timing interval based on temperature
-    uint32_t intervalMs;
-    if (currentAsicTemp < 68) {
-        intervalMs = 300000; // 5 minutes for normal operation
-    } else {
-        intervalMs = 500;  // 5 seconds for higher temperatures
-    }
-    
-    // Check if enough time has passed since last autotune
-    if ((currentTime - lastAutotuneTime) < pdMS_TO_TICKS(intervalMs)) {
-        ESP_LOGI(autotuneTAG, "Autotune - Waiting for next adjustment interval (%lu ms remaining)", 
-                 intervalMs - ((currentTime - lastAutotuneTime) * portTICK_PERIOD_MS));
-        return;
-    }
-    
-    // Update last autotune time
-    lastAutotuneTime = currentTime;
-    
-    // Safety mechanism: Track consecutive low hashrate attempts
-    static uint8_t consecutiveLowHashrateAttempts = 0;
-    float hashrateThreshold = targetHashrate * 0.5; // 50% of target hashrate
-    
-    if (currentHashrate < hashrateThreshold) {
-        consecutiveLowHashrateAttempts++;
-        ESP_LOGI(autotuneTAG, "Low hashrate detected: %.2f GH/s (threshold: %.2f GH/s), consecutive attempts: %u", 
-                 currentHashrate, hashrateThreshold, consecutiveLowHashrateAttempts);
-        char data[128];
-        snprintf(data, sizeof(data), "{\"currentHashrate\":%.2f,\"hashrateThreshold\":%.2f,\"consecutiveAttempts\":%u}", 
-                 currentHashrate, hashrateThreshold, consecutiveLowHashrateAttempts);
-        dataBase_log_event("power", "warn", "Autotune - Low hashrate detected", data);
-        
-        // If we've had 3 consecutive low hashrate attempts, reapply preset
-        if (consecutiveLowHashrateAttempts >= 3) {
-            static char current_preset[32];
-            char* preset_ptr = nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, "balanced");
-            strncpy(current_preset, preset_ptr, sizeof(current_preset) - 1);
-            current_preset[sizeof(current_preset) - 1] = '\0';
-            free(preset_ptr);
-            
-            ESP_LOGE(autotuneTAG, "SAFETY: 3 consecutive low hashrate attempts detected, reapplying preset '%s'", current_preset);
-            
-            // Log safety reset event
-            char safety_data[256];
-            snprintf(safety_data, sizeof(safety_data), 
-                     "{\"consecutiveAttempts\":%u,\"currentHashrate\":%.2f,\"targetHashrate\":%.2f,\"threshold\":%.2f,\"preset\":\"%s\"}", 
-                     consecutiveLowHashrateAttempts, currentHashrate, targetHashrate, hashrateThreshold, current_preset);
-            dataBase_log_event("power", "critical", "Autotune safety reset - consecutive low hashrate attempts", safety_data);
-            
-            // Reapply the current preset
-            if (apply_preset(GLOBAL_STATE->device_model, current_preset)) {
-                ESP_LOGI(autotuneTAG, "Successfully reapplied preset '%s'", current_preset);
-            } else {
-                ESP_LOGE(autotuneTAG, "Failed to reapply preset '%s'", current_preset);
-            }
-            
-            // Reset the counter
-            consecutiveLowHashrateAttempts = 0;
-            return;
-        }
-    } else {
-        // Hashrate is good, reset the counter
-        if (consecutiveLowHashrateAttempts > 0) {
-            ESP_LOGI(autotuneTAG, "Hashrate recovered: %.2f GH/s, resetting consecutive low hashrate counter", currentHashrate);
-            consecutiveLowHashrateAttempts = 0;
-        }
-    }
-    
-    // Temperature-based adjustments
-    int8_t tempDiff = currentAsicTemp - targetAsicTemp;
-    
-    // If temperature is within 2 degrees of target
-    if (tempDiff >= -2 && tempDiff <= 2) {
-        // Check hashrate
-        float hashrateDiffPercent = ((currentHashrate - targetHashrate) / targetHashrate) * 100.0;
-        
-        if (hashrateDiffPercent < -20.0) { // Hashrate is below target by 20%
-            // Increase voltage by 10mV
-            uint16_t newVoltage = targetDomainVoltage + 10;
-            ESP_LOGI(autotuneTAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
-            char data[128];
-            snprintf(data, sizeof(data), "{\"voltage\":%u, \"frequency\":%u, \"temperature\":%u, \"hashrate\":%.2f, \"targetHashrate\":%.2f, }", 
-            newVoltage, currentFrequency, currentAsicTemp, currentHashrate, targetHashrate);
-            dataBase_log_event("power", "info", "Autotune - Hashrate below target, increasing voltage", data);
-            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
-            return;
-        } else {
-            ESP_LOGI(TAG, "Autotune - Hashrate above target, no adjustments needed");
-            char data[128];
-            snprintf(data, sizeof(data), "{\"voltage\":%u, \"frequency\":%u, \"temperature\":%u, \"hashrate\":%.2f, \"targetHashrate\":%.2f, }", 
-            targetDomainVoltage, currentFrequency, currentAsicTemp, currentHashrate, targetHashrate);
-            dataBase_log_event("power", "info", "Autotune - Hashrate above target, no adjustments needed", data);
-            return;
-        }
-    }
-    // If temperature is under target
-    else if (tempDiff < -2) {
-        static uint16_t newFrequency = 0;
-        static uint16_t newVoltage = 0;
-        // Increase frequency by 2%
-        if (currentFrequency < GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency && GLOBAL_STATE->AUTOTUNE_MODULE.maxPower > currentPower) {
-           newFrequency = currentFrequency * 1.02;
-        }
-        else {
-            ESP_LOGI(TAG, "freq or power limit reached, no adjustments possible");
-            ESP_LOGI(TAG, "Autotune - Frequency: %u MHz, Power: %d W, Max Frequency: %u MHz, Max Power: %d W", 
-                     currentFrequency, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
-            char data[128];
-            snprintf(data, sizeof(data), "{\"frequency\":%u,\"power\":%d,\"maxFrequency\":%u,\"maxPower\":%d}", 
-                     currentFrequency, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxFrequency, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
-            dataBase_log_event("power", "warn", "Autotune - Frequency or power limit reached, no adjustments possible", data);
+    /* Get timing info from thread-safe state */
+    uint32_t currentTickMs = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    uint32_t msSinceLastAdjust = autotune_state_get_ms_since_last_adjust(s_autotune_state, currentTickMs);
+    uint8_t consecutiveLowHashrate = autotune_state_get_low_hashrate_count(s_autotune_state);
 
-            return;
+    /* Call pure calculation function */
+    pm_autotune_decision_t decision = pm_calc_autotune(&input, &limits,
+                                                        PM_AUTOTUNE_TARGET_TEMP,
+                                                        consecutiveLowHashrate,
+                                                        msSinceLastAdjust);
+
+    /* Handle skip reasons */
+    if (decision.skip_reason_invalid) {
+        if ((uint8_t)chipTempAvg == 255) {
+            ESP_LOGI(autotuneTAG, "Skipping autotune - Temperature sensor not initialized");
+        } else if (currentHashrate <= 0) {
+            ESP_LOGI(autotuneTAG, "Skipping autotune - Hashrate is 0");
         }
-        // Increase voltage by 0.2%
-        if (targetDomainVoltage < GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage && GLOBAL_STATE->AUTOTUNE_MODULE.maxPower > currentPower) {
-            newVoltage = targetDomainVoltage * 1.002;
-        }
-        else {
-            ESP_LOGI(TAG, "voltage or power limit reached, no adjustments possible");
-            ESP_LOGI(TAG, "Autotune - Voltage: %u mV, Power: %d W, Max Voltage: %u mV, Max Power: %d W", 
-                     targetDomainVoltage, currentPower, GLOBAL_STATE->AUTOTUNE_MODULE.maxDomainVoltage, GLOBAL_STATE->AUTOTUNE_MODULE.maxPower);
-            return;
-        }
-        
-        ESP_LOGI(TAG, "Autotune - Temperature under target, increasing frequency from %u MHz to %u MHz", 
-                 currentFrequency, newFrequency);
-        ESP_LOGI(TAG, "Autotune - Increasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
-        char data[128];
-        snprintf(data, sizeof(data), "{\"newFrequency\":%u,\"newVoltage\":%u, \"currentTemperature\":%u, \"currentHashrate\":%.2f, \"targetHashrate\":%.2f}", 
-        newFrequency, newVoltage, currentAsicTemp, currentHashrate, targetHashrate);
-        dataBase_log_event("power", "info", "Autotune - Temperature under target, increasing frequency and voltage", data);
-        
-        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
-        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
         return;
     }
-    // If temperature is over target
-    else {
-        // Decrease frequency by 2%
-        uint16_t newFrequency = currentFrequency * 0.98;
-        // Ensure frequency doesn't go below minimum
-        if (newFrequency < GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency) {
-            newFrequency = GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency;
-            ESP_LOGI(TAG, "Autotune - Frequency limited to minimum: %u MHz", newFrequency);
-        }
-        
-        // Decrease voltage by 0.2%
-        uint16_t newVoltage = targetDomainVoltage * 0.998;
-        // Ensure voltage doesn't go below minimum
-        if (newVoltage < GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage) {
-            newVoltage = GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage;
-            ESP_LOGI(TAG, "Autotune - Voltage limited to minimum: %u mV", newVoltage);
-        }
-        
-        // Only apply changes if they're different from current values
-        bool frequencyChanged = (newFrequency != currentFrequency);
-        bool voltageChanged = (newVoltage != targetDomainVoltage);
-        
-        if (!frequencyChanged && !voltageChanged) {
-            ESP_LOGI(TAG, "Autotune - At minimum limits, no further adjustments possible");
-            char data[128];
-            snprintf(data, sizeof(data), "{\"currentFrequency\":%u,\"currentVoltage\":%u,\"minFrequency\":%u,\"minVoltage\":%u,\"currentTemperature\":%u}", 
-                     currentFrequency, targetDomainVoltage, GLOBAL_STATE->AUTOTUNE_MODULE.minFrequency, 
-                     GLOBAL_STATE->AUTOTUNE_MODULE.minDomainVoltage, currentAsicTemp);
-            dataBase_log_event("power", "warn", "Autotune - At minimum limits, no further adjustments possible", data);
-            return;
-        }
-        
-        if (frequencyChanged) {
-            ESP_LOGI(TAG, "Autotune - Temperature over target, decreasing frequency from %u MHz to %u MHz", 
-                     currentFrequency, newFrequency);
-            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, newFrequency);
-        }
-        
-        if (voltageChanged) {
-            ESP_LOGI(TAG, "Autotune - Decreasing voltage from %u mV to %u mV", targetDomainVoltage, newVoltage);
-            char data[128];
-            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, newVoltage);
-        }
-        
-        char data[128];
-        snprintf(data, sizeof(data), "{\"newFrequency\":%u,\"newVoltage\":%u,\"currentTemperature\":%u,\"currentHashrate\":%.2f,\"targetHashrate\":%.2f}", 
-                 newFrequency, newVoltage, currentAsicTemp, currentHashrate, targetHashrate);
-        dataBase_log_event("power", "info", "Autotune - Temperature over target, decreasing frequency and/or voltage", data);
-        
+
+    if (decision.skip_reason_warmup) {
+        uint32_t remaining = PM_AUTOTUNE_WARMUP_SECONDS - input.uptime_seconds;
+        ESP_LOGI(autotuneTAG, "Autotune - Waiting for initial warmup period (%lu seconds remaining)", remaining);
         return;
     }
+
+    if (decision.skip_reason_timing) {
+        uint32_t interval = pm_get_autotune_interval_ms(chipTempAvg);
+        uint32_t remaining = interval - msSinceLastAdjust;
+        ESP_LOGI(autotuneTAG, "Autotune - Waiting for next adjustment interval (%lu ms remaining)", remaining);
+        return;
+    }
+
+    /* Update timing - we're going to process this cycle */
+    autotune_state_update_last_adjust_time(s_autotune_state, currentTickMs);
+
+    /* Check for low hashrate condition */
+    if (pm_is_hashrate_low(currentHashrate, targetHashrate, PM_HASHRATE_THRESHOLD_PERCENT)) {
+        uint8_t newCount = autotune_state_increment_low_hashrate(s_autotune_state);
+        ESP_LOGI(autotuneTAG, "Low hashrate detected: %.2f GH/s (threshold: %.2f%% of %.2f), consecutive: %u",
+                 currentHashrate, PM_HASHRATE_THRESHOLD_PERCENT, targetHashrate, newCount);
+
+        char data[128];
+        snprintf(data, sizeof(data), "{\"currentHashrate\":%.2f,\"targetHashrate\":%.2f,\"consecutiveAttempts\":%u}",
+                 currentHashrate, targetHashrate, newCount);
+        dataBase_log_event("power", "warn", "Autotune - Low hashrate detected", data);
+    } else {
+        /* Hashrate is good, reset counter if needed */
+        if (consecutiveLowHashrate > 0) {
+            ESP_LOGI(autotuneTAG, "Hashrate recovered: %.2f GH/s, resetting counter", currentHashrate);
+            autotune_state_reset_low_hashrate(s_autotune_state);
+        }
+    }
+
+    /* Handle preset reset (3 consecutive low hashrate events) */
+    if (decision.should_reset_preset) {
+        char current_preset[32];
+        char* preset_ptr = nvs_config_get_string(NVS_CONFIG_AUTOTUNE_PRESET, "balanced");
+        strncpy(current_preset, preset_ptr, sizeof(current_preset) - 1);
+        current_preset[sizeof(current_preset) - 1] = '\0';
+        free(preset_ptr);
+
+        ESP_LOGE(autotuneTAG, "SAFETY: %u consecutive low hashrate attempts, reapplying preset '%s'",
+                 PM_MAX_LOW_HASHRATE_ATTEMPTS, current_preset);
+
+        char safety_data[256];
+        snprintf(safety_data, sizeof(safety_data),
+                 "{\"consecutiveAttempts\":%u,\"currentHashrate\":%.2f,\"targetHashrate\":%.2f,\"preset\":\"%s\"}",
+                 PM_MAX_LOW_HASHRATE_ATTEMPTS, currentHashrate, targetHashrate, current_preset);
+        dataBase_log_event("power", "critical", "Autotune safety reset - consecutive low hashrate attempts", safety_data);
+
+        if (apply_preset(GLOBAL_STATE->device_model, current_preset)) {
+            ESP_LOGI(autotuneTAG, "Successfully reapplied preset '%s'", current_preset);
+        } else {
+            ESP_LOGE(autotuneTAG, "Failed to reapply preset '%s'", current_preset);
+        }
+
+        autotune_state_reset_low_hashrate(s_autotune_state);
+        return;
+    }
+
+    /* Apply adjustments if needed */
+    if (!decision.should_adjust) {
+        ESP_LOGI(autotuneTAG, "Autotune - No adjustments needed");
+        return;
+    }
+
+    /* Apply frequency change */
+    if (decision.new_frequency != 0 && decision.new_frequency != currentFrequency) {
+        ESP_LOGI(autotuneTAG, "Autotune - Adjusting frequency from %u MHz to %u MHz",
+                 currentFrequency, decision.new_frequency);
+        nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, decision.new_frequency);
+    }
+
+    /* Apply voltage change */
+    if (decision.new_voltage != 0 && decision.new_voltage != currentDomainVoltage) {
+        ESP_LOGI(autotuneTAG, "Autotune - Adjusting voltage from %u mV to %u mV",
+                 currentDomainVoltage, decision.new_voltage);
+        nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, decision.new_voltage);
+    }
+
+    /* Log the adjustment */
+    char data[192];
+    snprintf(data, sizeof(data),
+             "{\"newFrequency\":%u,\"newVoltage\":%u,\"temperature\":%.1f,\"hashrate\":%.2f,\"targetHashrate\":%.2f}",
+             decision.new_frequency ? decision.new_frequency : currentFrequency,
+             decision.new_voltage ? decision.new_voltage : currentDomainVoltage,
+             chipTempAvg, currentHashrate, targetHashrate);
+    dataBase_log_event("power", "info", "Autotune - Applied adjustments", data);
 }
 
 // static float _fbound(float value, float lower_bound, float upper_bound)
@@ -603,6 +532,16 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     ESP_LOGI(TAG, "Starting");
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+
+    /* Initialize thread-safe autotune state */
+    if (s_autotune_state == NULL) {
+        s_autotune_state = autotune_state_create();
+        if (s_autotune_state == NULL) {
+            ESP_LOGE(TAG, "Failed to create autotune state - autotune will be disabled");
+        } else {
+            ESP_LOGI(TAG, "Autotune state initialized");
+        }
+    }
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 

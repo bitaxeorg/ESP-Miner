@@ -29,6 +29,8 @@ SRCS
     "./tasks/asic_task.c"
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
+    "./power_management/power_management_calc.c"
+    "./power_management/autotune_state.c"
 
 INCLUDE_DIRS
     "."
@@ -36,6 +38,7 @@ INCLUDE_DIRS
     "http_server"
     "database"
     "self_test"
+    "power_management"
     "../components/asic/include"
     "../components/connect/include"
     "../components/dns_server/include"
