@@ -57,3 +57,5 @@ TPS546,data,u16,1
 TMP1075,data,u16,1
 # Self-test Power Consumption Target (> 0)
 power_cons_tgt,data,u16,12
+# Enable captive portal
+captiveportal,data,u16,1
