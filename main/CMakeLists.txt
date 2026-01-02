@@ -32,6 +32,7 @@ SRCS
     "./power_management/power_management_calc.c"
     "./power_management/autotune_state.c"
     "./power_management/overheat.c"
+    "./logging/logging.c"
 
 INCLUDE_DIRS
     "."
@@ -40,6 +41,7 @@ INCLUDE_DIRS
     "database"
     "self_test"
     "power_management"
+    "logging"
     "../components/asic/include"
     "../components/connect/include"
     "../components/dns_server/include"

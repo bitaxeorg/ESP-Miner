@@ -121,6 +121,17 @@ target_include_directories(overheat PUBLIC
 )
 target_link_libraries(overheat PUBLIC power_management_calc)
 
+# Unified logging module
+add_library(logging STATIC
+    ${MAIN_DIR}/logging/logging.c
+)
+target_include_directories(logging PUBLIC
+    ${MAIN_DIR}/logging
+    ${MAIN_DIR}
+    ${STUB_DIR}
+)
+target_link_libraries(logging PRIVATE pthread)
+
 # Stratum utilities require mbedtls - will be added when we have mbedtls stub
 # Production code will be compiled and tested as we refactor in later phases
 
@@ -144,12 +155,14 @@ add_executable(run_tests
     test_power_management_calc.c
     test_autotune_state.c
     test_overheat.c
+    test_logging.c
 )
 target_link_libraries(run_tests
     test_helpers
     power_management_calc
     autotune_state
     overheat
+    logging
     pthread
 )
 
