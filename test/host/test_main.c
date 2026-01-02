@@ -10,11 +10,7 @@
 
 /* Forward declarations of test suite runners */
 extern void run_infrastructure_tests(void);
-/* Add more test suite declarations here as tests are added:
- * extern void run_autotune_tests(void);
- * extern void run_fan_control_tests(void);
- * extern void run_overheat_tests(void);
- */
+extern void run_power_management_calc_tests(void);
 
 /**
  * @brief Unity setUp function - called before each test
@@ -50,12 +46,7 @@ int main(int argc, char** argv)
 
     /* Run all test suites */
     run_infrastructure_tests();
-
-    /* Add more test suite calls here:
-     * run_autotune_tests();
-     * run_fan_control_tests();
-     * run_overheat_tests();
-     */
+    run_power_management_calc_tests();
 
     int result = UNITY_END();
 

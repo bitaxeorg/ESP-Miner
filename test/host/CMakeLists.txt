@@ -91,8 +91,16 @@ target_link_libraries(test_helpers INTERFACE
 # Note: We compile production code here with stubs
 # Each module should be added as needed
 
+# Power Management Calculations (pure functions, no hardware deps)
+add_library(power_management_calc STATIC
+    ${MAIN_DIR}/power_management/power_management_calc.c
+)
+target_include_directories(power_management_calc PUBLIC
+    ${MAIN_DIR}/power_management
+    ${STUB_DIR}
+)
+
 # Stratum utilities require mbedtls - will be added when we have mbedtls stub
-# For now, modules will be added incrementally as their dependencies are stubbed
 # Production code will be compiled and tested as we refactor in later phases
 
 # ============================================
@@ -112,13 +120,11 @@ target_link_libraries(test_infrastructure
 add_executable(run_tests
     test_main.c
     test_infrastructure.c
-    # Add more test files here as they are created:
-    # test_autotune.c
-    # test_fan_control.c
-    # etc.
+    test_power_management_calc.c
 )
 target_link_libraries(run_tests
     test_helpers
+    power_management_calc
     pthread
 )
 
