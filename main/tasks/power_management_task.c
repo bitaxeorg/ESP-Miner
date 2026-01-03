@@ -20,7 +20,6 @@
 #include "asic_reset.h"
 #include "driver/uart.h"
 
-#define EPSILON 0.0001f
 #define POLL_RATE 1800
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
@@ -37,24 +36,6 @@
 #define ASIC_REDUCTION 100.0
 
 static const char * TAG = "power_management";
-
-double pid_input = 0.0;
-double pid_output = 0.0;
-double min_fan_pct;
-double pid_setPoint;
-double pid_p = 15.0;        
-double pid_i = 0.2;
-double pid_d = 3.0;
-double pid_d_startup = 20.0;  // Higher D value for startup
-
-bool pid_startup_phase = true;
-int pid_startup_counter = 0;
-
-// Hold and Ramp startup D-term
-#define PID_STARTUP_HOLD_DURATION 3  // Number of cycles to HOLD pid_d_startup
-#define PID_STARTUP_RAMP_DURATION 17 // Number of cycles to RAMP DOWN D (Total startup duration PID_STARTUP_HOLD_DURATION + PID_STARTUP_RAMP_DURATION)
-
-PIDController pid;
 
 static float expected_hashrate(GlobalState * GLOBAL_STATE, float frequency)
 {
@@ -88,15 +69,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     
     float last_asic_frequency = power_management->frequency_value;
 
-    pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET);
-    min_fan_pct = (double)nvs_config_get_u16(NVS_CONFIG_MIN_FAN_SPEED);
-
-    // Initialize PID controller with pid_d_startup and PID_REVERSE directly
-    pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, pid_p, pid_i, pid_d_startup, PID_P_ON_E, PID_REVERSE);
-    pid_set_sample_time(&pid, POLL_RATE - 1); // Sample time in ms
-    pid_set_output_limits(&pid, min_fan_pct, 100);
-    pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
-
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uint16_t last_core_voltage = 0.0;
 
@@ -104,15 +76,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     float last_known_asic_frequency = 0.0;
 
     while (1) {
-
-        // Refresh PID setpoint from NVS in case it was changed via API
-        pid_setPoint = (double)nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET);
-
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);
 
-        power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
-        power_management->fan2_rpm = Thermal_get_fan2_speed(&GLOBAL_STATE->DEVICE_CONFIG);
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
         power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
 
@@ -127,8 +93,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             } else {
                 ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC: %fC", power_management->vr_temp, power_management->chip_temp_avg);
             }
-            power_management->fan_perc = 100;
-            Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1);
 
             VCORE_set_voltage(GLOBAL_STATE, 0.0f);
             
@@ -204,81 +168,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 // Frequency reduction will now be applied by normal power management loop
                 nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, false);
                 ESP_LOGI(TAG, "Resuming normal operation. Reduced frequency (%.0f MHz) will be applied automatically.", reduced_asic_frequency);
-            }
-        }
-
-        //enable the PID auto control for the FAN if set
-        if (nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED)) {
-            if (power_management->chip_temp_avg >= 0) { // Ignore invalid temperature readings (-1)
-                if (power_management->chip_temp2_avg > power_management->chip_temp_avg) {
-                    pid_input = power_management->chip_temp2_avg;
-                } else {
-                    pid_input = power_management->chip_temp_avg;
-                }
-                
-                // Hold and Ramp logic for startup D value
-                if (pid_startup_phase) {
-                    pid_startup_counter++; // Increment counter at the start of each startup phase cycle
-                    
-                    if (pid_startup_counter >= (PID_STARTUP_HOLD_DURATION + PID_STARTUP_RAMP_DURATION)) {
-                        // Transition complete, switch to normal D value
-                        pid_set_tunings(&pid, pid_p, pid_i, pid_d); // Use normal pid_d
-                        pid_startup_phase = false;
-                        ESP_LOGI(TAG, "PID startup phase complete, switching to normal D value: %.1f", pid_d);
-                    } else if (pid_startup_counter > PID_STARTUP_HOLD_DURATION) {
-                        // In RAMP DOWN phase
-                        int ramp_counter = pid_startup_counter - PID_STARTUP_HOLD_DURATION;
-                        double current_d = pid_d_startup - ((pid_d_startup - pid_d) * (double)ramp_counter / PID_STARTUP_RAMP_DURATION);
-                        pid_set_tunings(&pid, pid_p, pid_i, current_d);
-                        ESP_LOGI(TAG, "PID startup ramp phase: %d/%d (Total cycle: %d), current D: %.1f", 
-                                 ramp_counter, PID_STARTUP_RAMP_DURATION, pid_startup_counter, current_d);
-                    } else {
-                        // In HOLD phase, ensure pid_d_startup is used.
-                        // pid_init already set it with pid_d_startup. If pid_p or pid_i changed dynamically,
-                        // this call ensures pid_d_startup is maintained.
-                        pid_set_tunings(&pid, pid_p, pid_i, pid_d_startup);
-                        ESP_LOGI(TAG, "PID startup hold phase: %d/%d, holding D at: %.1f", 
-                                 pid_startup_counter, PID_STARTUP_HOLD_DURATION, pid_d_startup);
-                    }
-                }
-                // If not in startup_phase, PID tunings remain as set (either normal or last startup value if just exited)
-                
-                pid_compute(&pid);
-                // Uncomment for debugging PID output directly after compute
-                // ESP_LOGD(TAG, "DEBUG: PID raw output: %.2f%%, Input: %.1f, SetPoint: %.1f", pid_output, pid_input, pid_setPoint);
-
-                power_management->fan_perc = pid_output;
-                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, pid_output / 100.0) != ESP_OK) {
-                    exit(EXIT_FAILURE);
-                }
-                ESP_LOGI(TAG, "Temp: %.1f °C, SetPoint: %.1f °C, Output: %.1f%% (P:%.1f I:%.1f D_val:%.1f D_start_val:%.1f)",
-                         pid_input, pid_setPoint, pid_output, pid.dispKp, pid.dispKi, pid.dispKd, pid_d_startup); // Log current effective Kp, Ki, Kd
-            } else {
-                if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled) {
-                    ESP_LOGW(TAG, "AP mode with invalid temperature reading: %.1f °C - Setting fan to 70%%", power_management->chip_temp_avg);
-                    power_management->fan_perc = 70;
-                    if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 0.7) != ESP_OK) {
-                        exit(EXIT_FAILURE);
-                    }
-                } else {
-                    ESP_LOGW(TAG, "Ignoring invalid temperature reading: %.1f °C", power_management->chip_temp_avg);
-                    if (power_management->fan_perc < 100) {
-                        ESP_LOGW(TAG, "Setting fan speed to 100%%");
-                        power_management->fan_perc = 100;
-                        if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1)) {
-                            exit(EXIT_FAILURE);
-                        }
-                    }
-                }
-            }
-        } else { // Manual fan speed
-            uint16_t fan_perc = nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED);
-            if (fabs(power_management->fan_perc - fan_perc) > EPSILON) {
-                ESP_LOGI(TAG, "Setting manual fan speed to %d%%", fan_perc);
-                power_management->fan_perc = fan_perc;
-                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_perc / 100.0f) != ESP_OK) {
-                    exit(EXIT_FAILURE);
-                }
             }
         }
 
