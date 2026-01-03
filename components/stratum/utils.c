@@ -19,7 +19,7 @@ static const uint8_t hex_val_table[256] = {
 
 size_t bin2hex(const uint8_t *buf, size_t buflen, char *hex, size_t hexlen)
 {
-    if (hexlen < buflen * 2) {
+    if (hexlen <= buflen * 2) {
         return 0;
     }
 
