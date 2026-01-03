@@ -7,6 +7,7 @@ import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { ISystemInfo } from 'src/models/ISystemInfo';
 import { ISystemStatistics } from 'src/models/ISystemStatistics';
 import { ISystemASIC } from 'src/models/ISystemASIC';
+import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
 
 import { environment } from '../../environments/environment';
 
@@ -203,10 +204,22 @@ export class SystemService {
     return this.httpClient.post(`${uri}/api/system/identify`, {}, {responseType: 'text'});
   }
 
-  public updateSystem(uri: string = '', update: any) {
+  public updateSystem(uri: string = '', update: any): Observable<any | ISystemUpdateResponse> {
     if (environment.production) {
       return this.httpClient.patch(`${uri}/api/system`, update);
     } else {
+      // Check if hostname is being changed in development mode
+      if (update.hostname) {
+        // Simulate redirect response for development
+        return of({
+          status: 'success',
+          redirect: {
+            url: `http://${update.hostname}.local`,
+            delay: 2000,
+            message: 'Hostname updated. Redirecting to new address...'
+          }
+        } as ISystemUpdateResponse);
+      }
       return of(true);
     }
   }
