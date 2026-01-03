@@ -162,7 +162,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
             Validators.max(this.displayTimeoutMaxValue)
           ]],
           coreVoltage: [info.coreVoltage, [Validators.required]],
-          frequency: [info.frequency, [Validators.required]],
+          frequency: [info.frequencySet, [Validators.required]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
           minfanspeed: [info.minFanSpeed, [Validators.required]],
           manualFanSpeed: [info.manualFanSpeed, [Validators.required]],
