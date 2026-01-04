@@ -15,6 +15,7 @@ typedef enum
     REGISTER_DOMAIN_2_COUNT,
     REGISTER_DOMAIN_3_COUNT,
     REGISTER_ERROR_COUNT,    // error count register (all)
+    REGISTER_PLL_PARAM,      // PLL/clock config readback (BM1370)
 } register_type_t;
 
 typedef struct
