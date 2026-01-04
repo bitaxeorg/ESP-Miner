@@ -27,7 +27,12 @@ static TPS546_CONFIG TPS546_CONFIG_DEFAULT = {
     .TPS546_INIT_VOUT_COMMAND = 1.2,
     /* iout current */
     .TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00, /* A */
-    .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00 /* A */
+    .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00, /* A */
+
+    /* config */
+    .TPS546_INIT_STACK_CONFIG = 0x0000, /* 1 module */
+    .TPS546_INIT_SYNC_CONFIG = 0x10, /* Disable SYNC */
+    .TPS546_INIT_COMPENSATION_CONFIG = {0x13, 0x11, 0x08, 0x19, 0x04} /* Default compensation config */
 };
 
 static TPS546_CONFIG TPS546_CONFIG_GAMMATURBO = {
@@ -43,7 +48,12 @@ static TPS546_CONFIG TPS546_CONFIG_GAMMATURBO = {
     .TPS546_INIT_VOUT_COMMAND = 1.2,
     /* iout current */
     .TPS546_INIT_IOUT_OC_WARN_LIMIT = 50.00, /* A */
-    .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 55.00 /* A */
+    .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 55.00, /* A */
+
+    /* config */
+    .TPS546_INIT_STACK_CONFIG = 0x0001, /* 2 modules */
+    .TPS546_INIT_SYNC_CONFIG = 0xD0, /* Enable Auto Detect SYNC */
+    .TPS546_INIT_COMPENSATION_CONFIG = {0x12, 0x34, 0x42, 0x21, 0x04} /* Default compensation config */
 };
 
 static TPS546_CONFIG TPS546_CONFIG_HEX = {
@@ -59,7 +69,12 @@ static TPS546_CONFIG TPS546_CONFIG_HEX = {
     .TPS546_INIT_VOUT_COMMAND = 3.6,
     /* iout current */
     .TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00, /* A */
-    .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00 /* A */
+    .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00, /* A */
+
+    /* config */
+    .TPS546_INIT_STACK_CONFIG = 0x0000, /* 1 module */
+    .TPS546_INIT_SYNC_CONFIG = 0x10, /* Disable SYNC */
+    .TPS546_INIT_COMPENSATION_CONFIG = {0x13, 0x11, 0x08, 0x19, 0x04} /* Default compensation config */
 };
 
 esp_err_t VCORE_init(GlobalState * GLOBAL_STATE)
