@@ -49,6 +49,7 @@ typedef struct
     uint32_t version;
     uint32_t target;
     uint32_t ntime;
+    bool clean_jobs;
 } mining_notify;
 
 typedef struct
@@ -61,7 +62,6 @@ typedef struct
     stratum_method method;
 
     // mining.notify
-    int should_abandon_work;
     mining_notify *mining_notification;
     // mining.set_difficulty
     uint32_t new_difficulty;
