@@ -9,7 +9,7 @@
     "start": "ng serve",
     "build": "npm run generate:api && ng build --configuration=production && gzipper compress --verbose --gzip --gzip-level 9 --exclude woff2 ./dist/axe-os && node only-gzip.js && node generate-version.js",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
+    "test": "ng test --watch=false --browsers=ChromeHeadless",
     "generate:api": "rm -rf ./src/app/generated && openapi-generator-cli generate",
     "bundle-report": "ng build --configuration=production --stats-json && webpack-bundle-analyzer dist/axe-os/stats.json"
   },
