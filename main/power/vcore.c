@@ -58,11 +58,11 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         // Single-phase configuration
         config.TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
         config.TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
-        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x13;
-        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x11;
-        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0x08;
-        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x19;
-        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x04;
+        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x22;
+        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x18;
+        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0xC2;
+        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x1D;
+        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x06;
         break;
 
     default: // MAX, ULTRA, SUPRA, GAMMA
@@ -80,11 +80,11 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         // Single-phase configuration
         config.TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
         config.TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
-        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x13;
-        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x11;
-        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0x08;
-        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x19;
-        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x04;
+        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x22;
+        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x18;
+        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0xC2;
+        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x1D;
+        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x06;
         break;
     }
 
