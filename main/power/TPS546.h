@@ -21,7 +21,8 @@
 #define OPERATION_OFF 0x00
 #define OPERATION_ON  0x80
 
-#define TPS546_INIT_PHASE 0xFF  /* default phase register value from TPS546 datasheet */
+#define TPS546_INIT_PHASE_SINGLE 0x00  /* Single-phase (Single TPS) */
+#define TPS546_INIT_PHASE_MULTI   0xFF  /* Multi-phase stack (Multi TPS) */
 
 #define TPS546_INIT_FREQUENCY 650  /* KHz */
 
@@ -37,6 +38,8 @@ typedef struct {
 
 typedef struct
 {
+  /* Phase readout configuration */
+  uint8_t TPS546_INIT_PHASE; /* phase register configuration */
   /* vin voltage */
   float TPS546_INIT_VIN_ON;  /* V */
   float TPS546_INIT_VIN_OFF; /* V */
