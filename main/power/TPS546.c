@@ -539,8 +539,8 @@ void TPS546_write_entire_config(void)
 
 
     /* Phase */
-    ESP_LOGI(TAG, "Setting PHASE: %02X", TPS546_INIT_PHASE);
-    smb_write_byte(PMBUS_PHASE, TPS546_INIT_PHASE);
+    ESP_LOGI(TAG, "Setting PHASE: %02X", tps546_config.TPS546_INIT_PHASE);
+    smb_write_byte(PMBUS_PHASE, tps546_config.TPS546_INIT_PHASE);
 
     /* Switch frequency */
     ESP_LOGI(TAG, "Setting FREQUENCY: %dMHz", TPS546_INIT_FREQUENCY);
@@ -725,9 +725,6 @@ float TPS546_get_iout(void)
     uint16_t u16_value = 0;
     float iout;
 
-    // //set the phase register to 0xFF to read all phases
-    // smb_write_byte(PMBUS_PHASE, 0xFF);
-
     /* Get current output (SLINEAR11) */
     if (smb_read_word(PMBUS_READ_IOUT, &u16_value) != ESP_OK) {
         ESP_LOGE(TAG, "Could not read Iout");
@@ -738,9 +735,6 @@ float TPS546_get_iout(void)
     #ifdef DEBUG_TPS546_MEAS
         ESP_LOGI(TAG, "Got Iout: %2.3f A", iout);
     #endif
-
-    // //set the phase register back to the default
-    // smb_write_byte(PMBUS_PHASE, TPS546_INIT_PHASE);
 
         return iout;
     }
