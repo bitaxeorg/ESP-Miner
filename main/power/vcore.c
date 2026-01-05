@@ -14,83 +14,78 @@
 
 static const char *TAG = "vcore";
 
-/**
- * @brief Generate TPS546 configuration based on family and phase flag
- * @param family Pointer to family configuration
- * @return Complete TPS546_CONFIG structure
- */
 static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
 {
-    TPS546_CONFIG config = {
-        // Always set phase based on device config flag
-        .TPS546_INIT_PHASE = family->tps546_multi_phase ? TPS546_INIT_PHASE_MULTI : TPS546_INIT_PHASE_SINGLE,
-        // Default UV warning limit (TI bug workaround)
-        .TPS546_INIT_VIN_UV_WARN_LIMIT = 0,
-    };
 
     // Set family-specific parameters
     switch (family->id) {
     case GAMMA_TURBO:
-        config.TPS546_INIT_VIN_ON = 11.0;
-        config.TPS546_INIT_VIN_OFF = 10.5;
-        config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
-        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
-        config.TPS546_INIT_SCALE_LOOP = 0.25;
-        config.TPS546_INIT_VOUT_MIN = 1;
-        config.TPS546_INIT_VOUT_MAX = 3;
-        config.TPS546_INIT_VOUT_COMMAND = 1.2;
-        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = 50.00;
-        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = 55.00;
+        .TPS546_INIT_PHASE = TPS546_INIT_PHASE_MULTI;
+        .TPS546_INIT_VIN_UV_WARN_LIMIT = 0,
+        .TPS546_INIT_VIN_ON = 11.0;
+        .TPS546_INIT_VIN_OFF = 10.5;
+        .TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
+        .TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        .TPS546_INIT_SCALE_LOOP = 0.25;
+        .TPS546_INIT_VOUT_MIN = 1;
+        .TPS546_INIT_VOUT_MAX = 3;
+        .TPS546_INIT_VOUT_COMMAND = 1.2;
+        .TPS546_INIT_IOUT_OC_WARN_LIMIT = 50.00;
+        .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 55.00;
         // Multi-phase stacking configuration for 2 TPS modules
-        config.TPS546_INIT_STACK_CONFIG = 0x0001; // 2 modules (One-Slave, 2-phase)
-        config.TPS546_INIT_SYNC_CONFIG = 0xD0;    // Enable Auto Detect SYNC
-        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x12;
-        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x34;
-        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0x42;
-        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x21;
-        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x04;
+        .TPS546_INIT_STACK_CONFIG = 0x0001; // 2 modules (One-Slave, 2-phase)
+        .TPS546_INIT_SYNC_CONFIG = 0xD0;    // Enable Auto Detect SYNC
+        .TPS546_INIT_COMPENSATION_CONFIG[0] = 0x12;
+        .TPS546_INIT_COMPENSATION_CONFIG[1] = 0x34;
+        .TPS546_INIT_COMPENSATION_CONFIG[2] = 0x42;
+        .TPS546_INIT_COMPENSATION_CONFIG[3] = 0x21;
+        .TPS546_INIT_COMPENSATION_CONFIG[4] = 0x04;
         break;
 
     case HEX:
     case SUPRA_HEX:
-        config.TPS546_INIT_VIN_ON = 11.5;
-        config.TPS546_INIT_VIN_OFF = 11.0;
-        config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
-        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
-        config.TPS546_INIT_SCALE_LOOP = 0.125;
-        config.TPS546_INIT_VOUT_MIN = 2.5;
-        config.TPS546_INIT_VOUT_MAX = 4.5;
-        config.TPS546_INIT_VOUT_COMMAND = 3.6;
-        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00;
-        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00;
+        .TPS546_INIT_PHASE = TPS546_INIT_PHASE_SINGLE;
+        .TPS546_INIT_VIN_UV_WARN_LIMIT = 0,
+        .TPS546_INIT_VIN_ON = 11.5;
+        .TPS546_INIT_VIN_OFF = 11.0;
+        .TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
+        .TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        .TPS546_INIT_SCALE_LOOP = 0.125;
+        .TPS546_INIT_VOUT_MIN = 2.5;
+        .TPS546_INIT_VOUT_MAX = 4.5;
+        .TPS546_INIT_VOUT_COMMAND = 3.6;
+        .TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00;
+        .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00;
         // Single-phase configuration
-        config.TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
-        config.TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
-        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x13;
-        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x11;
-        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0x08;
-        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x19;
-        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x04;
+        .TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
+        .TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
+        .TPS546_INIT_COMPENSATION_CONFIG[0] = 0x13;
+        .TPS546_INIT_COMPENSATION_CONFIG[1] = 0x11;
+        .TPS546_INIT_COMPENSATION_CONFIG[2] = 0x08;
+        .TPS546_INIT_COMPENSATION_CONFIG[3] = 0x19;
+        .TPS546_INIT_COMPENSATION_CONFIG[4] = 0x04;
         break;
 
     default: // MAX, ULTRA, SUPRA, GAMMA
-        config.TPS546_INIT_VIN_ON = 4.8;
-        config.TPS546_INIT_VIN_OFF = 4.5;
-        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 6.5;
-        config.TPS546_INIT_SCALE_LOOP = 0.25;
-        config.TPS546_INIT_VOUT_MIN = 1;
-        config.TPS546_INIT_VOUT_MAX = 2;
-        config.TPS546_INIT_VOUT_COMMAND = 1.2;
-        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00;
-        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00;
+        .TPS546_INIT_PHASE = TPS546_INIT_PHASE_SINGLE;
+        .TPS546_INIT_VIN_UV_WARN_LIMIT = 0,
+        .TPS546_INIT_VIN_ON = 4.8;
+        .TPS546_INIT_VIN_OFF = 4.5;
+        .TPS546_INIT_VIN_OV_FAULT_LIMIT = 6.5;
+        .TPS546_INIT_SCALE_LOOP = 0.25;
+        .TPS546_INIT_VOUT_MIN = 1;
+        .TPS546_INIT_VOUT_MAX = 2;
+        .TPS546_INIT_VOUT_COMMAND = 1.2;
+        .TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00;
+        .TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00;
         // Single-phase configuration
-        config.TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
-        config.TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
-        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x13;
-        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x11;
-        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0x08;
-        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x19;
-        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x04;
+        .TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
+        .TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
+        .TPS546_INIT_COMPENSATION_CONFIG[0] = 0x13;
+        .TPS546_INIT_COMPENSATION_CONFIG[1] = 0x11;
+        .TPS546_INIT_COMPENSATION_CONFIG[2] = 0x08;
+        .TPS546_INIT_COMPENSATION_CONFIG[3] = 0x19;
+        .TPS546_INIT_COMPENSATION_CONFIG[4] = 0x04;
         break;
     }
 
