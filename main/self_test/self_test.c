@@ -86,8 +86,22 @@ static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 {
     uint16_t fan_speed = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
     ESP_LOGI(TAG, "fanSpeed: %d RPM", fan_speed);
-    if (fan_speed > FAN_SPEED_TARGET_MIN) {
-        return ESP_OK;
+    switch (GLOBAL_STATE->DEVICE_CONFIG.family.id) {
+        case GAMMA:
+            if (fan_speed > 1000) {
+                return ESP_OK;
+            }
+            break;
+        case GAMMA_TURBO:
+            if (fan_speed > 500) {
+                return ESP_OK;
+            }
+            break;
+        default:
+            if (fan_speed > 1000) {
+                return ESP_OK;
+            }
+            break;
     }
 
     // fan test failed
@@ -174,8 +188,7 @@ esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE)
 {
     ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
 
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, 1.150), TAG,
-                        "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, 1.150), TAG, "VCORE set voltage failed!");
 
     return ESP_OK;
 }
@@ -226,7 +239,7 @@ esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE)
 
     ESP_RETURN_ON_ERROR(Thermal_init(&GLOBAL_STATE->DEVICE_CONFIG), TAG, "THERMAL init failed");
 
-    //ESP_RETURN_ON_ERROR(Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1), TAG, "THERMAL set fan percent failed");
+    // ESP_RETURN_ON_ERROR(Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1), TAG, "THERMAL set fan percent failed");
 
     ESP_LOGI(TAG, "Peripherals init success!");
     return ESP_OK;
@@ -416,7 +429,6 @@ bool self_test(void * pvParameters)
 
     Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1);
 
-
     ESP_LOGI(TAG, "Sending work");
 
     //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, &job);
@@ -488,7 +500,7 @@ bool self_test(void * pvParameters)
 
     float expected_hashrate_mhs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value *
                                   GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count *
-                                  GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0f * 
+                                  GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0f *
                                   GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target;
 
     ESP_LOGI(TAG, "Hashrate: %.2f Gh/s, Expected: %.2f Gh/s", hashrate, expected_hashrate_mhs);
@@ -500,14 +512,11 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
-
     if (current_job != NULL) {
         free_bm_job(current_job);
     }
     free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
     free(GLOBAL_STATE->valid_jobs);
-
-
 
     if (test_core_voltage(GLOBAL_STATE) != ESP_OK) {
         tests_done(GLOBAL_STATE, false);
