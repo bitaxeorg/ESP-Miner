@@ -7,57 +7,57 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 
-#include "i2c_bitaxe.h"
 #include "DS4432U.h"
-#include "thermal.h"
+#include "TPS546.h"
 #include "adc.h"
+#include "display.h"
+#include "esp_psram.h"
 #include "global_state.h"
+#include "i2c_bitaxe.h"
+#include "input.h"
 #include "nvs_config.h"
 #include "nvs_flash.h"
-#include "display.h"
-#include "screen.h"
-#include "input.h"
-#include "vcore.h"
-#include "utils.h"
-#include "TPS546.h"
-#include "esp_psram.h"
 #include "power.h"
-#include "thermal.h"
 #include "power_management_task.h"
+#include "screen.h"
+#include "thermal.h"
+#include "utils.h"
+#include "vcore.h"
 
-#include "bm1397.h"
+#include "asic.h"
+#include "asic_reset.h"
 #include "bm1366.h"
 #include "bm1368.h"
 #include "bm1370.h"
-#include "asic.h"
+#include "bm1397.h"
 #include "device_config.h"
-#include "asic_reset.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
 /////Test Constants/////
-//Test Fan Speed
-#define FAN_SPEED_TARGET_MIN 1000 //RPM
+// Test Fan Speed
+#define FAN_SPEED_TARGET_MIN 1000 // RPM
 
-//Test Core Voltage
-#define CORE_VOLTAGE_TARGET_MIN 1000 //mV
-#define CORE_VOLTAGE_TARGET_MAX 1300 //mV
+// Test Core Voltage
+#define CORE_VOLTAGE_TARGET_MIN 1000 // mV
+#define CORE_VOLTAGE_TARGET_MAX 1300 // mV
 
-//Test Power Consumption
-#define POWER_CONSUMPTION_MARGIN 3              //+/- watts
+// Test Power Consumption
+#define POWER_CONSUMPTION_MARGIN 3 //+/- watts
 
-//Test Difficulty
-#define DIFFICULTY 8
+// Test Difficulty
+#define DIFFICULTY 16
 
 static const char * TAG = "self_test";
 
 static SemaphoreHandle_t longPressSemaphore;
 static bool isFactoryTest = false;
 
-//local function prototypes
+// local function prototypes
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
-static bool should_test() {
+static bool should_test()
+{
     bool is_factory_flash = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF) < 1;
     bool is_self_test_flag_set = nvs_config_get_bool(NVS_CONFIG_SELF_TEST);
     if (is_factory_flash && is_self_test_flag_set) {
@@ -69,13 +69,14 @@ static bool should_test() {
     return gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed
 }
 
-static void reset_self_test() {
+static void reset_self_test()
+{
     ESP_LOGI(TAG, "Long press detected...");
     // Give the semaphore back
     xSemaphoreGive(longPressSemaphore);
 }
 
-static void display_msg(char * msg, GlobalState * GLOBAL_STATE) 
+static void display_msg(char * msg, GlobalState * GLOBAL_STATE)
 {
     GLOBAL_STATE->SELF_TEST_MODULE.message = msg;
     vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -89,16 +90,16 @@ static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
         return ESP_OK;
     }
 
-    //fan test failed
+    // fan test failed
     ESP_LOGE(TAG, "FAN test failed!");
-    display_msg("FAN:WARN", GLOBAL_STATE);  
+    display_msg("FAN:WARN", GLOBAL_STATE);
     return ESP_FAIL;
 }
 
 static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 {
-    float target_power = (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
-    float margin = (float)POWER_CONSUMPTION_MARGIN;
+    float target_power = (float) GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
+    float margin = (float) POWER_CONSUMPTION_MARGIN;
 
     float power = Power_get_power(GLOBAL_STATE);
     ESP_LOGI(TAG, "Power: %.2f W", power);
@@ -120,13 +121,14 @@ static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
     if (core_voltage > CORE_VOLTAGE_TARGET_MIN && core_voltage < CORE_VOLTAGE_TARGET_MAX) {
         return ESP_OK;
     }
-    //tests failed
+    // tests failed
     ESP_LOGE(TAG, "Core Voltage TEST FAIL, INCORRECT CORE VOLTAGE");
     display_msg("VCORE:FAIL", GLOBAL_STATE);
     return ESP_FAIL;
 }
 
-esp_err_t test_display(GlobalState * GLOBAL_STATE) {
+esp_err_t test_display(GlobalState * GLOBAL_STATE)
+{
     // Display testing
     if (display_init(GLOBAL_STATE) != ESP_OK) {
         display_msg("DISPLAY:FAIL", GLOBAL_STATE);
@@ -142,19 +144,21 @@ esp_err_t test_display(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_input(GlobalState * GLOBAL_STATE) {
+esp_err_t test_input(GlobalState * GLOBAL_STATE)
+{
     // Input testing
     if (input_init(NULL, reset_self_test) != ESP_OK) {
         display_msg("INPUT:FAIL", GLOBAL_STATE);
         return ESP_FAIL;
     }
-            
+
     ESP_LOGI(TAG, "INPUT init success!");
 
     return ESP_OK;
 }
 
-esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
+esp_err_t test_screen(GlobalState * GLOBAL_STATE)
+{
     // Screen testing
     if (screen_start(GLOBAL_STATE) != ESP_OK) {
         display_msg("SCREEN:FAIL", GLOBAL_STATE);
@@ -166,16 +170,19 @@ esp_err_t test_screen(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
+esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE)
+{
     ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
 
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE) / 1000.0), TAG, "VCORE set voltage failed!");
-    
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, 1.150), TAG,
+                        "VCORE set voltage failed!");
+
     return ESP_OK;
 }
 
-esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
-    //check for faults on the voltage regulator
+esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE)
+{
+    // check for faults on the voltage regulator
     ESP_RETURN_ON_ERROR(VCORE_check_fault(GLOBAL_STATE), TAG, "VCORE check fault failed!");
 
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault) {
@@ -184,9 +191,10 @@ esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
-    
-    //enable the voltage regulator GPIO on HW that supports it
+esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE)
+{
+
+    // enable the voltage regulator GPIO on HW that supports it
     if (GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
         gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
         gpio_set_level(GPIO_ASIC_ENABLE, 0);
@@ -195,7 +203,7 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
     if (init_voltage_regulator(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "VCORE init failed!");
         display_msg("VCORE:FAIL", GLOBAL_STATE);
-        //tests_done(GLOBAL_STATE, false);
+        // tests_done(GLOBAL_STATE, false);
         return ESP_FAIL;
     }
 
@@ -204,7 +212,7 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
         if (DS4432U_test() != ESP_OK) {
             ESP_LOGE(TAG, "DS4432 test failed!");
             display_msg("DS4432U:FAIL", GLOBAL_STATE);
-            //tests_done(GLOBAL_STATE, false);
+            // tests_done(GLOBAL_STATE, false);
             return ESP_FAIL;
         }
     }
@@ -213,18 +221,20 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
-    
+esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE)
+{
+
     ESP_RETURN_ON_ERROR(Thermal_init(&GLOBAL_STATE->DEVICE_CONFIG), TAG, "THERMAL init failed");
 
-    ESP_RETURN_ON_ERROR(Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1), TAG, "THERMAL set fan percent failed");
+    //ESP_RETURN_ON_ERROR(Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1), TAG, "THERMAL set fan percent failed");
 
     ESP_LOGI(TAG, "Peripherals init success!");
     return ESP_OK;
 }
 
-esp_err_t test_psram(GlobalState * GLOBAL_STATE){
-    if(!esp_psram_is_initialized()) {
+esp_err_t test_psram(GlobalState * GLOBAL_STATE)
+{
+    if (!esp_psram_is_initialized()) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32!");
         display_msg("PSRAM:FAIL", GLOBAL_STATE);
         return ESP_FAIL;
@@ -235,7 +245,7 @@ esp_err_t test_psram(GlobalState * GLOBAL_STATE){
 /**
  * @brief Perform a self-test of the system.
  *
- * This function is intended to be run as a task and will execute a series of 
+ * This function is intended to be run as a task and will execute a series of
  * diagnostic tests to ensure the system is functioning correctly.
  *
  * @param pvParameters Pointer to the parameters passed to the task (if any).
@@ -246,13 +256,16 @@ bool self_test(void * pvParameters)
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
     // Should we run the self-test?
-    if (!should_test()) return false;
+    if (!should_test())
+        return false;
 
     if (isFactoryTest) {
         ESP_LOGI(TAG, "Running factory self-test");
     } else {
         ESP_LOGI(TAG, "Running manual self-test");
     }
+
+    char logString[300];
 
     GLOBAL_STATE->SELF_TEST_MODULE.is_active = true;
 
@@ -266,37 +279,37 @@ bool self_test(void * pvParameters)
         return true;
     }
 
-    //Run PSRAM test
-    if(test_psram(GLOBAL_STATE) != ESP_OK) {
+    // Run PSRAM test
+    if (test_psram(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "NO PSRAM on device!");
         tests_done(GLOBAL_STATE, false);
     }
 
-    //Run display tests
+    // Run display tests
     if (test_display(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Display test failed!");
         tests_done(GLOBAL_STATE, false);
     }
 
-    //Run input tests
+    // Run input tests
     if (test_input(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Input test failed!");
         tests_done(GLOBAL_STATE, false);
     }
 
-    //Run screen tests
+    // Run screen tests
     if (test_screen(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Screen test failed!");
         tests_done(GLOBAL_STATE, false);
     }
 
-    //Init peripherals EMC2101 and INA260 (if present)
+    // Init peripherals EMC2101 and INA260 (if present)
     if (test_init_peripherals(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Peripherals init failed!");
         tests_done(GLOBAL_STATE, false);
     }
 
-    //Voltage Regulator Testing
+    // Voltage Regulator Testing
     if (test_voltage_regulator(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Voltage Regulator test failed!");
         tests_done(GLOBAL_STATE, false);
@@ -307,7 +320,7 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
-    //test for number of ASICs
+    // test for number of ASICs
     if (SERIAL_init() != ESP_OK) {
         ESP_LOGE(TAG, "SERIAL init failed!");
         tests_done(GLOBAL_STATE, false);
@@ -329,7 +342,7 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
-    //test for voltage regulator faults
+    // test for voltage regulator faults
     if (test_vreg_faults(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "VCORE check fault failed!");
         char error_buf[20];
@@ -339,7 +352,7 @@ bool self_test(void * pvParameters)
     }
     GLOBAL_STATE->ASIC_initalized = true;
 
-    //setup and test hashrate
+    // setup and test hashrate
     int baud = ASIC_set_max_baud(GLOBAL_STATE);
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
@@ -369,15 +382,13 @@ bool self_test(void * pvParameters)
     extranonce_2_generate(1, 8, extranonce_2_str);
 
     uint8_t coinbase_tx_hash[32];
-    calculate_coinbase_tx_hash("01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfab" 
+    calculate_coinbase_tx_hash("01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfab"
                                "e6d6d5cbab26a2599e92916edec5657a94a0708ddb970f5c45b5d",
                                "31650707758de07b010000000000001cfd7038212f736c7573682f000000000379ad0c2a000000001976a9147c154ed"
                                "1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3ae725d3994b811572"
                                "c1f345deb98b56b465ef8e153ecbbd27fa37bf1b005161380000000000000000266a24aa21a9ed63b06a7946b190a3f"
                                "da1d76165b25c9b883bcc6621b040773050ee2a1bb18f1800000000",
-                               "12905085617eff8e",
-                               extranonce_2_str,
-                               coinbase_tx_hash);
+                               "12905085617eff8e", extranonce_2_str, coinbase_tx_hash);
 
     uint8_t merkles[13][32];
     int num_merkles = 13;
@@ -399,61 +410,104 @@ bool self_test(void * pvParameters)
     uint8_t merkle_root[32];
     calculate_merkle_root_hash(coinbase_tx_hash, merkles, num_merkles, merkle_root);
 
-    bm_job job = {0};
-    construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000, &job);
+    bm_job base_job = {0};
+    construct_bm_job(&notify_message, merkle_root, 0x1fffe000, 1000000, &base_job);
+    bm_job * job = NULL;
+
+    Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1);
+
 
     ESP_LOGI(TAG, "Sending work");
 
     //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, &job);
-    ASIC_send_work(GLOBAL_STATE, &job);
-    
+    job = calloc(1, sizeof(bm_job));
+    if (job == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate job");
+        tests_done(GLOBAL_STATE, false);
+    }
+    memcpy(job, &base_job, sizeof(bm_job));
+    ASIC_send_work(GLOBAL_STATE, job);
+    bm_job * current_job = job;
+
+    float asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
+    ESP_LOGI(TAG, "ASIC Temp %f", asic_temp);
+
+    // detect open circiut / no result
+    if (asic_temp == -1.0 || asic_temp == 127.0) {
+        snprintf(logString, sizeof(logString), "TEMP:FAIL :%.0f", asic_temp);
+        display_msg(logString, GLOBAL_STATE);
+        tests_done(GLOBAL_STATE, false);
+    }
+
     uint32_t start_ms = esp_timer_get_time() / 1000;
     uint32_t duration_ms = 0;
     uint32_t counter = 0;
     float hashrate = 0;
-    uint32_t hashtest_ms = 5000;
+    uint32_t hashtest_ms = 30000;
+    uint32_t last_job_duration = 0;
 
     while (duration_ms < hashtest_ms) {
         task_result * asic_result = ASIC_process_work(GLOBAL_STATE);
         if (asic_result != NULL) {
             // check the nonce difficulty
-            double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
-            counter += DIFFICULTY;
-            duration_ms = (esp_timer_get_time() / 1000) - start_ms;
-            hashrate = hashCounterToGhs(duration_ms, counter);
+            double nonce_diff = test_nonce_value(current_job, asic_result->nonce, asic_result->rolled_version);
+            if (nonce_diff >= DIFFICULTY) {
+                counter += DIFFICULTY;
+                duration_ms = (esp_timer_get_time() / 1000) - start_ms;
+                hashrate = hashCounterToGhs(duration_ms, counter);
 
-            ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
-            ESP_LOGI(TAG, "%f Gh/s  , duration %dms", hashrate, duration_ms);
+                ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
+                ESP_LOGI(TAG, "%f Gh/s  , duration %dms", hashrate, duration_ms);
+
+                if (duration_ms - last_job_duration > 1000) {
+                    // resend job every second to keep asics busy
+                    base_job.ntime++;
+                    bm_job * resend_job = calloc(1, sizeof(bm_job));
+                    if (resend_job != NULL) {
+                        memcpy(resend_job, &base_job, sizeof(bm_job));
+                        ASIC_send_work(GLOBAL_STATE, resend_job);
+                        current_job = resend_job;
+                    } else {
+                        ESP_LOGE(TAG, "Failed to allocate resend job");
+                    }
+                    last_job_duration = duration_ms;
+                    asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
+                    if (asic_temp > 55) {
+                        snprintf(logString, sizeof(logString), "TEMP:FAIL :%.0f", asic_temp);
+                        display_msg(logString, GLOBAL_STATE);
+                        tests_done(GLOBAL_STATE, false);
+                    }
+                    snprintf(logString, sizeof(logString), "%.0fGH/s %.0fC", hashrate, asic_temp);
+                    display_msg(logString, GLOBAL_STATE);
+                }
+            }
         }
     }
 
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
-    float expected_hashrate_mhs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value 
-                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count 
-                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target
-                                * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count
-                                / 1000.0f;
+    float expected_hashrate_mhs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value *
+                                  GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count *
+                                  GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0f * 
+                                  GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target;
 
     ESP_LOGI(TAG, "Hashrate: %.2f Gh/s, Expected: %.2f Gh/s", hashrate, expected_hashrate_mhs);
 
+    snprintf(logString, sizeof(logString), "%.0fGH/s ", hashrate);
+    display_msg(logString, GLOBAL_STATE);
     if (hashrate < expected_hashrate_mhs) {
         display_msg("HASHRATE:FAIL", GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
     }
 
+
+    if (current_job != NULL) {
+        free_bm_job(current_job);
+    }
     free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
     free(GLOBAL_STATE->valid_jobs);
 
 
-    float asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
-    ESP_LOGI(TAG, "ASIC Temp: %.2f C", asic_temp);
-
-    // detect open circiut / no result
-    if(asic_temp == -1.0 || asic_temp == 127.0){
-        display_msg("TEMP:FAIL", GLOBAL_STATE);
-        tests_done(GLOBAL_STATE, false);
-    }
 
     if (test_core_voltage(GLOBAL_STATE) != ESP_OK) {
         tests_done(GLOBAL_STATE, false);
@@ -461,13 +515,13 @@ bool self_test(void * pvParameters)
 
     // TODO: Maybe make a test equivalent for test values
     if (test_power_consumption(GLOBAL_STATE) != ESP_OK) {
-        ESP_LOGE(TAG, "Power Draw Failed, target %.2f W", (float)GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
+        ESP_LOGE(TAG, "Power Draw Failed, target %.2f W", (float) GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target);
         display_msg("POWER:FAIL", GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
     }
 
-    if (test_fan_sense(GLOBAL_STATE) != ESP_OK) {     
-        ESP_LOGE(TAG, "Fan test failed!"); 
+    if (test_fan_sense(GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Fan test failed!");
         tests_done(GLOBAL_STATE, false);
     }
 
@@ -476,7 +530,7 @@ bool self_test(void * pvParameters)
     return true;
 }
 
-static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed) 
+static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
 {
     VCORE_set_voltage(GLOBAL_STATE, 0.0f);
 
@@ -492,8 +546,11 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
         // isTestFailed
         GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST FAIL!";
         if (isFactoryTest) {
-            ESP_LOGI(TAG, "SELF-TEST FAIL! -- Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.");
-            GLOBAL_STATE->SELF_TEST_MODULE.finished = "Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.";
+            ESP_LOGI(
+                TAG,
+                "SELF-TEST FAIL! -- Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.");
+            GLOBAL_STATE->SELF_TEST_MODULE.finished =
+                "Hold BOOT button for 2 seconds to cancel self-test, or press RESET to run self-test again.";
             GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
         } else {
             ESP_LOGI(TAG, "SELF-TEST FAIL -- Press RESET button to restart.");
@@ -505,11 +562,10 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
                 ESP_LOGI(TAG, "Self-test flag cleared");
                 nvs_config_set_bool(NVS_CONFIG_SELF_TEST, false);
                 // Wait until NVS is written
-                vTaskDelay(100/ portTICK_PERIOD_MS);
+                vTaskDelay(100 / portTICK_PERIOD_MS);
                 esp_restart();
             }
         }
-        
     }
     GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
 }

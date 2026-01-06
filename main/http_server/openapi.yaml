@@ -120,6 +120,8 @@ components:
         - fallbackStratumSuggestedDifficulty
         - fallbackStratumURL
         - fallbackStratumUser
+        - fallbackStratumTLS
+        - fallbackStratumCert
         - fanrpm
         - fan2rpm
         - fanspeed
@@ -147,10 +149,9 @@ components:
         - nominalVoltage
         - overheat_mode
         - overclockEnabled
-        - poolAddrFamily
+        - poolConnectionInfo
         - poolDifficulty
         - power
-        - power_fault
         - resetReason
         - responseTime
         - runningPartition
@@ -166,6 +167,8 @@ components:
         - stratumSuggestedDifficulty
         - stratumURL
         - stratumUser
+        - stratumTLS
+        - stratumCert
         - temp
         - temp2
         - uptimeSeconds
@@ -228,6 +231,12 @@ components:
         fallbackStratumUser:
           type: string
           description: Fallback stratum username
+        fallbackStratumTLS:
+          type: boolean
+          description: Enable fallback stratum TLS
+        fallbackStratumCert:
+          type: string
+          description: Fallback stratum TLS cert
         fanrpm:
           type: number
           description: Current fan speed in RPM
@@ -312,9 +321,9 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
-        poolAddrFamily:
-          type: integer
-          description: Current pool address family (2 = v4, 10 = v6)
+        poolConnectionInfo:
+          type: string
+          description: Current pool address family
         poolDifficulty:
           type: number
           description: Current pool difficulty
@@ -368,6 +377,12 @@ components:
         stratumUser:
           type: string
           description: Primary stratum username
+        stratumTLS:
+          type: boolean
+          description: Enable primary pool TLS
+        stratumCert:
+          type: string
+          description: Primary stratum TLS cert
         temp:
           type: number
           description: Average chip temperature

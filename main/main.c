@@ -56,6 +56,12 @@ void app_main(void)
         return;
     }
 
+    // Ensure SSID is initialized before any screen/self-test uses it.
+    GLOBAL_STATE.SYSTEM_MODULE.ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
+    if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL) {
+        GLOBAL_STATE.SYSTEM_MODULE.ssid = strdup("");
+    }
+
     if (device_config_init(&GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init device config");
         return;
