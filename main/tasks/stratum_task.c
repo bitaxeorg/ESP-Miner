@@ -5,6 +5,7 @@
 #include "lwip/dns.h"
 #include <lwip/tcpip.h>
 #include <lwip/netdb.h>
+#include <esp_netif.h>
 #include "nvs_config.h"
 #include "stratum_task.h"
 #include "work_queue.h"
@@ -68,95 +69,124 @@ typedef struct {
 
 static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, stratum_connection_info_t *conn_info)
 {
+    // Input validation
+    if (hostname == NULL || conn_info == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (port == 0) {
+        ESP_LOGE(TAG, "Invalid port: 0");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char port_str[6];
+    snprintf(port_str, sizeof(port_str), "%u", port);
+
+    ESP_LOGD(TAG, "Resolving address for %s:%u", hostname, port);
+
     struct addrinfo hints = {
-        .ai_family = AF_UNSPEC,
+        .ai_family   = AF_UNSPEC,
         .ai_socktype = SOCK_STREAM,
         .ai_protocol = IPPROTO_TCP,
-        .ai_flags = AI_NUMERICSERV  // Port is numeric
+        .ai_flags    = AI_NUMERICSERV
     };
-    struct addrinfo *res;
-    char port_str[6];
-    
-    snprintf(port_str, sizeof(port_str), "%d", port);
-    
-    ESP_LOGD(TAG, "Resolving address for hostname: %s (port %d)", hostname, port);
-    
-    int gai_err = getaddrinfo(hostname, port_str, &hints, &res);
-    if (gai_err != 0) {
-        ESP_LOGE(TAG, "getaddrinfo failed for %s: error code %d", hostname, gai_err);
-        return ESP_FAIL;
+
+    struct addrinfo *res = NULL;
+    int gai_err = esp_getaddrinfo(hostname, port_str, &hints, &res);
+    if (gai_err != 0 || res == NULL) {
+        ESP_LOGE(TAG, "DNS resolution failed for %s:%u (error: %d)", hostname, port, gai_err);
+        return ESP_ERR_NOT_FOUND;
     }
 
-    memset(conn_info, 0, sizeof(stratum_connection_info_t));
+    // Initialize connection info
+    memset(conn_info, 0, sizeof(*conn_info));
     conn_info->addr_family = AF_UNSPEC;
 
-    // Prefer IPv6
-    struct addrinfo *p;
-    for (p = res; p != NULL; p = p->ai_next) {
-        if (p->ai_family == AF_INET6) {
-            memcpy(&conn_info->dest_addr, p->ai_addr, p->ai_addrlen);
-            conn_info->addrlen = p->ai_addrlen;
-            conn_info->addr_family = AF_INET6;
-            conn_info->ip_protocol = IPPROTO_IPV6;
-            
-            // Log scope ID for IPv6 link-local addresses
-            struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
-            if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr)) {
-                ESP_LOGI(TAG, "Link-local IPv6 address detected, scope_id: %lu", (unsigned long)addr6->sin6_scope_id);
-                if (addr6->sin6_scope_id == 0) {
-                    ESP_LOGW(TAG, "Warning: Link-local IPv6 without scope ID - attempting to set from WIFI_STA_DEF");
-                    // Try to get the WiFi STA interface index
-                    esp_netif_t *esp_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-                    if (esp_netif) {
-                        int netif_index = esp_netif_get_netif_impl_index(esp_netif);
-                        if (netif_index >= 0) {
-                            addr6->sin6_scope_id = (u32_t)netif_index;
-                            ESP_LOGI(TAG, "Set scope_id to interface index: %lu", (unsigned long)addr6->sin6_scope_id);
-                        }
-                    }
-                }
-            }
-            break;
-        }
-    }
+    // Preferred order: IPv4 first, then IPv6
+    const int preferred_families[] = { AF_INET, AF_INET6 };
+    const size_t num_families = sizeof(preferred_families) / sizeof(preferred_families[0]);
 
-    // If no IPv6, use IPv4
-    if (conn_info->addr_family == AF_UNSPEC) {
-        for (p = res; p != NULL; p = p->ai_next) {
-            if (p->ai_family == AF_INET) {
-                memcpy(&conn_info->dest_addr, p->ai_addr, p->ai_addrlen);
-                conn_info->addrlen = p->ai_addrlen;
-                conn_info->addr_family = AF_INET;
-                conn_info->ip_protocol = IPPROTO_IP;
+    const struct addrinfo *selected = NULL;
+
+    for (size_t i = 0; i < num_families && selected == NULL; i++) {
+        int family = preferred_families[i];
+
+        for (const struct addrinfo *p = res; p != NULL; p = p->ai_next) {
+            if (p->ai_family == family) {
+                selected = p;
                 break;
             }
         }
     }
 
-    freeaddrinfo(res);
-
-    if (conn_info->addr_family == AF_UNSPEC) {
-        ESP_LOGE(TAG, "No suitable address found for %s", hostname);
-        return ESP_FAIL;
+    if (selected == NULL) {
+        ESP_LOGE(TAG, "No supported address family (IPv4 or IPv6) found for %s", hostname);
+        freeaddrinfo(res);
+        return ESP_ERR_NOT_SUPPORTED;
     }
 
-    // Convert address to string for logging
-    if (conn_info->addr_family == AF_INET6) {
+    // Copy selected address
+    memcpy(&conn_info->dest_addr, selected->ai_addr, selected->ai_addrlen);
+    conn_info->addrlen     = selected->ai_addrlen;
+    conn_info->addr_family = selected->ai_family;
+    conn_info->ip_protocol = (selected->ai_family == AF_INET) ? IPPROTO_IP : IPPROTO_IPV6;
+
+    // Handle IPv6 link-local scope ID if needed
+    if (selected->ai_family == AF_INET6) {
         struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
-        inet_ntop(AF_INET6, &addr6->sin6_addr,
-                  conn_info->host_ip, sizeof(conn_info->host_ip));
-        
-        // Append zone identifier for link-local addresses
-        if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr) && addr6->sin6_scope_id != 0) {
-            char zone_buf[16];
-            snprintf(zone_buf, sizeof(zone_buf), "%%%lu", addr6->sin6_scope_id);
-            strncat(conn_info->host_ip, zone_buf, sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
+
+        if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr)) {
+            if (addr6->sin6_scope_id == 0) {
+                ESP_LOGW(TAG, "Link-local IPv6 address without scope ID - attempting to set from WiFi STA interface");
+
+                esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+                if (netif) {
+                    int index = esp_netif_get_netif_impl_index(netif);
+                    if (index >= 0) {
+                        addr6->sin6_scope_id = (uint32_t)index;
+                        ESP_LOGI(TAG, "Set IPv6 scope_id to interface index: %lu", (unsigned long)addr6->sin6_scope_id);
+                    } else {
+                        ESP_LOGW(TAG, "Failed to get valid interface index for WIFI_STA_DEF");
+                    }
+                } else {
+                    ESP_LOGW(TAG, "Could not get netif handle for WIFI_STA_DEF");
+                }
+            } else {
+                ESP_LOGI(TAG, "Link-local IPv6 address with existing scope_id: %lu", (unsigned long)addr6->sin6_scope_id);
+            }
         }
-    } else {
-        inet_ntop(AF_INET, &((struct sockaddr_in *)&conn_info->dest_addr)->sin_addr,
-                  conn_info->host_ip, sizeof(conn_info->host_ip));
     }
 
+    // Convert resolved address to string for logging and storage
+    const void *src_addr;
+    int af = conn_info->addr_family;
+
+    if (af == AF_INET) {
+        struct sockaddr_in *addr4 = (struct sockaddr_in *)&conn_info->dest_addr;
+        src_addr = &addr4->sin_addr;
+    } else {
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
+        src_addr = &addr6->sin6_addr;
+    }
+
+    if (inet_ntop(af, src_addr, conn_info->host_ip, sizeof(conn_info->host_ip)) == NULL) {
+        ESP_LOGW(TAG, "inet_ntop failed (errno: %d)", errno);
+        snprintf(conn_info->host_ip, sizeof(conn_info->host_ip), "[invalid %s addr]",
+                 (af == AF_INET) ? "IPv4" : "IPv6");
+    } else if (af == AF_INET6) {
+        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
+        if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr) && addr6->sin6_scope_id != 0) {
+            char zone[16];
+            snprintf(zone, sizeof(zone), "%%%lu", (unsigned long)addr6->sin6_scope_id);
+            strncat(conn_info->host_ip, zone,
+                    sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
+            // Ensure null termination
+            conn_info->host_ip[sizeof(conn_info->host_ip) - 1] = '\0';
+        }
+    }
+
+    ESP_LOGI(TAG, "Resolved %s:%u → %s", hostname, port, conn_info->host_ip);
+
+    freeaddrinfo(res);
     return ESP_OK;
 }
 
@@ -567,6 +597,8 @@ void stratum_task(void * pvParameters)
                 GLOBAL_STATE->extranonce_str = stratum_api_v1_message.extranonce_str;
                 GLOBAL_STATE->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
                 free(old_extranonce_str);
+            } else if (stratum_api_v1_message.method == MINING_PING) { 
+                STRATUM_V1_pong(GLOBAL_STATE->transport, stratum_api_v1_message.message_id);
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
                 ESP_LOGE(TAG, "Pool requested client reconnect...");
                 stratum_close_connection(GLOBAL_STATE);

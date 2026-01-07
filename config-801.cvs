@@ -23,9 +23,9 @@ asicfrequency,data,u16,525
 asicvoltage,data,u16,1150
 asicmodel,data,string,BM1370
 devicemodel,data,string,gammaturbo
-boardversion,data,string,800
+boardversion,data,string,801
 rotation,data,u16,0
 autofanspeed,data,u16,1
 fanspeed,data,u16,100
-selftest,data,u16,0
+selftest,data,u16,1
 overheat_mode,data,u16,0

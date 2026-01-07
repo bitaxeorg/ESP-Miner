@@ -1,6 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { LogsComponent } from './logs.component';
+import { provideToastr } from 'ngx-toastr';
+import { ButtonModule } from 'primeng/button';
+import { ReactiveFormsModule } from '@angular/forms';
+import { TooltipModule } from 'primeng/tooltip';
 
 describe('LogsComponent', () => {
   let component: LogsComponent;
@@ -8,7 +12,9 @@ describe('LogsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [LogsComponent]
+      declarations: [LogsComponent],
+      imports: [ButtonModule, ReactiveFormsModule, TooltipModule],
+      providers: [provideToastr()]
     })
     .compileComponents();
     

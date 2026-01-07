@@ -178,12 +178,14 @@ TEST_CASE("Test nonce diff checking", "[mining test_nonce][not-on-qemu]")
     notify_message.target = 0x1705ae3a;
     notify_message.ntime = 0x646ff1a9;
     uint8_t merkle_root[32];
-    hex2bin("6d0359c451434605c52a5a9ce074340be47c2c63840731f9edf1db3f26b1cdd9a9f16f64", merkle_root, 32);
+    hex2bin("6d0359c451434605c52a5a9ce074340be47c2c63840731f9edf1db3f26b1cdd9", merkle_root, 32);
     bm_job job = { 0 };
     construct_bm_job(&notify_message, merkle_root, 0, 1000, &job);
 
     uint32_t nonce = 0x276E8947;
-    double diff = test_nonce_value(&job, nonce, 0);
+    uint32_t version_bits = 0;
+    uint32_t rolled_version = job.version | version_bits;
+    double diff = test_nonce_value(&job, nonce, rolled_version);
     TEST_ASSERT_EQUAL_INT(18, (int)diff);
 }
 
@@ -229,6 +231,8 @@ TEST_CASE("Test nonce diff checking 2", "[mining test_nonce][not-on-qemu]")
     construct_bm_job(&notify_message, merkle_root_hash, 0, 1000, &job);
 
     uint32_t nonce = 0x0a029ed1;
-    double diff = test_nonce_value(&job, nonce, 0);
+    uint32_t version_bits = 0;
+    uint32_t rolled_version = job.version | version_bits;
+    double diff = test_nonce_value(&job, nonce, rolled_version);
     TEST_ASSERT_EQUAL_INT(683, (int)diff);
 }
