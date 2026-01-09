@@ -3,7 +3,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ValidatorFn, ValidationErrors, AbstractControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemApiService } from 'src/app/services/system.service';
 
 type PoolType = 'stratum' | 'fallbackStratum';
 
@@ -37,7 +37,7 @@ export class PoolComponent implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private toastr: ToastrService,
     private loadingService: LoadingService
   ) { }

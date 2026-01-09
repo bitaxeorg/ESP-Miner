@@ -5,7 +5,7 @@ import { ToastrService } from 'ngx-toastr';
 import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable, Subscription } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { LayoutService } from "../../layout/service/app.layout.service";
-import { SystemService } from 'src/app/services/system.service';
+import { SystemApiService } from 'src/app/services/system.service';
 import { ModalComponent } from '../modal/modal.component';
 import { SystemInfo as ISystemInfo } from 'src/app/generated';
 
@@ -63,7 +63,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     private toastr: ToastrService,
     private localStorageService: LocalStorageService,
     public layoutService: LayoutService,
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private httpClient: HttpClient
   ) {
 

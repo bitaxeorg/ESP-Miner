@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Observable, Subject, combineLatest, switchMap, shareReplay, first, takeUntil, map, timer } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemApiService } from 'src/app/services/system.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
@@ -34,7 +34,7 @@ export class SystemComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   constructor(
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private loadingService: LoadingService,
     private toastr: ToastrService,
   ) {

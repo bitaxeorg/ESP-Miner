@@ -1,7 +1,7 @@
 import { Component, ElementRef, Input, ViewChild, OnInit, OnDestroy } from '@angular/core';
 import { Observable, shareReplay, Subject, takeUntil } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemApiService } from 'src/app/services/system.service';
 import { LayoutService } from './service/app.layout.service';
 import { SensitiveData } from 'src/app/services/sensitive-data.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated';
@@ -24,7 +24,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
 
   constructor(
     public layoutService: LayoutService,
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private toastr: ToastrService,
     private sensitiveData: SensitiveData,
   ) {
