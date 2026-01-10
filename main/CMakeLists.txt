@@ -24,7 +24,6 @@ SRCS
     "./self_test/self_test.c"
     "./tasks/stratum_task.c"
     "./tasks/create_jobs_task.c"
-    "./tasks/asic_task.c"
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
     "./tasks/statistics_task.c"
