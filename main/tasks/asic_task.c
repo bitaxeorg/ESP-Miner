@@ -43,7 +43,13 @@ void ASIC_task(void *pvParameters)
         }
         
         bm_job *next_bm_job = (bm_job *)queue_dequeue(&GLOBAL_STATE->ASIC_jobs_queue);
-    
+
+        if (next_bm_job == NULL) {
+            ESP_LOGW(TAG, "ASIC_jobs_queue is empty");
+            vTaskDelay(100 / portTICK_PERIOD_MS); // Wait before trying again
+            continue;
+        }
+
         //(*GLOBAL_STATE->ASIC_functions.send_work_fn)(GLOBAL_STATE, next_bm_job); // send the job to the ASIC
         ASIC_send_work(GLOBAL_STATE, next_bm_job);
 
