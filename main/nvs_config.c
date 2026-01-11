@@ -13,6 +13,8 @@
 #include <math.h>
 #include "display.h"
 #include "theme_api.h"
+#include "screen.h"
+#include "default_screens.h"
 
 #define NVS_CONFIG_NAMESPACE "main"
 #define NVS_STR_LIMIT (4000 - 1) // See nvs_set_str
@@ -76,6 +78,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_INVERT_SCREEN]                         = {.nvs_key_name = "invertscreen",    .type = TYPE_BOOL,                                                                         .rest_name = "invertscreen",                       .min = 0,  .max = 1},
     [NVS_CONFIG_DISPLAY_OFFSET]                        = {.nvs_key_name = "displayOffset",   .type = TYPE_U16,   .default_value = {.u16 = LCD_SH1107_PARAM_DEFAULT_DISP_OFFSET },       .rest_name = "displayOffset",                      .min = 0,  .max = UINT8_MAX},
     [NVS_CONFIG_DISPLAY_TIMEOUT]                       = {.nvs_key_name = "displayTimeout",  .type = TYPE_I32,   .default_value = {.i32 = -1},                                          .rest_name = "displayTimeout",                     .min = -1, .max = UINT16_MAX},
+    [NVS_CONFIG_SCREENS]                               = {.nvs_key_name = "screens",         .type = TYPE_STR,   .array_size = MAX_CAROUSEL_SCREENS,                                    .rest_name = "displayScreens",                     .min = 0,  .max = NVS_STR_LIMIT},
 
     [NVS_CONFIG_AUTO_FAN_SPEED]                        = {.nvs_key_name = "autofanspeed",    .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "autofanspeed",                       .min = 0,  .max = 1},
     [NVS_CONFIG_MANUAL_FAN_SPEED]                      = {.nvs_key_name = "manualfanspeed",  .type = TYPE_U16,   .default_value = {.u16 = 100},                                         .rest_name = "manualFanSpeed",                     .min = 0,  .max = 100},
@@ -269,19 +272,20 @@ esp_err_t nvs_config_init(void)
         setting->value = calloc(count, sizeof(ConfigValue));
 
         for (int idx = 0; idx < count; idx++) {
-            char key[NVS_KEY_NAME_MAX_SIZE];
-            get_nvs_key_name(setting, idx, key);
+            char nvs_key[NVS_KEY_NAME_MAX_SIZE];
+            get_nvs_key_name(setting, idx, nvs_key);
 
             switch (setting->type) {
                 case TYPE_STR: {
                     size_t len = 0;
-                    esp_err_t ret = nvs_get_str(handle, key, NULL, &len);
+                    esp_err_t ret = nvs_get_str(handle, nvs_key, NULL, &len);
                     if (ret == ESP_OK && len > 1) {
                         char *buf = malloc(len);
                         if (buf) {
-                            ret = nvs_get_str(handle, key, buf, &len);
+                            ret = nvs_get_str(handle, nvs_key, buf, &len);
                             if (ret == ESP_OK) {
                                 setting->value[idx].str = buf;
+                                ESP_LOGI(TAG, "%s: %s", nvs_key, buf);
                                 break;
                             }
                             free(buf);
@@ -290,36 +294,42 @@ esp_err_t nvs_config_init(void)
 
                     const char *def = setting->default_value.str ? setting->default_value.str : "";
                     setting->value[idx].str = strdup(def);
+
+                    // For display screens, if default is empty, use default_screens
+                    if (key == NVS_CONFIG_SCREENS && setting->value[idx].str[0] == '\0') {
+                        free(setting->value[idx].str);
+                        setting->value[idx].str = strdup(default_screens[idx]);
+                    }
                     break;
                 }
                 case TYPE_U16: {
                     uint16_t val;
-                    ret = nvs_get_u16(handle, key, &val);
+                    ret = nvs_get_u16(handle, nvs_key, &val);
                     setting->value[idx].u16 = (ret == ESP_OK) ? val : setting->default_value.u16;
                     break;
                 }
                 case TYPE_I32: {
                     int32_t val;
-                    ret = nvs_get_i32(handle, key, &val);
+                    ret = nvs_get_i32(handle, nvs_key, &val);
                     setting->value[idx].i32 = (ret == ESP_OK) ? val : setting->default_value.i32;
                     break;
                 }
                 case TYPE_U64: {
                     uint64_t val;
-                    ret = nvs_get_u64(handle, key, &val);
+                    ret = nvs_get_u64(handle, nvs_key, &val);
                     setting->value[idx].u64 = (ret == ESP_OK) ? val : setting->default_value.u64;
                     break;
                 }
                 case TYPE_FLOAT: {
                     char buf[32];
                     size_t len = sizeof(buf);
-                    ret = nvs_get_str(handle, key, buf, &len);
+                    ret = nvs_get_str(handle, nvs_key, buf, &len);
                     setting->value[idx].f = (ret == ESP_OK) ? atof(buf) : setting->default_value.f;
                     break;
                 }
                 case TYPE_BOOL: {
                     uint16_t val;
-                    ret = nvs_get_u16(handle, key, &val);
+                    ret = nvs_get_u16(handle, nvs_key, &val);
                     setting->value[idx].b = (ret == ESP_OK) ? (val != 0) : setting->default_value.b;
                     break;
                 }

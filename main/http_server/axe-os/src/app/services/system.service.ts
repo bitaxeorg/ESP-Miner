@@ -273,4 +273,97 @@ export class SystemService {
   public updateSwarm(uri: string = '', swarmConfig: any) {
     return this.httpClient.patch(`${uri}/api/swarm`, swarmConfig);
   }
+
+  public getDisplayScreens(uri: string = ''): Observable<{ screens: string[] }> {
+    if (environment.production) {
+      return this.httpClient.get<{ screens: string[] }>(`${uri}/api/display/screens`).pipe(timeout(5000));
+    }
+
+    // Mock data for development
+    return of({
+      screens: [
+        "Gh/s: {hashrate}",
+        "J/Th: {efficiency}",
+        "Temp: {temp}°C",
+        "Best: {best_diff}"
+      ]
+    }).pipe(delay(1000));
+  }
+
+  public updateDisplayScreens(uri: string = '', screens: string[]): Observable<any> {
+    if (environment.production) {
+      return this.httpClient.post(`${uri}/api/display/screens`, { screens });
+    }
+
+    return of({ success: true }).pipe(delay(1000));
+  }
+
+  public resetDisplayScreens(uri: string = ''): Observable<any> {
+    if (environment.production) {
+      return this.httpClient.post(`${uri}/api/display/screens/reset`, {});
+    }
+
+    return of({ success: true }).pipe(delay(1000));
+  }
+
+  public getDisplayVariables(uri: string = ''): Observable<string[]> {
+    if (environment.production) {
+      return this.httpClient.get<string[]>(`${uri}/api/display/variables`).pipe(timeout(5000));
+    }
+
+    // Mock data for development
+    return of([
+      "hashrate",
+      "hashrate_1m",
+      "hashrate_10m",
+      "hashrate_1h",
+      "expected_hashrate",
+      "frequency",
+      "power",
+      "efficiency",
+      "voltage",
+      "core_voltage",
+      "amps",
+      "power_fault",
+      "temp",
+      "vr_temp",
+      "temp_target",
+      "chip_temp2_avg",
+      "fan",
+      "fan_rpm",
+      "fan2_rpm",
+      "pool_connection_info",
+      "pool",
+      "pool_difficulty",
+      "stratum_url",
+      "stratum_port",
+      "stratum_user",
+      "response_time",
+      "is_using_fallback_stratum",
+      "shares_a",
+      "shares_r",
+      "work_received",
+      "error_percentage",
+      "session_diff",
+      "best_diff",
+      "block_found",
+      "ssid",
+      "wifi_status",
+      "ipv6_addr_str",
+      "ip",
+      "rssi",
+      "signal",
+      "uptime",
+      "network_diff",
+      "scriptsig",
+      "block_height",
+      "hostname",
+      "device_model",
+      "asic_model",
+      "board_version",
+      "version",
+      "axe_os_version",
+      "free_heap"
+    ]).pipe(delay(1000));
+  }
 }
