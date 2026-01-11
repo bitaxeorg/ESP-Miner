@@ -4,9 +4,12 @@ import { delay, Observable, of, timeout } from 'rxjs';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
-import { ISystemInfo } from 'src/models/ISystemInfo';
-import { ISystemStatistics } from 'src/models/ISystemStatistics';
-import { ISystemASIC } from 'src/models/ISystemASIC';
+import {
+  SystemInfo as ISystemInfo,
+  SystemStatistics as ISystemStatistics,
+  SystemASIC as ISystemASIC,
+  SystemASICASICModelEnum
+} from 'src/app/generated';
 
 import { environment } from '../../environments/environment';
 
@@ -65,20 +68,20 @@ export class SystemService {
         ],
         uptimeSeconds: 38,
         smallCoreCount: 672,
-        ASICModel: "BM1370",
+        ASICModel: "BM1370" as SystemASICASICModelEnum,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         stratumSuggestedDifficulty: 1000,
-        stratumExtranonceSubscribe: 0,
-        stratumTLS: 0,
+        stratumExtranonceSubscribe: !!0,
+        stratumTLS: !!0,
         stratumCert: "",
         fallbackStratumURL: "test.public-pool.io",
         fallbackStratumPort: 21497,
         fallbackStratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         fallbackStratumSuggestedDifficulty: 1000,
-        fallbackStratumExtranonceSubscribe: 0,
-        fallbackStratumTLS: 0,
+        fallbackStratumExtranonceSubscribe: !!0,
+        fallbackStratumTLS: !!0,
         fallbackStratumCert: "",
         poolDifficulty: 1000,
         responseTime: 10,
@@ -95,6 +98,9 @@ export class SystemService {
         invertscreen: 0,
         displayTimeout: -1,
         autofanspeed: 1,
+        isPSRAMAvailable: 1,
+        overclockEnabled: 1,
+        runningPartition: "factory",
         minFanSpeed: 25,
         fanspeed: 50,
         manualFanSpeed: 70,
@@ -255,7 +261,7 @@ export class SystemService {
 
     // Mock data for development
     return of({
-      ASICModel: "BM1370",
+      ASICModel: "BM1370" as SystemASICASICModelEnum,
       deviceModel: "Gamma",
       swarmColor: "purple",
       asicCount: 1,
