@@ -91,18 +91,23 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds) },
       { label: 'Reset Reason', value: data.info.resetReason, class: 'pb-3' },
-      { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitiveData: true },
-      { label: 'Wi-Fi Status', value: data.info.wifiStatus },
-      { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + ' dBm', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) },
-      { label: 'Wi-Fi IPv4', value: data.info.ipv4},
-      { label: 'Wi-Fi IPv6', value: data.info.ipv6, class: 'pb-3', isSensitiveData: true},
+      { label: 'Network Mode', value: data.info.networkMode === 'wifi' ? 'Wi-Fi' : 'Ethernet-over-USB' },
+
+      ...(data.info.networkMode === 'wifi' ? [
+        { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitiveData: true },
+        { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + ' dBm', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) }
+      ] : []),
+
+      { label: 'Network Status', value: data.info.networkStatus || 'Unknown' },
+      { label: 'IPv4 Address', value: data.info.ipv4 },
+      { label: 'IPv6 Address', value: data.info.ipv6, class: 'pb-3', isSensitiveData: true },
       { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3', isSensitiveData: true },
-      { label: 'Free Heap Memory', value: ByteSuffixPipe.transform(data.info.freeHeap)},
-      { label: '• Internal', value: ByteSuffixPipe.transform(data.info.freeHeapInternal)},
+      { label: 'Free Heap Memory', value: ByteSuffixPipe.transform(data.info.freeHeap) },
+      { label: '• Internal', value: ByteSuffixPipe.transform(data.info.freeHeapInternal) },
       { label: '• Spiram', value: ByteSuffixPipe.transform(data.info.freeHeapSpiram), class: 'pb-3' },
       { label: 'Firmware Version', value: data.info.version },
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
-      { label: 'ESP-IDF Version', value: data.info.idfVersion },
+      { label: 'ESP-IDF Version', value: data.info.idfVersion }
     ];
   }
 
