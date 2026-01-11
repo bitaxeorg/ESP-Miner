@@ -179,6 +179,11 @@ static void handle_pool_url(GlobalState *GLOBAL_STATE, char *temp, size_t ts, ch
     append_string(dst, remaining, pool);
 }
 
+static void handle_pool_difficulty(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
+{
+    append_formatted(dst, remaining, temp, ts, "%u", GLOBAL_STATE->pool_difficulty);
+}
+
 static void handle_rssi(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
 {
     int8_t rssi = -128;
@@ -306,31 +311,6 @@ static void handle_is_using_fallback_stratum(GlobalState *GLOBAL_STATE, char *te
     append_string(dst, remaining, str);
 }
 
-static void handle_pool_difficulty(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%u", GLOBAL_STATE->pool_difficulty);
-}
-
-static void handle_stratum_url(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    char *url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL);
-    append_string(dst, remaining, url);
-    free(url);
-}
-
-static void handle_stratum_port(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    uint16_t port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT);
-    append_formatted(dst, remaining, temp, ts, "%u", port);
-}
-
-static void handle_stratum_user(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    char *user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER);
-    append_string(dst, remaining, user);
-    free(user);
-}
-
 static void handle_block_height(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
 {
     append_formatted(dst, remaining, temp, ts, "%u", GLOBAL_STATE->block_height);
@@ -369,9 +349,6 @@ static const var_entry_t variables[] = {
 
     { "pool_url",          handle_pool_url },
     { "pool_difficulty",   handle_pool_difficulty },
-    { "stratum_url",       handle_stratum_url },
-    { "stratum_port",      handle_stratum_port },
-    { "stratum_user",      handle_stratum_user },
     { "response_time",     handle_response_time },
     { "pool_connection_info", handle_pool_connection_info },
     { "is_using_fallback_stratum", handle_is_using_fallback_stratum },
