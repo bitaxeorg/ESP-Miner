@@ -198,7 +198,7 @@ export class SystemService {
 
   public getScoreboard(uri: string = ''): Observable<ISystemScoreboardEntry[]> {
     if (environment.production) {
-      return this.httpClient.get(`${uri}/api/system/scoreboard`) as Observable<ISystemScoreboardEntry[]>;
+      return this.httpClient.get<ISystemScoreboardEntry[]>(`${uri}/api/system/scoreboard`).pipe(timeout(5000));
     }
 
     // Mock data for development

@@ -65,7 +65,7 @@ export class ScoreboardComponent implements OnInit, OnDestroy {
       return data;
     }
 
-    return data.sort((a, b) => {
+    return [...data].sort((a, b) => {
       let valueA = a[field as keyof ISystemScoreboardEntry];
       let valueB = b[field as keyof ISystemScoreboardEntry];
 

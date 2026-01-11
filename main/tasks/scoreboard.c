@@ -5,16 +5,18 @@
 
 static const char * TAG = "scoreboard";
 
-void scoreboard_init(Scoreboard *scoreboard) {
+esp_err_t scoreboard_init(Scoreboard *scoreboard)
+{
     scoreboard->count = 0;
     scoreboard->mutex = xSemaphoreCreateMutex();
     if (scoreboard->mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create mutex");
+        return ESP_FAIL;
     }
 
     for (int i = 0; i < MAX_SCOREBOARD; i++) {
         char *entry_str = nvs_config_get_string_indexed(NVS_CONFIG_SCOREBOARD, i);
-        if (entry_str[0] == '\0') {
+        if (entry_str == NULL || entry_str[0] == '\0') {
             free(entry_str);
             break;
         }
@@ -35,18 +37,22 @@ void scoreboard_init(Scoreboard *scoreboard) {
         }
         free(entry_str);
     }
+    return ESP_OK;
 }
 
-static void scoreboard_save(int i, ScoreboardEntry *entry) {
+static void scoreboard_save(int i, ScoreboardEntry *entry)
+{
     nvs_config_set_string_indexed(NVS_CONFIG_SCOREBOARD, i, entry->nvs_entry);
 }
 
-void scoreboard_add(Scoreboard *scoreboard, double difficulty, const char *job_id, const char *extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version_bits)
+esp_err_t scoreboard_add(Scoreboard *scoreboard, double difficulty, const char *job_id, const char *extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version_bits)
 {
+    if (scoreboard->mutex == NULL) return ESP_OK;
+
     int i = (scoreboard->count < MAX_SCOREBOARD) ? scoreboard->count : MAX_SCOREBOARD - 1;
 
     if (scoreboard->count == MAX_SCOREBOARD && i >= 0 && difficulty <= scoreboard->entries[i].difficulty) {
-        return;
+        return ESP_OK;
     }
 
     ScoreboardEntry new_entry = {
@@ -83,9 +89,11 @@ void scoreboard_add(Scoreboard *scoreboard, double difficulty, const char *job_i
         xSemaphoreGive(scoreboard->mutex);
     } else {
         ESP_LOGE(TAG, "Failed to take mutex");
-        return;
+        return ESP_FAIL;
     }
     
     ESP_LOGI(TAG, "New #%d: Difficulty: %.1f, Job ID: %s, extranonce2: %s, ntime: %d, nonce: %08X, version_bits: %08X",
         i+1, new_entry.difficulty, new_entry.job_id, new_entry.extranonce2, new_entry.ntime, (unsigned int)new_entry.nonce, (unsigned int)new_entry.version_bits);
+
+    return ESP_OK;
 }

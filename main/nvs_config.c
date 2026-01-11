@@ -346,7 +346,11 @@ esp_err_t nvs_config_init(void)
 char *nvs_config_get_string(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_STR || setting->array_size > 1) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return NULL;
+    }
+    if (setting->type != TYPE_STR || setting->array_size > 1) {
         ESP_LOGE(TAG, "Wrong type for %s (str)", setting->nvs_key_name);
         return NULL;
     }
@@ -356,7 +360,16 @@ char *nvs_config_get_string(NvsConfigKey key)
 char *nvs_config_get_string_indexed(NvsConfigKey key, int index)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_STR || setting->array_size < 1 || index < 0 || index >= setting->array_size) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return NULL;
+    }
+    if (setting->type != TYPE_STR || setting->array_size < 1) {
+        ESP_LOGE(TAG, "Wrong type for %s (indexed str)", setting->nvs_key_name);
+        return NULL;
+    }
+    if (index < 0 || index >= setting->array_size) {
+        ESP_LOGE(TAG, "Index out of bounds for key %s (%d)", setting->nvs_key_name, index);
         return NULL;
     }
     return strdup(setting->value[index].str);
@@ -365,7 +378,6 @@ char *nvs_config_get_string_indexed(NvsConfigKey key, int index)
 void nvs_config_set_string(NvsConfigKey key, const char *value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    // Skip if invalid, wrong type, or value unchanged
     if (!setting || setting->type != TYPE_STR || (setting->value[0].str && strcmp(setting->value[0].str, value) == 0)) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value) };
@@ -376,7 +388,9 @@ void nvs_config_set_string(NvsConfigKey key, const char *value)
 void nvs_config_set_string_indexed(NvsConfigKey key, int index, const char *value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_STR || (setting->value[index].str && strcmp(setting->value[index].str, value) == 0)) return;
+    if (!setting || setting->type != TYPE_STR || setting->array_size < 1) return;
+    if (index < 0 || index >= setting->array_size) return;
+    if (setting->value[index].str && strcmp(setting->value[index].str, value) == 0) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value), .index = index };
     if (!update.value.str) return;
@@ -386,7 +400,11 @@ void nvs_config_set_string_indexed(NvsConfigKey key, int index, const char *valu
 uint16_t nvs_config_get_u16(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_U16) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return 0;
+    }
+    if (setting->type != TYPE_U16) {
         ESP_LOGE(TAG, "Wrong type for %s (u16)", setting->nvs_key_name);
         return 0;
     }
@@ -405,7 +423,11 @@ void nvs_config_set_u16(NvsConfigKey key, uint16_t value)
 int32_t nvs_config_get_i32(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_I32) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return 0;
+    }
+    if (setting->type != TYPE_I32) {
         ESP_LOGE(TAG, "Wrong type for %s (i32)", setting->nvs_key_name);
         return 0;
     }
@@ -424,7 +446,11 @@ void nvs_config_set_i32(NvsConfigKey key, int32_t value)
 uint64_t nvs_config_get_u64(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_U64) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return 0;
+    }
+    if (setting->type != TYPE_U64) {
         ESP_LOGE(TAG, "Wrong type for %s (u64)", setting->nvs_key_name);
         return 0;
     }
@@ -443,7 +469,11 @@ void nvs_config_set_u64(NvsConfigKey key, uint64_t value)
 float nvs_config_get_float(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_FLOAT) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return 0;
+    }
+    if (setting->type != TYPE_FLOAT) {
         ESP_LOGE(TAG, "Wrong type for %s (float)", setting->nvs_key_name);
         return 0;
     }
@@ -453,7 +483,6 @@ float nvs_config_get_float(NvsConfigKey key)
 void nvs_config_set_float(NvsConfigKey key, float value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    // Skip if invalid, wrong type, or value unchanged (use epsilon for float comparison)
     if (!setting || setting->type != TYPE_FLOAT || fabsf(setting->value[0].f - value) < 0.001f) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_FLOAT, .value.f = value };
@@ -463,7 +492,11 @@ void nvs_config_set_float(NvsConfigKey key, float value)
 bool nvs_config_get_bool(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_BOOL) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return false;
+    }
+    if (setting->type != TYPE_BOOL) {
         ESP_LOGE(TAG, "Wrong type for %s (bool)", setting->nvs_key_name);
         return false;
     }

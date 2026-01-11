@@ -784,32 +784,32 @@ paths:
                 type: array
                 items:
                   type: object
-                    required:
-                      - difficulty
-                      - job_id
-                      - extranonce2
-                      - ntime
-                      - nonce
-                      - version_bits
-                    properties:
-                      difficulty:
-                        type: number
-                        description: Difficulty of the share
-                      job_id:
-                        type: string
-                        description: Job ID of the share
-                      extranonce2:
-                        type: string
-                        description: Extranonce2 of the share
-                      ntime:
-                        type: number
-                        description: Ntime of the share
-                      nonce:
-                        type: string
-                        description: Nonce of the share
-                      version_bits:
-                        type: string
-                        description: Version bits of the share
+                  required:
+                    - difficulty
+                    - job_id
+                    - extranonce2
+                    - ntime
+                    - nonce
+                    - version_bits
+                  properties:
+                    difficulty:
+                      type: number
+                      description: Difficulty of the share
+                    job_id:
+                      type: string
+                      description: Job ID of the share
+                    extranonce2:
+                      type: string
+                      description: Extranonce2 of the share
+                    ntime:
+                      type: number
+                      description: Ntime of the share
+                    nonce:
+                      type: string
+                      description: Nonce of the share
+                    version_bits:
+                      type: string
+                      description: Version bits of the share
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

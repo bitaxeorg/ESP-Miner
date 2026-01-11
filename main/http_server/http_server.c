@@ -1089,12 +1089,12 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
         return ESP_OK;
     }
 
-    Scoreboard scoreboard = GLOBAL_STATE->SYSTEM_MODULE.scoreboard;
+    Scoreboard *scoreboard = &GLOBAL_STATE->SYSTEM_MODULE.scoreboard;
     cJSON * root = cJSON_CreateArray();
 
-    if (xSemaphoreTake(scoreboard.mutex, portMAX_DELAY) == pdTRUE) {
-        for (int i = 0; i < scoreboard.count; i++) {
-            const ScoreboardEntry *e = &scoreboard.entries[i];
+    if (xSemaphoreTake(scoreboard->mutex, portMAX_DELAY) == pdTRUE) {
+        for (int i = 0; i < scoreboard->count; i++) {
+            const ScoreboardEntry *e = &scoreboard->entries[i];
             cJSON *entry = cJSON_CreateObject();
 
             char nonce_str[9], version_bits_str[9];
@@ -1110,11 +1110,12 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
 
             cJSON_AddItemToArray(root, entry);
         }
-        xSemaphoreGive(scoreboard.mutex);
+        xSemaphoreGive(scoreboard->mutex);
     } else {
         ESP_LOGE(TAG, "Failed to take mutex for JSON conversion");
         cJSON_Delete(root);
-        return ESP_FAIL;
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to take mutex for JSON conversion");
+        return ESP_OK;
     }
 
     const char *response = cJSON_Print(root);
