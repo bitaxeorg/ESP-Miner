@@ -217,7 +217,7 @@ components:
           type: string
           description: The configured display
         fallbackStratumExtranonceSubscribe:
-          type: boolean
+          type: int
           description: Enable fallback pool extranonce subscription
         fallbackStratumPort:
           type: number
@@ -363,7 +363,7 @@ components:
           type: string
           description: IPv6 address
         stratumExtranonceSubscribe:
-          type: boolean
+          type: int
           description: Enable pool extranonce subscription
         stratumPort:
           type: number
