@@ -214,7 +214,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public postAction(axe: any, action: string) {
-    this.httpClient.post(`http://${axe.IP}/api/system/${action}`, {}, { responseType: 'text' }).pipe(
+    this.httpClient.post(`http://${axe.IP}/api/system/${action}`, {}, { responseType: 'json' }).pipe(
       timeout(800),
       catchError(error => {
         let errorMsg = `Failed to ${action} device`;
@@ -226,9 +226,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
         this.toastr.error(errorMsg, `Device at ${axe.IP}`);
         return of(null);
       })
-    ).subscribe(res => {
+    ).subscribe((res: any) => {
       if (res !== null) {
-        this.toastr.success(res, `Device at ${axe.IP}`);
+        this.toastr.success(res.message, `Device at ${axe.IP}`);
+        this.refreshList(false);
       }
     });
   }
@@ -461,6 +462,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
         return { color: 'red', msg: 'Overheated' };
       case !!axe.power_fault:
         return { color: 'red', msg: 'Power Fault' };
+      case axe.isIdentifying === 1:
+        return { color: 'blue', msg: 'Identifying' };
       case !axe.frequency || axe.frequency < 400:
         return { color: 'orange', msg: 'Frequency Low' };
       case axe.isUsingFallbackStratum === 1:
