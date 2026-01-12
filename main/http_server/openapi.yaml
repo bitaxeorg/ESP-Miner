@@ -17,6 +17,13 @@ servers:
 
 components:
   schemas:
+    GenericResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
     SharesRejectedReason:
       type: object
       required:
@@ -778,6 +785,10 @@ paths:
       responses:
         '200':
           description: System restart initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
@@ -793,6 +804,10 @@ paths:
       responses:
         '200':
           description: Device identify initiated
+          content:
+            application/json:
+              schema:
+                '$ref': '#/components/schemas/GenericResponse'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
