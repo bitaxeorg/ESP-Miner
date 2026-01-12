@@ -868,3 +868,78 @@ paths:
           description: Unauthorized - Client not in allowed network range
         '500':
           description: Internal server error
+
+  /api/display/screens:
+    get:
+      summary: Get display screens configuration
+      description: Returns the current display screens configuration
+      operationId: getDisplayScreens
+      tags:
+        - display
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - screens
+                  - carouselEnabled
+                properties:
+                  screens:
+                    type: array
+                    items:
+                      type: string
+                      description: Screen content with variables
+                  carouselEnabled:
+                    type: boolean
+                    description: Whether carousel mode is enabled
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+    post:
+      summary: Update display screens configuration
+      description: Updates the display screens configuration
+      operationId: updateDisplayScreens
+      tags:
+        - display
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - screens
+              properties:
+                screens:
+                  type: array
+                  items:
+                    type: string
+                    description: Screen content with variables
+      responses:
+        '200':
+          description: Screens updated successfully
+        '400':
+          description: Invalid configuration provided
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/display/reset:
+    post:
+      summary: Reset display screens to defaults
+      description: Resets all display screens to their default configurations
+      operationId: resetDisplayScreens
+      tags:
+        - display
+      responses:
+        '200':
+          description: Screens reset to defaults
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error

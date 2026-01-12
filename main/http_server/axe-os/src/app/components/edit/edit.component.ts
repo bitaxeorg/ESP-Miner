@@ -47,6 +47,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public displayTimeoutControl: FormControl;
   public statsFrequencyControl: FormControl;
 
+  public showCustomizeScreens = false;
+  public displayScreens: string[] = [];
+  public availableVariables: string[] = [];
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemService,
@@ -114,6 +118,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   ngOnInit(): void {
     this.loadDeviceSettings();
+    this.loadDisplayScreens();
+    this.loadDisplayVariables();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -121,6 +127,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     if (changes['uri'] && changes['uri'].currentValue && !changes['uri'].firstChange) {
       this.loadDeviceSettings();
     }
+  }
+
+  trackByIndex(index: number, item: any): number {
+    return index;
   }
 
   private loadDeviceSettings(): void {
@@ -211,6 +221,78 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
         STATS_FREQUENCY_STEPS.findIndex(x => x === info.statsFrequency)
       );
     });
+  }
+
+  private loadDisplayScreens(): void {
+    const deviceUri = this.uri || '';
+    this.systemService.getDisplayScreens(deviceUri)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (screens) => {
+          this.displayScreens = screens.screens;
+        },
+        error: (err) => {
+          console.error('Failed to load display screens:', err);
+          this.displayScreens = [''];
+        }
+      });
+  }
+
+  private loadDisplayVariables(): void {
+    const deviceUri = this.uri || '';
+    this.systemService.getDisplayVariables(deviceUri)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (variables) => {
+          this.availableVariables = variables;
+        },
+        error: (err) => {
+          console.error('Failed to load display variables:', err);
+          this.availableVariables = [];
+        }
+      });
+  }
+
+  public saveDisplayScreens(): void {
+    const deviceUri = this.uri || '';
+
+    this.systemService.updateDisplayScreens(deviceUri, this.displayScreens)
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => {
+          this.toastr.success('Display screens saved successfully');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error(`Failed to save display screens: ${err.message}`);
+        }
+      });
+  }
+
+  public resetDisplayScreens(): void {
+    const deviceUri = this.uri || '';
+    this.systemService.resetDisplayScreens(deviceUri)
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => {
+          this.toastr.success('Display screens reset to defaults');
+          this.loadDisplayScreens(); // Reload screens
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error(`Failed to reset display screens: ${err.message}`);
+        }
+      });
+  }
+
+  public addScreen(): void {
+    if (this.displayScreens.length < 8) {
+      this.displayScreens.push('');
+    }
+  }
+
+  public removeScreen(index: number): void {
+    if (this.displayScreens.length > 1) {
+      this.displayScreens.splice(index, 1);
+    }
   }
 
   ngOnDestroy(): void {

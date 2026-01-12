@@ -36,7 +36,6 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "vcore.h"
-#include "power.h"
 #include "connect.h"
 #include "asic.h"
 #include "TPS546.h"
@@ -47,11 +46,11 @@
 #include "http_server.h"
 #include "system.h"
 #include "websocket.h"
+#include "screen.h"
+#include "display_config.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
-
-static char axeOSVersion[32];
 
 static const char * STATS_LABEL_HASHRATE = "hashrate";
 static const char * STATS_LABEL_HASHRATE_1m = "hashrate_1m";
@@ -305,24 +304,6 @@ esp_err_t is_network_allowed(httpd_req_t * req)
     return ESP_FAIL;
 }
 
-static void readAxeOSVersion(void) {
-    FILE* f = fopen("/version.txt", "r");
-    if (f != NULL) {
-        size_t n = fread(axeOSVersion, 1, sizeof(axeOSVersion) - 1, f);
-        axeOSVersion[n] = '\0';
-        fclose(f);
-
-        ESP_LOGI(TAG, "AxeOS version: %s", axeOSVersion);
-
-        if (strcmp(axeOSVersion, esp_app_get_description()->version) != 0) {
-            ESP_LOGE(TAG, "Firmware (%s) and AxeOS (%s) versions do not match. Please make sure to update both www.bin and esp-miner.bin.", esp_app_get_description()->version, axeOSVersion);
-        }
-    } else {
-        strcpy(axeOSVersion, "unknown");
-        ESP_LOGE(TAG, "Failed to open AxeOS version.txt");
-    }
-}
-
 esp_err_t init_fs(void)
 {
     esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = NULL, .max_files = 5, .format_if_mount_failed = false};
@@ -346,8 +327,6 @@ esp_err_t init_fs(void)
     } else {
         ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
     }
-
-    readAxeOSVersion();
 
     return ESP_OK;
 }
@@ -822,7 +801,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON * root = cJSON_CreateObject();
     cJSON_AddFloatToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
     cJSON_AddFloatToObject(root, "voltage", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
-    cJSON_AddFloatToObject(root, "current", Power_get_current(GLOBAL_STATE));
+    cJSON_AddFloatToObject(root, "current", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.current);
     cJSON_AddFloatToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
     cJSON_AddFloatToObject(root, "temp2", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
     cJSON_AddFloatToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
@@ -849,7 +828,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
-    cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "coreVoltageActual", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.core_voltage);
     cJSON_AddNumberToObject(root, "frequency", frequency);
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
@@ -891,8 +870,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
     cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
 
-    cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
-    cJSON_AddStringToObject(root, "axeOSVersion", axeOSVersion);
+    cJSON_AddStringToObject(root, "version", GLOBAL_STATE->SYSTEM_MODULE.version);
+    cJSON_AddStringToObject(root, "axeOSVersion", GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
 
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
@@ -1075,6 +1054,169 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     return res;
 }
 
+/* Handler for getting display screens */
+static esp_err_t GET_display_screens(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *screens_array = cJSON_CreateArray();
+
+    // Get all screens from NVS
+    for (int i = 0; i < MAX_CAROUSEL_SCREENS; i++) {
+        char *screen_content = nvs_config_get_string_indexed(NVS_CONFIG_SCREENS, i);
+        if (screen_content && screen_content[0] != '\0') {
+            cJSON_AddItemToArray(screens_array, cJSON_CreateString(screen_content));
+        }
+        free(screen_content);
+    }
+
+    cJSON_AddItemToObject(root, "screens", screens_array);
+    cJSON_AddBoolToObject(root, "carouselEnabled", true);
+
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+
+    cJSON_Delete(root);
+
+    return res;
+}
+
+/* Handler for updating display screens */
+static esp_err_t POST_display_screens(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    int total_len = req->content_len;
+    int cur_len = 0;
+    char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
+    int received = 0;
+    if (total_len >= SCRATCH_BUFSIZE) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_OK;
+    }
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len);
+        if (received <= 0) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post screen data");
+            return ESP_OK;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    cJSON * root = cJSON_Parse(buf);
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
+    cJSON *screens_array = cJSON_GetObjectItem(root, "screens");
+    if (!cJSON_IsArray(screens_array)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing screens array");
+        return ESP_OK;
+    }
+
+    // Update screens in NVS
+    int screen_count = cJSON_GetArraySize(screens_array);
+    if (screen_count > MAX_CAROUSEL_SCREENS) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Too many screens");
+        return ESP_OK;
+    }
+
+    for (int i = 0; i < MAX_CAROUSEL_SCREENS; i++) {
+        char * value = "";
+        if (i < screen_count) {
+            cJSON *content_item = cJSON_GetArrayItem(screens_array, i);
+            if (cJSON_IsString(content_item)) {
+                value = content_item->valuestring;
+            }
+        }
+        nvs_config_set_string_indexed(NVS_CONFIG_SCREENS, i, value);
+    }
+
+    cJSON_Delete(root);
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+/* Handler for resetting display screens to defaults */
+static esp_err_t POST_display_reset(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    // Reset all screens to defaults (empty strings in NVS)
+    for (int i = 0; i < MAX_CAROUSEL_SCREENS; i++) {
+        nvs_config_set_string_indexed(NVS_CONFIG_SCREENS, i, "");
+    }
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_send(req, "Display screens reset to defaults", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+/* Handler for getting display variables */
+static esp_err_t GET_display_variables(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    const char **vars;
+    size_t count;
+    if (display_config_get_variables(&vars, &count) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to get variables");
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateArray();
+
+    for (size_t i = 0; i < count; i++) {
+        cJSON_AddItemToArray(root, cJSON_CreateString(vars[i]));
+    }
+
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+
+    cJSON_Delete(root);
+
+    return res;
+}
+
 esp_err_t POST_WWW_update(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1137,8 +1279,6 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     }
 
     httpd_resp_sendstr(req, "WWW update complete\n");
-
-    readAxeOSVersion();
 
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Finished...");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -1262,6 +1402,7 @@ esp_err_t start_rest_server(void * pvParameters)
     config.max_uri_handlers = 20;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
+    config.max_uri_handlers = 21;
 
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
@@ -1274,6 +1415,14 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &recovery_explicit_get_uri);
     
+    httpd_uri_t options_uri = {
+        .uri = "/api/*", 
+        .method = HTTP_OPTIONS, 
+        .handler = handle_options_request, 
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &options_uri);
+
     // Register theme API endpoints
     ESP_ERROR_CHECK(register_theme_api_endpoints(server, rest_context));
 
@@ -1320,28 +1469,12 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &system_identify_uri);
 
-    httpd_uri_t system_identify_options_uri = {
-        .uri = "/api/system/identify", 
-        .method = HTTP_OPTIONS, 
-        .handler = handle_options_request, 
-        .user_ctx = NULL
-    };
-    httpd_register_uri_handler(server, &system_identify_options_uri);
-
     httpd_uri_t system_restart_uri = {
         .uri = "/api/system/restart", .method = HTTP_POST, 
         .handler = POST_restart, 
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_restart_uri);
-
-    httpd_uri_t system_restart_options_uri = {
-        .uri = "/api/system/restart", 
-        .method = HTTP_OPTIONS, 
-        .handler = handle_options_request, 
-        .user_ctx = NULL
-    };
-    httpd_register_uri_handler(server, &system_restart_options_uri);
 
     httpd_uri_t update_system_settings_uri = {
         .uri = "/api/system", 
@@ -1351,13 +1484,40 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &update_system_settings_uri);
 
-    httpd_uri_t system_options_uri = {
-        .uri = "/api/system",
-        .method = HTTP_OPTIONS,
-        .handler = handle_options_request,
-        .user_ctx = NULL,
+    /* URI handler for getting display screens */
+    httpd_uri_t display_screens_get_uri = {
+        .uri = "/api/display/screens",
+        .method = HTTP_GET,
+        .handler = GET_display_screens,
+        .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &system_options_uri);
+    httpd_register_uri_handler(server, &display_screens_get_uri);
+
+    /* URI handler for updating display screens */
+    httpd_uri_t display_screens_post_uri = {
+        .uri = "/api/display/screens",
+        .method = HTTP_POST,
+        .handler = POST_display_screens,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &display_screens_post_uri);
+
+    /* URI handler for resetting display screens */
+    httpd_uri_t display_reset_post_uri = {
+        .uri = "/api/display/screens/reset",
+        .method = HTTP_POST,
+        .handler = POST_display_reset,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &display_reset_post_uri);
+
+    httpd_uri_t display_variables_get_uri = {
+        .uri = "/api/display/variables",
+        .method = HTTP_GET,
+        .handler = GET_display_variables,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &display_variables_get_uri);
 
     httpd_uri_t update_post_ota_firmware = {
         .uri = "/api/system/OTA", 
