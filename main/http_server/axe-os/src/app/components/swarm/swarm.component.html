@@ -92,21 +92,21 @@
                             <div class="flex flex-column">
                                 <div class="flex flex-column">
                                     <div class="white-space-nowrap">
-                                        <a [href]="'http://' + axe.IP" target="_blank" class="text-900" pTooltip="Hostname" tooltipPosition="top">
-                                            {{axe.hostname}}
+                                        <a [href]="'http://' + axe.address" target="_blank" class="text-900" pTooltip="Hostname" tooltipPosition="top">
+                                            {{getDeviceDisplayName(axe)}}
                                         </a>
                                         <span class="ml-1 text-lg line-height-1 cursor-pointer" [ngStyle]="{color: axe.swarmColor}" pTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">
                                             ●
                                         </span>
-                                    </div>
-                                    <div class="white-space-nowrap">
-                                        <a [href]="'http://' + axe.IP" target="_blank" class="text-800" pTooltip="IP" tooltipPosition="top">
-                                            {{axe.IP}}
-                                        </a>
-                                        <span *ngIf="isThisDevice(axe.IP)" class="ml-1 cursor-pointer" pTooltip="This device" tooltipPosition="top">
-                                            <i class="pi pi-star-fill text-xs"></i>
-                                        </span>
-                                    </div>
+                                     </div>
+                                     <div class="white-space-nowrap">
+                                         <a [href]="'http://' + axe.address" target="_blank" class="text-800" pTooltip="Address" tooltipPosition="top">
+                                             {{axe.address}}
+                                         </a>
+                                         <span *ngIf="isThisDevice(axe.address)" class="ml-1 cursor-pointer" pTooltip="This device" tooltipPosition="top">
+                                             <i class="pi pi-star-fill text-xs"></i>
+                                         </span>
+                                     </div>
                                 </div>
                                 <span class="text-500 cursor-pointer" pTooltip="Version" tooltipPosition="top">
                                     {{axe.version}}
@@ -210,7 +210,7 @@
                         <tr>
                             <th *ngFor="let field of [
                                 { label: 'Hostname', name: 'hostname' },
-                                { label: 'IP', name: 'IP' },
+                                { label: 'Address', name: 'address' },
                                 { label: 'Hashrate', name: 'hashRate' },
                                 { label: 'Shares', name: 'sharesAccepted' },
                                 { label: 'Best Diff', name: 'bestDiff' },
@@ -234,8 +234,8 @@
                     <tbody>
                         <tr *ngFor="let axe of filteredSwarm">
                             <td>
-                                <a [href]="'http://' + axe.IP" target="_blank">
-                                    <span class="text-900">{{axe.hostname}}</span>
+                                <a [href]="'http://' + axe.address" target="_blank">
+                                    <span class="text-900">{{getDeviceDisplayName(axe)}}</span>
                                     <span class="ml-2 text-lg line-height-1 cursor-pointer" [ngStyle]="{color: axe.swarmColor}" pTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">●</span>
                                 </a>
                                 <div *ngIf="getDeviceNotification(axe) as notification" class="flex align-items-center gap-1" [ngClass]="'text-' + notification.color + '-500'">
@@ -244,8 +244,8 @@
                                 </div>
                             </td>
                             <td>
-                                <a [href]="'http://' + axe.IP" target="_blank" class="text-800">{{axe.IP}}</a>
-                                <span *ngIf="isThisDevice(axe.IP)" class="ml-2 cursor-pointer" pTooltip="This device" tooltipPosition="top">
+                                <a [href]="'http://' + axe.address" target="_blank" class="text-800">{{axe.address}}</a>
+                                <span *ngIf="isThisDevice(axe.address)" class="ml-2 cursor-pointer" pTooltip="This device" tooltipPosition="top">
                                     <i class="pi pi-star-fill text-xs"></i>
                                 </span>
                             </td>
@@ -345,7 +345,7 @@
 
     <ng-template #noDevices>
         <p class="text-500 text-center pt-5">
-            Scan your network for devices or add a device manually by using its IP address.
+            Scan your network for devices or add a device manually by using its address (IP or .local hostname).
         </p>
     </ng-template>
 
@@ -367,13 +367,13 @@
 
         <div class="md:ml-auto">
             <p-inputGroup>
-                <input pInputText placeholder="Add Device by IP" formControlName="manualAddIp" type="text" class="xl:w-20rem" />
+                <input pInputText placeholder="Add Device by Address" formControlName="manualAddAddress" type="text" class="xl:w-20rem" />
                 <button pButton [disabled]="form.invalid" (click)="add()" class="ml-1">Add</button>
             </p-inputGroup>
         </div>
     </form>
 
-    <app-modal [headline]="selectedAxeOs?.IP">
-        <app-edit *ngIf="selectedAxeOs" [uri]="'http://' + selectedAxeOs.IP"></app-edit>
+    <app-modal [headline]="selectedAxeOs?.address">
+        <app-edit *ngIf="selectedAxeOs" [uri]="'http://' + selectedAxeOs.connectionAddress"></app-edit>
     </app-modal>
 </div>

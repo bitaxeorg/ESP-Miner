@@ -1,11 +1,19 @@
 #include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
+#include "mdns.h"
+#include "esp_system.h"
 #include "esp_wifi.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
 #include "lwip/err.h"
+#include "lwip/lwip_napt.h"
+#include "lwip/sys.h"
+#include "lwip/sockets.h"
+#include "esp_netif.h"
+#include "nvs_flash.h"
 #include "esp_wifi_types_generic.h"
 
 #include "connect.h"
@@ -55,10 +63,114 @@ static uint16_t ap_number = 0;
 static wifi_ap_record_t ap_info[MAX_AP_COUNT];
 static int s_retry_num = 0;
 static int clients_connected_to_ap = 0;
+static bool mdns_initialized = false;
 
 static const char *get_wifi_reason_string(int reason);
 static void wifi_softap_on(void);
 static void wifi_softap_off(void);
+
+static char* generate_unique_hostname(const char *base);
+static char* check_and_resolve_hostname_conflict(const char *hostname, const char *current_ip);
+
+static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
+    if (mdns_initialized) {
+        return;
+    }
+
+    char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    if (hostname == NULL) {
+        ESP_LOGW(TAG, "Hostname not configured, skipping mDNS setup");
+        return;
+    }
+    esp_err_t err = mdns_init();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "mDNS/Avahi initialization failed: %s", esp_err_to_name(err));
+        ESP_LOGW(TAG, "Device will not be discoverable via mDNS/Bonjour/Avahi");
+    } else {
+        ESP_LOGI(TAG, "mDNS/Avahi initialized successfully - device discoverable on network");
+
+        /* Get current IP */
+        esp_netif_ip_info_t ip_info;
+        esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
+        char current_ip[16];
+        snprintf(current_ip, sizeof(current_ip), IPSTR, IP2STR(&ip_info.ip));
+
+        /* Check for hostname conflicts */
+        char *final_hostname = check_and_resolve_hostname_conflict(hostname, current_ip);
+
+        /* Set mDNS hostname */
+        err = mdns_hostname_set(final_hostname);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "mDNS hostname setup failed: %s", esp_err_to_name(err));
+            ESP_LOGW(TAG, "Device hostname not set for mDNS discovery");
+        } else {
+            ESP_LOGI(TAG, "mDNS hostname set to: %s.local", final_hostname);
+            ESP_LOGI(TAG, "Access device at: http://%s.local", final_hostname);
+        }
+
+        free(final_hostname);
+
+        /* Set mDNS instance name */
+        uint8_t mac[6];
+        esp_wifi_get_mac(WIFI_IF_STA, mac);
+        char mac_suffix[6];
+        snprintf(mac_suffix, sizeof(mac_suffix), "%02X%02X", mac[4], mac[5]);
+
+        char instance_name[64];
+        snprintf(instance_name, sizeof(instance_name), "Bitaxe %s %s (%s)",
+                 GLOBAL_STATE->DEVICE_CONFIG.family.name,
+                 GLOBAL_STATE->DEVICE_CONFIG.board_version,
+                 mac_suffix);
+        
+        /* Add HTTP service */
+        err = mdns_service_add(instance_name, "_http", "_tcp", 80, NULL, 0);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "mDNS HTTP service registration failed: %s", esp_err_to_name(err));
+            ESP_LOGW(TAG, "HTTP service not advertised via mDNS");
+        } else {
+            ESP_LOGI(TAG, "mDNS HTTP service registered: _http._tcp port 80");
+            ESP_LOGI(TAG, "Discover with: avahi-browse _http._tcp");
+            ESP_LOGI(TAG, "mDNS instance: %s", instance_name);
+        }
+
+        ESP_LOGI(TAG, "mDNS/Avahi setup complete - device ready for network discovery");
+        mdns_initialized = true;
+    }
+    free(hostname);
+}
+
+esp_err_t update_mdns_hostname(const char *new_hostname) {
+    if (new_hostname == NULL || strlen(new_hostname) == 0) {
+        ESP_LOGW(TAG, "Invalid hostname provided for mDNS update");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Get current IP for conflict checking */
+    esp_netif_ip_info_t ip_info;
+    esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
+    char current_ip[16];
+    snprintf(current_ip, sizeof(current_ip), IPSTR, IP2STR(&ip_info.ip));
+
+    /* Check for hostname conflicts and resolve if needed */
+    char *resolved_hostname = check_and_resolve_hostname_conflict(new_hostname, current_ip);
+
+    /* If the hostname was resolved to a different one, update NVS */
+    if (strcmp(resolved_hostname, new_hostname) != 0) {
+        nvs_config_set_string(NVS_CONFIG_HOSTNAME, resolved_hostname);
+        ESP_LOGI(TAG, "Hostname conflict resolved, updated NVS to: %s", resolved_hostname);
+    }
+
+    esp_err_t err = mdns_hostname_set(resolved_hostname);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to update mDNS hostname to: %s, error: %s", resolved_hostname, esp_err_to_name(err));
+        free(resolved_hostname);
+        return err;
+    }
+
+    ESP_LOGI(TAG, "mDNS hostname updated to: %s", resolved_hostname);
+    free(resolved_hostname);
+    return ESP_OK;
+}
 
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
@@ -255,6 +367,8 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         if (ipv6_err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to create IPv6 link-local address: %s", esp_err_to_name(ipv6_err));
         }
+
+        initialize_mdns_if_needed(GLOBAL_STATE);
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
@@ -286,6 +400,8 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1] = '\0';
             ESP_LOGI(TAG, "IPv6 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
         }
+
+        initialize_mdns_if_needed(GLOBAL_STATE);
     }
 }
 
@@ -326,6 +442,49 @@ void toggle_wifi_softap(void)
 static void wifi_softap_off(void)
 {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+}
+
+
+
+static char* generate_unique_hostname(const char *base) {
+    uint8_t mac[6];
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    char suffix[6];
+    snprintf(suffix, sizeof(suffix), "-%02x%02x", mac[4], mac[5]);
+    char *new_hostname = malloc(strlen(base) + strlen(suffix) + 1);
+    strcpy(new_hostname, base);
+    strcat(new_hostname, suffix);
+    return new_hostname;
+}
+
+static char* check_and_resolve_hostname_conflict(const char *hostname, const char *current_ip) {
+    mdns_result_t *results = NULL;
+    esp_err_t err = mdns_query_generic(hostname, NULL, NULL, MDNS_TYPE_A, MDNS_QUERY_MULTICAST, 3000, 1, &results);
+    if (err != ESP_OK || !results || !results->addr) {
+        // No A record found, no conflict
+        if (results) mdns_query_results_free(results);
+        return strdup(hostname);
+    }
+
+    mdns_ip_addr_t *a = results->addr;
+    char ip_str[INET6_ADDRSTRLEN];
+    if (a->addr.type == IPADDR_TYPE_V4) {
+        esp_ip4addr_ntoa(&a->addr.u_addr.ip4, ip_str, sizeof(ip_str));
+    } else {
+        inet_ntop(AF_INET6, &a->addr.u_addr.ip6, ip_str, sizeof(ip_str));
+    }
+
+    if (strcmp(ip_str, current_ip) != 0) {
+        // Different IP, conflict detected
+        char *new_hostname = generate_unique_hostname(hostname);
+        ESP_LOGI(TAG, "mDNS conflict detected for '%s' at %s, renaming to '%s'", hostname, ip_str, new_hostname);
+        nvs_config_set_string(NVS_CONFIG_HOSTNAME, new_hostname);
+        mdns_query_results_free(results);
+        return new_hostname;
+    }
+
+    mdns_query_results_free(results);
+    return strdup(hostname);
 }
 
 static void wifi_softap_on(void)
