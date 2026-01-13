@@ -274,14 +274,14 @@ export class SystemApiService {
 
   public performOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
     if (environment.production && this.generatedSystemService) {
-      return this.generatedSystemService.updateFirmware(file);
+      return this.generatedSystemService.updateFirmware(file, 'events', true);
     }
     return this.otaUpdate(file, '/api/system/OTA');
   }
 
   public performWWWOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
     if (environment.production && this.generatedSystemService) {
-      return this.generatedSystemService.updateWebInterface(file);
+      return this.generatedSystemService.updateWebInterface(file, 'events', true);
     }
     return this.otaUpdate(file, '/api/system/OTAWWW');
   }
