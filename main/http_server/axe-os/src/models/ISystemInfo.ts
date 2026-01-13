@@ -71,6 +71,7 @@ export interface ISystemInfo {
     isUsingFallbackStratum: number,
     poolConnectionInfo: string,
     frequency: number,
+    frequencySet: number,
     version: string,
     axeOSVersion: string,
     idfVersion: string,
@@ -85,6 +86,7 @@ export interface ISystemInfo {
     fan2rpm: number,
     statsFrequency: number,
     coreVoltageActual: number,
+    coreVoltageSet: number,
 
     boardtemp1?: number,
     boardtemp2?: number,
