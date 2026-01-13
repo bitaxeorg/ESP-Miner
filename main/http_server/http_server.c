@@ -1154,7 +1154,7 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
 
         remaining -= recv_len;
     }
-
+    httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "WWW update complete\n");
 
     readAxeOSVersion();
@@ -1232,6 +1232,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
 
+    httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "Firmware update complete, rebooting now!\n");
     ESP_LOGI(TAG, "Restarting System because of Firmware update complete");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
