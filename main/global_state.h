@@ -25,6 +25,11 @@ typedef struct {
     uint32_t count;
 } RejectedReasonStat;
 
+typedef enum {
+    NETWORK_MODE_WIFI,
+    NETWORK_MODE_USB,
+} NetworkMode;
+
 typedef struct
 {
     float current_hashrate;
@@ -44,8 +49,9 @@ typedef struct
     uint64_t best_session_nonce_diff;
     char best_session_diff_string[DIFF_STRING_SIZE];
     bool block_found;
+    NetworkMode network_mode;
     char * ssid;
-    char wifi_status[256];
+    char network_status[256];
     char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
     char ipv6_addr_str[64]; // IPv6 address string with zone identifier (INET6_ADDRSTRLEN=46 + % + interface=15)
     char ap_ssid[12];

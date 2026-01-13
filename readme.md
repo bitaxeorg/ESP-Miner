@@ -128,6 +128,10 @@ In the event that the admin web front end is inaccessible, for example because o
 
 In order to unlock the Input fields for ASIC Frequency and ASIC Core Voltage you need to append `?oc` to the end of the settings tab URL in your browser. Be aware that without additional cooling overclocking can overheat and/or damage your Bitaxe.
 
+### Ethernet-over-USB Mode
+
+The Bitaxe supports Ethernet-over-USB (NCM) as an alternative to WiFi connectivity. See [Ethernet-over-USB](ethernet-over-usb.md) for more details.
+
 ## Development
 
 ### Prerequisites

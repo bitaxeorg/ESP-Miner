@@ -49,10 +49,23 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->lastClockSync = 0;
     module->block_found = false;
     
-    // Initialize network address strings
+    // Initialize network configuration strings
+    char * network_mode = nvs_config_get_string(NVS_CONFIG_NETWORK_MODE);
+    if (strcmp(network_mode, "wifi") == 0) {
+        ESP_LOGI(TAG, "Network mode: Wi-Fi");
+        module->network_mode = NETWORK_MODE_WIFI;
+    } else if (strcmp(network_mode, "usb") == 0) {
+        ESP_LOGI(TAG, "Network mode: Ethernet-over-USB");
+        module->network_mode = NETWORK_MODE_USB;
+    } else {
+        ESP_LOGE(TAG, "Invalid network mode: %s", network_mode);
+        module->network_mode = NETWORK_MODE_WIFI;
+    }
+    free(network_mode);
+
     strcpy(module->ip_addr_str, "");
     strcpy(module->ipv6_addr_str, "");
-    strcpy(module->wifi_status, "Initializing...");
+    strcpy(module->network_status, "Initializing...");
     
     // set the pool url
     module->pool_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL);

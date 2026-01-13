@@ -11,30 +11,53 @@
                 <input pInputText id="hostname" type="text" formControlName="hostname" />
             </div>
         </div>
+
         <div class="field grid p-fluid">
-            <label for="ssid" class="col-12 md:col-2 md:m-0">Wi-Fi SSID</label>
-            <div class="col-12 md:col-10 p-inputgroup">
-                <input pInputText id="ssid" type="text" formControlName="ssid" />
-                <p-button
-                    icon="pi pi-search"
-                    pp-button
-                    (click)="scanWifi()"
-                    [loading]="scanning"
-                    pTooltip="Scan Wi-Fi"
-                    tooltipPosition="left"></p-button>
+            <label for="networkMode" class="col-12 md:col-2 md:m-0">
+                <tooltip-text-icon
+                    text="Network Mode"
+                    tooltip="Select Wi-Fi or Ethernet-over-USB for network connectivity"
+                />
+            </label>
+            <div class="col-12 md:col-10">
+                <p-dropdown
+                    id="networkMode"
+                    formControlName="networkMode"
+                    [options]="networkModeOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Select network mode">
+                </p-dropdown>
             </div>
         </div>
-        <div class="field grid p-fluid">
-            <label for="wifiPass" class="col-12 md:col-2 md:m-0">Wi-Fi Password</label>
-            <div class="col-12 md:col-10 p-input-icon-right">
-                <i *ngIf="form.get('wifiPass')?.dirty" class="pi cursor-pointer"
-                    [ngClass]="{'pi-eye': !showWifiPassword, 'pi-eye-slash': showWifiPassword}"
-                    (click)="toggleWifiPasswordVisibility()"></i>
-                <input pInputText id="wifiPass" formControlName="wifiPass"
-                    [type]="showWifiPassword ? 'text' : 'password'"
-                    placeholder="Enter Wi-Fi password" />
+
+        <!-- WiFi-specific fields - only shown when networkMode is 'wifi' -->
+        <ng-container *ngIf="form.get('networkMode')?.value === 'wifi'">
+            <div class="field grid p-fluid">
+                <label for="ssid" class="col-12 md:col-2 md:m-0">Wi-Fi SSID</label>
+                <div class="col-12 md:col-10 p-inputgroup">
+                    <input pInputText id="ssid" type="text" formControlName="ssid" />
+                    <p-button
+                        icon="pi pi-search"
+                        pp-button
+                        (click)="scanWifi()"
+                        [loading]="scanning"
+                        pTooltip="Scan Wi-Fi"
+                        tooltipPosition="left"></p-button>
+                </div>
             </div>
-        </div>
+            <div class="field grid p-fluid">
+                <label for="wifiPass" class="col-12 md:col-2 md:m-0">Wi-Fi Password</label>
+                <div class="col-12 md:col-10 p-input-icon-right">
+                    <i *ngIf="form.get('wifiPass')?.dirty" class="pi cursor-pointer"
+                        [ngClass]="{'pi-eye': !showWifiPassword, 'pi-eye-slash': showWifiPassword}"
+                        (click)="toggleWifiPasswordVisibility()"></i>
+                    <input pInputText id="wifiPass" formControlName="wifiPass"
+                        [type]="showWifiPassword ? 'text' : 'password'"
+                        placeholder="Enter Wi-Fi password" />
+                </div>
+            </div>
+        </ng-container>
 
         <div class="flex mt-5 gap-3">
             <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
