@@ -855,6 +855,10 @@ paths:
       responses:
         '200':
           description: Firmware update successful
+          content:
+            text/plain:
+              schema:
+                type: string
         '400':
           description: Invalid firmware file
         '401':
@@ -879,6 +883,10 @@ paths:
       responses:
         '200':
           description: Web interface update successful
+          content:
+            text/plain:
+              schema:
+                type: string
         '400':
           description: Invalid web interface file
         '401':
