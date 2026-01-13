@@ -307,19 +307,5 @@ export class SystemApiService {
     }).pipe(delay(1000));
   }
 
-  public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
-    if (!uri) {
-      // Local device swarm info - this might not be implemented in the generated API
-      return this.httpClient.get<{ ip: string }[]>(`/api/swarm/info`).pipe(timeout(API_TIMEOUT));
-    }
-    return this.httpClient.get<{ ip: string }[]>(`${uri}/api/swarm/info`).pipe(timeout(API_TIMEOUT));
-  }
 
-  public updateSwarm(uri: string = '', swarmConfig: any) {
-    if (!uri) {
-      // Local device swarm update - this might not be implemented in the generated API
-      return this.httpClient.patch(`/api/swarm`, swarmConfig);
-    }
-    return this.httpClient.patch(`${uri}/api/swarm`, swarmConfig);
-  }
 }
