@@ -82,16 +82,16 @@ void double_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[
 
 void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t dest[32])
 {
-    mbedtls_sha256_context midstate;
+    mbedtls_sha256_context ctx;
 
     // Calculate midstate
-    mbedtls_sha256_init(&midstate);
-    mbedtls_sha256_starts(&midstate, 0);
-    mbedtls_sha256_update(&midstate, data, 64);
+    mbedtls_sha256_init(&ctx);
+    mbedtls_sha256_starts(&ctx, 0);
+    mbedtls_sha256_update(&ctx, data, 64);
 
-    memcpy(dest, midstate.state, 32);
+    memcpy(dest, ctx.state, 32);
 
-    mbedtls_sha256_free(&ctx);    
+    mbedtls_sha256_free(&ctx);
 }
 
 void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32])
