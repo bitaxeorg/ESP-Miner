@@ -90,6 +90,8 @@ void midstate_sha256_bin(const uint8_t *data, const size_t data_len, uint8_t des
     mbedtls_sha256_update(&midstate, data, 64);
 
     memcpy(dest, midstate.state, 32);
+
+    mbedtls_sha256_free(&ctx);    
 }
 
 void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32])
