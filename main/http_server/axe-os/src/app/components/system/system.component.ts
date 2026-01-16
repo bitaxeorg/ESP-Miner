@@ -6,7 +6,7 @@ import { SystemApiService } from 'src/app/services/system.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
-import { SystemInfo as ISystemInfo, SystemASIC as ISystemASIC, GenericResponse, } from 'src/app/generated';
+import { SystemInfo as ISystemInfo, SystemASIC as ISystemASIC, } from 'src/app/generated';
 
 type TableRow = {
   label: string;

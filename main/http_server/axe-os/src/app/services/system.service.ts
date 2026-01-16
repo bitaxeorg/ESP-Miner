@@ -8,10 +8,9 @@ import {
   SystemInfo as ISystemInfo,
   SystemStatistics as ISystemStatistics,
   SystemASIC as ISystemASIC,
-  SystemASICASICModelEnum,
-  SystemService as GeneratedSystemService,
-  Settings
+  SystemASICASICModelEnum
 } from 'src/app/generated';
+
 import { environment } from '../../environments/environment';
 
 const API_TIMEOUT = 15000;
