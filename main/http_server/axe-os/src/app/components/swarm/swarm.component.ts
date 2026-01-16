@@ -217,6 +217,13 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.httpClient.post(`http://${axe.IP}/api/system/${action}`, {}, { responseType: 'json' }).pipe(
       timeout(800),
       catchError(error => {
+        if ((action === 'restart' || action === 'identify') && (error.status === 200 || error.status === 0 || error.name === 'HttpErrorResponse' || error.statusText === 'Unknown Error')) {
+          if (action === 'restart') {
+            return of({ message: 'System will restarted shortly' });
+          } else {
+            return of({ message: 'Identify signal sent - device should say "Hi!"' });
+          }
+        }
         let errorMsg = `Failed to ${action} device`;
         if (error.name === 'TimeoutError') {
           errorMsg = 'Request timed out';
