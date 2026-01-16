@@ -5,7 +5,7 @@ import { ToastrService } from 'ngx-toastr';
 import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable, Subscription } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { LayoutService } from "../../layout/service/app.layout.service";
-import { SystemService } from 'src/app/services/system.service';
+import { SystemApiService } from 'src/app/services/system.service';
 import { ModalComponent } from '../modal/modal.component';
 import { SystemInfo as ISystemInfo } from 'src/app/generated';
 
@@ -63,7 +63,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     private toastr: ToastrService,
     private localStorageService: LocalStorageService,
     public layoutService: LayoutService,
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private httpClient: HttpClient
   ) {
 
@@ -214,9 +214,16 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public postAction(axe: any, action: string) {
-    this.httpClient.post(`http://${axe.IP}/api/system/${action}`, {}, { responseType: 'text' }).pipe(
+    this.httpClient.post(`http://${axe.IP}/api/system/${action}`, {}, { responseType: 'json' }).pipe(
       timeout(800),
       catchError(error => {
+        if ((action === 'restart' || action === 'identify') && (error.status === 200 || error.status === 0 || error.name === 'HttpErrorResponse' || error.statusText === 'Unknown Error')) {
+          if (action === 'restart') {
+            return of({ message: 'System will restarted shortly' });
+          } else {
+            return of({ message: 'Identify signal sent - device should say "Hi!"' });
+          }
+        }
         let errorMsg = `Failed to ${action} device`;
         if (error.name === 'TimeoutError') {
           errorMsg = 'Request timed out';
@@ -226,9 +233,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
         this.toastr.error(errorMsg, `Device at ${axe.IP}`);
         return of(null);
       })
-    ).subscribe(res => {
+    ).subscribe((res: any) => {
       if (res !== null) {
-        this.toastr.success(res, `Device at ${axe.IP}`);
+        this.toastr.success(res.message, `Device at ${axe.IP}`);
+        this.refreshList(false);
       }
     });
   }

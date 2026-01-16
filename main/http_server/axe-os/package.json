@@ -39,6 +39,7 @@
     "@angular-devkit/build-angular": "^18.2.19",
     "@angular/cli": "^18.2.19",
     "@angular/compiler-cli": "^18.2.13",
+    "@openapitools/openapi-generator-cli": "^2.25.2",
     "@types/jasmine": "^5.1.5",
     "chokidar": "^3.6.0",
     "gzipper": "^8.2.0",

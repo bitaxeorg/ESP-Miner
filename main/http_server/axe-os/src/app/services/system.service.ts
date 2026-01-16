@@ -1,5 +1,5 @@
-import { HttpClient, HttpParams, HttpEvent } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { HttpClient, HttpEvent } from '@angular/common/http';
+import { Injectable, Optional } from '@angular/core';
 import { delay, Observable, of, timeout } from 'rxjs';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
@@ -8,26 +8,34 @@ import {
   SystemInfo as ISystemInfo,
   SystemStatistics as ISystemStatistics,
   SystemASIC as ISystemASIC,
-  SystemASICASICModelEnum
+  SystemASICASICModelEnum,
+  SystemService as GeneratedSystemService,
+  Settings
 } from 'src/app/generated';
 
 import { environment } from '../../environments/environment';
 
+const API_TIMEOUT = 15000;
+
 @Injectable({
   providedIn: 'root'
 })
-export class SystemService {
+export class SystemApiService {
 
   constructor(
-    private httpClient: HttpClient
+    private httpClient: HttpClient,
+    @Optional() private generatedSystemService: GeneratedSystemService
   ) { }
 
   public getInfo(uri: string = ''): Observable<ISystemInfo> {
-    if (environment.production) {
-      return this.httpClient.get<ISystemInfo>(`${uri}/api/system/info`).pipe(timeout(5000));
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.getSystemInfo().pipe(timeout(API_TIMEOUT));
     }
 
-    // Mock data for development
+    if (environment.production && uri) {
+      return this.httpClient.get<ISystemInfo>(`${uri}/api/system/info`).pipe(timeout(API_TIMEOUT));
+    }
+
     return of(
       {
         power: 11.670000076293945,
@@ -139,12 +147,10 @@ export class SystemService {
       columnList.push(y2);
     }
 
-    if (environment.production) {
-      const options = { params: new HttpParams().set('columns', columnList.join(',')) };
-      return this.httpClient.get<ISystemStatistics>(`${uri}/api/system/statistics`, options).pipe(timeout(5000));
+    if (environment.production && this.generatedSystemService) {
+      return this.generatedSystemService.getSystemStatistics(columnList).pipe(timeout(API_TIMEOUT));
     }
 
-    // Mock data for development
     const hashrateData = [0,413.4903744405481,410.7764830376959,440.100549473198,430.5816012914026,452.5464981767163,414.9564271189586,498.7294609150379,411.1671601439723,491.327834852684];
     const powerData = [14.45068359375,14.86083984375,15.03173828125,15.1171875,15.1171875,15.1513671875,15.185546875,15.27099609375,15.30517578125,15.33935546875];
     const asicTempData = [-1,58.5,59.625,60.125,60.75,61.5,61.875,62.125,62.5,63];
@@ -202,34 +208,54 @@ export class SystemService {
   }
 
   public restart(uri: string = '') {
-    return this.httpClient.post(`${uri}/api/system/restart`, {}, {responseType: 'text'});
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.restartSystem();
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post(`${uri}/api/system/restart`, {});
+    }
+
+    return of('Device restarted (mock)');
   }
 
   public identify(uri: string = '') {
-    return this.httpClient.post(`${uri}/api/system/identify`, {}, {responseType: 'text'});
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.identifySystem();
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post(`${uri}/api/system/identify`, {});
+    }
+
+    return of('Device identified (mock)');
   }
 
   public updateSystem(uri: string = '', update: any) {
-    if (environment.production) {
-      return this.httpClient.patch(`${uri}/api/system`, update);
-    } else {
-      return of(true);
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.updateSystemSettings(update as Settings);
     }
+
+    if (environment.production && uri) {
+      return this.httpClient.patch(`${uri}/api/system`, update);
+    }
+
+    return of(true);
   }
 
-  private otaUpdate(file: File | Blob, url: string) {
+  private otaUpdate(file: File | Blob, url: string): Observable<HttpEvent<string>> {
     return new Observable<HttpEvent<string>>((subscriber) => {
       const reader = new FileReader();
 
       reader.onload = (event: any) => {
         const fileContent = event.target.result;
 
-        return this.httpClient.post(url, fileContent, {
+        this.httpClient.post(url, fileContent, {
           reportProgress: true,
           observe: 'events',
-          responseType: 'text', // Specify the response type
+          responseType: 'text',
           headers: {
-            'Content-Type': 'application/octet-stream', // Set the content type
+            'Content-Type': 'application/octet-stream',
           },
         }).subscribe({
           next: (event) => {
@@ -247,19 +273,29 @@ export class SystemService {
     });
   }
 
-  public performOTAUpdate(file: File | Blob) {
-    return this.otaUpdate(file, `/api/system/OTA`);
+  public performOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
+    if (environment.production && this.generatedSystemService) {
+      return this.generatedSystemService.updateFirmware(file, 'events', true);
+    }
+    return this.otaUpdate(file, '/api/system/OTA');
   }
-  public performWWWOTAUpdate(file: File | Blob) {
-    return this.otaUpdate(file, `/api/system/OTAWWW`);
+
+  public performWWWOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
+    if (environment.production && this.generatedSystemService) {
+      return this.generatedSystemService.updateWebInterface(file, 'events', true);
+    }
+    return this.otaUpdate(file, '/api/system/OTAWWW');
   }
 
   public getAsicSettings(uri: string = ''): Observable<ISystemASIC> {
-    if (environment.production) {
-      return this.httpClient.get<ISystemASIC>(`${uri}/api/system/asic`).pipe(timeout(5000));
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.getAsicSettings().pipe(timeout(API_TIMEOUT));
     }
 
-    // Mock data for development
+    if (environment.production && uri) {
+      return this.httpClient.get<ISystemASIC>(`${uri}/api/system/asic`).pipe(timeout(API_TIMEOUT));
+    }
+
     return of({
       ASICModel: "BM1370" as SystemASICASICModelEnum,
       deviceModel: "Gamma",
@@ -270,14 +306,6 @@ export class SystemService {
       defaultVoltage: 1200,
       voltageOptions: [1100, 1150, 1200, 1250, 1300]
     }).pipe(delay(1000));
-  }
-
-  public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
-    return this.httpClient.get<{ ip: string }[]>(`${uri}/api/swarm/info`).pipe(timeout(5000));
-  }
-
-  public updateSwarm(uri: string = '', swarmConfig: any) {
-    return this.httpClient.patch(`${uri}/api/swarm`, swarmConfig);
   }
 
   public getDisplayScreens(uri: string = ''): Observable<{ screens: string[] }> {

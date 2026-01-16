@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { Observable, shareReplay } from 'rxjs';
-import { SystemService } from '../services/system.service';
+import { SystemApiService } from '../services/system.service';
 import { LayoutService } from './service/app.layout.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated';
 
@@ -14,7 +14,7 @@ export class AppMenuComponent implements OnInit {
   model: any[] = [];
 
   constructor(public layoutService: LayoutService,
-    private systemService: SystemService,
+    private systemService: SystemApiService,
   ) {
     this.info$ = this.systemService.getInfo().pipe(shareReplay({ refCount: true, bufferSize: 1 }))
   }

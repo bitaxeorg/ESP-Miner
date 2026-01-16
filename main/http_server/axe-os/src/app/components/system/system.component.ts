@@ -2,11 +2,11 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Observable, Subject, combineLatest, switchMap, shareReplay, first, takeUntil, map, timer } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemApiService } from 'src/app/services/system.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
-import { SystemInfo as ISystemInfo, SystemASIC as ISystemASIC, } from 'src/app/generated';
+import { SystemInfo as ISystemInfo, SystemASIC as ISystemASIC, GenericResponse, } from 'src/app/generated';
 
 type TableRow = {
   label: string;
@@ -34,7 +34,7 @@ export class SystemComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   constructor(
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private loadingService: LoadingService,
     private toastr: ToastrService,
   ) {
@@ -110,7 +110,7 @@ export class SystemComponent implements OnInit, OnDestroy {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: (result) => {
-          this.toastr.success(result);
+          this.toastr.success((result as GenericResponse).message);
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error(`Could not identify device. ${err.message}`);
