@@ -12,8 +12,7 @@ import { ShareRejectionExplanationService } from 'src/app/services/share-rejecti
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
-import { ISystemInfo } from 'src/models/ISystemInfo';
-import { ISystemStatistics } from 'src/models/ISystemStatistics';
+import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
 import { SelectItem } from 'primeng/api';
