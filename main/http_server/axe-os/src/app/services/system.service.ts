@@ -8,7 +8,9 @@ import {
   SystemInfo as ISystemInfo,
   SystemStatistics as ISystemStatistics,
   SystemASIC as ISystemASIC,
-  SystemASICASICModelEnum
+  SystemASICASICModelEnum,
+  SystemService as GeneratedSystemService,
+  Settings
 } from 'src/app/generated';
 
 import { environment } from '../../environments/environment';
