@@ -145,7 +145,7 @@ git clone https://github.com/bitaxeorg/ESP-MINER.git
 cd ESP-MINER
 git checkout <the branch you want>
 # The next step builds the docker container that will compile the source code
-# This will take several minutes finish
+# This will take several minutes to finish
 docker build -t espminer-build .devcontainer
 ```
 ### Building
