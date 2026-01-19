@@ -718,17 +718,27 @@ static esp_err_t POST_identify(httpd_req_t * req)
 
     ESP_LOGI(TAG, "Identify mode enabled for 30s");
 
-    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_type(req, "application/json");
+
+    cJSON * root = cJSON_CreateObject();
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_OK;
+    }
 
     if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
-        httpd_resp_send(req, "The device no longer says \"Hi!\".", HTTPD_RESP_USE_STRLEN);
+        cJSON_AddStringToObject(root, "message", "The device no longer says \"Hi!\".");
     } else {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 30000;
-        httpd_resp_send(req, "The device says \"Hi!\" for 30 seconds.", HTTPD_RESP_USE_STRLEN);
+         cJSON_AddStringToObject(root, "message", "The device says \"Hi!\" for 30 seconds.");
     }
 
-    return ESP_OK;
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+
+    cJSON_Delete(root);
+
+    return res;
 }
 
 static esp_err_t POST_restart(httpd_req_t * req)
@@ -745,11 +755,20 @@ static esp_err_t POST_restart(httpd_req_t * req)
 
     ESP_LOGI(TAG, "Restarting System because of API Request");
 
-    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_type(req, "application/json");
+
+    cJSON * root = cJSON_CreateObject();
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_OK;
+    }
+
+    cJSON_AddStringToObject(root, "message", "System will restart shortly.");
 
     // Send HTTP response before restarting
-    const char* resp_str = "System will restart shortly.";
-    httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+
+    cJSON_Delete(root);
 
     // Delay to ensure the response is sent
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -758,7 +777,7 @@ static esp_err_t POST_restart(httpd_req_t * req)
     esp_restart();
 
     // This return statement will never be reached, but it's good practice to include it
-    return ESP_OK;
+    return res;
 }
 
 static const char* esp_reset_reason_to_string(esp_reset_reason_t reason) {
@@ -1187,7 +1206,7 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
 
         remaining -= recv_len;
     }
-
+    httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "WWW update complete\n");
 
     readAxeOSVersion();
@@ -1265,6 +1284,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
 
+    httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "Firmware update complete, rebooting now!\n");
     ESP_LOGI(TAG, "Restarting System because of Firmware update complete");
     vTaskDelay(1000 / portTICK_PERIOD_MS);

@@ -22,6 +22,8 @@ Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.
 export CHROME_BIN=/snap/bin/chromium
 npm run test
 ```
+The value of `CHROME_BIN` depends on your system.  
+On linux you may use `which chromium` or so to get the value.  
 
 ## Running end-to-end tests
 

@@ -10,10 +10,9 @@ import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
 import { QuicklinkService } from 'src/app/services/quicklink.service';
 import { ShareRejectionExplanationService } from 'src/app/services/share-rejection-explanation.service';
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemApiService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
-import { ISystemInfo } from 'src/models/ISystemInfo';
-import { ISystemStatistics } from 'src/models/ISystemStatistics';
+import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
 import { SelectItem } from 'primeng/api';
@@ -100,7 +99,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   constructor(
     private fb: FormBuilder,
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private themeService: ThemeService,
     private quickLinkService: QuicklinkService,
     private titleService: Title,
@@ -330,7 +329,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           if (stats.labels[i] === 'timestamp')                         { idxTimestamp = i; }
         }
 
-        stats.statistics.forEach(element => {
+        stats.statistics.forEach((element: number[]) => {
           switch (chartLabelValue(chartY1DataLabel)) {
             case eChartLabel.asicVoltage:
             case eChartLabel.voltage:

@@ -29,7 +29,8 @@ TEST_CASE("Test bin2hex", "[utils]")
 {
     uint8_t bin[5] = {72, 69, 76, 76, 79};
     char hex_string[11];
-    bin2hex(bin, 5, hex_string, 11);
+    TEST_ASSERT_EQUAL(0, bin2hex(bin, 5, hex_string, 10));
+    TEST_ASSERT_EQUAL(10, bin2hex(bin, 5, hex_string, 11));
     TEST_ASSERT_EQUAL_STRING("48454c4c4f", hex_string);
 }
 

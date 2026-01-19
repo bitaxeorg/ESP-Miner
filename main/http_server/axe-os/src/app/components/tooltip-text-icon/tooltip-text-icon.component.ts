@@ -6,6 +6,7 @@ import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 })
 export class TooltipTextIconComponent implements OnChanges {
   @Input() tooltip: string | null = '';
+  @Input() icon: string = 'pi-question-circle';
   @Input() text: string | null = '';
   @Input() split: boolean = true;
 

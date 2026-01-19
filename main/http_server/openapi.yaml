@@ -17,6 +17,13 @@ servers:
 
 components:
   schemas:
+    GenericResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
     SharesRejectedReason:
       type: object
       required:
@@ -748,11 +755,13 @@ paths:
         - in: query
           name: columns
           required: false
+          style: form
+          explode: false
           schema:
             type: array
             items:
               type: string
-            example: hashrate,hashrate_1m,hashrate_10m,hashrate_1h,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap,responseTime
+            example: [hashrate,hashrate_1m,hashrate_10m,hashrate_1h,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap,responseTime]
           description: List of labels for which data should be retrieved
       tags:
         - system
@@ -825,6 +834,10 @@ paths:
       responses:
         '200':
           description: System restart initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
@@ -840,6 +853,10 @@ paths:
       responses:
         '200':
           description: Device identify initiated
+          content:
+            application/json:
+              schema:
+                '$ref': '#/components/schemas/GenericResponse'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
@@ -885,6 +902,10 @@ paths:
       responses:
         '200':
           description: Firmware update successful
+          content:
+            text/plain:
+              schema:
+                type: string
         '400':
           description: Invalid firmware file
         '401':
@@ -909,6 +930,10 @@ paths:
       responses:
         '200':
           description: Web interface update successful
+          content:
+            text/plain:
+              schema:
+                type: string
         '400':
           description: Invalid web interface file
         '401':
