@@ -171,7 +171,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
       }).pipe(
         map(({ info, asic }) => {
           const existingDevice = this.swarm.find(device => device.IP === IP);
-          return this.fallbackDeviceModel({ IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) });
+          // Reset power_fault to null if not present in response (fault was cleared)
+          const clearedFaults = { power_fault: null };
+          return this.fallbackDeviceModel({ IP, ...(existingDevice ? existingDevice : {}), ...clearedFaults, ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) });
         }),
         timeout(5000),
         catchError(error => errorHandler(error, IP))
