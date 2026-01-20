@@ -110,6 +110,51 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     pthread_mutex_init(&GLOBAL_STATE->valid_jobs_lock, NULL);
 }
 
+void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    
+    // Store the firmware version
+    GLOBAL_STATE->SYSTEM_MODULE.version = strdup(app_desc->version);
+    if (GLOBAL_STATE->SYSTEM_MODULE.version == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for version");
+        GLOBAL_STATE->SYSTEM_MODULE.version = strdup("Unknown");
+    }
+    
+    // Read AxeOS version from SPIFFS
+    FILE *f = fopen("/version.txt", "r");
+    if (f == NULL) {
+        ESP_LOGW(TAG, "Failed to open /version.txt");
+        GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
+    } else {
+        char version[64];
+        if (fgets(version, sizeof(version), f) == NULL) {
+            ESP_LOGW(TAG, "Failed to read version from /version.txt");
+            GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
+        } else {
+            // Remove trailing newline if present
+            size_t len = strlen(version);
+            if (len > 0 && version[len - 1] == '\n') {
+                version[len - 1] = '\0';
+            }
+            GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup(version);
+            if (GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion == NULL) {
+                ESP_LOGE(TAG, "Failed to allocate memory for axeOSVersion");
+                GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
+            }
+        }
+        fclose(f);
+    }
+    
+    ESP_LOGI(TAG, "Firmware Version: %s", GLOBAL_STATE->SYSTEM_MODULE.version);
+    ESP_LOGI(TAG, "AxeOS Version: %s", GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
+
+    if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.version, GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion) != 0) {
+        ESP_LOGE(TAG, "Firmware (%s) and AxeOS (%s) versions do not match. Please make sure to update both www.bin and esp-miner.bin.", 
+            GLOBAL_STATE->SYSTEM_MODULE.version, 
+            GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
+    }
+}
+
 esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     
     ESP_RETURN_ON_ERROR(gpio_install_isr_service(0), TAG, "Error installing ISR service");
