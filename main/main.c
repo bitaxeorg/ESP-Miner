@@ -87,6 +87,9 @@ void app_main(void)
     //start the API for AxeOS
     start_rest_server((void *) &GLOBAL_STATE);
 
+    // After mounting SPIFFS
+    SYSTEM_init_versions(&GLOBAL_STATE);
+
     // Initialize BAP interface
     esp_err_t bap_ret = BAP_init(&GLOBAL_STATE);
     if (bap_ret != ESP_OK) {

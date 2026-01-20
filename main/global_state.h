@@ -83,6 +83,8 @@ typedef struct
     char firmware_update_filename[20];
     char firmware_update_status[20];
     char * asic_status;
+    char * version;
+    char * axeOSVersion;
     Scoreboard scoreboard;
 } SystemModule;
 
