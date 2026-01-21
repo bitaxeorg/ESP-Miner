@@ -378,7 +378,10 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         new_work->target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
         new_work->ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
 
-        message->should_abandon_work = params_count > 8 ? cJSON_IsTrue(cJSON_GetArrayItem(params, params_count - 1)) : false;
+        // params can be varible length
+        int paramsLength = cJSON_GetArraySize(params);
+        int value = cJSON_IsTrue(cJSON_GetArrayItem(params, paramsLength - 1));
+        new_work->clean_jobs = value;
 
         message->mining_notification = new_work;
     } else if (message->method == MINING_SET_DIFFICULTY) {

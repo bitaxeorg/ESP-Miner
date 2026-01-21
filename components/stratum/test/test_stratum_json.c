@@ -15,7 +15,7 @@ TEST_CASE("Parse stratum method", "[stratum]")
 
     STRATUM_V1_parse(&stratum_api_v1_message, json_string_standard);
     TEST_ASSERT_EQUAL(MINING_NOTIFY, stratum_api_v1_message.method);
-    TEST_ASSERT_EQUAL_INT(0, stratum_api_v1_message.should_abandon_work);
+    TEST_ASSERT_FALSE(stratum_api_v1_message.mining_notification->clean_jobs);
 }
 
 TEST_CASE("Parse stratum mining.notify abandon work", "[stratum]")
@@ -32,7 +32,7 @@ TEST_CASE("Parse stratum mining.notify abandon work", "[stratum]")
 
     STRATUM_V1_parse(&stratum_api_v1_message, json_string_abandon_work_false);
     TEST_ASSERT_EQUAL(MINING_NOTIFY, stratum_api_v1_message.method);
-    TEST_ASSERT_EQUAL_INT(0, stratum_api_v1_message.should_abandon_work);
+    TEST_ASSERT_FALSE(stratum_api_v1_message.mining_notification->clean_jobs);
 
     const char *json_string_abandon_work = "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
                                            "[\"1b4c3d9041\","
@@ -44,7 +44,7 @@ TEST_CASE("Parse stratum mining.notify abandon work", "[stratum]")
 
     STRATUM_V1_parse(&stratum_api_v1_message, json_string_abandon_work);
     TEST_ASSERT_EQUAL(MINING_NOTIFY, stratum_api_v1_message.method);
-    TEST_ASSERT_EQUAL_INT(1, stratum_api_v1_message.should_abandon_work);
+    TEST_ASSERT_TRUE(stratum_api_v1_message.mining_notification->clean_jobs);
 
     const char *json_string_abandon_work_length_9 = "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
                                                     "[\"1b4c3d9041\","
@@ -56,7 +56,7 @@ TEST_CASE("Parse stratum mining.notify abandon work", "[stratum]")
 
     STRATUM_V1_parse(&stratum_api_v1_message, json_string_abandon_work_length_9);
     TEST_ASSERT_EQUAL(MINING_NOTIFY, stratum_api_v1_message.method);
-    TEST_ASSERT_EQUAL_INT(1, stratum_api_v1_message.should_abandon_work);
+    TEST_ASSERT_TRUE(stratum_api_v1_message.mining_notification->clean_jobs);
 }
 
 TEST_CASE("Parse stratum set_difficulty params", "[mining.set_difficulty]")
