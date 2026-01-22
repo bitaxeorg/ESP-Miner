@@ -170,8 +170,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
         asic: fetchAsic ? this.httpClient.get<any>(`http://${IP}/api/system/asic`).pipe(catchError(() => of({}))) : of({})
       }).pipe(
         map(({ info, asic }) => {
-          const existingDevice = this.swarm.find(device => device.IP === IP);
-          return this.fallbackDeviceModel({ IP, ...(existingDevice ? existingDevice : {}), ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) });
+          const existingDevice = this.swarm.find(device => device.IP === IP) || {};
+          return this.mergeDeviceData(existingDevice, info, asic);
         }),
         timeout(5000),
         catchError(error => errorHandler(error, IP))
@@ -201,7 +201,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       if (!info.ASICModel || !asic.ASICModel) {
         return;
       }
-      this.swarm.push(this.fallbackDeviceModel({ IP, ...info, ...asic, ...this.numerizeDeviceBestDiffs(info) }));
+      this.swarm.push(this.mergeDeviceData({}, info, asic));
       this.sortSwarm();
       this.localStorageService.setObject(SWARM_DATA, this.swarm);
       this.calculateTotals();
@@ -341,16 +341,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
     );
   }
 
-  // Fallback logic to derive deviceModel and swarmColor, can be removed after some time
-  private fallbackDeviceModel(data: any): any {
-    if (data.deviceModel && data.swarmColor && data.poolDifficulty && data.hashRate) return data;
-    const deviceModel = data.deviceModel || this.deriveDeviceModel(data);
-    const swarmColor = data.swarmColor || this.deriveSwarmColor(deviceModel);
-    const poolDifficulty = data.poolDifficulty || data.stratumDiff;
-    const hashRate = data.hashRate || data.hashRate_10m;
-    return { ...data, deviceModel, swarmColor, poolDifficulty, hashRate };
-  }
-
   private deriveDeviceModel(data: any): string {
     if (data.boardVersion && data.boardVersion.length > 1) {
       if (data.boardVersion[0] == "1" || data.boardVersion == "2.2") return "Max";
@@ -375,15 +365,27 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
   }
 
-  private numerizeDeviceBestDiffs(info: ISystemInfo) {
-    const parseAsNumber = (val: number | string): number => {
-      return typeof val === 'string' ? this.parseSuffixString(val) : val;
+  private mergeDeviceData(existing: Partial<SwarmDevice>, info: any, asic: any): SwarmDevice {
+    const merged: any = {
+      ...existing,
+      power_fault: null,
+      overheat_mode: null,
+      isUsingFallbackStratum: null,
+      blockFound: null,
+      ...info,
+      ...asic,
     };
 
-    return {
-      bestDiff: parseAsNumber(info.bestDiff),
-      bestSessionDiff: parseAsNumber(info.bestSessionDiff),
-    };
+    merged.deviceModel = merged.deviceModel || this.deriveDeviceModel(merged);
+    merged.swarmColor = merged.swarmColor || this.deriveSwarmColor(merged.deviceModel);
+    merged.asicCount = merged.asicCount || 1;
+
+    merged.poolDifficulty = merged.poolDifficulty || info.stratumDiff;
+    merged.hashRate = merged.hashRate || info.hashRate_10m;
+    if (typeof merged.bestDiff === 'string') merged.bestDiff = this.parseSuffixString(merged.bestDiff);
+    if (typeof merged.bestSessionDiff === 'string') merged.bestSessionDiff = this.parseSuffixString(merged.bestSessionDiff);
+
+    return merged as SwarmDevice;
   }
 
   private parseSuffixString(input: string): number {
