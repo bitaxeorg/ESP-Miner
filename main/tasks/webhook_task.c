@@ -13,8 +13,22 @@
 #include "vcore.h"
 #include <string.h>
 #include <sys/time.h>
+#include <math.h>
 
 static const char *TAG = "webhook_task";
+
+// Helper functions for float JSON (similar to http_server.c)
+static const double FACTOR = 10000000.0;
+
+static cJSON* cJSON_AddFloatToObject(cJSON * const object, const char * const name, const float number) {
+    double d_value = round((double)number * FACTOR) / FACTOR;
+    return cJSON_AddNumberToObject(object, name, d_value);
+}
+
+static cJSON* cJSON_CreateFloat(float number) {
+    double d_value = round((double)number * FACTOR) / FACTOR;
+    return cJSON_CreateNumber(d_value);
+}
 
 // Helper function to create system info JSON (similar to GET_system_info but without httpd_req_t)
 static cJSON* create_system_info_json(GlobalState *GLOBAL_STATE)
