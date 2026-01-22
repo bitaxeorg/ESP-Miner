@@ -915,6 +915,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "blockFound", GLOBAL_STATE->SYSTEM_MODULE.block_found);
 
+    // Webhook configuration
+    cJSON_AddNumberToObject(root, "webhookEnabled", nvs_config_get_bool(NVS_CONFIG_WEBHOOK_ENABLED));
+    cJSON_AddStringToObject(root, "webhookUrl", nvs_config_get_string(NVS_CONFIG_WEBHOOK_URL));
+    cJSON_AddNumberToObject(root, "webhookInterval", nvs_config_get_u16(NVS_CONFIG_WEBHOOK_INTERVAL));
+
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
     }
