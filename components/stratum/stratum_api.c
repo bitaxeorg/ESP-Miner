@@ -149,35 +149,33 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
     while (!strstr(json_rpc_buffer, "\n")) {
         memset(recv_buffer, 0, BUFFER_SIZE);
         nbytes = esp_transport_read(transport, recv_buffer, BUFFER_SIZE - 1, TRANSPORT_TIMEOUT_MS);
-        if (nbytes <= 0) {
-            if (nbytes == 0) {
-                ESP_LOGI(TAG, "Connection closed by peer");
-            } else {
-                const char *err_str;
-                switch(nbytes) {
-                    case ERR_TCP_TRANSPORT_NO_MEM:
-                        err_str = "No memory available";
-                        break;
-                    case ERR_TCP_TRANSPORT_CONNECTION_FAILED:
-                        err_str = "Connection failed";
-                        break;
-                    case ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN:
-                        err_str = "Connection closed by peer";
-                        break;
-                    default:
-                        err_str = "Unknown error";
-                        break;
-                }
-                ESP_LOGE(TAG, "Error: transport read failed: %s (code: %d)", err_str, nbytes);
+        if (nbytes < 0) {
+            const char *err_str;
+            switch(nbytes) {
+                case ERR_TCP_TRANSPORT_NO_MEM:
+                    err_str = "No memory available";
+                    break;
+                case ERR_TCP_TRANSPORT_CONNECTION_FAILED:
+                    err_str = "Connection failed";
+                    break;
+                case ERR_TCP_TRANSPORT_CONNECTION_CLOSED_BY_FIN:
+                    err_str = "Connection closed by peer";
+                    break;
+                default:
+                    err_str = "Unknown error";
+                    break;
             }
+            ESP_LOGE(TAG, "Error: transport read failed: %s (code: %d)", err_str, nbytes);
             if (json_rpc_buffer) {
                 free(json_rpc_buffer);
                 json_rpc_buffer = NULL;
             }
             return NULL;
         }
-        realloc_json_buffer(nbytes);
-        strncat(json_rpc_buffer, recv_buffer, nbytes);
+        if (nbytes > 0) {
+            realloc_json_buffer(nbytes);
+            strncat(json_rpc_buffer, recv_buffer, nbytes);
+        }
     }
 
     // Extract the line
