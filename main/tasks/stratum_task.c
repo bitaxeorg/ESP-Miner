@@ -542,7 +542,6 @@ void stratum_task(void * pvParameters)
 
         //mining.authorize - ID: 3
         STRATUM_V1_authorize(GLOBAL_STATE->transport, authorize_message_id, username, password);
-        STRATUM_V1_stamp_tx(authorize_message_id);
 
         while (1) {
             char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->transport);
