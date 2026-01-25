@@ -18,18 +18,70 @@
 #include "bap_uart.h"
 #include "bap.h"
 #include "connect.h"
+#include "nvs_config.h"
 
 static const char *TAG = "BAP_SUBSCRIPTION";
 
 static bap_subscription_t subscriptions[BAP_PARAM_UNKNOWN] = {0};
 static TaskHandle_t subscription_task_handle = NULL;
 
+typedef struct {
+    char hashrate[32];
+    char chip_temp[32];
+    char vr_temp[32];
+    char power[32];
+    char voltage[32];
+    char current[32];
+    char shares[64];
+    char fan_speed[32];
+    char best_difficulty[32];
+    char block_height[32];
+    char wifi_ssid[64];
+    char wifi_password[64];
+    char wifi_rssi[32];
+    char wifi_ip[32];
+} bap_last_values_t;
+
+typedef struct {
+    bool hashrate;
+    bool chip_temp;
+    bool vr_temp;
+    bool power;
+    bool voltage;
+    bool current;
+    bool shares;
+    bool fan_speed;
+    bool best_difficulty;
+    bool block_height;
+    bool wifi_ssid;
+    bool wifi_password;
+    bool wifi_rssi;
+    bool wifi_ip;
+} bap_last_values_valid_t;
+
+static bap_last_values_t last_values = {0};
+static bap_last_values_valid_t last_values_valid = {0};
+
 static void subscription_update_task(void *pvParameters);
+
+static void BAP_send_if_changed(const char *parameter, const char *value, char *last, size_t last_size, bool *is_valid) {
+    const char *safe_value = value ? value : "";
+
+    if (*is_valid && strcmp(last, safe_value) == 0) {
+        return;
+    }
+
+    snprintf(last, last_size, "%s", safe_value);
+    *is_valid = true;
+    BAP_send_message_with_queue(BAP_CMD_RES, parameter, safe_value);
+}
 
 esp_err_t BAP_subscription_init(void) {
     //ESP_LOGI(TAG, "Initializing BAP subscription management");
     
     memset(subscriptions, 0, sizeof(subscriptions));
+    memset(&last_values, 0, sizeof(last_values));
+    memset(&last_values_valid, 0, sizeof(last_values_valid));
     
     //ESP_LOGI(TAG, "BAP subscription management initialized");
     return ESP_OK;
@@ -59,6 +111,45 @@ void BAP_subscription_handle_subscribe(const char *parameter, const char *value)
         subscriptions[param].last_subscribe = current_time;
         subscriptions[param].last_response = 0;
         subscriptions[param].update_interval_ms = 3000;
+
+        switch (param) {
+            case BAP_PARAM_HASHRATE:
+                last_values_valid.hashrate = false;
+                break;
+            case BAP_PARAM_TEMPERATURE:
+                last_values_valid.chip_temp = false;
+                last_values_valid.vr_temp = false;
+                break;
+            case BAP_PARAM_POWER:
+                last_values_valid.power = false;
+                break;
+            case BAP_PARAM_VOLTAGE:
+                last_values_valid.voltage = false;
+                break;
+            case BAP_PARAM_CURRENT:
+                last_values_valid.current = false;
+                break;
+            case BAP_PARAM_SHARES:
+                last_values_valid.shares = false;
+                break;
+            case BAP_PARAM_FAN_SPEED:
+                last_values_valid.fan_speed = false;
+                break;
+            case BAP_PARAM_BEST_DIFFICULTY:
+                last_values_valid.best_difficulty = false;
+                break;
+            case BAP_PARAM_BLOCK_HEIGHT:
+                last_values_valid.block_height = false;
+                break;
+            case BAP_PARAM_WIFI:
+                last_values_valid.wifi_ssid = false;
+                last_values_valid.wifi_password = false;
+                last_values_valid.wifi_rssi = false;
+                last_values_valid.wifi_ip = false;
+                break;
+            default:
+                break;
+        }
 
         if (value) {
             int interval = atoi(value);
@@ -147,7 +238,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char hashrate_str[32];
                             snprintf(hashrate_str, sizeof(hashrate_str), "%.2f", state->SYSTEM_MODULE.current_hashrate);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "hashrate", hashrate_str);
+                            BAP_send_if_changed("hashrate", hashrate_str, last_values.hashrate, sizeof(last_values.hashrate), &last_values_valid.hashrate);
                         }
                         break;
                         
@@ -155,10 +246,10 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char temp_str[32];
                             snprintf(temp_str, sizeof(temp_str), "%f", state->POWER_MANAGEMENT_MODULE.chip_temp_avg);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "chipTemp", temp_str);
+                            BAP_send_if_changed("chipTemp", temp_str, last_values.chip_temp, sizeof(last_values.chip_temp), &last_values_valid.chip_temp);
                             
                             snprintf(temp_str, sizeof(temp_str), "%f", state->POWER_MANAGEMENT_MODULE.vr_temp);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "vrTemp", temp_str);
+                            BAP_send_if_changed("vrTemp", temp_str, last_values.vr_temp, sizeof(last_values.vr_temp), &last_values_valid.vr_temp);
                         }
                         break;
                         
@@ -166,7 +257,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char power_str[32];
                             snprintf(power_str, sizeof(power_str), "%.2f", state->POWER_MANAGEMENT_MODULE.power);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "power", power_str);
+                            BAP_send_if_changed("power", power_str, last_values.power, sizeof(last_values.power), &last_values_valid.power);
                         }
                         break;
                         
@@ -174,7 +265,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char voltage_str[32];
                             snprintf(voltage_str, sizeof(voltage_str), "%.2f", state->POWER_MANAGEMENT_MODULE.voltage);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "voltage", voltage_str);
+                            BAP_send_if_changed("voltage", voltage_str, last_values.voltage, sizeof(last_values.voltage), &last_values_valid.voltage);
                         }
                         break;
                         
@@ -182,7 +273,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char current_str[32];
                             snprintf(current_str, sizeof(current_str), "%.2f", state->POWER_MANAGEMENT_MODULE.current);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "current", current_str);
+                            BAP_send_if_changed("current", current_str, last_values.current, sizeof(last_values.current), &last_values_valid.current);
                         }
                         break;
                         
@@ -190,7 +281,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char shares_ar_str[64];
                             snprintf(shares_ar_str, sizeof(shares_ar_str), "%llu/%llu", state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "shares", shares_ar_str);
+                            BAP_send_if_changed("shares", shares_ar_str, last_values.shares, sizeof(last_values.shares), &last_values_valid.shares);
                             
                         }
                         break;
@@ -199,7 +290,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char fan_speed_str[32];
                             snprintf(fan_speed_str, sizeof(fan_speed_str), "%d", state->POWER_MANAGEMENT_MODULE.fan_rpm);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "fan_speed", fan_speed_str);
+                            BAP_send_if_changed("fan_speed", fan_speed_str, last_values.fan_speed, sizeof(last_values.fan_speed), &last_values_valid.fan_speed);
                         }
                         break;
                     
@@ -207,7 +298,15 @@ void BAP_send_subscription_update(GlobalState *state) {
                         {
                             char best_diff_str[32];
                             snprintf(best_diff_str, sizeof(best_diff_str), "%s", state->SYSTEM_MODULE.best_diff_string);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "best_difficulty", best_diff_str);
+                            BAP_send_if_changed("best_difficulty", best_diff_str, last_values.best_difficulty, sizeof(last_values.best_difficulty), &last_values_valid.best_difficulty);
+                        }
+                        break;
+
+                    case BAP_PARAM_BLOCK_HEIGHT:
+                        {
+                            char block_height_str[32];
+                            snprintf(block_height_str, sizeof(block_height_str), "%d", state->block_height);
+                            BAP_send_if_changed("block_height", block_height_str, last_values.block_height, sizeof(last_values.block_height), &last_values_valid.block_height);
                         }
                         break;
 
@@ -225,9 +324,15 @@ void BAP_send_subscription_update(GlobalState *state) {
                             snprintf(rssi_str, sizeof(rssi_str), "%d", current_rssi);
                             
                             snprintf(ip_str, sizeof(ip_str), "%s", state->SYSTEM_MODULE.ip_addr_str);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "wifi_ssid", state->SYSTEM_MODULE.ssid);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "wifi_rssi", rssi_str);
-                            BAP_send_message_with_queue(BAP_CMD_RES, "wifi_ip", ip_str);
+                            char *wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS);
+                            if (!wifi_pass) {
+                                wifi_pass = strdup("");
+                            }
+                            BAP_send_if_changed("wifi_ssid", state->SYSTEM_MODULE.ssid, last_values.wifi_ssid, sizeof(last_values.wifi_ssid), &last_values_valid.wifi_ssid);
+                            BAP_send_if_changed("wifi_password", wifi_pass, last_values.wifi_password, sizeof(last_values.wifi_password), &last_values_valid.wifi_password);
+                            BAP_send_if_changed("wifi_rssi", rssi_str, last_values.wifi_rssi, sizeof(last_values.wifi_rssi), &last_values_valid.wifi_rssi);
+                            BAP_send_if_changed("wifi_ip", ip_str, last_values.wifi_ip, sizeof(last_values.wifi_ip), &last_values_valid.wifi_ip);
+                            free(wifi_pass);
                         }
 
                     default:
