@@ -10,6 +10,7 @@ import { ToastrModule } from 'ngx-toastr';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
+import { ApiModule, Configuration } from './generated';
 import { EditComponent } from './components/edit/edit.component';
 import { PoolComponent } from './components/pool/pool.component';
 import { NetworkEditComponent } from './components/network-edit/network.edit.component';
@@ -90,7 +91,8 @@ const components = [
     AppLayoutModule,
     MessageModule,
     TooltipModule,
-    DialogModule
+    DialogModule,
+    ApiModule.forRoot(() => new Configuration({ basePath: '' }))
   ],
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },

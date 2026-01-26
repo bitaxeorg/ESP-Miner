@@ -110,6 +110,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
         power_management->power = Power_get_power(GLOBAL_STATE);
+        power_management->current = Power_get_current(GLOBAL_STATE);
+        power_management->core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
 
         power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
         power_management->fan2_rpm = Thermal_get_fan2_speed(&GLOBAL_STATE->DEVICE_CONFIG);

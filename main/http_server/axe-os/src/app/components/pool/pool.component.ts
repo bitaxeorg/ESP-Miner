@@ -3,7 +3,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ValidatorFn, ValidationErrors, AbstractControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemApiService } from 'src/app/services/system.service';
 
 type PoolType = 'stratum' | 'fallbackStratum';
 
@@ -21,6 +21,8 @@ export class PoolComponent implements OnInit {
   public form!: FormGroup;
   public savedChanges: boolean = false;
 
+  public readonly DEFAULT_BITCOIN_ADDRESS = 'bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq';
+
   public pools: PoolType[] = ['stratum', 'fallbackStratum'];
   public showPassword = { 'stratum': false, 'fallbackStratum': false };
   public showAdvancedOptions = { 'stratum': false, 'fallbackStratum': false };
@@ -35,7 +37,7 @@ export class PoolComponent implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private toastr: ToastrService,
     private loadingService: LoadingService
   ) { }
@@ -57,7 +59,7 @@ export class PoolComponent implements OnInit {
             Validators.min(0),
             Validators.max(65535)
           ]],
-          stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == 1, [Validators.required]],
+          stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == true, [Validators.required]],
           stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
           stratumUser: [info.stratumUser, [Validators.required]],
           stratumPassword: ['*****', [Validators.required]],
@@ -72,7 +74,7 @@ export class PoolComponent implements OnInit {
             Validators.min(0),
             Validators.max(65535)
           ]],
-          fallbackStratumExtranonceSubscribe: [info.fallbackStratumExtranonceSubscribe == 1, [Validators.required]],
+          fallbackStratumExtranonceSubscribe: [info.fallbackStratumExtranonceSubscribe == true, [Validators.required]],
           fallbackStratumSuggestedDifficulty: [info.fallbackStratumSuggestedDifficulty, [Validators.required]],
           fallbackStratumTLS: [info.fallbackStratumTLS || 0],
           fallbackStratumCert: [info.fallbackStratumCert],
@@ -230,5 +232,14 @@ export class PoolComponent implements OnInit {
 
   trackByFn(index: number, option: ITlsOption): number {
     return option.value;
+  }
+
+  isUsingDefaultAddress(pool: PoolType): boolean {
+    const userValue = this.form?.get(pool + 'User')?.value || '';
+    return userValue.includes(this.DEFAULT_BITCOIN_ADDRESS);
+  }
+
+  isAnyPoolUsingDefaultAddress(): boolean {
+    return this.pools.some(pool => this.isUsingDefaultAddress(pool));
   }
 }

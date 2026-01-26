@@ -3,8 +3,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "asic_task.h"
 #include "common.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "power_management_task.h"
 #include "hashrate_monitor_task.h"
 #include "serial.h"
@@ -45,11 +46,11 @@ typedef struct
     uint64_t best_session_nonce_diff;
     char best_session_diff_string[DIFF_STRING_SIZE];
     bool block_found;
-    char ssid[32];
+    char * ssid;
     char wifi_status[256];
     char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
     char ipv6_addr_str[64]; // IPv6 address string with zone identifier (INET6_ADDRSTRLEN=46 + % + interface=15)
-    char ap_ssid[32];
+    char ap_ssid[12];
     bool ap_enabled;
     bool is_connected;
     int identify_mode_time_ms;
@@ -83,6 +84,8 @@ typedef struct
     char firmware_update_filename[20];
     char firmware_update_status[20];
     char * asic_status;
+    char * version;
+    char * axeOSVersion;
 } SystemModule;
 
 typedef struct
@@ -96,8 +99,19 @@ typedef struct
 
 typedef struct
 {
+    // ASIC may not return the nonce in the same order as the jobs were sent
+    // it also may return a previous nonce under some circumstances
+    // so we keep a list of jobs indexed by the job id
+    bm_job **active_jobs;
+    // Current job to be processed (replaces ASIC_jobs_queue)
+    bm_job *current_job;
+    //semaphone
+    SemaphoreHandle_t semaphore;
+} AsicTaskModule;
+
+typedef struct
+{
     work_queue stratum_queue;
-    work_queue ASIC_jobs_queue;
 
     SystemModule SYSTEM_MODULE;
     DeviceConfig DEVICE_CONFIG;
@@ -109,7 +123,6 @@ typedef struct
 
     char * extranonce_str;
     int extranonce_2_len;
-    int abandon_work;
 
     uint8_t * valid_jobs;
     pthread_mutex_t valid_jobs_lock;

@@ -55,7 +55,8 @@ $BAP,<COMMAND>,<PARAMETER>,<VALUE>*<CHECKSUM>\r\n
 | `fan_speed` | Fan speed percentage | Integer | "80" |
 | `auto_fan` | Auto fan speed control | Boolean | "1" |
 | `best_difficulty` | Best difficulty achieved | String | "1024" |
-| `wifi` | WiFi status information | String | Various |
+| `block_height` | Current network block height | Integer | "845123" |
+| `wifi` | WiFi status information (ssid/password/rssi/ip) | String | Various |
 
 ## Implementation Details
 

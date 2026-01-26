@@ -1,13 +1,16 @@
 import { TestBed } from '@angular/core/testing';
 
-import { SystemService } from './system.service';
+import { SystemApiService } from './system.service';
+import { provideHttpClient } from '@angular/common/http';
 
-describe('SystemService', () => {
-  let service: SystemService;
+describe('SystemApiService', () => {
+  let service: SystemApiService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(SystemService);
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient()]
+    });
+    service = TestBed.inject(SystemApiService);
   });
 
   it('should be created', () => {
