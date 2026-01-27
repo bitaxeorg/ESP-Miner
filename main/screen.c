@@ -559,7 +559,7 @@ static void screen_update_cb(lv_timer_t * timer)
         lv_label_set_text_fmt(mining_network_difficulty_label, "Difficulty: %s", GLOBAL_STATE->network_diff_string);
     }
 
-    if (GLOBAL_STATE->scriptsig != NULL && strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
+    if (strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
         lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->scriptsig);
     }
 

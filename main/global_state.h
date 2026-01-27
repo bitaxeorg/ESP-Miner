@@ -10,6 +10,7 @@
 #include "hashrate_monitor_task.h"
 #include "serial.h"
 #include "stratum_api.h"
+#include "coinbase_decoder.h"
 #include "work_queue.h"
 #include "device_config.h"
 #include "display.h"
@@ -141,7 +142,11 @@ typedef struct
     bool psram_is_available;
 
     int block_height;
-    char * scriptsig;
+    char scriptsig[128];
+    coinbase_output_t coinbase_outputs[MAX_COINBASE_TX_OUTPUTS];
+    int coinbase_output_count;
+    uint64_t coinbase_value_total_satoshis;
+    uint64_t coinbase_value_user_satoshis;
     uint64_t network_nonce_diff;
     char network_diff_string[DIFF_STRING_SIZE];
 } GlobalState;
