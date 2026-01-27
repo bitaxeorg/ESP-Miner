@@ -28,6 +28,7 @@ SRCS
     "./tasks/power_management_task.c"
     "./tasks/statistics_task.c"
     "./tasks/hashrate_monitor_task.c"
+    "./tasks/fan_controller_task.c"
     "./thermal/EMC2101.c"
     "./thermal/EMC2103.c"
     "./thermal/EMC2302.c"
