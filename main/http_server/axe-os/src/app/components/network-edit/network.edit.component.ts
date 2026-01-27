@@ -7,12 +7,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { DialogService } from 'src/app/services/dialog.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
-
-interface WifiNetwork {
-  ssid: string;
-  rssi: number;
-  authmode: number;
-}
+import { WifiNetwork } from 'src/app/generated';
 
 @Component({
   selector: 'app-network-edit',
