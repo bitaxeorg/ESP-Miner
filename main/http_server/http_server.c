@@ -846,7 +846,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
     cJSON_AddNumberToObject(root, "coreVoltageActual", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.core_voltage);
-    cJSON_AddNumberToObject(root, "frequency", frequency);
+    cJSON_AddFloatToObject(root, "frequency", frequency);
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
     cJSON_AddStringToObject(root, "hostname", hostname);
@@ -885,7 +885,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddNumberToObject(root, "fallbackStratumTLS", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS));
     cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
-    cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
+    cJSON_AddFloatToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
 
     cJSON_AddStringToObject(root, "version", GLOBAL_STATE->SYSTEM_MODULE.version);
     cJSON_AddStringToObject(root, "axeOSVersion", GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
