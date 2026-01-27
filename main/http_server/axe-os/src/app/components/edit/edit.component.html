@@ -144,6 +144,81 @@
             </div>
             <label for="invertscreen" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Invert Display Colors</label>
         </div>
+
+        <fieldset class="m-0 p-0 mt-4 border-200 border-bottom-none border-left-none border-right-none">
+            <legend class="p-0 pr-3">
+                <label class="cursor-pointer">
+                    <input type="checkbox" hidden (click)="showCustomizeScreens = !showCustomizeScreens">
+                    <i class="pi pi-angle-{{showCustomizeScreens ? 'down' : 'right'}} text-sm -ml-1 mr-1"></i>
+                    {{showCustomizeScreens ? 'Hide' : 'Show'}} Screen Customization
+                </label>
+            </legend>
+
+            <ng-container *ngIf="showCustomizeScreens">
+
+                <div class="field grid mt-4">
+    
+                    <div class="lg:col-6 col-12">
+                        <div *ngFor="let screen of displayScreens; 
+                                    let i = index; 
+                                    let isLast = last; 
+                                    trackBy: trackByIndex"
+                            class="field grid p-fluid align-items-start">
+
+                            <label class="col-12 md:col-4">Screen {{i + 1}}</label>
+
+                            <div class="col-12 md:col-8">
+                                <div class="flex gap-2 h-full items-stretch">
+                                    <textarea pInputTextarea
+                                            [(ngModel)]="displayScreens[i]"
+                                            [ngModelOptions]="{standalone: true}"
+                                            class="flex-1 text-monospace"
+                                            style="resize: vertical; min-height: min-content; field-sizing: content;"></textarea>
+
+                                    <div class="flex flex-column justify-content-between">
+                                        <button pButton 
+                                                type="button" 
+                                                icon="pi pi-trash"
+                                                class="p-button-danger p-button-sm"
+                                                (click)="removeScreen(i)"
+                                                pTooltip="Remove Screen" 
+                                                tooltipPosition="top"
+                                                [disabled]="displayScreens.length === 1"></button>
+
+                                        <button *ngIf="isLast && displayScreens.length < 8"
+                                                pButton 
+                                                type="button" 
+                                                icon="pi pi-plus"
+                                                class="p-button-success p-button-sm mt-2"
+                                                (click)="addScreen()"></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex mt-5 gap-3">
+                            <button pButton type="button" class="p-button-primary" (click)="saveDisplayScreens()">Save Screens</button>
+
+                            <button pButton type="button" class="p-button-secondary" (click)="resetDisplayScreens()">Reset to Defaults</button>
+                        </div>      
+                    </div>
+
+                    <div class="lg:col-6 lg:pl-6 col-12 ">
+                        <div class="h-full flex flex-column">
+                            <h5 class="lg:mt-0 mt-4 lg:mb-4 font-medium">Available Variables:</h5>
+
+                            <div class="grid-container">
+                                <ul class="variable-list text-sm" style="column-count:3">
+                                    <li *ngFor="let item of availableVariables" class="mb-1">
+                                        <code class="p-1 border-round surface-border">{{ '{' + item + '}' }}</code>
+                                    </li>
+                                </ul>
+                            </div>                            
+                        </div>
+                    </div>
+                </div>
+            </ng-container>
+        </fieldset>
     </div>
 
     <h3 class="mt-5">Statistics</h3>

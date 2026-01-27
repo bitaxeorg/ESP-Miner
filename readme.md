@@ -60,6 +60,8 @@ Available API endpoints:
 * `/api/system/statistics` Get system statistics (data logging should be activated)
 * `/api/system/statistics/dashboard` Get system statistics for dashboard
 * `/api/system/wifi/scan` Scan for available Wi-Fi networks
+* `/api/display/screens` Get display screens configuration
+* `/api/display/variables` Get display variables
 
 **POST**
 
@@ -67,6 +69,8 @@ Available API endpoints:
 * `/api/system/identify` Identify the device
 * `/api/system/OTA` Update system firmware
 * `/api/system/OTAWWW` Update AxeOS
+* `/api/display/screens` Update display screens configuration
+* `/api/display/screens/reset` Reset display screens to defaults
 
 **PATCH**
 
