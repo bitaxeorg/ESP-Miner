@@ -6,6 +6,7 @@
 #include "create_jobs_task.h"
 #include "hashrate_monitor_task.h"
 #include "statistics_task.h"
+#include "webhook_task.h"
 #include "system.h"
 #include "http_server.h"
 #include "serial.h"
@@ -117,5 +118,8 @@ void app_main(void)
     }
     if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
         ESP_LOGE(TAG, "Error creating statistics task");
+    }
+    if (xTaskCreate(webhook_task, "webhook", 8192, (void *) &GLOBAL_STATE, 2, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating webhook task");
     }
 }

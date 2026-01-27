@@ -172,6 +172,13 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
             Validators.required,
             Validators.min(0),
             Validators.max(this.statsFrequencyMaxValue)
+          ]],
+          webhookEnabled: [(info as any).webhookEnabled == 1 || (info as any).webhookEnabled === true, [Validators.required]],
+          webhookUrl: [{value: (info as any).webhookUrl || '', disabled: !((info as any).webhookEnabled == 1 || (info as any).webhookEnabled === true)}, [Validators.required]],
+          webhookInterval: [{value: (info as any).webhookInterval || 60, disabled: !((info as any).webhookEnabled == 1 || (info as any).webhookEnabled === true)}, [
+            Validators.required,
+            Validators.min(10),
+            Validators.max(3600)
           ]]
         });
 
@@ -187,6 +194,19 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
         } else {
           this.form.controls['manualFanSpeed'].enable();
           this.form.controls['temptarget'].disable();
+        }
+      });
+
+      this.form.controls['webhookEnabled'].valueChanges.pipe(
+        startWith(this.form.controls['webhookEnabled'].value),
+        takeUntil(this.destroy$)
+      ).subscribe(webhookEnabled => {
+        if (webhookEnabled) {
+          this.form.controls['webhookUrl'].enable();
+          this.form.controls['webhookInterval'].enable();
+        } else {
+          this.form.controls['webhookUrl'].disable();
+          this.form.controls['webhookInterval'].disable();
         }
       });
 
@@ -341,7 +361,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       'manualFanSpeed',
       'temptarget',
       'overheat_mode',
-      'statsFrequency'
+      'statsFrequency',
+      'webhookEnabled',
+      'webhookUrl',
+      'webhookInterval'
     ];
   }
 
