@@ -311,26 +311,44 @@ esp_netif_t * wifi_init_softap(GlobalState * GLOBAL_STATE)
     return esp_netif_ap;
 }
 
+static bool is_wifi_operation_allowed(esp_err_t err)
+{
+    if (err == ESP_ERR_WIFI_NOT_INIT || err == ESP_ERR_WIFI_STOP_STATE) {
+        ESP_LOGI(TAG, "WiFi not initialized or stopped, skipping operation");
+        return false;
+    }
+    return true;
+}
+
 void toggle_wifi_softap(void)
 {
     wifi_mode_t mode = WIFI_MODE_NULL;
-    ESP_ERROR_CHECK(esp_wifi_get_mode(&mode));
-
-    if (mode == WIFI_MODE_APSTA) {
-        wifi_softap_off();
-    } else {
-        wifi_softap_on();
+    esp_err_t err = esp_wifi_get_mode(&mode);
+    if (is_wifi_operation_allowed(err)) {
+        ESP_ERROR_CHECK(err);
+    
+        if (mode == WIFI_MODE_APSTA) {
+            wifi_softap_off();
+        } else {
+            wifi_softap_on();
+        }
     }
 }
 
 static void wifi_softap_off(void)
 {
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (is_wifi_operation_allowed(err)) {
+        ESP_ERROR_CHECK(err);
+    }
 }
 
 static void wifi_softap_on(void)
 {
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+    if (is_wifi_operation_allowed(err)) {
+        ESP_ERROR_CHECK(err);
+    }
 }
 
 /* Initialize wifi station */
