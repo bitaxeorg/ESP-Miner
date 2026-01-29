@@ -14,6 +14,8 @@ import { CheckboxComponent } from '../checkbox/checkbox.component';
 import { FormsModule } from '@angular/forms';
 
 import { ProgressbarComponent } from '../progressbar/progressbar.component';
+import { I18nService } from 'src/app/i18n/i18n.service';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 
@@ -23,7 +25,7 @@ export type FirmwareVerifyStatus = 'idle' | 'checking' | 'match' | 'mismatch' | 
   selector: 'app-update',
   templateUrl: './update.component.html',
   styleUrls: ['./update.component.scss'],
-  imports: [ModalComponent, CheckboxComponent, ProgressbarComponent, FormsModule, AsyncPipe]
+  imports: [ModalComponent, CheckboxComponent, ProgressbarComponent, FormsModule, AsyncPipe, TranslatePipe]
 })
 export class UpdateComponent {
 
@@ -60,6 +62,7 @@ export class UpdateComponent {
     private toastrService: ToastrService,
     private githubUpdateService: GithubUpdateService,
     private localStorageService: LocalStorageService,
+    private i18n: I18nService,
   ) {
     this.latestRelease$ = this.githubUpdateService.getReleases().pipe(map(releases => {
       return (releases as any)[0];
@@ -106,7 +109,7 @@ export class UpdateComponent {
     }
 
     if (file.name != 'esp-miner.bin') {
-      this.toastrService.error('Incorrect file, looking for esp-miner.bin.');
+      this.toastrService.error(this.i18n.t('errors.incorrect_file', { expected: 'esp-miner.bin' }));
       return;
     }
 
@@ -153,7 +156,7 @@ export class UpdateComponent {
     }
 
     if (file.name != 'www.bin') {
-      this.toastrService.error('Incorrect file, looking for www.bin.');
+      this.toastrService.error(this.i18n.t('errors.incorrect_file', { expected: 'www.bin' }));
       return;
     }
 

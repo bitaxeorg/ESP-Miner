@@ -11,6 +11,8 @@ import { TooltipDirective } from '../../directives/tooltip.directive';
 import { TooltipTextIconComponent } from '../tooltip-text-icon/tooltip-text-icon.component';
 import { RadioButtonComponent } from '../radio-button/radio-button.component';
 import { CheckboxComponent } from '../checkbox/checkbox.component';
+import { I18nService } from 'src/app/i18n/i18n.service';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 interface ITlsOption {
   value: number;
@@ -30,7 +32,7 @@ interface IChannelOption {
 @Component({
   selector: 'app-pool',
   templateUrl: './pool.component.html',
-  imports: [FormsModule, ReactiveFormsModule, TooltipDirective, TooltipTextIconComponent, RadioButtonComponent, CheckboxComponent]
+  imports: [FormsModule, ReactiveFormsModule, TooltipDirective, TooltipTextIconComponent, RadioButtonComponent, CheckboxComponent, TranslatePipe]
 })
 export class PoolComponent implements OnInit {
   public form!: FormGroup;
@@ -44,9 +46,9 @@ export class PoolComponent implements OnInit {
   public activeCardIndex: number | null = 0;
 
   public tlsOptions: ITlsOption[] = [
-    { value: 0, label: 'No TLS' },
-    { value: 1, label: 'TLS (System certificate)' },
-    { value: 2, label: 'TLS (Custom CA certificate)' }
+    { value: 0, label: 'settings.pool.tls_none' },
+    { value: 1, label: 'settings.pool.tls_system' },
+    { value: 2, label: 'settings.pool.tls_custom' }
   ];
 
   public protocolOptions: IProtocolOption[] = [
@@ -70,7 +72,8 @@ export class PoolComponent implements OnInit {
     private liveDataService: LiveDataService,
     private toastr: ToastrService,
     private loadingService: LoadingService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private i18n: I18nService
   ) { }
 
   ngOnInit(): void {
@@ -277,13 +280,18 @@ export class PoolComponent implements OnInit {
           }
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not save pool settings. ${getHttpErrorMessage(err, this.uri)}`);
+          const errorMessage = this.uri
+            ? this.i18n.t('errors.pool_save_failed_for', { uri: this.uri, error: err.message })
+            : this.i18n.t('errors.pool_save_failed', { error: err.message });
+          this.toastr.error(errorMessage);
         }
       });
   }
 
   private onSaveSuccess() {
-    const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
+    const successMessage = this.uri
+      ? this.i18n.t('messages.pool_saved_for', { uri: this.uri })
+      : this.i18n.t('messages.pool_saved');
     this.toastr.success(successMessage);
     this.pendingDeletePoolIds = [];
     this.form.markAsPristine();
@@ -348,7 +356,7 @@ export class PoolComponent implements OnInit {
       };
 
       reader.onerror = () => {
-        this.toastr.error('Failed to read certificate file');
+        this.toastr.error(this.i18n.t('errors.certificate_read_failed'));
         fileInput.value = '';
       };
 

@@ -1,6 +1,6 @@
 @if (systemRows$ | async; as rows) {
   <div class="card">
-    <h2>System</h2>
+    <h2>{{ 'device.system.title' | t }}</h2>
     <div class="mt-4">
       <table>
         @for (row of rows; track trackByRowLabel($index, row)) {
@@ -11,7 +11,7 @@
         }
       </table>
       <button class="btn btn-primary mt-5" (click)="identifyDevice()">
-        Identify device
+        {{ 'actions.identify_device' | t }}
       </button>
     </div>
   </div>

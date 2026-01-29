@@ -15,12 +15,14 @@ import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
 import { TooltipTextIconComponent } from '../tooltip-text-icon/tooltip-text-icon.component';
 import { TooltipDirective } from '../../directives/tooltip.directive';
 import { CheckboxComponent } from '../checkbox/checkbox.component';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 @Component({
   selector: 'app-network-edit',
   templateUrl: './network.edit.component.html',
   styleUrls: ['./network.edit.component.scss'],
-  imports: [FormsModule, ReactiveFormsModule, TooltipTextIconComponent, TooltipDirective, CheckboxComponent]
+  imports: [FormsModule, ReactiveFormsModule, TooltipTextIconComponent, TooltipDirective, CheckboxComponent, TranslatePipe]
 })
 export class NetworkEditComponent implements OnInit {
   private formSubject = new BehaviorSubject<FormGroup | null>(null);
@@ -39,7 +41,8 @@ export class NetworkEditComponent implements OnInit {
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private http: HttpClient,
-    private dialogService: DialogService
+    private dialogService: DialogService,
+    private i18n: I18nService
   ) {
 
   }
@@ -94,10 +97,10 @@ export class NetworkEditComponent implements OnInit {
                 }
                const redirectUrl = redirectResponse.redirect.url;
                const redirectDelay = redirectResponse.redirect.delay;
-               
+
                this.toastr.success(redirectResponse.redirect.message);
                this.toastr.info(`Redirecting to ${newHostname} in ${Math.ceil(redirectDelay / 1000)} seconds...`);
-               
+
                setTimeout(() => {
                  window.location.href = redirectUrl;
                }, redirectDelay);
@@ -107,14 +110,14 @@ export class NetworkEditComponent implements OnInit {
 
            // Normal success handling
            if (restartRequired) {
-             this.toastr.warning('You must restart this device after saving for changes to take effect.');
+             this.toastr.warning(this.i18n.t('messages.restart_required'));
            }
-          this.toastr.success('Saved network settings');
+          this.toastr.success(this.i18n.t('messages.network_saved'));
           this.savedChanges = restartAlreadyPending || restartRequired;
           this.form.markAsPristine();
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not save. ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(this.i18n.t('errors.save_failed', { error: getHttpErrorMessage(err, this.uri) }));
           this.savedChanges = restartAlreadyPending;
         }
       });
@@ -158,7 +161,7 @@ export class NetworkEditComponent implements OnInit {
           }));
 
           // Show dialog with network list
-          this.dialogService.open('Select Wi-Fi Network', dialogData)
+          this.dialogService.open(this.i18n.t('settings.network.select_wifi_title'), dialogData)
             .subscribe((selectedSsid: string) => {
               if (selectedSsid) {
                 this.form.patchValue({ ssid: selectedSsid });
@@ -167,7 +170,7 @@ export class NetworkEditComponent implements OnInit {
             });
         },
         error: (err) => {
-          this.toastr.error('Failed to scan Wi-Fi networks');
+          this.toastr.error(this.i18n.t('errors.wifi_scan_failed'));
         }
       });
   }
@@ -177,11 +180,11 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.success('Device restarted');
+          this.toastr.success(this.i18n.t('messages.device_restarted'));
           this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not restart. ${getHttpErrorMessage(err, this.uri)}`);
+          this.toastr.error(this.i18n.t('errors.restart_failed', { error: getHttpErrorMessage(err, this.uri) }));
         }
       });
   }

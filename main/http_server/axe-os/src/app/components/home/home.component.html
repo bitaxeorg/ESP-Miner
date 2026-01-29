@@ -1,5 +1,5 @@
 <ng-template #powerFault>
-  <span class="text-red-500">Not available - Power fault</span>
+  <span class="text-red-500">{{ 'messages.power_fault_unavailable' | t }}</span>
 </ng-template>
 
 @if (info$ | async; as info) {
@@ -30,7 +30,7 @@
       <div class="grid-stack-item-content">
         <div class="card">
           <div class="flex flex-col justify-between">
-            <span class="block text-lg font-medium mb-4">Hashrate</span>
+            <span class="block text-lg font-medium mb-4">{{ 'miner.hashrate' | t }}</span>
 
             @if (!info.power_fault) {
               <div class="flex items-center justify-between gap-2 mb-4">
@@ -42,13 +42,13 @@
                     <tr>
                       <th class="p-0 text-secondary font-normal leading-none">
                         <tooltip-text-icon class="pl-2"
-                          text="Error"
-                          tooltip="Hash error percentage as reported by the ASIC. A small amount of errors every few seconds is normal. Frequency changes, agressive overclocking, undervoltage or a bad power supply can significantly increase the error rate."
+                          [text]="'common.error' | t"
+                          [tooltip]="'miner.hash_error_help' | t"
                         />
                       </th>
                       @if (info.expectedHashrate) {
                         <th class="p-0 pl-3 text-secondary font-normal leading-none">
-                          Expected
+                          {{ 'common.expected' | t }}
                         </th>
                       }
                     </tr>
@@ -112,7 +112,7 @@
                   <thead>
                     <tr>
                       <th class="p-0 text-secondary font-normal leading-none">
-                        Expected
+                        {{ 'common.expected' | t }}
                       </th>
                     </tr>
                   </thead>
@@ -131,7 +131,7 @@
                   {{efficiencyAverage | number: '1.2-2'}} J/Th
                 </span>
                 <span class="text-secondary">
-                  Average
+                  {{ 'common.average' | t }}
                 </span>
               </div>
             } @else {
@@ -148,9 +148,9 @@
         <div class="card">
           <div class="flex justify-between mb-4">
             <div>
-              <span class="block text-lg font-medium mb-4">Shares
-                <i class="pi pi-arrow-up transition-opacity duration-500 ml-2 text-sm align-middle text-green-500" [class.opacity-100]="flashShareAccepted" [class.opacity-0]="!flashShareAccepted" appTooltip="Share Accepted" tooltipPosition="top"></i>
-                <i class="pi pi-times transition-opacity duration-500 ml-1 text-sm align-middle text-red-500" [class.opacity-100]="flashShareRejected" [class.opacity-0]="!flashShareRejected" appTooltip="Share Rejected" tooltipPosition="top"></i>
+              <span class="block text-lg font-medium mb-4">{{ 'miner.shares' | t }}
+                <i class="pi pi-arrow-up transition-opacity duration-500 ml-2 text-sm align-middle text-green-500" [class.opacity-100]="flashShareAccepted" [class.opacity-0]="!flashShareAccepted" [appTooltip]="'miner.shares_accepted' | t" tooltipPosition="top"></i>
+                <i class="pi pi-times transition-opacity duration-500 ml-1 text-sm align-middle text-red-500" [class.opacity-100]="flashShareRejected" [class.opacity-0]="!flashShareRejected" [appTooltip]="'miner.shares_rejected' | t" tooltipPosition="top"></i>
               </span>
               <div class="font-medium text-2xl">
                 {{info.sharesAccepted | number: '1.0-0'}}
@@ -163,7 +163,7 @@
           @if (info.sharesRejected === 0) {
             <div>
               <span class="text-red-500 font-medium">0 </span>
-              <span class="text-secondary">rejected</span>
+              <span class="text-secondary">{{ 'miner.rejected' | t }}</span>
             </div>
           } @else {
             @for (sharesRejectedReason of sortedRejectionReasons; track trackByReason($index, sharesRejectedReason)) {
@@ -172,7 +172,7 @@
                   {{ sharesRejectedReason.count | number: '1.0-0' }}
                 </span>
                 <span class="text-secondary">
-                  {{ sharesRejectedReason.message }}
+                  {{ getRejectionLabel(sharesRejectedReason.message) }}
                 </span>
                 <tooltip-text-icon
                   [text]="'(' + (sharesRejectedReason.percentage | number:'1.2-2') + ' %)'"
@@ -191,12 +191,12 @@
         <div class="card">
           <div class="flex justify-between mb-4">
             <div>
-              <span class="block text-lg font-medium mb-4">Best Difficulty</span>
+              <span class="block text-lg font-medium mb-4">{{ 'miner.best_difficulty' | t }}</span>
               <div class="font-medium text-2xl">
                 <span class="cursor-pointer" appTooltip="{{info.bestDiff | number:'1.0-0'}}" tooltipPosition="bottom">
                   {{info.bestDiff | diffSuffix}}
                 </span>
-                <span class="text-secondary text-lg">all-time best</span>
+                <span class="text-secondary text-lg">{{ 'miner.all_time_best' | t }}</span>
 
               </div>
             </div>
@@ -205,7 +205,7 @@
             <span class="font-medium cursor-pointer" appTooltip="{{info.bestSessionDiff | number:'1.0-0'}}" tooltipPosition="bottom">
               {{info.bestSessionDiff | diffSuffix}}
             </span>
-            <span class="text-secondary text-lg">session best</span>
+            <span class="text-secondary text-lg">{{ 'miner.session_best' | t }}</span>
           </div>
         </div>
       </div>
@@ -241,18 +241,18 @@
     <div class="grid-stack-item" gs-id="power">
       <div class="grid-stack-item-content">
         <div class="card">
-          <h4 class="text-center font-medium">Power</h4>
+          <h4 class="text-center font-medium">{{ 'miner.power' | t }}</h4>
 
           <div class="mb-4">
             <h6 class="flex justify-between mb-1">
-              Power<span>{{info.power}} W</span>
+              {{ 'miner.power' | t }}<span>{{info.power}} W</span>
             </h6>
             <app-progressbar [value]="(info.power / info.maxPower) * 100"></app-progressbar>
           </div>
 
           <div class="mb-4">
             <h6 class="flex justify-between mb-1">
-              Input Voltage<span>{{info.voltage}} V</span>
+              {{ 'miner.input_voltage' | t }}<span>{{info.voltage}} V</span>
             </h6>
             <app-progressbar
               [value]="((info.voltage / (info.nominalVoltage + .5)) * 100)"
@@ -261,21 +261,21 @@
             <!-- Adding 0.949 because we want to give it the 5mV headroom for weak psu's  -->
             @if (info.voltage < (info.nominalVoltage) * 0.949) {
               <strong class="text-red-500">
-                Danger: Low Voltage
+                {{ 'messages.danger_low_voltage' | t }}
               </strong>
             }
           </div>
 
           <div class="mb-4">
             <h6 class="flex justify-between mb-1">
-              ASIC Frequency<span>{{info.actualFrequency | number: '1.0-4'}} MHz</span>
+              {{ 'miner.asic_frequency' | t }}<span>{{info.actualFrequency | number: '1.0-4'}} MHz</span>
             </h6>
             <app-progressbar [value]="(info.actualFrequency / maxFrequency) * 100"></app-progressbar>
           </div>
 
           <div>
             <h6 class="flex justify-between mb-1">
-              Measured ASIC Voltage<span>{{info.coreVoltageActual}} V</span>
+              {{ 'miner.asic_voltage_measured' | t }}<span>{{info.coreVoltageActual}} V</span>
             </h6>
             <app-progressbar [value]="(info.coreVoltageActual / 1.8) * 100"></app-progressbar>
           </div>
@@ -287,20 +287,20 @@
     <div class="grid-stack-item" gs-id="heat">
       <div class="grid-stack-item-content">
         <div class="card">
-          <h4 class="text-center font-medium">Heat</h4>
+          <h4 class="text-center font-medium">{{ 'miner.heat' | t }}</h4>
 
           <div class="mb-4">
             <h6 class="flex justify-between mb-1">
               @if (info.temp2 > 0) {
-                ASIC Temperature 1
+                {{ 'miner.asic_temperature_1' | t }}
               } @else {
-                ASIC Temperature
+                {{ 'miner.asic_temperature' | t }}
               }
               <span>
                 @if (info.temp > 0) {
                   {{info.temp}} °C
                 } @else {
-                  --
+                  {{ 'common.no_value' | t }}
                 }
               </span>
             </h6>
@@ -311,7 +311,7 @@
 
             @if (info.temp >= 70) {
               <strong class="text-red-500">
-                Danger: High Temperature
+                {{ 'messages.danger_high_temperature' | t }}
               </strong>
             }
           </div>
@@ -319,7 +319,7 @@
           @if (info.temp2 > 0) {
             <div class="mb-4">
               <h6 class="flex justify-between mb-1">
-                ASIC Temperature 2
+                {{ 'miner.asic_temperature_2' | t }}
                 <span>
                   {{info.temp2}} °C
                 </span>
@@ -331,7 +331,7 @@
 
               @if (info.temp2 >= 70) {
                 <strong class="text-red-500">
-                  Danger: High Temperature
+                  {{ 'messages.danger_high_temperature' | t }}
                 </strong>
               }
             </div>
@@ -340,13 +340,13 @@
           @if (info.vrTemp > 0) {
             <div class="mb-4">
               <h6 class="flex justify-between mb-1">
-                Voltage Regulator Temperature<span>{{info.vrTemp}} °C</span>
+                {{ 'miner.voltage_regulator_temperature' | t }}<span>{{info.vrTemp}} °C</span>
               </h6>
               <app-progressbar [value]="(info.vrTemp / 120) * 100"></app-progressbar>
 
               @if (info.vrTemp >= 105) {
                 <strong class="text-red-500">
-                  Danger: High Temperature
+                  {{ 'messages.danger_high_temperature' | t }}
                 </strong>
               }
             </div>
@@ -359,17 +359,13 @@
     <div class="grid-stack-item" gs-id="fan">
       <div class="grid-stack-item-content">
         <div class="card">
-          <h4 class="text-center font-medium">Fan</h4>
+          <h4 class="text-center font-medium">{{ 'miner.fan' | t }}</h4>
 
           <div class="mb-4">
             <h6 class="flex justify-between mb-1" tooltipPosition="top"
                 appTooltip="{{info.fan2rpm > 0 ? 'Fan 1: ' : ''}}{{info.fanrpm}} RPM{{info.fan2rpm > 0 ? '\nFan 2: ' + info.fan2rpm + ' RPM' : ''}}">
 
-              @if (info.fan2rpm > 0) {
-                Fan Speeds
-              } @else {
-                Fan Speed
-              }
+              {{ 'miner.fan_speed' | t }}
 
               <span>{{info.fanspeed.toFixed(1)}} %</span>
             </h6>
@@ -386,15 +382,15 @@
           <div class="card">
             <div class="flex flex-nowrap justify-between relative">
               <h4 class="font-medium">
-                Pool
+                {{ 'miner.pool' | t }}
                 @if ((quickLink$ | async); as quickLink) {
                   <a
                     [href]="quickLink"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="ml-1 text-white"
-                    [attr.aria-label]="'Open pool dashboard in new tab'"
-                    appTooltip="Open pool dashboard"
+                    [attr.aria-label]="'actions.open_pool_dashboard_new_tab' | t"
+                    [appTooltip]="'actions.open_pool_dashboard' | t"
                     tooltipPosition="top"
                   >
                     <i class="pi pi-external-link text-base text-primary"></i>
@@ -412,7 +408,7 @@
 
             <div class="flex flex-nowrap items-baseline">
               <div class="w-24 shrink-0 text-secondary">
-                <span>URL</span>
+                <span>{{ 'common.url' | t }}</span>
               </div>
               <div class="flex items-center gap-1">
                 @if (activePoolTLS) {
@@ -427,7 +423,7 @@
 
             <div class="flex flex-nowrap items-baseline">
               <div class="w-24 shrink-0 text-secondary">
-                User
+                {{ 'common.user' | t }}
               </div>
 
               <div appTooltip="{{ activePoolUser }}" tooltipPosition="top" sensitive-data>
@@ -449,8 +445,8 @@
             <div class="flex flex-nowrap">
               <div class="w-24 shrink-0 text-secondary">
                 <tooltip-text-icon
-                  text="Time"
-                  tooltip="Time it takes for the pool to respond to a share"
+                  [text]="'miner.pool_response_time' | t"
+                  [tooltip]="'miner.pool_response_time_help' | t"
                 />
               </div>
               @if (info.responseTime > 0) {
@@ -488,7 +484,7 @@
             }
             <div class="flex flex-nowrap">
               <div class="w-24 shrink-0 text-secondary">
-                <span>Difficulty</span>
+                <span>{{ 'miner.difficulty' | t }}</span>
               </div>
               @if (info.poolDifficulty > 0) {
                 <div class="flex items-center gap-1.5">
@@ -500,7 +496,7 @@
                   }
                 </div>
               } @else {
-                --
+                {{ 'common.no_value' | t }}
               }
             </div>
             <div class="flex flex-nowrap">
@@ -519,7 +515,7 @@
       <div class="grid-stack-item-content">
         <div class="card">
           <h4 class="whitespace-nowrap overflow-hidden text-ellipsis font-medium">
-            Block Header
+            {{ 'miner.block_header' | t }}
             <i class="pi pi-arrow-down transition-opacity duration-500 ml-2 text-sm align-middle text-blue-500" [class.opacity-100]="flashWorkReceived" [class.opacity-0]="!flashWorkReceived" appTooltip="Work Received" tooltipPosition="top"></i>
             @if (info.blockSignals && info.blockSignals.length > 0) {
               <span class="align-bottom ml-2">
@@ -533,7 +529,7 @@
           @if (info.blockHeight) {
             <div class="flex flex-nowrap">
               <div class="w-24 shrink-0 text-secondary">
-                <span>Height</span>
+                <span>{{ 'miner.block_height' | t }}</span>
               </div>
               <div>
                 {{ info.blockHeight }}
@@ -543,7 +539,7 @@
 
           <div class="flex flex-nowrap">
             <div class="w-24 shrink-0 text-secondary">
-              <span>Difficulty</span>
+              <span>{{ 'miner.difficulty' | t }}</span>
             </div>
             @if (info.networkDifficulty) {
               <div class="cursor-pointer" appTooltip="{{info.networkDifficulty | number:'1.0-0'}}" tooltipPosition="bottom">
@@ -555,7 +551,7 @@
           @if (info.scriptsig) {
             <div class="flex flex-nowrap items-baseline">
               <div class="w-24 shrink-0 text-secondary">
-                <span>Scriptsig</span>
+                <span>{{ 'miner.scriptsig' | t }}</span>
               </div>
               <div class="font-mono text-sm">
                 {{ info.scriptsig }}
@@ -614,7 +610,7 @@
     <div class="grid-stack-item" gs-id="registers">
       <div class="grid-stack-item-content">
         <div class="card flex flex-col">
-          <h4 class="whitespace-nowrap overflow-hidden text-ellipsis font-medium">Hashrate Registers</h4>
+          <h4 class="whitespace-nowrap overflow-hidden text-ellipsis font-medium">{{ 'miner.hashrate_registers' | t }}</h4>
 
           @if (sparklineAsicRows.length > 0) {
             <div class="w-full flex-1 min-h-0 flex flex-col gap-1.5 overflow-hidden">
@@ -649,7 +645,7 @@
 
           <div class="flex flex-nowrap mb-1">
             <div class="w-24 shrink-0 text-secondary">
-              <span>Uptime</span>
+              <span>{{ 'common.uptime' | t }}</span>
             </div>
             <div>
               <span>{{ info.uptimeSeconds | dateAgo: { intervals: 2, strict:true, short:false } }}</span>
