@@ -20,6 +20,7 @@ import { AppSidebarComponent } from './app.sidebar.component';
 import { AppTopBarComponent } from './app.topbar.component';
 import { LoadingComponent } from '../components/loading/loading.component';
 import { WifiIconComponent } from '../components/wifi-icon/wifi-icon.component';
+import { TranslatePipe } from '../i18n/translate.pipe';
 
 @NgModule({
     declarations: [
@@ -28,9 +29,10 @@ import { WifiIconComponent } from '../components/wifi-icon/wifi-icon.component';
         AppFooterComponent,
         AppMenuComponent,
         AppSidebarComponent,
-        AppLayoutComponent,
-        LoadingComponent,
-        WifiIconComponent,
+    AppLayoutComponent,
+    LoadingComponent,
+    WifiIconComponent,
+    TranslatePipe,
     ],
     imports: [
         BrowserModule,
@@ -44,9 +46,9 @@ import { WifiIconComponent } from '../components/wifi-icon/wifi-icon.component';
         InputSwitchModule,
         RippleModule,
         RouterModule,
-        PrimeNGModule,
-        TooltipModule,
+    PrimeNGModule,
+    TooltipModule,
     ],
-    exports: [AppLayoutComponent, WifiIconComponent]
+    exports: [AppLayoutComponent, WifiIconComponent, TranslatePipe]
 })
 export class AppLayoutModule { }
