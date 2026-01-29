@@ -1,16 +1,21 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, OnDestroy, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, FormControl, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { ActivatedRoute } from '@angular/router';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 type Dropdown = {
   name: string;
   value: number;
 }[]
+type DisplayOption = {
+  label: string;
+  value: string;
+}[];
 
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
 const STATS_FREQUENCY_STEPS = [0, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
@@ -33,6 +38,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public settingsUnlocked: boolean = false;
 
   @Input() uri = '';
+  @Output() saveRequested = new EventEmitter<void>();
 
   // Store frequency and voltage options from API
   public defaultFrequency: number = 0;
@@ -42,7 +48,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   private destroy$ = new Subject<void>();
 
-  public displays = ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
+  private readonly displayValues = ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
   public rotations = [0, 90, 180, 270];
   public displayTimeoutControl: FormControl;
   public statsFrequencyControl: FormControl;
@@ -53,6 +59,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private route: ActivatedRoute,
+    private i18n: I18nService,
   ) {
     // Check URL parameter for settings unlock
     this.route.queryParams.subscribe(params => {
@@ -218,6 +225,11 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     this.destroy$.complete();
   }
 
+  public onSaveClick() {
+    this.saveRequested.emit();
+    this.updateSystem();
+  }
+
   public updateSystem() {
     const form = this.form.getRawValue();
 
@@ -230,15 +242,19 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
+          const successMessage = this.uri
+            ? this.i18n.t('messages.settings_saved_for', { uri: this.uri })
+            : this.i18n.t('messages.settings_saved');
           if (this.isRestartRequired) {
-            this.toastr.warning('You must restart this device after saving for changes to take effect.');
+            this.toastr.warning(this.i18n.t('messages.restart_required'));
           }
           this.toastr.success(successMessage);
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Could not save settings for ${this.uri}. ${err.message}` : `Could not save settings. ${err.message}`;
+          const errorMessage = this.uri
+            ? this.i18n.t('errors.save_failed_for', { uri: this.uri, error: err.message })
+            : this.i18n.t('errors.save_failed', { error: err.message });
           this.toastr.error(errorMessage);
           this.savedChanges = false;
         }
@@ -269,11 +285,15 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
+          const successMessage = this.uri
+            ? this.i18n.t('messages.device_restarted_at', { uri: this.uri })
+            : this.i18n.t('messages.device_restarted');
           this.toastr.success(successMessage);
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
+          const errorMessage = this.uri
+            ? this.i18n.t('errors.restart_failed_for', { uri: this.uri, error: err.message })
+            : this.i18n.t('errors.restart_failed', { error: err.message });
           this.toastr.error(errorMessage);
         }
       });
@@ -285,6 +305,13 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   get dropdownVoltage(): Dropdown {
     return this.buildDropdown('coreVoltage', this.voltageOptions, this.defaultVoltage);
+  }
+
+  get displays(): DisplayOption {
+    return this.displayValues.map(value => ({
+      value,
+      label: value === 'NONE' ? this.i18n.t('settings.device.display.none') : value
+    }));
   }
 
   get displayTimeoutMaxSteps(): number {
@@ -308,10 +335,13 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       return [];
     }
 
+    const defaultLabel = this.i18n.t('common.default');
+    const customLabel = this.i18n.t('common.custom');
+
     // Convert options from API to dropdown format
     const options = apiOptions.map(option => {
       return {
-        name: defaultValue === option ? `${option} (Default)` : `${option}`,
+        name: defaultValue === option ? `${option} (${defaultLabel})` : `${option}`,
         value: option
       };
     });
@@ -322,7 +352,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     // If current field value exists and isn't in the options
     if (currentValue && !options.some(opt => opt.value === currentValue)) {
       options.push({
-        name: `${currentValue} (Custom)`,
+        name: `${currentValue} (${customLabel})`,
         value: currentValue
       });
       // Sort options by value

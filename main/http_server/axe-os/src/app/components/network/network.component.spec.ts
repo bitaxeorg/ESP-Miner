@@ -6,6 +6,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
 import { DialogService } from 'src/app/services/dialog.service';
 import { DialogService as PrimeDialogService } from 'primeng/dynamicdialog';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 describe('NetworkComponent', () => {
   let component: NetworkComponent;
@@ -13,7 +14,7 @@ describe('NetworkComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [NetworkComponent, NetworkEditComponent],
+      declarations: [NetworkComponent, NetworkEditComponent, TranslatePipe],
       providers: [provideHttpClient(), provideToastr(), DialogService, PrimeDialogService]
     });
     fixture = TestBed.createComponent(NetworkComponent);

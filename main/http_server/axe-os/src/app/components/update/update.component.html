@@ -1,40 +1,42 @@
 <div class="card">
-    <h2>Update</h2>
+    <h2>{{ 'device.update.title' | t }}</h2>
 
     <div class="grid">
         <div class="col-12 xl:col-4">
             <div class="card h-full">
-                <h5>Current Version: {{(info$ | async)?.version}}</h5>
+                <h5>{{ 'device.update.current_version' | t }}: {{(info$ | async)?.version}}</h5>
 
                 <ng-container *ngIf="checkLatestRelease == false; else afterCheck">
-                    <h3>Latest Release: <p-button (onClick)="handleReleaseCheck()">Check</p-button></h3>
+                    <h3>{{ 'device.update.latest_release' | t }}:
+                        <p-button (onClick)="handleReleaseCheck()">{{ 'actions.check' | t }}</p-button>
+                    </h3>
 
-                    <app-modal [headline]="'Privacy Warning'">
+                    <app-modal [headline]="'device.update.privacy_warning_title' | t">
                         <p>
-                            Please note, this will connect to <strong>github.com</strong> to check for the latest release.
+                            {{ 'messages.release_check_notice_prefix' | t }} <strong>github.com</strong> {{ 'messages.release_check_notice_suffix' | t }}
                         </p>
                         <p class="flex gap-2">
                             <p-checkbox
                                 [binary]="true"
                                 inputId="ignoreWarning"
                                 #ignoreWarning></p-checkbox>
-                            <label for="ignoreWarning">Don't show again</label>
+                            <label for="ignoreWarning">{{ 'common.dont_show_again' | t }}</label>
                         </p>
                         <div class="flex gap-3 mt-5">
-                            <p-button (onClick)="continueReleaseCheck(ignoreWarning.model)">Continue</p-button>
-                            <p-button styleClass="p-button-secondary" (onClick)="modalComponent.isVisible = false">Cancel</p-button>
+                            <p-button (onClick)="continueReleaseCheck(ignoreWarning.model)">{{ 'actions.continue' | t }}</p-button>
+                            <p-button styleClass="p-button-secondary" (onClick)="modalComponent.isVisible = false">{{ 'actions.cancel' | t }}</p-button>
                         </div>
                     </app-modal>
                 </ng-container>
 
                 <ng-template #afterCheck>
                     <ng-container *ngIf="latestRelease$ | async as latestRelease">
-                        <h3>Latest Release:
+                        <h3>{{ 'device.update.latest_release' | t }}:
                             <a style="text-decoration: underline;" target="_blank"
                             [href]="latestRelease.html_url">{{latestRelease.name}}</a>
                         </h3>
 
-                        <div class="text-orange-500 mb-3">Download both files for update!</div>
+                        <div class="text-orange-500 mb-3">{{ 'messages.update_download_both' | t }}</div>
 
                         <div *ngFor="let asset of latestRelease.assets">
                             <div *ngIf="asset.name == 'esp-miner.bin'">
@@ -48,7 +50,7 @@
                         </div>
 
                         <a class="text-500 underline block mt-3 cursor-pointer" (click)="modalComponent.isVisible = true">
-                            Release Notes
+                            {{ 'device.update.release_notes' | t }}
                         </a>
 
                         <app-modal [headline]="latestRelease.name">
@@ -60,19 +62,19 @@
         </div>
         <div class="col-12 lg:col-6 xl:col-4">
             <div class="card h-full">
-                <h3>Update AxeOS <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}} %</span></h3>
+                <h3>{{ 'device.update.axeos' | t }} <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}} %</span></h3>
 
                 <p-fileUpload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
-                    [auto]="true" chooseLabel="Browse"></p-fileUpload>
+                    [auto]="true" [chooseLabel]="'actions.browse' | t"></p-fileUpload>
 
                 <small>(www.bin)</small>
             </div>
         </div>
         <div class="col-12 lg:col-6 xl:col-4">
             <div class="card h-full">
-                <h3>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}} %</span></h3>
+                <h3>{{ 'device.update.firmware' | t }} <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}} %</span></h3>
                 <p-fileUpload #firmwareUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaUpdate($event)"
-                    [auto]="true" chooseLabel="Browse"></p-fileUpload>
+                    [auto]="true" [chooseLabel]="'actions.browse' | t"></p-fileUpload>
 
                 <small>(esp-miner.bin)</small>
             </div>

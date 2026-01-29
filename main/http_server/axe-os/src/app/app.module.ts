@@ -39,6 +39,8 @@ import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { DialogService as PrimeDialogService } from 'primeng/dynamicdialog';
 import { DialogService, DialogListComponent } from './services/dialog.service';
+import { TitleStrategy } from '@angular/router';
+import { I18nTitleStrategy } from './i18n/i18n-title.strategy';
 
 const components = [
   AppComponent,
@@ -92,6 +94,7 @@ const components = [
   ],
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },
+    { provide: TitleStrategy, useClass: I18nTitleStrategy },
     DialogService,
     PrimeDialogService,
     provideHttpClient()

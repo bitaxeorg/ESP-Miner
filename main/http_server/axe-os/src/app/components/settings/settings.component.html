@@ -1,4 +1,21 @@
-<div [ngClass]="{'card': (form$ | async), 'hidden': !(form$ | async)}">
-    <h2>Settings</h2>
-    <app-edit></app-edit>
+<div [ngClass]="{'hidden': !(form$ | async)}">
+    <div class="card mb-4">
+        <h2>{{ 'settings.title' | t }}</h2>
+        <h3 class="mt-4 mb-3">{{ 'settings.ui.title' | t }}</h3>
+        <div class="field grid p-fluid mb-0">
+            <label for="uiLanguage" class="col-12 md:col-2 md:m-0">{{ 'settings.ui.language' | t }}</label>
+            <div class="col-12 md:col-10">
+                <p-dropdown
+                    [options]="languageOptions"
+                    [(ngModel)]="selectedLocale"
+                    (onChange)="onLanguageChange($event.value)"
+                    optionLabel="label"
+                    optionValue="value"
+                    inputId="uiLanguage"
+                    styleClass="w-full md:w-12rem"
+                ></p-dropdown>
+            </div>
+        </div>
+    </div>
+    <app-edit (saveRequested)="applyLocaleOnSave()"></app-edit>
 </div>

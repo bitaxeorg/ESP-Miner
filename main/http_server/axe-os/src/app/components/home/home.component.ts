@@ -20,6 +20,7 @@ import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { LocalStorageService } from 'src/app/local-storage.service';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 type PoolLabel = 'Primary' | 'Fallback';
 type MessageType =
@@ -106,7 +107,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     private loadingService: LoadingService,
     private toastr: ToastrService,
     private shareRejectReasonsService: ShareRejectionExplanationService,
-    private storageService: LocalStorageService
+    private storageService: LocalStorageService,
+    private i18n: I18nService
   ) {
     this.initializeChart();
   }
@@ -183,7 +185,10 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.loadPreviousData();
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error.', `Could not save chart source. ${err.message}`);
+          this.toastr.error(
+            this.i18n.t('errors.chart_source_save_failed', { error: err.message }),
+            this.i18n.t('errors.error_title')
+          );
         }
       });
   }
@@ -237,13 +242,14 @@ export class HomeComponent implements OnInit, OnDestroy {
         },
         tooltip: {
           callbacks: {
-            label: function (tooltipItem: any) {
-              let label = tooltipItem.dataset.label || '';
+            label: (tooltipItem: any) => {
+              const label = tooltipItem.dataset.label || '';
               if (label) {
-                return label += ': ' + HomeComponent.cbFormatValue(tooltipItem.raw, label);
-              } else {
-                return tooltipItem.raw;
+                const key = chartLabelKey(label as eChartLabel);
+                const translated = key ? this.i18n.t(`chart.${key}`) : label;
+                return translated + ': ' + HomeComponent.cbFormatValue(tooltipItem.raw, label);
               }
+              return tooltipItem.raw;
             }
           }
         },
@@ -499,10 +505,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(map(info => {
         const result: SelectItem<PoolLabel>[] = [];
         if (info.stratumURL) {
-          result.push({ label: 'Primary', value: 'Primary' });
+          result.push({ label: this.i18n.t('miner.pool_primary'), value: 'Primary' });
         }
         if (info.fallbackStratumURL) {
-          result.push({ label: 'Fallback', value: 'Fallback' });
+          result.push({ label: this.i18n.t('miner.pool_fallback'), value: 'Fallback' });
         }
         return result;
       }));
@@ -529,10 +535,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.toastr.success('Pool changed and device restarted');
+          this.toastr.success(this.i18n.t('messages.pool_changed_restart'));
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Error during pool change or device restart: ${err.message}`);
+          this.toastr.error(this.i18n.t('errors.pool_change_failed', { error: err.message }));
         }
       });
   }
@@ -541,9 +547,9 @@ export class HomeComponent implements OnInit, OnDestroy {
     const parts = [this.pageDefaultTitle];
 
     if (info.blockFound) {
-      parts.push('Block found 🎉');
+      parts.push(this.i18n.t('messages.block_found_title'));
     } else if (!!systemInfoError.duration) {
-      parts.push('Unable to reach the device');
+      parts.push(this.i18n.t('errors.device_unreachable'));
     } else {
       parts.push(
         info.hostname,
@@ -572,6 +578,10 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
+  }
+
+  getRejectionLabel(reason: string): string {
+    return this.shareRejectReasonsService.getLabel(reason);
   }
 
   getSortedRejectionReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
@@ -628,12 +638,22 @@ export class HomeComponent implements OnInit, OnDestroy {
       }
     };
 
-    updateMessage(!!systemInfoError.duration, 'SYSTEM_INFO_ERROR', 'error', `Unable to reach the device for ${DateAgoPipe.transform(systemInfoError.duration, { strict: true })}`);
-    updateMessage(info.overheat_mode === 1, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
-    updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
-    updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
-    updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
-    updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
+    updateMessage(
+      !!systemInfoError.duration,
+      'SYSTEM_INFO_ERROR',
+      'error',
+      this.i18n.t('errors.device_unreachable_for', { duration: DateAgoPipe.transform(systemInfoError.duration, { strict: true }) })
+    );
+    updateMessage(info.overheat_mode === 1, 'DEVICE_OVERHEAT', 'error', this.i18n.t('messages.device_overheated'));
+    updateMessage(
+      !!info.power_fault,
+      'POWER_FAULT',
+      'error',
+      this.i18n.t('messages.power_fault_check', { fault: info.power_fault ?? '' })
+    );
+    updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', this.i18n.t('messages.frequency_low'));
+    updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', this.i18n.t('messages.fallback_pool'));
+    updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', this.i18n.t('messages.version_mismatch', { fw: info.version, axeos: info.axeOSVersion }));
   }
 
   private calculateEfficiency(info: ISystemInfo, key: 'hashRate' | 'expectedHashrate'): number {
@@ -811,6 +831,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   dataSourceLabels(info: ISystemInfo) {
     return Object.entries(eChartLabel)
       .filter(([key, ]) => key !== 'vrTemp' || info.vrTemp)
-      .map(([key, value]) => ({name: value, value: key}));
+      .map(([key, _value]) => ({name: this.i18n.t(`chart.${key}`), value: key}));
   }
 }

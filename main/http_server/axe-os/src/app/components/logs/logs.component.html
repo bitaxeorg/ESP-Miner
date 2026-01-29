@@ -3,7 +3,7 @@
     <form [formGroup]="form">
         <div class="flex justify-content-between flex-column md:align-items-center md:flex-row mb-3">
             <h2 class="mb-0 h-3rem">
-                Realtime Logs
+                {{ 'logs.realtime_title' | t }}
             </h2>
 
             <nav class="flex gap-3 w-full md:w-6">
@@ -14,7 +14,7 @@
                         type="text"
                         class="w-full"
                         autocomplete="off"
-                        placeholder="Case-sensitive filter"
+                        [placeholder]="'logs.case_sensitive_filter' | t"
                         id="filter"
                         formControlName="filter"/>
                 </span>
@@ -22,21 +22,21 @@
                     pp-button
                     icon="pi pi-{{stopScroll ? 'play' : 'pause'}}"
                     (click)="stopScroll = !stopScroll"
-                    pTooltip="{{stopScroll ? 'Start' : 'Stop'}} Scrolling"
+                    [pTooltip]="(stopScroll ? ('actions.start' | t) : ('actions.stop' | t)) + ' ' + ('common.scrolling' | t)"
                     tooltipPosition="left">
                 </p-button>
                 <p-button
                     pp-button
                     icon="pi pi-trash"
                     (click)="clearLogs()"
-                    pTooltip="Clear Logs"
+                    [pTooltip]="'actions.clear_logs' | t"
                     tooltipPosition="left">
                 </p-button>
                 <p-button
                     pp-button
                     icon="pi pi-window-{{isExpanded ? 'minimize' : 'maximize'}}"
                     (click)="isExpanded = !isExpanded"
-                    pTooltip="{{isExpanded ? 'Minimize' : 'Maximize'}} Logs"
+                    [pTooltip]="(isExpanded ? ('actions.minimize' | t) : ('actions.maximize' | t)) + ' ' + ('common.logs' | t)"
                     tooltipPosition="left">
                 </p-button>
             </nav>

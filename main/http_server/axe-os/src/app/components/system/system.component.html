@@ -1,5 +1,5 @@
 <div class="card" *ngIf="combinedData$ | async as data">
-    <h2>System</h2>
+    <h2>{{ 'device.system.title' | t }}</h2>
 
     <div class="card">
         <table>
@@ -10,7 +10,7 @@
         </table>
 
         <button pButton class="btn btn-primary mt-5" (click)="identifyDevice()">
-            Identify device
+            {{ 'actions.identify_device' | t }}
         </button>
     </div>
 </div>

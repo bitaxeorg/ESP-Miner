@@ -5,6 +5,7 @@ import { provideToastr } from 'ngx-toastr';
 import { ButtonModule } from 'primeng/button';
 import { ReactiveFormsModule } from '@angular/forms';
 import { TooltipModule } from 'primeng/tooltip';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 describe('LogsComponent', () => {
   let component: LogsComponent;
@@ -12,7 +13,7 @@ describe('LogsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [LogsComponent],
+      declarations: [LogsComponent, TranslatePipe],
       imports: [ButtonModule, ReactiveFormsModule, TooltipModule],
       providers: [provideToastr()]
     })
