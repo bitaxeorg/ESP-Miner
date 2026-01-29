@@ -16,14 +16,6 @@ static esp_err_t set_cors_headers(httpd_req_t *req)
     return ESP_OK;
 }
 
-// Handle OPTIONS requests for CORS
-static esp_err_t theme_options_handler(httpd_req_t *req)
-{
-    set_cors_headers(req);
-    httpd_resp_send(req, NULL, 0);
-    return ESP_OK;
-}
-
 // GET /api/theme handler
 static esp_err_t theme_get_handler(httpd_req_t *req)
 {
@@ -104,16 +96,8 @@ esp_err_t register_theme_api_endpoints(httpd_handle_t server, void* ctx)
         .user_ctx = ctx
     };
 
-    httpd_uri_t theme_options = {
-        .uri = "/api/theme",
-        .method = HTTP_OPTIONS,
-        .handler = theme_options_handler,
-        .user_ctx = ctx
-    };
-
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_get));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_post));
-    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &theme_options));
 
     return ESP_OK;
 }

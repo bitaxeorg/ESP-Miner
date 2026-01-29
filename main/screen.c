@@ -1,5 +1,4 @@
 #include <string.h>
-#include "esp_log.h"
 #include "esp_err.h"
 #include "esp_check.h"
 #include "lvgl.h"
@@ -10,6 +9,8 @@
 #include "display.h"
 #include "connect.h"
 #include "esp_timer.h"
+#include "default_screens.h"
+#include "display_config.h"
 
 typedef enum {
     SCR_SELF_TEST,
@@ -20,26 +21,24 @@ typedef enum {
     SCR_CONNECTION,
     SCR_BITAXE_LOGO,
     SCR_OSMU_LOGO,
-    SCR_URLS,
-    SCR_STATS,
-    SCR_MINING,
-    SCR_WIFI,
+    SCR_CAROUSEL,
     MAX_SCREENS,
 } screen_t;
 
 #define SCREEN_UPDATE_MS 500
-
-#define SCR_CAROUSEL_START SCR_URLS
 
 extern const lv_img_dsc_t bitaxe_logo;
 extern const lv_img_dsc_t osmu_logo;
 extern const lv_img_dsc_t identify_text;
 
 static lv_obj_t * screens[MAX_SCREENS];
-static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000, 10000, 10000};
+static screen_t current_screen;
+
+static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000};
 
 static int current_screen_time_ms;
 static int current_screen_delay_ms;
+static int current_carousel_index = 0;
 
 // static int screen_chars;
 static int screen_lines;
@@ -54,34 +53,15 @@ static lv_obj_t *overheat_ip_addr_label;
 
 static lv_obj_t *asic_status_label;
 
-static lv_obj_t *mining_block_height_label;
-static lv_obj_t *mining_network_difficulty_label;
-static lv_obj_t *mining_scriptsig_label;
-
 static lv_obj_t *firmware_update_scr_filename_label;
 static lv_obj_t *firmware_update_scr_status_label;
 
 static lv_obj_t *connection_wifi_status_label;
 
-static lv_obj_t *urls_ip_addr_label;
-static lv_obj_t *urls_mining_url_label;
-
-static lv_obj_t *stats_hashrate_label;
-static lv_obj_t *stats_efficiency_label;
-static lv_obj_t *stats_difficulty_label;
-static lv_obj_t *stats_temp_label;
-
-static lv_obj_t *wifi_rssi_value_label;
-static lv_obj_t *wifi_signal_strength_label;
-static lv_obj_t *wifi_uptime_label;
-
 static lv_obj_t *notification_label;
 static lv_obj_t *identify_image;
 
-static float current_hashrate;
-static float current_power;
-static uint64_t current_difficulty;
-static float current_chip_temp;
+static lv_obj_t *carousel_labels[MAX_CAROUSEL_LABELS] = {0};
 
 #define NOTIFICATION_SHARE_ACCEPTED (1 << 0)
 #define NOTIFICATION_SHARE_REJECTED (1 << 1)
@@ -101,18 +81,8 @@ static const char *notifications[] = {
 static uint64_t current_shares_accepted;
 static uint64_t current_shares_rejected;
 static uint64_t current_work_received;
-static int8_t current_rssi_value;
-static int current_block_height;
 
 static bool self_test_finished;
-
-static screen_t get_current_screen() {
-    lv_obj_t * active_screen = lv_screen_active();
-    for (screen_t scr = 0; scr < MAX_SCREENS; scr++) {
-        if (screens[scr] == active_screen) return scr;
-    }
-    return -1;
-}
 
 static lv_obj_t * create_flex_screen(int expected_lines) {
     lv_obj_t * scr = lv_obj_create(NULL);
@@ -286,77 +256,97 @@ static lv_obj_t * create_scr_osmu_logo() {
     return scr;
 }
 
-static lv_obj_t * create_scr_urls() {
-    lv_obj_t * scr = create_flex_screen(4);
+static void update_carousel_screen_content(int screen_index, lv_obj_t *labels[MAX_CAROUSEL_LABELS])
+{
+    // Get custom screen content from NVS
+    char *screen_content = nvs_config_get_string_indexed(NVS_CONFIG_SCREENS, screen_index);
+    const char *content = screen_content;
 
-    lv_obj_t *label1 = lv_label_create(scr);
-    lv_label_set_text(label1, "Stratum Host:");
+    // If empty or not found, use default
+    if (!content || content[0] == '\0') {
+        free(screen_content);
+        screen_content = NULL;
+        if (screen_index < DEFAULT_SCREENS_COUNT) {
+            content = default_screens[screen_index];
+        } else {
+            content = "";
+        }
+    }
 
-    urls_mining_url_label = lv_label_create(scr);
-    lv_obj_set_width(urls_mining_url_label, LV_HOR_RES);
-    lv_label_set_long_mode(urls_mining_url_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    char *content_copy = strdup(content);
+    if (content_copy) {
+        char *line = strtok(content_copy, "\n");
+        int line_count = 0;
 
-    lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, "IP Address:");
+        while (line && line_count < MAX_CAROUSEL_LABELS && labels[line_count]) {
+            char formatted_line[128];
+            if (display_config_format_string(GLOBAL_STATE, line, formatted_line, sizeof(formatted_line)) == ESP_OK) {
+                lv_label_set_text(labels[line_count], formatted_line);
+            } else {
+                lv_label_set_text(labels[line_count], line);
+            }
+            line = strtok(NULL, "\n");
+            line_count++;
+        }
 
-    urls_ip_addr_label = lv_label_create(scr);
+        // Clear any remaining labels
+        for (int i = line_count; i < MAX_CAROUSEL_LABELS; i++) {
+            if (labels[i]) {
+                lv_label_set_text(labels[i], "");
+            }
+        }
 
-    return scr;
+        free(content_copy);
+    }
+
+    free(screen_content);
 }
 
-static lv_obj_t * create_scr_stats() {
-    lv_obj_t * scr = create_flex_screen(4);
+static lv_obj_t * create_scr_carousel(int screen_index)
+{
+    char *screen_content = nvs_config_get_string_indexed(NVS_CONFIG_SCREENS, screen_index);
+    const char *content = screen_content;
 
-    stats_hashrate_label = lv_label_create(scr);
-    lv_label_set_text(stats_hashrate_label, "Gh/s: --");
+    if (!content || content[0] == '\0') {
+        free(screen_content);
+        screen_content = NULL;
+        if (screen_index < DEFAULT_SCREENS_COUNT) {
+            content = default_screens[screen_index];
+        } else {
+            content = "";
+        }
+    }
 
-    stats_efficiency_label = lv_label_create(scr);
-    lv_label_set_text(stats_efficiency_label, "J/Th: --");
+    // Truly empty → caller will skip this page
+    if (!content || content[0] == '\0') {
+        free(screen_content);
+        return NULL;
+    }
 
-    stats_difficulty_label = lv_label_create(scr);
-    lv_label_set_text(stats_difficulty_label, "Best: --");
+    // Count lines including blank ones
+    int total_lines = 1;
+    for (const char *p = content; *p; p++) {
+        if (*p == '\n') total_lines++;
+    }
 
-    stats_temp_label = lv_label_create(scr);
-    lv_label_set_text(stats_temp_label, "Temp: --");
+    int lines_to_show = total_lines;
+    if (lines_to_show > screen_lines) lines_to_show = screen_lines;
+    if (lines_to_show > MAX_CAROUSEL_LABELS) lines_to_show = MAX_CAROUSEL_LABELS;
 
-    return scr;
-}
+    lv_obj_t *scr = create_flex_screen(lines_to_show);
 
-static lv_obj_t * create_scr_mining() {
-    lv_obj_t * scr = create_flex_screen(4);
+    memset(carousel_labels, 0, sizeof(carousel_labels));
 
-    mining_block_height_label = lv_label_create(scr);
-    lv_label_set_text(mining_block_height_label, "Block: --");
+    for (int i = 0; i < lines_to_show; i++) {
+        lv_obj_t *label = lv_label_create(scr);
+        lv_obj_set_width(label, LV_HOR_RES);
+        lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+        carousel_labels[i] = label;
+    }
 
-    mining_network_difficulty_label = lv_label_create(scr);
-    lv_label_set_text(mining_network_difficulty_label, "Difficulty: --");
+    update_carousel_screen_content(screen_index, carousel_labels);
 
-    lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, "Scriptsig:");
-
-    mining_scriptsig_label = lv_label_create(scr);
-    lv_label_set_text(mining_scriptsig_label, "--");
-    lv_obj_set_width(mining_scriptsig_label, LV_HOR_RES);
-    lv_label_set_long_mode(mining_scriptsig_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-
-    return scr;
-}
-
-static lv_obj_t * create_scr_wifi() {
-    lv_obj_t * scr = create_flex_screen(4);
-
-    lv_obj_t *title_label = lv_label_create(scr);
-    lv_label_set_text(title_label, "Wi-Fi Signal");
-
-    wifi_rssi_value_label = lv_label_create(scr);
-    lv_label_set_text(wifi_rssi_value_label, "RSSI: -- dBm");
-
-    wifi_signal_strength_label = lv_label_create(scr);
-    lv_label_set_text(wifi_signal_strength_label, "Signal: --%%");
-
-    wifi_uptime_label = lv_label_create(scr);
-    lv_label_set_text(wifi_uptime_label, "Uptime: --");
-
+    free(screen_content);
     return scr;
 }
 
@@ -374,19 +364,27 @@ static void scr_create_overlay()
 
 static bool screen_show(screen_t screen)
 {
-    if (SCR_CAROUSEL_START > screen) {
+    if (screen < SCR_CAROUSEL) {
         lv_display_trigger_activity(NULL);
     }
 
     bool is_valid = true;
-    screen_t current_screen = get_current_screen();
-    if (current_screen != screen) {
-        lv_obj_t * scr = screens[screen];
+    if (current_screen != screen || screen == SCR_CAROUSEL) {
+        lv_obj_t *scr = NULL;
+        if (screen == SCR_CAROUSEL) {
+            scr = create_scr_carousel(current_carousel_index);
+            if (!scr) {
+                return false;
+            }
+        } else {
+            scr = screens[screen];
+        }
 
         is_valid = lv_obj_is_valid(scr);
         if (is_valid && lvgl_port_lock(0)) {
-            bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
+            bool auto_del = (current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO || current_screen == SCR_CAROUSEL);
             lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
+            current_screen = screen;
             lvgl_port_unlock();
         }
 
@@ -398,15 +396,27 @@ static bool screen_show(screen_t screen)
 
 void screen_next()
 {
-    screen_t next_scr = get_current_screen();
-    do {
-        next_scr++;
-
-        if (next_scr == MAX_SCREENS) {
-            next_scr = SCR_CAROUSEL_START;
+    if (current_screen < SCR_CAROUSEL) {
+        screen_t next = current_screen + 1;
+        while (next < SCR_CAROUSEL) {
+            if (screen_show(next)) return;
+            next++;
         }
+        current_carousel_index = 0;
+        screen_show(SCR_CAROUSEL);
+        return;
+    }
 
-    } while (!screen_show(next_scr));
+    int start_index = current_carousel_index;
+
+    do {
+        current_carousel_index = (current_carousel_index + 1) % MAX_CAROUSEL_SCREENS;
+
+        if (screen_show(SCR_CAROUSEL) || current_carousel_index == start_index) {
+            current_screen_time_ms = 0;
+            return;
+        }
+    } while (true);
 }
 
 static void screen_update_cb(lv_timer_t * timer)
@@ -423,7 +433,7 @@ static void screen_update_cb(lv_timer_t * timer)
         // display timeout
         const uint32_t display_timeout = display_timeout_config * 60 * 1000;
 
-        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (SCR_CAROUSEL_START <= get_current_screen()) &&
+        if ((lv_display_get_inactive_time(NULL) > display_timeout) && (current_screen == SCR_CAROUSEL) &&
              lv_obj_has_flag(identify_image, LV_OBJ_FLAG_HIDDEN)) {
             display_on(false);
         } else {
@@ -505,90 +515,12 @@ static void screen_update_cb(lv_timer_t * timer)
     }
 
     // Carousel
-
     current_screen_time_ms += SCREEN_UPDATE_MS;
 
-    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-
-    char *pool_url = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
-    if (strcmp(lv_label_get_text(urls_mining_url_label), pool_url) != 0) {
-        lv_label_set_text(urls_mining_url_label, pool_url);
-    }
-
-    if (strcmp(lv_label_get_text(urls_ip_addr_label), module->ip_addr_str) != 0) {
-        lv_label_set_text(urls_ip_addr_label, module->ip_addr_str);
-    }
-
-    if (current_hashrate != module->current_hashrate) {
-        lv_label_set_text_fmt(stats_hashrate_label, "Gh/s: %.2f", module->current_hashrate);
-    }
-
-    if (current_power != power_management->power || current_hashrate != module->current_hashrate) {
-        if (power_management->power > 0 && module->current_hashrate > 0) {
-            float efficiency = power_management->power / (module->current_hashrate / 1000.0);
-            lv_label_set_text_fmt(stats_efficiency_label, "J/Th: %.2f", efficiency);
-        }
-        current_power = power_management->power;
-    }
-    current_hashrate = module->current_hashrate;
-
-    if (current_difficulty != module->best_session_nonce_diff) {
-        if (module->block_found) {
-            lv_obj_set_width(stats_difficulty_label, LV_HOR_RES);
-            lv_label_set_long_mode(stats_difficulty_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-            lv_label_set_text_fmt(stats_difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", module->best_session_diff_string);
-        } else {
-            lv_label_set_text_fmt(stats_difficulty_label, "Best: %s/%s", module->best_session_diff_string, module->best_diff_string);
-        }
-        current_difficulty = module->best_session_nonce_diff;
-    }
-
-    if (current_chip_temp != power_management->chip_temp_avg) {
-        if (power_management->chip_temp_avg > 0) {
-            lv_label_set_text_fmt(stats_temp_label, "Temp: %.1f°C", power_management->chip_temp_avg);    
-        }
-        current_chip_temp = power_management->chip_temp_avg;
-    }
-
-    if (current_block_height != GLOBAL_STATE->block_height) {
-        lv_label_set_text_fmt(mining_block_height_label, "Block: %d", GLOBAL_STATE->block_height);
-        current_block_height = GLOBAL_STATE->block_height;
-    }
-    
-    if (strcmp(&lv_label_get_text(mining_network_difficulty_label)[9], GLOBAL_STATE->network_diff_string) != 0) {
-        lv_label_set_text_fmt(mining_network_difficulty_label, "Difficulty: %s", GLOBAL_STATE->network_diff_string);
-    }
-
-    if (GLOBAL_STATE->scriptsig != NULL && strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
-        lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->scriptsig);
-    }
-
-    // Update WiFi RSSI periodically
-    int8_t rssi_value = -128;
-    if (module->is_connected) {
-        get_wifi_current_rssi(&rssi_value);
-    }
-
-    if (rssi_value != current_rssi_value) {
-        if (rssi_value > -50) {
-            lv_label_set_text(wifi_signal_strength_label, "Signal: Excellent");
-        } else if (rssi_value > -60) {
-            lv_label_set_text(wifi_signal_strength_label, "Signal: Good");
-        } else if (rssi_value > -70) {
-            lv_label_set_text(wifi_signal_strength_label, "Signal: Fair");
-        } else if (rssi_value > -128){
-            lv_label_set_text(wifi_signal_strength_label, "Signal: Weak");
-        } else {
-            lv_label_set_text(wifi_signal_strength_label, "Signal: --");
-        }
-
-        if (rssi_value > -128) {
-            lv_label_set_text_fmt(wifi_rssi_value_label, "RSSI: %d dBm", rssi_value);
-        } else {
-            lv_label_set_text(wifi_rssi_value_label, "RSSI: -- dBm");
-        }
-        current_rssi_value = rssi_value;
-    }
+    // Always update content in case variables changed
+    if (current_screen == SCR_CAROUSEL) {
+        update_carousel_screen_content(current_carousel_index, carousel_labels);
+    }    
 
     uint32_t shares_accepted = module->shares_accepted;
     uint32_t shares_rejected = module->shares_rejected;
@@ -613,8 +545,9 @@ static void screen_update_cb(lv_timer_t * timer)
     }
 
     if (module->block_found) {
-        if (get_current_screen() != SCR_STATS) {
-            screen_show(SCR_STATS);
+        if (current_screen != SCR_CAROUSEL || current_carousel_index != 1) {
+            current_carousel_index = 1;  // Stats screen
+            screen_show(SCR_CAROUSEL);
         }
 
         lv_display_trigger_activity(NULL);
@@ -637,35 +570,6 @@ void screen_button_press()
     }
 }
 
-static void uptime_update_cb(lv_timer_t * timer)
-{
-    if (wifi_uptime_label) {
-        char uptime[50];
-        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
-
-        uint32_t days = uptime_seconds / (24 * 3600);
-        uptime_seconds %= (24 * 3600);
-        uint32_t hours = uptime_seconds / 3600;
-        uptime_seconds %= 3600;
-        uint32_t minutes = uptime_seconds / 60;
-        uptime_seconds %= 60;
-
-        if (days > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
-        } else if (hours > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
-        } else if (minutes > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
-        } else {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
-        }
-
-        if (strcmp(lv_label_get_text(wifi_uptime_label), uptime) != 0) {
-            lv_label_set_text(wifi_uptime_label, uptime);
-        }
-    }
-}
-
 esp_err_t screen_start(void * pvParameters)
 {
     if (lvgl_port_lock(0)) {
@@ -685,17 +589,11 @@ esp_err_t screen_start(void * pvParameters)
             screens[SCR_CONNECTION] = create_scr_connection(SYSTEM_MODULE->ssid, SYSTEM_MODULE->ap_ssid);
             screens[SCR_BITAXE_LOGO] = create_scr_bitaxe_logo(GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version);
             screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
-            screens[SCR_URLS] = create_scr_urls();
-            screens[SCR_STATS] = create_scr_stats();
-            screens[SCR_MINING] = create_scr_mining();
-            screens[SCR_WIFI] = create_scr_wifi();
+            screens[SCR_CAROUSEL] = NULL;  // Created dynamically
 
             scr_create_overlay();
 
             lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);
-
-            // Create uptime update timer (runs every 1 second)
-            lv_timer_create(uptime_update_cb, 1000, NULL);
         }
         lvgl_port_unlock();
     }
