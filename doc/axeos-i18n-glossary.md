@@ -45,7 +45,7 @@ Notes:
 | EN | DE | ES |
 |---|---|---|
 | Hashrate | Hashrate | Tasa de hash |
-| Difficulty | Schwierigkeit | Dificultad |
+| Difficulty | Difficulty | Dificultad |
 | Pool | Pool | Pool |
 | Pool URL | Pool-URL | URL del pool |
 | Worker | Worker | Worker |

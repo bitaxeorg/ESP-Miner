@@ -6,6 +6,7 @@
     "logs": "Logs",
     "system": "Sistema",
     "pool": "Pool",
+    "scoreboard": "Scoreboard",
     "network": "Red",
     "theme": "Tema",
     "settings": "Ajustes",
@@ -307,7 +308,17 @@
       "mining_submit_validation_error": "El trabajo de minería enviado era inválido o estaba mal formateado.",
       "job_not_found": "Mientras se enviaba este Share, la red ya había encontrado un nuevo bloque, por lo que el Share es inválido.",
       "duplicate_share": "Este Share ya se había enviado.",
-      "difficulty_too_low": "El Share enviado no cumple la dificultad mínima requerida."
+      "difficulty_too_low": "El Share enviado no cumple la dificultad mínima requerida.",
+      "invalid_subscription_message": "The miner's mining.subscribe request was malformed.",
+      "invalid_configuration_message": "The miner's mining.configure request was malformed.",
+      "invalid_authorization_message": "The miner's mining.authorize request was malformed.",
+      "invalid_bitcoin_address": "The submitted username is not a valid Bitcoin address.",
+      "invalid_suggest_difficulty_message": "The mining.suggest_difficulty request was malformed.",
+      "suggest_difficulty_disabled": "This pool port does not allow miners to suggest a difficulty.",
+      "invalid_mining_submit_message": "The mining.submit request was malformed.",
+      "unauthorized_worker": "This worker has not been authorized — submit mining.authorize first.",
+      "not_subscribed": "This connection has not subscribed — submit mining.subscribe first.",
+      "invalid_channel_id": "The SV2 channel ID in the share submission is not known to the pool."
     }
   },
   "device": {
