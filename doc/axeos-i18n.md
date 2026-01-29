@@ -11,8 +11,9 @@ This document explains how internationalization (i18n) works in the AxeOS web UI
   - `en.json` (baseline)
   - `de.json`
   - `es.json`
-- Share rejection explanation mapping: `main/http_server/axe-os/src/assets/share-rejection-explanations.json`
-  - Maps backend rejection reason strings to i18n keys under `miner.rejection_explanations.*`.
+- Share rejection mapping: `main/http_server/axe-os/src/assets/share-rejection-explanations.json`
+  - Maps backend rejection reason strings to i18n keys under `miner.rejection_explanations.*` (tooltip explanations).
+  - Labels use the same map with `miner.rejection_reasons.*` keys; if missing, the raw reason is shown.
 
 ## Key naming convention
 Use dot-separated namespaces with stable identifiers:
@@ -70,6 +71,7 @@ this.i18n.t('messages.device_restarted_at', { uri: deviceUri })
 - User selection is stored in `localStorage` under `axeos.locale`.
 - If no saved preference exists, the browser language is used.
 - Language selector is in Settings > UI.
+- Language changes apply only after clicking Save.
 
 ## Add or update translations
 1) Add or update the English key in `en.json`.
