@@ -1,4 +1,4 @@
-name: Build & Release Factory Images [Release]
+name: Build & Release Factory Images with Webhook [Release]
 
 on:
   release:

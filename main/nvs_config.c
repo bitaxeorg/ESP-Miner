@@ -107,6 +107,10 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_TPS546]                                = {.nvs_key_name = "TPS546",          .type = TYPE_BOOL},
     [NVS_CONFIG_TMP1075]                               = {.nvs_key_name = "TMP1075",         .type = TYPE_BOOL},
     [NVS_CONFIG_POWER_CONSUMPTION_TARGET]              = {.nvs_key_name = "power_cons_tgt",  .type = TYPE_U16},
+    
+    [NVS_CONFIG_WEBHOOK_ENABLED]                       = {.nvs_key_name = "webhook_enabled", .type = TYPE_BOOL, .default_value = {.b = false}, .rest_name = "webhookEnabled", .min = 0, .max = 1},
+    [NVS_CONFIG_WEBHOOK_URL]                           = {.nvs_key_name = "webhook_url",     .type = TYPE_STR,  .default_value = {.str = ""},   .rest_name = "webhookUrl",    .min = 0, .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_WEBHOOK_INTERVAL]                      = {.nvs_key_name = "webhook_interval", .type = TYPE_U16,  .default_value = {.u16 = 60},    .rest_name = "webhookInterval", .min = 10, .max = 3600},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
