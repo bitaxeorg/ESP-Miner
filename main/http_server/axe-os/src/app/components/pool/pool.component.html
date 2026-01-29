@@ -3,34 +3,37 @@
         <div *ngIf="isAnyPoolUsingDefaultAddress()" class="p-message p-message-warn mb-4 p-3 border-round flex align-items-center gap-2" style="background-color: var(--yellow-100); border: 1px solid var(--yellow-500); color: var(--yellow-900);">
             <i class="pi pi-exclamation-triangle text-xl" style="color: var(--yellow-700);"></i>
             <div>
-                <strong>Warning:</strong> You are using the default factory Bitcoin address. Please change the <strong>User</strong> field to your own Bitcoin address to receive mining rewards.
+                <strong>{{ 'common.warning' | t }}:</strong>
+                {{ 'messages.default_btc_address_warning_prefix' | t }}
+                <strong>{{ 'common.user' | t }}</strong>
+                {{ 'messages.default_btc_address_warning_suffix' | t }}
             </div>
         </div>
         <ng-container *ngFor="let pool of pools">
-            <h2 *ngIf="pool === 'stratum'">Pool Configuration</h2>
-            <h2 *ngIf="pool === 'fallbackStratum'" class="mt-5">Fallback Pool Configuration</h2>
+            <h2 *ngIf="pool === 'stratum'">{{ 'settings.pool.title' | t }}</h2>
+            <h2 *ngIf="pool === 'fallbackStratum'" class="mt-5">{{ 'settings.pool.fallback_title' | t }}</h2>
 
             <div class="card">
                 <div class="field grid p-fluid">
-                    <label [htmlFor]="pool + 'URL'" class="col-12 md:col-2 md:mb-0">Stratum Host</label>
+                    <label [htmlFor]="pool + 'URL'" class="col-12 md:col-2 md:mb-0">{{ 'settings.pool.stratum_host' | t }}</label>
                     <div class="col-12 md:col-10">
                         <input pInputText type="text" [id]="pool + 'URL'" [formControlName]="pool + 'URL'" (change)="onUrlChange(pool)" />
                     </div>
                 </div>
                 <div class="field grid p-fluid">
-                    <label [htmlFor]="pool + 'Port'" class="col-12 md:col-2 md:mb-0">Stratum Port</label>
+                    <label [htmlFor]="pool + 'Port'" class="col-12 md:col-2 md:mb-0">{{ 'settings.pool.stratum_port' | t }}</label>
                     <div class="col-12 md:col-10">
                         <input pInputText [id]="pool + 'Port'" [formControlName]="pool + 'Port'" type="number" />
                     </div>
                 </div>
                 <div class="field grid p-fluid">
-                    <label [htmlFor]="pool + 'User'" class="col-12 md:col-2 md:mb-0">User</label>
+                    <label [htmlFor]="pool + 'User'" class="col-12 md:col-2 md:mb-0">{{ 'common.user' | t }}</label>
                     <div class="col-12 md:col-10">
                         <input pInputText [id]="pool + 'User'" [formControlName]="pool + 'User'" sensitive-data type="text" />
                     </div>
                 </div>
                 <div class="field grid p-fluid">
-                    <label [htmlFor]="pool + 'Password'" class="col-12 md:col-2 md:mb-0">Password</label>
+                    <label [htmlFor]="pool + 'Password'" class="col-12 md:col-2 md:mb-0">{{ 'common.password' | t }}</label>
                     <div class="col-12 md:col-10 p-input-icon-right">
                         <i *ngIf="form.get(pool + 'Password')?.dirty" class="pi cursor-pointer"
                         [ngClass]="{'pi-eye': !showPassword[pool], 'pi-eye-slash': showPassword[pool]}"
@@ -45,7 +48,7 @@
                         <label class="cursor-pointer">
                             <input type="checkbox" hidden (click)="showAdvancedOptions[pool] = !showAdvancedOptions[pool]">
                             <i class="pi pi-angle-{{showAdvancedOptions[pool] ? 'down' : 'right'}} text-sm -ml-1 mr-1"></i>
-                            {{showAdvancedOptions[pool] ? 'Hide' : 'Show'}} Advanced Options
+                            {{showAdvancedOptions[pool] ? ('actions.hide_advanced_options' | t) : ('actions.show_advanced_options' | t)}}
                         </label>
                     </legend>
 
@@ -53,8 +56,8 @@
                         <div class="field grid p-fluid mt-4">
                             <label [htmlFor]="pool + 'SuggestedDifficulty'" class="col-12 md:col-2 md:mb-0">
                                 <tooltip-text-icon
-                                    text="Suggested Difficulty"
-                                    tooltip="Used to indicate a preference for share difficulty to the pool. Servers are not required to honour this request, even if they support the stratum method. (0 to disable)"
+                                    [text]="'settings.pool.suggested_difficulty' | t"
+                                    [tooltip]="'settings.pool.suggested_difficulty_help' | t"
                                 />
                             </label>
                             <div class="col-12 md:col-10">
@@ -69,14 +72,14 @@
                             </div>
                             <label [htmlFor]="pool + 'ExtranonceSubscribe'" class="col-11 m-0 pb-0 pl-3 md:col-2 md:flex-order-1 md:pl-2">
                                 <tooltip-text-icon
-                                    text="Enable Extranonce Subscribe"
-                                    tooltip="Indicates to the server that the client supports the mining.set_extranonce method. Required by some pools, check the pool documentation."
+                                    [text]="'settings.pool.extranonce_subscribe' | t"
+                                    [tooltip]="'settings.pool.extranonce_subscribe_help' | t"
                                 />
                             </label>
                         </div>
 
                         <div class="field grid p-fluid">
-                            <label [htmlFor]="pool + 'TLS'" class="col-12 mb-2 md:col-2 md:mb-0">Connection Security</label>
+                            <label [htmlFor]="pool + 'TLS'" class="col-12 mb-2 md:col-2 md:mb-0">{{ 'settings.pool.connection_security' | t }}</label>
                             <div class="col-12 md:col-10">
                                 <div class="flex flex-wrap gap-3">
                                     <div *ngFor="let option of tlsOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
@@ -87,14 +90,14 @@
                                             [inputId]="pool + 'TLS_' + option.value">
                                         </p-radioButton>
                                         <label [for]="pool + 'TLS_' + option.value" class="ml-2 cursor-pointer">
-                                            {{ option.label }}
+                                            {{ option.label | t }}
                                         </label>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div *ngIf="form.get(pool + 'TLS')?.value === 2" class="field grid p-fluid mb-0">
-                            <label [htmlFor]="pool + 'Cert'" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">Certificate</label>
+                            <label [htmlFor]="pool + 'Cert'" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">{{ 'settings.pool.certificate' | t }}</label>
                             <div class="col-12 md:col-10">
                                 <div class="p-inputgroup">
                                     <textarea
@@ -103,13 +106,13 @@
                                         [formControlName]="pool + 'Cert'"
                                         rows="6"
                                         class="w-full p-2 text-sm text-monospace"
-                                        placeholder="Enter or choose a certificate file (.pem, .crt, .cer)"></textarea>
+                                        [placeholder]="'settings.pool.certificate_placeholder' | t"></textarea>
                                     <span class="p-inputgroup-addon">
                                         <button pButton
                                             type="button"
                                             icon="pi pi-upload"
                                             class="p-button-secondary"
-                                            pTooltip="Choose a certificate file"
+                                            [pTooltip]="'actions.choose_certificate' | t"
                                             tooltipPosition="top"
                                             (click)="certFileInput.click()"></button>
                                         <input #certFileInput type="file" (change)="onCertFileSelected($event, pool + 'Cert')"
@@ -117,7 +120,7 @@
                                     </span>
                                 </div>
                                 <small *ngIf="form.get(pool + 'Cert')?.errors?.['invalidCertificate']" class="block text-red-500 mt-1">
-                                    Please enter a valid SSL/TLS certificate
+                                    {{ 'errors.invalid_certificate' | t }}
                                 </small>
                             </div>
                         </div>
@@ -128,8 +131,8 @@
 
         <div class="flex mt-5 gap-3">
             <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-                class="btn btn-primary">Save</button>
-            <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
+                class="btn btn-primary">{{ 'actions.save' | t }}</button>
+            <button pButton [disabled]="!savedChanges" (click)="restart()">{{ 'actions.restart' | t }}</button>
         </div>
     </div>
 </form>

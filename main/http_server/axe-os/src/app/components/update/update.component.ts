@@ -8,6 +8,7 @@ import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 
@@ -37,6 +38,7 @@ export class UpdateComponent {
     private loadingService: LoadingService,
     private githubUpdateService: GithubUpdateService,
     private localStorageService: LocalStorageService,
+    private i18n: I18nService,
   ) {
     this.latestRelease$ = this.githubUpdateService.getReleases().pipe(map(releases => {
       return releases[0];
@@ -54,7 +56,7 @@ export class UpdateComponent {
     this.firmwareUpload.clear(); // clear the file upload component
 
     if (file.name != 'esp-miner.bin') {
-      this.toastrService.error('Incorrect file, looking for esp-miner.bin.');
+      this.toastrService.error(this.i18n.t('errors.incorrect_file', { expected: 'esp-miner.bin' }));
       return;
     }
 
@@ -66,7 +68,7 @@ export class UpdateComponent {
             this.firmwareUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
           } else if (event.type === HttpEventType.Response) {
             if (event.ok) {
-              this.toastrService.success('Firmware updated. Device has been successfully restarted.');
+              this.toastrService.success(this.i18n.t('messages.firmware_updated'));
 
             } else {
               this.toastrService.error(event.statusText);
@@ -91,7 +93,7 @@ export class UpdateComponent {
     this.websiteUpload.clear(); // clear the file upload component
 
     if (file.name != 'www.bin') {
-      this.toastrService.error('Incorrect file, looking for www.bin.');
+      this.toastrService.error(this.i18n.t('errors.incorrect_file', { expected: 'www.bin' }));
       return;
     }
 
@@ -104,7 +106,7 @@ export class UpdateComponent {
             this.websiteUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
           } else if (event.type === HttpEventType.Response) {
             if (event.ok) {
-              this.toastrService.success('AxeOS updated. The page will reload in a few seconds.');
+              this.toastrService.success(this.i18n.t('messages.axeos_updated_reload'));
               setTimeout(() => {
                 window.location.reload();
               }, 2000);
@@ -114,12 +116,12 @@ export class UpdateComponent {
           }
           else if (event instanceof HttpErrorResponse)
           {
-            const errorMessage = event.error?.message || event.message || 'Unknown error occurred';
+            const errorMessage = event.error?.message || event.message || this.i18n.t('errors.unknown_error');
             this.toastrService.error(errorMessage);
           }
         },
         error: (err) => {
-          const errorMessage = err.error?.message || err.message || 'Unknown error occurred';
+          const errorMessage = err.error?.message || err.message || this.i18n.t('errors.unknown_error');
           this.toastrService.error(errorMessage);
         },
         complete: () => {

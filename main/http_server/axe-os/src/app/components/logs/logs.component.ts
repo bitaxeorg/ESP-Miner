@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { WebsocketService } from 'src/app/services/web-socket.service';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 @Component({
   selector: 'app-logs',
@@ -36,6 +37,7 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
     private fb: FormBuilder,
     private websocketService: WebsocketService,
     private toastr: ToastrService,
+    private i18n: I18nService,
   ) {}
 
   ngOnInit(): void {
@@ -82,7 +84,7 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
           }
         },
         error: (error) => {
-          this.toastr.error("Error opening websocket connection");
+          this.toastr.error(this.i18n.t('errors.websocket_connection_failed'));
         }
       })
   }

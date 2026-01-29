@@ -1,18 +1,18 @@
 <form *ngIf="form" [formGroup]="form">
     <div class="card">
         <p-message *ngIf="settingsUnlocked" severity="warn" styleClass="w-full mb-3 py-4 border-round-xl"
-            text="Custom settings can cause damage & system instability. Only modify these settings if you understand the risks of running outside designed parameters.">
+            [text]="'settings.device.custom_settings_warning' | t">
         </p-message>
 
         <div class="field grid p-fluid">
             <ng-container *ngIf="settingsUnlocked">
-                <label for="frequency" class="col-12 md:col-2 md:m-0">Frequency</label>
+                <label for="frequency" class="col-12 md:col-2 md:m-0">{{ 'settings.device.frequency' | t }}</label>
                 <div class="col-12 md:col-10">
                     <input pInputText id="frequency" formControlName="frequency" type="number" />
                 </div>
             </ng-container>
             <ng-container *ngIf="!settingsUnlocked">
-                <label (click)="frequencyDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Frequency</label>
+                <label (click)="frequencyDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">{{ 'settings.device.frequency' | t }}</label>
                 <div class="col-12 md:col-10">
                     <p-dropdown
                         [options]="dropdownFrequency"
@@ -27,13 +27,13 @@
 
         <div class="field grid p-fluid">
             <ng-container *ngIf="settingsUnlocked">
-                <label for="coreVoltage" class="col-12 md:col-2 md:m-0">Core Voltage</label>
+                <label for="coreVoltage" class="col-12 md:col-2 md:m-0">{{ 'settings.device.core_voltage' | t }}</label>
                 <div class="col-12 md:col-10">
                     <input pInputText id="coreVoltage" formControlName="coreVoltage" type="number" />
                 </div>
             </ng-container>
             <ng-container *ngIf="!settingsUnlocked">
-                <label (click)="voltageDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Core Voltage</label>
+                <label (click)="voltageDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">{{ 'settings.device.core_voltage' | t }}</label>
                 <div class="col-12 md:col-10">
                     <p-dropdown
                         [options]="dropdownVoltage"
@@ -47,12 +47,12 @@
         </div>
 
         <div *ngIf="form.get('overheat_mode')?.value === 1" class="mt-4">
-            <button pButton type="button" label="Disable Overheat Mode"
+            <button pButton type="button" [label]="'actions.disable_overheat_mode' | t"
                     class="p-button-danger w-full"
                     (click)="disableOverheatMode()">
             </button>
             <small class="block mt-1 text-center text-primary">
-                Make sure to reset Frequency and Voltage before clicking this button.
+                {{ 'settings.device.overheat_reset_hint' | t }}
             </small>
         </div>
 
@@ -60,39 +60,39 @@
             <div class="col-1 md:col-10 md:flex-order-2">
                 <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed" [binary]="true"></p-checkbox>
             </div>
-            <label for="autofanspeed" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Automatic Fan Control</label>
+            <label for="autofanspeed" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">{{ 'settings.device.automatic_fan_control' | t }}</label>
         </div>
 
         <div *ngIf="form.controls['autofanspeed'].value" class="grid p-fluid my-2">
-            <label class="hidden md:flex md:col-2 md:m-0 hover-next-input">Target Temperature</label>
+            <label class="hidden md:flex md:col-2 md:m-0 hover-next-input">{{ 'settings.device.target_temperature' | t }}</label>
             <div class="col-12 md:col-10">
                 <label class="block mb-1">
-                    <span class="md:hidden mr-1">Target Temperature:</span>{{form.controls['temptarget'].value}} °C
+                    <span class="md:hidden mr-1">{{ 'settings.device.target_temperature' | t }}:</span>{{form.controls['temptarget'].value}} °C
                 </label>
                 <p-slider [min]="35" [max]="66" formControlName="temptarget"></p-slider>
             </div>
         </div>
 
         <div *ngIf="form.controls['autofanspeed'].value" class="grid p-fluid">
-            <label class="hidden md:flex md:col-2 md:m-0 hover-next-input">Minimum Fan Speed</label>
+            <label class="hidden md:flex md:col-2 md:m-0 hover-next-input">{{ 'settings.device.minimum_fan_speed' | t }}</label>
             <div class="col-12 md:col-10">
                 <label class="block mb-1">
-                    <span class="md:hidden mr-1">Minimum Fan Speed:</span>{{form.controls['minfanspeed'].value}} %
+                    <span class="md:hidden mr-1">{{ 'settings.device.minimum_fan_speed' | t }}:</span>{{form.controls['minfanspeed'].value}} %
                 </label>
                 <p-slider [min]="0" [max]="99" formControlName="minfanspeed"></p-slider>
             </div>
         </div>
 
         <div *ngIf="!form.controls['autofanspeed'].value" class="grid p-fluid mt-2">
-            <label class="hidden md:flex md:col-2 md:m-0 hover-next-input">Fan Speed</label>
+            <label class="hidden md:flex md:col-2 md:m-0 hover-next-input">{{ 'settings.device.fan_speed' | t }}</label>
             <div class="col-12 md:col-10">
                 <label class="block mb-1">
-                    <span class="md:hidden mr-1">Fan Speed:</span>{{form.controls['manualFanSpeed'].value}} %
+                    <span class="md:hidden mr-1">{{ 'settings.device.fan_speed' | t }}:</span>{{form.controls['manualFanSpeed'].value}} %
                     <b *ngIf="form.controls['manualFanSpeed'].value < 33" class="text-primary">
-                        Danger: Could Cause Overheating
+                        {{ 'settings.device.danger_overheating' | t }}
                     </b>
                     <b *ngIf="form.controls['manualFanSpeed'].value == 100" class="text-orange-500 ml-2">
-                        S19 Simulator
+                        {{ 'settings.device.s19_simulator' | t }}
                     </b>
                 </label>
                 <p-slider formControlName="manualFanSpeed"></p-slider>
@@ -100,18 +100,23 @@
         </div>
     </div>
 
-    <h3 class="mt-5">Display</h3>
+    <h3 class="mt-5">{{ 'settings.device.display.title' | t }}</h3>
 
     <div class="card">
         <div class="field grid p-fluid">
-            <label (click)="displayDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Type</label>
+            <label (click)="displayDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">{{ 'settings.device.display.type' | t }}</label>
             <div class="col-12 md:col-10">
-                <p-dropdown [options]="displays" formControlName="display" #displayDropdown></p-dropdown>
+                <p-dropdown
+                    [options]="displays"
+                    optionLabel="label"
+                    optionValue="value"
+                    formControlName="display"
+                    #displayDropdown></p-dropdown>
             </div>
         </div>
 
         <div class="field grid p-fluid">
-            <label (click)="rotationDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Rotation</label>
+            <label (click)="rotationDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">{{ 'settings.device.display.rotation' | t }}</label>
             <div class="col-12 md:col-10">
                 <p-dropdown [options]="rotations" formControlName="rotation" #rotationDropdown></p-dropdown>
             </div>
@@ -119,18 +124,19 @@
 
         <div class="field grid p-fluid">
             <label class="col-12 md:col-2 hidden md:flex md:m-0 relative hover-next-input">
-                Sleep
+                {{ 'settings.device.display.sleep' | t }}
             </label>
             <div class="col-12 md:col-10">
                 <label class="block mb-1">
                     <ng-container *ngIf="this.form.controls['displayTimeout'].value == 0">
-                        <span class="md:hidden mr-1">Display</span> Always Off
+                        <span class="md:hidden mr-1">{{ 'settings.device.display.label' | t }}</span> {{ 'settings.device.display.always_off' | t }}
                     </ng-container>
                     <ng-container *ngIf="this.form.controls['displayTimeout'].value > 0">
-                        <span class="md:hidden mr-1">Display</span> Timeout: {{this.form.controls['displayTimeout'].value * 60 | dateAgo}}
+                        <span class="md:hidden mr-1">{{ 'settings.device.display.label' | t }}</span>
+                        {{ 'settings.device.display.timeout' | t:{ time: (this.form.controls['displayTimeout'].value * 60 | dateAgo) } }}
                     </ng-container>
                     <ng-container *ngIf="this.form.controls['displayTimeout'].value == -1">
-                        <span class="md:hidden mr-1">Display</span> Always On
+                        <span class="md:hidden mr-1">{{ 'settings.device.display.label' | t }}</span> {{ 'settings.device.display.always_on' | t }}
                     </ng-container>
                 </label>
                 <p-slider [min]="0" [max]="displayTimeoutMaxSteps" [step]="1" [formControl]="displayTimeoutControl"></p-slider>
@@ -142,24 +148,25 @@
             <div class="col-1 md:col-10 md:flex-order-2">
                 <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen" [binary]="true"></p-checkbox>
             </div>
-            <label for="invertscreen" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Invert Display Colors</label>
+            <label for="invertscreen" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">{{ 'settings.device.display.invert_colors' | t }}</label>
         </div>
     </div>
 
-    <h3 class="mt-5">Statistics</h3>
+    <h3 class="mt-5">{{ 'settings.device.stats.title' | t }}</h3>
 
     <div class="card">
         <div class="grid p-fluid">
             <label class="col-12 md:col-2 hidden md:flex md:m-0 relative hover-next-input">
-                Data Logging
+                {{ 'settings.device.stats.data_logging' | t }}
             </label>
             <div class="col-12 md:col-10">
                 <label class="block mb-2">
                     <ng-container *ngIf="this.form.controls['statsFrequency'].value == 0">
-                        <span class="md:hidden mr-1">Data Logging</span>Disabled
+                        <span class="md:hidden mr-1">{{ 'settings.device.stats.data_logging' | t }}</span> {{ 'settings.device.stats.disabled' | t }}
                     </ng-container>
                     <ng-container *ngIf="this.form.controls['statsFrequency'].value > 0">
-                        <span class="md:hidden mr-1">Log Data</span>Every {{form.controls['statsFrequency'].value | dateAgo: {strict: true} }} for {{(form.controls['statsFrequency'].value * 720) | dateAgo}}
+                        <span class="md:hidden mr-1">{{ 'settings.device.stats.log_data' | t }}</span>
+                        {{ 'settings.device.stats.every_for' | t:{ every: (form.controls['statsFrequency'].value | dateAgo: {strict: true}), duration: ((form.controls['statsFrequency'].value * 720) | dateAgo) } }}
                     </ng-container>
                 </label>
                 <p-slider [min]="0" [max]="statsFrequencyMaxSteps" [step]="1" [formControl]="statsFrequencyControl"></p-slider>
@@ -169,12 +176,12 @@
     </div>
 
     <div class="flex mt-5 gap-3">
-        <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-            class="btn btn-primary">Save</button>
+        <button pButton [disabled]="!form.dirty || form.invalid" (click)="onSaveClick()"
+            class="btn btn-primary">{{ 'actions.save' | t }}</button>
 
-        <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
+        <button pButton [disabled]="!savedChanges" (click)="restart()">{{ 'actions.restart' | t }}</button>
 
         <button *ngIf="settingsUnlocked" pButton pButton="p-button-danger" (click)="toggleOverclockMode(false)"
-            class="p-button-danger" pTooltip="Return to safe preset values only">Disable Overclock Mode</button>
+            class="p-button-danger" [pTooltip]="'settings.device.overclock_reset_tooltip' | t">{{ 'actions.disable_overclock_mode' | t }}</button>
     </div>
 </form>

@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, Validators, ValidatorFn, ValidationErrors, Abst
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 type PoolType = 'stratum' | 'fallbackStratum';
 
@@ -28,9 +29,9 @@ export class PoolComponent implements OnInit {
   public showAdvancedOptions = { 'stratum': false, 'fallbackStratum': false };
 
   public tlsOptions: ITlsOption[] = [
-    { value: 0, label: 'No TLS' },
-    { value: 1, label: 'TLS (System certificate)' },
-    { value: 2, label: 'TLS (Custom CA certificate)' }
+    { value: 0, label: 'settings.pool.tls_none' },
+    { value: 1, label: 'settings.pool.tls_system' },
+    { value: 2, label: 'settings.pool.tls_custom' }
   ];
 
   @Input() uri = '';
@@ -39,7 +40,8 @@ export class PoolComponent implements OnInit {
     private fb: FormBuilder,
     private systemService: SystemApiService,
     private toastr: ToastrService,
-    private loadingService: LoadingService
+    private loadingService: LoadingService,
+    private i18n: I18nService
   ) { }
 
   ngOnInit(): void {
@@ -121,13 +123,17 @@ export class PoolComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
-          this.toastr.warning('You must restart this device after saving for changes to take effect.');
+          const successMessage = this.uri
+            ? this.i18n.t('messages.pool_saved_for', { uri: this.uri })
+            : this.i18n.t('messages.pool_saved');
+          this.toastr.warning(this.i18n.t('messages.restart_required'));
           this.toastr.success(successMessage);
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Could not save pool settings for ${this.uri}. ${err.message}` : `Could not save pool settings. ${err.message}`;
+          const errorMessage = this.uri
+            ? this.i18n.t('errors.pool_save_failed_for', { uri: this.uri, error: err.message })
+            : this.i18n.t('errors.pool_save_failed', { error: err.message });
           this.toastr.error(errorMessage);
           this.savedChanges = false;
         }
@@ -139,11 +145,15 @@ export class PoolComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
+          const successMessage = this.uri
+            ? this.i18n.t('messages.device_restarted_at', { uri: this.uri })
+            : this.i18n.t('messages.device_restarted');
           this.toastr.success(successMessage);
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
+          const errorMessage = this.uri
+            ? this.i18n.t('errors.restart_failed_for', { uri: this.uri, error: err.message })
+            : this.i18n.t('errors.restart_failed', { error: err.message });
           this.toastr.error(errorMessage);
         }
       });
@@ -209,7 +219,7 @@ export class PoolComponent implements OnInit {
 
       reader.onerror = () => {
         // Error handling when reading the certificate file
-        this.toastr.error('Failed to read certificate file');
+        this.toastr.error(this.i18n.t('errors.certificate_read_failed'));
         fileInput.value = '';
       };
 

@@ -7,6 +7,7 @@ import { InputGroupModule } from 'primeng/inputgroup';
 import { ReactiveFormsModule } from '@angular/forms';
 import { provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 describe('SwarmComponent', () => {
   let component: SwarmComponent;
@@ -14,7 +15,7 @@ describe('SwarmComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [SwarmComponent, ModalComponent],
+      declarations: [SwarmComponent, ModalComponent, TranslatePipe],
       imports: [FileUploadModule, InputGroupModule, ReactiveFormsModule],
       providers: [provideHttpClient(), provideToastr()]
     });

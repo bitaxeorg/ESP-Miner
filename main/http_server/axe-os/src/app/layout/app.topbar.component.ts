@@ -6,6 +6,7 @@ import { LayoutService } from './service/app.layout.service';
 import { SensitiveData } from 'src/app/services/sensitive-data.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated';
 import { MenuItem } from 'primeng/api';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 @Component({
   selector: 'app-topbar',
@@ -27,6 +28,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
     private systemService: SystemApiService,
     private toastr: ToastrService,
     private sensitiveData: SensitiveData,
+    private i18n: I18nService,
   ) {
     this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}))
   }
@@ -50,8 +52,8 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
 
   public restart() {
     this.systemService.restart().subscribe({
-      next: () => this.toastr.success('Device restarted'),
-      error: () => this.toastr.error('Restart failed')
+      next: () => this.toastr.success(this.i18n.t('messages.device_restarted')),
+      error: (err) => this.toastr.error(this.i18n.t('errors.restart_failed', { error: err?.message ?? '' }))
     });
   }
 }

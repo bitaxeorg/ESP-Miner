@@ -3,8 +3,8 @@
         <div class="field grid p-fluid">
             <label for="hostname" class="col-12 md:col-2 md:m-0">
                 <tooltip-text-icon
-                    text="Hostname"
-                    tooltip="Name of the device on your local network"
+                    [text]="'common.hostname' | t"
+                    [tooltip]="'settings.network.hostname_help' | t"
                 />
             </label>
             <div class="col-12 md:col-10">
@@ -12,7 +12,7 @@
             </div>
         </div>
         <div class="field grid p-fluid">
-            <label for="ssid" class="col-12 md:col-2 md:m-0">Wi-Fi SSID</label>
+            <label for="ssid" class="col-12 md:col-2 md:m-0">{{ 'settings.network.wifi_ssid' | t }}</label>
             <div class="col-12 md:col-10 p-inputgroup">
                 <input pInputText id="ssid" type="text" formControlName="ssid" />
                 <p-button
@@ -20,26 +20,26 @@
                     pp-button
                     (click)="scanWifi()"
                     [loading]="scanning"
-                    pTooltip="Scan Wi-Fi"
+                    [pTooltip]="'actions.scan_wifi' | t"
                     tooltipPosition="left"></p-button>
             </div>
         </div>
         <div class="field grid p-fluid">
-            <label for="wifiPass" class="col-12 md:col-2 md:m-0">Wi-Fi Password</label>
+            <label for="wifiPass" class="col-12 md:col-2 md:m-0">{{ 'settings.network.wifi_password' | t }}</label>
             <div class="col-12 md:col-10 p-input-icon-right">
                 <i *ngIf="form.get('wifiPass')?.dirty" class="pi cursor-pointer"
                     [ngClass]="{'pi-eye': !showWifiPassword, 'pi-eye-slash': showWifiPassword}"
                     (click)="toggleWifiPasswordVisibility()"></i>
                 <input pInputText id="wifiPass" formControlName="wifiPass"
                     [type]="showWifiPassword ? 'text' : 'password'"
-                    placeholder="Enter Wi-Fi password" />
+                    [placeholder]="'settings.network.wifi_password_placeholder' | t" />
             </div>
         </div>
 
         <div class="flex mt-5 gap-3">
             <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-                class="btn btn-primary">Save</button>
-            <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
+                class="btn btn-primary">{{ 'actions.save' | t }}</button>
+            <button pButton [disabled]="!savedChanges" (click)="restart()">{{ 'actions.restart' | t }}</button>
         </div>
     </div>
 </form>

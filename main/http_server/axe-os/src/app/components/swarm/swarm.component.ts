@@ -8,6 +8,7 @@ import { LayoutService } from "../../layout/service/app.layout.service";
 import { SystemApiService } from 'src/app/services/system.service';
 import { ModalComponent } from '../modal/modal.component';
 import { SystemInfo as ISystemInfo } from 'src/app/generated';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 const SWARM_DATA = 'SWARM_DATA';
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
@@ -64,7 +65,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
     private localStorageService: LocalStorageService,
     public layoutService: LayoutService,
     private systemService: SystemApiService,
-    private httpClient: HttpClient
+    private httpClient: HttpClient,
+    private i18n: I18nService
   ) {
 
     this.form = this.fb.group({
@@ -187,7 +189,10 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     // Check if IP already exists
     if (this.swarm.some(item => item.IP === IP)) {
-      this.toastr.warning('Device already added to the swarm.', `Device at ${IP}`);
+      this.toastr.warning(
+        this.i18n.t('messages.device_already_in_swarm'),
+        this.i18n.t('messages.device_at', { ip: IP })
+      );
       return;
     }
 
@@ -219,23 +224,23 @@ export class SwarmComponent implements OnInit, OnDestroy {
       catchError(error => {
         if ((action === 'restart' || action === 'identify') && (error.status === 200 || error.status === 0 || error.name === 'HttpErrorResponse' || error.statusText === 'Unknown Error')) {
           if (action === 'restart') {
-            return of({ message: 'System will restarted shortly' });
+            return of({ message: this.i18n.t('messages.restart_soon') });
           } else {
-            return of({ message: 'Identify signal sent - device should say "Hi!"' });
+            return of({ message: this.i18n.t('messages.identify_signal_sent') });
           }
         }
-        let errorMsg = `Failed to ${action} device`;
+        let errorMsg = this.i18n.t('errors.device_action_failed', { action: this.getActionLabel(action) });
         if (error.name === 'TimeoutError') {
-          errorMsg = 'Request timed out';
+          errorMsg = this.i18n.t('errors.request_timeout');
         } else if (error.message) {
-          errorMsg += `: ${error.message}`;
+          errorMsg = this.i18n.t('errors.device_action_failed_detail', { action: this.getActionLabel(action), error: error.message });
         }
-        this.toastr.error(errorMsg, `Device at ${axe.IP}`);
+        this.toastr.error(errorMsg, this.i18n.t('messages.device_at', { ip: axe.IP }));
         return of(null);
       })
     ).subscribe((res: any) => {
       if (res !== null) {
-        this.toastr.success(res.message, `Device at ${axe.IP}`);
+        this.toastr.success(res.message, this.i18n.t('messages.device_at', { ip: axe.IP }));
         this.refreshList(false);
       }
     });
@@ -248,8 +253,11 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public refreshErrorHandler = (error: any, ip: string) => {
-    const errorMessage = error?.message || error?.statusText || error?.toString() || 'Unknown error';
-    this.toastr.error(`Failed to get info: ${errorMessage}`, `Device at ${ip}`);
+    const errorMessage = error?.message || error?.statusText || error?.toString() || this.i18n.t('errors.unknown_error');
+    this.toastr.error(
+      this.i18n.t('errors.device_info_failed', { error: errorMessage }),
+      this.i18n.t('messages.device_at', { ip })
+    );
     const existingDevice = this.swarm.find(axeOs => axeOs.IP === ip);
     return of({
       ...existingDevice,
@@ -350,7 +358,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       if (data.boardVersion[0] == "6") return "Gamma";
       if (data.boardVersion[0] == "8") return "GammaTurbo";
     }
-    return 'Other';
+    return this.i18n.t('common.other');
   }
 
   private deriveSwarmColor(deviceModel: string): string {
@@ -409,7 +417,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public stringifyDeviceLabel(data: any): string {
-    const model = data.deviceModel || 'Other';
+    const model = data.deviceModel || this.i18n.t('common.other');
     const asicCountPart = data.asicCount > 1 ? data.asicCount + 'x ' : '';
     const asicModel = data.ASICModel || '';
 
@@ -422,27 +430,28 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   get sortOptions() {
+    const t = (key: string) => this.i18n.t(key);
     return [
-      { label: 'Hostname', value: { sortField: 'hostname', sortDirection: 'desc' } },
-      { label: 'Hostname', value: { sortField: 'hostname', sortDirection: 'asc' } },
-      { label: 'IP', value: { sortField: 'IP', sortDirection: 'desc' } },
-      { label: 'IP', value: { sortField: 'IP', sortDirection: 'asc' } },
-      { label: 'Hashrate', value: { sortField: 'hashRate', sortDirection: 'desc' } },
-      { label: 'Hashrate', value: { sortField: 'hashRate', sortDirection: 'asc' } },
-      { label: 'Shares', value: { sortField: 'sharesAccepted', sortDirection: 'desc' } },
-      { label: 'Shares', value: { sortField: 'sharesAccepted', sortDirection: 'asc' } },
-      { label: 'Best Diff', value: { sortField: 'bestDiff', sortDirection: 'desc' } },
-      { label: 'Best Diff', value: { sortField: 'bestDiff', sortDirection: 'asc' } },
-      { label: 'Uptime', value: { sortField: 'uptimeSeconds', sortDirection: 'desc' } },
-      { label: 'Uptime', value: { sortField: 'uptimeSeconds', sortDirection: 'asc' } },
-      { label: 'Power', value: { sortField: 'power', sortDirection: 'desc' } },
-      { label: 'Power', value: { sortField: 'power', sortDirection: 'asc' } },
-      { label: 'Temp', value: { sortField: 'temp', sortDirection: 'desc' } },
-      { label: 'Temp', value: { sortField: 'temp', sortDirection: 'asc' } },
-      { label: 'Pool Diff', value: { sortField: 'poolDifficulty', sortDirection: 'desc' } },
-      { label: 'Pool Diff', value: { sortField: 'poolDifficulty', sortDirection: 'asc' } },
-      { label: 'Version', value: { sortField: 'version', sortDirection: 'desc' } },
-      { label: 'Version', value: { sortField: 'version', sortDirection: 'asc' } },
+      { label: t('common.hostname'), value: { sortField: 'hostname', sortDirection: 'desc' } },
+      { label: t('common.hostname'), value: { sortField: 'hostname', sortDirection: 'asc' } },
+      { label: t('common.ip'), value: { sortField: 'IP', sortDirection: 'desc' } },
+      { label: t('common.ip'), value: { sortField: 'IP', sortDirection: 'asc' } },
+      { label: t('miner.hashrate'), value: { sortField: 'hashRate', sortDirection: 'desc' } },
+      { label: t('miner.hashrate'), value: { sortField: 'hashRate', sortDirection: 'asc' } },
+      { label: t('miner.shares'), value: { sortField: 'sharesAccepted', sortDirection: 'desc' } },
+      { label: t('miner.shares'), value: { sortField: 'sharesAccepted', sortDirection: 'asc' } },
+      { label: t('miner.best_diff'), value: { sortField: 'bestDiff', sortDirection: 'desc' } },
+      { label: t('miner.best_diff'), value: { sortField: 'bestDiff', sortDirection: 'asc' } },
+      { label: t('common.uptime'), value: { sortField: 'uptimeSeconds', sortDirection: 'desc' } },
+      { label: t('common.uptime'), value: { sortField: 'uptimeSeconds', sortDirection: 'asc' } },
+      { label: t('miner.power'), value: { sortField: 'power', sortDirection: 'desc' } },
+      { label: t('miner.power'), value: { sortField: 'power', sortDirection: 'asc' } },
+      { label: t('miner.temp'), value: { sortField: 'temp', sortDirection: 'desc' } },
+      { label: t('miner.temp'), value: { sortField: 'temp', sortDirection: 'asc' } },
+      { label: t('miner.pool_diff'), value: { sortField: 'poolDifficulty', sortDirection: 'desc' } },
+      { label: t('miner.pool_diff'), value: { sortField: 'poolDifficulty', sortDirection: 'asc' } },
+      { label: t('common.version'), value: { sortField: 'version', sortDirection: 'desc' } },
+      { label: t('common.version'), value: { sortField: 'version', sortDirection: 'asc' } },
     ];
   }
 
@@ -469,17 +478,28 @@ export class SwarmComponent implements OnInit, OnDestroy {
   getDeviceNotification(axe: any): { color: string; msg: string } | undefined {
     switch (true) {
       case axe.overheat_mode === 1:
-        return { color: 'red', msg: 'Overheated' };
+        return { color: 'red', msg: this.i18n.t('messages.overheated_short') };
       case !!axe.power_fault:
-        return { color: 'red', msg: 'Power Fault' };
+        return { color: 'red', msg: this.i18n.t('messages.power_fault_short') };
       case !axe.frequency || axe.frequency < 400:
-        return { color: 'orange', msg: 'Frequency Low' };
+        return { color: 'orange', msg: this.i18n.t('messages.frequency_low_short') };
       case axe.isUsingFallbackStratum === 1:
-        return { color: 'orange', msg: 'Fallback Pool' };
+        return { color: 'orange', msg: this.i18n.t('messages.fallback_pool_short') };
       case axe.blockFound === 1:
-        return { color: 'green', msg: 'Block found' };
+        return { color: 'green', msg: this.i18n.t('messages.block_found_short') };
       default:
         return undefined;
+    }
+  }
+
+  private getActionLabel(action: string): string {
+    switch (action) {
+      case 'restart':
+        return this.i18n.t('actions.restart');
+      case 'identify':
+        return this.i18n.t('actions.identify');
+      default:
+        return action;
     }
   }
 

@@ -7,6 +7,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { DialogService } from 'src/app/services/dialog.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
+import { I18nService } from 'src/app/i18n/i18n.service';
 
 interface WifiNetwork {
   ssid: string;
@@ -35,7 +36,8 @@ export class NetworkEditComponent implements OnInit {
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private http: HttpClient,
-    private dialogService: DialogService
+    private dialogService: DialogService,
+    private i18n: I18nService
   ) {
 
   }
@@ -73,12 +75,12 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.warning('You must restart this device after saving for changes to take effect.');
-          this.toastr.success('Saved network settings');
+          this.toastr.warning(this.i18n.t('messages.restart_required'));
+          this.toastr.success(this.i18n.t('messages.network_saved'));
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not save. ${err.message}`);
+          this.toastr.error(this.i18n.t('errors.save_failed', { error: err.message }));
           this.savedChanges = false;
         }
       });
@@ -122,7 +124,7 @@ export class NetworkEditComponent implements OnInit {
           }));
 
           // Show dialog with network list
-          this.dialogService.open('Select Wi-Fi Network', dialogData)
+          this.dialogService.open(this.i18n.t('settings.network.select_wifi_title'), dialogData)
             .subscribe((selectedSsid: string) => {
               if (selectedSsid) {
                 this.form.patchValue({ ssid: selectedSsid });
@@ -131,7 +133,7 @@ export class NetworkEditComponent implements OnInit {
             });
         },
         error: (err) => {
-          this.toastr.error('Failed to scan Wi-Fi networks');
+          this.toastr.error(this.i18n.t('errors.wifi_scan_failed'));
         }
       });
   }
@@ -141,10 +143,10 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.success('Device restarted');
+          this.toastr.success(this.i18n.t('messages.device_restarted'));
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not restart. ${err.message}`);
+          this.toastr.error(this.i18n.t('errors.restart_failed', { error: err.message }));
         }
       });
   }

@@ -6,6 +6,7 @@ import { FileUploadModule } from 'primeng/fileupload';
 import { CheckboxModule } from 'primeng/checkbox';
 import { provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
+import { TranslatePipe } from 'src/app/i18n/translate.pipe';
 
 describe('UpdateComponent', () => {
   let component: UpdateComponent;
@@ -13,7 +14,7 @@ describe('UpdateComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [UpdateComponent, ModalComponent],
+      declarations: [UpdateComponent, ModalComponent, TranslatePipe],
       imports: [FileUploadModule, CheckboxModule],
       providers: [provideHttpClient(), provideToastr()]
     });
