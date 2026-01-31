@@ -1,6 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { UpdateComponent } from './update.component';
+import { ModalComponent } from '../modal/modal.component';
+import { FileUploadModule } from 'primeng/fileupload';
+import { CheckboxModule } from 'primeng/checkbox';
+import { provideHttpClient } from '@angular/common/http';
+import { provideToastr } from 'ngx-toastr';
 
 describe('UpdateComponent', () => {
   let component: UpdateComponent;
@@ -8,7 +13,9 @@ describe('UpdateComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [UpdateComponent]
+      declarations: [UpdateComponent, ModalComponent],
+      imports: [FileUploadModule, CheckboxModule],
+      providers: [provideHttpClient(), provideToastr()]
     });
     fixture = TestBed.createComponent(UpdateComponent);
     component = fixture.componentInstance;

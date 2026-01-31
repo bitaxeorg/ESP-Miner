@@ -10,11 +10,11 @@ typedef struct
     float chip_temp2_avg;
     float vr_temp;
     float voltage;
-    float core_voltage;
     float frequency_value;
     float expected_hashrate;
     float power;
     float current;
+    float core_voltage;
 } PowerManagementModule;
 
 void POWER_MANAGEMENT_init_frequency(void * pvParameters);

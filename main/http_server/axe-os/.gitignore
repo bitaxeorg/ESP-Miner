@@ -6,6 +6,9 @@
 /out-tsc
 /bazel-out
 
+# Openapi generator
+**/generated
+
 # Node
 /node_modules
 npm-debug.log

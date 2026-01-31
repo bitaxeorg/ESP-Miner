@@ -36,7 +36,6 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "vcore.h"
-#include "power.h"
 #include "connect.h"
 #include "asic.h"
 #include "TPS546.h"
@@ -51,8 +50,6 @@
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
-
-static char axeOSVersion[32];
 
 static const char * STATS_LABEL_HASHRATE = "hashrate";
 static const char * STATS_LABEL_HASHRATE_1m = "hashrate_1m";
@@ -312,24 +309,6 @@ esp_err_t is_network_allowed(httpd_req_t * req)
     return ESP_FAIL;
 }
 
-static void readAxeOSVersion(void) {
-    FILE* f = fopen("/version.txt", "r");
-    if (f != NULL) {
-        size_t n = fread(axeOSVersion, 1, sizeof(axeOSVersion) - 1, f);
-        axeOSVersion[n] = '\0';
-        fclose(f);
-
-        ESP_LOGI(TAG, "AxeOS version: %s", axeOSVersion);
-
-        if (strcmp(axeOSVersion, esp_app_get_description()->version) != 0) {
-            ESP_LOGE(TAG, "Firmware (%s) and AxeOS (%s) versions do not match. Please make sure to update both www.bin and esp-miner.bin.", esp_app_get_description()->version, axeOSVersion);
-        }
-    } else {
-        strcpy(axeOSVersion, "unknown");
-        ESP_LOGE(TAG, "Failed to open AxeOS version.txt");
-    }
-}
-
 esp_err_t init_fs(void)
 {
     esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = NULL, .max_files = 5, .format_if_mount_failed = false};
@@ -353,8 +332,6 @@ esp_err_t init_fs(void)
     } else {
         ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
     }
-
-    readAxeOSVersion();
 
     return ESP_OK;
 }
@@ -725,17 +702,27 @@ static esp_err_t POST_identify(httpd_req_t * req)
 
     ESP_LOGI(TAG, "Identify mode enabled for 30s");
 
-    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_type(req, "application/json");
+
+    cJSON * root = cJSON_CreateObject();
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_OK;
+    }
 
     if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
-        httpd_resp_send(req, "The device no longer says \"Hi!\".", HTTPD_RESP_USE_STRLEN);
+        cJSON_AddStringToObject(root, "message", "The device no longer says \"Hi!\".");
     } else {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 30000;
-        httpd_resp_send(req, "The device says \"Hi!\" for 30 seconds.", HTTPD_RESP_USE_STRLEN);
+         cJSON_AddStringToObject(root, "message", "The device says \"Hi!\" for 30 seconds.");
     }
 
-    return ESP_OK;
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+
+    cJSON_Delete(root);
+
+    return res;
 }
 
 static esp_err_t POST_restart(httpd_req_t * req)
@@ -752,11 +739,20 @@ static esp_err_t POST_restart(httpd_req_t * req)
 
     ESP_LOGI(TAG, "Restarting System because of API Request");
 
-    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_type(req, "application/json");
+
+    cJSON * root = cJSON_CreateObject();
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_OK;
+    }
+
+    cJSON_AddStringToObject(root, "message", "System will restart shortly.");
 
     // Send HTTP response before restarting
-    const char* resp_str = "System will restart shortly.";
-    httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+
+    cJSON_Delete(root);
 
     // Delay to ensure the response is sent
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -765,7 +761,7 @@ static esp_err_t POST_restart(httpd_req_t * req)
     esp_restart();
 
     // This return statement will never be reached, but it's good practice to include it
-    return ESP_OK;
+    return res;
 }
 
 static const char* esp_reset_reason_to_string(esp_reset_reason_t reason) {
@@ -829,7 +825,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON * root = cJSON_CreateObject();
     cJSON_AddFloatToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
     cJSON_AddFloatToObject(root, "voltage", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
-    cJSON_AddFloatToObject(root, "current", Power_get_current(GLOBAL_STATE));
+    cJSON_AddFloatToObject(root, "current", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.current);
     cJSON_AddFloatToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
     cJSON_AddFloatToObject(root, "temp2", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
     cJSON_AddFloatToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
@@ -856,7 +852,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
-    cJSON_AddNumberToObject(root, "coreVoltageActual", VCORE_get_voltage_mv(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "coreVoltageActual", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.core_voltage);
     cJSON_AddNumberToObject(root, "coreVoltageSet", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.core_voltage);
     cJSON_AddNumberToObject(root, "frequency", frequency);
     cJSON_AddNumberToObject(root, "frequencySet", nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY));
@@ -900,8 +896,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
     cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
 
-    cJSON_AddStringToObject(root, "version", esp_app_get_description()->version);
-    cJSON_AddStringToObject(root, "axeOSVersion", axeOSVersion);
+    cJSON_AddStringToObject(root, "version", GLOBAL_STATE->SYSTEM_MODULE.version);
+    cJSON_AddStringToObject(root, "axeOSVersion", GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
 
     cJSON_AddStringToObject(root, "idfVersion", esp_get_idf_version());
     cJSON_AddStringToObject(root, "boardVersion", GLOBAL_STATE->DEVICE_CONFIG.board_version);
@@ -1148,10 +1144,8 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
 
         remaining -= recv_len;
     }
-
+    httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "WWW update complete\n");
-
-    readAxeOSVersion();
 
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Finished...");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -1226,6 +1220,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
 
+    httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "Firmware update complete, rebooting now!\n");
     ESP_LOGI(TAG, "Restarting System because of Firmware update complete");
     vTaskDelay(1000 / portTICK_PERIOD_MS);

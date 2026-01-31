@@ -24,7 +24,6 @@ SRCS
     "./self_test/self_test.c"
     "./tasks/stratum_task.c"
     "./tasks/create_jobs_task.c"
-    "./tasks/asic_task.c"
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
     "./tasks/statistics_task.c"
@@ -94,6 +93,22 @@ else()
         message(FATAL_ERROR "npm is not found! Please install it to proceed.")
     endif()
 
+    # OpenAPI generation - only when openapi.yaml changes
+    set(OPENAPI_SPEC "${CMAKE_CURRENT_SOURCE_DIR}/http_server/openapi.yaml")
+    set(OPENAPI_STAMP "${CMAKE_BINARY_DIR}/openapi_generate.stamp")
+
+    add_custom_command(
+        OUTPUT ${OPENAPI_STAMP}
+        COMMAND ${NPM_EXECUTABLE} i
+        COMMAND ${NPM_EXECUTABLE} run generate:api
+        COMMAND ${CMAKE_COMMAND} -E touch ${OPENAPI_STAMP}
+        WORKING_DIRECTORY ${WEB_SRC_DIR}
+        DEPENDS ${OPENAPI_SPEC}
+        COMMENT "Generating API client from OpenAPI spec (openapi.yaml changed)"
+        VERBATIM
+        USES_TERMINAL
+    )
+
     # Collect all frontend source files to track dependencies
     file(GLOB_RECURSE WEB_UI_SOURCES
         "${WEB_SRC_DIR}/src/*.*"
@@ -117,10 +132,10 @@ else()
     add_custom_command(
         OUTPUT ${WEB_UI_STAMP} ${WEB_UI_OUTPUT}
         COMMAND ${NPM_EXECUTABLE} i
-        COMMAND ${NPM_EXECUTABLE} run build
+        COMMAND ${NPM_EXECUTABLE} run build:no-api-gen
         COMMAND ${CMAKE_COMMAND} -E touch ${WEB_UI_STAMP}
         WORKING_DIRECTORY ${WEB_SRC_DIR}
-        DEPENDS ${WEB_UI_SOURCES}
+        DEPENDS ${WEB_UI_SOURCES} ${OPENAPI_STAMP}
         COMMENT "Building Web UI (source files changed)"
         VERBATIM
         USES_TERMINAL
@@ -128,7 +143,7 @@ else()
 
     # Create a target for the web UI build
     add_custom_target(web_ui_dist ALL
-        DEPENDS ${WEB_UI_STAMP}
+        DEPENDS ${WEB_UI_STAMP} ${OPENAPI_STAMP}
     )
 
     add_dependencies(${COMPONENT_LIB} web_ui_dist)

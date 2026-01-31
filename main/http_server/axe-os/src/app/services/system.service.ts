@@ -1,31 +1,43 @@
-import { HttpClient, HttpParams, HttpEvent } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { HttpClient, HttpEvent } from '@angular/common/http';
+import { Injectable, Optional } from '@angular/core';
 import { delay, Observable, of, timeout } from 'rxjs';
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
-import { ISystemInfo } from 'src/models/ISystemInfo';
-import { ISystemStatistics } from 'src/models/ISystemStatistics';
-import { ISystemASIC } from 'src/models/ISystemASIC';
 import { IAutotuneSettings } from 'src/models/IAutotuneSettings';
+import {
+  SystemInfo as ISystemInfo,
+  SystemStatistics as ISystemStatistics,
+
+  SystemASIC as ISystemASIC,
+  SystemASICASICModelEnum,
+  SystemService as GeneratedSystemService,
+  Settings
+} from 'src/app/generated';
 
 import { environment } from '../../environments/environment';
+
+const API_TIMEOUT = 15000;
 
 @Injectable({
   providedIn: 'root'
 })
-export class SystemService {
+export class SystemApiService {
 
   constructor(
-    private httpClient: HttpClient
+    private httpClient: HttpClient,
+    @Optional() private generatedSystemService: GeneratedSystemService
   ) { }
 
   public getInfo(uri: string = ''): Observable<ISystemInfo> {
-    if (environment.production) {
-      return this.httpClient.get<ISystemInfo>(`${uri}/api/system/info`).pipe(timeout(5000));
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.getSystemInfo().pipe(timeout(API_TIMEOUT));
     }
 
-    // Mock data for development
+    if (environment.production && uri) {
+      return this.httpClient.get<ISystemInfo>(`${uri}/api/system/info`).pipe(timeout(API_TIMEOUT));
+    }
+
     return of(
       {
         power: 11.670000076293945,
@@ -67,24 +79,24 @@ export class SystemService {
         ],
         uptimeSeconds: 38,
         smallCoreCount: 672,
-        ASICModel: "BM1370",
+        ASICModel: "BM1370" as SystemASICASICModelEnum,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         stratumSuggestedDifficulty: 1000,
-        stratumExtranonceSubscribe: 0,
-        stratumTLS: 0,
+        stratumExtranonceSubscribe: !!0,
+        stratumTLS: !!0,
         stratumCert: "",
         fallbackStratumURL: "test.public-pool.io",
         fallbackStratumPort: 21497,
         fallbackStratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         fallbackStratumSuggestedDifficulty: 1000,
-        fallbackStratumExtranonceSubscribe: 0,
-        fallbackStratumTLS: 0,
+        fallbackStratumExtranonceSubscribe: !!0,
+        fallbackStratumTLS: !!0,
         fallbackStratumCert: "",
         poolDifficulty: 1000,
         responseTime: 10,
-        isUsingFallbackStratum: false,
+        isUsingFallbackStratum: 0,
         poolConnectionInfo: "IPv4 (TLS)",
         frequency: 485,
         frequencySet: 450,
@@ -98,6 +110,9 @@ export class SystemService {
         invertscreen: 0,
         displayTimeout: -1,
         autofanspeed: 1,
+        isPSRAMAvailable: 1,
+        overclockEnabled: 1,
+        runningPartition: "factory",
         minFanSpeed: 25,
         fanspeed: 50,
         manualFanSpeed: 70,
@@ -136,49 +151,47 @@ export class SystemService {
       columnList.push(y2);
     }
 
-    if (environment.production) {
-      const options = { params: new HttpParams().set('columns', columnList.join(',')) };
-      return this.httpClient.get<ISystemStatistics>(`${uri}/api/system/statistics`, options).pipe(timeout(5000));
+    if (environment.production && this.generatedSystemService) {
+      return this.generatedSystemService.getSystemStatistics(columnList).pipe(timeout(API_TIMEOUT));
     }
 
-    // Mock data for development
-    const hashrateData = [0,413.4903744405481,410.7764830376959,440.100549473198,430.5816012914026,452.5464981767163,414.9564271189586,498.7294609150379,411.1671601439723,491.327834852684];
-    const powerData = [14.45068359375,14.86083984375,15.03173828125,15.1171875,15.1171875,15.1513671875,15.185546875,15.27099609375,15.30517578125,15.33935546875];
-    const asicTempData = [-1,58.5,59.625,60.125,60.75,61.5,61.875,62.125,62.5,63];
-    const vrTempData = [45,45,45,44,45,44,44,45,45,45];
-    const asicVoltageData = [1221,1223,1219,1223,1217,1222,1221,1219,1221,1221];
-    const voltageData = [5196.875,5204.6875,5196.875,5196.875,5196.875,5196.875,5196.875,5196.875,5196.875,5204.6875];
-    const currentData = [2284.375,2284.375,2253.125,2284.375,2253.125,2231.25,2284.375,2253.125,2253.125,2284.375];
-    const fanSpeedData = [48,52,50,52,53,54,50,50,48,48];
-    const fanRpmData = [4032,3545,3904,3691,3564,3554,3691,3573,3701,4044];
-    const fan2RpmData = [3545,3904,3691,3564,3554,3691,3573,3701,4044, 4032];
-    const wifiRssiData = [-35,-34,-33,-34,-34,-34,-33,-35,-33,-34];
-    const freeHeapData = [214504,212504,213504,210504,207504,209504,203504,202504,201504,200504];
-    const responseTimeData = [15.1,14.5,14.3,15.1,13.1,16.1,28.6,18.4,17.7,17.6,18.0,15.5];
-    const timestampData = [13131,18126,23125,28125,33125,38125,43125,48125,53125,58125];
+    const hashrateData = [0, 413.4903744405481, 410.7764830376959, 440.100549473198, 430.5816012914026, 452.5464981767163, 414.9564271189586, 498.7294609150379, 411.1671601439723, 491.327834852684];
+    const powerData = [14.45068359375, 14.86083984375, 15.03173828125, 15.1171875, 15.1171875, 15.1513671875, 15.185546875, 15.27099609375, 15.30517578125, 15.33935546875];
+    const asicTempData = [-1, 58.5, 59.625, 60.125, 60.75, 61.5, 61.875, 62.125, 62.5, 63];
+    const vrTempData = [45, 45, 45, 44, 45, 44, 44, 45, 45, 45];
+    const asicVoltageData = [1221, 1223, 1219, 1223, 1217, 1222, 1221, 1219, 1221, 1221];
+    const voltageData = [5196.875, 5204.6875, 5196.875, 5196.875, 5196.875, 5196.875, 5196.875, 5196.875, 5196.875, 5204.6875];
+    const currentData = [2284.375, 2284.375, 2253.125, 2284.375, 2253.125, 2231.25, 2284.375, 2253.125, 2253.125, 2284.375];
+    const fanSpeedData = [48, 52, 50, 52, 53, 54, 50, 50, 48, 48];
+    const fanRpmData = [4032, 3545, 3904, 3691, 3564, 3554, 3691, 3573, 3701, 4044];
+    const fan2RpmData = [3545, 3904, 3691, 3564, 3554, 3691, 3573, 3701, 4044, 4032];
+    const wifiRssiData = [-35, -34, -33, -34, -34, -34, -33, -35, -33, -34];
+    const freeHeapData = [214504, 212504, 213504, 210504, 207504, 209504, 203504, 202504, 201504, 200504];
+    const responseTimeData = [15.1, 14.5, 14.3, 15.1, 13.1, 16.1, 28.6, 18.4, 17.7, 17.6, 18.0, 15.5];
+    const timestampData = [13131, 18126, 23125, 28125, 33125, 38125, 43125, 48125, 53125, 58125];
 
     columnList.push("timestamp");
     let statisticsList: number[][] = [];
 
-    for(let i: number = 0; i < 10; i++) {
+    for (let i: number = 0; i < 10; i++) {
       statisticsList[i] = [];
-      for(let j: number = 0; j < columnList.length; j++) {
+      for (let j: number = 0; j < columnList.length; j++) {
         switch (chartLabelValue(columnList[j])) {
-          case eChartLabel.hashrate:     statisticsList[i][j] = hashrateData[i];     break;
-          case eChartLabel.hashrate_1m:  statisticsList[i][j] = hashrateData[i];     break;
-          case eChartLabel.hashrate_10m: statisticsList[i][j] = hashrateData[i];     break;
-          case eChartLabel.hashrate_1h:  statisticsList[i][j] = hashrateData[i];     break;
-          case eChartLabel.power:        statisticsList[i][j] = powerData[i];        break;
-          case eChartLabel.asicTemp:     statisticsList[i][j] = asicTempData[i];     break;
-          case eChartLabel.vrTemp:       statisticsList[i][j] = vrTempData[i];       break;
-          case eChartLabel.asicVoltage:  statisticsList[i][j] = asicVoltageData[i];  break;
-          case eChartLabel.voltage:      statisticsList[i][j] = voltageData[i];      break;
-          case eChartLabel.current:      statisticsList[i][j] = currentData[i];      break;
-          case eChartLabel.fanSpeed:     statisticsList[i][j] = fanSpeedData[i];     break;
-          case eChartLabel.fanRpm:       statisticsList[i][j] = fanRpmData[i];       break;
-          case eChartLabel.fan2Rpm:      statisticsList[i][j] = fan2RpmData[i];      break;
-          case eChartLabel.wifiRssi:     statisticsList[i][j] = wifiRssiData[i];     break;
-          case eChartLabel.freeHeap:     statisticsList[i][j] = freeHeapData[i];     break;
+          case eChartLabel.hashrate: statisticsList[i][j] = hashrateData[i]; break;
+          case eChartLabel.hashrate_1m: statisticsList[i][j] = hashrateData[i]; break;
+          case eChartLabel.hashrate_10m: statisticsList[i][j] = hashrateData[i]; break;
+          case eChartLabel.hashrate_1h: statisticsList[i][j] = hashrateData[i]; break;
+          case eChartLabel.power: statisticsList[i][j] = powerData[i]; break;
+          case eChartLabel.asicTemp: statisticsList[i][j] = asicTempData[i]; break;
+          case eChartLabel.vrTemp: statisticsList[i][j] = vrTempData[i]; break;
+          case eChartLabel.asicVoltage: statisticsList[i][j] = asicVoltageData[i]; break;
+          case eChartLabel.voltage: statisticsList[i][j] = voltageData[i]; break;
+          case eChartLabel.current: statisticsList[i][j] = currentData[i]; break;
+          case eChartLabel.fanSpeed: statisticsList[i][j] = fanSpeedData[i]; break;
+          case eChartLabel.fanRpm: statisticsList[i][j] = fanRpmData[i]; break;
+          case eChartLabel.fan2Rpm: statisticsList[i][j] = fan2RpmData[i]; break;
+          case eChartLabel.wifiRssi: statisticsList[i][j] = wifiRssiData[i]; break;
+          case eChartLabel.freeHeap: statisticsList[i][j] = freeHeapData[i]; break;
           case eChartLabel.responseTime: statisticsList[i][j] = responseTimeData[i]; break;
           default:
             if (columnList[j] === "timestamp") {
@@ -199,34 +212,54 @@ export class SystemService {
   }
 
   public restart(uri: string = '') {
-    return this.httpClient.post(`${uri}/api/system/restart`, {}, {responseType: 'text'});
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.restartSystem();
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post(`${uri}/api/system/restart`, {});
+    }
+
+    return of('Device restarted (mock)');
   }
 
   public identify(uri: string = '') {
-    return this.httpClient.post(`${uri}/api/system/identify`, {}, {responseType: 'text'});
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.identifySystem();
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post(`${uri}/api/system/identify`, {});
+    }
+
+    return of('Device identified (mock)');
   }
 
   public updateSystem(uri: string = '', update: any) {
-    if (environment.production) {
-      return this.httpClient.patch(`${uri}/api/system`, update);
-    } else {
-      return of(true);
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.updateSystemSettings(update as Settings);
     }
+
+    if (environment.production && uri) {
+      return this.httpClient.patch(`${uri}/api/system`, update);
+    }
+
+    return of(true);
   }
 
-  private otaUpdate(file: File | Blob, url: string) {
+  private otaUpdate(file: File | Blob, url: string): Observable<HttpEvent<string>> {
     return new Observable<HttpEvent<string>>((subscriber) => {
       const reader = new FileReader();
 
       reader.onload = (event: any) => {
         const fileContent = event.target.result;
 
-        return this.httpClient.post(url, fileContent, {
+        this.httpClient.post(url, fileContent, {
           reportProgress: true,
           observe: 'events',
-          responseType: 'text', // Specify the response type
+          responseType: 'text',
           headers: {
-            'Content-Type': 'application/octet-stream', // Set the content type
+            'Content-Type': 'application/octet-stream',
           },
         }).subscribe({
           next: (event) => {
@@ -244,21 +277,31 @@ export class SystemService {
     });
   }
 
-  public performOTAUpdate(file: File | Blob) {
-    return this.otaUpdate(file, `/api/system/OTA`);
+  public performOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
+    if (environment.production && this.generatedSystemService) {
+      return this.generatedSystemService.updateFirmware(file, 'events', true);
+    }
+    return this.otaUpdate(file, '/api/system/OTA');
   }
-  public performWWWOTAUpdate(file: File | Blob) {
-    return this.otaUpdate(file, `/api/system/OTAWWW`);
+
+  public performWWWOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
+    if (environment.production && this.generatedSystemService) {
+      return this.generatedSystemService.updateWebInterface(file, 'events', true);
+    }
+    return this.otaUpdate(file, '/api/system/OTAWWW');
   }
 
   public getAsicSettings(uri: string = ''): Observable<ISystemASIC> {
-    if (environment.production) {
-      return this.httpClient.get<ISystemASIC>(`${uri}/api/system/asic`).pipe(timeout(5000));
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.getAsicSettings().pipe(timeout(API_TIMEOUT));
     }
 
-    // Mock data for development
+    if (environment.production && uri) {
+      return this.httpClient.get<ISystemASIC>(`${uri}/api/system/asic`).pipe(timeout(API_TIMEOUT));
+    }
+
     return of({
-      ASICModel: "BM1370",
+      ASICModel: "BM1370" as SystemASICASICModelEnum,
       deviceModel: "Gamma",
       swarmColor: "purple",
       asicCount: 1,
@@ -269,13 +312,8 @@ export class SystemService {
     }).pipe(delay(1000));
   }
 
-  public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
-    return this.httpClient.get<{ ip: string }[]>(`${uri}/api/swarm/info`).pipe(timeout(5000));
-  }
 
-  public updateSwarm(uri: string = '', swarmConfig: any) {
-    return this.httpClient.patch(`${uri}/api/swarm`, swarmConfig);
-  }
+
 
   public getAutotune() {
     if (environment.production) {

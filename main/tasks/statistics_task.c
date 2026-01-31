@@ -8,9 +8,7 @@
 #include "statistics_task.h"
 #include "global_state.h"
 #include "nvs_config.h"
-#include "power.h"
 #include "connect.h"
-#include "vcore.h"
 #include "bm1370.h"
 
 #define DEFAULT_POLL_RATE 5000
@@ -142,8 +140,8 @@ void statistics_task(void * pvParameters)
                 statsData.vrTemperature = power_management->vr_temp;
                 statsData.power = power_management->power;
                 statsData.voltage = power_management->voltage;
-                statsData.current = Power_get_current(GLOBAL_STATE);
-                statsData.coreVoltageActual = VCORE_get_voltage_mv(GLOBAL_STATE);
+                statsData.current = power_management->current;
+                statsData.coreVoltageActual = power_management->core_voltage;
                 statsData.fanSpeed = power_management->fan_perc;
                 statsData.fanRPM = power_management->fan_rpm;
                 statsData.fan2RPM = power_management->fan2_rpm;

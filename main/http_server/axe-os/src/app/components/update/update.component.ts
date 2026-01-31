@@ -5,7 +5,7 @@ import { ToastrService } from 'ngx-toastr';
 import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemApiService } from 'src/app/services/system.service';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
 
@@ -32,7 +32,7 @@ export class UpdateComponent {
   @ViewChild(ModalComponent) modalComponent!: ModalComponent;
 
   constructor(
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private toastrService: ToastrService,
     private loadingService: LoadingService,
     private githubUpdateService: GithubUpdateService,

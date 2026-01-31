@@ -63,7 +63,7 @@ void construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], cons
     // make the midstate hash
     uint8_t midstate_data[64];
 
-    // copy 68 bytes header data into midstate (and deal with endianess)
+    // copy 64 bytes header data into midstate (and deal with endianess)
     memcpy(midstate_data, &new_job->version, 4);      // copy version
     memcpy(midstate_data + 4, prev_block_hash, 32);   // copy prev_block_hash
     memcpy(midstate_data + 36, merkle_root, 28);      // copy merkle_root
