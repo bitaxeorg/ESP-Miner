@@ -1,11 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ISystemInfo } from 'src/models/ISystemInfo';
+
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
+
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin } from 'rxjs';
+import { SystemInfo, SystemService } from 'src/app/generated';
+import { AutotuneRequestService } from 'src/app/generated/api/autotune-request.service';
+import { AutotuneResponseService } from 'src/app/generated/api/autotune-response.service';
 
 interface SliderConfig {
   formControlName: string;
@@ -103,7 +106,9 @@ export class AutotuneComponent implements OnInit {
     private fb: FormBuilder,
     private loadingService: LoadingService,
     private systemService: SystemService,
-    private toastr: ToastrService
+    private toastr: ToastrService,
+    private autotuneRequestService: AutotuneRequestService,
+    private autotuneResponseService: AutotuneResponseService
   ) { }
 
   ngOnInit(): void {
@@ -124,9 +129,9 @@ export class AutotuneComponent implements OnInit {
 
   private loadAutotuneSettings(): void {
     forkJoin({
-      info: this.systemService.getInfo(),
+      info: this.systemService.getSystemInfo(),
       asic: this.systemService.getAsicSettings(),
-      autotune: this.systemService.getAutotune()
+      autotune: this.autotuneResponseService.apiSystemAutotuneGet()
     }).pipe(
       this.loadingService.lockUIUntilComplete()
     ).subscribe({
@@ -149,7 +154,7 @@ export class AutotuneComponent implements OnInit {
         this.autotuneForm.patchValue({
           power_limit: autotune.power_limit,
           fan_limit: autotune.fan_limit,
-          osh_pow_limit: parseFloat(autotune.osh_pow_limit.toFixed(2)),
+          osh_pow_limit: autotune.osh_pow_limit,
           osh_fan_limit: autotune.osh_fan_limit,
           max_volt_asic: autotune.max_volt_asic,
           max_freq_asic: autotune.max_freq_asic,
@@ -165,13 +170,13 @@ export class AutotuneComponent implements OnInit {
   }
 
   public updateAutotune(): void {
-    this.systemService.updateAutotune(this.autotuneForm.value).subscribe({
+    this.autotuneRequestService.apiSystemAutotunePost(this.autotuneForm.value).subscribe({
       next: () => this.toastr.success('Autotune settings saved'),
       error: (err: HttpErrorResponse) => this.toastr.error(`Could not save autotune settings. ${err.message}`)
     });
   }
 
-  private updateSliderMinForPid(info: ISystemInfo): void {
+  private updateSliderMinForPid(info: SystemInfo): void {
     // Check if PID is active (autofanspeed = 1)
     const isPidActive = info.autofanspeed === 1;
 

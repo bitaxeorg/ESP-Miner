@@ -17,6 +17,62 @@ servers:
 
 components:
   schemas:
+    AutotuneSettings:
+      type: object
+      properties:
+        power_limit:
+          type: number
+          description: Power limit (in watts)
+          minimum: 0
+          maximum: 60
+        fan_limit:
+          type: number
+          description: Fan speed limit (%)
+          minimum: 0
+          maximum: 100
+        max_volt_asic:
+          type: number
+          description: Maximum voltage for ASIC chips (volts)
+          minimum: 0.5
+          maximum: 20
+        max_freq_asic:
+          type: number
+          description: Maximum frequency for ASIC chips (MHz)
+          minimum: 1100
+          maximum: 1400
+        max_temp_asic:
+          type: number
+          description: Maximum temperature for ASIC chips (°C)
+          minimum: 30
+          maximum: 90
+        auto_tune:
+          type: boolean
+          description: Whether autotuning is enabled to optimize hashrate
+        osh_pow_limit:
+          type: number
+          description: Power limit during overshoot conditions (watts)
+          minimum: 0
+          maximum: 2
+        osh_fan_limit:
+          type: number
+          description: Fan speed limit during overshoot conditions (%)
+          minimum: 0
+          maximum: 20
+        max_temp_vr:
+          type: number
+          description: Maximum temperature for VR (°C)
+          minimum: 40
+          maximum: 95
+      required:
+        - power_limit
+        - fan_limit
+        - max_voltage_asic
+        - max_frequency_asic
+        - max_temp_asic
+        - auto_tune_hashrate
+        - overshoot_power_limit
+        - overshoot_fanspeed
+        - max_temp_vr
     GenericResponse:
       type: object
       required:
@@ -120,6 +176,7 @@ components:
         - boardVersion
         - coreVoltage
         - coreVoltageActual
+        - coreVoltageSet
         - current
         - display
         - fallbackStratumExtranonceSubscribe
@@ -138,6 +195,7 @@ components:
         - freeHeapInternal
         - freeHeapSpiram
         - frequency
+        - frequencySet
         - hashRate
         - hashRate_1m
         - hashRate_10m
@@ -217,6 +275,9 @@ components:
         coreVoltageActual:
           type: number
           description: Actual measured ASIC core voltage
+        coreVoltageSet:
+          type: number
+          description: Actual set ASIC core voltage
         current:
           type: number
           description: Current draw in milliamps
@@ -274,6 +335,9 @@ components:
         frequency:
           type: number
           description: ASIC frequency in MHz
+        frequencySet:
+          type: number
+          description: ASIC frequency set in MHz
         hashRate:
           type: number
           description: Current hashrate in Gh/s
@@ -609,9 +673,21 @@ components:
           minimum: 1
           examples:
             - 850
+        coreVoltageSet:
+          type: integer
+          description: ASIC core voltage set in millivolts
+          minimum: 1
+          examples:
+            - 850
         frequency:
           type: integer
           description: ASIC frequency in MHz
+          minimum: 1
+          examples:
+            - 450
+        frequencySet:
+          type: integer
+          description: ASIC frequency set in MHz
           minimum: 1
           examples:
             - 450
@@ -893,67 +969,6 @@ paths:
           description: Unauthorized - Client not in allowed network range
         '500':
           description: Internal server error
-
-  components:
-    schemas:
-      AutotuneSettings:
-        type: object
-        properties:
-          power_limit:
-            type: number
-            description: Power limit (in watts)
-            minimum: 0
-            maximum: 60
-          fan_limit:
-            type: number
-            description: Fan speed limit (%)
-            minimum: 0
-            maximum: 100
-          max_voltage_asic:
-            type: number
-            description: Maximum voltage for ASIC chips (volts)
-            minimum: 0.5
-            maximum: 20
-          max_frequency_asic:
-            type: number
-            description: Maximum frequency for ASIC chips (MHz)
-            minimum: 1100
-            maximum: 1400
-          max_temp_asic:
-            type: number
-            description: Maximum temperature for ASIC chips (°C)
-            minimum: 30
-            maximum: 90
-          auto_tune_hashrate:
-            type: boolean
-            description: Whether autotuning is enabled to optimize hashrate
-          overshoot_power_limit:
-            type: number
-            description: Power limit during overshoot conditions (watts)
-            minimum: 0
-            maximum: 2
-          overshoot_fanspeed:
-            type: number
-            description: Fan speed limit during overshoot conditions (%)
-            minimum: 0
-            maximum: 20
-          max_temp_vr:
-            type: number
-            description: Maximum temperature for VR (°C)
-            minimum: 40
-            maximum: 95
-        required:
-          - power_limit
-          - fan_limit
-          - max_voltage_asic
-          - max_frequency_asic
-          - max_temp_asic
-          - auto_tune_hashrate
-          - overshoot_power_limit
-          - overshoot_fanspeed
-          - max_temp_vr
-
-paths:
   /api/system/autotune:
     post:
       summary: Update autotuning configuration
@@ -1032,4 +1047,3 @@ paths:
                   error:
                     type: string
                     example: "Internal Server Error"
-
