@@ -11,7 +11,7 @@
     "build:no-api-gen": "ng build --configuration=production && gzipper compress --verbose --gzip --gzip-level 9 --exclude woff2 ./dist/axe-os && node only-gzip.js && node generate-version.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
-    "generate:api": "rm -rf ./src/app/generated && openapi-generator-cli generate",
+    "generate:api": "npx rimraf ./src/app/generated && openapi-generator-cli generate",
     "bundle-report": "ng build --configuration=production --stats-json && webpack-bundle-analyzer dist/axe-os/stats.json"
   },
   "private": true,
@@ -49,6 +49,7 @@
     "karma-coverage": "^2.2.1",
     "karma-jasmine": "^5.1.0",
     "karma-jasmine-html-reporter": "^2.1.0",
+    "rimraf": "^6.1.2",
     "typescript": "^5.5.4",
     "webpack-bundle-analyzer": "^4.10.2"
   }
