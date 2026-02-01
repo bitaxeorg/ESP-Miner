@@ -974,7 +974,7 @@ paths:
       summary: Update autotuning configuration
       description: Updates the current autotuning settings via a JSON body. Requires valid authentication.
       tags:
-        - AutotuneRequest
+        - Autotune
       requestBody:
         required: true
         content:
@@ -984,42 +984,13 @@ paths:
       responses:
         '204':
           description: Settings updated successfully (no content returned)
-        '400':
-          description: Invalid JSON or missing required field.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Invalid JSON"
-        '401':
-          description: Unauthorized access — authentication failed.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Unauthorized"
-        '500':
-          description: Internal server error (e.g., failed to parse body, disk issue).
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Internal Server Error"
+      operationId: updateAutotuneSettings   # <-- renamed from autotune
 
     get:
       summary: Get current autotuning configuration
       description: Returns the current power, fan, temperature, and frequency limits used in autotuning.
       tags:
-        - AutotuneResponse
+        - Autotune
       responses:
         '200':
           description: Successful response with autotuning settings in JSON format
@@ -1028,22 +999,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AutotuneSettings'
         '401':
-          description: Unauthorized access — authentication failed or missing.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Unauthorized"
+          description: Unauthorized - Client not in allowed network range
         '500':
-          description: Internal server error (e.g., JSON parsing failure, network issue)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Internal Server Error"
+          description: Internal server error
+      operationId: getAutotuneSettings   # <-- renamed from autotune

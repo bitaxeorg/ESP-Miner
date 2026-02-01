@@ -7,8 +7,7 @@ import { LoadingService } from 'src/app/services/loading.service';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin } from 'rxjs';
 import { SystemInfo, SystemService } from 'src/app/generated';
-import { AutotuneRequestService } from 'src/app/generated/api/autotune-request.service';
-import { AutotuneResponseService } from 'src/app/generated/api/autotune-response.service';
+import { AutotuneService } from 'src/app/generated/api/autotune.service';
 
 interface SliderConfig {
   formControlName: string;
@@ -107,8 +106,7 @@ export class AutotuneComponent implements OnInit {
     private loadingService: LoadingService,
     private systemService: SystemService,
     private toastr: ToastrService,
-    private autotuneRequestService: AutotuneRequestService,
-    private autotuneResponseService: AutotuneResponseService
+    private autotuneService: AutotuneService
   ) { }
 
   ngOnInit(): void {
@@ -131,7 +129,7 @@ export class AutotuneComponent implements OnInit {
     forkJoin({
       info: this.systemService.getSystemInfo(),
       asic: this.systemService.getAsicSettings(),
-      autotune: this.autotuneResponseService.apiSystemAutotuneGet()
+      autotune: this.autotuneService.getAutotuneSettings()
     }).pipe(
       this.loadingService.lockUIUntilComplete()
     ).subscribe({
@@ -170,7 +168,7 @@ export class AutotuneComponent implements OnInit {
   }
 
   public updateAutotune(): void {
-    this.autotuneRequestService.apiSystemAutotunePost(this.autotuneForm.value).subscribe({
+    this.autotuneService.updateAutotuneSettings(this.autotuneForm.value).subscribe({
       next: () => this.toastr.success('Autotune settings saved'),
       error: (err: HttpErrorResponse) => this.toastr.error(`Could not save autotune settings. ${err.message}`)
     });
