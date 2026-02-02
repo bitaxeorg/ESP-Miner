@@ -29,7 +29,8 @@ type MessageType =
   | 'FREQUENCY_LOW'
   | 'FALLBACK_STRATUM'
   | 'VERSION_MISMATCH'
-  | 'NOT_SOLO_MINING';
+  | 'NOT_SOLO_MINING'
+  | 'NO_MINING_REWARD';
 
 interface ISystemMessage {
   type: MessageType;
@@ -644,7 +645,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
     let percentage = this.getPayoutPercentage(info);
     updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the coinbase reward is only ${percentage.toFixed(1)}%`);
-    updateMessage(percentage === 0, 'NOT_SOLO_MINING', 'warn', `You don't have a share in the coinbase reward`);
+    updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the coinbase reward`);
   }
 
   private calculateEfficiency(info: ISystemInfo, key: 'hashRate' | 'expectedHashrate'): number {

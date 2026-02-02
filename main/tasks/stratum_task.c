@@ -374,6 +374,10 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
     }
 
     // Update coinbase outputs
+    // Safety guard: ensure output_count doesn't exceed array capacity
+    if (result->output_count > MAX_COINBASE_TX_OUTPUTS) {
+        result->output_count = MAX_COINBASE_TX_OUTPUTS;
+    }
     if (result->output_count != GLOBAL_STATE->coinbase_output_count ||
         memcmp(result->outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {
 
