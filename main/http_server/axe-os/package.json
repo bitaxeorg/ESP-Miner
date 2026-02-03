@@ -11,7 +11,7 @@
     "build:no-api-gen": "ng build --configuration=production && gzipper compress --verbose --gzip --gzip-level 9 --exclude woff2 ./dist/axe-os && node only-gzip.js && node generate-version.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
-    "generate:api": "npx rimraf ./src/app/generated && openapi-generator-cli generate",
+    "generate:api": "rimraf ./src/app/generated && openapi-generator-cli generate",
     "bundle-report": "ng build --configuration=production --stats-json && webpack-bundle-analyzer dist/axe-os/stats.json"
   },
   "private": true,
