@@ -171,7 +171,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       }).pipe(
         map(({ info, asic }) => {
           const existingDevice = this.swarm.find(device => device.IP === IP) || {};
-          return this.mergeDeviceData(existingDevice, info, asic);
+          return this.mergeDeviceData(IP, existingDevice, info, asic);
         }),
         timeout(5000),
         catchError(error => errorHandler(error, IP))
@@ -201,7 +201,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       if (!info.ASICModel || !asic.ASICModel) {
         return;
       }
-      this.swarm.push(this.mergeDeviceData({}, info, asic));
+      this.swarm.push(this.mergeDeviceData(IP, {}, info, asic));
       this.sortSwarm();
       this.localStorageService.setObject(SWARM_DATA, this.swarm);
       this.calculateTotals();
@@ -365,8 +365,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
     }
   }
 
-  private mergeDeviceData(existing: Partial<SwarmDevice>, info: any, asic: any): SwarmDevice {
+  private mergeDeviceData(IP: string, existing: Partial<SwarmDevice>, info: any, asic: any): SwarmDevice {
     const merged: any = {
+      IP,
       ...existing,
       power_fault: null,
       overheat_mode: null,
