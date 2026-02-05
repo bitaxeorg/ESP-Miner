@@ -426,15 +426,9 @@
                             tooltip="Time it takes for the pool to respond to a share"
                         />
                     </div>
-<<<<<<< flatline-research
                     <ng-container *ngIf="info.responseTime > 0; else noValue">
                         {{ info.responseTime | number:'1.1-1' }} ms
                     </ng-container>
-=======
-                    <div *ngIf="info.responseTime > 0; else noValue">
-                        {{ info.responseTime }} ms
-                    </div>
->>>>>>> master
                 </div>
                 <div class="flex flex-nowrap">
                     @let percentage = getPayoutPercentage(info);
@@ -459,11 +453,7 @@
                     <div class="col-fixed-width text-500">
                         <span>Difficulty</span>
                     </div>
-<<<<<<< flatline-research
                     <ng-container *ngIf="info.poolDifficulty > 0; else noValue">
-=======
-                    <div *ngIf="info.poolDifficulty > 0; else noValue">
->>>>>>> master
                         {{ info.poolDifficulty }}
                     </ng-container>
                 </div>
