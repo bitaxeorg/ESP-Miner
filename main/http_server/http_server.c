@@ -923,6 +923,17 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         cJSON_AddNumberToObject(root, "blockHeight", GLOBAL_STATE->block_height);
         cJSON_AddStringToObject(root, "scriptsig", GLOBAL_STATE->scriptsig);
         cJSON_AddNumberToObject(root, "networkDifficulty", GLOBAL_STATE->network_nonce_diff);
+
+        cJSON *outputs_array = cJSON_CreateArray();
+        for (int i = 0; i < GLOBAL_STATE->coinbase_output_count; i++) {
+            cJSON *output_obj = cJSON_CreateObject();
+            cJSON_AddNumberToObject(output_obj, "value", GLOBAL_STATE->coinbase_outputs[i].value_satoshis);
+            cJSON_AddStringToObject(output_obj, "address", GLOBAL_STATE->coinbase_outputs[i].address);
+            cJSON_AddItemToArray(outputs_array, output_obj);
+        }
+        cJSON_AddItemToObject(root, "coinbaseOutputs", outputs_array);
+        cJSON_AddNumberToObject(root, "coinbaseValueTotalSatoshis", GLOBAL_STATE->coinbase_value_total_satoshis);
+        cJSON_AddNumberToObject(root, "coinbaseValueUserSatoshis", GLOBAL_STATE->coinbase_value_user_satoshis);
     }
 
     cJSON *hashrate_monitor = cJSON_CreateObject();

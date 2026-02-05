@@ -244,6 +244,13 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
                 BAP_send_message(BAP_CMD_RES, "shares", shares_ar_str);
             }
             break;
+        case BAP_PARAM_BLOCK_HEIGHT:
+            {
+                char block_height_str[32];
+                snprintf(block_height_str, sizeof(block_height_str), "%d", state->block_height);
+                BAP_send_message(BAP_CMD_RES, "block_height", block_height_str);
+            }
+            break;
         default:
             ESP_LOGE(TAG, "Unsupported request parameter: %d", param);
             break;
