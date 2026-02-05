@@ -24,7 +24,6 @@ SRCS
     "./self_test/self_test.c"
     "./tasks/stratum_task.c"
     "./tasks/create_jobs_task.c"
-    "./tasks/asic_task.c"
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
     "./tasks/statistics_task.c"
@@ -74,6 +73,7 @@ PRIV_REQUIRES
     "spiffs"
     "vfs"
     "esp_driver_i2c"
+    "tcp_transport"
 
 EMBED_FILES "http_server/recovery_page.html"
 )
@@ -93,21 +93,57 @@ else()
         message(FATAL_ERROR "npm is not found! Please install it to proceed.")
     endif()
 
-    ExternalProject_Add(
-        web_ui_dist
-        PREFIX ${CMAKE_BINARY_DIR}/web_ui_dist
-        SOURCE_DIR ${WEB_SRC_DIR}
-        DOWNLOAD_COMMAND ""
-        CONFIGURE_COMMAND
-            ${NPM_EXECUTABLE}  i
-        USES_TERMINAL_BUILD true
-        BUILD_COMMAND
-            ${NPM_EXECUTABLE} run build
-        INSTALL_COMMAND ""
-        BUILD_ALWAYS OFF
-        BUILD_IN_SOURCE TRUE
-        BUILD_BYPRODUCTS
-            "${WEB_SRC_DIR}/dist/axe-os/index.html"
+    # OpenAPI generation - only when openapi.yaml changes
+    set(OPENAPI_SPEC "${CMAKE_CURRENT_SOURCE_DIR}/http_server/openapi.yaml")
+    set(OPENAPI_STAMP "${CMAKE_BINARY_DIR}/openapi_generate.stamp")
+
+    add_custom_command(
+        OUTPUT ${OPENAPI_STAMP}
+        COMMAND ${NPM_EXECUTABLE} i
+        COMMAND ${NPM_EXECUTABLE} run generate:api
+        COMMAND ${CMAKE_COMMAND} -E touch ${OPENAPI_STAMP}
+        WORKING_DIRECTORY ${WEB_SRC_DIR}
+        DEPENDS ${OPENAPI_SPEC}
+        COMMENT "Generating API client from OpenAPI spec (openapi.yaml changed)"
+        VERBATIM
+        USES_TERMINAL
+    )
+
+    # Collect all frontend source files to track dependencies
+    file(GLOB_RECURSE WEB_UI_SOURCES
+        "${WEB_SRC_DIR}/src/*.*"
+    )
+
+    # Also track build configuration files
+    list(APPEND WEB_UI_SOURCES
+        "${WEB_SRC_DIR}/package.json"
+        "${WEB_SRC_DIR}/package-lock.json"
+        "${WEB_SRC_DIR}/angular.json"
+        "${WEB_SRC_DIR}/tsconfig.json"
+        "${WEB_SRC_DIR}/tsconfig.app.json"
+    )
+
+    # Use a stamp file to track when the build was last done
+    set(WEB_UI_STAMP "${CMAKE_BINARY_DIR}/web_ui_build.stamp")
+    # Track version.txt which is generated last and doesn't get deleted
+    set(WEB_UI_OUTPUT "${WEB_SRC_DIR}/dist/axe-os/version.txt")
+
+    # Custom command that only runs when source files change
+    add_custom_command(
+        OUTPUT ${WEB_UI_STAMP} ${WEB_UI_OUTPUT}
+        COMMAND ${NPM_EXECUTABLE} i
+        COMMAND ${NPM_EXECUTABLE} run build:no-api-gen
+        COMMAND ${CMAKE_COMMAND} -E touch ${WEB_UI_STAMP}
+        WORKING_DIRECTORY ${WEB_SRC_DIR}
+        DEPENDS ${WEB_UI_SOURCES} ${OPENAPI_STAMP}
+        COMMENT "Building Web UI (source files changed)"
+        VERBATIM
+        USES_TERMINAL
+    )
+
+    # Create a target for the web UI build
+    add_custom_target(web_ui_dist ALL
+        DEPENDS ${WEB_UI_STAMP} ${OPENAPI_STAMP}
     )
 
     add_dependencies(${COMPONENT_LIB} web_ui_dist)

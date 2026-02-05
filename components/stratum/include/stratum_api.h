@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/time.h>
-
+#include <esp_transport.h>
 
 #define MAX_MERKLE_BRANCHES 32
 #define HASH_SIZE 32
@@ -21,12 +21,20 @@ typedef enum
     MINING_SET_DIFFICULTY,
     MINING_SET_VERSION_MASK,
     MINING_SET_EXTRANONCE,
+    MINING_PING,
     STRATUM_RESULT,
     STRATUM_RESULT_SETUP,
     STRATUM_RESULT_VERSION_MASK,
     STRATUM_RESULT_SUBSCRIBE,
     CLIENT_RECONNECT
 } stratum_method;
+
+typedef enum
+{
+    DISABLED = 0,
+    BUNDLED_CRT = 1,
+    CUSTOM_CRT = 2,
+} tls_mode;
 
 static const int  STRATUM_ID_CONFIGURE    = 1;
 static const int  STRATUM_ID_SUBSCRIBE    = 2;
@@ -42,6 +50,7 @@ typedef struct
     uint32_t version;
     uint32_t target;
     uint32_t ntime;
+    bool clean_jobs;
 } mining_notify;
 
 typedef struct
@@ -49,12 +58,11 @@ typedef struct
     char * extranonce_str;
     int extranonce_2_len;
 
-    int64_t message_id;
+    int message_id;
     // Indicates the type of request the message represents.
     stratum_method method;
 
     // mining.notify
-    int should_abandon_work;
     mining_notify *mining_notification;
     // mining.set_difficulty
     uint32_t new_difficulty;
@@ -70,12 +78,13 @@ typedef struct {
     bool tracking;
 } RequestTiming;
 
+esp_transport_handle_t STRATUM_V1_transport_init(tls_mode tls, char * cert);
 
 void STRATUM_V1_initialize_buffer();
 
-char *STRATUM_V1_receive_jsonrpc_line(int sockfd);
+char *STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport);
 
-int STRATUM_V1_subscribe(int socket, int send_uid, const char * model);
+int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const char * model);
 
 void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
 
@@ -83,15 +92,17 @@ void STRATUM_V1_stamp_tx(int request_id);
 
 void STRATUM_V1_free_mining_notify(mining_notify *params);
 
-int STRATUM_V1_authorize(int socket, int send_uid, const char *username, const char *pass);
+int STRATUM_V1_authorize(esp_transport_handle_t transport, int send_uid, const char *username, const char *pass);
 
-int STRATUM_V1_configure_version_rolling(int socket, int send_uid, uint32_t * version_mask);
+int STRATUM_V1_configure_version_rolling(esp_transport_handle_t transport, int send_uid, uint32_t * version_mask);
 
-int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty);
+int STRATUM_V1_pong(esp_transport_handle_t transport, int message_id);
 
-int STRATUM_V1_extranonce_subscribe(int socket, int send_uid);
+int STRATUM_V1_suggest_difficulty(esp_transport_handle_t transport, int send_uid, uint32_t difficulty);
 
-int STRATUM_V1_submit_share(int socket, int send_uid, const char *username, const char *job_id,
+int STRATUM_V1_extranonce_subscribe(esp_transport_handle_t transport, int send_uid);
+
+int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, const char *username, const char *job_id,
                             const char *extranonce_2, const uint32_t ntime, const uint32_t nonce,
                             const uint32_t version_bits);
 

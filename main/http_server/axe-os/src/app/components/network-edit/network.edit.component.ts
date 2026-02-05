@@ -6,7 +6,7 @@ import { finalize } from 'rxjs/operators';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { DialogService } from 'src/app/services/dialog.service';
 import { LoadingService } from 'src/app/services/loading.service';
-import { SystemService } from 'src/app/services/system.service';
+import { SystemApiService } from 'src/app/services/system.service';
 
 interface WifiNetwork {
   ssid: string;
@@ -31,7 +31,7 @@ export class NetworkEditComponent implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private http: HttpClient,

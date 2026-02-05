@@ -1,5 +1,11 @@
 <form [formGroup]="form" *ngIf="form">
     <div class="card">
+        <div *ngIf="isAnyPoolUsingDefaultAddress()" class="p-message p-message-warn mb-4 p-3 border-round flex align-items-center gap-2" style="background-color: var(--yellow-100); border: 1px solid var(--yellow-500); color: var(--yellow-900);">
+            <i class="pi pi-exclamation-triangle text-xl" style="color: var(--yellow-700);"></i>
+            <div>
+                <strong>Warning:</strong> You are using the default factory Bitcoin address. Please change the <strong>User</strong> field to your own Bitcoin address to receive mining rewards.
+            </div>
+        </div>
         <ng-container *ngFor="let pool of pools">
             <h2 *ngIf="pool === 'stratum'">Pool Configuration</h2>
             <h2 *ngIf="pool === 'fallbackStratum'" class="mt-5">Fallback Pool Configuration</h2>
@@ -43,29 +49,79 @@
                         </label>
                     </legend>
 
-                    <div *ngIf="showAdvancedOptions[pool]" class="field grid p-fluid mt-4">
-                        <label [htmlFor]="pool + 'SuggestedDifficulty'" class="col-12 md:col-2 md:mb-0">
-                            <tooltip-text-icon
-                                text="Suggested Difficulty"
-                                tooltip="Used to indicate a preference for share difficulty to the pool. Servers are not required to honour this request, even if they support the stratum method. (0 to disable)"
-                            />
-                        </label>
-                        <div class="col-12 md:col-10">
-                            <input pInputText [id]="pool + 'SuggestedDifficulty'" [formControlName]="pool + 'SuggestedDifficulty'" type="number" />
+                    <ng-container *ngIf="showAdvancedOptions[pool]">
+                        <div class="field grid p-fluid mt-4">
+                            <label [htmlFor]="pool + 'SuggestedDifficulty'" class="col-12 md:col-2 md:mb-0">
+                                <tooltip-text-icon
+                                    text="Suggested Difficulty"
+                                    tooltip="Used to indicate a preference for share difficulty to the pool. Servers are not required to honour this request, even if they support the stratum method. (0 to disable)"
+                                />
+                            </label>
+                            <div class="col-12 md:col-10">
+                                <input pInputText [id]="pool + 'SuggestedDifficulty'" [formControlName]="pool + 'SuggestedDifficulty'" type="number" />
+                            </div>
                         </div>
-                    </div>
-                    <div *ngIf="showAdvancedOptions[pool]" class="field-checkbox grid mb-0">
-                        <div class="col-1 md:col-10 md:flex-order-2">
-                            <p-checkbox [name]="pool + 'ExtranonceSubscribe'" [inputId]="pool + 'ExtranonceSubscribe'" [formControlName]="pool + 'ExtranonceSubscribe'"
-                                [binary]="true"></p-checkbox>
+
+                        <div class="field-checkbox grid">
+                            <div class="col-1 md:col-10 md:flex-order-2">
+                                <p-checkbox [name]="pool + 'ExtranonceSubscribe'" [inputId]="pool + 'ExtranonceSubscribe'" [formControlName]="pool + 'ExtranonceSubscribe'"
+                                    [binary]="true"></p-checkbox>
+                            </div>
+                            <label [htmlFor]="pool + 'ExtranonceSubscribe'" class="col-11 m-0 pb-0 pl-3 md:col-2 md:flex-order-1 md:pl-2">
+                                <tooltip-text-icon
+                                    text="Enable Extranonce Subscribe"
+                                    tooltip="Indicates to the server that the client supports the mining.set_extranonce method. Required by some pools, check the pool documentation."
+                                />
+                            </label>
                         </div>
-                        <label [htmlFor]="pool + 'ExtranonceSubscribe'" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">
-                            <tooltip-text-icon
-                                text="Enable Extranonce Subscribe"
-                                tooltip="Indicates to the server that the client supports the mining.set_extranonce method. Required by some pools, check the pool documentation."
-                            />
-                        </label>
-                    </div>
+
+                        <div class="field grid p-fluid">
+                            <label [htmlFor]="pool + 'TLS'" class="col-12 mb-2 md:col-2 md:mb-0">Connection Security</label>
+                            <div class="col-12 md:col-10">
+                                <div class="flex flex-wrap gap-3">
+                                    <div *ngFor="let option of tlsOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
+                                        <p-radioButton
+                                            [name]="pool + 'TLS'"
+                                            [value]="option.value"
+                                            [formControlName]="pool + 'TLS'"
+                                            [inputId]="pool + 'TLS_' + option.value">
+                                        </p-radioButton>
+                                        <label [for]="pool + 'TLS_' + option.value" class="ml-2 cursor-pointer">
+                                            {{ option.label }}
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div *ngIf="form.get(pool + 'TLS')?.value === 2" class="field grid p-fluid mb-0">
+                            <label [htmlFor]="pool + 'Cert'" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">Certificate</label>
+                            <div class="col-12 md:col-10">
+                                <div class="p-inputgroup">
+                                    <textarea
+                                        pInputTextarea
+                                        [id]="pool + 'Cert'"
+                                        [formControlName]="pool + 'Cert'"
+                                        rows="6"
+                                        class="w-full p-2 text-sm text-monospace"
+                                        placeholder="Enter or choose a certificate file (.pem, .crt, .cer)"></textarea>
+                                    <span class="p-inputgroup-addon">
+                                        <button pButton
+                                            type="button"
+                                            icon="pi pi-upload"
+                                            class="p-button-secondary"
+                                            pTooltip="Choose a certificate file"
+                                            tooltipPosition="top"
+                                            (click)="certFileInput.click()"></button>
+                                        <input #certFileInput type="file" (change)="onCertFileSelected($event, pool + 'Cert')"
+                                            class="hidden" accept=".pem,.crt,.cer" />
+                                    </span>
+                                </div>
+                                <small *ngIf="form.get(pool + 'Cert')?.errors?.['invalidCertificate']" class="block text-red-500 mt-1">
+                                    Please enter a valid SSL/TLS certificate
+                                </small>
+                            </div>
+                        </div>
+                    </ng-container>
                 </fieldset>
             </div>
         </ng-container>

@@ -1,11 +1,12 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Observable, Subject, combineLatest, switchMap, shareReplay, first, takeUntil, map, timer } from 'rxjs';
-import { SystemService } from 'src/app/services/system.service';
+import { HttpErrorResponse } from '@angular/common/http';
+import { ToastrService } from 'ngx-toastr';
+import { SystemApiService } from 'src/app/services/system.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
-import { ISystemInfo } from 'src/models/ISystemInfo';
-import { ISystemASIC } from 'src/models/ISystemASIC';
+import { SystemInfo as ISystemInfo, SystemASIC as ISystemASIC, GenericResponse, } from 'src/app/generated';
 
 type TableRow = {
   label: string;
@@ -33,8 +34,9 @@ export class SystemComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   constructor(
-    private systemService: SystemService,
+    private systemService: SystemApiService,
     private loadingService: LoadingService,
+    private toastr: ToastrService,
   ) {
     this.info$ = timer(0, 5000).pipe(
       switchMap(() => this.systemService.getInfo()),
@@ -86,7 +88,8 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Device Model', value: data.asic.deviceModel || 'Other', valueClass: 'text-' + data.asic.swarmColor + '-500' },
       { label: 'Board Version', value: data.info.boardVersion },
       { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
-      { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds), class: 'pb-3' },
+      { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds) },
+      { label: 'Reset Reason', value: data.info.resetReason, class: 'pb-3' },
       { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitiveData: true },
       { label: 'Wi-Fi Status', value: data.info.wifiStatus },
       { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + ' dBm', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) },
@@ -100,5 +103,18 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
       { label: 'ESP-IDF Version', value: data.info.idfVersion },
     ];
+  }
+
+  identifyDevice(): void {
+    this.systemService.identify()
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: (result) => {
+          this.toastr.success((result as GenericResponse).message);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error(`Could not identify device. ${err.message}`);
+        }
+      });
   }
 }

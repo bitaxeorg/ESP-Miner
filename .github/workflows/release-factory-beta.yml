@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build_type: ["102", "202", "204", "205", "207", "401", "402", "403", "601", "602"]
+        build_type: ["102", "201", "202", "203", "204", "205", "207", "302", "303", "400", "401", "402", "403", "601", "602", "701", "702", "801"]
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -34,14 +34,14 @@ jobs:
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5.1
+          esp_idf_version: v5.5.2
           target: esp32s3
           command: GITHUB_ACTIONS="true" idf.py build
           path: '.'
       - name: "esp-idf build factory config for ${{ matrix.build_type }}"
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5.1
+          esp_idf_version: v5.5.2
           target: esp32s3
           command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate config-${{ matrix.build_type }}.cvs config.bin 0x6000
           path: '.'

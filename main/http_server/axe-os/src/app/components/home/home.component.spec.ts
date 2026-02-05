@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { HomeComponent } from './home.component';
+import { provideHttpClient } from '@angular/common/http';
+import { provideToastr } from 'ngx-toastr';
 
 describe('HomeComponent', () => {
   let component: HomeComponent;
@@ -8,7 +10,8 @@ describe('HomeComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [HomeComponent]
+      declarations: [HomeComponent],
+      providers: [provideHttpClient(), provideToastr()]
     });
     fixture = TestBed.createComponent(HomeComponent);
     component = fixture.componentInstance;
