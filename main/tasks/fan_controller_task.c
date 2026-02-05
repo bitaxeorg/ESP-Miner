@@ -81,6 +81,9 @@ void FAN_CONTROLLER_task(void * pvParameters)
                     }
                     
                     pid_compute(&pid);
+                    // Clamp PID output to valid range to prevent overshoot above 100%
+                    if (pid_output > 100) pid_output = 100;
+                    if (pid_output < 0) pid_output = 0;
                     // Uncomment for debugging PID output directly after compute
                     // ESP_LOGD(TAG, "DEBUG: PID raw output: %.2f%%, Input: %.1f, SetPoint: %.1f", pid_output, pid_input, pid_setPoint);
 
@@ -107,6 +110,7 @@ void FAN_CONTROLLER_task(void * pvParameters)
                 }
             } else { // Manual fan speed
                 uint16_t fan_perc = nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED);
+                if (fan_perc > 100) fan_perc = 100;
                 if (fabs(power_management->fan_perc - fan_perc) > EPSILON) {
                     power_management->fan_perc = fan_perc;
                     if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_perc / 100.0f) != ESP_OK) {
