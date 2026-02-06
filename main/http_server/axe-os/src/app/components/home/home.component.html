@@ -413,9 +413,8 @@
                         User
                     </div>
 
-                    <div pTooltip="{{ activePoolUser }}" tooltipPosition="top">
-                        <span sensitive-data class="text-monospace font-bold">{{ getAddressPart(activePoolUser) | address }}</span>
-                        <span sensitive-data>{{ getSuffixPart(activePoolUser) }}</span>
+                    <div pTooltip="{{ activePoolUser }}" tooltipPosition="top" sensitive-data>
+                        <span class="text-monospace font-bold">{{ getAddressPart(activePoolUser) | address }}</span>{{ getSuffixPart(activePoolUser) }}
                     </div>
                 </div>
 
