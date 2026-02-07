@@ -40,19 +40,19 @@ void app_main(void)
     // Init I2C
     ESP_ERROR_CHECK(i2c_bitaxe_init());
     ESP_LOGI(TAG, "I2C initialized successfully");
-    
+
     // Initialize RST pin to low early to minimize ASIC power consumption
     ESP_ERROR_CHECK(asic_hold_reset_low());
     ESP_LOGI(TAG, "RST pin initialized to low");
 
-    //wait for I2C to init
+    // wait for I2C to init
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    //Init ADC
+    // Init ADC
     ADC_init();
 
-    //initialize the ESP32 NVS
-    if (nvs_config_init() != ESP_OK){
+    // initialize the ESP32 NVS
+    if (nvs_config_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init NVS");
         return;
     }
@@ -60,7 +60,12 @@ void app_main(void)
     // Ensure SSID is initialized before any screen/self-test uses it.
     GLOBAL_STATE.SYSTEM_MODULE.ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
     if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL) {
+        ESP_LOGW(TAG, "No SSID configured in NVS, using empty string");
         GLOBAL_STATE.SYSTEM_MODULE.ssid = strdup("");
+        if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate memory for SSID");
+            return;
+        }
     }
 
     if (device_config_init(&GLOBAL_STATE) != ESP_OK) {
@@ -68,7 +73,8 @@ void app_main(void)
         return;
     }
 
-    if (self_test(&GLOBAL_STATE)) return;
+    if (self_test(&GLOBAL_STATE))
+        return;
 
     SYSTEM_init_system(&GLOBAL_STATE);
 
@@ -84,7 +90,7 @@ void app_main(void)
         ESP_LOGE(TAG, "Error creating fan controller task");
     }
 
-    //start the API for AxeOS
+    // start the API for AxeOS
     start_rest_server((void *) &GLOBAL_STATE);
 
     // After mounting SPIFFS
@@ -116,7 +122,8 @@ void app_main(void)
     if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating asic result task");
     }
-    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) !=
+        pdPASS) {
         ESP_LOGE(TAG, "Error creating hashrate monitor task");
     }
     if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
