@@ -119,12 +119,12 @@ void statistics_task(void * pvParameters)
     TickType_t taskWakeTime = xTaskGetTickCount();
 
     while (1) {
-        const int32_t currentTime = esp_timer_get_time() / 1000;
+        const uint64_t currentTime = esp_timer_get_time() / 1000;
         const uint16_t configStatsFrequency = nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY);
-        const uint32_t statsFrequency = configStatsFrequency * 1000;
+        const uint64_t statsFrequency = (uint64_t)configStatsFrequency * 1000;
 
         if (0 != statsFrequency) {
-            const int32_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
+            const uint64_t waitingTime = statsData.timestamp + statsFrequency - (DEFAULT_POLL_RATE / 2);
 
             if (currentTime > waitingTime) {
                 int8_t wifiRSSI = -90;
