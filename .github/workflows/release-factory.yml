@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build_type: ["102", "201", "202", "203", "204", "205", "207", "302", "303", "400", "401", "402", "403", "601", "602", "701", "702", "801"]
+        build_type: ["102", "201", "202", "203", "204", "205", "207", "302", "303", "400", "401", "402", "403", "601", "602", "650", "701", "702", "801"]
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
       - name: "Create factory image for ${{ matrix.build_type }}-${{ github.ref_name }}"
         run: "./merge_bin.sh -c esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin"
       - name: Release esp-miner.bin
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.4.2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: "esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin"
