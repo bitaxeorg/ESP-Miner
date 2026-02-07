@@ -144,11 +144,14 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
                                  const char *extranonce1,
                                  int extranonce2_len,
                                  const char *user_address,
+                                 bool decode_outputs,
                                  mining_notification_result_t *result) {
     if (!notification || !extranonce1 || !result) return ESP_ERR_INVALID_ARG;
 
     // Initialize result
     result->total_value_satoshis = 0;
+    result->user_value_satoshis = 0;
+    result->decoding_enabled = decode_outputs;
 
     // 1. Calculate difficulty
     result->network_difficulty = networkDifficulty(notification->target);
@@ -269,34 +272,36 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
         }
         offset += 8;
 
+        // Add to total value
+        result->total_value_satoshis += value_satoshis;
+
         // Read scriptPubKey length
         if (offset >= coinbase_2_len) break;
         uint64_t script_len = coinbase_decode_varint(coinbase_2_bin, &offset);
 
-        // Read scriptPubKey
         if (offset + script_len > coinbase_2_len) break;
 
-        if (value_satoshis > 0) {
-            char output_address[MAX_ADDRESS_STRING_LEN];
-            coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN);
-            bool is_user_address = strncmp(user_address, output_address, strlen(output_address)) == 0;
+        if (decode_outputs) {
+            if (value_satoshis > 0) {            
+                char output_address[MAX_ADDRESS_STRING_LEN];
+                coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN);
+                bool is_user_address = strncmp(user_address, output_address, strlen(output_address)) == 0;
 
-            // Add to total value
-            result->total_value_satoshis += value_satoshis;
-            if (is_user_address) result->user_value_satoshis += value_satoshis;
+                if (is_user_address) result->user_value_satoshis += value_satoshis;
 
-            if (i < MAX_COINBASE_TX_OUTPUTS) {
-                strncpy(result->outputs[i].address, output_address, MAX_ADDRESS_STRING_LEN);
-                result->outputs[i].value_satoshis = value_satoshis;
-                result->outputs[i].is_user_output = is_user_address;
-                result->output_count++;
-            }
-        } else {
-            if (i < MAX_COINBASE_TX_OUTPUTS) {
-                coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, result->outputs[i].address, MAX_ADDRESS_STRING_LEN);
-                result->outputs[i].value_satoshis = 0;
-                result->outputs[i].is_user_output = false;
-                result->output_count++;
+                if (i < MAX_COINBASE_TX_OUTPUTS) {
+                    strncpy(result->outputs[i].address, output_address, MAX_ADDRESS_STRING_LEN);
+                    result->outputs[i].value_satoshis = value_satoshis;
+                    result->outputs[i].is_user_output = is_user_address;
+                    result->output_count++;
+                }
+            } else {
+                if (i < MAX_COINBASE_TX_OUTPUTS) {
+                    coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, result->outputs[i].address, MAX_ADDRESS_STRING_LEN);
+                    result->outputs[i].value_satoshis = 0;
+                    result->outputs[i].is_user_output = false;
+                    result->output_count++;
+                }
             }
         }
 

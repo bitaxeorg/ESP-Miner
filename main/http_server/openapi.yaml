@@ -129,6 +129,7 @@ components:
         - fallbackStratumUser
         - fallbackStratumTLS
         - fallbackStratumCert
+        - fallbackStratumDecodeCoinbase
         - fanrpm
         - fan2rpm
         - fanspeed
@@ -176,6 +177,7 @@ components:
         - stratumUser
         - stratumTLS
         - stratumCert
+        - stratumDecodeCoinbase
         - temp
         - temp2
         - uptimeSeconds
@@ -247,6 +249,9 @@ components:
         fallbackStratumCert:
           type: string
           description: Fallback stratum TLS cert
+        fallbackStratumDecodeCoinbase:
+          type: boolean
+          description: Enable fallback pool coinbase transaction decoding
         fanrpm:
           type: number
           description: Current fan speed in RPM
@@ -393,6 +398,9 @@ components:
         stratumCert:
           type: string
           description: Primary stratum TLS cert
+        stratumDecodeCoinbase:
+          type: boolean
+          description: Enable primary pool coinbase transaction decoding
         temp:
           type: number
           description: Average chip temperature
