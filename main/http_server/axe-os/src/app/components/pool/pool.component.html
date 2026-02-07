@@ -75,6 +75,19 @@
                             </label>
                         </div>
 
+                        <div class="field-checkbox grid">
+                            <div class="col-1 md:col-10 md:flex-order-2">
+                                <p-checkbox [name]="pool + 'DecodeCoinbase'" [inputId]="pool + 'DecodeCoinbase'" [formControlName]="pool + 'DecodeCoinbase'"
+                                    [binary]="true"></p-checkbox>
+                            </div>
+                            <label [htmlFor]="pool + 'DecodeCoinbase'" class="col-11 m-0 pb-0 pl-3 md:col-2 md:flex-order-1 md:pl-2">
+                                <tooltip-text-icon
+                                    text="Decode Coinbase Tx"
+                                    tooltip="Enable decoding of the coinbase transaction to show payout addresses. Disable when mining on non-Bitcoin chains."
+                                />
+                            </label>
+                        </div>
+
                         <div class="field grid p-fluid">
                             <label [htmlFor]="pool + 'TLS'" class="col-12 mb-2 md:col-2 md:mb-0">Connection Security</label>
                             <div class="col-12 md:col-10">

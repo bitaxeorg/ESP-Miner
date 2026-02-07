@@ -85,6 +85,7 @@ typedef struct {
     int output_count;
     uint64_t total_value_satoshis;
     uint64_t user_value_satoshis;
+    bool decoding_enabled;
 } mining_notification_result_t;
 
 /**
@@ -94,13 +95,15 @@ typedef struct {
  * @param extranonce1 Hex string of extranonce1
  * @param extranonce2_len Length of extranonce2 in bytes
  * @param user_address Payout address of the user
+ * @param decode_outputs Enable coinbase tx decoding
  * @param result Pointer to store the results
  * @return esp_err_t
  */
 esp_err_t coinbase_process_notification(const mining_notify *notification,
                                  const char *extranonce1,
                                  int extranonce2_len,
-                                 const char *user_address,                                 
+                                 const char *user_address,
+                                 bool decode_outputs,
                                  mining_notification_result_t *result);
 
 #endif // COINBASE_DECODER_H

@@ -430,7 +430,7 @@
                         {{ info.responseTime | number:'1.1-1' }} ms
                     </ng-container>
                 </div>
-                <div class="flex flex-nowrap">
+                <div class="flex flex-nowrap" *ngIf="info.coinbaseOutputs.length > 0">
                     @let percentage = getPayoutPercentage(info);
                     <ng-container *ngIf="percentage >= 95">
                         <div class="col-fixed-width text-500">
@@ -490,7 +490,7 @@
                         {{ info.scriptsig }}
                     </div>
                 </div>
-                <div class="flex flex-nowrap justify-content-between">
+                <div class="flex flex-nowrap justify-content-between" *ngIf="info.coinbaseOutputs.length > 0">
                     <div class="col-fixed-width text-500">
                         Value
                     </div>
@@ -498,7 +498,7 @@
                         {{ info.coinbaseValueTotalSatoshis | sats }}
                     </ng-container>
                 </div>                
-                <div class="flex flex-nowrap align-items-baseline">
+                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.coinbaseOutputs.length > 0">
                     <div class="col-fixed-width text-500">
                         <span>Outputs</span>
                     </div>
@@ -516,6 +516,14 @@
                             }
                         </div>
                     </div>
+                </div>
+                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.coinbaseOutputs.length == 0">
+                    <div class="col-fixed-width text-500">
+                        Amount
+                    </div>
+                    <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
+                        {{ info.coinbaseValueTotalSatoshis }}
+                    </ng-container>
                 </div>
             </div>
         </div>

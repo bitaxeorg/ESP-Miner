@@ -65,6 +65,7 @@ export class PoolComponent implements OnInit {
           stratumPassword: ['*****', [Validators.required]],
           stratumTLS: [info.stratumTLS || 0],
           stratumCert: [info.stratumCert],
+          stratumDecodeCoinbase: [info.stratumDecodeCoinbase == true, [Validators.required]],
           fallbackStratumURL: [info.fallbackStratumURL, [
             Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
           ]],
@@ -78,6 +79,7 @@ export class PoolComponent implements OnInit {
           fallbackStratumSuggestedDifficulty: [info.fallbackStratumSuggestedDifficulty, [Validators.required]],
           fallbackStratumTLS: [info.fallbackStratumTLS || 0],
           fallbackStratumCert: [info.fallbackStratumCert],
+          fallbackStratumDecodeCoinbase: [info.fallbackStratumDecodeCoinbase == true, [Validators.required]],
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
           fallbackStratumPassword: ['*****', [Validators.required]]
         });
