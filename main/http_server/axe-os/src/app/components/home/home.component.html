@@ -496,7 +496,7 @@
                         Amount
                     </div>
                     <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
-                        {{ info.coinbaseValueTotalSatoshis }}
+                        {{ info.coinbaseValueTotalSatoshis / 100_000_000 }}
                     </ng-container>
                 </div>
             </div>
