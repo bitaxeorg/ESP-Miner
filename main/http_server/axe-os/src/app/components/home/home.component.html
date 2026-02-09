@@ -466,7 +466,7 @@
                 </div>
                 <div class="flex flex-nowrap justify-content-between" *ngIf="info.coinbaseOutputs.length > 0">
                     <div class="col-fixed-width text-500">
-                        Value
+                        <tooltip-text-icon text="Value" tooltip="Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options." />
                     </div>
                     <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
                         {{ info.coinbaseValueTotalSatoshis | sats }}
