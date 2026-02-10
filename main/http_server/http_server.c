@@ -222,6 +222,19 @@ static esp_err_t ip_in_private_range(uint32_t address) {
         return ESP_OK;
     }
 
+    // Check if the address is in the same /24 network as the device's IP
+    // This allows non-standard private networks (e.g., if device has 23.33.0.111, allow 23.33.0.*)
+    if (GLOBAL_STATE != NULL && GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str[0] != '\0') {
+        uint32_t device_ip_addr = inet_addr(GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str);
+        if (device_ip_addr != INADDR_NONE) {
+            uint32_t device_ip = ntohl(device_ip_addr);
+            // Compare the first 24 bits (network portion for /24 subnet)
+            if ((ip_address & 0xFFFFFF00) == (device_ip & 0xFFFFFF00)) {
+                return ESP_OK;
+            }
+        }
+    }
+
     return ESP_FAIL;
 }
 
