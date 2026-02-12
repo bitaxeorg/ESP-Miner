@@ -18,6 +18,13 @@
 
 static const char *TAG = "serial";
 
+typedef int (*uart_read_bytes_fn_t)(uart_port_t, void*, uint32_t, TickType_t);
+static uart_read_bytes_fn_t *_uart_read_bytes = uart_read_bytes;
+
+void SERIAL_set_read_fn(uart_read_bytes_fn_t *fn) {
+    _uart_read_bytes = fn;
+}
+
 esp_err_t SERIAL_init(void)
 {
     ESP_LOGI(TAG, "Initializing serial");
@@ -76,7 +83,7 @@ int SERIAL_send(uint8_t *data, int len, bool debug)
 /// @return number of bytes read, or -1 on error
 int16_t SERIAL_rx(uint8_t *buf, uint16_t size, uint16_t timeout_ms)
 {
-    int16_t bytes_read = uart_read_bytes(UART_NUM_1, buf, size, timeout_ms / portTICK_PERIOD_MS);
+    int16_t bytes_read = _uart_read_bytes(UART_NUM_1, buf, size, timeout_ms / portTICK_PERIOD_MS);
 
     #if BM1397_SERIALRX_DEBUG || BM1366_SERIALRX_DEBUG || BM1368_SERIALRX_DEBUG || BM1370_SERIALRX_DEBUG
     size_t buff_len = 0;
