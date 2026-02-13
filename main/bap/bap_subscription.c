@@ -40,6 +40,7 @@ typedef struct {
     char wifi_password[64];
     char wifi_rssi[32];
     char wifi_ip[32];
+    char found_block[16];
 } bap_last_values_t;
 
 typedef struct {
@@ -57,6 +58,7 @@ typedef struct {
     bool wifi_password;
     bool wifi_rssi;
     bool wifi_ip;
+    bool found_block;
 } bap_last_values_valid_t;
 
 static bap_last_values_t last_values = {0};
@@ -146,6 +148,9 @@ void BAP_subscription_handle_subscribe(const char *parameter, const char *value)
                 last_values_valid.wifi_password = false;
                 last_values_valid.wifi_rssi = false;
                 last_values_valid.wifi_ip = false;
+                break;
+            case BAP_PARAM_FOUND_BLOCK:
+                last_values_valid.found_block = false;
                 break;
             default:
                 break;
@@ -334,6 +339,15 @@ void BAP_send_subscription_update(GlobalState *state) {
                             BAP_send_if_changed("wifi_ip", ip_str, last_values.wifi_ip, sizeof(last_values.wifi_ip), &last_values_valid.wifi_ip);
                             free(wifi_pass);
                         }
+                        break;
+
+                    case BAP_PARAM_FOUND_BLOCK:
+                        {
+                            char found_block_str[16];
+                            snprintf(found_block_str, sizeof(found_block_str), "%d", state->SYSTEM_MODULE.block_found);
+                            BAP_send_if_changed("found_block", found_block_str, last_values.found_block, sizeof(last_values.found_block), &last_values_valid.found_block);
+                        }
+                        break;
 
                     default:
                         break;
