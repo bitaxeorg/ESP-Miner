@@ -96,7 +96,8 @@ typedef union {
 typedef struct {
     const char *nvs_key_name;
     ConfigType type;
-    ConfigValue value;
+    ConfigValue *value;
+    int array_size;
     ConfigValue default_value;
     const char *rest_name;
     int min;
@@ -107,6 +108,8 @@ esp_err_t nvs_config_init(void);
 
 char * nvs_config_get_string(NvsConfigKey key);
 void nvs_config_set_string(NvsConfigKey key, const char * value);
+char *nvs_config_get_string_indexed(NvsConfigKey key, int index);
+void nvs_config_set_string_indexed(NvsConfigKey key, int index, const char *value);
 uint16_t nvs_config_get_u16(NvsConfigKey key);
 void nvs_config_set_u16(NvsConfigKey key, uint16_t value);
 int32_t nvs_config_get_i32(NvsConfigKey key);
