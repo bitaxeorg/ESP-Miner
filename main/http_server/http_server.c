@@ -1310,6 +1310,14 @@ esp_err_t start_rest_server(void * pvParameters)
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
 
+    httpd_uri_t api_options_uri = {
+        .uri = "/api/*", 
+        .method = HTTP_OPTIONS, 
+        .handler = handle_options_request, 
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &api_options_uri);
+
     httpd_uri_t recovery_explicit_get_uri = {
         .uri = "/recovery", 
         .method = HTTP_GET, 
@@ -1364,14 +1372,6 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &system_identify_uri);
 
-    httpd_uri_t system_identify_options_uri = {
-        .uri = "/api/system/identify", 
-        .method = HTTP_OPTIONS, 
-        .handler = handle_options_request, 
-        .user_ctx = NULL
-    };
-    httpd_register_uri_handler(server, &system_identify_options_uri);
-
     httpd_uri_t system_restart_uri = {
         .uri = "/api/system/restart", .method = HTTP_POST, 
         .handler = POST_restart, 
@@ -1410,14 +1410,6 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &update_system_settings_uri);
-
-    httpd_uri_t system_options_uri = {
-        .uri = "/api/system",
-        .method = HTTP_OPTIONS,
-        .handler = handle_options_request,
-        .user_ctx = NULL,
-    };
-    httpd_register_uri_handler(server, &system_options_uri);
 
     httpd_uri_t update_post_ota_firmware = {
         .uri = "/api/system/OTA", 
