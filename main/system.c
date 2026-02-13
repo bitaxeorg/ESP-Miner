@@ -47,7 +47,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->best_session_nonce_diff = 0;
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
-    module->block_found = false;
+    module->block_found = 0;
     
     // Initialize network address strings
     strcpy(module->ip_addr_str, "");
@@ -250,8 +250,12 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t 
 
     double network_diff = networkDifficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
     if (diff >= network_diff) {
-        module->block_found = true;
-        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f >= %f", diff, network_diff);
+        if (module->block_found < 0) {
+            module->block_found = -module->block_found + 1;
+        } else {
+            module->block_found++;
+        }
+        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f >= %f (count: %d)", diff, network_diff, module->block_found > 0 ? module->block_found : -module->block_found);
     }
 
     if ((uint64_t) diff <= module->best_nonce_diff) {

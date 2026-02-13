@@ -15,9 +15,14 @@
         />
     </ng-container>
 
-    <p-message *ngIf="info.blockFound" severity="success" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Today is your lucky day! Your device has found a block 🎉">
-    </p-message>
+    <div *ngIf="info.blockFound > 0" class="p-inline-message p-inline-message-success w-full mb-3 py-3 border-round-lg">
+        <div class="flex justify-content-between align-items-center w-full px-3">
+            <span>Today is your lucky day! Your device has found {{ info.blockFound === 1 ? 'a block' : info.blockFound + ' blocks' }} 🎉</span>
+            <button type="button" class="p-link" style="line-height: 1;" (click)="dismissBlockFound()" pTooltip="Dismiss" tooltipPosition="left">
+                <i class="pi pi-times"></i>
+            </button>
+        </div>
+    </div>
 
     <div class="grid">
         <div class="col-12 md:col-6 xl:col-3">
@@ -539,5 +544,5 @@
         </div>
     </div>
 
-    <app-confetti *ngIf="info.blockFound"></app-confetti>
+    <app-confetti *ngIf="info.blockFound > 0"></app-confetti>
 </ng-container>

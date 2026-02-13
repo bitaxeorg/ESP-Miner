@@ -539,10 +539,25 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
   }
 
+  public dismissBlockFound(): void {
+    this.systemService.dismissBlockFound()
+      .pipe(
+        this.loadingService.lockUIUntilComplete()
+      )
+      .subscribe({
+        next: () => {
+          this.toastr.success('Block found notification dismissed');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error(`Error dismissing notification: ${err.message}`);
+        }
+      });
+  }
+
   private setTitle(info: ISystemInfo, systemInfoError: ISystemInfoError) {
     const parts = [this.pageDefaultTitle];
 
-    if (info.blockFound) {
+    if (info.blockFound > 0) {
       parts.push('Block found 🎉');
     } else if (!!systemInfoError.duration) {
       parts.push('Unable to reach the device');

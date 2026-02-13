@@ -18,6 +18,7 @@
         width: 100vw;
         height: 100vh;
         position: fixed;
+        pointer-events: none;
     }
     .confetti-container {
         perspective: 700px;

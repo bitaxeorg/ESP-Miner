@@ -445,7 +445,7 @@ components:
           description: Current network difficulty
         blockFound:
           type: number
-          description: Whether a block was found (0=no, 1=yes)
+          description: Number of blocks found. Positive value = active notification, negative value = dismissed (absolute value is the count)
         coinbaseOutputs:
           type: array
           description: Coinbase transaction outputs
@@ -843,6 +843,31 @@ paths:
             application/json:
               schema:
                 '$ref': '#/components/schemas/GenericResponse'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/blockFound/dismiss:
+    post:
+      summary: Dismiss block found notification
+      description: Dismisses the block found notification while preserving the count
+      operationId: dismissBlockFound
+      tags:
+        - system
+      responses:
+        '200':
+          description: Block found notification dismissed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blockFound:
+                    type: number
+                    description: The new blockFound value (negative indicates dismissed)
+                  message:
+                    type: string
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
