@@ -779,13 +779,10 @@ static esp_err_t POST_dismiss_block_found(httpd_req_t * req)
         return ESP_OK;
     }
 
-    // Convert positive block_found to negative to indicate dismissed state
-    // while preserving the count (abs value)
-    if (GLOBAL_STATE->SYSTEM_MODULE.block_found > 0) {
-        GLOBAL_STATE->SYSTEM_MODULE.block_found = -GLOBAL_STATE->SYSTEM_MODULE.block_found;
-    }
+    GLOBAL_STATE->SYSTEM_MODULE.show_new_block = false;
 
     cJSON_AddNumberToObject(root, "blockFound", GLOBAL_STATE->SYSTEM_MODULE.block_found);
+    cJSON_AddBoolToObject(root, "showNewBlock", GLOBAL_STATE->SYSTEM_MODULE.show_new_block);
     cJSON_AddStringToObject(root, "message", "Block found notification dismissed");
 
     esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
@@ -954,6 +951,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY));
 
     cJSON_AddNumberToObject(root, "blockFound", GLOBAL_STATE->SYSTEM_MODULE.block_found);
+    cJSON_AddBoolToObject(root, "showNewBlock", GLOBAL_STATE->SYSTEM_MODULE.show_new_block);
 
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));

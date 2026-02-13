@@ -445,7 +445,10 @@ components:
           description: Current network difficulty
         blockFound:
           type: number
-          description: Number of blocks found. Positive value = active notification, negative value = dismissed (absolute value is the count)
+          description: Number of blocks found
+        showNewBlock:
+          type: boolean
+          description: Whether to show the block found notification
         coinbaseOutputs:
           type: array
           description: Coinbase transaction outputs
@@ -865,7 +868,10 @@ paths:
                 properties:
                   blockFound:
                     type: number
-                    description: The new blockFound value (negative indicates dismissed)
+                    description: Number of blocks found
+                  showNewBlock:
+                    type: boolean
+                    description: Whether to show the block found notification
                   message:
                     type: string
         '401':

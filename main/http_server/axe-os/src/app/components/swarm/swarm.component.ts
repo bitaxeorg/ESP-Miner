@@ -476,7 +476,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
         return { color: 'orange', msg: 'Frequency Low' };
       case axe.isUsingFallbackStratum === 1:
         return { color: 'orange', msg: 'Fallback Pool' };
-      case axe.blockFound === 1:
+      case axe.blockFound > 0:
         return { color: 'green', msg: 'Block found' };
       default:
         return undefined;

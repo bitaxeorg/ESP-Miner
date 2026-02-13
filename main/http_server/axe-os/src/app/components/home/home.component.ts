@@ -557,7 +557,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   private setTitle(info: ISystemInfo, systemInfoError: ISystemInfoError) {
     const parts = [this.pageDefaultTitle];
 
-    if (info.blockFound > 0) {
+    if (info.showNewBlock) {
       parts.push('Block found 🎉');
     } else if (!!systemInfoError.duration) {
       parts.push('Unable to reach the device');

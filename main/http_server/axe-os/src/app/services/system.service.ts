@@ -135,6 +135,7 @@ export class SystemApiService {
           hashrate: 441.2579,
         },
         blockFound: 1,
+        showNewBlock: true,
         coinbaseOutputs: [{value: 50, address: "payoutaddress"}],
         coinbaseValueTotalSatoshis: 50,
         coinbaseValueUserSatoshis: 50,

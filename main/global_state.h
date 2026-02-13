@@ -46,6 +46,7 @@ typedef struct
     uint64_t best_session_nonce_diff;
     char best_session_diff_string[DIFF_STRING_SIZE];
     int block_found;
+    bool show_new_block;
     char * ssid;
     char wifi_status[256];
     char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
