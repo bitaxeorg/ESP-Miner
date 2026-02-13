@@ -1395,14 +1395,6 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &system_dismiss_block_found_uri);
 
-    httpd_uri_t system_dismiss_block_found_options_uri = {
-        .uri = "/api/system/blockFound/dismiss", 
-        .method = HTTP_OPTIONS, 
-        .handler = handle_options_request, 
-        .user_ctx = NULL
-    };
-    httpd_register_uri_handler(server, &system_dismiss_block_found_options_uri);
-
     httpd_uri_t update_system_settings_uri = {
         .uri = "/api/system", 
         .method = HTTP_PATCH, 
