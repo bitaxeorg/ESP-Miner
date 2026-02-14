@@ -348,6 +348,7 @@ void sv2_task(void *pvParameters)
 
                 // Signal fallback mode
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
+                GLOBAL_STATE->SYSTEM_MODULE.sv2_fallback_to_v1 = true;
 
                 // Reset share stats (same pattern as V1 failover)
                 for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
