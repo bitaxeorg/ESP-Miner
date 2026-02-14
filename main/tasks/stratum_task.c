@@ -422,6 +422,9 @@ void stratum_task(void * pvParameters)
     tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
     char * cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
 
+    // Set V1-specific free function for the work queue
+    GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *))STRATUM_V1_free_mining_notify;
+
     STRATUM_V1_initialize_buffer();
     int retry_attempts = 0;
     int retry_critical_attempts = 0;

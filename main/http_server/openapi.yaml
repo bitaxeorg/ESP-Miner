@@ -172,6 +172,8 @@ components:
         - ipv6
         - stratumExtranonceSubscribe
         - stratumPort
+        - stratumProtocol
+        - sv2AuthorityPubkey
         - stratumSuggestedDifficulty
         - stratumURL
         - stratumUser
@@ -383,6 +385,12 @@ components:
         stratumPort:
           type: number
           description: Primary stratum server port
+        stratumProtocol:
+          type: number
+          description: Stratum protocol version (0=V1, 1=V2)
+        sv2AuthorityPubkey:
+          type: string
+          description: SV2 authority public key for certificate verification (base58-encoded)
         stratumSuggestedDifficulty:
           type: number
           description: Pool suggested difficulty
@@ -611,6 +619,20 @@ components:
           maximum: 65535
           examples:
             - 3333
+        stratumProtocol:
+          type: integer
+          description: Stratum protocol version (0=V1, 1=V2)
+          enum: [0, 1]
+          examples:
+            - 0
+        sv2AuthorityPubkey:
+          type: string
+          description: Optional SV2 authority public key for certificate verification (base58-encoded)
+          pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+          maxLength: 52
+          examples:
+            - ""
+            - "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
         fallbackStratumPort:
           type: integer
           description: Port number for fallback stratum server

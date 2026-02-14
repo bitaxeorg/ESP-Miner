@@ -12,6 +12,11 @@ interface ITlsOption {
   label: string;
 }
 
+interface IProtocolOption {
+  value: number;
+  label: string;
+}
+
 @Component({
   selector: 'app-pool',
   templateUrl: './pool.component.html',
@@ -31,6 +36,11 @@ export class PoolComponent implements OnInit {
     { value: 0, label: 'No TLS' },
     { value: 1, label: 'TLS (System certificate)' },
     { value: 2, label: 'TLS (Custom CA certificate)' }
+  ];
+
+  public protocolOptions: IProtocolOption[] = [
+    { value: 0, label: 'Stratum V1' },
+    { value: 1, label: 'Stratum V2' }
   ];
 
   @Input() uri = '';
@@ -59,6 +69,8 @@ export class PoolComponent implements OnInit {
             Validators.min(0),
             Validators.max(65535)
           ]],
+          stratumProtocol: [info.stratumProtocol || 0],
+          sv2AuthorityPubkey: [info.sv2AuthorityPubkey || '', [this.base58Validator()]],
           stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == true, [Validators.required]],
           stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
           stratumUser: [info.stratumUser, [Validators.required]],
@@ -232,6 +244,26 @@ export class PoolComponent implements OnInit {
     };
   }
 
+  private base58Validator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value?.trim();
+      if (!value) return null;
+
+      // Base58 alphabet (no 0, O, I, l)
+      const base58Regex = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
+      if (!base58Regex.test(value)) {
+        return { invalidBase58: true };
+      }
+
+      // SV2 authority pubkeys are typically 51-52 characters
+      if (value.length < 40 || value.length > 52) {
+        return { invalidBase58Length: true };
+      }
+
+      return null;
+    };
+  }
+
   trackByFn(index: number, option: ITlsOption): number {
     return option.value;
   }
@@ -243,5 +275,9 @@ export class PoolComponent implements OnInit {
 
   isAnyPoolUsingDefaultAddress(): boolean {
     return this.pools.some(pool => this.isUsingDefaultAddress(pool));
+  }
+
+  isStratumV2Enabled(): boolean {
+    return this.form?.get('stratumProtocol')?.value === 1;
   }
 }

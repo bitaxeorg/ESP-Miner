@@ -10,11 +10,22 @@
 #include "hashrate_monitor_task.h"
 #include "serial.h"
 #include "stratum_api.h"
+#include "mining.h"
 #include "coinbase_decoder.h"
 #include "work_queue.h"
 #include "device_config.h"
 #include "display.h"
 #include "esp_transport.h"
+
+// Protocol selection (V1 = JSON-RPC, V2 = binary SV2)
+typedef enum {
+    STRATUM_V1 = 0,
+    STRATUM_V2 = 1,
+} stratum_protocol_t;
+
+// Forward declarations
+struct sv2_conn;
+struct sv2_noise_ctx;
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
@@ -140,6 +151,10 @@ typedef struct
     // A message ID that must be unique per request that expects a response.
     // For requests not expecting a response (called notifications), this is null.
     int send_uid;
+
+    stratum_protocol_t stratum_protocol;
+    struct sv2_conn *sv2_conn;
+    struct sv2_noise_ctx *sv2_noise_ctx;
 
     bool ASIC_initalized;
     bool psram_is_available;

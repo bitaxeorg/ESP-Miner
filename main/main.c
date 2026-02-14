@@ -11,6 +11,7 @@
 #include "http_server.h"
 #include "serial.h"
 #include "stratum_task.h"
+#include "sv2_task.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
 #include "nvs_config.h"
@@ -107,8 +108,14 @@ void app_main(void)
         return;
     }
 
-    if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating stratum admin task");
+    if (GLOBAL_STATE.stratum_protocol == STRATUM_V2) {
+        if (xTaskCreate(sv2_task, "sv2 admin", 12288, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating sv2 admin task");
+        }
+    } else {
+        if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating stratum admin task");
+        }
     }
     if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum miner task");
