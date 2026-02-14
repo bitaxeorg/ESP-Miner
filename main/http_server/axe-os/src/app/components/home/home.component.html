@@ -443,7 +443,7 @@
             <div class="card">
                 <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis">Block Header</h4>
 
-                <div class="flex flex-nowrap" *ngIf="info.stratumProtocol !== 1">
+                <div class="flex flex-nowrap" *ngIf="info.activeStratumProtocol !== 1">
                     <div class="col-fixed-width text-500">
                         <span>Height</span>
                     </div>
@@ -461,7 +461,7 @@
                     </div>
                 </div>
 
-                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.stratumProtocol !== 1">
+                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.activeStratumProtocol !== 1">
                     <div class="col-fixed-width text-500">
                         <span>Scriptsig</span>
                     </div>
@@ -469,7 +469,7 @@
                         {{ info.scriptsig }}
                     </div>
                 </div>
-                <div class="flex flex-nowrap justify-content-between" *ngIf="info.stratumProtocol !== 1 && (info.coinbaseOutputs?.length ?? 0) > 0">
+                <div class="flex flex-nowrap justify-content-between" *ngIf="info.activeStratumProtocol !== 1 && (info.coinbaseOutputs?.length ?? 0) > 0">
                     <div class="col-fixed-width text-500">
                         <tooltip-text-icon text="Value" tooltip="Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options." />
                     </div>
@@ -477,7 +477,7 @@
                         {{ info.coinbaseValueTotalSatoshis | sats }}
                     </ng-container>
                 </div>
-                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.stratumProtocol !== 1 && (info.coinbaseOutputs?.length ?? 0) > 0">
+                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.activeStratumProtocol !== 1 && (info.coinbaseOutputs?.length ?? 0) > 0">
                     <div class="col-fixed-width text-500">
                         <span>Outputs</span>
                     </div>
@@ -496,7 +496,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.stratumProtocol !== 1 && (info.coinbaseOutputs?.length ?? 0) == 0">
+                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.activeStratumProtocol !== 1 && (info.coinbaseOutputs?.length ?? 0) == 0">
                     <div class="col-fixed-width text-500">
                         Amount
                     </div>

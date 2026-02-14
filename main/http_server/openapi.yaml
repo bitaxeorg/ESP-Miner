@@ -388,6 +388,9 @@ components:
         stratumProtocol:
           type: number
           description: Stratum protocol version (0=V1, 1=V2)
+        activeStratumProtocol:
+          type: number
+          description: Active runtime stratum protocol (0=V1, 1=V2), may differ from configured when using fallback
         sv2AuthorityPubkey:
           type: string
           description: SV2 authority public key for certificate verification (base58-encoded)

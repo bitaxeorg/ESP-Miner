@@ -80,6 +80,7 @@ export class SystemApiService {
         stratumURL: "public-pool.io",
         stratumPort: 21496,
         stratumProtocol: 0,
+        activeStratumProtocol: 0,
         sv2AuthorityPubkey: "",
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         stratumSuggestedDifficulty: 1000,

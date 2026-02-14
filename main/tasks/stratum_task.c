@@ -285,7 +285,8 @@ void stratum_primary_heartbeat(void * pvParameters)
         }
 
         // SV2 recovery: primary is an SV2 pool, use TCP-only probe
-        if (GLOBAL_STATE->SYSTEM_MODULE.sv2_fallback_to_v1) {
+        // Skip if user explicitly chose the fallback pool via dashboard
+        if (GLOBAL_STATE->SYSTEM_MODULE.sv2_fallback_to_v1 && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
             esp_transport_handle_t probe = esp_transport_tcp_init();
             if (!probe) {
                 ESP_LOGD(TAG, "Heartbeat. Failed TCP probe transport init");
@@ -511,8 +512,15 @@ void stratum_task(void * pvParameters)
                 continue;
             }
 
+            // If user explicitly selected fallback, don't toggle away from it
+            if (GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
+                ESP_LOGI(TAG, "User selected fallback pool, staying on fallback (retries: %d)...", retry_attempts);
+                retry_attempts = 0;
+                continue;
+            }
+
             GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
-            
+
             // Reset share stats at failover
             for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
                 GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].count = 0;

@@ -914,6 +914,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT));
     cJSON_AddNumberToObject(root, "stratumProtocol", nvs_config_get_u16(NVS_CONFIG_STRATUM_PROTOCOL));
+    cJSON_AddNumberToObject(root, "activeStratumProtocol", (int)GLOBAL_STATE->stratum_protocol);
     cJSON_AddStringToObject(root, "sv2AuthorityPubkey", sv2AuthPubkey);
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
     cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY));

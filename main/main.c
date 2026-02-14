@@ -108,11 +108,16 @@ void app_main(void)
         return;
     }
 
-    if (GLOBAL_STATE.stratum_protocol == STRATUM_V2) {
+    if (GLOBAL_STATE.stratum_protocol == STRATUM_V2 && !GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback) {
         if (xTaskCreate(sv2_task, "sv2 admin", 12288, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
             ESP_LOGE(TAG, "Error creating sv2 admin task");
         }
     } else {
+        // If configured for SV2 but user selected fallback, override runtime protocol to V1
+        // so create_jobs_task and asic_result_task use V1 job format
+        if (GLOBAL_STATE.stratum_protocol == STRATUM_V2) {
+            GLOBAL_STATE.stratum_protocol = STRATUM_V1;
+        }
         if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
             ESP_LOGE(TAG, "Error creating stratum admin task");
         }
