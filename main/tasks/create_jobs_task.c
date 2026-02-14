@@ -43,6 +43,21 @@ void create_jobs_task(void *pvParameters)
     ESP_LOGI(TAG, "ASIC Ready! Protocol: %s", is_sv2 ? "SV2" : "V1");
 
     while (1) {
+        // Check if protocol changed (e.g., SV2 fell back to V1)
+        bool current_is_sv2 = (GLOBAL_STATE->stratum_protocol == STRATUM_V2);
+        if (current_is_sv2 != is_sv2) {
+            ESP_LOGW(TAG, "Protocol changed from %s to %s, resetting current work",
+                     is_sv2 ? "SV2" : "V1", current_is_sv2 ? "SV2" : "V1");
+            if (current_work != NULL) {
+                if (GLOBAL_STATE->stratum_queue.free_fn) {
+                    GLOBAL_STATE->stratum_queue.free_fn(current_work);
+                } else {
+                    free(current_work);
+                }
+                current_work = NULL;
+            }
+            is_sv2 = current_is_sv2;
+        }
         uint64_t start_time = esp_timer_get_time();
         void *new_work = queue_dequeue_timeout(&GLOBAL_STATE->stratum_queue, timeout_ms);
         timeout_ms -= (esp_timer_get_time() - start_time) / 1000;

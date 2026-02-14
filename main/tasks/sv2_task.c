@@ -8,6 +8,7 @@
 #include "sv2_task.h"
 #include "sv2_api.h"
 #include "sv2_noise.h"
+#include "stratum_task.h"
 #include "nvs_config.h"
 #include "work_queue.h"
 #include "utils.h"
@@ -333,7 +334,43 @@ void sv2_task(void *pvParameters)
         }
 
         if (retry_attempts >= MAX_RETRY_ATTEMPTS) {
-            ESP_LOGE(TAG, "Max retry attempts reached (%d), resetting count", retry_attempts);
+            // Check if a V1 fallback pool is configured
+            if (GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url != NULL &&
+                GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url[0] != '\0') {
+                ESP_LOGW(TAG, "Max SV2 retry attempts reached (%d), falling back to V1 stratum pool",
+                         retry_attempts);
+
+                // Close any lingering SV2 connection state
+                sv2_close_connection(GLOBAL_STATE);
+
+                // Switch protocol to V1 so other tasks (create_jobs, asic_result) adapt
+                GLOBAL_STATE->stratum_protocol = STRATUM_V1;
+
+                // Signal fallback mode
+                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
+
+                // Reset share stats (same pattern as V1 failover)
+                for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+                    GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
+                    GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].message[0] = '\0';
+                }
+                GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count = 0;
+                GLOBAL_STATE->SYSTEM_MODULE.shares_accepted = 0;
+                GLOBAL_STATE->SYSTEM_MODULE.shares_rejected = 0;
+                GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
+
+                // Start V1 stratum task (stack 8192, priority 5, same as main.c)
+                if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) GLOBAL_STATE, 5, NULL) != pdPASS) {
+                    ESP_LOGE(TAG, "Failed to create V1 stratum task!");
+                }
+
+                // Delete this SV2 task
+                GLOBAL_STATE->sv2_conn = NULL;
+                vTaskDelete(NULL);
+            }
+
+            // No fallback configured — reset count and keep retrying SV2
+            ESP_LOGE(TAG, "Max retry attempts reached (%d), no fallback configured, resetting count", retry_attempts);
             retry_attempts = 0;
             vTaskDelay(5000 / portTICK_PERIOD_MS);
             continue;
