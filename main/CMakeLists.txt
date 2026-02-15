@@ -23,6 +23,7 @@ SRCS
     "./http_server/axe-os/api/system/asic_settings.c"
     "./self_test/self_test.c"
     "./tasks/stratum_task.c"
+    "./tasks/sv2_task.c"
     "./tasks/create_jobs_task.c"
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
@@ -74,6 +75,7 @@ PRIV_REQUIRES
     "vfs"
     "esp_driver_i2c"
     "tcp_transport"
+    "stratum_v2"
 
 EMBED_FILES "http_server/recovery_page.html"
 )

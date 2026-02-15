@@ -15,6 +15,9 @@
                     <label [htmlFor]="pool + 'URL'" class="col-12 md:col-2 md:mb-0">Stratum Host</label>
                     <div class="col-12 md:col-10">
                         <input pInputText type="text" [id]="pool + 'URL'" [formControlName]="pool + 'URL'" (change)="onUrlChange(pool)" />
+                        <small *ngIf="pool === 'stratum' && isStratumV2Enabled()" class="block text-blue-600 mt-1">
+                            <i class="pi pi-info-circle mr-1"></i>SV2 Mode
+                        </small>
                     </div>
                 </div>
                 <div class="field grid p-fluid">
@@ -50,7 +53,58 @@
                     </legend>
 
                     <ng-container *ngIf="showAdvancedOptions[pool]">
-                        <div class="field grid p-fluid mt-4">
+                        <div *ngIf="pool === 'stratum'" class="field grid p-fluid mt-4">
+                            <label for="stratumProtocol" class="col-12 mb-2 md:col-2 md:mb-0">
+                                <tooltip-text-icon
+                                    text="Stratum Protocol"
+                                    tooltip="Select Stratum protocol version. Note: Not all pools support Stratum V2."
+                                />
+                            </label>
+                            <div class="col-12 md:col-10">
+                                <div class="flex flex-wrap gap-3">
+                                    <div *ngFor="let option of protocolOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
+                                        <p-radioButton
+                                            name="stratumProtocol"
+                                            [value]="option.value"
+                                            formControlName="stratumProtocol"
+                                            [inputId]="'stratumProtocol_' + option.value">
+                                        </p-radioButton>
+                                        <label [for]="'stratumProtocol_' + option.value" class="ml-2 cursor-pointer">
+                                            {{ option.label }}
+                                        </label>
+                                    </div>
+                                </div>
+                                <small class="block text-orange-600 mt-2">
+                                    <i class="pi pi-exclamation-triangle mr-1"></i>Note: Not all pools support Stratum V2
+                                </small>
+                            </div>
+                        </div>
+
+                        <div *ngIf="pool === 'stratum' && isStratumV2Enabled()" class="field grid p-fluid">
+                            <label for="sv2AuthorityPubkey" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">
+                                <tooltip-text-icon
+                                    text="SV2 Authority Pubkey"
+                                    tooltip="Optional base58-encoded authority public key for verifying server certificate signatures. Leave empty to skip verification (TOFU mode)."
+                                />
+                            </label>
+                            <div class="col-12 md:col-10">
+                                <textarea
+                                    pInputTextarea
+                                    id="sv2AuthorityPubkey"
+                                    formControlName="sv2AuthorityPubkey"
+                                    rows="2"
+                                    class="w-full p-2 text-sm text-monospace"
+                                    placeholder="Enter base58-encoded authority public key (optional, e.g., 9auqWEzQ...)"></textarea>
+                                <small *ngIf="form.get('sv2AuthorityPubkey')?.errors?.['invalidBase58']" class="block text-red-500 mt-1">
+                                    Invalid base58 string. Only base58 characters allowed (no 0, O, I, l).
+                                </small>
+                                <small *ngIf="form.get('sv2AuthorityPubkey')?.errors?.['invalidBase58Length']" class="block text-red-500 mt-1">
+                                    Invalid length. SV2 authority pubkeys are typically 51-52 characters.
+                                </small>
+                            </div>
+                        </div>
+
+                        <div *ngIf="pool === 'fallbackStratum' || !isStratumV2Enabled()" class="field grid p-fluid mt-4">
                             <label [htmlFor]="pool + 'SuggestedDifficulty'" class="col-12 md:col-2 md:mb-0">
                                 <tooltip-text-icon
                                     text="Suggested Difficulty"
@@ -62,7 +116,7 @@
                             </div>
                         </div>
 
-                        <div class="field-checkbox grid">
+                        <div *ngIf="pool === 'fallbackStratum' || !isStratumV2Enabled()" class="field-checkbox grid">
                             <div class="col-1 md:col-10 md:flex-order-2">
                                 <p-checkbox [name]="pool + 'ExtranonceSubscribe'" [inputId]="pool + 'ExtranonceSubscribe'" [formControlName]="pool + 'ExtranonceSubscribe'"
                                     [binary]="true"></p-checkbox>
@@ -88,7 +142,7 @@
                             </label>
                         </div>
 
-                        <div class="field grid p-fluid">
+                        <div *ngIf="pool === 'fallbackStratum' || !isStratumV2Enabled()" class="field grid p-fluid">
                             <label [htmlFor]="pool + 'TLS'" class="col-12 mb-2 md:col-2 md:mb-0">Connection Security</label>
                             <div class="col-12 md:col-10">
                                 <div class="flex flex-wrap gap-3">
@@ -106,7 +160,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div *ngIf="form.get(pool + 'TLS')?.value === 2" class="field grid p-fluid mb-0">
+                        <div *ngIf="(pool === 'fallbackStratum' || !isStratumV2Enabled()) && form.get(pool + 'TLS')?.value === 2" class="field grid p-fluid mb-0">
                             <label [htmlFor]="pool + 'Cert'" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">Certificate</label>
                             <div class="col-12 md:col-10">
                                 <div class="p-inputgroup">

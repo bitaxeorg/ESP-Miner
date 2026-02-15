@@ -11,6 +11,7 @@
 #include "http_server.h"
 #include "serial.h"
 #include "stratum_task.h"
+#include "sv2_task.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
 #include "nvs_config.h"
@@ -107,8 +108,19 @@ void app_main(void)
         return;
     }
 
-    if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating stratum admin task");
+    if (GLOBAL_STATE.stratum_protocol == STRATUM_V2 && !GLOBAL_STATE.SYSTEM_MODULE.is_using_fallback) {
+        if (xTaskCreate(sv2_task, "sv2 admin", 12288, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating sv2 admin task");
+        }
+    } else {
+        // If configured for SV2 but user selected fallback, override runtime protocol to V1
+        // so create_jobs_task and asic_result_task use V1 job format
+        if (GLOBAL_STATE.stratum_protocol == STRATUM_V2) {
+            GLOBAL_STATE.stratum_protocol = STRATUM_V1;
+        }
+        if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating stratum admin task");
+        }
     }
     if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum miner task");

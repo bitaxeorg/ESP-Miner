@@ -4,10 +4,13 @@
 #include <lwip/tcpip.h>
 #include <lwip/netdb.h>
 #include "stratum_task.h"
+#include "sv2_task.h"
 #include "work_queue.h"
 #include "esp_wifi.h"
 #include <esp_sntp.h>
 #include "esp_timer.h"
+#include "esp_transport.h"
+#include "esp_transport_tcp.h"
 #include <sys/time.h>
 #include <stdbool.h>
 #include <string.h>
@@ -281,13 +284,68 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
 
+        // SV2 recovery: primary is an SV2 pool, use TCP-only probe
+        // Skip if user explicitly chose the fallback pool via dashboard
+        if (GLOBAL_STATE->SYSTEM_MODULE.sv2_fallback_to_v1 && !GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
+            esp_transport_handle_t probe = esp_transport_tcp_init();
+            if (!probe) {
+                ESP_LOGD(TAG, "Heartbeat. Failed TCP probe transport init");
+                vTaskDelay(60000 / portTICK_PERIOD_MS);
+                continue;
+            }
+
+            esp_err_t err = esp_transport_connect(probe, primary_stratum_url, primary_stratum_port, TRANSPORT_TIMEOUT_MS);
+            esp_transport_close(probe);
+            esp_transport_destroy(probe);
+
+            if (err != ESP_OK) {
+                ESP_LOGD(TAG, "Heartbeat. SV2 pool still unreachable: %s:%d", primary_stratum_url, primary_stratum_port);
+                vTaskDelay(60000 / portTICK_PERIOD_MS);
+                continue;
+            }
+
+            ESP_LOGI(TAG, "Heartbeat: SV2 pool is back! Switching from V1 fallback to SV2.");
+
+            // Switch protocol back to SV2
+            GLOBAL_STATE->stratum_protocol = STRATUM_V2;
+            GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
+            GLOBAL_STATE->SYSTEM_MODULE.sv2_fallback_to_v1 = false;
+
+            // Reset share stats
+            for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
+                GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
+                GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].message[0] = '\0';
+            }
+            GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count = 0;
+            GLOBAL_STATE->SYSTEM_MODULE.shares_accepted = 0;
+            GLOBAL_STATE->SYSTEM_MODULE.shares_rejected = 0;
+            GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
+
+            // Start SV2 task
+            if (xTaskCreate(sv2_task, "sv2 task", 12288, (void *) GLOBAL_STATE, 5, NULL) != pdPASS) {
+                ESP_LOGE(TAG, "Failed to create SV2 task, staying on V1");
+                GLOBAL_STATE->stratum_protocol = STRATUM_V1;
+                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
+                GLOBAL_STATE->SYSTEM_MODULE.sv2_fallback_to_v1 = true;
+                vTaskDelay(60000 / portTICK_PERIOD_MS);
+                continue;
+            }
+
+            // Close V1 connection so stratum_task's recv loop breaks
+            stratum_close_connection(GLOBAL_STATE);
+
+            // Heartbeat's job is done — delete itself
+            vTaskDelete(NULL);
+        }
+
+        // V1-to-V1 heartbeat: probe primary with subscribe/authorize
         stratum_connection_info_t conn_info;
         if (resolve_stratum_address(primary_stratum_url, primary_stratum_port, &conn_info) != ESP_OK) {
             ESP_LOGD(TAG, "Heartbeat. Address resolution failed for: %s", primary_stratum_url);
             vTaskDelay(60000 / portTICK_PERIOD_MS);
             continue;
         }
-       
+
         tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
         char * cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
         esp_transport_handle_t transport = STRATUM_V1_transport_init(tls, cert);
@@ -313,7 +371,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 
         char recv_buffer[BUFFER_SIZE];
         memset(recv_buffer, 0, BUFFER_SIZE);
-        int bytes_received = esp_transport_read(transport, recv_buffer, BUFFER_SIZE - 1, TRANSPORT_TIMEOUT_MS); 
+        int bytes_received = esp_transport_read(transport, recv_buffer, BUFFER_SIZE - 1, TRANSPORT_TIMEOUT_MS);
 
         esp_transport_close(transport);
 
@@ -415,12 +473,21 @@ void stratum_task(void * pvParameters)
     primary_stratum_port = GLOBAL_STATE->SYSTEM_MODULE.pool_port;
     primary_stratum_tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
     primary_stratum_cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
-    char * stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pool_url;
-    uint16_t port = GLOBAL_STATE->SYSTEM_MODULE.pool_port;
-    bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
-    uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
-    tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
-    char * cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
+    char * stratum_url = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ?
+        GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
+    uint16_t port = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ?
+        GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
+    bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ?
+        GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
+    uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ?
+        GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
+    tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ?
+        GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_tls : GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
+    char * cert = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ?
+        GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_cert : GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
+
+    // Set V1-specific free function for the work queue
+    GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *))STRATUM_V1_free_mining_notify;
 
     STRATUM_V1_initialize_buffer();
     int retry_attempts = 0;
@@ -445,8 +512,15 @@ void stratum_task(void * pvParameters)
                 continue;
             }
 
+            // If user explicitly selected fallback, don't toggle away from it
+            if (GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
+                ESP_LOGI(TAG, "User selected fallback pool, staying on fallback (retries: %d)...", retry_attempts);
+                retry_attempts = 0;
+                continue;
+            }
+
             GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
-            
+
             // Reset share stats at failover
             for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
                 GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
@@ -623,6 +697,11 @@ void stratum_task(void * pvParameters)
                 ESP_LOGI(TAG, "Stratum response time: %.1f ms", response_time_ms);
                 GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
             }
+        }
+
+        // If heartbeat switched us back to SV2, exit this task
+        if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+            vTaskDelete(NULL);
         }
 
         if (stratum_api_v1_message.error_str) {

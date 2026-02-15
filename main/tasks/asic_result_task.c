@@ -8,6 +8,7 @@
 #include "nvs_config.h"
 #include "utils.h"
 #include "stratum_task.h"
+#include "sv2_task.h"
 #include "hashrate_monitor_task.h"
 #include "asic.h"
 
@@ -24,8 +25,7 @@ void ASIC_result_task(void *pvParameters)
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
         }
-        
-        //task_result *asic_result = (*GLOBAL_STATE->ASIC_functions.receive_result_fn)(GLOBAL_STATE);
+
         task_result *asic_result = ASIC_process_work(GLOBAL_STATE);
 
         if (asic_result == NULL)
@@ -55,20 +55,36 @@ void ASIC_result_task(void *pvParameters)
 
         if (nonce_diff >= active_job->pool_diff)
         {
-            char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-            int ret = STRATUM_V1_submit_share(
-                GLOBAL_STATE->transport,
-                GLOBAL_STATE->send_uid++,
-                user,
-                active_job->jobid,
-                active_job->extranonce2,
-                active_job->ntime,
-                asic_result->nonce,
-                asic_result->rolled_version ^ active_job->version);
+            int ret;
+
+            if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+                // SV2: submit with binary protocol
+                uint32_t sv2_job_id = (uint32_t)strtoul(active_job->jobid, NULL, 10);
+                ret = sv2_submit_share(GLOBAL_STATE, sv2_job_id,
+                                       asic_result->nonce,
+                                       active_job->ntime,
+                                       asic_result->rolled_version);
+            } else {
+                // V1: submit with JSON-RPC
+                char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+                ret = STRATUM_V1_submit_share(
+                    GLOBAL_STATE->transport,
+                    GLOBAL_STATE->send_uid++,
+                    user,
+                    active_job->jobid,
+                    active_job->extranonce2,
+                    active_job->ntime,
+                    asic_result->nonce,
+                    asic_result->rolled_version ^ active_job->version);
+            }
 
             if (ret < 0) {
                 ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
-                stratum_close_connection(GLOBAL_STATE);
+                if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+                    sv2_close_connection(GLOBAL_STATE);
+                } else {
+                    stratum_close_connection(GLOBAL_STATE);
+                }
             }
         }
 

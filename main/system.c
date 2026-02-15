@@ -111,6 +111,10 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     suffixString(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     suffixString(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 
+    // Load stratum protocol selection (0=V1, 1=V2)
+    GLOBAL_STATE->stratum_protocol = (stratum_protocol_t)nvs_config_get_u16(NVS_CONFIG_STRATUM_PROTOCOL);
+    GLOBAL_STATE->sv2_conn = NULL;
+
     // Initialize mutexes
     pthread_mutex_init(&GLOBAL_STATE->valid_jobs_lock, NULL);
 }
