@@ -52,6 +52,7 @@ typedef enum {
     BAP_PARAM_BLOCK_HEIGHT,
     BAP_PARAM_WIFI,
     BAP_PARAM_FOUND_BLOCK,
+    BAP_PARAM_SHOW_NEW_BLOCK,
     BAP_PARAM_UNKNOWN
 } bap_parameter_t;
 

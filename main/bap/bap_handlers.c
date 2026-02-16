@@ -258,6 +258,13 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
                 BAP_send_message(BAP_CMD_RES, "block_found", block_found_str);
             }
             break;
+        case BAP_PARAM_SHOW_NEW_BLOCK:
+            {
+                char show_new_block_str[2];
+                snprintf(show_new_block_str, sizeof(show_new_block_str), "%d", state->SYSTEM_MODULE.show_new_block);
+                BAP_send_message(BAP_CMD_RES, "show_new_block", show_new_block_str);
+            }
+            break;
         default:
             ESP_LOGE(TAG, "Unsupported request parameter: %d", param);
             break;
@@ -418,6 +425,22 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 nvs_config_set_bool(NVS_CONFIG_AUTO_FAN_SPEED, auto_fan_speed);
                 BAP_send_message(BAP_CMD_ACK, parameter, "auto_fan_speed_set");
                 return;
+            }
+            break;
+
+        case BAP_PARAM_FOUND_BLOCK:
+            {
+                int block_found_val = atoi(value);
+                bap_global_state->SYSTEM_MODULE.block_found = block_found_val;
+                BAP_send_message(BAP_CMD_ACK, parameter, value);
+            }
+            break;
+
+        case BAP_PARAM_SHOW_NEW_BLOCK:
+            {
+                int show_new_block_val = atoi(value);
+                bap_global_state->SYSTEM_MODULE.show_new_block = (show_new_block_val != 0);
+                BAP_send_message(BAP_CMD_ACK, parameter, value);
             }
             break;
             
