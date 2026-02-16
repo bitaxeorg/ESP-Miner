@@ -45,7 +45,8 @@ typedef struct
     char best_diff_string[DIFF_STRING_SIZE];
     uint64_t best_session_nonce_diff;
     char best_session_diff_string[DIFF_STRING_SIZE];
-    bool block_found;
+    int block_found;
+    bool show_new_block;
     char * ssid;
     char wifi_status[256];
     char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
@@ -66,6 +67,8 @@ typedef struct
     uint16_t fallback_pool_difficulty;
     bool pool_extranonce_subscribe;
     bool fallback_pool_extranonce_subscribe;
+    bool pool_decode_coinbase;
+    bool fallback_pool_decode_coinbase;
     float response_time;
     bool use_fallback_stratum;
     uint16_t pool_is_tls;

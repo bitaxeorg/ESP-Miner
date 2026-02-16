@@ -47,8 +47,9 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->best_session_nonce_diff = 0;
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
-    module->block_found = false;
-    
+    module->block_found = 0;
+    module->show_new_block = false;
+
     // Initialize network address strings
     strcpy(module->ip_addr_str, "");
     strcpy(module->ipv6_addr_str, "");
@@ -85,6 +86,10 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     // set the pool extranonce subscribe
     module->pool_extranonce_subscribe = nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE);
     module->fallback_pool_extranonce_subscribe = nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
+
+    // set the pool decode coinbase
+    module->pool_decode_coinbase = nvs_config_get_bool(NVS_CONFIG_STRATUM_DECODE_COINBASE);
+    module->fallback_pool_decode_coinbase = nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE);
 
     // use fallback stratum
     module->use_fallback_stratum = nvs_config_get_bool(NVS_CONFIG_USE_FALLBACK_STRATUM);
@@ -246,8 +251,9 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t 
 
     double network_diff = networkDifficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
     if (diff >= network_diff) {
-        module->block_found = true;
-        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f >= %f", diff, network_diff);
+        module->block_found++;
+        module->show_new_block = true;
+        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f >= %f (count: %d)", diff, network_diff, module->block_found);
     }
 
     if ((uint64_t) diff <= module->best_nonce_diff) {

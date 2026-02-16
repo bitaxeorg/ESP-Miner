@@ -539,10 +539,25 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
   }
 
+  public dismissBlockFound(): void {
+    this.systemService.dismissBlockFound()
+      .pipe(
+        this.loadingService.lockUIUntilComplete()
+      )
+      .subscribe({
+        next: () => {
+          this.toastr.success('Block found notification dismissed');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error(`Error dismissing notification: ${err.message}`);
+        }
+      });
+  }
+
   private setTitle(info: ISystemInfo, systemInfoError: ISystemInfoError) {
     const parts = [this.pageDefaultTitle];
 
-    if (info.blockFound) {
+    if (info.showNewBlock) {
       parts.push('Block found 🎉');
     } else if (!!systemInfoError.duration) {
       parts.push('Unable to reach the device');
@@ -643,9 +658,11 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
-    let percentage = this.getPayoutPercentage(info);
-    updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the coinbase reward is only ${percentage.toFixed(1)}%`);
-    updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the coinbase reward`);
+    if (info.coinbaseOutputs.length > 0) {
+      let percentage = this.getPayoutPercentage(info);
+      updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the coinbase reward is only ${percentage.toFixed(1)}%`);
+      updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the coinbase reward`);
+    }
   }
 
   private calculateEfficiency(info: ISystemInfo, key: 'hashRate' | 'expectedHashrate'): number {

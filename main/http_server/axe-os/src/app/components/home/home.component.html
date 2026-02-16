@@ -15,9 +15,14 @@
         />
     </ng-container>
 
-    <p-message *ngIf="info.blockFound" severity="success" styleClass="w-full mb-4 py-4 border-round-xl"
-        text="Today is your lucky day! Your device has found a block 🎉">
-    </p-message>
+    <div *ngIf="info.showNewBlock" class="p-inline-message p-inline-message-success w-full mb-3 py-3 border-round-lg">
+        <div class="flex justify-content-between align-items-center w-full px-3">
+            <span>Today is your lucky day! Your device has found {{ info.blockFound === 1 ? 'a block' : info.blockFound + ' blocks' }} 🎉</span>
+            <button type="button" class="p-link" style="line-height: 1;" (click)="dismissBlockFound()" pTooltip="Dismiss" tooltipPosition="left">
+                <i class="pi pi-times"></i>
+            </button>
+        </div>
+    </div>
 
     <div class="grid">
         <div class="col-12 md:col-6 xl:col-3">
@@ -324,44 +329,19 @@
                 <h4 class="text-center">Fan</h4>
 
                 <div class="mb-3">
-                    <h6 class="flex justify-content-between mb-1">
-                        Fan Speed<span>{{info.fanspeed.toFixed(1)}} %</span>
-                    </h6>
-                    <p-progressBar [value]="info.fanspeed" [styleClass]="'p-progressbar--thin'">
-                        <ng-template pTemplate="content" let-value></ng-template>
-                    </p-progressBar>
-                </div>
+                    <h6 class="flex justify-content-between mb-1" tooltipPosition="top"
+                            pTooltip="{{info.fan2rpm > 0 ? 'Fan 1: ' : ''}}{{info.fanrpm}} RPM{{info.fan2rpm > 0 ? '<br>Fan 2: ' + info.fan2rpm + ' RPM' : ''}}">
 
-                <div class="mb-3">
-                    <h6 class="flex justify-content-between mb-1">
                         <ng-container *ngIf="info.fan2rpm > 0; else singleFan">
-                            Fan 1 RPM
+                            Fan Speeds
                         </ng-container>
                         <ng-template #singleFan>
-                            Fan RPM
+                            Fan Speed
                         </ng-template>
-                        <span>
-                            <ng-container *ngIf="info.fanrpm > 0; else noValue">
-                                {{info.fanrpm}} RPM
-                            </ng-container>
-                        </span>
-                    </h6>
-                    <p-progressBar [value]="(info.fanrpm / maxRpm) * 100" [styleClass]="'p-progressbar--thin'">
-                        <ng-template pTemplate="content" let-value></ng-template>
-                    </p-progressBar>
 
-                </div>
-
-                <div *ngIf="info.fan2rpm > 0">
-                    <h6 class="flex justify-content-between mb-1">
-                        Fan 2 RPM
-                        <span>
-                            <ng-container *ngIf="info.fan2rpm > 0; else noValue">
-                                {{info.fan2rpm}} RPM
-                            </ng-container>
-                        </span>
+                        <span>{{info.fanspeed.toFixed(1)}} %</span>
                     </h6>
-                    <p-progressBar [value]="(info.fan2rpm / maxRpm) * 100" [styleClass]="'p-progressbar--thin'">
+                    <p-progressBar [value]="info.fanspeed" [styleClass]="'p-progressbar--thin'">
                         <ng-template pTemplate="content" let-value></ng-template>
                     </p-progressBar>
                 </div>
@@ -413,9 +393,8 @@
                         User
                     </div>
 
-                    <div pTooltip="{{ activePoolUser }}" tooltipPosition="top">
-                        <span sensitive-data class="text-monospace font-bold">{{ getAddressPart(activePoolUser) | address }}</span>
-                        <span sensitive-data>{{ getSuffixPart(activePoolUser) }}</span>
+                    <div pTooltip="{{ activePoolUser }}" tooltipPosition="top" sensitive-data>
+                        <span class="text-monospace font-bold">{{ getAddressPart(activePoolUser) | address }}</span>{{ getSuffixPart(activePoolUser) }}
                     </div>
                 </div>
 
@@ -430,7 +409,7 @@
                         {{ info.responseTime | number:'1.1-1' }} ms
                     </ng-container>
                 </div>
-                <div class="flex flex-nowrap">
+                <div class="flex flex-nowrap" *ngIf="info.coinbaseOutputs.length > 0">
                     @let percentage = getPayoutPercentage(info);
                     <ng-container *ngIf="percentage >= 95">
                         <div class="col-fixed-width text-500">
@@ -490,15 +469,15 @@
                         {{ info.scriptsig }}
                     </div>
                 </div>
-                <div class="flex flex-nowrap justify-content-between">
+                <div class="flex flex-nowrap justify-content-between" *ngIf="info.coinbaseOutputs.length > 0">
                     <div class="col-fixed-width text-500">
-                        Value
+                        <tooltip-text-icon text="Value" tooltip="Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options." />
                     </div>
                     <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
                         {{ info.coinbaseValueTotalSatoshis | sats }}
                     </ng-container>
                 </div>                
-                <div class="flex flex-nowrap align-items-baseline">
+                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.coinbaseOutputs.length > 0">
                     <div class="col-fixed-width text-500">
                         <span>Outputs</span>
                     </div>
@@ -516,6 +495,14 @@
                             }
                         </div>
                     </div>
+                </div>
+                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.coinbaseOutputs.length == 0">
+                    <div class="col-fixed-width text-500">
+                        Amount
+                    </div>
+                    <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
+                        {{ info.coinbaseValueTotalSatoshis / 100_000_000 }}
+                    </ng-container>
                 </div>
             </div>
         </div>
@@ -557,5 +544,5 @@
         </div>
     </div>
 
-    <app-confetti *ngIf="info.blockFound"></app-confetti>
+    <app-confetti *ngIf="info.showNewBlock"></app-confetti>
 </ng-container>
