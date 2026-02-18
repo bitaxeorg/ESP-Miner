@@ -39,6 +39,7 @@ typedef enum
     HEX,
     SUPRA,
     GAMMA,
+    GAMMA_DUO,
     SUPRA_HEX,
     GAMMA_TURBO,
 } Family;
