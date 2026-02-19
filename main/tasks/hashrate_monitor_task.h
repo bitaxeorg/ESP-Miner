@@ -5,7 +5,7 @@
 
 typedef struct {
     uint32_t value;
-    uint32_t time_ms;
+    uint64_t time_us;
     float hashrate;
 } measurement_t;
 

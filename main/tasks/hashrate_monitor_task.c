@@ -63,17 +63,17 @@ static void update_hashrate(measurement_t * measurement, uint32_t value)
     }
 }
 
-static void update_hash_counter(measurement_t * measurement, uint32_t value, uint32_t time_ms)
+static void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t time_us)
 {
-    uint32_t previous_time_ms = measurement->time_ms;
-    if (previous_time_ms != 0) {
-        uint32_t duration_ms = time_ms - previous_time_ms;
+    uint64_t previous_time_us = measurement->time_us;
+    if (previous_time_us != 0) {
+        uint32_t duration_us = time_us - previous_time_us;
         uint32_t counter = value - measurement->value; // Compute counter difference, handling uint32_t wraparound
-        measurement->hashrate = hashCounterToGhs(duration_ms, counter);
+        measurement->hashrate = hashCounterToGhs(duration_us, counter);
     }
 
     measurement->value = value;
-    measurement->time_ms = time_ms;
+    measurement->time_us = time_us;
 }
 
 static void init_averages()
@@ -173,7 +173,7 @@ void hashrate_monitor_task(void *pvParameters)
 
 void hashrate_monitor_register_read(void *pvParameters, register_type_t register_type, uint8_t asic_nr, uint32_t value)
 {
-    uint32_t time_ms = esp_timer_get_time() / 1000;
+    uint64_t time_us = esp_timer_get_time();
 
     GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
     HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
@@ -191,22 +191,22 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
             update_hashrate(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][0], value);
             break;
         case REGISTER_TOTAL_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->total_measurement[asic_nr], value, time_ms);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->total_measurement[asic_nr], value, time_us);
             break;
         case REGISTER_DOMAIN_0_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][0], value, time_ms);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][0], value, time_us);
             break;
         case REGISTER_DOMAIN_1_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][1], value, time_ms);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][1], value, time_us);
             break;
         case REGISTER_DOMAIN_2_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][2], value, time_ms);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][2], value, time_us);
             break;
         case REGISTER_DOMAIN_3_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][3], value, time_ms);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][3], value, time_us);
             break;
         case REGISTER_ERROR_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->error_measurement[asic_nr], value, time_ms);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->error_measurement[asic_nr], value, time_us);
             break;
         case REGISTER_PLL_PARAM:
             ESP_LOGD(TAG, "PLL param read asic %d: 0x%08" PRIX32, asic_nr, value);
