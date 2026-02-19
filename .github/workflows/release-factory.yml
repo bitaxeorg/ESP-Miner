@@ -57,3 +57,16 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: "esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin"
+      - name: Install rclone
+        run: |
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+      - name: Upload to Cloudflare R2 using rclone
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "$RCLONE_CONF" > ~/.config/rclone/rclone.conf
+          rclone copyto "esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin" \
+            "r2:esp-miner/${{ github.ref_name }}/esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin" \
+            --s3-acl public-read
