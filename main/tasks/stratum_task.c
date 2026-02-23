@@ -439,21 +439,20 @@ void stratum_task(void * pvParameters)
 
         if (retry_attempts >= MAX_RETRY_ATTEMPTS)
         {
-            if (GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url == NULL || GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url[0] == '\0') {
+            if (GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
+                // User has manually pinned fallback — never toggle away from it
+                ESP_LOGI(TAG, "Manually pinned to fallback, retrying fallback pool (retries: %d)...", retry_attempts);
+                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
+            } else if (GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url == NULL || GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url[0] == '\0') {
                 ESP_LOGI(TAG, "Unable to switch to fallback. No url configured. (retries: %d)...", retry_attempts);
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
                 retry_attempts = 0;
                 continue;
-            }
-
-            if (GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
-                // User has manually pinned fallback — do not toggle, stay on fallback
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
-                retry_attempts = 0;
             } else {
+                ESP_LOGI(TAG, "Switching target due to too many failures (retries: %d)...", retry_attempts);
                 GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
             }
-            
+
             // Reset share stats at failover
             for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
                 GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats[i].count = 0;
@@ -463,8 +462,6 @@ void stratum_task(void * pvParameters)
             GLOBAL_STATE->SYSTEM_MODULE.shares_accepted = 0;
             GLOBAL_STATE->SYSTEM_MODULE.shares_rejected = 0;
             GLOBAL_STATE->SYSTEM_MODULE.work_received = 0;
-
-            ESP_LOGI(TAG, "Switching target due to too many failures (retries: %d)...", retry_attempts);
             retry_attempts = 0;
         }
 
