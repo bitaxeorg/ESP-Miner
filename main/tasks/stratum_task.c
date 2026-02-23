@@ -268,7 +268,8 @@ void stratum_primary_heartbeat(void * pvParameters)
 
     while (1)
     {
-        if (GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback == false) {
+        if (GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback == false ||
+            GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum == true) {
             vTaskDelay(10000 / portTICK_PERIOD_MS);
             continue;
         }
@@ -445,7 +446,13 @@ void stratum_task(void * pvParameters)
                 continue;
             }
 
-            GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
+            if (GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
+                // User has manually pinned fallback — do not toggle, stay on fallback
+                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
+                retry_attempts = 0;
+            } else {
+                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
+            }
             
             // Reset share stats at failover
             for (int i = 0; i < GLOBAL_STATE->SYSTEM_MODULE.rejected_reason_stats_count; i++) {
