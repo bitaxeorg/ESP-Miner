@@ -1,7 +1,7 @@
 #ifndef BM1368_H_
 #define BM1368_H_
 
-#include "common.h"
+#include "asic_common.h"
 #include "mining.h"
 
 #define BM1368_SERIALTX_DEBUG false

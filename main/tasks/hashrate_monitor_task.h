@@ -1,7 +1,7 @@
 #ifndef HASHRATE_MONITOR_TASK_H_
 #define HASHRATE_MONITOR_TASK_H_
 
-#include "common.h"
+#include "asic_common.h"
 
 typedef struct {
     uint32_t value;
