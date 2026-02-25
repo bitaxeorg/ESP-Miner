@@ -50,7 +50,7 @@ TEST_CASE("Decode P2PKH address", "[coinbase_decoder]")
     };
     char output[MAX_ADDRESS_STRING_LEN];
     
-    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bc", false);
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
     
     TEST_ASSERT_EQUAL_STRING("1DYwPTnC4NgEmoqbLbcRqoSzVeH3ehmGbV", output);
 }
@@ -66,7 +66,7 @@ TEST_CASE("Decode P2SH address", "[coinbase_decoder]")
     };
     char output[MAX_ADDRESS_STRING_LEN];
     
-    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bc", false);
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
     
     TEST_ASSERT_EQUAL_STRING("33MGnVL6rnKqt6Jjt3HbRqWJrhwy65dMhS", output);
 }
@@ -81,7 +81,7 @@ TEST_CASE("Decode P2WPKH address", "[coinbase_decoder]")
     };
     char output[MAX_ADDRESS_STRING_LEN];
     
-    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bc", false);
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
     
     TEST_ASSERT_EQUAL_STRING("bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x", output);
 }
@@ -98,7 +98,7 @@ TEST_CASE("Decode P2WSH address", "[coinbase_decoder]")
     };
     char output[MAX_ADDRESS_STRING_LEN];
     
-    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bc", false);
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
     
     TEST_ASSERT_EQUAL_STRING("bc1qqypqxpq9qcrsszg2pvxq6rs0zqg3yyc5z5tpwxqergd3c8g7rusqyp0mu0", output);
 }
@@ -115,7 +115,7 @@ TEST_CASE("Decode P2TR address", "[coinbase_decoder]")
     };
     char output[MAX_ADDRESS_STRING_LEN];
     
-    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bc", false);
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
     
     TEST_ASSERT_EQUAL_STRING("bc1pllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqc0cgpt", output);
 }
