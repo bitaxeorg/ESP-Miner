@@ -923,8 +923,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
             ? "SV2 Extended Channel" : "SV2 Standard Channel";
     }
     cJSON_AddStringToObject(root, "activeProtocolLabel", protocol_label);
-    cJSON_AddStringToObject(root, "sv2AuthorityPubkey", sv2AuthPubkey);
-    cJSON_AddNumberToObject(root, "sv2ChannelType", nvs_config_get_u16(NVS_CONFIG_SV2_CHANNEL_TYPE));
+    cJSON_AddStringToObject(root, "stratumV2AuthorityPubkey", sv2AuthPubkey);
+    cJSON_AddNumberToObject(root, "stratumV2ChannelType", nvs_config_get_u16(NVS_CONFIG_SV2_CHANNEL_TYPE));
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
     cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY));
     cJSON_AddNumberToObject(root, "stratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE));
@@ -940,8 +940,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
     cJSON_AddNumberToObject(root, "fallbackStratumProtocol", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL));
     cJSON_AddNumberToObject(root, "fallbackStratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE));
-    cJSON_AddStringToObject(root, "fallbackSv2AuthorityPubkey", fallbackSv2AuthPubkey);
-    cJSON_AddNumberToObject(root, "fallbackSv2ChannelType", nvs_config_get_u16(NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE));
+    cJSON_AddStringToObject(root, "fallbackStratumV2AuthorityPubkey", fallbackSv2AuthPubkey);
+    cJSON_AddNumberToObject(root, "fallbackStratumV2ChannelType", nvs_config_get_u16(NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE));
     cJSON_AddFloatToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
 
     cJSON_AddStringToObject(root, "version", GLOBAL_STATE->SYSTEM_MODULE.version);

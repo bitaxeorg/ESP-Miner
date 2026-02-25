@@ -173,7 +173,7 @@ components:
         - stratumExtranonceSubscribe
         - stratumPort
         - stratumProtocol
-        - sv2AuthorityPubkey
+        - stratumV2AuthorityPubkey
         - stratumSuggestedDifficulty
         - stratumURL
         - stratumUser
@@ -257,10 +257,10 @@ components:
         fallbackStratumProtocol:
           type: number
           description: Fallback stratum protocol version (0=V1, 1=V2)
-        fallbackSv2AuthorityPubkey:
+        fallbackStratumV2AuthorityPubkey:
           type: string
           description: Fallback SV2 authority public key for certificate verification (base58-encoded)
-        fallbackSv2ChannelType:
+        fallbackStratumV2ChannelType:
           type: number
           description: Fallback SV2 channel type (0=extended, 1=standard)
         fanrpm:
@@ -403,10 +403,10 @@ components:
         activeProtocolLabel:
           type: string
           description: Human-readable label for the active protocol (e.g. "SV1", "SV2 Extended Channel")
-        sv2AuthorityPubkey:
+        stratumV2AuthorityPubkey:
           type: string
           description: SV2 authority public key for certificate verification (base58-encoded)
-        sv2ChannelType:
+        stratumV2ChannelType:
           type: number
           description: SV2 channel type (0=extended, 1=standard)
         stratumSuggestedDifficulty:
@@ -643,7 +643,7 @@ components:
           enum: [0, 1]
           examples:
             - 0
-        sv2AuthorityPubkey:
+        stratumV2AuthorityPubkey:
           type: string
           description: Optional SV2 authority public key for certificate verification (base58-encoded)
           pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
@@ -664,7 +664,7 @@ components:
           enum: [0, 1]
           examples:
             - 0
-        fallbackSv2AuthorityPubkey:
+        fallbackStratumV2AuthorityPubkey:
           type: string
           description: Optional fallback SV2 authority public key for certificate verification (base58-encoded)
           pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"

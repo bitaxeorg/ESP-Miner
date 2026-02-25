@@ -83,7 +83,7 @@ export class PoolComponent implements OnInit {
             Validators.max(65535)
           ]],
           stratumProtocol: [info.stratumProtocol || 0],
-          sv2AuthorityPubkey: [info.sv2AuthorityPubkey || '', [this.base58Validator()]],
+          stratumV2AuthorityPubkey: [info.stratumV2AuthorityPubkey || '', [this.base58Validator()]],
           stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == true, [Validators.required]],
           stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
           stratumUser: [info.stratumUser, [Validators.required]],
@@ -108,9 +108,9 @@ export class PoolComponent implements OnInit {
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
           fallbackStratumPassword: ['*****', [Validators.required]],
           fallbackStratumProtocol: [info.fallbackStratumProtocol || 0],
-          fallbackSv2AuthorityPubkey: [info.fallbackSv2AuthorityPubkey || '', [this.base58Validator()]],
-          sv2ChannelType: [info.sv2ChannelType ?? 0],
-          fallbackSv2ChannelType: [info.fallbackSv2ChannelType ?? 0]
+          fallbackStratumV2AuthorityPubkey: [info.fallbackStratumV2AuthorityPubkey || '', [this.base58Validator()]],
+          stratumV2ChannelType: [info.stratumV2ChannelType ?? 0],
+          fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType ?? 0]
         });
 
         const setupTlsValidation = (tlsControlName: string, certControlName: string) => {
@@ -312,7 +312,7 @@ export class PoolComponent implements OnInit {
 
   isPoolV2Extended(pool: PoolType): boolean {
     if (!this.isPoolV2Enabled(pool)) return false;
-    const key = pool === 'stratum' ? 'sv2ChannelType' : 'fallbackSv2ChannelType';
+    const key = pool === 'stratum' ? 'stratumV2ChannelType' : 'fallbackStratumV2ChannelType';
     return this.form?.get(key)?.value === 0;
   }
 }
