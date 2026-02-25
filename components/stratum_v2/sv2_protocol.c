@@ -1,4 +1,5 @@
 #include "sv2_protocol.h"
+#include "utils.h"
 #include <string.h>
 #include <math.h>
 
@@ -539,36 +540,9 @@ void sv2_ext_job_free(sv2_ext_job_t *job)
 
 // --- Helpers ---
 
-// truediffone = 0x00000000FFFF0000000000000000000000000000000000000000000000000000
-static const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
-static const double bits192 = 6277101735386680763835789423207666416102355444464034512896.0;
-static const double bits128 = 340282366920938463463374607431768211456.0;
-static const double bits64 = 18446744073709551616.0;
-
-// Convert LE 256-bit value to double (same logic as utils.c le256todouble)
-static double le256_to_double(const uint8_t *target)
-{
-    double dcut64;
-    uint64_t data64;
-
-    memcpy(&data64, target + 24, 8);
-    dcut64 = (double)data64 * bits192;
-
-    memcpy(&data64, target + 16, 8);
-    dcut64 += (double)data64 * bits128;
-
-    memcpy(&data64, target + 8, 8);
-    dcut64 += (double)data64 * bits64;
-
-    memcpy(&data64, target, 8);
-    dcut64 += (double)data64;
-
-    return dcut64;
-}
-
 uint32_t sv2_target_to_pdiff(const uint8_t target[32])
 {
-    double target_d = le256_to_double(target);
+    double target_d = le256todouble(target);
     if (target_d == 0.0) return UINT32_MAX;
     double pdiff = truediffone / target_d;
     if (pdiff > (double)UINT32_MAX) return UINT32_MAX;

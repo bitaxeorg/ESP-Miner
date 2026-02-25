@@ -132,10 +132,6 @@ void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[sta
 }
 
 ///////cgminer nonce testing
-/* truediffone == 0x00000000FFFF0000000000000000000000000000000000000000000000000000
- */
-static const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
-
 /* testing a nonce and return the diff - 0 means invalid */
 double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version)
 {
