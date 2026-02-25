@@ -427,9 +427,7 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
             mbedtls_sha256_context sha;
             mbedtls_sha256_init(&sha);
             mbedtls_sha256_starts(&sha, 0);
-            mbedtls_sha256_update(&sha, sig_msg, 2);   // version
-            mbedtls_sha256_update(&sha, sig_msg + 2, 4); // valid_from
-            mbedtls_sha256_update(&sha, sig_msg + 6, 4); // not_valid_after
+            mbedtls_sha256_update(&sha, sig_msg, 10); // version(2) + valid_from(4) + not_valid_after(4)
             // Decode rs_static to get the actual 32-byte x-only pubkey
             secp256k1_pubkey decoded_pubkey;
             secp256k1_ellswift_decode(ctx->secp_ctx, &decoded_pubkey, rs_static);
