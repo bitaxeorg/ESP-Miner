@@ -56,15 +56,16 @@ struct timeval tcp_rcv_timeout = {
 
 
 typedef struct {
-    struct sockaddr_storage dest_addr;
+    struct sockaddr_storage dest_addr;  // Stores IPv4 or IPv6 address with scope_id for IPv6
     socklen_t addrlen;
     int addr_family;
     int ip_protocol;
-    char host_ip[INET6_ADDRSTRLEN + 16];
+    char host_ip[INET6_ADDRSTRLEN + 16];  // IPv6 address + zone identifier (e.g., "fe80::1%wlan0")
 } stratum_connection_info_t;
 
 static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, stratum_connection_info_t *conn_info)
 {
+    // Input validation
     if (hostname == NULL || conn_info == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -92,9 +93,11 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
         return ESP_ERR_NOT_FOUND;
     }
 
+    // Initialize connection info
     memset(conn_info, 0, sizeof(*conn_info));
     conn_info->addr_family = AF_UNSPEC;
 
+    // Preferred order: IPv4 first, then IPv6
     const int preferred_families[] = { AF_INET, AF_INET6 };
     const size_t num_families = sizeof(preferred_families) / sizeof(preferred_families[0]);
 
@@ -117,11 +120,13 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
         return ESP_ERR_NOT_SUPPORTED;
     }
 
+    // Copy selected address
     memcpy(&conn_info->dest_addr, selected->ai_addr, selected->ai_addrlen);
     conn_info->addrlen     = selected->ai_addrlen;
     conn_info->addr_family = selected->ai_family;
     conn_info->ip_protocol = (selected->ai_family == AF_INET) ? IPPROTO_IP : IPPROTO_IPV6;
 
+    // Handle IPv6 link-local scope ID if needed
     if (selected->ai_family == AF_INET6) {
         struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
 
@@ -158,6 +163,7 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
         src_addr = &addr6->sin6_addr;
     }
 
+    // Convert resolved address to string for logging and storage
     if (inet_ntop(af, src_addr, conn_info->host_ip, sizeof(conn_info->host_ip)) == NULL) {
         ESP_LOGW(TAG, "inet_ntop failed (errno: %d)", errno);
         snprintf(conn_info->host_ip, sizeof(conn_info->host_ip), "[invalid %s addr]",
@@ -169,6 +175,7 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
             snprintf(zone, sizeof(zone), "%%%lu", (unsigned long)addr6->sin6_scope_id);
             strncat(conn_info->host_ip, zone,
                     sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
+            // Ensure null termination
             conn_info->host_ip[sizeof(conn_info->host_ip) - 1] = '\0';
         }
     }
@@ -183,6 +190,7 @@ static void set_socket_options(esp_transport_handle_t transport)
 {
     int sock = esp_transport_get_socket(transport);
     if (sock >= 0) {
+        // Set send and receive timeouts
         if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tcp_snd_timeout, sizeof(tcp_snd_timeout)) < 0) {
             ESP_LOGE(TAG, "Failed to set SO_SNDTIMEO");
         }
@@ -190,14 +198,16 @@ static void set_socket_options(esp_transport_handle_t transport)
             ESP_LOGE(TAG, "Failed to set SO_RCVTIMEO");
         }
 
+        // Enable keepalive
         int keepalive = 1;
         if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive)) < 0) {
             ESP_LOGE(TAG, "Failed to set SO_KEEPALIVE");
         }
 
-        int keepidle = 60;
-        int keepintvl = 10;
-        int keepcnt = 3;
+        // Set keepalive parameters (adjust values as needed)
+        int keepidle = 60;  // TCP_KEEPIDLE: seconds before sending keepalive
+        int keepintvl = 10; // TCP_KEEPINTVL: seconds between keepalive probes
+        int keepcnt = 3;    // TCP_KEEPCNT: number of keepalive probes
         if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, sizeof(keepidle)) < 0) {
             ESP_LOGE(TAG, "Failed to set TCP_KEEPIDLE");
         }
@@ -271,14 +281,17 @@ static void decode_mining_notification(GlobalState *GLOBAL_STATE, const mining_n
         return;
     }
 
+    // Update network difficulty
     GLOBAL_STATE->network_nonce_diff = (uint64_t) result->network_difficulty;
     suffixString(result->network_difficulty, GLOBAL_STATE->network_diff_string, DIFF_STRING_SIZE, 0);
 
+    // Update block height
     if (result->block_height != GLOBAL_STATE->block_height) {
         ESP_LOGI(TAG, "Block height %d", result->block_height);
         GLOBAL_STATE->block_height = result->block_height;
     }
 
+    // Update scriptsig
     if (result->scriptsig) {
         if (strcmp(result->scriptsig, GLOBAL_STATE->scriptsig) != 0) {
             ESP_LOGI(TAG, "Scriptsig: %s", result->scriptsig);
@@ -288,6 +301,8 @@ static void decode_mining_notification(GlobalState *GLOBAL_STATE, const mining_n
         free(result->scriptsig);
     }
 
+    // Update coinbase outputs
+    // Safety guard: ensure output_count doesn't exceed array capacity
     if (result->output_count > MAX_COINBASE_TX_OUTPUTS) {
         result->output_count = MAX_COINBASE_TX_OUTPUTS;
     }
@@ -357,6 +372,7 @@ void stratum_v1_task(void *pvParameters)
         }
 
         if (retry_attempts >= MAX_RETRY_ATTEMPTS) {
+            // Reset share stats at failover
             // Notify coordinator and exit — let it handle fallback decisions
             ESP_LOGW(TAG, "Max V1 retry attempts reached (%d), notifying coordinator", retry_attempts);
             stratum_v1_close_connection(GLOBAL_STATE);
@@ -376,6 +392,7 @@ void stratum_v1_task(void *pvParameters)
         ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)", stratum_url, port, conn_info.host_ip);
 
         GLOBAL_STATE->transport = STRATUM_V1_transport_init(tls, cert);
+        // Check if transport was initialized
         if (GLOBAL_STATE->transport == NULL) {
             ESP_LOGE(TAG, "Transport initialization failed.");
             retry_attempts++;
@@ -388,9 +405,11 @@ void stratum_v1_task(void *pvParameters)
         if (ret != ESP_OK) {
             retry_attempts++;
             ESP_LOGE(TAG, "Transport unable to connect to %s:%d (errno %d). Attempt: %d", stratum_url, port, ret, retry_attempts);
+            // close the transport
             esp_transport_close(GLOBAL_STATE->transport);
             esp_transport_destroy(GLOBAL_STATE->transport);
             GLOBAL_STATE->transport = NULL;
+            // instead of restarting, retry this every 5 seconds
             vTaskDelay(5000 / portTICK_PERIOD_MS);
             continue;
         }
@@ -475,6 +494,7 @@ void stratum_v1_task(void *pvParameters)
                 GLOBAL_STATE->new_stratum_version_rolling_msg = true;
             } else if (stratum_api_v1_message.method == MINING_SET_EXTRANONCE ||
                     stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
+                // Validate extranonce_2_len to prevent buffer overflow
                 if (stratum_api_v1_message.extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
                     ESP_LOGW(TAG, "Extranonce_2_len %d exceeds maximum %d, clamping to maximum",
                              stratum_api_v1_message.extranonce_2_len, MAX_EXTRANONCE_2_LEN);
@@ -500,6 +520,7 @@ void stratum_v1_task(void *pvParameters)
                     SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
                 }
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {
+                // Reset retry attempts after successfully receiving data.
                 retry_attempts = 0;
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "setup message accepted");
