@@ -33,17 +33,20 @@ uint64_t coinbase_decode_varint(const uint8_t *data, int *offset);
 
 /**
  * @brief Decode Bitcoin address from scriptPubKey
- * 
+ *
  * Supports P2PKH, P2SH, P2WPKH, P2WSH, and P2TR address types.
- * Output format: "<TYPE>:<HEX_HASH>"
- * 
+ * Detects network from user_address prefix (bc1/tb1/bcrt1/1/3/m/n/2).
+ *
  * @param script ScriptPubKey binary data
  * @param script_len Length of scriptPubKey
  * @param output Output buffer for address string
  * @param output_len Size of output buffer (should be at least MAX_ADDRESS_STRING_LEN)
+ * @param bech32_hrp Bech32 human-readable part ("bc" for mainnet, "tb" for testnet, "bcrt" for regtest)
+ * @param is_testnet true for testnet/regtest (affects base58 version bytes)
  */
-void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t script_len, 
-                                                char *output, size_t output_len);
+void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t script_len,
+                                                char *output, size_t output_len,
+                                                const char *bech32_hrp, bool is_testnet);
 
 /**
  * @brief Structure representing a decoded coinbase transaction output
@@ -53,26 +56,6 @@ typedef struct {
     char address[MAX_ADDRESS_STRING_LEN];
     bool is_user_output;
 } coinbase_output_t;
-
-/**
- * @brief Decode a variable-length integer from binary data
- * 
- * @param data Binary data containing the varint
- * @param offset Pointer to current offset (will be updated)
- * @return Decoded integer value
- */
-uint64_t coinbase_decode_varint(const uint8_t *data, int *offset);
-
-/**
- * @brief Decode a Bitcoin address from a scriptPubKey
- * 
- * @param script Binary scriptPubKey data
- * @param script_len Length of scriptPubKey
- * @param output Buffer to store the decoded address string
- * @param output_len Size of output buffer
- */
-void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t script_len, 
-                                                char *output, size_t output_len);
 
 /**
  * @brief Result structure for full mining notification processing
