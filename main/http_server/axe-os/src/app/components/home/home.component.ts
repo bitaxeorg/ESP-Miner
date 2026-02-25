@@ -626,11 +626,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   hasCoinbaseVisibility(info: ISystemInfo): boolean {
-    if (info.activeStratumProtocol !== 1) return true; // V1 always has coinbase data
-    const channelType = info.isUsingFallbackStratum
-      ? (info.fallbackSv2ChannelType ?? 0)
-      : (info.sv2ChannelType ?? 0);
-    return channelType === 0; // 0 = extended channel has coinbase template
+    return info.blockHeight > 0;
   }
 
   getPayoutPercentage(info: ISystemInfo) {
