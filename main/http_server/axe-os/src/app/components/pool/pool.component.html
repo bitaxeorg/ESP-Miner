@@ -120,7 +120,7 @@
                             <label [htmlFor]="pool === 'stratum' ? 'sv2AuthorityPubkey' : 'fallbackSv2AuthorityPubkey'" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">
                                 <tooltip-text-icon
                                     text="SV2 Authority Pubkey"
-                                    tooltip="Optional base58-encoded authority public key for verifying server certificate signatures. Leave empty to skip verification (TOFU mode)."
+                                    tooltip="The pool operator provides this key to prove you are connecting to the real pool and not an impersonator. Without it, the connection is still encrypted but a man-in-the-middle attack could redirect your hashrate."
                                 />
                             </label>
                             <div class="col-12 md:col-10">

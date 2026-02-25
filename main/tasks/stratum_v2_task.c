@@ -695,7 +695,7 @@ void stratum_v2_task(void *pvParameters)
         if (has_auth) {
             ESP_LOGI(TAG, "Authority pubkey configured, will verify server certificate");
         } else {
-            ESP_LOGW(TAG, "No authority pubkey configured (TOFU mode)");
+            ESP_LOGW(TAG, "No authority pubkey configured, server identity will not be verified");
         }
 
         if (sv2_noise_handshake(noise_ctx, transport, has_auth ? auth_key : NULL) != 0) {
