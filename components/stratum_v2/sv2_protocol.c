@@ -198,13 +198,14 @@ int sv2_build_submit_shares_standard(uint8_t *buf, size_t buf_len,
     // Channel message: extension_type has bit 15 set
     sv2_encode_frame_header(buf, SV2_CHANNEL_MSG_FLAG, SV2_MSG_SUBMIT_SHARES_STANDARD, (uint32_t)payload_len);
 
-    uint8_t *p = buf + SV2_FRAME_HEADER_SIZE;
-    write_u32_le(p, channel_id);      p += 4;
-    write_u32_le(p, sequence_number); p += 4;
-    write_u32_le(p, job_id);          p += 4;
-    write_u32_le(p, nonce);           p += 4;
-    write_u32_le(p, ntime);           p += 4;
-    write_u32_le(p, version);
+    int pos = 0;
+    uint8_t *payload = buf + SV2_FRAME_HEADER_SIZE;
+    write_u32_le(payload + pos, channel_id);      pos += 4;
+    write_u32_le(payload + pos, sequence_number); pos += 4;
+    write_u32_le(payload + pos, job_id);          pos += 4;
+    write_u32_le(payload + pos, nonce);           pos += 4;
+    write_u32_le(payload + pos, ntime);           pos += 4;
+    write_u32_le(payload + pos, version);
 
     return total;
 }
@@ -387,18 +388,19 @@ int sv2_build_submit_shares_extended(uint8_t *buf, size_t buf_len,
     // Channel message: extension_type has bit 15 set
     sv2_encode_frame_header(buf, SV2_CHANNEL_MSG_FLAG, SV2_MSG_SUBMIT_SHARES_EXTENDED, (uint32_t)payload_len);
 
-    uint8_t *p = buf + SV2_FRAME_HEADER_SIZE;
-    write_u32_le(p, channel_id);      p += 4;
-    write_u32_le(p, sequence_number); p += 4;
-    write_u32_le(p, job_id);          p += 4;
-    write_u32_le(p, nonce);           p += 4;
-    write_u32_le(p, ntime);           p += 4;
-    write_u32_le(p, version);         p += 4;
+    int pos = 0;
+    uint8_t *payload = buf + SV2_FRAME_HEADER_SIZE;
+    write_u32_le(payload + pos, channel_id);      pos += 4;
+    write_u32_le(payload + pos, sequence_number); pos += 4;
+    write_u32_le(payload + pos, job_id);          pos += 4;
+    write_u32_le(payload + pos, nonce);           pos += 4;
+    write_u32_le(payload + pos, ntime);           pos += 4;
+    write_u32_le(payload + pos, version);         pos += 4;
 
     // extranonce: B0_32 (1 byte length + data)
-    *p++ = extranonce_len;
+    payload[pos++] = extranonce_len;
     if (extranonce_len > 0) {
-        memcpy(p, extranonce, extranonce_len);
+        memcpy(payload + pos, extranonce, extranonce_len);
     }
 
     return total;
