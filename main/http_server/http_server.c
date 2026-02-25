@@ -46,6 +46,7 @@
 #include "http_server.h"
 #include "system.h"
 #include "websocket.h"
+#include "stratum_v2_task.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -916,6 +917,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT));
     cJSON_AddNumberToObject(root, "stratumProtocol", nvs_config_get_u16(NVS_CONFIG_STRATUM_PROTOCOL));
     cJSON_AddNumberToObject(root, "activeStratumProtocol", (int)GLOBAL_STATE->stratum_protocol);
+    const char *protocol_label = "SV1";
+    if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+        protocol_label = stratum_v2_is_extended_channel(GLOBAL_STATE)
+            ? "SV2 Extended Channel" : "SV2 Standard Channel";
+    }
+    cJSON_AddStringToObject(root, "activeProtocolLabel", protocol_label);
     cJSON_AddStringToObject(root, "sv2AuthorityPubkey", sv2AuthPubkey);
     cJSON_AddNumberToObject(root, "sv2ChannelType", nvs_config_get_u16(NVS_CONFIG_SV2_CHANNEL_TYPE));
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);

@@ -622,11 +622,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   getProtocolLabel(info: ISystemInfo): string {
-    if (info.activeStratumProtocol !== 1) return 'SV1';
-    const channelType = info.isUsingFallbackStratum
-      ? (info.fallbackSv2ChannelType ?? 0)
-      : (info.sv2ChannelType ?? 0);
-    return channelType === 0 ? 'SV2 Extended Channel' : 'SV2 Standard Channel';
+    return info.activeProtocolLabel ?? 'SV1';
   }
 
   hasCoinbaseVisibility(info: ISystemInfo): boolean {
