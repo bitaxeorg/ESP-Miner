@@ -844,6 +844,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * stratumCert = nvs_config_get_string(NVS_CONFIG_STRATUM_CERT);
     char * fallbackStratumCert = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_CERT);
     char * sv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_SV2_AUTHORITY_PUBKEY);
+    char * fallbackSv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY);
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
     
@@ -930,7 +931,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddNumberToObject(root, "fallbackStratumTLS", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS));
     cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
+    cJSON_AddNumberToObject(root, "fallbackStratumProtocol", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL));
     cJSON_AddNumberToObject(root, "fallbackStratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE));
+    cJSON_AddStringToObject(root, "fallbackSv2AuthorityPubkey", fallbackSv2AuthPubkey);
     cJSON_AddNumberToObject(root, "fallbackSv2ChannelType", nvs_config_get_u16(NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE));
     cJSON_AddFloatToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
 
@@ -1018,6 +1021,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(stratumCert);
     free(fallbackStratumCert);
     free(sv2AuthPubkey);
+    free(fallbackSv2AuthPubkey);
     free(stratumUser);
     free(fallbackStratumUser);
     free(display);
