@@ -19,7 +19,7 @@ jobs:
         build_type: ["102", "201", "202", "203", "204", "205", "207", "302", "303", "400", "401", "402", "403", "601", "602", "650", "701", "702", "801"]
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: 'recursive'
       - name: Setup Node.js
@@ -45,7 +45,7 @@ jobs:
           target: esp32s3
           command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate config-${{ matrix.build_type }}.cvs config.bin 0x6000
           path: '.'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
           cache: 'pip'
