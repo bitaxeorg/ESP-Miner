@@ -147,6 +147,15 @@ void create_jobs_task(void *pvParameters)
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 continue;
             }
+            // SV2 standard channel: the ASIC has enough nonce+version space
+            // (2^32 nonces x version rolls) to keep mining without re-feeding.
+            // Re-sending the same job restarts the nonce search from 0 and
+            // produces duplicate shares. Only send work on new jobs.
+            // (V1 and SV2 extended are fine — extranonce_2 gives unique work each time.)
+            if (active_protocol == STRATUM_V2 && !stratum_v2_is_extended_channel(GLOBAL_STATE)) {
+                timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+                continue;
+            }
         }
 
         // Final protocol check before generating work — protocol may have switched
