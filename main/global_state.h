@@ -21,6 +21,8 @@
 
 #define HISTORY_LENGTH 100
 #define DIFF_STRING_SIZE 10
+#define MAX_BLOCK_SIGNALS 8
+#define MAX_BLOCK_SIGNAL_LEN 16
 
 typedef struct {
     char message[64];
@@ -152,6 +154,8 @@ typedef struct
     uint64_t coinbase_value_user_satoshis;
     uint64_t network_nonce_diff;
     char network_diff_string[DIFF_STRING_SIZE];
+    char block_signals[MAX_BLOCK_SIGNALS][MAX_BLOCK_SIGNAL_LEN];
+    int block_signals_count;
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */

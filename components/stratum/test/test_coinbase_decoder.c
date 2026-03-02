@@ -119,3 +119,35 @@ TEST_CASE("Decode P2TR address", "[coinbase_decoder]")
     
     TEST_ASSERT_EQUAL_STRING("bc1pllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqc0cgpt", output);
 }
+
+TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
+{
+    // Create a mining_notify without BIP-110 bit set
+    mining_notify notify = { 0 };
+    notify.version = 0x20000000;  // No BIP-110 signaling
+    notify.job_id = "test_job";
+    notify.coinbase_1 = "0200000000000000";
+    notify.coinbase_2 = "00";
+    
+    mining_notification_result_t result = { 0 };
+    
+    esp_err_t err = coinbase_process_notification(&notify, "", 0, "", false, &result);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_FALSE(result.bip110_signaling);
+}
+
+TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
+{
+    // Create a minimal mining_notify with BIP-110 bit set (bit 4 = 0x00000010)
+    mining_notify notify = { 0 };
+    notify.version = 0x20000010;  // BIP-110 signaling bit set
+    notify.job_id = "test_job";
+    notify.coinbase_1 = "0200000000000000";
+    notify.coinbase_2 = "00";
+    
+    mining_notification_result_t result = { 0 };
+    
+    esp_err_t err = coinbase_process_notification(&notify, "", 0, "", false, &result);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_TRUE(result.bip110_signaling);
+}

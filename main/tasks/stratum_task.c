@@ -366,6 +366,15 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
         GLOBAL_STATE->block_height = result->block_height;
     }
 
+    // Update block signals (BIP-110, etc.)
+    GLOBAL_STATE->block_signals_count = 0;
+    if (result->bip110_signaling) {
+        strncpy(GLOBAL_STATE->block_signals[0], "BIP-110", MAX_BLOCK_SIGNAL_LEN - 1);
+        GLOBAL_STATE->block_signals[0][MAX_BLOCK_SIGNAL_LEN - 1] = '\0';
+        GLOBAL_STATE->block_signals_count = 1;
+        ESP_LOGI(TAG, "BIP-110 signaling detected");
+    }
+
     // Update scriptsig
     if (result->scriptsig) {
         if (strcmp(result->scriptsig, GLOBAL_STATE->scriptsig) != 0) {

@@ -153,6 +153,9 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
     result->user_value_satoshis = 0;
     result->decoding_enabled = decode_outputs;
 
+    // Detect BIP-110 signaling: check if bit 4 (0x00000010) is set in version
+    result->bip110_signaling = (notification->version & 0x00000010) != 0;
+
     // 1. Calculate difficulty
     result->network_difficulty = networkDifficulty(notification->target);
 
