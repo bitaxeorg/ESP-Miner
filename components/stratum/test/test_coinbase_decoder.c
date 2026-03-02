@@ -126,7 +126,7 @@ TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
     mining_notify notify = { 0 };
     notify.version = 0x20000000;  // No BIP-110 signaling
     notify.job_id = "test_job";
-    notify.coinbase_1 = "0200000000000000";
+    notify.coinbase_1 = "010000000100000000000000000000000000000000000000000000000000000000000000ffffffff";
     notify.coinbase_2 = "00";
     
     mining_notification_result_t result = { 0 };
@@ -138,11 +138,11 @@ TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
 
 TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
 {
-    // Create a minimal mining_notify with BIP-110 bit set (bit 4 = 0x00000010)
+    // Create a mining_notify with BIP-110 bit set (bit 4 = 0x00000010)
     mining_notify notify = { 0 };
-    notify.version = 0x20000010;  // BIP-110 signaling bit set
+    notify.version = 0x20000010;  // Version with BIP-110 signaling
     notify.job_id = "test_job";
-    notify.coinbase_1 = "0200000000000000";
+    notify.coinbase_1 = "010000000100000000000000000000000000000000000000000000000000000000000000ffffffff";
     notify.coinbase_2 = "00";
     
     mining_notification_result_t result = { 0 };
