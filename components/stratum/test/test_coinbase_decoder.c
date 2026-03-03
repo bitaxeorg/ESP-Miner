@@ -168,7 +168,7 @@ TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
     // Use valid extranonce1 (8 hex chars = 4 bytes)
     esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
-    TEST_ASSERT_EQUAL(965663, result.block_height)
+    TEST_ASSERT_EQUAL(965663, result.block_height);
     TEST_ASSERT_TRUE(result.bip110_signaling);
 }
 
@@ -186,6 +186,6 @@ TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
     // Use valid extranonce1 (8 hex chars = 4 bytes)
     esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
-    TEST_ASSERT_EQUAL(965664, result.block_height)
+    TEST_ASSERT_EQUAL(965664, result.block_height);
     TEST_ASSERT_FALSE(result.bip110_signaling);
 }
