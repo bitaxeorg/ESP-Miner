@@ -343,7 +343,7 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
     memset(result, 0, sizeof(mining_notification_result_t));
 
     const char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-    bool decode_coinbase_tx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_decode_coinbase : GLOBAL_STATE->SYSTEM_MODULE.pool_decode_coinbase;
+    bool decode_coinbase_tx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_decode_coinbase_tx : GLOBAL_STATE->SYSTEM_MODULE.pool_decode_coinbase_tx;
 
     if (coinbase_process_notification(mining_notification,
                                      GLOBAL_STATE->extranonce_str,
