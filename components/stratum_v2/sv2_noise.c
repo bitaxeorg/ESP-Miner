@@ -193,7 +193,12 @@ sv2_noise_ctx_t *sv2_noise_create(void)
     // Randomize the context for side-channel protection
     uint8_t seed[32];
     esp_fill_random(seed, sizeof(seed));
-    secp256k1_context_randomize(ctx->secp_ctx, seed);
+    if (!secp256k1_context_randomize(ctx->secp_ctx, seed)) {
+        ESP_LOGE(TAG, "Failed to randomize secp256k1 context");
+        secp256k1_context_destroy(ctx->secp_ctx);
+        free(ctx);
+        return NULL;
+    }
 
     return ctx;
 }
@@ -439,7 +444,11 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
             secp256k1_ellswift_decode(ctx->secp_ctx, &decoded_pubkey, rs_static);
             secp256k1_xonly_pubkey xonly_pk;
             int pk_parity;
-            secp256k1_xonly_pubkey_from_pubkey(ctx->secp_ctx, &xonly_pk, &pk_parity, &decoded_pubkey);
+            if (!secp256k1_xonly_pubkey_from_pubkey(ctx->secp_ctx, &xonly_pk, &pk_parity, &decoded_pubkey)) {
+                ESP_LOGE(TAG, "Failed to extract x-only pubkey from server key");
+                mbedtls_sha256_free(&sha);
+                return -1;
+            }
             uint8_t xonly_bytes[32];
             secp256k1_xonly_pubkey_serialize(ctx->secp_ctx, xonly_bytes, &xonly_pk);
             mbedtls_sha256_update(&sha, xonly_bytes, 32);
