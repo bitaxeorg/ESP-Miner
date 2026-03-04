@@ -5,7 +5,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "system.h"
-#include "common.h"
+#include "asic_common.h"
 #include "asic.h"
 #include "utils.h"
 

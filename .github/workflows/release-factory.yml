@@ -69,4 +69,4 @@ jobs:
           echo "$RCLONE_CONF" > ~/.config/rclone/rclone.conf
           rclone copyto "esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin" \
             "r2:esp-miner/${{ github.ref_name }}/esp-miner-factory-${{ matrix.build_type }}-${{ github.ref_name }}.bin" \
-            --s3-acl public-read
+            --s3-acl public-read --s3-no-check-bucket

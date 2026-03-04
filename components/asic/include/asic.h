@@ -3,7 +3,7 @@
 
 #include <esp_err.h>
 #include "global_state.h"
-#include "common.h"
+#include "asic_common.h"
 
 uint8_t ASIC_init(GlobalState * GLOBAL_STATE);
 task_result * ASIC_process_work(GlobalState * GLOBAL_STATE);

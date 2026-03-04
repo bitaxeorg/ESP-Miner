@@ -466,7 +466,7 @@ bool self_test(void * pvParameters)
             if (nonce_diff >= DIFFICULTY) {
                 counter += DIFFICULTY;
                 duration_ms = (esp_timer_get_time() / 1000) - start_ms;
-                hashrate = hashCounterToGhs(duration_ms, counter);
+                hashrate = hashCounterToGhs(duration_ms * 1000, counter);
 
                 ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
                 ESP_LOGI(TAG, "%f Gh/s  , duration %dms", hashrate, duration_ms);

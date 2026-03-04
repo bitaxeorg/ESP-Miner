@@ -1,7 +1,7 @@
 #ifndef BM1370_H_
 #define BM1370_H_
 
-#include "common.h"
+#include "asic_common.h"
 #include "mining.h"
 
 #define BM1370_SERIALTX_DEBUG false
