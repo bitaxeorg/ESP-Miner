@@ -407,12 +407,18 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
     // Step 14: Parse signature message
     // version(u16 LE) + valid_from(u32 LE) + not_valid_after(u32 LE) + schnorr_sig(64B)
-    uint16_t cert_version = sig_msg[0] | ((uint16_t)sig_msg[1] << 8);
-    uint32_t valid_from = sig_msg[2] | ((uint32_t)sig_msg[3] << 8) |
-                          ((uint32_t)sig_msg[4] << 16) | ((uint32_t)sig_msg[5] << 24);
-    uint32_t not_valid_after = sig_msg[6] | ((uint32_t)sig_msg[7] << 8) |
-                               ((uint32_t)sig_msg[8] << 16) | ((uint32_t)sig_msg[9] << 24);
-    const uint8_t *schnorr_sig = sig_msg + 10;
+    typedef struct __attribute__((packed)) {
+        uint16_t version;
+        uint32_t valid_from;
+        uint32_t not_valid_after;
+        uint8_t schnorr_sig[64];
+    } sv2_cert_msg_t;
+
+    sv2_cert_msg_t *cert = (sv2_cert_msg_t *)sig_msg;
+    uint16_t cert_version = cert->version;
+    uint32_t valid_from = cert->valid_from;
+    uint32_t not_valid_after = cert->not_valid_after;
+    const uint8_t *schnorr_sig = cert->schnorr_sig;
 
     ESP_LOGI(TAG, "Server certificate: version=%d, valid_from=%lu, not_valid_after=%lu",
              cert_version, valid_from, not_valid_after);

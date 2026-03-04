@@ -651,6 +651,8 @@ void stratum_v2_task(void *pvParameters)
         esp_transport_handle_t transport = esp_transport_tcp_init();
         if (!transport) {
             ESP_LOGE(TAG, "Failed to init TCP transport");
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Internal error");
             retry_attempts++;
             vTaskDelay(5000 / portTICK_PERIOD_MS);
             continue;
@@ -661,6 +663,8 @@ void stratum_v2_task(void *pvParameters)
         esp_err_t ret = esp_transport_connect(transport, stratum_url, port, TRANSPORT_TIMEOUT_MS);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "TCP connect failed to %s:%d (err %d)", stratum_url, port, ret);
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool unreachable");
             esp_transport_close(transport);
             esp_transport_destroy(transport);
             retry_attempts++;
@@ -683,6 +687,8 @@ void stratum_v2_task(void *pvParameters)
         sv2_noise_ctx_t *noise_ctx = sv2_noise_create();
         if (!noise_ctx) {
             ESP_LOGE(TAG, "Failed to create noise context");
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Internal error");
             stratum_v2_close_connection(GLOBAL_STATE);
             retry_attempts++;
             continue;
@@ -700,6 +706,8 @@ void stratum_v2_task(void *pvParameters)
 
         if (sv2_noise_handshake(noise_ctx, transport, has_auth ? auth_key : NULL) != 0) {
             ESP_LOGE(TAG, "Noise handshake failed, reconnecting...");
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Auth failed - check key");
             stratum_v2_close_connection(GLOBAL_STATE);
             retry_attempts++;
             continue;
@@ -735,6 +743,8 @@ void stratum_v2_task(void *pvParameters)
                                                        "", "", setup_flags);
             if (frame_len < 0 || sv2_noise_send(noise_ctx, transport, frame_buf, frame_len) != 0) {
                 ESP_LOGE(TAG, "Failed to send SetupConnection");
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Connection lost");
                 stratum_v2_close_connection(GLOBAL_STATE);
                 retry_attempts++;
                 continue;
@@ -746,6 +756,8 @@ void stratum_v2_task(void *pvParameters)
             if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
                                sizeof(recv_buf), &payload_len) != 0) {
                 ESP_LOGE(TAG, "Failed to receive SetupConnectionSuccess");
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool not responding");
                 stratum_v2_close_connection(GLOBAL_STATE);
                 retry_attempts++;
                 continue;
@@ -754,6 +766,8 @@ void stratum_v2_task(void *pvParameters)
 
             if (hdr.msg_type != SV2_MSG_SETUP_CONNECTION_SUCCESS) {
                 ESP_LOGE(TAG, "SetupConnection rejected by pool (msg_type=0x%02x)", hdr.msg_type);
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool rejected config");
                 stratum_v2_close_connection(GLOBAL_STATE);
                 retry_attempts++;
                 continue;
@@ -789,6 +803,8 @@ void stratum_v2_task(void *pvParameters)
 
             if (frame_len < 0 || sv2_noise_send(noise_ctx, transport, frame_buf, frame_len) != 0) {
                 ESP_LOGE(TAG, "Failed to send OpenMiningChannel");
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Connection lost");
                 stratum_v2_close_connection(GLOBAL_STATE);
                 retry_attempts++;
                 continue;
@@ -800,6 +816,8 @@ void stratum_v2_task(void *pvParameters)
             if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
                                sizeof(recv_buf), &payload_len) != 0) {
                 ESP_LOGE(TAG, "Failed to receive OpenChannelSuccess");
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool not responding");
                 stratum_v2_close_connection(GLOBAL_STATE);
                 retry_attempts++;
                 continue;
@@ -813,6 +831,8 @@ void stratum_v2_task(void *pvParameters)
             if (hdr.msg_type != expected_msg) {
                 ESP_LOGE(TAG, "OpenChannel rejected by pool (msg_type=0x%02x, expected=0x%02x)",
                          hdr.msg_type, expected_msg);
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                         sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool rejected miner");
                 stratum_v2_close_connection(GLOBAL_STATE);
                 retry_attempts++;
                 continue;
