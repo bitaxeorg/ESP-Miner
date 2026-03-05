@@ -27,6 +27,11 @@ export class NetworkEditComponent implements OnInit {
   public savedChanges: boolean = false;
   public scanning: boolean = false;
 
+  public networkModeOptions = [
+    { label: 'Wi-Fi', value: 'wifi' },
+    { label: 'Ethernet-over-USB', value: 'usb' }
+  ];
+
   @Input() uri = '';
 
   constructor(
@@ -44,10 +49,23 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
         this.form = this.fb.group({
+          networkMode: [info.networkMode || 'wifi', [Validators.required]],
           hostname: [info.hostname, [Validators.required]],
-          ssid: [info.ssid, [Validators.required]],
+          ssid: [info.ssid],  // Not required when USB mode
           wifiPass: ['*****'],
         });
+        
+        // Update validators when network mode changes
+        this.form.get('networkMode')?.valueChanges.subscribe(mode => {
+          const ssidControl = this.form.get('ssid');
+          if (mode === 'wifi') {
+            ssidControl?.setValidators([Validators.required]);
+          } else {
+            ssidControl?.clearValidators();
+          }
+          ssidControl?.updateValueAndValidity();
+        });
+        
         this.formSubject.next(this.form);
       });
   }

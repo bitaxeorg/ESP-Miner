@@ -36,6 +36,7 @@ typedef struct {
     char fan_speed[32];
     char best_difficulty[32];
     char block_height[32];
+    char network_status[256];
     char wifi_ssid[64];
     char wifi_password[64];
     char wifi_rssi[32];
@@ -54,6 +55,7 @@ typedef struct {
     bool fan_speed;
     bool best_difficulty;
     bool block_height;
+    bool network_status;
     bool wifi_ssid;
     bool wifi_password;
     bool wifi_rssi;
@@ -317,13 +319,13 @@ void BAP_send_subscription_update(GlobalState *state) {
 
                     case BAP_PARAM_WIFI:
                         {
-                            char wifi_status_str[256];
+                            char network_status_str[256];
                             char rssi_str[32];
                             char ip_str[32];
-                            snprintf(wifi_status_str, sizeof(wifi_status_str), "%s", state->SYSTEM_MODULE.wifi_status);
+                            snprintf(network_status_str, sizeof(network_status_str), "%s", state->SYSTEM_MODULE.network_status);
                             
                             int8_t current_rssi = -128; // no connection
-                            if (state->SYSTEM_MODULE.is_connected) {
+                            if (state->SYSTEM_MODULE.is_connected && state->SYSTEM_MODULE.network_mode == NETWORK_MODE_WIFI) {
                                 get_wifi_current_rssi(&current_rssi);
                             }
                             snprintf(rssi_str, sizeof(rssi_str), "%d", current_rssi);
@@ -333,6 +335,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                             if (!wifi_pass) {
                                 wifi_pass = strdup("");
                             }
+                            BAP_send_if_changed("network_status", network_status_str, last_values.network_status, sizeof(last_values.network_status), &last_values_valid.network_status);
                             BAP_send_if_changed("wifi_ssid", state->SYSTEM_MODULE.ssid, last_values.wifi_ssid, sizeof(last_values.wifi_ssid), &last_values_valid.wifi_ssid);
                             BAP_send_if_changed("wifi_password", wifi_pass, last_values.wifi_password, sizeof(last_values.wifi_password), &last_values_valid.wifi_password);
                             BAP_send_if_changed("wifi_rssi", rssi_str, last_values.wifi_rssi, sizeof(last_values.wifi_rssi), &last_values_valid.wifi_rssi);
