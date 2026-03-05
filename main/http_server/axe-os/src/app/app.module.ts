@@ -10,7 +10,7 @@ import { ToastrModule } from 'ngx-toastr';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
-import { ApiModule, Configuration } from './generated';
+import { ApiModule } from './generated';
 import { EditComponent } from './components/edit/edit.component';
 import { PoolComponent } from './components/pool/pool.component';
 import { NetworkEditComponent } from './components/network-edit/network.edit.component';
@@ -92,7 +92,7 @@ const components = [
     MessageModule,
     TooltipModule,
     DialogModule,
-    ApiModule.forRoot(() => new Configuration({ basePath: '' }))
+    ApiModule.forRoot({ rootUrl: '' })
   ],
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },

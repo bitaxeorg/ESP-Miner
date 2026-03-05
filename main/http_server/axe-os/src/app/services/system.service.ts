@@ -7,11 +7,14 @@ import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import {
   SystemInfo as ISystemInfo,
   SystemStatistics as ISystemStatistics,
-  SystemASIC as ISystemASIC,
-  SystemASICASICModelEnum,
+  SystemAsic as ISystemASIC,
   SystemService as GeneratedSystemService,
-  Settings
+  Settings,
+  GenericResponse
 } from 'src/app/generated';
+
+// Type alias for ASIC model enum compatibility
+type SystemASICASICModelEnum = 'BM1366' | 'BM1368' | 'BM1370' | 'BM1397';
 
 import { environment } from '../../environments/environment';
 
@@ -154,7 +157,7 @@ export class SystemApiService {
     }
 
     if (environment.production && this.generatedSystemService) {
-      return this.generatedSystemService.getSystemStatistics(columnList).pipe(timeout(API_TIMEOUT));
+      return this.generatedSystemService.getSystemStatistics({ columns: columnList }).pipe(timeout(API_TIMEOUT));
     }
 
     const hashrateData = [0,413.4903744405481,410.7764830376959,440.100549473198,430.5816012914026,452.5464981767163,414.9564271189586,498.7294609150379,411.1671601439723,491.327834852684];
@@ -213,7 +216,7 @@ export class SystemApiService {
     });
   }
 
-  public restart(uri: string = '') {
+  public restart(uri: string = ''): Observable<GenericResponse | Object | string> {
     if (environment.production && this.generatedSystemService && !uri) {
       return this.generatedSystemService.restartSystem();
     }
@@ -225,7 +228,7 @@ export class SystemApiService {
     return of('Device restarted (mock)');
   }
 
-  public dismissBlockFound(uri: string = '') {
+  public dismissBlockFound(uri: string = ''): Observable<{ blockFound?: number; showNewBlock?: boolean; message?: string } | Object | string> {
     if (environment.production && this.generatedSystemService && !uri) {
       return this.generatedSystemService.dismissBlockFound();
     }
@@ -237,7 +240,7 @@ export class SystemApiService {
     return of('Block found notification dismissed (mock)');
   }
 
-  public identify(uri: string = '') {
+  public identify(uri: string = ''): Observable<GenericResponse | Object | string> {
     if (environment.production && this.generatedSystemService && !uri) {
       return this.generatedSystemService.identifySystem();
     }
@@ -249,9 +252,9 @@ export class SystemApiService {
     return of('Device identified (mock)');
   }
 
-  public updateSystem(uri: string = '', update: any) {
+  public updateSystem(uri: string = '', update: any): Observable<void | Object | boolean> {
     if (environment.production && this.generatedSystemService && !uri) {
-      return this.generatedSystemService.updateSystemSettings(update as Settings);
+      return this.generatedSystemService.updateSystemSettings({ body: update as Settings });
     }
 
     if (environment.production && uri) {
@@ -292,16 +295,12 @@ export class SystemApiService {
   }
 
   public performOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
-    if (environment.production && this.generatedSystemService) {
-      return this.generatedSystemService.updateFirmware(file, 'events', true);
-    }
+    // Use direct HttpClient for progress tracking - ng-openapi-gen doesn't support HttpEvent returns
     return this.otaUpdate(file, '/api/system/OTA');
   }
 
   public performWWWOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
-    if (environment.production && this.generatedSystemService) {
-      return this.generatedSystemService.updateWebInterface(file, 'events', true);
-    }
+    // Use direct HttpClient for progress tracking - ng-openapi-gen doesn't support HttpEvent returns
     return this.otaUpdate(file, '/api/system/OTAWWW');
   }
 
