@@ -1120,6 +1120,58 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     return res;
 }
 
+static esp_err_t GET_scoreboard(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    Scoreboard *scoreboard = &GLOBAL_STATE->SYSTEM_MODULE.scoreboard;
+    cJSON * root = cJSON_CreateArray();
+
+    if (xSemaphoreTake(scoreboard->mutex, portMAX_DELAY) == pdTRUE) {
+        for (int i = 0; i < scoreboard->count; i++) {
+            const ScoreboardEntry *e = &scoreboard->entries[i];
+            cJSON *entry = cJSON_CreateObject();
+
+            char nonce_str[9], version_bits_str[9];
+            snprintf(nonce_str, sizeof(nonce_str), "%08X", (unsigned int)e->nonce);
+            snprintf(version_bits_str, sizeof(version_bits_str), "%08X", (unsigned int)e->version_bits);
+
+            cJSON_AddNumberToObject(entry, "difficulty", e->difficulty);
+            cJSON_AddStringToObject(entry, "job_id", e->job_id);
+            cJSON_AddStringToObject(entry, "extranonce2", e->extranonce2);
+            cJSON_AddNumberToObject(entry, "ntime", e->ntime);
+            cJSON_AddStringToObject(entry, "nonce", nonce_str);
+            cJSON_AddStringToObject(entry, "version_bits", version_bits_str);
+
+            cJSON_AddItemToArray(root, entry);
+        }
+        xSemaphoreGive(scoreboard->mutex);
+    } else {
+        ESP_LOGE(TAG, "Failed to take mutex for JSON conversion");
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to take mutex for JSON conversion");
+        return ESP_OK;
+    }
+
+    const char *response = cJSON_Print(root);
+    httpd_resp_sendstr(req, response);
+
+    free((void *)response);
+    cJSON_Delete(root);
+
+    return ESP_OK;
+}
+
 esp_err_t POST_WWW_update(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1355,6 +1407,14 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_statistics_get_uri);
+
+    httpd_uri_t scoreboard_get_uri = {
+        .uri = "/api/system/scoreboard",
+        .method = HTTP_GET,
+        .handler = GET_scoreboard,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &scoreboard_get_uri);
 
     /* URI handler for WiFi scan */
     httpd_uri_t wifi_scan_get_uri = {

@@ -731,6 +731,7 @@ paths:
           content:
             application/json:
               schema:
+                title: SystemWifiScan
                 type: object
                 required:
                   - networks
@@ -808,6 +809,54 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SystemStatistics'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/scoreboard:
+    get:
+      summary: Get best difficulty share scoreboard
+      description: Returns top 20 best difficulty shares
+      operationId: getSystemScoreboard
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  title: SystemScoreboardEntry
+                  type: object
+                  required:
+                    - difficulty
+                    - job_id
+                    - extranonce2
+                    - ntime
+                    - nonce
+                    - version_bits
+                  properties:
+                    difficulty:
+                      type: number
+                      description: Difficulty of the share
+                    job_id:
+                      type: string
+                      description: Job ID of the share
+                    extranonce2:
+                      type: string
+                      description: Extranonce2 of the share
+                    ntime:
+                      type: number
+                      description: Ntime of the share
+                    nonce:
+                      type: string
+                      description: Nonce of the share
+                    version_bits:
+                      type: string
+                      description: Version bits of the share
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

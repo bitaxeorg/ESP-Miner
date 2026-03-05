@@ -8,6 +8,7 @@ import {
   SystemInfo as ISystemInfo,
   SystemStatistics as ISystemStatistics,
   SystemASIC as ISystemASIC,
+  SystemScoreboardEntry as ISystemScoreboardEntry,
   SystemASICASICModelEnum,
   SystemService as GeneratedSystemService,
   Settings
@@ -211,6 +212,35 @@ export class SystemApiService {
       labels: columnList,
       statistics: statisticsList
     });
+  }
+
+  public getScoreboard(uri: string = ''): Observable<ISystemScoreboardEntry[]> {
+    if (environment.production) {
+      return this.httpClient.get<ISystemScoreboardEntry[]>(`${uri}/api/system/scoreboard`).pipe(timeout(5000));
+    }
+
+    // Mock data for development
+    return of([
+      {
+        rank: 0,
+        since: 3606,
+        difficulty: 2000,
+        job_id: "123456",
+        extranonce2: "000000",
+        ntime: 61125,
+        nonce: "00000000",
+        version_bits: "20000000"
+      },
+      {
+        rank: 1,
+        since: 3605,
+        difficulty: 1000,
+        job_id: "123457",
+        extranonce2: "000001",
+        ntime: 61126,
+        nonce: "00000001",
+        version_bits: "20000000"
+      }]).pipe(delay(1000));
   }
 
   public restart(uri: string = '') {
