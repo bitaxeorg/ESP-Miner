@@ -148,6 +148,7 @@ git checkout <the branch you want>
 # This will take several minutes to finish
 docker build -t espminer-build .devcontainer
 ```
+
 ### Building
 
 ```
@@ -156,15 +157,19 @@ docker run --rm -it -v $PWD:/workspace espminer-build /bin/bash
 git config --global --add safe.directory /workspace    # set git permissions or build will fail; only done once
 cd /workspace
 idf.py build
-```	
+```
+
 Once the build is done exit out of the docker session and flash the new firmware.
 
-## Development
+## Development (local build, without Docker)
+
+If you prefer to build on your machine without using the devcontainer, install the prerequisites below.
 
 ### Prerequisites
 
 - Install the ESP-IDF toolchain from https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/
 - Install nodejs/npm from https://nodejs.org/en/download
+- Install a Java Runtime (e.g. OpenJDK JRE)
 - (Optional) Install the ESP-IDF extension for VSCode from https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension
 
 ### Building
