@@ -13,6 +13,7 @@
 #define COINBASE2_SIZE 128
 #define MAX_REQUEST_IDS 1024
 #define MAX_EXTRANONCE_2_LEN 32
+#define MAX_POOL_MESSAGE_LEN 256
 
 typedef enum
 {
@@ -26,7 +27,8 @@ typedef enum
     STRATUM_RESULT_SETUP,
     STRATUM_RESULT_VERSION_MASK,
     STRATUM_RESULT_SUBSCRIBE,
-    CLIENT_RECONNECT
+    CLIENT_RECONNECT,
+    CLIENT_SHOW_MESSAGE
 } stratum_method;
 
 typedef enum
