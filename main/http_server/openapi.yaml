@@ -746,6 +746,7 @@ paths:
 
   /api/system/info:
     get:
+      deprecated: true
       summary: Get system information
       description: Returns current system status and information
       operationId: getSystemInfo
@@ -765,6 +766,7 @@ paths:
 
   /api/system/asic:
     get:
+      deprecated: true
       summary: Get ASIC settings information
       description: Returns current ASIC model and corresponding available frequency and voltage options
       operationId: getAsicSettings
@@ -881,6 +883,7 @@ paths:
 
   /api/system:
     patch:
+      deprecated: true
       summary: Update system settings
       description: Updates system configuration settings
       operationId: updateSystemSettings
