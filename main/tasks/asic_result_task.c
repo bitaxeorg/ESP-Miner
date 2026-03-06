@@ -51,7 +51,7 @@ void ASIC_result_task(void *pvParameters)
         double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
 
         //log the ASIC response
-        ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid, asic_result->asic_nr, asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
+        ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %.2f.", active_job->jobid, asic_result->asic_nr, asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
 
         if (nonce_diff >= active_job->pool_diff)
         {

@@ -417,10 +417,6 @@ void stratum_task(void * pvParameters)
     primary_stratum_cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
     char * stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pool_url;
     uint16_t port = GLOBAL_STATE->SYSTEM_MODULE.pool_port;
-    bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
-    uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
-    tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
-    char * cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
 
     STRATUM_V1_initialize_buffer();
     int retry_attempts = 0;
@@ -463,8 +459,6 @@ void stratum_task(void * pvParameters)
 
         stratum_url = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
         port = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
-        extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
-        difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
 
         stratum_connection_info_t conn_info;
         if (resolve_stratum_address(stratum_url, port, &conn_info) != ESP_OK) {
@@ -476,8 +470,8 @@ void stratum_task(void * pvParameters)
 
         ESP_LOGI(TAG, "Connecting to: stratum+tcp://%s:%d (%s)", stratum_url, port, conn_info.host_ip);
 
-        tls = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_tls : GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
-        cert = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_cert : GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
+        tls_mode tls = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_tls : GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
+        char * cert = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_cert : GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
         retry_critical_attempts = 0;
 
         GLOBAL_STATE->transport = STRATUM_V1_transport_init(tls, cert);
@@ -567,7 +561,7 @@ void stratum_task(void * pvParameters)
                 queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
                 decode_mining_notification(GLOBAL_STATE, stratum_api_v1_message.mining_notification);
             } else if (stratum_api_v1_message.method == MINING_SET_DIFFICULTY) {
-                ESP_LOGI(TAG, "Set pool difficulty: %ld", stratum_api_v1_message.new_difficulty);
+                ESP_LOGI(TAG, "Set pool difficulty: %.2f", stratum_api_v1_message.new_difficulty);
                 GLOBAL_STATE->pool_difficulty = stratum_api_v1_message.new_difficulty;
                 GLOBAL_STATE->new_set_mining_difficulty_msg = true;
             } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK ||
@@ -607,9 +601,11 @@ void stratum_task(void * pvParameters)
                 retry_attempts = 0;
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "setup message accepted");
+                    uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
                     if (stratum_api_v1_message.message_id == authorize_message_id && difficulty > 0) {
                         STRATUM_V1_suggest_difficulty(GLOBAL_STATE->transport, GLOBAL_STATE->send_uid++, difficulty);
                     }
+                    bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
                     if (extranonce_subscribe) {
                         STRATUM_V1_extranonce_subscribe(GLOBAL_STATE->transport, GLOBAL_STATE->send_uid++);
                     }

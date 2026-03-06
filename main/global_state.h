@@ -130,7 +130,7 @@ typedef struct
     uint8_t * valid_jobs;
     pthread_mutex_t valid_jobs_lock;
 
-    uint32_t pool_difficulty;
+    double pool_difficulty;
     bool new_set_mining_difficulty_msg;
     uint32_t version_mask;
     bool new_stratum_version_rolling_msg;
