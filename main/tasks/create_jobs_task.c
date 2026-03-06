@@ -65,9 +65,6 @@ void create_jobs_task(void *pvParameters)
 
             extranonce_2 = 0;
 
-            if (!current_mining_notification->clean_jobs) {
-                continue;
-            }
         } else {
             if (current_mining_notification == NULL) {
                 vTaskDelay(100 / portTICK_PERIOD_MS);
