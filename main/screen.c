@@ -57,6 +57,7 @@ static lv_obj_t *asic_status_label;
 
 static lv_obj_t *mining_block_height_label;
 static lv_obj_t *mining_network_difficulty_label;
+static lv_obj_t *mining_scriptsig_title_label;
 static lv_obj_t *mining_scriptsig_label;
 
 static lv_obj_t *firmware_update_scr_filename_label;
@@ -332,8 +333,8 @@ static lv_obj_t * create_scr_mining() {
     mining_network_difficulty_label = lv_label_create(scr);
     lv_label_set_text(mining_network_difficulty_label, "Difficulty: --");
 
-    lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, "Scriptsig:");
+    mining_scriptsig_title_label = lv_label_create(scr);
+    lv_label_set_text(mining_scriptsig_title_label, "Scriptsig:");
 
     mining_scriptsig_label = lv_label_create(scr);
     lv_label_set_text(mining_scriptsig_label, "--");
@@ -556,17 +557,27 @@ static void screen_update_cb(lv_timer_t * timer)
         current_chip_temp = power_management->chip_temp_avg;
     }
 
-    if (current_block_height != GLOBAL_STATE->block_height) {
-        lv_label_set_text_fmt(mining_block_height_label, "Block: %d", GLOBAL_STATE->block_height);
-        current_block_height = GLOBAL_STATE->block_height;
-    }
-    
-    if (strcmp(&lv_label_get_text(mining_network_difficulty_label)[9], GLOBAL_STATE->network_diff_string) != 0) {
-        lv_label_set_text_fmt(mining_network_difficulty_label, "Difficulty: %s", GLOBAL_STATE->network_diff_string);
+    if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+        // SV2 standard channel: no coinbase data, so no block height or scriptsig
+        lv_label_set_text(mining_block_height_label, "Protocol: SV2");
+        lv_obj_add_flag(mining_scriptsig_title_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(mining_scriptsig_label, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_clear_flag(mining_scriptsig_title_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(mining_scriptsig_label, LV_OBJ_FLAG_HIDDEN);
+
+        if (current_block_height != GLOBAL_STATE->block_height) {
+            lv_label_set_text_fmt(mining_block_height_label, "Block: %d", GLOBAL_STATE->block_height);
+            current_block_height = GLOBAL_STATE->block_height;
+        }
+
+        if (strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
+            lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->scriptsig);
+        }
     }
 
-    if (strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
-        lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->scriptsig);
+    if (strcmp(&lv_label_get_text(mining_network_difficulty_label)[9], GLOBAL_STATE->network_diff_string) != 0) {
+        lv_label_set_text_fmt(mining_network_difficulty_label, "Difficulty: %s", GLOBAL_STATE->network_diff_string);
     }
 
     // Update WiFi RSSI periodically

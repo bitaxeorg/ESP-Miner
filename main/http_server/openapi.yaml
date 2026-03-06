@@ -172,6 +172,8 @@ components:
         - ipv6
         - stratumExtranonceSubscribe
         - stratumPort
+        - stratumProtocol
+        - stratumV2AuthorityPubkey
         - stratumSuggestedDifficulty
         - stratumURL
         - stratumUser
@@ -252,6 +254,15 @@ components:
         fallbackStratumDecodeCoinbase:
           type: boolean
           description: Enable fallback pool coinbase transaction decoding
+        fallbackStratumProtocol:
+          type: number
+          description: Fallback stratum protocol version (0=V1, 1=V2)
+        fallbackStratumV2AuthorityPubkey:
+          type: string
+          description: Fallback SV2 authority public key for certificate verification (base58-encoded)
+        fallbackStratumV2ChannelType:
+          type: number
+          description: Fallback SV2 channel type (0=extended, 1=standard)
         fanrpm:
           type: number
           description: Current fan speed in RPM
@@ -383,6 +394,21 @@ components:
         stratumPort:
           type: number
           description: Primary stratum server port
+        stratumProtocol:
+          type: number
+          description: Stratum protocol version (0=V1, 1=V2)
+        activeStratumProtocol:
+          type: number
+          description: Active runtime stratum protocol (0=V1, 1=V2), may differ from configured when using fallback
+        activeProtocolLabel:
+          type: string
+          description: Human-readable label for the active protocol (e.g. "SV1", "SV2 Extended Channel")
+        stratumV2AuthorityPubkey:
+          type: string
+          description: SV2 authority public key for certificate verification (base58-encoded)
+        stratumV2ChannelType:
+          type: number
+          description: SV2 channel type (0=extended, 1=standard)
         stratumSuggestedDifficulty:
           type: number
           description: Pool suggested difficulty
@@ -611,6 +637,20 @@ components:
           maximum: 65535
           examples:
             - 3333
+        stratumProtocol:
+          type: integer
+          description: Stratum protocol version (0=V1, 1=V2)
+          enum: [0, 1]
+          examples:
+            - 0
+        stratumV2AuthorityPubkey:
+          type: string
+          description: Optional SV2 authority public key for certificate verification (base58-encoded)
+          pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+          maxLength: 52
+          examples:
+            - ""
+            - "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
         fallbackStratumPort:
           type: integer
           description: Port number for fallback stratum server
@@ -618,6 +658,19 @@ components:
           maximum: 65535
           examples:
             - 3333
+        fallbackStratumProtocol:
+          type: integer
+          description: Fallback stratum protocol version (0=V1, 1=V2)
+          enum: [0, 1]
+          examples:
+            - 0
+        fallbackStratumV2AuthorityPubkey:
+          type: string
+          description: Optional fallback SV2 authority public key for certificate verification (base58-encoded)
+          pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+          maxLength: 52
+          examples:
+            - ""
         ssid:
           type: string
           description: WiFi network SSID

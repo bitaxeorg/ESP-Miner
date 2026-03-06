@@ -46,6 +46,7 @@
 #include "http_server.h"
 #include "system.h"
 #include "websocket.h"
+#include "stratum_v2_task.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -127,6 +128,10 @@ static httpd_handle_t server = NULL;
 esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_len)
 {
     const char * response = cJSON_PrintBuffered(item, *prebuffer_len, true);
+    if (response == NULL) {
+        ESP_LOGE(TAG, "cJSON_PrintBuffered failed (free heap: %lu)", (unsigned long)esp_get_free_heap_size());
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+    }
     int len = strlen(response);
     esp_err_t res = httpd_resp_send(req, response, len);
     if (len > *prebuffer_len) *prebuffer_len = len * 1.2;
@@ -839,6 +844,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * fallbackStratumUser = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER);
     char * stratumCert = nvs_config_get_string(NVS_CONFIG_STRATUM_CERT);
     char * fallbackStratumCert = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_CERT);
+    char * sv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_SV2_AUTHORITY_PUBKEY);
+    char * fallbackSv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY);
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
     
@@ -908,6 +915,16 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT));
+    cJSON_AddNumberToObject(root, "stratumProtocol", nvs_config_get_u16(NVS_CONFIG_STRATUM_PROTOCOL));
+    cJSON_AddNumberToObject(root, "activeStratumProtocol", (int)GLOBAL_STATE->stratum_protocol);
+    const char *protocol_label = "SV1";
+    if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+        protocol_label = stratum_v2_is_extended_channel(GLOBAL_STATE)
+            ? "SV2 Extended Channel" : "SV2 Standard Channel";
+    }
+    cJSON_AddStringToObject(root, "activeProtocolLabel", protocol_label);
+    cJSON_AddStringToObject(root, "stratumV2AuthorityPubkey", sv2AuthPubkey);
+    cJSON_AddNumberToObject(root, "stratumV2ChannelType", nvs_config_get_u16(NVS_CONFIG_SV2_CHANNEL_TYPE));
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
     cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY));
     cJSON_AddNumberToObject(root, "stratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE));
@@ -921,7 +938,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddNumberToObject(root, "fallbackStratumTLS", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS));
     cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
+    cJSON_AddNumberToObject(root, "fallbackStratumProtocol", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL));
     cJSON_AddNumberToObject(root, "fallbackStratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE));
+    cJSON_AddStringToObject(root, "fallbackStratumV2AuthorityPubkey", fallbackSv2AuthPubkey);
+    cJSON_AddNumberToObject(root, "fallbackStratumV2ChannelType", nvs_config_get_u16(NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE));
     cJSON_AddFloatToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
 
     cJSON_AddStringToObject(root, "version", GLOBAL_STATE->SYSTEM_MODULE.version);
@@ -957,10 +977,13 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
     }
 
+    if (GLOBAL_STATE->network_nonce_diff > 0) {
+        cJSON_AddNumberToObject(root, "networkDifficulty", GLOBAL_STATE->network_nonce_diff);
+    }
+
     if (GLOBAL_STATE->block_height > 0) {
         cJSON_AddNumberToObject(root, "blockHeight", GLOBAL_STATE->block_height);
         cJSON_AddStringToObject(root, "scriptsig", GLOBAL_STATE->scriptsig);
-        cJSON_AddNumberToObject(root, "networkDifficulty", GLOBAL_STATE->network_nonce_diff);
 
         cJSON *outputs_array = cJSON_CreateArray();
         for (int i = 0; i < GLOBAL_STATE->coinbase_output_count; i++) {
@@ -1004,6 +1027,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(fallbackStratumURL);
     free(stratumCert);
     free(fallbackStratumCert);
+    free(sv2AuthPubkey);
+    free(fallbackSv2AuthPubkey);
     free(stratumUser);
     free(fallbackStratumUser);
     free(display);

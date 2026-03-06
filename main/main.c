@@ -10,7 +10,7 @@
 #include "system.h"
 #include "http_server.h"
 #include "serial.h"
-#include "stratum_task.h"
+#include "protocol_coordinator.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
 #include "nvs_config.h"
@@ -113,8 +113,9 @@ void app_main(void)
         return;
     }
 
-    if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating stratum admin task");
+    protocol_coordinator_init(&GLOBAL_STATE);
+    if (xTaskCreate(protocol_coordinator_task, "protocol coord", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating protocol coordinator task");
     }
     if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum miner task");

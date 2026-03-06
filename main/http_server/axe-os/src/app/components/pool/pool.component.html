@@ -15,6 +15,9 @@
                     <label [htmlFor]="pool + 'URL'" class="col-12 md:col-2 md:mb-0">Stratum Host</label>
                     <div class="col-12 md:col-10">
                         <input pInputText type="text" [id]="pool + 'URL'" [formControlName]="pool + 'URL'" (change)="onUrlChange(pool)" />
+                        <small *ngIf="isPoolV2Enabled(pool)" class="block text-blue-600 mt-1">
+                            SV2 Mode
+                        </small>
                     </div>
                 </div>
                 <div class="field grid p-fluid">
@@ -51,31 +54,171 @@
 
                     <ng-container *ngIf="showAdvancedOptions[pool]">
                         <div class="field grid p-fluid mt-4">
-                            <label [htmlFor]="pool + 'SuggestedDifficulty'" class="col-12 md:col-2 md:mb-0">
+                            <label [htmlFor]="(pool === 'stratum' ? 'stratumProtocol' : 'fallbackStratumProtocol')" class="col-12 mb-2 md:col-2 md:mb-0">
                                 <tooltip-text-icon
-                                    text="Suggested Difficulty"
-                                    tooltip="Used to indicate a preference for share difficulty to the pool. Servers are not required to honour this request, even if they support the stratum method. (0 to disable)"
+                                    text="Stratum Protocol"
+                                    tooltip="Select Stratum protocol version. Note: Not all pools support Stratum V2."
                                 />
                             </label>
                             <div class="col-12 md:col-10">
-                                <input pInputText [id]="pool + 'SuggestedDifficulty'" [formControlName]="pool + 'SuggestedDifficulty'" type="number" />
+                                <div class="flex flex-wrap gap-3">
+                                    <div *ngFor="let option of protocolOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
+                                        <p-radioButton
+                                            [name]="pool === 'stratum' ? 'stratumProtocol' : 'fallbackStratumProtocol'"
+                                            [value]="option.value"
+                                            [formControlName]="pool === 'stratum' ? 'stratumProtocol' : 'fallbackStratumProtocol'"
+                                            [inputId]="(pool === 'stratum' ? 'stratumProtocol_' : 'fallbackStratumProtocol_') + option.value">
+                                        </p-radioButton>
+                                        <label [for]="(pool === 'stratum' ? 'stratumProtocol_' : 'fallbackStratumProtocol_') + option.value" class="ml-2 cursor-pointer">
+                                            {{ option.label }}
+                                        </label>
+                                    </div>
+                                </div>
+                                <small class="block text-orange-600 mt-2">
+                                    Note: Not all pools support Stratum V2
+                                </small>
                             </div>
                         </div>
 
-                        <div class="field-checkbox grid">
-                            <div class="col-1 md:col-10 md:flex-order-2">
-                                <p-checkbox [name]="pool + 'ExtranonceSubscribe'" [inputId]="pool + 'ExtranonceSubscribe'" [formControlName]="pool + 'ExtranonceSubscribe'"
-                                    [binary]="true"></p-checkbox>
+                        <!-- SV2-only options -->
+                        <ng-container *ngIf="isPoolV2Enabled(pool)">
+                            <div class="field grid p-fluid">
+                                <label class="col-12 mb-2 md:col-2 md:mb-0">
+                                    <tooltip-text-icon
+                                        text="SV2 Channel Type"
+                                        tooltip="Extended Channels are recommended for external pools — the pool sends the coinbase template so the miner can verify it. Standard Channels should only be used with a locally deployed SV2 node or JD client."
+                                    />
+                                </label>
+                                <div class="col-12 md:col-10">
+                                    <div class="flex flex-wrap gap-3">
+                                        <div *ngFor="let option of sv2ChannelOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
+                                            <p-radioButton
+                                                [name]="pool === 'stratum' ? 'stratumV2ChannelType' : 'fallbackStratumV2ChannelType'"
+                                                [value]="option.value"
+                                                [formControlName]="pool === 'stratum' ? 'stratumV2ChannelType' : 'fallbackStratumV2ChannelType'"
+                                                [inputId]="(pool === 'stratum' ? 'stratumV2ChannelType_' : 'fallbackStratumV2ChannelType_') + option.value"
+                                                [disabled]="option.value === 1 && isStandardChannelDisabled()">
+                                            </p-radioButton>
+                                            <label [for]="(pool === 'stratum' ? 'stratumV2ChannelType_' : 'fallbackStratumV2ChannelType_') + option.value"
+                                                class="ml-2 cursor-pointer"
+                                                [class.text-400]="option.value === 1 && isStandardChannelDisabled()">
+                                                {{ option.label }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <small class="block text-blue-600 mt-2" *ngIf="(pool === 'stratum' ? form.get('stratumV2ChannelType')?.value : form.get('fallbackStratumV2ChannelType')?.value) === 0">
+                                        Recommended for external SV2 pools. The pool sends the coinbase template, enabling transaction verification.
+                                    </small>
+                                    <small class="block text-orange-600 mt-2" *ngIf="(pool === 'stratum' ? form.get('stratumV2ChannelType')?.value : form.get('fallbackStratumV2ChannelType')?.value) === 1">
+                                        Only use with a self-deployed local SV2 node or JD client. Not supported on Bitaxe Max (BM1397).
+                                    </small>
+                                    <small class="block text-400 mt-2" *ngIf="isStandardChannelDisabled()">
+                                        Standard Channels are not available on BM1397 — Extended Channels are required.
+                                    </small>
+                                </div>
                             </div>
-                            <label [htmlFor]="pool + 'ExtranonceSubscribe'" class="col-11 m-0 pb-0 pl-3 md:col-2 md:flex-order-1 md:pl-2">
-                                <tooltip-text-icon
-                                    text="Enable Extranonce Subscribe"
-                                    tooltip="Indicates to the server that the client supports the mining.set_extranonce method. Required by some pools, check the pool documentation."
-                                />
-                            </label>
-                        </div>
 
-                        <div class="field-checkbox grid">
+                            <div class="field grid p-fluid">
+                                <label [htmlFor]="pool === 'stratum' ? 'stratumV2AuthorityPubkey' : 'fallbackStratumV2AuthorityPubkey'" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">
+                                    <tooltip-text-icon
+                                        text="SV2 Authority Pubkey"
+                                        tooltip="The pool operator provides this key to prove you are connecting to the real pool and not an impersonator. Without it, the connection is still encrypted but a man-in-the-middle attack could redirect your hashrate."
+                                    />
+                                </label>
+                                <div class="col-12 md:col-10">
+                                    <textarea
+                                        pInputTextarea
+                                        [id]="pool === 'stratum' ? 'stratumV2AuthorityPubkey' : 'fallbackStratumV2AuthorityPubkey'"
+                                        [formControlName]="pool === 'stratum' ? 'stratumV2AuthorityPubkey' : 'fallbackStratumV2AuthorityPubkey'"
+                                        rows="2"
+                                        class="w-full p-2 text-sm text-monospace"
+                                        placeholder="Enter base58-encoded authority public key (optional, e.g., 9auqWEzQ...)"></textarea>
+                                    <small *ngIf="form.get(pool === 'stratum' ? 'stratumV2AuthorityPubkey' : 'fallbackStratumV2AuthorityPubkey')?.errors?.['invalidBase58']" class="block text-red-500 mt-1">
+                                        Invalid base58 string. Only base58 characters allowed (no 0, O, I, l).
+                                    </small>
+                                    <small *ngIf="form.get(pool === 'stratum' ? 'stratumV2AuthorityPubkey' : 'fallbackStratumV2AuthorityPubkey')?.errors?.['invalidBase58Length']" class="block text-red-500 mt-1">
+                                        Invalid length. SV2 authority pubkeys are typically 51-52 characters.
+                                    </small>
+                                </div>
+                            </div>
+                        </ng-container>
+
+                        <!-- SV1-only options -->
+                        <ng-container *ngIf="!isPoolV2Enabled(pool)">
+                            <div class="field grid p-fluid mt-4">
+                                <label [htmlFor]="pool + 'SuggestedDifficulty'" class="col-12 md:col-2 md:mb-0">
+                                    <tooltip-text-icon
+                                        text="Suggested Difficulty"
+                                        tooltip="Used to indicate a preference for share difficulty to the pool. Servers are not required to honour this request, even if they support the stratum method. (0 to disable)"
+                                    />
+                                </label>
+                                <div class="col-12 md:col-10">
+                                    <input pInputText [id]="pool + 'SuggestedDifficulty'" [formControlName]="pool + 'SuggestedDifficulty'" type="number" />
+                                </div>
+                            </div>
+
+                            <div class="field-checkbox grid">
+                                <div class="col-1 md:col-10 md:flex-order-2">
+                                    <p-checkbox [name]="pool + 'ExtranonceSubscribe'" [inputId]="pool + 'ExtranonceSubscribe'" [formControlName]="pool + 'ExtranonceSubscribe'"
+                                        [binary]="true"></p-checkbox>
+                                </div>
+                                <label [htmlFor]="pool + 'ExtranonceSubscribe'" class="col-11 m-0 pb-0 pl-3 md:col-2 md:flex-order-1 md:pl-2">
+                                    <tooltip-text-icon
+                                        text="Enable Extranonce Subscribe"
+                                        tooltip="Indicates to the server that the client supports the mining.set_extranonce method. Required by some pools, check the pool documentation."
+                                    />
+                                </label>
+                            </div>
+
+                            <div class="field grid p-fluid">
+                                <label [htmlFor]="pool + 'TLS'" class="col-12 mb-2 md:col-2 md:mb-0">Connection Security</label>
+                                <div class="col-12 md:col-10">
+                                    <div class="flex flex-wrap gap-3">
+                                        <div *ngFor="let option of tlsOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
+                                            <p-radioButton
+                                                [name]="pool + 'TLS'"
+                                                [value]="option.value"
+                                                [formControlName]="pool + 'TLS'"
+                                                [inputId]="pool + 'TLS_' + option.value">
+                                            </p-radioButton>
+                                            <label [for]="pool + 'TLS_' + option.value" class="ml-2 cursor-pointer">
+                                                {{ option.label }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div *ngIf="form.get(pool + 'TLS')?.value === 2" class="field grid p-fluid mb-0">
+                                <label [htmlFor]="pool + 'Cert'" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">Certificate</label>
+                                <div class="col-12 md:col-10">
+                                    <div class="p-inputgroup">
+                                        <textarea
+                                            pInputTextarea
+                                            [id]="pool + 'Cert'"
+                                            [formControlName]="pool + 'Cert'"
+                                            rows="6"
+                                            class="w-full p-2 text-sm text-monospace"
+                                            placeholder="Enter or choose a certificate file (.pem, .crt, .cer)"></textarea>
+                                        <span class="p-inputgroup-addon">
+                                            <button pButton
+                                                type="button"
+                                                icon="pi pi-upload"
+                                                class="p-button-secondary"
+                                                pTooltip="Choose a certificate file"
+                                                tooltipPosition="top"
+                                                (click)="certFileInput.click()"></button>
+                                            <input #certFileInput type="file" (change)="onCertFileSelected($event, pool + 'Cert')"
+                                                class="hidden" accept=".pem,.crt,.cer" />
+                                        </span>
+                                    </div>
+                                    <small *ngIf="form.get(pool + 'Cert')?.errors?.['invalidCertificate']" class="block text-red-500 mt-1">
+                                        Please enter a valid SSL/TLS certificate
+                                    </small>
+                                </div>
+                            </div>
+                        </ng-container>
+
+                        <div *ngIf="!isPoolV2Enabled(pool) || isPoolV2Extended(pool)" class="field-checkbox grid">
                             <div class="col-1 md:col-10 md:flex-order-2">
                                 <p-checkbox [name]="pool + 'DecodeCoinbase'" [inputId]="pool + 'DecodeCoinbase'" [formControlName]="pool + 'DecodeCoinbase'"
                                     [binary]="true"></p-checkbox>
@@ -86,53 +229,6 @@
                                     tooltip="Enable decoding of the coinbase transaction to show payout addresses. Disable when mining on non-Bitcoin chains."
                                 />
                             </label>
-                        </div>
-
-                        <div class="field grid p-fluid">
-                            <label [htmlFor]="pool + 'TLS'" class="col-12 mb-2 md:col-2 md:mb-0">Connection Security</label>
-                            <div class="col-12 md:col-10">
-                                <div class="flex flex-wrap gap-3">
-                                    <div *ngFor="let option of tlsOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
-                                        <p-radioButton
-                                            [name]="pool + 'TLS'"
-                                            [value]="option.value"
-                                            [formControlName]="pool + 'TLS'"
-                                            [inputId]="pool + 'TLS_' + option.value">
-                                        </p-radioButton>
-                                        <label [for]="pool + 'TLS_' + option.value" class="ml-2 cursor-pointer">
-                                            {{ option.label }}
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div *ngIf="form.get(pool + 'TLS')?.value === 2" class="field grid p-fluid mb-0">
-                            <label [htmlFor]="pool + 'Cert'" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">Certificate</label>
-                            <div class="col-12 md:col-10">
-                                <div class="p-inputgroup">
-                                    <textarea
-                                        pInputTextarea
-                                        [id]="pool + 'Cert'"
-                                        [formControlName]="pool + 'Cert'"
-                                        rows="6"
-                                        class="w-full p-2 text-sm text-monospace"
-                                        placeholder="Enter or choose a certificate file (.pem, .crt, .cer)"></textarea>
-                                    <span class="p-inputgroup-addon">
-                                        <button pButton
-                                            type="button"
-                                            icon="pi pi-upload"
-                                            class="p-button-secondary"
-                                            pTooltip="Choose a certificate file"
-                                            tooltipPosition="top"
-                                            (click)="certFileInput.click()"></button>
-                                        <input #certFileInput type="file" (change)="onCertFileSelected($event, pool + 'Cert')"
-                                            class="hidden" accept=".pem,.crt,.cer" />
-                                    </span>
-                                </div>
-                                <small *ngIf="form.get(pool + 'Cert')?.errors?.['invalidCertificate']" class="block text-red-500 mt-1">
-                                    Please enter a valid SSL/TLS certificate
-                                </small>
-                            </div>
                         </div>
                     </ng-container>
                 </fieldset>
