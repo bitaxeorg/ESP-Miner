@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/ng-openapi-gen/ng-openapi-gen-schema.json",
+  "input": "../openapi.yaml",
+  "output": "src/app/generated",
+  "prefix": "api",
+  "module": "ApiModule",
+  "configuration": "ApiConfiguration",
+  "serviceSuffix": "Service",
+  "modelSuffix": "",
+  "enumSuffix": "",
+  "stringEnums": true,
+  "ignoreUnusedModels": false,
+  "minParamsForContainer": 2,
+  "sortParams": "desc",
+  "defaultTag": "Api",
+  "removeStaleFiles": true,
+  "modelIndex": true,
+  "serviceIndex": true
+}
