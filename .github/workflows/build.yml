@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: 'recursive'
     - name: Setup Node.js
@@ -24,7 +24,7 @@ jobs:
         target: esp32s3
         command: GITHUB_ACTIONS="true" idf.py build
         path: '.'
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v6
       with:
         python-version: '3.10'
         cache: 'pip'
