@@ -131,7 +131,6 @@ static void _send_read_address(void)
 
 static void _send_chain_inactive(void)
 {
-
     unsigned char read_address[2] = {0x00, 0x00};
     // send serial data
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_INACTIVE), read_address, 2, BM1397_SERIALTX_DEBUG);
@@ -139,13 +138,13 @@ static void _send_chain_inactive(void)
 
 static void _set_chip_address(uint8_t chipAddr)
 {
-
     unsigned char read_address[2] = {chipAddr, 0x00};
     // send serial data
     _send_BM1397((TYPE_CMD | GROUP_SINGLE | CMD_SETADDRESS), read_address, 2, BM1397_SERIALTX_DEBUG);
 }
 
-void BM1397_set_version_mask(uint32_t version_mask) {
+void BM1397_set_version_mask(uint32_t version_mask) 
+{
     // placeholder
 }
 
@@ -177,7 +176,7 @@ void BM1397_send_hash_frequency(float target_freq)
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
 }
 
-uint8_t BM1397_init(float frequency, uint16_t asic_count, uint16_t difficulty)
+uint8_t BM1397_init(float frequency, uint16_t asic_count, uint16_t difficulty, uint16_t cores)
 {
     // send the init command
     _send_read_address();
