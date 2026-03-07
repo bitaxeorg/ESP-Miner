@@ -15,6 +15,11 @@
 // Maximum number of access points to scan
 #define MAX_AP_COUNT 20
 
+// Roaming configuration
+#define ROAM_CHECK_INTERVAL_MS   (90 * 1000)  // Check every 90 seconds
+#define ROAM_RSSI_THRESHOLD      (-70)         // Only consider roaming if current RSSI is below this
+#define ROAM_RSSI_HYSTERESIS     (10)          // New AP must be at least this much better (dB)
+
 #if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
 #define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_HUNT_AND_PECK
 #define EXAMPLE_H2E_IDENTIFIER ""
@@ -59,6 +64,91 @@ static int clients_connected_to_ap = 0;
 static const char *get_wifi_reason_string(int reason);
 static void wifi_softap_on(void);
 static void wifi_softap_off(void);
+
+static GlobalState *roam_global_state = NULL;
+static TimerHandle_t roam_timer = NULL;
+static bool roam_in_progress = false;
+
+static void roam_timer_callback(TimerHandle_t xTimer)
+{
+    if (roam_global_state == NULL || !roam_global_state->SYSTEM_MODULE.is_connected) {
+        return;
+    }
+
+    if (is_scanning || clients_connected_to_ap > 0) {
+        return;
+    }
+
+    // Check current RSSI
+    wifi_ap_record_t current_ap;
+    if (esp_wifi_sta_get_ap_info(&current_ap) != ESP_OK) {
+        return;
+    }
+
+    if (current_ap.rssi >= ROAM_RSSI_THRESHOLD) {
+        ESP_LOGD(TAG, "Roam check: RSSI %d is good enough, skipping", current_ap.rssi);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Roam check: RSSI %d is below threshold %d, scanning for better AP...",
+             current_ap.rssi, ROAM_RSSI_THRESHOLD);
+
+    // Do a background scan (non-blocking)
+    wifi_scan_config_t scan_config = {
+        .ssid = (uint8_t *)roam_global_state->SYSTEM_MODULE.ssid,
+        .bssid = NULL,
+        .channel = 0,
+        .show_hidden = false,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time.active.min = 100,
+        .scan_time.active.max = 300,
+    };
+
+    is_scanning = true;
+    if (esp_wifi_scan_start(&scan_config, true) != ESP_OK) {
+        is_scanning = false;
+        return;
+    }
+
+    uint16_t num_found = MAX_AP_COUNT;
+    wifi_ap_record_t scan_results[MAX_AP_COUNT];
+    if (esp_wifi_scan_get_ap_records(&num_found, scan_results) != ESP_OK) {
+        is_scanning = false;
+        return;
+    }
+    is_scanning = false;
+
+    // Find the best AP with matching SSID (excluding current BSSID)
+    int8_t best_rssi = current_ap.rssi;
+    int best_idx = -1;
+    for (int i = 0; i < num_found; i++) {
+        if (strcmp((char *)scan_results[i].ssid, roam_global_state->SYSTEM_MODULE.ssid) != 0) {
+            continue;
+        }
+        if (memcmp(scan_results[i].bssid, current_ap.bssid, 6) == 0) {
+            continue;
+        }
+        if (scan_results[i].rssi > best_rssi) {
+            best_rssi = scan_results[i].rssi;
+            best_idx = i;
+        }
+    }
+
+    if (best_idx >= 0 && (best_rssi - current_ap.rssi) >= ROAM_RSSI_HYSTERESIS) {
+        ESP_LOGI(TAG, "Roam: found better AP %02x:%02x:%02x:%02x:%02x:%02x (RSSI %d vs current %d), switching...",
+                 scan_results[best_idx].bssid[0], scan_results[best_idx].bssid[1],
+                 scan_results[best_idx].bssid[2], scan_results[best_idx].bssid[3],
+                 scan_results[best_idx].bssid[4], scan_results[best_idx].bssid[5],
+                 best_rssi, current_ap.rssi);
+        roam_in_progress = true;
+        esp_wifi_disconnect();
+        // The disconnect event handler will trigger reconnect,
+        // and WIFI_CONNECT_AP_BY_SIGNAL will pick the best AP
+    } else {
+        ESP_LOGI(TAG, "Roam check: no significantly better AP found (best candidate RSSI: %d, current: %d)",
+                 best_rssi, current_ap.rssi);
+    }
+}
 
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
@@ -184,6 +274,16 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*) event_data;
             if (event->reason == WIFI_REASON_ROAMING) {
                 ESP_LOGI(TAG, "We are roaming, nothing to do");
+                return;
+            }
+
+            // Handle roaming-initiated disconnect: reconnect immediately without softAP
+            if (roam_in_progress) {
+                roam_in_progress = false;
+                GLOBAL_STATE->SYSTEM_MODULE.is_connected = false;
+                ESP_LOGI(TAG, "Roaming reconnect: switching to better AP...");
+                snprintf(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, sizeof(GLOBAL_STATE->SYSTEM_MODULE.wifi_status), "Roaming...");
+                esp_wifi_connect();
                 return;
             }
 
@@ -478,6 +578,16 @@ void wifi_init(void * pvParameters)
         free(hostname);
 
         ESP_LOGI(TAG, "wifi_init_sta finished.");
+
+        // Start periodic roaming check
+        roam_global_state = GLOBAL_STATE;
+        roam_timer = xTimerCreate("roam_timer", pdMS_TO_TICKS(ROAM_CHECK_INTERVAL_MS),
+                                  pdTRUE, NULL, roam_timer_callback);
+        if (roam_timer != NULL) {
+            xTimerStart(roam_timer, 0);
+            ESP_LOGI(TAG, "WiFi roaming check enabled (interval: %ds, threshold: %ddBm)",
+                     ROAM_CHECK_INTERVAL_MS / 1000, ROAM_RSSI_THRESHOLD);
+        }
 
         return;
     }
