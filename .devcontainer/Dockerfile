@@ -7,6 +7,7 @@ ARG DEBIAN_FRONTEND=nointeractive
 RUN apt-get update \
   && apt install -y -q \
   cmake \
+  default-jre \
   git \
   hwdata \
   libglib2.0-dev \
