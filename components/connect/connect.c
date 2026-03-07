@@ -135,8 +135,11 @@ static void roam_timer_callback(TimerHandle_t xTimer)
     }
 
     if (best_idx >= 0 && (best_rssi - current_ap.rssi) >= ROAM_RSSI_HYSTERESIS) {
-        ESP_LOGI(TAG, "Roam: found better AP " MACSTR " (RSSI %d vs current %d), switching...",
-                 MAC2STR(scan_results[best_idx].bssid), best_rssi, current_ap.rssi);
+        ESP_LOGI(TAG, "Roam: found better AP %02x:%02x:%02x:%02x:%02x:%02x (RSSI %d vs current %d), switching...",
+                 scan_results[best_idx].bssid[0], scan_results[best_idx].bssid[1],
+                 scan_results[best_idx].bssid[2], scan_results[best_idx].bssid[3],
+                 scan_results[best_idx].bssid[4], scan_results[best_idx].bssid[5],
+                 best_rssi, current_ap.rssi);
         roam_in_progress = true;
         esp_wifi_disconnect();
         // The disconnect event handler will trigger reconnect,
