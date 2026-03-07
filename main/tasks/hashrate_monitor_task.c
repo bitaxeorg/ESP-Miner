@@ -167,6 +167,8 @@ void hashrate_monitor_task(void *pvParameters)
 
         if(current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
 
+        SYSTEM_noinit_update(SYSTEM_MODULE);
+
         vTaskDelayUntil(&taskWakeTime, POLL_RATE / portTICK_PERIOD_MS);
     }
 }

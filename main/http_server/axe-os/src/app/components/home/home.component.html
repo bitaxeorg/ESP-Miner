@@ -28,7 +28,7 @@
         <div class="col-12 md:col-6 xl:col-3">
             <div class="card mb-0">
                 <div class="flex flex-column justify-content-between">
-                    <span class="block text-lg font-medium mb-3">Hashrate</span>
+                    <span class="block text-lg font-medium mb-2">Hashrate</span>
 
                     <ng-container *ngIf="!info.power_fault; else powerFault">
                         <div class="flex align-items-center justify-content-between gap-2 mb-3">
@@ -85,10 +85,10 @@
         <div class="col-12 md:col-6 xl:col-3">
             <div class="card mb-0">
                 <div class="flex flex-column justify-content-between">
-                    <span class="block text-lg font-medium mb-3">Efficiency</span>
+                    <span class="block text-lg font-medium mb-2">Efficiency</span>
 
                     <ng-container *ngIf="!info.power_fault; else powerFault">
-                        <div class="flex align-items-center justify-content-between gap-2 mb-3">
+                        <div class="flex align-items-center justify-content-between gap-2 mb-2">
                             <span class="text-900 font-medium text-2xl white-space-nowrap">
                                 {{getEfficiency(info) | number: '1.2-2'}} J/Th
                             </span>
@@ -124,13 +124,9 @@
         </div>
         <div class="col-12 md:col-6 xl:col-3">
             <div class="card mb-0">
-                <div class="flex justify-content-between mb-3">
-                    <div>
-                        <span class="block text-lg font-medium mb-3">Shares</span>
-                        <div class="text-900 font-medium text-2xl">
-                            {{info.sharesAccepted | number: '1.0-0'}}
-                        </div>
-                    </div>
+                <div class="block text-lg font-medium mb-2">Shares</div>
+                <div class="text-900 font-medium text-2xl mb-2">
+                    {{info.sharesAccepted | number: '1.0-0'}}
                 </div>
                 <div *ngIf="info.sharesRejected === 0">
                     <span class="text-red-500 font-medium">0 </span>
@@ -155,30 +151,38 @@
 
         <div class="col-12 md:col-6 xl:col-3">
             <div class="card mb-0">
-                <div class="flex justify-content-between mb-3">
-                    <div>
-                        <span class="block text-lg font-medium mb-3">Best Difficulty</span>
-                        <div class="text-900 font-medium text-2xl">
-                            <span class="cursor-pointer" pTooltip="{{info.bestDiff | number:'1.0-0'}}" tooltipPosition="bottom">
-                                {{info.bestDiff | diffSuffix}}
-                            </span>
-                            <span class="text-500 text-lg">all-time best</span>
-                            <span class="text-sm font-medium mb-3" *ngIf="info.networkDifficulty">
-                                <tooltip-text-icon
-                                    [text]="'(' + getNetworkDifficultyPercentage(info) + '%)'"
-                                    tooltip="Chance to find a Block"
-                                    [split]="false"
-                                />
-                            </span>
-                        </div>
-                    </div>
+                <div class="block text-lg font-medium mb-2">Best Difficulty</div>
+                <div class="text-900 font-medium text-2xl mb-2">
+                    <span class="cursor-pointer" pTooltip="{{info.bestDiff | number:'1.0-0'}}" tooltipPosition="left">
+                        {{info.bestDiff | diffSuffix}}
+                    </span>
+                    <span class="text-500 text-lg mr-1">all-time best</span>
+                    <span class="text-sm font-medium mr-1" *ngIf="info.networkDifficulty">
+                        <tooltip-text-icon
+                            [text]="'(' + getNetworkDifficultyPercentage(info) + '%)'"
+                            tooltip="Chance to find a Block"
+                            [split]="false"
+                        />
+                    </span>
                 </div>
-                <div>
-                    <span class="text-900 font-medium cursor-pointer" pTooltip="{{info.bestSessionDiff | number:'1.0-0'}}" tooltipPosition="bottom">
+                <div class="mb-2">
+                    <span class="text-900 font-medium cursor-pointer mr-1" pTooltip="{{info.bestSessionDiff | number:'1.0-0'}}" tooltipPosition="left">
                         {{info.bestSessionDiff | diffSuffix}}
                     </span>
-                    <span class="text-500 text-lg">session best</span>
-                    <span class="text-sm font-medium mb-3"> ({{ info.uptimeSeconds | dateAgo: { intervals: 2, strict:true, short:true } }})</span>
+                    <span class="text-500 text-lg mr-1">session best</span>
+                    <span class="text-sm font-medium"> ({{ info.uptimeSeconds | dateAgo: { intervals: 2, strict:true, short:true } }})</span>
+                </div>
+                <div *ngIf="info.totalLog2Work">
+                    <span class="text-900 font-medium cursor-pointer mr-1" pTooltip="{{info.totalHashes | number}} total hashes" tooltipPosition="left">
+                        {{info.totalLog2Work | number:'1.6-6'}}
+                    </span>
+                    <span class="text-500 text-lg">
+                        <tooltip-text-icon
+                            text="total work (log 2)"
+                            tooltip="Approximate base-2 logarithm of your total accumulated hashes (personal mining effort). Example: log2_work = 50 means roughly 2^50 ≈ 1 quadrillion hashes attempted."
+                            tooltipPosition="left"
+                        />
+                    </span>
                 </div>
             </div>
         </div>
