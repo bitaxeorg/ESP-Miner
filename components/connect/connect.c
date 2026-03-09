@@ -135,7 +135,7 @@ static void roam_timer_callback(TimerHandle_t xTimer)
     }
 
     if (best_idx >= 0 && (best_rssi - current_ap.rssi) >= ROAM_RSSI_HYSTERESIS) {
-        ESP_LOGI(TAG, "Roam: found better AP %02x:%02x:%02x:%02x:%02x:%02x (RSSI %d vs current %d), switching...",
+        ESP_LOGD(TAG, "Roam: found better AP %02x:%02x:%02x:%02x:%02x:%02x (RSSI %d vs current %d), switching...",
                  scan_results[best_idx].bssid[0], scan_results[best_idx].bssid[1],
                  scan_results[best_idx].bssid[2], scan_results[best_idx].bssid[3],
                  scan_results[best_idx].bssid[4], scan_results[best_idx].bssid[5],
