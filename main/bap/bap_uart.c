@@ -111,6 +111,9 @@ void BAP_send_init_message(GlobalState *state) {
 
 void BAP_send_ap_message(GlobalState *state) {
     BAP_send_message(BAP_CMD_CMD, "mode", "ap_mode");
+    if (state && state->SELF_TEST_MODULE.is_active && state->SELF_TEST_MODULE.state) {
+        BAP_send_message(BAP_CMD_CMD, "self_test", state->SELF_TEST_MODULE.state);
+    }
 }
 
 

@@ -98,6 +98,7 @@ typedef struct
     char *message;
     char *result;
     char *finished;
+    const char *state;
 } SelfTestModule;
 
 typedef struct

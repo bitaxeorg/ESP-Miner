@@ -32,6 +32,7 @@
 #include "bm1397.h"
 #include "device_config.h"
 #include "hashrate_monitor_task.h"
+#include "bap.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
@@ -56,6 +57,7 @@ static bool isFactoryTest = false;
 
 // local function prototypes
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
+static void publish_self_test_state(GlobalState * GLOBAL_STATE, const char *state);
 
 static bool should_test()
 {
@@ -81,6 +83,16 @@ static void display_msg(char * msg, GlobalState * GLOBAL_STATE)
 {
     GLOBAL_STATE->SELF_TEST_MODULE.message = msg;
     vTaskDelay(10 / portTICK_PERIOD_MS);
+}
+
+static void publish_self_test_state(GlobalState * GLOBAL_STATE, const char *state)
+{
+    if (!GLOBAL_STATE || !state) {
+        return;
+    }
+
+    GLOBAL_STATE->SELF_TEST_MODULE.state = state;
+    BAP_send_message(BAP_CMD_CMD, "self_test", state);
 }
 
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
@@ -282,6 +294,15 @@ bool self_test(void * pvParameters)
     char logString[300];
 
     GLOBAL_STATE->SELF_TEST_MODULE.is_active = true;
+    GLOBAL_STATE->SELF_TEST_MODULE.is_finished = false;
+    GLOBAL_STATE->SELF_TEST_MODULE.state = "running";
+
+    esp_err_t bap_ret = BAP_init(GLOBAL_STATE);
+    if (bap_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to initialize BAP for self-test status: %s", esp_err_to_name(bap_ret));
+    } else {
+        publish_self_test_state(GLOBAL_STATE, "running");
+    }
 
     // Create a binary semaphore
     longPressSemaphore = xSemaphoreCreateBinary();
@@ -640,6 +661,7 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
         GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST PASS!";
         GLOBAL_STATE->SELF_TEST_MODULE.finished = "Restarting automatically in 10 seconds...";
         GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
+        publish_self_test_state(GLOBAL_STATE, "pass");
         vTaskDelay(pdMS_TO_TICKS(10000));
         esp_restart();
     } else {
@@ -656,6 +678,7 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
             ESP_LOGI(TAG, "SELF-TEST FAIL -- Press RESET button to restart.");
             GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart.";
         }
+        publish_self_test_state(GLOBAL_STATE, "fail");
         while (1) {
             // Wait here forever until reset_self_test() gives the longPressSemaphore
             if (xSemaphoreTake(longPressSemaphore, portMAX_DELAY) == pdTRUE) {
