@@ -57,7 +57,7 @@ void hashrate_monitor_reset_measurements(void *pvParameters)
     memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
 }
 
-static void update_hashrate(measurement_t * measurement, uint32_t value)
+void update_hashrate(measurement_t * measurement, uint32_t value)
 {
     uint8_t flag_long = (value & 0x80000000) >> 31;
     uint32_t hashrate_value = value & 0x7FFFFFFF;    
@@ -68,7 +68,7 @@ static void update_hashrate(measurement_t * measurement, uint32_t value)
     }
 }
 
-static void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t time_us)
+void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t time_us)
 {
     uint64_t previous_time_us = measurement->time_us;
     if (previous_time_us != 0) {

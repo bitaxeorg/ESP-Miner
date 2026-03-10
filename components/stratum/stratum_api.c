@@ -258,6 +258,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                         message->error_str = strdup(cJSON_GetStringValue(error_msg));
                     }
                 }
+            } else if (cJSON_IsString(error_json)) {
+                message->error_str = strdup(cJSON_GetStringValue(error_json));
             }
 
         // if the result is a boolean, then parse it
@@ -274,6 +276,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 message->error_str = strdup("unknown");
                 if (cJSON_IsString(reject_reason_json)) {
                     message->error_str = strdup(cJSON_GetStringValue(reject_reason_json));
+                } else if (cJSON_IsString(error_json)) {
+                    message->error_str = strdup(cJSON_GetStringValue(error_json));
                 }                
             }
         
