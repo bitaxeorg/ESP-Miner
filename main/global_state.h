@@ -14,6 +14,7 @@
 #include "work_queue.h"
 #include "device_config.h"
 #include "display.h"
+#include "scoreboard.h"
 #include "esp_transport.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
@@ -91,6 +92,7 @@ typedef struct
     char * asic_status;
     char * version;
     char * axeOSVersion;
+    Scoreboard scoreboard;
 } SystemModule;
 
 typedef struct

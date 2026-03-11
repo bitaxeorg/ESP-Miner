@@ -13,6 +13,7 @@
 #include <math.h>
 #include "display.h"
 #include "theme_api.h"
+#include "scoreboard.h"
 
 #define NVS_CONFIG_NAMESPACE "main"
 #define NVS_STR_LIMIT (4000 - 1) // See nvs_set_str
@@ -36,6 +37,7 @@ typedef struct {
     NvsConfigKey key;
     ConfigType type;
     ConfigValue value;
+    int index;
 } ConfigUpdate;
 
 static const char * TAG = "nvs_config";
@@ -88,9 +90,10 @@ static Settings settings[NVS_CONFIG_COUNT] = {
 
     [NVS_CONFIG_BEST_DIFF]                             = {.nvs_key_name = "bestdiff",        .type = TYPE_U64},
     [NVS_CONFIG_SELF_TEST]                             = {.nvs_key_name = "selftest",        .type = TYPE_BOOL},
-    [NVS_CONFIG_SWARM]                                 = {.nvs_key_name = "swarmconfig",     .type = TYPE_STR,   .default_value = {.str = ""}},
+    [NVS_CONFIG_SWARM]                                 = {.nvs_key_name = "swarmconfig",     .type = TYPE_STR},
     [NVS_CONFIG_THEME_SCHEME]                          = {.nvs_key_name = "themescheme",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_THEME}},
     [NVS_CONFIG_THEME_COLORS]                          = {.nvs_key_name = "themecolors",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_COLORS}},
+    [NVS_CONFIG_SCOREBOARD]                            = {.nvs_key_name = "scoreboard",      .type = TYPE_STR,   .array_size = MAX_SCOREBOARD},
     
     [NVS_CONFIG_BOARD_VERSION]                         = {.nvs_key_name = "boardversion",    .type = TYPE_STR,   .default_value = {.str = "000"}},
     [NVS_CONFIG_DEVICE_MODEL]                          = {.nvs_key_name = "devicemodel",     .type = TYPE_STR,   .default_value = {.str = "unknown"}},
@@ -119,6 +122,22 @@ Settings *nvs_config_get_settings(NvsConfigKey key)
     }
     return &settings[key];
 }
+
+static int get_array_size(const Settings * setting)
+{
+    return (setting->array_size > 0) ? setting->array_size : 1;
+}
+
+static void get_nvs_key_name(const Settings * setting, const int index, char dest[static NVS_KEY_NAME_MAX_SIZE])
+{
+    if (setting->array_size > 0) {
+        int width = 1;
+        for (int t = setting->array_size - 1; t >= 10 && width < 5; t /= 10) width++;
+        snprintf(dest, NVS_KEY_NAME_MAX_SIZE, "%s_%0*d", setting->nvs_key_name, width, index + 1);
+    } else {
+        strncpy(dest, setting->nvs_key_name, NVS_KEY_NAME_MAX_SIZE);
+    }
+}      
 
 static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
 {
@@ -150,10 +169,10 @@ static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
 static void nvs_config_apply_fallback(NvsConfigKey key, Settings * setting)
 {
     if (key == NVS_CONFIG_ASIC_FREQUENCY) {
-        nvs_set_u16(handle, FALLBACK_KEY_ASICFREQUENCY, (uint16_t) setting->value.f);
+        nvs_set_u16(handle, FALLBACK_KEY_ASICFREQUENCY, (uint16_t) setting->value[0].f);
     }
     if (key == NVS_CONFIG_MANUAL_FAN_SPEED) {
-        nvs_set_u16(handle, FALLBACK_KEY_FANSPEED, setting->value.u16);
+        nvs_set_u16(handle, FALLBACK_KEY_FANSPEED, setting->value[0].u16);
     }
 }
 
@@ -165,34 +184,38 @@ static void nvs_task(void *pvParameters)
             Settings *setting = nvs_config_get_settings(update.key);
             if (setting && setting->type == update.type) {
                 esp_err_t ret = ESP_OK;
+
+                char key[NVS_KEY_NAME_MAX_SIZE];
+                get_nvs_key_name(setting, update.index, key);
+
                 char *old_str = NULL;
                 switch (update.type) {
                     case TYPE_STR:
-                        old_str = setting->value.str;
-                        setting->value.str = update.value.str;
-                        ret = nvs_set_str(handle, setting->nvs_key_name, setting->value.str);
+                        old_str = setting->value[update.index].str;
+                        setting->value[update.index].str = update.value.str;
+                        ret = nvs_set_str(handle, key, setting->value[update.index].str);
                         break;
                     case TYPE_U16:
-                        setting->value.u16 = update.value.u16;
-                        ret = nvs_set_u16(handle, setting->nvs_key_name, setting->value.u16);
+                        setting->value[update.index].u16 = update.value.u16;
+                        ret = nvs_set_u16(handle, key, setting->value[update.index].u16);
                         break;
                     case TYPE_I32:
-                        setting->value.i32 = update.value.i32;
-                        ret = nvs_set_i32(handle, setting->nvs_key_name, setting->value.i32);
+                        setting->value[update.index].i32 = update.value.i32;
+                        ret = nvs_set_i32(handle, key, setting->value[update.index].i32);
                         break;
                     case TYPE_U64:
-                        setting->value.u64 = update.value.u64;
-                        ret = nvs_set_u64(handle, setting->nvs_key_name, setting->value.u64);
+                        setting->value[update.index].u64 = update.value.u64;
+                        ret = nvs_set_u64(handle, key, setting->value[update.index].u64);
                         break;
                     case TYPE_FLOAT:
-                        setting->value.f = update.value.f;
+                        setting->value[update.index].f = update.value.f;
                         char buf[32];
-                        snprintf(buf, sizeof(buf), "%f", setting->value.f);
-                        ret = nvs_set_str(handle, setting->nvs_key_name, buf);
+                        snprintf(buf, sizeof(buf), "%f", setting->value[update.index].f);
+                        ret = nvs_set_str(handle, key, buf);
                         break;
                     case TYPE_BOOL:
-                        setting->value.b = update.value.b;
-                        ret = nvs_set_u16(handle, setting->nvs_key_name, setting->value.b ? 1 : 0);
+                        setting->value[update.index].b = update.value.b;
+                        ret = nvs_set_u16(handle, key, setting->value[update.index].b ? 1 : 0);
                         break;
                 }
 
@@ -226,6 +249,17 @@ esp_err_t nvs_config_init(void)
         ESP_LOGW(TAG, "Could not open nvs");
         return err;
     }
+        
+    nvs_stats_t stats;
+    err = nvs_get_stats(NULL, &stats);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Used entries: %lu", stats.used_entries);
+        ESP_LOGI(TAG, "Free entries: %lu", stats.free_entries);
+        ESP_LOGI(TAG, "Available entries: %lu", stats.available_entries);
+        ESP_LOGI(TAG, "Total entries: %lu", stats.total_entries);
+    } else {
+        ESP_LOGE(TAG, "Error getting NVS stats: %s\n", esp_err_to_name(err));
+    }
 
     // Load all
     for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
@@ -234,50 +268,65 @@ esp_err_t nvs_config_init(void)
         nvs_config_init_fallback(key, setting);
 
         esp_err_t ret;
-        switch (setting->type) {
-            case TYPE_STR: {
-                size_t len = 0;
-                nvs_get_str(handle, setting->nvs_key_name, NULL, &len);
-                char *buf = len > 0 ? malloc(len) : NULL;
-                if (buf) {
-                    ret = nvs_get_str(handle, setting->nvs_key_name, buf, &len);
-                    setting->value.str = (ret == ESP_OK) ? buf : strdup(setting->default_value.str);
-                    if (ret != ESP_OK) free(buf);
-                } else {
-                    setting->value.str = strdup(setting->default_value.str);
+
+        int count = get_array_size(setting);
+        setting->value = calloc(count, sizeof(ConfigValue));
+
+        for (int idx = 0; idx < count; idx++) {
+            char key[NVS_KEY_NAME_MAX_SIZE];
+            get_nvs_key_name(setting, idx, key);
+
+            switch (setting->type) {
+                case TYPE_STR: {
+                    size_t len = 0;
+                    esp_err_t ret = nvs_get_str(handle, key, NULL, &len);
+                    if (ret == ESP_OK && len > 1) {
+                        char *buf = malloc(len);
+                        if (buf) {
+                            ret = nvs_get_str(handle, key, buf, &len);
+                            if (ret == ESP_OK) {
+                                setting->value[idx].str = buf;
+                                break;
+                            }
+                            free(buf);
+                        }
+                    }
+
+                    const char *def = setting->default_value.str ? setting->default_value.str : "";
+                    setting->value[idx].str = strdup(def);
+                    break;
                 }
-                break;
-            }
-            case TYPE_U16: {
-                uint16_t val;
-                ret = nvs_get_u16(handle, setting->nvs_key_name, &val);
-                setting->value.u16 = (ret == ESP_OK) ? val : setting->default_value.u16;
-                break;
-            }
-            case TYPE_I32: {
-                int32_t val;
-                ret = nvs_get_i32(handle, setting->nvs_key_name, &val);
-                setting->value.i32 = (ret == ESP_OK) ? val : setting->default_value.i32;
-                break;
-            }
-            case TYPE_U64: {
-                uint64_t val;
-                ret = nvs_get_u64(handle, setting->nvs_key_name, &val);
-                setting->value.u64 = (ret == ESP_OK) ? val : setting->default_value.u64;
-                break;
-            }
-            case TYPE_FLOAT: {
-                char buf[32];
-                size_t len = sizeof(buf);
-                ret = nvs_get_str(handle, setting->nvs_key_name, buf, &len);
-                setting->value.f = (ret == ESP_OK) ? atof(buf) : setting->default_value.f;
-                break;
-            }
-            case TYPE_BOOL: {
-                uint16_t val;
-                ret = nvs_get_u16(handle, setting->nvs_key_name, &val);
-                setting->value.b = (ret == ESP_OK) ? (val != 0) : setting->default_value.b;
-                break;
+                case TYPE_U16: {
+                    uint16_t val;
+                    ret = nvs_get_u16(handle, key, &val);
+                    setting->value[idx].u16 = (ret == ESP_OK) ? val : setting->default_value.u16;
+                    break;
+                }
+                case TYPE_I32: {
+                    int32_t val;
+                    ret = nvs_get_i32(handle, key, &val);
+                    setting->value[idx].i32 = (ret == ESP_OK) ? val : setting->default_value.i32;
+                    break;
+                }
+                case TYPE_U64: {
+                    uint64_t val;
+                    ret = nvs_get_u64(handle, key, &val);
+                    setting->value[idx].u64 = (ret == ESP_OK) ? val : setting->default_value.u64;
+                    break;
+                }
+                case TYPE_FLOAT: {
+                    char buf[32];
+                    size_t len = sizeof(buf);
+                    ret = nvs_get_str(handle, key, buf, &len);
+                    setting->value[idx].f = (ret == ESP_OK) ? atof(buf) : setting->default_value.f;
+                    break;
+                }
+                case TYPE_BOOL: {
+                    uint16_t val;
+                    ret = nvs_get_u16(handle, key, &val);
+                    setting->value[idx].b = (ret == ESP_OK) ? (val != 0) : setting->default_value.b;
+                    break;
+                }
             }
         }
     }
@@ -299,20 +348,53 @@ esp_err_t nvs_config_init(void)
 char *nvs_config_get_string(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_STR) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return NULL;
+    }
+    if (setting->type != TYPE_STR || setting->array_size > 1) {
         ESP_LOGE(TAG, "Wrong type for %s (str)", setting->nvs_key_name);
         return NULL;
     }
-    return strdup(setting->value.str);
+    return strdup(setting->value[0].str);
+}
+
+char *nvs_config_get_string_indexed(NvsConfigKey key, int index)
+{
+    Settings *setting = nvs_config_get_settings(key);
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return NULL;
+    }
+    if (setting->type != TYPE_STR || setting->array_size < 1) {
+        ESP_LOGE(TAG, "Wrong type for %s (indexed str)", setting->nvs_key_name);
+        return NULL;
+    }
+    if (index < 0 || index >= setting->array_size) {
+        ESP_LOGE(TAG, "Index out of bounds for key %s (%d)", setting->nvs_key_name, index);
+        return NULL;
+    }
+    return strdup(setting->value[index].str);
 }
 
 void nvs_config_set_string(NvsConfigKey key, const char *value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    // Skip if invalid, wrong type, or value unchanged
-    if (!setting || setting->type != TYPE_STR || (setting->value.str && strcmp(setting->value.str, value) == 0)) return;
+    if (!setting || setting->type != TYPE_STR || (setting->value[0].str && strcmp(setting->value[0].str, value) == 0)) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value) };
+    if (!update.value.str) return;
+    xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
+}
+
+void nvs_config_set_string_indexed(NvsConfigKey key, int index, const char *value)
+{
+    Settings *setting = nvs_config_get_settings(key);
+    if (!setting || setting->type != TYPE_STR || setting->array_size < 1) return;
+    if (index < 0 || index >= setting->array_size) return;
+    if (setting->value[index].str && strcmp(setting->value[index].str, value) == 0) return;
+
+    ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value), .index = index };
     if (!update.value.str) return;
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
 }
@@ -320,17 +402,21 @@ void nvs_config_set_string(NvsConfigKey key, const char *value)
 uint16_t nvs_config_get_u16(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_U16) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return 0;
+    }
+    if (setting->type != TYPE_U16) {
         ESP_LOGE(TAG, "Wrong type for %s (u16)", setting->nvs_key_name);
         return 0;
     }
-    return setting->value.u16;
+    return setting->value[0].u16;
 }
 
 void nvs_config_set_u16(NvsConfigKey key, uint16_t value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_U16 || setting->value.u16 == value) return;
+    if (!setting || setting->type != TYPE_U16 || setting->value[0].u16 == value) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_U16, .value.u16 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
@@ -339,17 +425,21 @@ void nvs_config_set_u16(NvsConfigKey key, uint16_t value)
 int32_t nvs_config_get_i32(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_I32) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return 0;
+    }
+    if (setting->type != TYPE_I32) {
         ESP_LOGE(TAG, "Wrong type for %s (i32)", setting->nvs_key_name);
         return 0;
     }
-    return setting->value.i32;
+    return setting->value[0].i32;
 }
 
 void nvs_config_set_i32(NvsConfigKey key, int32_t value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_I32 || setting->value.i32 == value) return;
+    if (!setting || setting->type != TYPE_I32 || setting->value[0].i32 == value) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_I32, .value.i32 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
@@ -358,17 +448,21 @@ void nvs_config_set_i32(NvsConfigKey key, int32_t value)
 uint64_t nvs_config_get_u64(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_U64) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return 0;
+    }
+    if (setting->type != TYPE_U64) {
         ESP_LOGE(TAG, "Wrong type for %s (u64)", setting->nvs_key_name);
         return 0;
     }
-    return setting->value.u64;
+    return setting->value[0].u64;
 }
 
 void nvs_config_set_u64(NvsConfigKey key, uint64_t value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_U64 || setting->value.u64 == value) return;
+    if (!setting || setting->type != TYPE_U64 || setting->value[0].u64 == value) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_U64, .value.u64 = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
@@ -377,38 +471,44 @@ void nvs_config_set_u64(NvsConfigKey key, uint64_t value)
 float nvs_config_get_float(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_FLOAT) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return 0;
+    }
+    if (setting->type != TYPE_FLOAT) {
         ESP_LOGE(TAG, "Wrong type for %s (float)", setting->nvs_key_name);
         return 0;
     }
-    return setting->value.f;
+    return setting->value[0].f;
 }
 
 void nvs_config_set_float(NvsConfigKey key, float value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    // Skip if invalid, wrong type, or value unchanged (use epsilon for float comparison)
-    if (!setting || setting->type != TYPE_FLOAT || fabsf(setting->value.f - value) < 0.001f) return;
+    if (!setting || setting->type != TYPE_FLOAT || fabsf(setting->value[0].f - value) < 0.001f) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_FLOAT, .value.f = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
 }
 
-
 bool nvs_config_get_bool(NvsConfigKey key)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_BOOL) {
+    if (!setting) {
+        ESP_LOGE(TAG, "Invalid key %d", key);
+        return false;
+    }
+    if (setting->type != TYPE_BOOL) {
         ESP_LOGE(TAG, "Wrong type for %s (bool)", setting->nvs_key_name);
         return false;
     }
-    return setting->value.b;
+    return setting->value[0].b;
 }
 
 void nvs_config_set_bool(NvsConfigKey key, bool value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_BOOL || setting->value.b == value) return;
+    if (!setting || setting->type != TYPE_BOOL || setting->value[0].b == value) return;
 
     ConfigUpdate update = { .key = key, .type = TYPE_BOOL, .value.b = value };
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
