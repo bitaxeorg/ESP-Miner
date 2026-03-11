@@ -19,5 +19,6 @@ void connect_init(void *pvParameters);
 void connect_await_connection(void *pvParameters);
 esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count);
 esp_err_t get_wifi_current_rssi(int8_t *rssi);
+esp_err_t update_mdns_hostname(const char *new_hostname);
 
 #endif /* CONNECT_H_ */

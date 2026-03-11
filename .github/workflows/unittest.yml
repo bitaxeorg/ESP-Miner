@@ -13,12 +13,28 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - name: esp-idf add-dependency esp_tinyusb
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.3
+          target: esp32s3
+          command: idf.py add-dependency "espressif/esp_tinyusb^2.0.1~1"
+          path: 'test-ci'
+
+      - name: esp-idf add-dependency mdns
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.3
+          target: esp32s3
+          command: idf.py add-dependency "espressif/mdns^1.8.0"
+          path: 'test-ci'
+
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v5.5.3
           target: esp32s3
-          command: idf.py add-dependency "espressif/esp_tinyusb^2.0.1~1" ; GITHUB_ACTIONS="true" idf.py build
+          command: GITHUB_ACTIONS="true" idf.py build
           path: 'test-ci'
 
       - name: Run tests
