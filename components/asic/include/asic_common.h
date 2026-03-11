@@ -1,5 +1,5 @@
-#ifndef COMMON_H_
-#define COMMON_H_
+#ifndef ASIC_COMMON_H_
+#define ASIC_COMMON_H_
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -38,4 +38,4 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
 esp_err_t receive_work(uint8_t * buffer, int buffer_size);
 void get_difficulty_mask(uint16_t difficulty, uint8_t *job_difficulty_mask);
 
-#endif /* COMMON_H_ */
+#endif /* ASIC_COMMON_H_ */
