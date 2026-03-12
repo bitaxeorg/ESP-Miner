@@ -103,7 +103,7 @@
                                          <a [href]="'http://' + axe.address" target="_blank" class="text-800" pTooltip="Address" tooltipPosition="top">
                                              {{axe.address}}
                                          </a>
-                                         <span *ngIf="isThisDevice(axe.address)" class="ml-1 cursor-pointer" pTooltip="This device" tooltipPosition="top">
+                                         <span *ngIf="isThisDevice(axe)" class="ml-1 cursor-pointer" pTooltip="This device" tooltipPosition="top">
                                              <i class="pi pi-star-fill text-xs"></i>
                                          </span>
                                      </div>
@@ -254,7 +254,7 @@
                             </td>
                             <td>
                                 <a [href]="'http://' + axe.address" target="_blank" class="text-800">{{axe.address}}</a>
-                                <span *ngIf="isThisDevice(axe.address)" class="ml-2 cursor-pointer" pTooltip="This device" tooltipPosition="top">
+                                <span *ngIf="isThisDevice(axe)" class="ml-2 cursor-pointer" pTooltip="This device" tooltipPosition="top">
                                     <i class="pi pi-star-fill text-xs"></i>
                                 </span>
                             </td>
