@@ -636,9 +636,12 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
             ESP_LOGI(TAG, "Self-test flag cleared");
             nvs_config_set_bool(NVS_CONFIG_SELF_TEST, false);
         }
-        ESP_LOGI(TAG, "SELF-TEST PASS! -- Press RESET button to restart.");
+        ESP_LOGI(TAG, "SELF-TEST PASS! -- Restarting in 10 seconds.");
         GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST PASS!";
-        GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart.";
+        GLOBAL_STATE->SELF_TEST_MODULE.finished = "Restarting in 10 seconds.";
+        GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        esp_restart();
     } else {
         // isTestFailed
         GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST FAIL!";
