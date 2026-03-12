@@ -32,6 +32,7 @@ esp_err_t EMC2103_init(int temp_offset_param)
     // Configure the fan setting
     ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_CONFIGURATION1, 0), TAG, "Failed to configure EMC2103");
     ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_CONFIG, 0x00), TAG, "Failed to configure PWM");
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_BASE_FREQ, 0x01), TAG, "Failed to configure PWM base frequency");
 
     return ESP_OK;
 
