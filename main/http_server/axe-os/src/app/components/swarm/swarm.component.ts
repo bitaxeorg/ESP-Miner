@@ -596,7 +596,17 @@ return this.swarm.filter(axe =>
     }
   }
 
-  isThisDevice(IP: string): boolean {
-    return IP === window.location.hostname || (this.currentDeviceIp !== null && IP === this.currentDeviceIp);
+  isThisDevice(device: SwarmDevice): boolean {
+    const hostname = window.location.hostname;
+    
+    if (device.address === hostname || device.connectionAddress === hostname) {
+      return true;
+    }
+    
+    if (this.currentDeviceIp !== null && device['ip'] === this.currentDeviceIp) {
+      return true;
+    }
+    
+    return false;
   }
 }
