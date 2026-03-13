@@ -63,8 +63,11 @@ void create_jobs_task(void *pvParameters)
                 GLOBAL_STATE->new_stratum_version_rolling_msg = false;
             }
 
-            // reset extranonce2 only if clean_jobs == true
-            // avoid a cosmic festival of duplicated shares
+            // Reset extranonce2 only if clean_jobs == true.
+            // Because if also reset when clean_jobs == false.
+            // It will reproduce the same values.
+            // So the same solution(s) will be sent a second time.
+            // Causing huge amount of duplicated shares
             if (current_mining_notification->clean_jobs) {
                 extranonce_2 = 0;
             }
