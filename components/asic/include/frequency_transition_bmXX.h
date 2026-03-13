@@ -27,4 +27,13 @@ typedef void (*set_hash_frequency_fn)(float frequency);
  */
 void do_frequency_transition(float target_frequency, set_hash_frequency_fn set_frequency_fn);
 
+/**
+ * @brief Reset the tracked frequency state to the initial value (50 MHz)
+ *
+ * Call this before re-initializing an ASIC after a reset so that
+ * do_frequency_transition ramps from the chip's post-reset default
+ * instead of the stale pre-reset value.
+ */
+void reset_frequency_transition_state(void);
+
 #endif // FREQUENCY_TRANSITION_H

@@ -238,6 +238,18 @@ export class SystemApiService {
     return of('Block found notification dismissed (mock)');
   }
 
+  public setMiningPause(pause: boolean, uri: string = '') {
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.httpClient.post('/api/system/mining', { pause });
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post(`${uri}/api/system/mining`, { pause });
+    }
+
+    return of({ paused: pause });
+  }
+
   public identify(uri: string = '') {
     if (environment.production && this.generatedSystemService && !uri) {
       return this.generatedSystemService.identifySystem();
