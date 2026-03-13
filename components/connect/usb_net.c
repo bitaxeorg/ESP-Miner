@@ -15,6 +15,7 @@
 #include "tinyusb_cdc_acm.h"
 #include "tinyusb_console.h"
 #include "tinyusb.h"
+#include "connect.h"
 #include "global_state.h"
 #include "nvs_config.h"
 
@@ -101,6 +102,9 @@ static void usb_ip_event_handler(void* arg, esp_event_base_t event_base,
         if (ipv6_err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to create IPv6 link-local address: %s", esp_err_to_name(ipv6_err));
         }
+
+        // Initialize mDNS for network discovery
+        initialize_mdns_if_needed(GLOBAL_STATE, event->esp_netif);
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
@@ -246,6 +250,14 @@ void usb_net_init(void * pvParameters)
     ESP_ERROR_CHECK(esp_netif_dhcpc_start(netif));
 
     ESP_LOGI(TAG, "Ethernet-over-USB initialized successfully - waiting for IP from DHCP");
+
+    /* Set hostname on USB netif */
+    esp_err_t hostname_err = esp_netif_set_hostname(netif, hostname);
+    if (hostname_err != ESP_OK) {
+        ESP_LOGW(TAG, "esp_netif_set_hostname failed: %s", esp_err_to_name(hostname_err));
+    } else {
+        ESP_LOGI(TAG, "Setting hostname to: %s", hostname);
+    }
 
     strcpy(GLOBAL_STATE->SYSTEM_MODULE.network_status, "Acquiring IP...");
 }

@@ -1,6 +1,7 @@
 #include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "mdns.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
@@ -72,82 +73,86 @@ static const char *get_wifi_reason_string(int reason);
 static char* generate_unique_hostname(const char *base);
 static char* check_and_resolve_hostname_conflict(const char *hostname, const char *current_ip);
 
-static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
-    if (mdns_initialized) {
-        return;
-    }
-
+void initialize_mdns_if_needed(void *pvParameters, esp_netif_t *netif) {
+    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
     char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    
     if (hostname == NULL) {
         ESP_LOGW(TAG, "Hostname not configured, skipping mDNS setup");
         return;
     }
-    esp_err_t err = mdns_init();
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "mDNS/Avahi initialization failed: %s", esp_err_to_name(err));
-        ESP_LOGW(TAG, "Device will not be discoverable via mDNS/Bonjour/Avahi");
-    } else {
-        ESP_LOGI(TAG, "mDNS/Avahi initialized successfully - device discoverable on network");
 
-        /* Get current IP */
-        esp_netif_ip_info_t ip_info;
-        esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
-        char current_ip[16];
-        snprintf(current_ip, sizeof(current_ip), IPSTR, IP2STR(&ip_info.ip));
-
-        /* Check for hostname conflicts */
-        char *final_hostname = check_and_resolve_hostname_conflict(hostname, current_ip);
-
-        /* Set mDNS hostname */
-        err = mdns_hostname_set(final_hostname);
+    if (!mdns_initialized) {
+        esp_err_t err = mdns_init();
         if (err != ESP_OK) {
-            ESP_LOGW(TAG, "mDNS hostname setup failed: %s", esp_err_to_name(err));
-            ESP_LOGW(TAG, "Device hostname not set for mDNS discovery");
+            ESP_LOGW(TAG, "mDNS/Avahi initialization failed: %s", esp_err_to_name(err));
         } else {
-            ESP_LOGI(TAG, "mDNS hostname set to: %s.local", final_hostname);
-            ESP_LOGI(TAG, "Access device at: http://%s.local", final_hostname);
+            ESP_LOGI(TAG, "mDNS/Avahi initialized successfully");
+
+            /* Get current IP from the provided netif */
+            esp_netif_ip_info_t ip_info;
+            esp_netif_get_ip_info(netif, &ip_info);
+            char current_ip[16];
+            snprintf(current_ip, sizeof(current_ip), IPSTR, IP2STR(&ip_info.ip));
+
+            /* Check for hostname conflicts and set global hostname */
+            char *final_hostname = check_and_resolve_hostname_conflict(hostname, current_ip);
+            ESP_LOGI(TAG, "mDNS initializing with IP: %s and hostname: %s", current_ip, final_hostname);
+            mdns_hostname_set(final_hostname);
+            strncpy(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname, final_hostname, sizeof(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname) - 1);
+            GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname[sizeof(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname) - 1] = '\0';
+            
+            /* Set mDNS instance name using base MAC */
+            uint8_t mac[6];
+            esp_efuse_mac_get_default(mac);
+            char mac_suffix[6];
+            snprintf(mac_suffix, sizeof(mac_suffix), "%02X%02X", mac[4], mac[5]);
+
+            char instance_name[64];
+            snprintf(instance_name, sizeof(instance_name), "Bitaxe %s %s (%s)",
+                     GLOBAL_STATE->DEVICE_CONFIG.family.name,
+                     GLOBAL_STATE->DEVICE_CONFIG.board_version,
+                     mac_suffix);
+            
+            /* Add HTTP service */
+            mdns_service_add(instance_name, "_http", "_tcp", 80, NULL, 0);
+            
+            mdns_initialized = true;
+            free(final_hostname);
         }
-
-        free(final_hostname);
-
-        /* Set mDNS instance name */
-        uint8_t mac[6];
-        esp_wifi_get_mac(WIFI_IF_STA, mac);
-        char mac_suffix[6];
-        snprintf(mac_suffix, sizeof(mac_suffix), "%02X%02X", mac[4], mac[5]);
-
-        char instance_name[64];
-        snprintf(instance_name, sizeof(instance_name), "Bitaxe %s %s (%s)",
-                 GLOBAL_STATE->DEVICE_CONFIG.family.name,
-                 GLOBAL_STATE->DEVICE_CONFIG.board_version,
-                 mac_suffix);
-        
-        /* Add HTTP service */
-        err = mdns_service_add(instance_name, "_http", "_tcp", 80, NULL, 0);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "mDNS HTTP service registration failed: %s", esp_err_to_name(err));
-            ESP_LOGW(TAG, "HTTP service not advertised via mDNS");
-        } else {
-            ESP_LOGI(TAG, "mDNS HTTP service registered: _http._tcp port 80");
-            ESP_LOGI(TAG, "Discover with: avahi-browse _http._tcp");
-            ESP_LOGI(TAG, "mDNS instance: %s", instance_name);
-        }
-
-        ESP_LOGI(TAG, "mDNS/Avahi setup complete - device ready for network discovery");
-        mdns_initialized = true;
     }
+
+    /* 
+     * Explicitly register this interface with mDNS and trigger an announcement.
+     * This is required for custom interfaces like "USB_NCM" to be recognized.
+     * We must both ENABLE and ANNOUNCE the protocols.
+     */
+    esp_err_t reg_err = mdns_register_netif(netif);
+    if (reg_err == ESP_OK || reg_err == ESP_ERR_INVALID_STATE) {
+        mdns_netif_action(netif, MDNS_EVENT_ENABLE_IP4 | MDNS_EVENT_ENABLE_IP6 | 
+                                 MDNS_EVENT_ANNOUNCE_IP4 | MDNS_EVENT_ANNOUNCE_IP6);
+        ESP_LOGI(TAG, "mDNS enabled and announced on interface %p", netif);
+    } else {
+        ESP_LOGW(TAG, "Failed to register netif with mDNS: %s", esp_err_to_name(reg_err));
+    }
+
     free(hostname);
 }
 
-esp_err_t update_mdns_hostname(const char *new_hostname) {
+esp_err_t update_mdns_hostname(void *pvParameters, const char *new_hostname) {
+    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
     if (new_hostname == NULL || strlen(new_hostname) == 0) {
         ESP_LOGW(TAG, "Invalid hostname provided for mDNS update");
         return ESP_ERR_INVALID_ARG;
     }
 
+    /* Get the correct netif based on network mode */
+    const char *ifkey = (GLOBAL_STATE->SYSTEM_MODULE.network_mode == NETWORK_MODE_USB) ? "USB_NCM" : "WIFI_STA_DEF";
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey(ifkey);
+
     /* Get current IP for conflict checking */
     esp_netif_ip_info_t ip_info;
-    esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
+    esp_netif_get_ip_info(netif, &ip_info);
     char current_ip[16];
     snprintf(current_ip, sizeof(current_ip), IPSTR, IP2STR(&ip_info.ip));
 
@@ -168,6 +173,8 @@ esp_err_t update_mdns_hostname(const char *new_hostname) {
     }
 
     ESP_LOGI(TAG, "mDNS hostname updated to: %s", resolved_hostname);
+    strncpy(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname, resolved_hostname, sizeof(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname) - 1);
+    GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname[sizeof(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname) - 1] = '\0';
     free(resolved_hostname);
     return ESP_OK;
 }
@@ -363,7 +370,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             ESP_LOGE(TAG, "Failed to create IPv6 link-local address: %s", esp_err_to_name(ipv6_err));
         }
 
-        initialize_mdns_if_needed(GLOBAL_STATE);
+        initialize_mdns_if_needed(GLOBAL_STATE, event->esp_netif);
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
@@ -396,7 +403,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             ESP_LOGI(TAG, "IPv6 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
         }
 
-        initialize_mdns_if_needed(GLOBAL_STATE);
+        initialize_mdns_if_needed(GLOBAL_STATE, event->esp_netif);
     }
 }
 

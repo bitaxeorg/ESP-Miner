@@ -693,7 +693,9 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
                         strlcpy(normalized_hostname, item->valuestring, sizeof(normalized_hostname));
                         normalize_hostname(normalized_hostname, sizeof(normalized_hostname));
                         nvs_config_set_string(key, normalized_hostname);
-                        update_mdns_hostname(normalized_hostname);
+                        if (GLOBAL_STATE->SYSTEM_MODULE.hostname) free(GLOBAL_STATE->SYSTEM_MODULE.hostname);
+                        GLOBAL_STATE->SYSTEM_MODULE.hostname = strdup(normalized_hostname);
+                        update_mdns_hostname(GLOBAL_STATE, normalized_hostname);
                         ESP_LOGI(TAG, "Updated hostname to: %s", normalized_hostname);
                     }
                     else
@@ -723,14 +725,13 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
 
     // Set redirect URL if hostname changed
     if (hostname_changed && redirect_url) {
-        char *current_hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+        const char *current_hostname = GLOBAL_STATE->SYSTEM_MODULE.hostname;
         if (current_hostname) {
             *redirect_url = malloc(256);
             if (*redirect_url) {
                 snprintf(*redirect_url, 256, "http://%s.local", current_hostname);
                 ESP_LOGI(TAG, "Hostname redirect URL set: %s", *redirect_url);
             }
-            free(current_hostname);
         }
     }
 
@@ -961,25 +962,17 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     }
 
     char * network_mode = nvs_config_get_string(NVS_CONFIG_NETWORK_MODE);
-    char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
-    char * hostname_base = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    const char * ssid = GLOBAL_STATE->SYSTEM_MODULE.ssid;
+    const char * hostname_base = GLOBAL_STATE->SYSTEM_MODULE.hostname;
     char mdns_hostname[64] = {0};
     char full_hostname[64];
     
-    // Get the base hostname from mDNS if available
-    if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
-        esp_err_t mdns_err = mdns_hostname_get(mdns_hostname);
-        ESP_LOGI(TAG, "mdns_hostname_get returned %d, hostname: %s", mdns_err, mdns_hostname);
-        if (mdns_err == ESP_OK && strlen(mdns_hostname) > 0) {
-            snprintf(full_hostname, sizeof(full_hostname), "%s.local", mdns_hostname);
-            ESP_LOGI(TAG, "Using mDNS hostname: %s", full_hostname);
-        } else {
-            strcpy(full_hostname, hostname_base);
-            ESP_LOGI(TAG, "Using base hostname: %s", full_hostname);
-        }
+    // Get the base hostname from GLOBAL_STATE if available
+    if (GLOBAL_STATE->SYSTEM_MODULE.is_connected && strlen(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname) > 0) {
+        strncpy(mdns_hostname, GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname, sizeof(mdns_hostname) - 1);
+        snprintf(full_hostname, sizeof(full_hostname), "%s.local", mdns_hostname);
     } else {
         strcpy(full_hostname, hostname_base);
-        ESP_LOGI(TAG, "Device not connected, using base hostname: %s", full_hostname);
     }
     char * ipv4 = GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str;
     char * ipv6 = GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str;
@@ -1195,9 +1188,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         }
     }
 
-    free(ssid);
     free(network_mode);
-    free(hostname_base);
     free(stratumURL);
     free(fallbackStratumURL);
     free(stratumCert);

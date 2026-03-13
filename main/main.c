@@ -70,6 +70,13 @@ void app_main(void)
         }
     }
 
+    GLOBAL_STATE.SYSTEM_MODULE.hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    if (GLOBAL_STATE.SYSTEM_MODULE.hostname == NULL) {
+        ESP_LOGW(TAG, "No hostname configured in NVS, using default");
+        GLOBAL_STATE.SYSTEM_MODULE.hostname = strdup(CONFIG_LWIP_LOCAL_HOSTNAME);
+    }
+    memset(GLOBAL_STATE.SYSTEM_MODULE.mdns_hostname, 0, sizeof(GLOBAL_STATE.SYSTEM_MODULE.mdns_hostname));
+
     if (device_config_init(&GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init device config");
         return;
