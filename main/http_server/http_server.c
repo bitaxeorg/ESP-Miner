@@ -792,6 +792,66 @@ static esp_err_t POST_dismiss_block_found(httpd_req_t * req)
     return res;
 }
 
+static esp_err_t POST_mining_pause(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    int total_len = req->content_len;
+    int cur_len = 0;
+    char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
+    int received = 0;
+    if (total_len >= SCRATCH_BUFSIZE) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_OK;
+    }
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len);
+        if (received <= 0) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive request body");
+            return ESP_OK;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    cJSON * root = cJSON_Parse(buf);
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
+    cJSON * pause_item = cJSON_GetObjectItem(root, "pause");
+    if (!cJSON_IsBool(pause_item)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing or invalid 'pause' field");
+        return ESP_OK;
+    }
+
+    bool pause = cJSON_IsTrue(pause_item);
+    GLOBAL_STATE->SYSTEM_MODULE.mining_paused = pause;
+    ESP_LOGI(TAG, "Mining %s by API request", pause ? "paused" : "resumed");
+
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    cJSON * resp = cJSON_CreateObject();
+    if (resp == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_OK;
+    }
+    cJSON_AddBoolToObject(resp, "paused", pause);
+    esp_err_t res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
+    cJSON_Delete(resp);
+    return res;
+}
+
 static const char* esp_reset_reason_to_string(esp_reset_reason_t reason) {
     switch (reason) {
         case ESP_RST_UNKNOWN:    return "Reset reason can not be determined";
@@ -933,6 +993,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
     cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE));
+    cJSON_AddBoolToObject(root, "miningPaused", GLOBAL_STATE->SYSTEM_MODULE.mining_paused);
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED));
     cJSON_AddStringToObject(root, "display", display);
     cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION));
@@ -1393,8 +1454,16 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &system_restart_options_uri);
 
+    httpd_uri_t system_mining_pause_uri = {
+        .uri = "/api/system/mining",
+        .method = HTTP_POST,
+        .handler = POST_mining_pause,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_mining_pause_uri);
+
     httpd_uri_t system_dismiss_block_found_uri = {
-        .uri = "/api/system/blockFound/dismiss", 
+        .uri = "/api/system/blockFound/dismiss",
         .method = HTTP_POST, 
         .handler = POST_dismiss_block_found, 
         .user_ctx = NULL

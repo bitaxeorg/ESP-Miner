@@ -140,6 +140,7 @@ export class SystemApiService {
         coinbaseOutputs: [{value: 50, address: "payoutaddress"}],
         coinbaseValueTotalSatoshis: 50,
         coinbaseValueUserSatoshis: 50,
+        miningPaused: false,
       }
     ).pipe(delay(1000));
   }
@@ -236,6 +237,18 @@ export class SystemApiService {
     }
 
     return of('Block found notification dismissed (mock)');
+  }
+
+  public setMiningPaused(pause: boolean, uri: string = '') {
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.setMiningPaused({ pause });
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post(`${uri}/api/system/mining`, { pause });
+    }
+
+    return of({ paused: pause });
   }
 
   public identify(uri: string = '') {

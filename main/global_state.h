@@ -82,6 +82,7 @@ typedef struct
     bool is_using_fallback;
     char pool_connection_info[64];
     bool overheat_mode;
+    bool mining_paused;
     uint16_t power_fault;
     uint32_t lastClockSync;
     bool is_screen_active;

@@ -104,6 +104,8 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
     ESP_LOGI(TAG, "Initial overheat_mode value: %d", module->overheat_mode);
 
+    module->mining_paused = false;
+
     //Initialize power_fault fault mode
     module->power_fault = 0;
 

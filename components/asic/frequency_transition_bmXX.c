@@ -11,6 +11,11 @@ static const char * TAG = "frequency_transition";
 
 static float current_frequency = 50; // Mhz
 
+void reset_frequency_transition_state(void)
+{
+    current_frequency = 50;
+}
+
 void do_frequency_transition(float target_frequency, set_hash_frequency_fn set_frequency_fn)
 {
     if (fabs(current_frequency - target_frequency) < EPSILON) {
