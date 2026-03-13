@@ -168,7 +168,7 @@ void hashrate_monitor_task(void *pvParameters)
             // time_us resets to 0. This prevents update_hash_counter from computing
             // a huge uint32_t wraparound diff (counter resets to 0 on ASIC reset)
             // which would cause a hashrate spike when resuming.
-            clear_measurements(GLOBAL_STATE);
+            hashrate_monitor_reset_measurements(GLOBAL_STATE);
         }
         was_asic_initialized = is_asic_initialized;
 
