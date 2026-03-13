@@ -225,6 +225,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             result = CLIENT_RECONNECT;
         } else if (strcmp("mining.ping", method_json->valuestring) == 0) {
             result = MINING_PING;
+        } else if (strcmp("client.show_message", method_json->valuestring) == 0) {
+            result = CLIENT_SHOW_MESSAGE;
         } else {
             ESP_LOGI(TAG, "unhandled method in stratum message: %s", stratum_json);
         }
@@ -405,6 +407,23 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         }
         message->extranonce_str = strdup(extranonce_str);
         message->extranonce_2_len = extranonce_2_len;
+    } else if (message->method == CLIENT_SHOW_MESSAGE) {
+        cJSON * params = cJSON_GetObjectItem(json, "params");
+        if (params && cJSON_IsArray(params) && cJSON_GetArraySize(params) > 0) {
+            cJSON * msg_item = cJSON_GetArrayItem(params, 0);
+            if (msg_item && cJSON_IsString(msg_item)) {
+                // Cap the pool message length to MAX_POOL_MESSAGE_LEN (256)
+                size_t msg_len = strlen(msg_item->valuestring);
+                if (msg_len > MAX_POOL_MESSAGE_LEN) {
+                    char capped_msg[MAX_POOL_MESSAGE_LEN + 1];
+                    strncpy(capped_msg, msg_item->valuestring, MAX_POOL_MESSAGE_LEN);
+                    capped_msg[MAX_POOL_MESSAGE_LEN] = '\0';
+                    ESP_LOGI(TAG, "Pool message: %s...", capped_msg);
+                } else {
+                    ESP_LOGI(TAG, "Pool message: %s", msg_item->valuestring);
+                }
+            }
+        }
     }
     done:
     cJSON_Delete(json);
