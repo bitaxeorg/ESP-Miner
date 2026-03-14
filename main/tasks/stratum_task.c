@@ -14,6 +14,7 @@
 #include "utils.h"
 #include "coinbase_decoder.h"
 #include <esp_heap_caps.h>
+#include "hashrate_monitor_task.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
@@ -242,6 +243,9 @@ void cleanQueue(GlobalState * GLOBAL_STATE) {
         GLOBAL_STATE->valid_jobs[i] = 0;
     }
     pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+    
+    // Reset hashrate measurements to prevent spike on reconnection
+    hashrate_monitor_reset_measurements(GLOBAL_STATE);
 }
 
 void stratum_reset_uid(GlobalState * GLOBAL_STATE)
