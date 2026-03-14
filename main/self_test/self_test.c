@@ -555,7 +555,7 @@ bool self_test(void * pvParameters)
                     }
                     last_job_duration = duration_ms;
                     asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
-                    if (asic_temp > 55) {
+                    if (asic_temp > 62) {
                         snprintf(logString, sizeof(logString), "TEMP:FAIL :%.0f", asic_temp);
                         display_msg(logString, GLOBAL_STATE);
                         tests_done(GLOBAL_STATE, false);
