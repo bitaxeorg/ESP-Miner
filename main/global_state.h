@@ -94,6 +94,8 @@ typedef struct
     char * version;
     char * axeOSVersion;
     Scoreboard scoreboard;
+    char mdns_hostname[64];
+    char full_hostname[70];
 } SystemModule;
 
 typedef struct

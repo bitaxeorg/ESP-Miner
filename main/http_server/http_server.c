@@ -661,7 +661,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
                         strlcpy(normalized_hostname, item->valuestring, sizeof(normalized_hostname));
                         normalize_hostname(normalized_hostname, sizeof(normalized_hostname));
                         nvs_config_set_string(key, normalized_hostname);
-                        update_mdns_hostname(normalized_hostname);
+                        update_mdns_hostname(normalized_hostname, GLOBAL_STATE);
                         ESP_LOGI(TAG, "Updated hostname to: %s", normalized_hostname);
                     }
                     else
@@ -982,24 +982,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
     char * hostname_base = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
-    char mdns_hostname[64] = {0};
-    char full_hostname[64];
-    
-    // Get the base hostname from mDNS if available
-    if (GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
-        esp_err_t mdns_err = mdns_hostname_get(mdns_hostname);
-        ESP_LOGI(TAG, "mdns_hostname_get returned %d, hostname: %s", mdns_err, mdns_hostname);
-        if (mdns_err == ESP_OK && strlen(mdns_hostname) > 0) {
-            snprintf(full_hostname, sizeof(full_hostname), "%s.local", mdns_hostname);
-            ESP_LOGI(TAG, "Using mDNS hostname: %s", full_hostname);
-        } else {
-            strcpy(full_hostname, hostname_base);
-            ESP_LOGI(TAG, "Using base hostname: %s", full_hostname);
-        }
-    } else {
-        strcpy(full_hostname, hostname_base);
-        ESP_LOGI(TAG, "Device not connected, using base hostname: %s", full_hostname);
-    }
+    char * mdns_hostname = GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname;
+    char * full_hostname = GLOBAL_STATE->SYSTEM_MODULE.full_hostname;
     char * ipv4 = GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str;
     char * ipv6 = GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str;
     char * stratumURL = nvs_config_get_string(NVS_CONFIG_STRATUM_URL);
