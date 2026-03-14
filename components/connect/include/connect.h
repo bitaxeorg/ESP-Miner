@@ -6,6 +6,7 @@
 #include <lwip/netdb.h>
 
 #include "esp_wifi_types.h"
+#include "global_state.h"
 
 // Structure to hold WiFi scan results
 typedef struct {
@@ -18,6 +19,6 @@ void toggle_wifi_softap(void);
 void wifi_init(void * GLOBAL_STATE);
 esp_err_t wifi_scan(wifi_ap_record_simple_t *ap_records, uint16_t *ap_count);
 esp_err_t get_wifi_current_rssi(int8_t *rssi);
-esp_err_t update_mdns_hostname(const char *new_hostname);
+esp_err_t update_mdns_hostname(const char *new_hostname, GlobalState *GLOBAL_STATE);
 
 #endif /* CONNECT_H_ */

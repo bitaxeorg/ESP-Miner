@@ -106,6 +106,8 @@ static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
         } else {
             ESP_LOGI(TAG, "mDNS hostname set to: %s.local", final_hostname);
             ESP_LOGI(TAG, "Access device at: http://%s.local", final_hostname);
+            strlcpy(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname, final_hostname, sizeof(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname));
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.full_hostname, sizeof(GLOBAL_STATE->SYSTEM_MODULE.full_hostname), "%s.local", final_hostname);
         }
 
         free(final_hostname);
@@ -139,7 +141,7 @@ static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
     free(hostname);
 }
 
-esp_err_t update_mdns_hostname(const char *new_hostname) {
+esp_err_t update_mdns_hostname(const char *new_hostname, GlobalState *GLOBAL_STATE) {
     if (new_hostname == NULL || strlen(new_hostname) == 0) {
         ESP_LOGW(TAG, "Invalid hostname provided for mDNS update");
         return ESP_ERR_INVALID_ARG;
@@ -168,6 +170,10 @@ esp_err_t update_mdns_hostname(const char *new_hostname) {
     }
 
     ESP_LOGI(TAG, "mDNS hostname updated to: %s", resolved_hostname);
+    if (GLOBAL_STATE != NULL) {
+        strlcpy(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname, resolved_hostname, sizeof(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname));
+        snprintf(GLOBAL_STATE->SYSTEM_MODULE.full_hostname, sizeof(GLOBAL_STATE->SYSTEM_MODULE.full_hostname), "%s.local", resolved_hostname);
+    }
     free(resolved_hostname);
     return ESP_OK;
 }
