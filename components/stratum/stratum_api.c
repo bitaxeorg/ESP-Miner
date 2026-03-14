@@ -388,7 +388,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         message->mining_notification = new_work;
     } else if (message->method == MINING_SET_DIFFICULTY) {
         cJSON * params = cJSON_GetObjectItem(json, "params");
-        uint32_t difficulty = cJSON_GetArrayItem(params, 0)->valueint;
+        double difficulty = cJSON_GetArrayItem(params, 0)->valuedouble;
         message->new_difficulty = difficulty;
     } else if (message->method == MINING_SET_VERSION_MASK) {
         cJSON * params = cJSON_GetObjectItem(json, "params");

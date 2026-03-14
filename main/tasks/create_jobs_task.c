@@ -15,7 +15,7 @@
 
 static const char *TAG = "create_jobs_task";
 
-static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, uint32_t difficulty);
+static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, double difficulty);
 
 void create_jobs_task(void *pvParameters)
 {
@@ -29,7 +29,7 @@ void create_jobs_task(void *pvParameters)
         GLOBAL_STATE->valid_jobs[i] = 0;
     }
 
-    uint32_t difficulty = GLOBAL_STATE->pool_difficulty;
+    double difficulty = GLOBAL_STATE->pool_difficulty;
     mining_notify *current_mining_notification = NULL;
     uint64_t extranonce_2 = 0;
     int timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
@@ -52,7 +52,7 @@ void create_jobs_task(void *pvParameters)
             current_mining_notification = new_mining_notification;
 
             if (GLOBAL_STATE->new_set_mining_difficulty_msg) {
-                ESP_LOGI(TAG, "New pool difficulty %lu", GLOBAL_STATE->pool_difficulty);
+                ESP_LOGI(TAG, "New pool difficulty %.2f", GLOBAL_STATE->pool_difficulty);
                 difficulty = GLOBAL_STATE->pool_difficulty;
                 GLOBAL_STATE->new_set_mining_difficulty_msg = false;
             }
@@ -82,7 +82,7 @@ void create_jobs_task(void *pvParameters)
     }
 }
 
-static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, uint32_t difficulty)
+static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, double difficulty)
 {
     char extranonce_2_str[GLOBAL_STATE->extranonce_2_len * 2 + 1];
     extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len, extranonce_2_str);

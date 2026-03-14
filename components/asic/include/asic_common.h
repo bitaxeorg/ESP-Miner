@@ -36,6 +36,6 @@ int _largest_power_of_two(int num);
 
 int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response_length);
 esp_err_t receive_work(uint8_t * buffer, int buffer_size);
-void get_difficulty_mask(uint16_t difficulty, uint8_t *job_difficulty_mask);
+void get_difficulty_mask(double difficulty, uint8_t *job_difficulty_mask);
 
 #endif /* ASIC_COMMON_H_ */
