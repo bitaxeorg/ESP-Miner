@@ -49,6 +49,20 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->lastClockSync = 0;
     module->block_found = 0;
     module->show_new_block = false;
+    
+    // Initialize network configuration strings
+    char * network_mode = nvs_config_get_string(NVS_CONFIG_NETWORK_MODE);
+    if (strcmp(network_mode, "wifi") == 0) {
+        ESP_LOGI(TAG, "Network mode: Wi-Fi");
+        module->network_mode = NETWORK_MODE_WIFI;
+    } else if (strcmp(network_mode, "usb") == 0) {
+        ESP_LOGI(TAG, "Network mode: Ethernet-over-USB");
+        module->network_mode = NETWORK_MODE_USB;
+    } else {
+        ESP_LOGE(TAG, "Invalid network mode: %s", network_mode);
+        module->network_mode = NETWORK_MODE_WIFI;
+    }
+    free(network_mode);
 
     // Initialize network address strings
     strcpy(module->ip_addr_str, "");

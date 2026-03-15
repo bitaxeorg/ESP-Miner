@@ -13,6 +13,14 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - name: esp-idf add-dependency esp_tinyusb
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.3
+          target: esp32s3
+          command: idf.py add-dependency "espressif/esp_tinyusb^2.0.1~1"
+          path: 'test-ci'
+
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
