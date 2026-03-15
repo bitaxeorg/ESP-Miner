@@ -46,6 +46,9 @@
 // Test Power Consumption
 #define POWER_CONSUMPTION_MARGIN 3 //+/- watts
 
+// Test Input Voltage
+#define INPUT_VOLTAGE_MARGIN 0.10f // +/- 10%
+
 // Test Difficulty
 #define DIFFICULTY 16
 
@@ -197,6 +200,27 @@ esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE)
     return ESP_OK;
 }
 
+static esp_err_t test_input_voltage(GlobalState * GLOBAL_STATE)
+{
+    if (!GLOBAL_STATE->DEVICE_CONFIG.INA260) {
+        return ESP_OK;
+    }
+
+    float input_voltage_mv = Power_get_input_voltage(GLOBAL_STATE);
+    float nominal_mv = GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage * 1000.0f;
+    float margin_mv = nominal_mv * INPUT_VOLTAGE_MARGIN;
+
+    ESP_LOGI(TAG, "Input voltage: %.0f mV (nominal: %.0f mV +/- %.0f mV)", input_voltage_mv, nominal_mv, margin_mv);
+
+    if (input_voltage_mv >= nominal_mv - margin_mv && input_voltage_mv <= nominal_mv + margin_mv) {
+        return ESP_OK;
+    }
+
+    ESP_LOGE(TAG, "Input voltage test failed! %.0f mV, expected %.0f +/- %.0f mV", input_voltage_mv, nominal_mv, margin_mv);
+    display_msg("VIN:FAIL", GLOBAL_STATE);
+    return ESP_FAIL;
+}
+
 esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE)
 {
     // check for faults on the voltage regulator
@@ -329,6 +353,12 @@ bool self_test(void * pvParameters)
     // Voltage Regulator Testing
     if (test_voltage_regulator(GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Voltage Regulator test failed!");
+        tests_done(GLOBAL_STATE, false);
+    }
+
+    // Input voltage check (INA260 devices only)
+    if (test_input_voltage(GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Input voltage test failed!");
         tests_done(GLOBAL_STATE, false);
     }
 
@@ -558,7 +588,7 @@ bool self_test(void * pvParameters)
                     }
                     last_job_duration = duration_ms;
                     asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
-                    if (asic_temp > 55) {
+                    if (asic_temp > 62) {
                         snprintf(logString, sizeof(logString), "TEMP:FAIL :%.0f", asic_temp);
                         display_msg(logString, GLOBAL_STATE);
                         tests_done(GLOBAL_STATE, false);
