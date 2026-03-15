@@ -12,6 +12,7 @@ RUN apt-get update \
   libglib2.0-dev \
   libnuma1 \
   libpixman-1-dev \
+  default-jre \
   && rm -rf /var/lib/apt/lists/*
 
 # Node.js and npm (v20 is required)
