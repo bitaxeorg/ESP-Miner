@@ -11,7 +11,7 @@
     "build:no-api-gen": "ng build --configuration=production && gzipper compress --verbose --gzip --gzip-level 9 --exclude woff2 ./dist/axe-os && node only-gzip.js && node generate-version.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
-    "generate:api": "rm -rf ./src/app/generated && openapi-generator-cli generate",
+    "generate:api": "rm -rf ./src/app/generated && ng-openapi-gen",
     "bundle-report": "ng build --configuration=production --stats-json && webpack-bundle-analyzer dist/axe-os/stats.json"
   },
   "private": true,
@@ -39,7 +39,6 @@
     "@angular-devkit/build-angular": "^18.2.19",
     "@angular/cli": "^18.2.19",
     "@angular/compiler-cli": "^18.2.13",
-    "@openapitools/openapi-generator-cli": "^2.25.2",
     "@types/jasmine": "^5.1.5",
     "chokidar": "^3.6.0",
     "gzipper": "^8.2.0",
@@ -49,6 +48,7 @@
     "karma-coverage": "^2.2.1",
     "karma-jasmine": "^5.1.0",
     "karma-jasmine-html-reporter": "^2.1.0",
+    "ng-openapi-gen": "^1.0.5",
     "typescript": "^5.5.4",
     "webpack-bundle-analyzer": "^4.10.2"
   }

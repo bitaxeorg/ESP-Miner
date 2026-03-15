@@ -8,6 +8,7 @@ import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
+import { SystemInfo } from 'src/app/generated/models';
 
 const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 
@@ -24,7 +25,7 @@ export class UpdateComponent {
   public checkLatestRelease: boolean = false;
   public latestRelease$: Observable<any>;
 
-  public info$: Observable<any>;
+  public info$: Observable<SystemInfo>;
 
   @ViewChild('firmwareUpload') firmwareUpload!: FileUpload;
   @ViewChild('websiteUpload') websiteUpload!: FileUpload;
@@ -39,7 +40,7 @@ export class UpdateComponent {
     private localStorageService: LocalStorageService,
   ) {
     this.latestRelease$ = this.githubUpdateService.getReleases().pipe(map(releases => {
-      return releases[0];
+      return (releases as any)[0];
     }));
 
     this.info$ = timer(0, 5000).pipe(
@@ -61,7 +62,7 @@ export class UpdateComponent {
     this.systemService.performOTAUpdate(file)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
-        next: (event) => {
+        next: (event: any) => {
           if (event.type === HttpEventType.UploadProgress) {
             this.firmwareUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
           } else if (event.type === HttpEventType.Response) {
@@ -99,7 +100,7 @@ export class UpdateComponent {
       .pipe(
         this.loadingService.lockUIUntilComplete(),
       ).subscribe({
-        next: (event) => {
+        next: (event: any) => {
           if (event.type === HttpEventType.UploadProgress) {
             this.websiteUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
           } else if (event.type === HttpEventType.Response) {
