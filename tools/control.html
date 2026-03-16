@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitaxe Control Panel</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #1c2128;
+  --bg-card: #1a1f2b;
+  --bg-input: #0d1117;
+  --border: #30363d;
+  --border-light: #3d444d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #f7931a;
+  --accent-dim: rgba(247, 147, 26, 0.15);
+  --accent-hover: #ffab40;
+  --green: #3fb950;
+  --green-dim: rgba(63, 185, 80, 0.15);
+  --yellow: #d29922;
+  --yellow-dim: rgba(210, 153, 34, 0.15);
+  --red: #f85149;
+  --red-dim: rgba(248, 81, 73, 0.15);
+  --blue: #58a6ff;
+  --blue-dim: rgba(88, 166, 255, 0.12);
+  --purple: #9b59b6;
+  --purple-dim: rgba(155, 89, 182, 0.15);
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
+  --mono: "SF Mono", "Cascadia Code", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --transition: 150ms ease;
+}
+
+html { font-size: 14px; }
+body {
+  font-family: var(--sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* Header */
+.header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-left { display: flex; align-items: center; gap: 16px; }
+.logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+}
+.logo span { color: var(--text-secondary); font-weight: 400; }
+.header-right { display: flex; align-items: center; gap: 20px; }
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.status-dot.disconnected { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.status-dot.unknown { background: var(--text-muted); }
+
+.miner-count {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Main */
+.main { padding: 24px; max-width: 1600px; margin: 0 auto; }
+
+/* Scan Network Section */
+.scan-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.scan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition);
+}
+.scan-header:hover { background: var(--bg-tertiary); }
+.scan-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.scan-header-left h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.scan-header-left .scan-icon {
+  color: var(--accent);
+}
+.scan-header .chevron {
+  color: var(--text-muted);
+  transition: transform var(--transition);
+  font-size: 0.7rem;
+}
+.scan-header.open .chevron { transform: rotate(180deg); }
+.scan-body { display: none; }
+.scan-body.open { display: block; }
+.scan-controls {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.scan-status-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Scanning spinner */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Discovery Results */
+.discovery-results {
+  padding: 0 20px 20px;
+}
+.discovery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+.discovery-card {
+  background: var(--bg-primary);
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: border-color var(--transition), background var(--transition);
+}
+.discovery-card:hover {
+  border-color: var(--accent);
+  background: rgba(247, 147, 26, 0.04);
+}
+.discovery-card.already-added {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.discovery-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.discovery-info-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.discovery-hostname {
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.discovery-meta {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.discovery-hashrate {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.discovery-empty {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.btn-add {
+  background: var(--green-dim);
+  color: var(--green);
+  border-color: rgba(63, 185, 80, 0.3);
+}
+.btn-add:hover { background: rgba(63, 185, 80, 0.25); border-color: var(--green); }
+
+/* Type Badge */
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.type-badge.bitaxe { background: rgba(247, 147, 26, 0.18); color: #f7931a; }
+.type-badge.hammer { background: rgba(231, 76, 60, 0.18); color: #e74c3c; }
+.type-badge.nerd { background: rgba(155, 89, 182, 0.18); color: #9b59b6; }
+.type-badge.canaan { background: rgba(52, 152, 219, 0.18); color: #3498db; }
+.type-badge.unknown { background: rgba(110, 118, 129, 0.18); color: #8b949e; }
+
+/* Grid */
+.miner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+/* Empty state */
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 80px 24px;
+  color: var(--text-muted);
+}
+.empty-state svg { margin-bottom: 16px; opacity: 0.4; }
+.empty-state h3 { color: var(--text-secondary); margin-bottom: 8px; font-weight: 500; }
+
+/* Miner Card */
+.miner-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.miner-card:hover {
+  border-color: var(--border-light);
+  box-shadow: var(--shadow);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+.card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.card-hostname {
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+.card-actions-top {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Remove button on card */
+.btn-remove-miner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+.btn-remove-miner:hover {
+  background: var(--red-dim);
+  color: var(--red);
+  border-color: rgba(248, 81, 73, 0.3);
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border);
+}
+.stat-cell {
+  background: var(--bg-card);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.stat-value {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.stat-value.hashrate { color: var(--accent); }
+.stat-value .unit {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+.stat-value.temp-green { color: var(--green); }
+.stat-value.temp-yellow { color: var(--yellow); }
+.stat-value.temp-red { color: var(--red); }
+
+/* Controls Section */
+.controls-section {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.control-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  min-width: 72px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+.control-slider-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.control-value {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  min-width: 60px;
+  text-align: right;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Range Slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--bg-primary);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition);
+  border: 2px solid var(--bg-card);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 8px var(--accent);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg-card);
+}
+
+/* Pool Config */
+.pool-config {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+.pool-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pool-row input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  color: var(--text-primary);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.pool-row input:focus { border-color: var(--accent); }
+.pool-row input::placeholder { color: var(--text-muted); }
+.pool-row input.port-input { max-width: 80px; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--transition);
+  font-family: var(--sans);
+  white-space: nowrap;
+}
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+}
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+.btn-ghost:hover { background: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-light); }
+
+.btn-danger {
+  background: var(--red-dim);
+  color: var(--red);
+  border-color: rgba(248,81,73,0.3);
+}
+.btn-danger:hover { background: rgba(248,81,73,0.25); border-color: var(--red); }
+
+.btn-identify {
+  background: var(--blue-dim);
+  color: var(--blue);
+  border-color: rgba(88,166,255,0.3);
+}
+.btn-identify:hover { background: rgba(88,166,255,0.2); border-color: var(--blue); }
+
+.btn-sm { padding: 5px 10px; font-size: 0.75rem; }
+
+.card-bottom-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+/* Collapsible controls */
+.controls-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: color var(--transition);
+  border-top: 1px solid var(--border);
+}
+.controls-toggle:hover { color: var(--text-primary); }
+.controls-toggle .chevron {
+  transition: transform var(--transition);
+  font-size: 0.7rem;
+}
+.controls-toggle.open .chevron { transform: rotate(180deg); }
+.controls-body { display: none; }
+.controls-body.open { display: block; }
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+  max-width: 360px;
+}
+.toast.success { background: var(--green-dim); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+.toast.error { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+.toast.info { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(88,166,255,0.3); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
+/* Log Section */
+.log-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.log-header h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.log-body {
+  height: 220px;
+  overflow-y: auto;
+  padding: 8px 0;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+.log-entry {
+  padding: 4px 20px;
+  display: flex;
+  gap: 12px;
+  line-height: 1.6;
+  transition: background var(--transition);
+}
+.log-entry:hover { background: var(--bg-tertiary); }
+.log-time { color: var(--text-muted); flex-shrink: 0; }
+.log-arrow { flex-shrink: 0; }
+.log-arrow.sent { color: var(--accent); }
+.log-arrow.recv { color: var(--blue); }
+.log-msg { word-break: break-all; }
+.log-msg.success { color: var(--green); }
+.log-msg.error { color: var(--red); }
+.log-msg.info { color: var(--text-secondary); }
+
+/* Responsive */
+@media (max-width: 540px) {
+  .miner-grid { grid-template-columns: 1fr; }
+  .discovery-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+  .main { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">Bitaxe<span> Control</span></div>
+  </div>
+  <div class="header-right">
+    <div class="status-badge" id="gateway-status">
+      <span class="status-dot unknown"></span>
+      <span>Gateway: Unknown</span>
+    </div>
+    <div class="status-badge" id="ws-status">
+      <span class="status-dot disconnected"></span>
+      <span>WebSocket: Disconnected</span>
+    </div>
+    <div class="miner-count" id="miner-count">0 miners</div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Scan Network Section -->
+  <div class="scan-section">
+    <div class="scan-header" id="scan-header" onclick="toggleScanSection()">
+      <div class="scan-header-left">
+        <svg class="scan-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+        </svg>
+        <h3>Scan Network</h3>
+      </div>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="scan-body" id="scan-body">
+      <div class="scan-controls">
+        <button class="btn btn-primary" id="scan-btn" onclick="startScan()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Scan Network
+        </button>
+        <span class="scan-status-text" id="scan-status"></span>
+      </div>
+      <div class="discovery-results" id="discovery-results" style="display:none">
+        <div class="discovery-grid" id="discovery-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="miner-grid" id="miner-grid">
+    <div class="empty-state" id="empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/>
+      </svg>
+      <h3>No miners detected</h3>
+      <p>Waiting for miner status data from the gateway...</p>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <div class="log-header">
+      <h3>Command Log</h3>
+      <button class="btn btn-ghost btn-sm" onclick="clearLog()">Clear</button>
+    </div>
+    <div class="log-body" id="log-body"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/control';
+const RECONNECT_DELAY = 3000;
+
+let ws = null;
+let miners = {};       // keyed by MAC address
+let openControls = {};
+let scanPollTimer = null;
+let scanResults = [];
+let scanOpen = false;
+
+const TYPE_COLORS = {
+  bitaxe: '#f7931a',
+  hammer: '#e74c3c',
+  nerd: '#9b59b6',
+  canaan: '#3498db',
+};
+
+// --- WebSocket ---
+
+function connect() {
+  logMsg('info', 'sent', `Connecting to ${WS_URL}...`);
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    updateWsStatus(true);
+    logMsg('info', 'recv', 'WebSocket connected');
+  };
+
+  ws.onclose = () => {
+    updateWsStatus(false);
+    updateGatewayStatus(null);
+    logMsg('info', 'recv', `Disconnected. Reconnecting in ${RECONNECT_DELAY / 1000}s...`);
+    setTimeout(connect, RECONNECT_DELAY);
+  };
+
+  ws.onerror = () => {
+    logMsg('error', 'recv', 'WebSocket error');
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      handleMessage(msg);
+    } catch (e) {
+      logMsg('error', 'recv', `Parse error: ${e.message}`);
+    }
+  };
+}
+
+function handleMessage(msg) {
+  if (msg.type === 'status') {
+    updateGatewayStatus(true);
+    if (Array.isArray(msg.miners)) {
+      const seen = new Set();
+      msg.miners.forEach(m => {
+        const mac = m.mac || m.macAddr;
+        if (!mac) return;
+        seen.add(mac);
+        miners[mac] = { ...miners[mac], ...m, _mac: mac, _lastSeen: Date.now() };
+      });
+      // Remove miners no longer reported
+      Object.keys(miners).forEach(k => {
+        if (!seen.has(k)) delete miners[k];
+      });
+      renderMiners();
+    }
+  } else if (msg.type === 'scan_results') {
+    handleScanResults(msg);
+  } else if (msg.type === 'result') {
+    const ok = msg.success !== false && msg.error == null;
+    const target = msg.target || '?';
+    const detail = msg.error || msg.message || msg.action || 'OK';
+    logMsg(ok ? 'success' : 'error', 'recv', `[${target}] ${detail}`);
+
+    if (msg.action === 'add_peer') {
+      if (ok) {
+        showToast('success', 'Miner added successfully');
+      } else {
+        showToast('error', `Failed to add miner: ${msg.error || 'unknown error'}`);
+      }
+    } else if (msg.action === 'remove_peer') {
+      if (ok) {
+        showToast('success', 'Miner removed');
+        // Remove from local state
+        const mac = msg.target || msg.mac;
+        if (mac && miners[mac]) {
+          delete miners[mac];
+          delete openControls[mac];
+          renderMiners();
+        }
+      } else {
+        showToast('error', `Failed to remove miner: ${msg.error || 'unknown error'}`);
+      }
+    }
+  } else if (msg.type === 'gateway_status') {
+    updateGatewayStatus(msg.connected);
+  } else {
+    logMsg('info', 'recv', JSON.stringify(msg));
+  }
+}
+
+function sendCommand(target, action, data) {
+  const cmd = { type: 'command', target, action, data: data || {} };
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(cmd));
+    logMsg('info', 'sent', `[${target}] ${action} ${Object.keys(data || {}).length ? JSON.stringify(data) : ''}`);
+  } else {
+    logMsg('error', 'sent', 'Not connected');
+  }
+}
+
+function sendGlobalCommand(action, data) {
+  const cmd = { type: 'command', action, data: data || {} };
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(cmd));
+    logMsg('info', 'sent', `${action} ${Object.keys(data || {}).length ? JSON.stringify(data) : ''}`);
+  } else {
+    logMsg('error', 'sent', 'Not connected');
+  }
+}
+
+// --- Scan Network ---
+
+function toggleScanSection() {
+  scanOpen = !scanOpen;
+  const header = document.getElementById('scan-header');
+  const body = document.getElementById('scan-body');
+  header.classList.toggle('open', scanOpen);
+  body.classList.toggle('open', scanOpen);
+}
+
+function startScan() {
+  const btn = document.getElementById('scan-btn');
+  const status = document.getElementById('scan-status');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Scanning...';
+  status.textContent = 'Scanning network...';
+
+  sendGlobalCommand('scan_network', {});
+
+  // Start polling for results
+  if (scanPollTimer) clearInterval(scanPollTimer);
+  scanPollTimer = setInterval(() => {
+    sendGlobalCommand('get_scan_results', {});
+  }, 2000);
+}
+
+function handleScanResults(msg) {
+  const btn = document.getElementById('scan-btn');
+  const status = document.getElementById('scan-status');
+  const scanning = msg.scanning;
+
+  if (!scanning) {
+    // Scan complete
+    if (scanPollTimer) {
+      clearInterval(scanPollTimer);
+      scanPollTimer = null;
+    }
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Scan Again`;
+    const count = Array.isArray(msg.results) ? msg.results.length : 0;
+    status.textContent = `Found ${count} device${count !== 1 ? 's' : ''} on the network`;
+  } else {
+    status.textContent = 'Scanning network...';
+  }
+
+  if (Array.isArray(msg.results)) {
+    scanResults = msg.results;
+    renderDiscoveryResults();
+  }
+
+  // Open scan section if not open
+  if (!scanOpen) toggleScanSection();
+}
+
+function renderDiscoveryResults() {
+  const container = document.getElementById('discovery-results');
+  const grid = document.getElementById('discovery-grid');
+
+  if (scanResults.length === 0) {
+    container.style.display = 'block';
+    grid.innerHTML = '<div class="discovery-empty">No miners discovered on the network.</div>';
+    return;
+  }
+
+  container.style.display = 'block';
+
+  const existingMACs = new Set(Object.keys(miners));
+
+  grid.innerHTML = scanResults.map(d => {
+    const mac = d.mac || d.macAddr || '';
+    const ip = d.ip || '';
+    const type = (d.type || 'unknown').toLowerCase();
+    const hostname = d.hostname || d.model || 'Unknown';
+    const model = d.model || '';
+    const hashrate = d.hashRate || d.hashrate;
+    const isAdded = mac && existingMACs.has(mac);
+    const isGateway = d.isGateway || d.isSelf;
+    const badgeClass = TYPE_COLORS[type] ? type : 'unknown';
+
+    if (isGateway) return '';
+
+    return `
+      <div class="discovery-card ${isAdded ? 'already-added' : ''}">
+        <div class="discovery-info">
+          <div class="discovery-info-top">
+            <span class="discovery-hostname">${esc(hostname)}</span>
+            <span class="type-badge ${badgeClass}">${esc(type)}</span>
+            ${isAdded ? '<span style="font-size:0.65rem;color:var(--green)">Added</span>' : ''}
+          </div>
+          <div class="discovery-meta">
+            <span>${esc(ip)}</span>
+            ${mac ? '<span>' + esc(mac) + '</span>' : ''}
+            ${model && model !== hostname ? '<span>' + esc(model) + '</span>' : ''}
+          </div>
+          ${hashrate != null ? '<span class="discovery-hashrate">' + fmtHashrateText(hashrate) + '</span>' : ''}
+        </div>
+        ${isAdded ? '' : `<button class="btn btn-add btn-sm" onclick="addPeer('${esc(mac)}','${esc(type)}','${esc(ip)}')">Add</button>`}
+      </div>
+    `;
+  }).join('');
+}
+
+function addPeer(mac, type, ip) {
+  if (!mac) {
+    showToast('error', 'Cannot add miner: no MAC address');
+    return;
+  }
+  sendGlobalCommand('add_peer', { mac, type, ip });
+  logMsg('info', 'sent', `Adding miner ${mac} (${type}) at ${ip}`);
+
+  // Visually mark as pending
+  const cards = document.querySelectorAll('.discovery-card');
+  cards.forEach(card => {
+    const meta = card.querySelector('.discovery-meta');
+    if (meta && meta.textContent.includes(mac)) {
+      card.classList.add('already-added');
+      const btn = card.querySelector('.btn-add');
+      if (btn) btn.remove();
+    }
+  });
+}
+
+function removeMiner(mac) {
+  const miner = miners[mac];
+  const label = miner ? (miner.hostname || mac) : mac;
+  if (!confirm(`Remove miner "${label}"?\n\nThis will stop monitoring this miner.`)) return;
+  sendGlobalCommand('remove_peer', { mac });
+}
+
+// --- Status indicators ---
+
+function updateWsStatus(connected) {
+  const el = document.getElementById('ws-status');
+  const dot = el.querySelector('.status-dot');
+  const label = el.querySelector('span:last-child');
+  dot.className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
+  label.textContent = 'WebSocket: ' + (connected ? 'Connected' : 'Disconnected');
+}
+
+function updateGatewayStatus(connected) {
+  const el = document.getElementById('gateway-status');
+  const dot = el.querySelector('.status-dot');
+  const label = el.querySelector('span:last-child');
+  if (connected === null || connected === undefined) {
+    dot.className = 'status-dot unknown';
+    label.textContent = 'Gateway: Unknown';
+  } else {
+    dot.className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
+    label.textContent = 'Gateway: ' + (connected ? 'Online' : 'Offline');
+  }
+}
+
+// --- Toast ---
+
+function showToast(type, message) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// --- Rendering ---
+
+function typeBadgeHTML(type) {
+  if (!type) return '';
+  const t = type.toLowerCase();
+  const badgeClass = TYPE_COLORS[t] ? t : 'unknown';
+  return `<span class="type-badge ${badgeClass}">${esc(t)}</span>`;
+}
+
+function renderMiners() {
+  const grid = document.getElementById('miner-grid');
+  const empty = document.getElementById('empty-state');
+  const keys = Object.keys(miners);
+
+  document.getElementById('miner-count').textContent = keys.length + ' miner' + (keys.length !== 1 ? 's' : '');
+
+  if (keys.length === 0) {
+    if (!empty) {
+      grid.innerHTML = `<div class="empty-state" id="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/>
+        </svg>
+        <h3>No miners detected</h3>
+        <p>Waiting for miner status data from the gateway...</p>
+      </div>`;
+    }
+    return;
+  }
+
+  // Build or update cards
+  const existingCards = {};
+  grid.querySelectorAll('.miner-card').forEach(c => { existingCards[c.dataset.key] = c; });
+
+  // Remove old empty state
+  const es = grid.querySelector('.empty-state');
+  if (es) es.remove();
+
+  keys.forEach(key => {
+    const m = miners[key];
+    if (existingCards[key]) {
+      updateCardStats(existingCards[key], m);
+      delete existingCards[key];
+    } else {
+      const card = createCard(m);
+      grid.appendChild(card);
+    }
+  });
+
+  // Remove stale cards
+  Object.values(existingCards).forEach(c => c.remove());
+
+  // Re-render discovery results to update "already added" state
+  if (scanResults.length > 0) renderDiscoveryResults();
+}
+
+function tempClass(temp) {
+  if (temp == null) return '';
+  if (temp < 50) return 'temp-green';
+  if (temp <= 65) return 'temp-yellow';
+  return 'temp-red';
+}
+
+function fmtHashrate(val) {
+  if (val == null) return '---';
+  if (val >= 1000) return (val / 1000).toFixed(2) + '<span class="unit">TH/s</span>';
+  return val.toFixed(1) + '<span class="unit">GH/s</span>';
+}
+
+function fmtHashrateText(val) {
+  if (val == null) return '---';
+  if (val >= 1000) return (val / 1000).toFixed(2) + ' TH/s';
+  return val.toFixed(1) + ' GH/s';
+}
+
+function fmtUptime(seconds) {
+  if (seconds == null) return '---';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function createCard(m) {
+  const mac = m._mac;
+  const type = (m.type || '').toLowerCase();
+  const card = document.createElement('div');
+  card.className = 'miner-card';
+  card.dataset.key = mac;
+
+  const isOpen = openControls[mac] || false;
+
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="card-title">
+        <div class="card-hostname">
+          ${esc(m.hostname || 'Unknown Miner')}
+          ${typeBadgeHTML(m.type)}
+        </div>
+        <div class="card-meta">${esc(m.ip || '---')} ${m.ASICModel ? '&middot; ' + esc(m.ASICModel) : ''} &middot; ${esc(mac)}</div>
+      </div>
+      <div class="card-actions-top">
+        <button class="btn-remove-miner" onclick="removeMiner('${esc(mac)}')" title="Remove miner">&times;</button>
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-cell"><span class="stat-label">Hashrate</span><span class="stat-value hashrate" data-stat="hashrate">${fmtHashrate(m.hashRate)}</span></div>
+      <div class="stat-cell"><span class="stat-label">Temperature</span><span class="stat-value ${tempClass(m.temp)}" data-stat="temp">${m.temp != null ? m.temp.toFixed(1) + '<span class="unit">&deg;C</span>' : '---'}</span></div>
+      <div class="stat-cell"><span class="stat-label">Power</span><span class="stat-value" data-stat="power">${m.power != null ? m.power.toFixed(1) + '<span class="unit">W</span>' : '---'}</span></div>
+      <div class="stat-cell"><span class="stat-label">Voltage</span><span class="stat-value" data-stat="voltage">${m.voltage != null ? m.voltage + '<span class="unit">mV</span>' : '---'}</span></div>
+      <div class="stat-cell"><span class="stat-label">Frequency</span><span class="stat-value" data-stat="frequency">${m.frequency != null ? m.frequency + '<span class="unit">MHz</span>' : '---'}</span></div>
+      <div class="stat-cell"><span class="stat-label">Fan</span><span class="stat-value" data-stat="fan">${m.fanSpeed != null ? m.fanSpeed + '<span class="unit">%</span>' : m.fanrpm != null ? m.fanrpm + '<span class="unit">RPM</span>' : '---'}</span></div>
+      <div class="stat-cell"><span class="stat-label">Shares</span><span class="stat-value" data-stat="shares">${m.sharesAccepted != null ? m.sharesAccepted.toLocaleString() + (m.sharesRejected ? ' <span class="unit">/ ' + m.sharesRejected + ' rej</span>' : '') : '---'}</span></div>
+      <div class="stat-cell"><span class="stat-label">Uptime</span><span class="stat-value" data-stat="uptime">${fmtUptime(m.uptimeSeconds)}</span></div>
+    </div>
+    ${m.stratumURL ? `<div style="padding:8px 20px;font-family:var(--mono);font-size:0.7rem;color:var(--text-muted);border-top:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-stat="pool" title="${esc(m.stratumURL)}">${esc(m.stratumURL)}${m.stratumPort ? ':' + m.stratumPort : ''}</div>` : ''}
+    <div class="controls-toggle ${isOpen ? 'open' : ''}" onclick="toggleControls(this, '${esc(mac)}')">
+      <span>Controls</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="controls-body ${isOpen ? 'open' : ''}">
+      <div class="controls-section">
+        <div class="control-row">
+          <span class="control-label">Frequency</span>
+          <div class="control-slider-wrap">
+            <input type="range" min="400" max="625" step="25" value="${m.frequency || 500}" data-ctrl="frequency"
+              oninput="this.parentNode.querySelector('.control-value').textContent = this.value + ' MHz'"
+              onchange="sendSetting('${esc(mac)}', 'frequency', Number(this.value))">
+            <span class="control-value">${m.frequency || 500} MHz</span>
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Voltage</span>
+          <div class="control-slider-wrap">
+            <input type="range" min="1000" max="1300" step="10" value="${m.voltage || 1200}" data-ctrl="voltage"
+              oninput="this.parentNode.querySelector('.control-value').textContent = this.value + ' mV'"
+              onchange="sendSetting('${esc(mac)}', 'coreVoltage', Number(this.value))">
+            <span class="control-value">${m.voltage || 1200} mV</span>
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="control-label">Fan Speed</span>
+          <div class="control-slider-wrap">
+            <input type="range" min="0" max="100" step="1" value="${m.fanSpeed || 100}" data-ctrl="fan"
+              oninput="this.parentNode.querySelector('.control-value').textContent = this.value + '%'"
+              onchange="sendSetting('${esc(mac)}', 'fanSpeed', Number(this.value))">
+            <span class="control-value">${m.fanSpeed || 100}%</span>
+          </div>
+        </div>
+        <div class="control-row" style="align-items:flex-start">
+          <span class="control-label" style="padding-top:8px">Pool</span>
+          <div class="pool-config" style="flex:1">
+            <div class="pool-row">
+              <input type="text" placeholder="stratum+tcp://pool.example.com" data-ctrl="stratumURL" value="${esc(m.stratumURL || '')}">
+              <input type="number" class="port-input" placeholder="3333" data-ctrl="stratumPort" value="${m.stratumPort || ''}">
+            </div>
+            <div class="pool-row">
+              <input type="text" placeholder="worker.name" data-ctrl="stratumUser" value="${esc(m.stratumUser || '')}">
+              <button class="btn btn-primary btn-sm" onclick="applyPool(this, '${esc(mac)}')">Apply</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-bottom-actions">
+        <button class="btn btn-identify btn-sm" onclick="sendCommand('${esc(mac)}','identify',{})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.07-5.07l-2.83 2.83M9.76 14.24l-2.83 2.83m0-10.14l2.83 2.83m4.48 4.48l2.83 2.83"/></svg>
+          Identify
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="restartMiner('${esc(mac)}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          Restart
+        </button>
+      </div>
+    </div>
+  `;
+
+  return card;
+}
+
+function updateCardStats(card, m) {
+  const q = (sel) => card.querySelector(sel);
+
+  // Update header
+  const hostname = q('.card-hostname');
+  if (hostname) hostname.innerHTML = `${esc(m.hostname || 'Unknown Miner')} ${typeBadgeHTML(m.type)}`;
+  const meta = q('.card-meta');
+  if (meta) meta.innerHTML = `${esc(m.ip || '---')} ${m.ASICModel ? '&middot; ' + esc(m.ASICModel) : ''} &middot; ${esc(m._mac)}`;
+
+  // Update stats
+  const hashEl = q('[data-stat="hashrate"]');
+  if (hashEl) hashEl.innerHTML = fmtHashrate(m.hashRate);
+
+  const tempEl = q('[data-stat="temp"]');
+  if (tempEl) {
+    tempEl.className = 'stat-value ' + tempClass(m.temp);
+    tempEl.innerHTML = m.temp != null ? m.temp.toFixed(1) + '<span class="unit">&deg;C</span>' : '---';
+  }
+
+  const powerEl = q('[data-stat="power"]');
+  if (powerEl) powerEl.innerHTML = m.power != null ? m.power.toFixed(1) + '<span class="unit">W</span>' : '---';
+
+  const voltEl = q('[data-stat="voltage"]');
+  if (voltEl) voltEl.innerHTML = m.voltage != null ? m.voltage + '<span class="unit">mV</span>' : '---';
+
+  const freqEl = q('[data-stat="frequency"]');
+  if (freqEl) freqEl.innerHTML = m.frequency != null ? m.frequency + '<span class="unit">MHz</span>' : '---';
+
+  const fanEl = q('[data-stat="fan"]');
+  if (fanEl) fanEl.innerHTML = m.fanSpeed != null ? m.fanSpeed + '<span class="unit">%</span>' : m.fanrpm != null ? m.fanrpm + '<span class="unit">RPM</span>' : '---';
+
+  const sharesEl = q('[data-stat="shares"]');
+  if (sharesEl) sharesEl.innerHTML = m.sharesAccepted != null ? m.sharesAccepted.toLocaleString() + (m.sharesRejected ? ' <span class="unit">/ ' + m.sharesRejected + ' rej</span>' : '') : '---';
+
+  const uptimeEl = q('[data-stat="uptime"]');
+  if (uptimeEl) uptimeEl.innerHTML = fmtUptime(m.uptimeSeconds);
+
+  const poolEl = q('[data-stat="pool"]');
+  if (poolEl && m.stratumURL) {
+    poolEl.textContent = m.stratumURL + (m.stratumPort ? ':' + m.stratumPort : '');
+    poolEl.title = m.stratumURL;
+  }
+
+  // Update slider positions only if controls are NOT open (avoid overriding user input)
+  if (!openControls[m._mac]) {
+    const freqSlider = card.querySelector('[data-ctrl="frequency"]');
+    if (freqSlider && m.frequency != null) freqSlider.value = m.frequency;
+    const voltSlider = card.querySelector('[data-ctrl="voltage"]');
+    if (voltSlider && m.voltage != null) voltSlider.value = m.voltage;
+    const fanSlider = card.querySelector('[data-ctrl="fan"]');
+    if (fanSlider && m.fanSpeed != null) fanSlider.value = m.fanSpeed;
+  }
+}
+
+function toggleControls(el, key) {
+  el.classList.toggle('open');
+  const body = el.nextElementSibling;
+  body.classList.toggle('open');
+  openControls[key] = body.classList.contains('open');
+}
+
+// --- Actions ---
+
+function sendSetting(target, field, value) {
+  sendCommand(target, 'patch_settings', { [field]: value });
+}
+
+function applyPool(btn, target) {
+  const section = btn.closest('.controls-section');
+  const url = section.querySelector('[data-ctrl="stratumURL"]').value.trim();
+  const port = parseInt(section.querySelector('[data-ctrl="stratumPort"]').value, 10);
+  const user = section.querySelector('[data-ctrl="stratumUser"]').value.trim();
+  if (!url) { logMsg('error', 'sent', 'Stratum URL is required'); return; }
+  const data = { stratumURL: url };
+  if (!isNaN(port)) data.stratumPort = port;
+  if (user) data.stratumUser = user;
+  sendCommand(target, 'patch_settings', data);
+}
+
+function restartMiner(target) {
+  const miner = miners[target];
+  const label = miner ? (miner.hostname || target) : target;
+  if (!confirm(`Restart miner "${label}"? This will temporarily interrupt mining.`)) return;
+  sendCommand(target, 'restart', {});
+}
+
+// --- Log ---
+
+function logMsg(type, direction, text) {
+  const body = document.getElementById('log-body');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  const now = new Date();
+  const ts = now.toLocaleTimeString('en-GB', { hour12: false }) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+  const arrow = direction === 'sent' ? '&uarr;' : '&darr;';
+  const arrowClass = direction === 'sent' ? 'sent' : 'recv';
+  const msgClass = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+  entry.innerHTML = `<span class="log-time">${ts}</span><span class="log-arrow ${arrowClass}">${arrow}</span><span class="log-msg ${msgClass}">${esc(text)}</span>`;
+  body.appendChild(entry);
+  body.scrollTop = body.scrollHeight;
+
+  // Cap log at 200 entries
+  while (body.children.length > 200) body.removeChild(body.firstChild);
+}
+
+function clearLog() {
+  document.getElementById('log-body').innerHTML = '';
+}
+
+// --- Util ---
+
+function esc(str) {
+  if (str == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(str);
+  return d.innerHTML;
+}
+
+// --- Init ---
+
+connect();
+</script>
+</body>
+</html>

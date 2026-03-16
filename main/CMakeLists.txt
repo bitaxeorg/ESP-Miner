@@ -29,6 +29,9 @@ SRCS
     "./tasks/statistics_task.c"
     "./tasks/hashrate_monitor_task.c"
     "./tasks/fan_controller_task.c"
+    "./tasks/gateway_task.c"
+    "./tasks/ws_client_task.c"
+    "./tasks/miner_adapter.c"
     "./thermal/EMC2101.c"
     "./thermal/EMC2103.c"
     "./thermal/EMC2302.c"
@@ -74,12 +77,17 @@ PRIV_REQUIRES
     "vfs"
     "esp_driver_i2c"
     "tcp_transport"
+    "esp_http_client"
+    "esp_websocket_client"
 
 EMBED_FILES "http_server/recovery_page.html"
 )
 
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_INCLUDE_SIMPLE=1" APPEND)
 idf_build_set_property(COMPILE_OPTIONS "-DLV_CONF_PATH=\"${CMAKE_SOURCE_DIR}/main/lv_conf.h\"" APPEND)
+
+# Increase ARP table from default 10 to 64 for network scanning (254 IPs on /24)
+idf_build_set_property(COMPILE_OPTIONS "-DARP_TABLE_SIZE=64" APPEND)
 
 set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/http_server/axe-os")
 

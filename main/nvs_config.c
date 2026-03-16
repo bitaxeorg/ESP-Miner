@@ -109,6 +109,14 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_TPS546]                                = {.nvs_key_name = "TPS546",          .type = TYPE_BOOL},
     [NVS_CONFIG_TMP1075]                               = {.nvs_key_name = "TMP1075",         .type = TYPE_BOOL},
     [NVS_CONFIG_POWER_CONSUMPTION_TARGET]              = {.nvs_key_name = "power_cons_tgt",  .type = TYPE_U16},
+
+    // Gateway settings
+    [NVS_CONFIG_GATEWAY_ENABLED]                       = {.nvs_key_name = "gw_enabled",     .type = TYPE_BOOL,  .default_value = {.b = false},     .rest_name = "gatewayEnabled",        .min = 0, .max = 1},
+    [NVS_CONFIG_GATEWAY_PEERS]                         = {.nvs_key_name = "gw_peers",       .type = TYPE_STR,   .default_value = {.str = ""},      .rest_name = "gatewayPeers",          .min = 0, .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_GATEWAY_POLL_INTERVAL]                 = {.nvs_key_name = "gw_poll_int",    .type = TYPE_U16,   .default_value = {.u16 = 30},      .rest_name = "gatewayPollInterval",   .min = 10, .max = 300},
+    [NVS_CONFIG_GATEWAY_CLOUD_URL]                     = {.nvs_key_name = "gw_cloud_url",   .type = TYPE_STR,   .default_value = {.str = ""},      .rest_name = "gatewayCloudUrl",       .min = 0, .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_GATEWAY_CLOUD_API_KEY]                 = {.nvs_key_name = "gw_cloud_key",   .type = TYPE_STR,   .default_value = {.str = ""},      .rest_name = "gatewayCloudApiKey",    .min = 0, .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_GATEWAY_CLOUD_ENABLED]                 = {.nvs_key_name = "gw_cloud_on",    .type = TYPE_BOOL,  .default_value = {.b = false},     .rest_name = "gatewayCloudEnabled",   .min = 0, .max = 1},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)

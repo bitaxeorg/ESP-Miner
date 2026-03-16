@@ -46,6 +46,12 @@
 #include "http_server.h"
 #include "system.h"
 #include "websocket.h"
+#include "gateway_task.h"
+
+// Gateway HTTP handlers (defined in gateway_task.c)
+extern esp_err_t GET_gateway_status(httpd_req_t *req);
+extern esp_err_t PATCH_gateway_settings(httpd_req_t *req);
+extern esp_err_t POST_gateway_test(httpd_req_t *req);
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -1303,7 +1309,7 @@ esp_err_t start_rest_server(void * pvParameters)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 24;
+    config.max_uri_handlers = 28;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
 
@@ -1427,6 +1433,31 @@ esp_err_t start_rest_server(void * pvParameters)
         .is_websocket = true
     };
     httpd_register_uri_handler(server, &ws);
+
+    /* Gateway API endpoints */
+    httpd_uri_t gateway_status_get_uri = {
+        .uri = "/api/gateway",
+        .method = HTTP_GET,
+        .handler = GET_gateway_status,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &gateway_status_get_uri);
+
+    httpd_uri_t gateway_settings_patch_uri = {
+        .uri = "/api/gateway",
+        .method = HTTP_PATCH,
+        .handler = PATCH_gateway_settings,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &gateway_settings_patch_uri);
+
+    httpd_uri_t gateway_test_post_uri = {
+        .uri = "/api/gateway/test",
+        .method = HTTP_POST,
+        .handler = POST_gateway_test,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &gateway_test_post_uri);
 
     if (enter_recovery) {
         /* Make default route serve Recovery */

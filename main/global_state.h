@@ -15,6 +15,7 @@
 #include "device_config.h"
 #include "display.h"
 #include "esp_transport.h"
+#include "gateway_task.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
@@ -123,6 +124,7 @@ typedef struct
     PowerManagementModule POWER_MANAGEMENT_MODULE;
     SelfTestModule SELF_TEST_MODULE;
     HashrateMonitorModule HASHRATE_MONITOR_MODULE;
+    GatewayModule GATEWAY_MODULE;
 
     char * extranonce_str;
     int extranonce_2_len;

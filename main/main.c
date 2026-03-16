@@ -21,6 +21,8 @@
 #include "connect.h"
 #include "asic_reset.h"
 #include "asic_init.h"
+#include "gateway_task.h"
+#include "ws_client_task.h"
 
 static GlobalState GLOBAL_STATE;
 
@@ -128,5 +130,13 @@ void app_main(void)
     }
     if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
         ESP_LOGE(TAG, "Error creating statistics task");
+    }
+
+    // Initialize gateway module (no separate task — server-driven via ws_client)
+    gateway_init((void *)&GLOBAL_STATE);
+
+    // Start WebSocket client task (sole gateway communication task, uses PSRAM)
+    if (xTaskCreateWithCaps(ws_client_task, "ws_client", 16384, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating ws_client task");
     }
 }
