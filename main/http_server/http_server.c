@@ -632,6 +632,28 @@ bool check_settings_and_update(const cJSON * const root)
     return result;
 }
 
+static esp_err_t http_server_read_request_body(httpd_req_t * req)
+{
+    int total_len = req->content_len;
+    int cur_len = 0;
+    char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
+    int received = 0;
+    if (total_len >= SCRATCH_BUFSIZE) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_FAIL;
+    }
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len);
+        if (received <= 0) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive request body");
+            return ESP_FAIL;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+    return ESP_OK;
+}
+
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -644,25 +666,10 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         return ESP_OK;
     }
 
-    int total_len = req->content_len;
-    int cur_len = 0;
     char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
-    int received = 0;
-    if (total_len >= SCRATCH_BUFSIZE) {
-        /* Respond with 500 Internal Server Error */
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+    if (http_server_read_request_body(req) != ESP_OK) {
         return ESP_OK;
     }
-    while (cur_len < total_len) {
-        received = httpd_req_recv(req, buf + cur_len, total_len);
-        if (received <= 0) {
-            /* Respond with 500 Internal Server Error */
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
-            return ESP_OK;
-        }
-        cur_len += received;
-    }
-    buf[total_len] = '\0';
 
     cJSON * root = cJSON_Parse(buf);
     if (root == NULL) {
@@ -803,23 +810,10 @@ static esp_err_t POST_mining_pause(httpd_req_t * req)
         return ESP_OK;
     }
 
-    int total_len = req->content_len;
-    int cur_len = 0;
     char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
-    int received = 0;
-    if (total_len >= SCRATCH_BUFSIZE) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+    if (http_server_read_request_body(req) != ESP_OK) {
         return ESP_OK;
     }
-    while (cur_len < total_len) {
-        received = httpd_req_recv(req, buf + cur_len, total_len);
-        if (received <= 0) {
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive request body");
-            return ESP_OK;
-        }
-        cur_len += received;
-    }
-    buf[total_len] = '\0';
 
     cJSON * root = cJSON_Parse(buf);
     if (root == NULL) {
