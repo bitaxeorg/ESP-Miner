@@ -126,6 +126,7 @@ export class SystemApiService {
         blockHeight: 811111,
         scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",
         networkDifficulty: 155970000000000,
+        blockSignals: [],
         hashrateMonitor: {
           asics: [{
             total: 441.2579,

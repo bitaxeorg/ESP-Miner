@@ -365,6 +365,18 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                     //ESP_LOGI(TAG, "WiFi SSID set to: %s", value);
                     BAP_send_message(BAP_CMD_ACK, parameter, value);
                     if (current_ssid) free(current_ssid);
+                    // If a password is already configured, reboot now to apply the new SSID.
+                    // If no password exists yet, the password SET handler will trigger the reboot.
+                    char *existing_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS);
+                    if (existing_pass && strlen(existing_pass) > 0) {
+                        free(existing_pass);
+                        vTaskDelay(pdMS_TO_TICKS(100));
+                        BAP_send_message(BAP_CMD_STA, "status", "restarting");
+                        vTaskDelay(pdMS_TO_TICKS(1000));
+                        esp_restart();
+                    } else {
+                        if (existing_pass) free(existing_pass);
+                    }
                 } else {
                     ESP_LOGE(TAG, "Failed to set WiFi SSID");
                     BAP_send_message(BAP_CMD_ERR, parameter, "set_failed");
