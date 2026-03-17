@@ -89,8 +89,12 @@ static volatile bool ws_connected = false;
 static volatile bool ws_authenticated = false;
 static volatile bool g_scan_stop_requested = false;
 
+bool ws_client_is_connected(void)    { return ws_connected; }
+bool ws_client_is_authenticated(void) { return ws_authenticated; }
+const char *ws_client_get_client_id(void) { return get_credential(EMBEDDED_CLIENT_ID, "HASHLY_CID:"); }
+
 // Firmware version (read from global state after init)
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.0.1"
 
 // ============================================================
 // Message queue — decouple event handler from main task
@@ -1211,6 +1215,7 @@ void ws_client_task(void *pvParameters)
         }
     }
 
+    int connect_attempts = 0;
     while (1) {
         // Safety net: if internal heap is critically low, reboot cleanly
         size_t free_internal = esp_get_free_internal_heap_size();
@@ -1219,7 +1224,8 @@ void ws_client_task(void *pvParameters)
             esp_restart();
         }
 
-        ESP_LOGI(TAG, "Connecting to %s (heap: %u)", ws_url, (unsigned)free_internal);
+        connect_attempts++;
+        ESP_LOGI(TAG, "Connecting to %s (attempt %d, heap: %u)", ws_url, connect_attempts, (unsigned)free_internal);
 
         ws_connected = false;
         ws_authenticated = false;
@@ -1261,7 +1267,7 @@ void ws_client_task(void *pvParameters)
         }
 
         if (!esp_websocket_client_is_connected(ws_client)) {
-            ESP_LOGW(TAG, "Connection timeout");
+            ESP_LOGW(TAG, "Connection timeout (attempt %d) — will retry", connect_attempts);
             esp_websocket_client_stop(ws_client);
             esp_websocket_client_destroy(ws_client);
             ws_client = NULL;
@@ -1270,12 +1276,21 @@ void ws_client_task(void *pvParameters)
         }
 
         // Connected — send auth immediately
+        connect_attempts = 0;
         send_auth();
 
         // Main loop — just process incoming commands
+        int status_tick = 0;
         while (esp_websocket_client_is_connected(ws_client)) {
             process_queued_messages();
             vTaskDelay(100 / portTICK_PERIOD_MS);
+            if (++status_tick >= 300) { // every 30 seconds
+                ESP_LOGI(TAG, "Connection status: connected to %s (auth=%s, heap=%u)",
+                    ws_url,
+                    ws_authenticated ? "yes" : "pending",
+                    (unsigned)esp_get_free_internal_heap_size());
+                status_tick = 0;
+            }
         }
 
         // Disconnected — clean up and reconnect

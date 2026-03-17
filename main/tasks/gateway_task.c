@@ -12,6 +12,7 @@
 
 #include "gateway_task.h"
 #include "miner_adapter.h"
+#include "ws_client_task.h"
 #include "global_state.h"
 #include "nvs_config.h"
 #include "esp_log.h"
@@ -56,6 +57,20 @@ esp_err_t GET_gateway_status(httpd_req_t *req)
     cJSON_AddBoolToObject(root, "isPolling", gw->is_polling);
     cJSON_AddNumberToObject(root, "peerCount", gw->peer_count);
     cJSON_AddStringToObject(root, "mode", "server-driven");
+
+    cJSON *cloud = cJSON_CreateObject();
+    bool connected = ws_client_is_connected();
+    bool authenticated = ws_client_is_authenticated();
+    const char *client_id = ws_client_get_client_id();
+    cJSON_AddBoolToObject(cloud, "connected", connected);
+    cJSON_AddBoolToObject(cloud, "authenticated", authenticated);
+    cJSON_AddStringToObject(cloud, "status",
+        authenticated ? "authenticated" :
+        connected     ? "connected" :
+                        "disconnected");
+    if (client_id && client_id[0] != '\0')
+        cJSON_AddStringToObject(cloud, "clientId", client_id);
+    cJSON_AddItemToObject(root, "cloudConnection", cloud);
 
     cJSON *peers_array = cJSON_CreateArray();
     for (int i = 0; i < gw->peer_count; i++) {
