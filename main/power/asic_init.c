@@ -5,7 +5,6 @@
 #include "asic.h"
 #include "serial.h"
 #include "asic_reset.h"
-#include "frequency_transition_bmXX.h"
 
 static const char *TAG = "asic_init";
 
@@ -42,12 +41,6 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
         SERIAL_set_baud(UART_FREQ);
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
-
-    // Reset the frequency transition tracker so the ramp starts from
-    // the chip's post-reset default (50 MHz) rather than the stale
-    // pre-reset frequency, which would cause do_frequency_transition
-    // to skip the ramp entirely (seeing current == target).
-    reset_frequency_transition_state();
 
     ESP_LOGI(TAG, "Detecting ASIC chips...");
     uint8_t chip_count = ASIC_init(GLOBAL_STATE);

@@ -9,6 +9,7 @@
 #include "asic_reset.h"
 #include "asic_init.h"
 #include "nvs_config.h"
+#include "frequency_transition_bmXX.h"
 
 static const char * TAG = "mining_control";
 
@@ -22,6 +23,12 @@ void mining_stop(GlobalState * GLOBAL_STATE)
 
     // Mark uninitialized immediately so tasks stop issuing UART commands
     GLOBAL_STATE->ASIC_initalized = false;
+
+    // Reset the frequency transition tracker so the ramp starts from
+    // the chip's post-reset default (50 MHz) rather than the stale
+    // pre-reset frequency, which would cause do_frequency_transition
+    // to skip the ramp entirely (seeing current == target).
+    reset_frequency_transition_state();
 
     // Give tasks time to complete any in-progress UART operation
     vTaskDelay(500 / portTICK_PERIOD_MS);
