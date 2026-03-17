@@ -92,7 +92,7 @@
                                 <div class="flex flex-column">
                                     <div class="flex flex-column">
                                         <div class="white-space-nowrap">
-                                            <a [href]="'http://' + axe.address" target="_blank" class="text-900" pTooltip="Hostname" tooltipPosition="top">
+                                            <a [href]="'http://' + getDeviceLink(axe)" target="_blank" class="text-900" pTooltip="Hostname" tooltipPosition="top">
                                                 {{axe.fullHostname || axe.hostname}}
                                             </a>
                                             <span class="ml-1 text-lg line-height-1 cursor-pointer" [ngStyle]="{color: axe.swarmColor}" pTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">
@@ -239,7 +239,7 @@
                         <tr *ngFor="let axe of filteredSwarm">
                             <td>
                                 <div class="flex flex-column">
-                                    <a [href]="'http://' + axe.address" target="_blank">
+                                    <a [href]="'http://' + getDeviceLink(axe)" target="_blank">
                                         <span class="text-900">{{axe.fullHostname || axe.hostname}}</span>
                                         <span class="ml-2 text-lg line-height-1 cursor-pointer" [ngStyle]="{color: axe.swarmColor}" pTooltip="{{stringifyDeviceLabel(axe)}}" tooltipPosition="top">●</span>
                                         <span *ngIf="isThisDevice(axe)" class="ml-2 cursor-pointer" pTooltip="This device" tooltipPosition="top">

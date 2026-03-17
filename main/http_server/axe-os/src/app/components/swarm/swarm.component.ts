@@ -154,6 +154,12 @@ private isIpAddress(value: string): boolean {
     return device.displayName || device.address;
   }
 
+  // Utility method to get the link URL for a device
+  // Falls back to IP for older devices without mDNS
+  public getDeviceLink(device: SwarmDevice): string {
+    return device['fullHostname'] || device.connectionAddress;
+  }
+
   private intToIp(int: number): string {
     return `${(int >>> 24) & 255}.${(int >>> 16) & 255}.${(int >>> 8) & 255}.${int & 255}`;
   }
