@@ -10,7 +10,7 @@ import {
   SystemASIC as ISystemASIC,
   SystemASICASICModelEnum,
   SystemService as GeneratedSystemService,
-  Settings
+  Settings,
 } from 'src/app/generated';
 
 import { environment } from '../../environments/environment';
@@ -239,16 +239,28 @@ export class SystemApiService {
     return of('Block found notification dismissed (mock)');
   }
 
-  public setMiningPaused(pause: boolean, uri: string = '') {
+  public pauseMining(uri: string = '') {
     if (environment.production && this.generatedSystemService && !uri) {
-      return this.generatedSystemService.setMiningPaused({ pause });
+      return this.generatedSystemService.pauseMining();
     }
 
     if (environment.production && uri) {
-      return this.httpClient.post(`${uri}/api/system/mining`, { pause });
+      return this.httpClient.post(`${uri}/api/system/pause`, {});
     }
 
-    return of({ paused: pause });
+    return of({ paused: true });
+  }
+
+  public resumeMining(uri: string = '') {
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.resumeMining();
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post(`${uri}/api/system/resume`, {});
+    }
+
+    return of({ paused: false });
   }
 
   public identify(uri: string = '') {

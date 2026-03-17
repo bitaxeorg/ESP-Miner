@@ -810,29 +810,8 @@ static esp_err_t POST_mining_pause(httpd_req_t * req)
         return ESP_OK;
     }
 
-    char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
-    if (http_server_read_request_body(req) != ESP_OK) {
-        return ESP_OK;
-    }
-
-    cJSON * root = cJSON_Parse(buf);
-    if (root == NULL) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
-        return ESP_OK;
-    }
-
-    cJSON * pause_item = cJSON_GetObjectItem(root, "pause");
-    if (!cJSON_IsBool(pause_item)) {
-        cJSON_Delete(root);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing or invalid 'pause' field");
-        return ESP_OK;
-    }
-
-    bool pause = cJSON_IsTrue(pause_item);
-    GLOBAL_STATE->SYSTEM_MODULE.mining_paused = pause;
-    ESP_LOGI(TAG, "Mining %s by API request", pause ? "paused" : "resumed");
-
-    cJSON_Delete(root);
+    GLOBAL_STATE->SYSTEM_MODULE.mining_paused = true;
+    ESP_LOGI(TAG, "Mining paused by API request");
 
     httpd_resp_set_type(req, "application/json");
     cJSON * resp = cJSON_CreateObject();
@@ -840,7 +819,33 @@ static esp_err_t POST_mining_pause(httpd_req_t * req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
         return ESP_OK;
     }
-    cJSON_AddBoolToObject(resp, "paused", pause);
+    cJSON_AddBoolToObject(resp, "paused", true);
+    esp_err_t res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
+    cJSON_Delete(resp);
+    return res;
+}
+
+static esp_err_t POST_mining_resume(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
+    ESP_LOGI(TAG, "Mining resumed by API request");
+
+    httpd_resp_set_type(req, "application/json");
+    cJSON * resp = cJSON_CreateObject();
+    if (resp == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_OK;
+    }
+    cJSON_AddBoolToObject(resp, "paused", false);
     esp_err_t res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
     cJSON_Delete(resp);
     return res;
@@ -1440,12 +1445,21 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &system_restart_uri);
     httpd_uri_t system_mining_pause_uri = {
-        .uri = "/api/system/mining",
+        .uri = "/api/system/pause",
         .method = HTTP_POST,
         .handler = POST_mining_pause,
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_mining_pause_uri);
+
+    httpd_uri_t system_mining_resume_uri = {
+        .uri = "/api/system/resume",
+        .method = HTTP_POST,
+        .handler = POST_mining_resume,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_mining_resume_uri);
+
     httpd_uri_t system_dismiss_block_found_uri = {
         .uri = "/api/system/blockFound/dismiss",
         .method = HTTP_POST, 

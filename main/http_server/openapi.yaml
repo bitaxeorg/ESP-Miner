@@ -823,28 +823,16 @@ paths:
         '500':
           description: Internal server error
 
-  /api/system/mining:
+  /api/system/pause:
     post:
-      summary: Pause or resume mining
-      description: Pauses or resumes mining activity
-      operationId: setMiningPaused
+      summary: Pause mining
+      description: Pauses mining activity
+      operationId: pauseMining
       tags:
         - system
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - pause
-              properties:
-                pause:
-                  type: boolean
-                  description: True to pause mining, false to resume
       responses:
         '200':
-          description: Mining state updated
+          description: Mining paused
           content:
             application/json:
               schema:
@@ -855,8 +843,31 @@ paths:
                   paused:
                     type: boolean
                     description: Current mining paused state
-        '400':
-          description: Missing or invalid 'pause' field
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/resume:
+    post:
+      summary: Resume mining
+      description: Resumes mining activity
+      operationId: resumeMining
+      tags:
+        - system
+      responses:
+        '200':
+          description: Mining resumed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - paused
+                properties:
+                  paused:
+                    type: boolean
+                    description: Current mining paused state
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
