@@ -1439,15 +1439,6 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_restart_uri);
-
-    httpd_uri_t system_restart_options_uri = {
-        .uri = "/api/system/restart", 
-        .method = HTTP_OPTIONS, 
-        .handler = handle_options_request, 
-        .user_ctx = NULL
-    };
-    httpd_register_uri_handler(server, &system_restart_options_uri);
-
     httpd_uri_t system_mining_pause_uri = {
         .uri = "/api/system/mining",
         .method = HTTP_POST,
@@ -1455,7 +1446,6 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_mining_pause_uri);
-
     httpd_uri_t system_dismiss_block_found_uri = {
         .uri = "/api/system/blockFound/dismiss",
         .method = HTTP_POST, 
