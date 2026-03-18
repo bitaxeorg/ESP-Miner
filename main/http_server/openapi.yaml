@@ -836,13 +836,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - paused
-                properties:
-                  paused:
-                    type: boolean
-                    description: Current mining paused state
+                $ref: '#/components/schemas/GenericResponse'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
@@ -861,13 +855,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - paused
-                properties:
-                  paused:
-                    type: boolean
-                    description: Current mining paused state
+                $ref: '#/components/schemas/GenericResponse'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

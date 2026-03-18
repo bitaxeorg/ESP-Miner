@@ -42,7 +42,6 @@ SRCS
     "./power/vcore.c"
     "./power/asic_reset.c"
     "./power/asic_init.c"
-    "./power/mining_control.c"
 
 INCLUDE_DIRS
     "."

@@ -19,7 +19,6 @@
 #include "asic_init.h"
 #include "asic_reset.h"
 #include "driver/uart.h"
-#include "mining_control.h"
 
 #define POLL_RATE 1800
 #define MAX_TEMP 90.0
@@ -37,6 +36,60 @@
 #define ASIC_REDUCTION 100.0
 
 static const char * TAG = "power_management";
+
+static void mining_stop(GlobalState * GLOBAL_STATE)
+{
+    ESP_LOGI(TAG, "Stopping mining");
+
+    // Wind frequency down to 50 MHz before cutting power. This also updates
+    // the transition tracker so the ramp starts from 50 MHz on next start,
+    // rather than the stale pre-reset frequency.
+    ASIC_set_frequency(GLOBAL_STATE, 50);
+
+    // Cut ASIC power and hold in reset
+    VCORE_set_voltage(GLOBAL_STATE, 0.0f);
+    asic_hold_reset_low();
+
+    // Mark uninitialized immediately so tasks stop issuing UART commands
+    GLOBAL_STATE->ASIC_initalized = false;
+
+    // Give tasks time to complete any in-progress UART operation
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+
+    // Flush any stale data from the UART buffers
+    uart_flush(UART_NUM_1);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
+    ESP_LOGI(TAG, "Mining stopped");
+}
+
+static uint8_t mining_start(GlobalState * GLOBAL_STATE)
+{
+    ESP_LOGI(TAG, "Starting mining");
+
+    // Restore voltage from NVS
+    uint16_t voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+    VCORE_set_voltage(GLOBAL_STATE, (double) voltage / 1000.0);
+
+    // Wait for voltage to stabilize before touching the ASIC
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+
+    // Clear any accumulated UART garbage before init
+    uart_flush(UART_NUM_1);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
+    // Stabilization delay of 2000ms prevents race conditions where tasks are
+    // just starting to use the ASIC while power management tries to change frequency
+    uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, 2000);
+
+    if (chip_count > 0) {
+        ESP_LOGI(TAG, "Mining started successfully (%d chip(s))", chip_count);
+    } else {
+        ESP_LOGE(TAG, "Mining start failed - ASIC not detected");
+    }
+
+    return chip_count;
+}
 
 static float expected_hashrate(GlobalState * GLOBAL_STATE, float frequency)
 {

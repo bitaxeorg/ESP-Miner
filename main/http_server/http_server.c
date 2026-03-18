@@ -819,7 +819,7 @@ static esp_err_t POST_mining_pause(httpd_req_t * req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
         return ESP_OK;
     }
-    cJSON_AddBoolToObject(resp, "paused", true);
+    cJSON_AddStringToObject(resp, "message", "Mining paused");
     esp_err_t res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
     cJSON_Delete(resp);
     return res;
@@ -845,7 +845,7 @@ static esp_err_t POST_mining_resume(httpd_req_t * req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
         return ESP_OK;
     }
-    cJSON_AddBoolToObject(resp, "paused", false);
+    cJSON_AddStringToObject(resp, "message", "Mining resumed");
     esp_err_t res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
     cJSON_Delete(resp);
     return res;
