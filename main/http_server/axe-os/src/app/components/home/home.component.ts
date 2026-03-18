@@ -24,6 +24,7 @@ import { LocalStorageService } from 'src/app/local-storage.service';
 type PoolLabel = 'Primary' | 'Fallback';
 type MessageType =
   | 'SYSTEM_INFO_ERROR'
+  | 'MINING_PAUSED'
   | 'DEVICE_OVERHEAT'
   | 'POWER_FAULT'
   | 'FREQUENCY_LOW'
@@ -653,6 +654,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     };
 
     updateMessage(!!systemInfoError.duration, 'SYSTEM_INFO_ERROR', 'error', `Unable to reach the device for ${DateAgoPipe.transform(systemInfoError.duration, { strict: true })}`);
+    updateMessage(!!(info as any).miningPaused, 'MINING_PAUSED', 'warn', 'Mining is paused');
     updateMessage(info.overheat_mode === 1, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
