@@ -61,9 +61,9 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
       : this.systemService.pauseMining();
     const newPausedState = !this.isMiningPaused;
     action.subscribe({
-      next: () => {
+      next: (response) => {
         this.isMiningPaused = newPausedState;
-        this.toastr.success(newPausedState ? 'Mining paused' : 'Mining resumed');
+        this.toastr.success(response.message);
       },
       error: () => this.toastr.error('Failed to change mining state')
     });

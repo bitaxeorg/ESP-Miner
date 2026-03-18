@@ -10,7 +10,8 @@ import {
   SystemASIC as ISystemASIC,
   SystemASICASICModelEnum,
   SystemService as GeneratedSystemService,
-  Settings
+  Settings,
+  GenericResponse
 } from 'src/app/generated';
 
 import { environment } from '../../environments/environment';
@@ -245,10 +246,10 @@ export class SystemApiService {
     }
 
     if (environment.production && uri) {
-      return this.httpClient.post(`${uri}/api/system/pause`, {});
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/pause`, {});
     }
 
-    return of({ paused: true });
+    return of<GenericResponse>({ message: 'Mining paused' });
   }
 
   public resumeMining(uri: string = '') {
@@ -257,10 +258,10 @@ export class SystemApiService {
     }
 
     if (environment.production && uri) {
-      return this.httpClient.post(`${uri}/api/system/resume`, {});
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/resume`, {});
     }
 
-    return of({ paused: false });
+    return of<GenericResponse>({ message: 'Mining resumed' });
   }
 
   public identify(uri: string = '') {
