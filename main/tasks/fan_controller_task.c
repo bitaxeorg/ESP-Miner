@@ -52,7 +52,15 @@ void FAN_CONTROLLER_task(void * pvParameters)
     TickType_t taskWakeTime = xTaskGetTickCount();
 
     while (1) {
-        if (nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE)) {
+        if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+            if (fabs(power_management->fan_perc - 30) > EPSILON) {
+                ESP_LOGI(TAG, "Mining paused, setting fan to 30%%");
+                power_management->fan_perc = 30;
+                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 0.3f) != ESP_OK) {
+                    exit(EXIT_FAILURE);
+                }
+            }
+        } else if (nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE)) {
             if (fabs(power_management->fan_perc - 100) > EPSILON) {
                 ESP_LOGW(TAG, "Overheat mode, setting fan to 100%%");
                 power_management->fan_perc = 100;
