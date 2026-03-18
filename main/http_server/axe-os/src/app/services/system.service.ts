@@ -10,7 +10,7 @@ import {
   SystemASIC as ISystemASIC,
   SystemASICASICModelEnum,
   SystemService as GeneratedSystemService,
-  Settings,
+  Settings
 } from 'src/app/generated';
 
 import { environment } from '../../environments/environment';
