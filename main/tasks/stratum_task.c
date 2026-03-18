@@ -443,6 +443,11 @@ void stratum_task(void * pvParameters)
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
     while (1) {
+        if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
         if (!is_wifi_connected()) {
             ESP_LOGI(TAG, "WiFi disconnected, attempting to reconnect...");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
@@ -553,6 +558,13 @@ void stratum_task(void * pvParameters)
         STRATUM_V1_authorize(GLOBAL_STATE->transport, authorize_message_id, username, password);
 
         while (1) {
+            if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+                ESP_LOGI(TAG, "Mining paused, disconnecting from pool");
+                retry_attempts = 0;
+                stratum_close_connection(GLOBAL_STATE);
+                break;
+            }
+
             char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->transport);
             if (!line) {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
