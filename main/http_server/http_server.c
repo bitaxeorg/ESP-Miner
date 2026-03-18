@@ -1004,6 +1004,19 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         }
     }
 
+    // Gateway cloud credentials
+    char *gatewayCloudUrl = nvs_config_get_string(NVS_CONFIG_GATEWAY_CLOUD_URL);
+    char *gatewayClientId = nvs_config_get_string(NVS_CONFIG_GATEWAY_CLIENT_ID);
+    char *gatewayClientSecret = nvs_config_get_string(NVS_CONFIG_GATEWAY_CLOUD_API_KEY);
+    cJSON_AddStringToObject(root, "gatewayCloudUrl", gatewayCloudUrl ? gatewayCloudUrl : "");
+    cJSON_AddStringToObject(root, "gatewayClientId", gatewayClientId ? gatewayClientId : "");
+    // Mask the secret — send "*****" if set, empty string otherwise
+    cJSON_AddStringToObject(root, "gatewayClientSecret",
+        (gatewayClientSecret && strlen(gatewayClientSecret) > 0) ? "*****" : "");
+    free(gatewayCloudUrl);
+    free(gatewayClientId);
+    free(gatewayClientSecret);
+
     free(ssid);
     free(hostname);
     free(stratumURL);

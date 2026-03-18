@@ -172,7 +172,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
             Validators.required,
             Validators.min(0),
             Validators.max(this.statsFrequencyMaxValue)
-          ]]
+          ]],
+          gatewayCloudUrl: [(info as unknown as Record<string, string>)['gatewayCloudUrl'] ?? ''],
+          gatewayClientId: [(info as unknown as Record<string, string>)['gatewayClientId'] ?? ''],
+          gatewayClientSecret: [(info as unknown as Record<string, string>)['gatewayClientSecret'] ?? ''],
         });
 
         this.formSubject.next(this.form);
@@ -223,6 +226,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
     if (form.stratumPassword === '*****') {
       delete form.stratumPassword;
+    }
+
+    if (form.gatewayClientSecret === '*****') {
+      delete form.gatewayClientSecret;
     }
 
     const deviceUri = this.uri || '';

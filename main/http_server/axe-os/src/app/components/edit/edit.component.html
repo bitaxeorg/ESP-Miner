@@ -168,6 +168,31 @@
         </div>
     </div>
 
+    <h3 class="mt-5">Gateway Cloud</h3>
+
+    <div class="card">
+        <div class="field grid p-fluid">
+            <label for="gatewayCloudUrl" class="col-12 md:col-2 md:m-0">Server URL</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="gatewayCloudUrl" formControlName="gatewayCloudUrl" type="text" placeholder="wss://your-server/ws" />
+            </div>
+        </div>
+
+        <div class="field grid p-fluid">
+            <label for="gatewayClientId" class="col-12 md:col-2 md:m-0">Client ID</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="gatewayClientId" formControlName="gatewayClientId" type="text" />
+            </div>
+        </div>
+
+        <div class="field grid p-fluid">
+            <label for="gatewayClientSecret" class="col-12 md:col-2 md:m-0">Client Secret</label>
+            <div class="col-12 md:col-10">
+                <input pInputText id="gatewayClientSecret" formControlName="gatewayClientSecret" type="password" autocomplete="new-password" />
+            </div>
+        </div>
+    </div>
+
     <div class="flex mt-5 gap-3">
         <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
             class="btn btn-primary">Save</button>

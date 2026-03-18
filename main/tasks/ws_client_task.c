@@ -83,16 +83,42 @@ void ws_client_task(void *pvParameters)
     const char *ws_url        = get_credential(EMBEDDED_WS_URL,        "HASHLY_URL:");
 
     // Fall back to NVS when running with placeholder firmware (dev builds)
-    if (strstr(ws_url, "__PLACEHOLDER") != NULL) {
+    bool url_is_placeholder = strstr(ws_url, "__PLACEHOLDER") != NULL;
+    bool cid_is_placeholder = strstr(client_id, "__PLACEHOLDER") != NULL;
+    bool sec_is_placeholder = strstr(client_secret, "__PLACEHOLDER") != NULL;
+
+    if (url_is_placeholder || cid_is_placeholder || sec_is_placeholder) {
         ESP_LOGW(TAG, "Embedded credentials are placeholders — falling back to NVS");
 
-        char *nvs_url = nvs_config_get_string(NVS_CONFIG_GATEWAY_CLOUD_URL);
-        if (nvs_url && *nvs_url) {
-            ws_url = nvs_url;  // intentional leak — used for lifetime of task
-        } else {
-            if (nvs_url) free(nvs_url);
-            ESP_LOGE(TAG, "No WebSocket URL configured. Flash firmware with embedded credentials.");
-            while (1) vTaskDelay(pdMS_TO_TICKS(30000));
+        if (url_is_placeholder) {
+            char *nvs_url = nvs_config_get_string(NVS_CONFIG_GATEWAY_CLOUD_URL);
+            if (nvs_url && *nvs_url) {
+                ws_url = nvs_url;  // intentional leak — used for lifetime of task
+            } else {
+                if (nvs_url) free(nvs_url);
+                ESP_LOGE(TAG, "No WebSocket URL configured. Flash firmware with embedded credentials.");
+                while (1) vTaskDelay(pdMS_TO_TICKS(30000));
+            }
+        }
+
+        if (cid_is_placeholder) {
+            char *nvs_cid = nvs_config_get_string(NVS_CONFIG_GATEWAY_CLIENT_ID);
+            if (nvs_cid && *nvs_cid) {
+                client_id = nvs_cid;  // intentional leak — used for lifetime of task
+            } else {
+                if (nvs_cid) free(nvs_cid);
+                ESP_LOGW(TAG, "No client ID configured in NVS");
+            }
+        }
+
+        if (sec_is_placeholder) {
+            char *nvs_sec = nvs_config_get_string(NVS_CONFIG_GATEWAY_CLOUD_API_KEY);
+            if (nvs_sec && *nvs_sec) {
+                client_secret = nvs_sec;  // intentional leak — used for lifetime of task
+            } else {
+                if (nvs_sec) free(nvs_sec);
+                ESP_LOGW(TAG, "No client secret configured in NVS");
+            }
         }
     }
 
