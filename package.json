@@ -1,0 +1,10 @@
+{
+  "name": "esp-miner-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "mac:build": "cmake -S gateway/platform/macos -B build-gateway-mac && cmake --build build-gateway-mac",
+    "mac:dev": "pnpm run mac:build && HASHLY_CID=GmFFG4O0QfwOMCeEARA_o9zt8Wk9zlJ8 HASHLY_SEC=Qwa0QEdVMig6PvXA0uynb4thXEtFJm3oapKL-UzhOXKmbOAU HASHLY_URL=ws://10.70.0.70:4000 ./build-gateway-mac/gateway",
+    "mac:rebuild": "rm -rf build-gateway-mac && npm run mac:build"
+  }
+}

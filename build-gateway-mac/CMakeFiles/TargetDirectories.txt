@@ -1,0 +1,7 @@
+/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/CMakeFiles/gateway.dir
+/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/CMakeFiles/edit_cache.dir
+/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/CMakeFiles/rebuild_cache.dir
+/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/CMakeFiles/list_install_components.dir
+/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/CMakeFiles/install.dir
+/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/CMakeFiles/install/local.dir
+/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/CMakeFiles/install/strip.dir

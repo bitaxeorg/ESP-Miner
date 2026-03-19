@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

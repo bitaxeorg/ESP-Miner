@@ -11,7 +11,7 @@
  */
 
 #include "gateway_task.h"
-#include "miner_adapter.h"
+#include "miner_adapter.h"   // gateway/include/miner_adapter.h (via gateway component)
 #include "ws_client_task.h"
 #include "global_state.h"
 #include "nvs_config.h"
