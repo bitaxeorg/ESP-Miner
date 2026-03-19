@@ -31,7 +31,7 @@ SRCS
     "./tasks/fan_controller_task.c"
     "./tasks/gateway_task.c"
     "./tasks/ws_client_task.c"
-    "./tasks/miner_adapter.c"
+    # miner_adapter.c is now compiled in the gateway component
     "./thermal/EMC2101.c"
     "./thermal/EMC2103.c"
     "./thermal/EMC2302.c"
@@ -59,6 +59,9 @@ INCLUDE_DIRS
     "../components/stratum/include"
     "thermal"
     "power"
+
+REQUIRES
+    "gateway"
 
 PRIV_REQUIRES
     "app_update"
