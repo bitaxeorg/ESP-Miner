@@ -312,6 +312,17 @@ static int lws_callback(struct lws *wsi,
         break;
     }
 
+    case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
+        // Fired when lws_cancel_service() interrupts the service loop from another thread.
+        // Call lws_callback_on_writable() here (inside the LWS thread) so CLIENT_WRITEABLE fires.
+        if (s_lws_wsi) {
+            pthread_mutex_lock(&s_send_mutex);
+            int has_pending = (s_send_head != s_send_tail);
+            pthread_mutex_unlock(&s_send_mutex);
+            if (has_pending) lws_callback_on_writable(s_lws_wsi);
+        }
+        break;
+
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
     case LWS_CALLBACK_CLIENT_CLOSED:
         s_lws_connected = false;
@@ -476,7 +487,7 @@ void platform_ws_connect(const char *url)
     conn_info.path           = path;
     conn_info.host           = host;
     conn_info.origin         = host;
-    conn_info.protocol       = NULL; /* don't request a subprotocol — server doesn't echo one back */
+    conn_info.protocol       = s_protocols[0].name;
     conn_info.ssl_connection = use_ssl
         ? (LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK)
         : 0;
@@ -552,8 +563,10 @@ void platform_ws_send(const char *data, int len)
     s_send_head = next;
     pthread_mutex_unlock(&s_send_mutex);
 
-    // Wake the service thread to deliver the message
-    lws_callback_on_writable(s_lws_wsi);
+    // Wake the LWS service thread. LWS_CALLBACK_EVENT_WAIT_CANCELLED will fire
+    // inside the service loop and call lws_callback_on_writable() from there —
+    // the correct cross-thread pattern for libwebsockets.
+    lws_cancel_service(s_lws_ctx);
 }
 
 void platform_ws_service(void)
