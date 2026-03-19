@@ -236,6 +236,7 @@ static int             s_send_head = 0;
 static int             s_send_tail = 0;
 static pthread_mutex_t s_send_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+static volatile int       s_pong_pending   = 0;   // set from LWS thread, drained in WRITEABLE
 static volatile bool      s_lws_connected  = false;
 static volatile bool      s_lws_stop       = false;
 static struct lws_context *s_lws_ctx       = NULL;
@@ -292,6 +293,17 @@ static int lws_callback(struct lws *wsi,
         break;
 
     case LWS_CALLBACK_CLIENT_WRITEABLE: {
+        // Priority: send PONG before anything else in the queue
+        if (s_pong_pending) {
+            s_pong_pending = 0;
+            static unsigned char pong_buf[LWS_PRE + 4];
+            memcpy(pong_buf + LWS_PRE, "PONG", 4);
+            GW_LOGI("gw_ws", "TX (4): PONG");
+            lws_write(wsi, pong_buf + LWS_PRE, 4, LWS_WRITE_TEXT);
+            lws_callback_on_writable(wsi); // drain normal queue next
+            break;
+        }
+
         // Drain one item from the send queue (service thread context — safe to lws_write)
         pthread_mutex_lock(&s_send_mutex);
         if (s_send_head != s_send_tail) {
@@ -304,24 +316,12 @@ static int lws_callback(struct lws *wsi,
             lws_write(wsi, item.buf + LWS_PRE, item.len, LWS_WRITE_TEXT);
             free(item.buf);
 
-            // If more queued, request another writable callback immediately
             if (more) lws_callback_on_writable(wsi);
         } else {
             pthread_mutex_unlock(&s_send_mutex);
         }
         break;
     }
-
-    case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
-        // Fired when lws_cancel_service() interrupts the service loop from another thread.
-        // Call lws_callback_on_writable() here (inside the LWS thread) so CLIENT_WRITEABLE fires.
-        if (s_lws_wsi) {
-            pthread_mutex_lock(&s_send_mutex);
-            int has_pending = (s_send_head != s_send_tail);
-            pthread_mutex_unlock(&s_send_mutex);
-            if (has_pending) lws_callback_on_writable(s_lws_wsi);
-        }
-        break;
 
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
     case LWS_CALLBACK_CLIENT_CLOSED:
@@ -357,6 +357,17 @@ static int lws_callback(struct lws *wsi,
 
         if (is_final && remaining == 0) {
             GW_LOGI("gw_ws", "RX (%d): %.*s", s_frag_len, s_frag_len, s_frag_buf);
+
+            // Handle PING inline — don't route through ring buffer or main thread.
+            // During scans the main thread may be blocked for seconds; replying
+            // here keeps us well within the 5 s server deadline.
+            if (s_frag_len == 4 && memcmp(s_frag_buf, "PING", 4) == 0) {
+                s_pong_pending = 1;
+                lws_callback_on_writable(wsi);
+                s_frag_len = 0;
+                break;
+            }
+
             char *copy_buf = malloc(s_frag_len + 1);
             if (copy_buf) {
                 memcpy(copy_buf, s_frag_buf, s_frag_len + 1);
@@ -390,6 +401,15 @@ static void *lws_thread_fn(void *arg)
     (void)arg;
     while (!s_lws_stop && s_lws_ctx) {
         lws_service(s_lws_ctx, 50);
+        /* After each service cycle, schedule a writable callback if messages
+         * are queued. This is the reliable cross-thread send pattern for lws —
+         * lws_callback_on_writable() called from within the service thread. */
+        if (s_lws_wsi && s_lws_connected) {
+            pthread_mutex_lock(&s_send_mutex);
+            int has_pending = (s_send_head != s_send_tail);
+            pthread_mutex_unlock(&s_send_mutex);
+            if (has_pending) lws_callback_on_writable(s_lws_wsi);
+        }
     }
     return NULL;
 }

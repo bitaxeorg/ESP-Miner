@@ -10,7 +10,7 @@
  * This file is responsible only for:
  *   - Providing connectionParams credentials to wslink
  *   - Subscribing to client.onCommand and dispatching received commands
- *   - Sending commandAck / commandResult / ping mutations
+ *   - Sending commandAck / commandResult mutations
  */
 
 #ifdef ESP_PLATFORM
@@ -115,11 +115,6 @@ static void send_command_result(const char *command_id, bool success,
     if (error)   cJSON_AddStringToObject(input, "error", error);
     if (partial) cJSON_AddBoolToObject(input, "partial", true);
     wslink_mutation(g_wslink, "client.commandResult", input, NULL, NULL);
-}
-
-static void send_ping_mutation(void)
-{
-    wslink_mutation(g_wslink, "client.ping", NULL, NULL, NULL);
 }
 
 /* ── Build POLL_MINERS result array ───────────────────────────────────────── */
@@ -806,7 +801,7 @@ void gateway_core_run(void)
                 GW_LOGI(TAG, "Connected (auth=%s, heap=%u)",
                         g_authenticated ? "yes" : "pending",
                         (unsigned)platform_get_free_heap());
-                if (g_authenticated) send_ping_mutation();
+
                 tick = 0;
             }
         }
