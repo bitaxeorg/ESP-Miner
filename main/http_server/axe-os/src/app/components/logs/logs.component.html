@@ -43,7 +43,7 @@
         </div>
 
         <div id="logs" #scrollContainer>
-            <div *ngFor="let log of logs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
+            <div *ngFor="let log of filteredLogs" [ngClass]="log.className">₿ {{log.text | ANSI}}</div>
         </div>
     </form>
 </div>

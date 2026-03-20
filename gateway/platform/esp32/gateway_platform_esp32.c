@@ -143,22 +143,22 @@ bool platform_arp_mac_to_ip(const char *mac, char *ip_buf, size_t ip_buf_size)
                &m[0], &m[1], &m[2], &m[3], &m[4], &m[5]) != 6)
         return false;
 
-    struct netif *netif;
-    ip4_addr_t  *ip_ret;
+    /* Iterate all ARP table slots — use continue (not break) on empty slots
+     * because the table can have gaps between valid entries. */
+    ip4_addr_t     *ip_ret;
+    struct netif   *entry_netif;
     struct eth_addr *eth_ret;
 
-    NETIF_FOREACH(netif) {
-        for (int i = 0; ; i++) {
-            if (etharp_get_entry(i, &ip_ret, &netif, &eth_ret) == 0) break;
-            if (eth_ret->addr[0] == (uint8_t)m[0] &&
-                eth_ret->addr[1] == (uint8_t)m[1] &&
-                eth_ret->addr[2] == (uint8_t)m[2] &&
-                eth_ret->addr[3] == (uint8_t)m[3] &&
-                eth_ret->addr[4] == (uint8_t)m[4] &&
-                eth_ret->addr[5] == (uint8_t)m[5]) {
-                esp_ip4addr_ntoa((const esp_ip4_addr_t *)ip_ret, ip_buf, (int)ip_buf_size);
-                return true;
-            }
+    for (int i = 0; i < ARP_TABLE_SIZE; i++) {
+        if (etharp_get_entry(i, &ip_ret, &entry_netif, &eth_ret) == 0) continue;
+        if (eth_ret->addr[0] == (uint8_t)m[0] &&
+            eth_ret->addr[1] == (uint8_t)m[1] &&
+            eth_ret->addr[2] == (uint8_t)m[2] &&
+            eth_ret->addr[3] == (uint8_t)m[3] &&
+            eth_ret->addr[4] == (uint8_t)m[4] &&
+            eth_ret->addr[5] == (uint8_t)m[5]) {
+            esp_ip4addr_ntoa((const esp_ip4_addr_t *)ip_ret, ip_buf, (int)ip_buf_size);
+            return true;
         }
     }
     return false;
@@ -169,20 +169,18 @@ bool platform_arp_ip_to_mac(const char *ip, char *mac_buf, size_t mac_buf_size)
     ip4_addr_t target;
     if (!ip4addr_aton(ip, &target)) return false;
 
-    struct netif *netif;
-    ip4_addr_t  *ip_ret;
+    ip4_addr_t     *ip_ret;
+    struct netif   *entry_netif;
     struct eth_addr *eth_ret;
 
-    NETIF_FOREACH(netif) {
-        for (int i = 0; ; i++) {
-            if (etharp_get_entry(i, &ip_ret, &netif, &eth_ret) == 0) break;
-            if (ip4_addr_eq(ip_ret, &target)) {
-                snprintf(mac_buf, mac_buf_size,
-                         "%02X:%02X:%02X:%02X:%02X:%02X",
-                         eth_ret->addr[0], eth_ret->addr[1], eth_ret->addr[2],
-                         eth_ret->addr[3], eth_ret->addr[4], eth_ret->addr[5]);
-                return true;
-            }
+    for (int i = 0; i < ARP_TABLE_SIZE; i++) {
+        if (etharp_get_entry(i, &ip_ret, &entry_netif, &eth_ret) == 0) continue;
+        if (ip4_addr_eq(ip_ret, &target)) {
+            snprintf(mac_buf, mac_buf_size,
+                     "%02X:%02X:%02X:%02X:%02X:%02X",
+                     eth_ret->addr[0], eth_ret->addr[1], eth_ret->addr[2],
+                     eth_ret->addr[3], eth_ret->addr[4], eth_ret->addr[5]);
+            return true;
         }
     }
     return false;
@@ -245,6 +243,15 @@ static void ws_event_handler(void *handler_args, esp_event_base_t base,
     case WEBSOCKET_EVENT_DATA: {
         esp_websocket_event_data_t *d = (esp_websocket_event_data_t *)event_data;
         if (d->op_code == 0x01 && d->data_len > 0 && d->data_ptr) {
+            /* Respond to PING immediately in the WS task — do NOT enqueue.
+             * The main loop may be blocked executing a command, and the server
+             * will close the connection if PONG doesn't arrive within ~5 s. */
+            if (d->data_len == 4 && memcmp(d->data_ptr, "PING", 4) == 0) {
+                ESP_LOGI(TAG_WS, "PING → PONG (inline)");
+                platform_ws_send("PONG", 4);
+                break;
+            }
+
             int copy_len = d->data_len;
             if (copy_len > WS_MSG_MAX_LEN) copy_len = WS_MSG_MAX_LEN;
 

@@ -63,9 +63,11 @@ static const char *get_credential(volatile const char *raw, const char *prefix)
 // Public accessors (used by HTTP API, screen, etc.)
 // ============================================================
 
+static const char *s_resolved_client_id = NULL;
+
 bool        ws_client_is_connected(void)     { return gateway_core_is_connected(); }
 bool        ws_client_is_authenticated(void) { return gateway_core_is_authenticated(); }
-const char *ws_client_get_client_id(void)    { return get_credential(EMBEDDED_CLIENT_ID, "HASHLY_CID:"); }
+const char *ws_client_get_client_id(void)    { return s_resolved_client_id; }
 
 // ============================================================
 // FreeRTOS task entry point
@@ -121,6 +123,9 @@ void ws_client_task(void *pvParameters)
             }
         }
     }
+
+    // Store resolved client_id for ws_client_get_client_id()
+    s_resolved_client_id = client_id;
 
     // ── Initialise and run gateway core ──────────────────────────────────────
     const char *version = "1.1.0";

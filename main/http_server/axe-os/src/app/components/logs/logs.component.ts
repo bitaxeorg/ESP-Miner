@@ -70,12 +70,7 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
             }
           }
 
-          // Get current filter value from form
-          const currentFilter = this.form?.get('filter')?.value;
-
-          if (!currentFilter || val.includes(currentFilter)) {
-            this.logs.push({ className: `max-w-full text-monospace ${className}`, text: val });
-          }
+          this.logs.push({ className: `max-w-full text-monospace ${className}`, text: val });
 
           if (this.logs.length > 256) {
             this.logs.shift();
@@ -85,6 +80,12 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
           this.toastr.error("Error opening websocket connection");
         }
       })
+  }
+
+  get filteredLogs() {
+    const f = this.form?.get('filter')?.value;
+    if (!f) return this.logs;
+    return this.logs.filter(log => log.text.includes(f));
   }
 
   public clearLogs() {

@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/work/code/ESP-Miner-Gateway/build-gateway-mac/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

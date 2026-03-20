@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "mac:build": "rm -rf build-gateway-mac && cmake -S gateway/platform/macos -B build-gateway-mac && cmake --build build-gateway-mac",
-    "mac:dev": "pnpm run mac:build && HASHLY_CID=GmFFG4O0QfwOMCeEARA_o9zt8Wk9zlJ8 HASHLY_SEC=Qwa0QEdVMig6PvXA0uynb4thXEtFJm3oapKL-UzhOXKmbOAU HASHLY_URL=ws://10.70.0.70:4000 ./build-gateway-mac/gateway"
+    "mac:dev": "pnpm run mac:build && HASHLY_CID=GmFFG4O0QfwOMCeEARA_o9zt8Wk9zlJ8 HASHLY_SEC=Qwa0QEdVMig6PvXA0uynb4thXEtFJm3oapKL-UzhOXKmbOAU HASHLY_URL=ws://10.70.0.70:4000 ./build-gateway-mac/gateway",
+    "bitaxe:build": ". $HOME/.espressif/v5.5.3/esp-idf/export.sh && idf.py build",
+    "bitaxe:flash": "curl 'http://10.70.0.28/api/system/OTA' -X POST -H 'Content-Type: application/octet-stream' --data-binary @build/esp-miner.bin; sleep 10 && curl 'http://10.70.0.28/api/system/OTAWWW' -X POST -H 'Content-Type: application/octet-stream' --data-binary @build/www.bin",
+    "bitaxe:dev": "pnpm run bitaxe:build && pnpm run bitaxe:flash"
   }
 }

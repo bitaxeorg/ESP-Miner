@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-static const char *TAG = "wslink";
+static const char *TAG = "gw_wslink";
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * [requestManager.ts]  Request table

@@ -33,7 +33,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-static const char *TAG = "gateway_core";
+static const char *TAG = "gw_core";
 
 /* ── Module state ─────────────────────────────────────────────────────────── */
 
@@ -347,25 +347,60 @@ static void handle_tcp_request(const char *command_id, cJSON *payload)
     send_command_result(command_id, true, result, NULL, false);
 }
 
-/* MAC_LOOKUP — find IP for a MAC via ARP; optionally sweep CIDRs first. */
+/* MAC_LOOKUP — resolve multiple MACs to IPs via ARP; optionally sweep CIDRs.
+ *
+ * Input:  { macs: ["AA:BB:...", ...], cidrs?: ["10.0.0.0/24", ...] }
+ * Output: { "AA:BB:...": "10.0.0.5", "CC:DD:...": null, ... }
+ */
 static void handle_mac_lookup(const char *command_id, cJSON *payload)
 {
-    cJSON *mac_item   = cJSON_GetObjectItem(payload, "mac");
+    cJSON *macs_item  = cJSON_GetObjectItem(payload, "macs");
     cJSON *cidrs_item = cJSON_GetObjectItem(payload, "cidrs");
-    const char *mac   = cJSON_IsString(mac_item) ? mac_item->valuestring : NULL;
 
-    if (!mac || !mac[0]) {
-        send_command_result(command_id, false, NULL, "Missing mac", false);
+    if (!cJSON_IsArray(macs_item) || cJSON_GetArraySize(macs_item) == 0) {
+        send_command_result(command_id, false, NULL, "Missing macs", false);
         return;
     }
 
-    char ip_buf[16] = "";
-    bool found = platform_arp_mac_to_ip(mac, ip_buf, sizeof(ip_buf));
+    typedef struct {
+        char mac[18];   /* "XX:XX:XX:XX:XX:XX\0" */
+        char ip[16];    /* resolved IP, or "" */
+        bool found;
+    } entry_t;
 
-    /* If not in ARP cache and CIDRs provided, TCP-probe each host to warm cache. */
-    if (!found && cJSON_IsArray(cidrs_item)) {
+    int mac_count = cJSON_GetArraySize(macs_item);
+    if (mac_count > 64) mac_count = 64;
+
+    entry_t *entries = (entry_t *)malloc(mac_count * sizeof(entry_t));
+    if (!entries) {
+        send_command_result(command_id, false, NULL, "Out of memory", false);
+        return;
+    }
+
+    /* Check ARP cache for all MACs up front */
+    int remaining = 0;
+    for (int mi = 0; mi < mac_count; mi++) {
+        cJSON *m = cJSON_GetArrayItem(macs_item, mi);
+        entries[mi].ip[0] = '\0';
+        entries[mi].found = false;
+        if (cJSON_IsString(m)) {
+            strncpy(entries[mi].mac, m->valuestring, sizeof(entries[mi].mac) - 1);
+            entries[mi].mac[sizeof(entries[mi].mac) - 1] = '\0';
+            entries[mi].found = platform_arp_mac_to_ip(
+                entries[mi].mac, entries[mi].ip, sizeof(entries[mi].ip));
+        } else {
+            entries[mi].mac[0] = '\0';
+            entries[mi].found  = true; /* skip invalid */
+        }
+        if (!entries[mi].found) remaining++;
+    }
+
+    GW_LOGI(TAG, "MAC_LOOKUP: %d MACs, %d need sweep", mac_count, remaining);
+
+    /* ARP sweep if any MACs are unresolved and CIDRs are provided */
+    if (remaining > 0 && cJSON_IsArray(cidrs_item)) {
         int n = cJSON_GetArraySize(cidrs_item);
-        for (int ci = 0; ci < n && !found; ci++) {
+        for (int ci = 0; ci < n && remaining > 0; ci++) {
             cJSON *ci_item = cJSON_GetArrayItem(cidrs_item, ci);
             if (!cJSON_IsString(ci_item)) continue;
 
@@ -392,23 +427,56 @@ static void handle_mac_lookup(const char *command_id, cJSON *payload)
             uint32_t net_addr  = base_ip & ~((1u << host_bits) - 1u);
 
             char host_str[16];
+            int64_t sweep_start = platform_time_ms();
             GW_LOGI(TAG, "MAC_LOOKUP: ARP sweep %s (%" PRIu32 " hosts)", cidr, num_hosts);
+
             for (uint32_t i = 1; i <= num_hosts; i++) {
                 ip_to_str(net_addr + i, host_str, sizeof(host_str));
-                platform_tcp_probe(host_str, 80, 50);  /* warms ARP cache */
+                int64_t t0  = platform_time_ms();
+                bool    hit = platform_tcp_probe(host_str, 80, 50);
+                int64_t dt  = platform_time_ms() - t0;
+
+                if (hit || dt > 100)
+                    GW_LOGI(TAG, "  probe %s: %s (%" PRId64 " ms)",
+                            host_str, hit ? "open" : "timeout", dt);
+
+                if (i % 32 == 0 || i == num_hosts)
+                    GW_LOGI(TAG, "  sweep progress: %" PRIu32 "/%" PRIu32
+                            " (elapsed %" PRId64 " ms)",
+                            i, num_hosts, platform_time_ms() - sweep_start);
+
+                /* Check ALL pending MACs right after each probe while the
+                 * ARP entry is still fresh (10-slot table evicts quickly). */
+                for (int mi = 0; mi < mac_count; mi++) {
+                    if (entries[mi].found) continue;
+                    if (platform_arp_mac_to_ip(entries[mi].mac,
+                                               entries[mi].ip,
+                                               sizeof(entries[mi].ip))) {
+                        entries[mi].found = true;
+                        remaining--;
+                        GW_LOGI(TAG, "  found %s -> %s (after host %" PRIu32 ")",
+                                entries[mi].mac, entries[mi].ip, i);
+                    }
+                }
             }
-            found = platform_arp_mac_to_ip(mac, ip_buf, sizeof(ip_buf));
+
+            GW_LOGI(TAG, "MAC_LOOKUP: sweep done in %" PRId64 " ms (%d/%d found)",
+                    platform_time_ms() - sweep_start, mac_count - remaining, mac_count);
         }
     }
 
-    cJSON *result = cJSON_CreateObject();
-    if (found)
-        cJSON_AddStringToObject(result, "ip", ip_buf);
-    else
-        cJSON_AddNullToObject(result, "ip");
+    /* Build results object: { "MAC": "ip" | null, ... } */
+    cJSON *results = cJSON_CreateObject();
+    for (int mi = 0; mi < mac_count; mi++) {
+        if (!entries[mi].mac[0]) continue;
+        if (entries[mi].found && entries[mi].ip[0])
+            cJSON_AddStringToObject(results, entries[mi].mac, entries[mi].ip);
+        else
+            cJSON_AddNullToObject(results, entries[mi].mac);
+    }
 
-    GW_LOGI(TAG, "MAC_LOOKUP %s -> %s", mac, found ? ip_buf : "not found");
-    send_command_result(command_id, true, result, NULL, false);
+    free(entries);
+    send_command_result(command_id, true, results, NULL, false);
 }
 
 /* IP_LOOKUP — find MAC for an IP via ARP table. */
