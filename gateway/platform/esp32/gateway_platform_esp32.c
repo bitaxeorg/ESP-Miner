@@ -29,28 +29,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-// ── Self-stats cache (push-based — no circular GlobalState dependency) ───────
-//
-// ws_client_task.c (in main/) reads GlobalState and calls
-// platform_esp32_update_self_stats() to push a snapshot here.
-// platform_get_self_stats() then serves from this cache without
-// needing to know anything about GlobalState or main component headers.
-
-static PeerMinerState s_self_stats;
-static volatile bool  s_self_stats_valid = false;
-
-/**
- * Called by ws_client_task.c (or gateway_task.c) whenever local miner stats
- * are refreshed.  stats must remain valid only for the duration of the call.
- */
-void platform_esp32_update_self_stats(const PeerMinerState *stats)
-{
-    if (stats) {
-        memcpy(&s_self_stats, stats, sizeof(s_self_stats));
-        s_self_stats_valid = true;
-    }
-}
-
 // ── Logging ──────────────────────────────────────────────────────────────────
 
 static const esp_log_level_t log_level_map[] = {
@@ -150,6 +128,64 @@ void platform_get_hostname(char *buf, size_t buf_size)
     }
     strncpy(buf, hostname, buf_size - 1);
     buf[buf_size - 1] = '\0';
+}
+
+// ── ARP ──────────────────────────────────────────────────────────────────────
+
+#include "lwip/etharp.h"
+#include "lwip/netif.h"
+
+bool platform_arp_mac_to_ip(const char *mac, char *ip_buf, size_t ip_buf_size)
+{
+    /* Parse target MAC */
+    unsigned int m[6];
+    if (sscanf(mac, "%x:%x:%x:%x:%x:%x",
+               &m[0], &m[1], &m[2], &m[3], &m[4], &m[5]) != 6)
+        return false;
+
+    struct netif *netif;
+    ip4_addr_t  *ip_ret;
+    struct eth_addr *eth_ret;
+
+    NETIF_FOREACH(netif) {
+        for (int i = 0; ; i++) {
+            if (etharp_get_entry(i, &ip_ret, &netif, &eth_ret) == 0) break;
+            if (eth_ret->addr[0] == (uint8_t)m[0] &&
+                eth_ret->addr[1] == (uint8_t)m[1] &&
+                eth_ret->addr[2] == (uint8_t)m[2] &&
+                eth_ret->addr[3] == (uint8_t)m[3] &&
+                eth_ret->addr[4] == (uint8_t)m[4] &&
+                eth_ret->addr[5] == (uint8_t)m[5]) {
+                esp_ip4addr_ntoa((const esp_ip4_addr_t *)ip_ret, ip_buf, (int)ip_buf_size);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool platform_arp_ip_to_mac(const char *ip, char *mac_buf, size_t mac_buf_size)
+{
+    ip4_addr_t target;
+    if (!ip4addr_aton(ip, &target)) return false;
+
+    struct netif *netif;
+    ip4_addr_t  *ip_ret;
+    struct eth_addr *eth_ret;
+
+    NETIF_FOREACH(netif) {
+        for (int i = 0; ; i++) {
+            if (etharp_get_entry(i, &ip_ret, &netif, &eth_ret) == 0) break;
+            if (ip4_addr_eq(ip_ret, &target)) {
+                snprintf(mac_buf, mac_buf_size,
+                         "%02X:%02X:%02X:%02X:%02X:%02X",
+                         eth_ret->addr[0], eth_ret->addr[1], eth_ret->addr[2],
+                         eth_ret->addr[3], eth_ret->addr[4], eth_ret->addr[5]);
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 // ── Memory ───────────────────────────────────────────────────────────────────
@@ -415,16 +451,36 @@ bool platform_tcp_send_recv(const char *ip, int port,
     int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock < 0) return false;
 
-    int secs = timeout_ms / 1000;
-    int usecs = (timeout_ms % 1000) * 1000;
-    struct timeval tv = { .tv_sec = secs ? secs : 1, .tv_usec = usecs };
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    struct timeval tv = {
+        .tv_sec  = timeout_ms / 1000,
+        .tv_usec = (timeout_ms % 1000) * 1000,
+    };
+    if (tv.tv_sec == 0 && tv.tv_usec == 0) tv.tv_sec = 1;
 
-    if (connect(sock, (struct sockaddr *)&dest, sizeof(dest)) != 0) {
+    /* Non-blocking connect so timeout_ms applies to the connect as well. */
+    int flags = fcntl(sock, F_GETFL, 0);
+    fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+    connect(sock, (struct sockaddr *)&dest, sizeof(dest)); /* EINPROGRESS expected */
+
+    fd_set wfds;
+    FD_ZERO(&wfds);
+    FD_SET(sock, &wfds);
+    if (select(sock + 1, NULL, &wfds, NULL, &tv) != 1) {
         close(sock);
         return false;
     }
+    int err = 0;
+    socklen_t errlen = sizeof(err);
+    getsockopt(sock, SOL_SOCKET, SO_ERROR, &err, &errlen);
+    if (err != 0) {
+        close(sock);
+        return false;
+    }
+
+    /* Restore blocking mode for send/recv, reuse the same timeout. */
+    fcntl(sock, F_SETFL, flags & ~O_NONBLOCK);
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
     int sent = send(sock, send_buf, strlen(send_buf), 0);
     if (sent < 0) {
@@ -443,11 +499,41 @@ bool platform_tcp_send_recv(const char *ip, int port,
     return total > 0;
 }
 
-// ── Self-stats ───────────────────────────────────────────────────────────────
+// ── TCP probe ─────────────────────────────────────────────────────────────────
 
-bool platform_get_self_stats(PeerMinerState *out)
+bool platform_tcp_probe(const char *ip, int port, int timeout_ms)
 {
-    if (!s_self_stats_valid) return false;
-    memcpy(out, &s_self_stats, sizeof(*out));
-    return true;
+    struct sockaddr_in dest = { 0 };
+    dest.sin_family = AF_INET;
+    dest.sin_port   = htons((uint16_t)port);
+    if (inet_pton(AF_INET, ip, &dest.sin_addr) != 1) return false;
+
+    int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock < 0) return false;
+
+    /* Non-blocking connect + select so timeout_ms is honoured precisely. */
+    int flags = fcntl(sock, F_GETFL, 0);
+    fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+
+    connect(sock, (struct sockaddr *)&dest, sizeof(dest)); /* EINPROGRESS expected */
+
+    struct timeval tv = {
+        .tv_sec  = timeout_ms / 1000,
+        .tv_usec = (timeout_ms % 1000) * 1000,
+    };
+    if (tv.tv_sec == 0 && tv.tv_usec == 0) tv.tv_sec = 1;
+
+    fd_set wfds;
+    FD_ZERO(&wfds);
+    FD_SET(sock, &wfds);
+
+    bool connected = false;
+    if (select(sock + 1, NULL, &wfds, NULL, &tv) == 1) {
+        int err = 0;
+        socklen_t len = sizeof(err);
+        getsockopt(sock, SOL_SOCKET, SO_ERROR, &err, &len);
+        connected = (err == 0);
+    }
+    close(sock);
+    return connected;
 }

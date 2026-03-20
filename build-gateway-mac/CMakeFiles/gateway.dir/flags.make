@@ -4,7 +4,7 @@
 # compile C with /usr/bin/cc
 C_DEFINES = 
 
-C_INCLUDES = -I/Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos/../../include -I/opt/homebrew/Cellar/libwebsockets/4.5.7/include -I/opt/homebrew/Cellar/cjson/1.7.18/include -I/opt/homebrew/Cellar/cjson/1.7.18/include/cjson -I/opt/homebrew/opt/openssl@3/include
+C_INCLUDES = -I/Users/work/code/ESP-Miner-Gateway/gateway/platform/macos/../../include -I/opt/homebrew/Cellar/libwebsockets/4.5.7/include -I/opt/homebrew/Cellar/cjson/1.7.18/include -I/opt/homebrew/Cellar/cjson/1.7.18/include/cjson -I/opt/homebrew/opt/openssl@3/include
 
 C_FLAGSarm64 = -std=gnu11 -arch arm64 -Wall -Wextra -Wno-unused-parameter
 

@@ -13,6 +13,7 @@ CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gate
   /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos/../../include/gateway_core.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/17/include/stdbool.h \
   /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos/../../include/gateway_types.h \
+  /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos/../../include/gateway_platform.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/17/include/stdint.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/stdint.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_int8_t.h \
@@ -35,9 +36,7 @@ CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gate
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_uintptr_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_types/_intmax_t.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_types/_uintmax_t.h \
-  /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos/../../include/gateway_platform.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/17/include/__stddef_rsize_t.h \
-  /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos/../../include/miner_adapter.h \
   /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos/../../include/wslink.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/string.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_string.h \

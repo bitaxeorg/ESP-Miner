@@ -1,16 +1,21 @@
 /**
  * Gateway Core — tRPC WebSocket client (platform-independent)
  *
- * Uses wslink (gateway/include/wslink.h) for all tRPC protocol concerns:
- *   - connectionParams handshake
- *   - subscription / mutation message framing and ID tracking
- *   - PING/PONG keep-alive
- *   - subscription replay on reconnect
+ * The ESP32 is a dumb network proxy.  Exactly three command types are handled:
  *
- * This file is responsible only for:
- *   - Providing connectionParams credentials to wslink
- *   - Subscribing to client.onCommand and dispatching received commands
- *   - Sending commandAck / commandResult mutations
+ *   SCAN_IP_RANGE — TCP-probe requested ports on every host in a CIDR range.
+ *                   Reads a "ports" array from the payload (default [80,4028]).
+ *                   Sends one partial commandResult per alive host:
+ *                     { ip, ports: { "80": bool, "4028": bool } }
+ *                   Then sends a final (non-partial) result with diagnostics.
+ *
+ *   HTTP_REQUEST  — Execute one HTTP call.
+ *                   Result: { status: <code>, body: "<response>" }
+ *
+ *   TCP_REQUEST   — Send one TCP message, read one response.
+ *                   Result: { body: "<response>" }
+ *
+ * All adapter logic, polling, and config parsing lives on the server.
  */
 
 #ifdef ESP_PLATFORM
@@ -21,46 +26,46 @@
 
 #include "gateway_core.h"
 #include "gateway_platform.h"
-#include "miner_adapter.h"
 #include "wslink.h"
 
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 static const char *TAG = "gateway_core";
 
 /* ── Module state ─────────────────────────────────────────────────────────── */
 
 static GatewayConfig    g_cfg;
-static GatewayModule   *g_gw             = NULL;
-static wslink_client_t *g_wslink         = NULL;
-static volatile bool    g_connected      = false;
-static volatile bool    g_authenticated  = false;
-static volatile bool    g_scan_stop_requested = false;
+static GatewayModule   *g_gw            = NULL;
+static wslink_client_t *g_wslink        = NULL;
+static volatile bool    g_connected     = false;
+static volatile bool    g_authenticated = false;
 
 bool gateway_core_is_connected(void)     { return g_connected; }
 bool gateway_core_is_authenticated(void) { return g_authenticated; }
 
 /* ── wslink config callbacks ──────────────────────────────────────────────── */
 
-/* get_connection_params: builds the data object for the connectionParams
- * message (mirrors WebSocketClientOptions.connectionParams in options.ts). */
 static cJSON *build_connection_params(void *user_data)
 {
     (void)user_data;
     char mac_str[20] = "";
+    char local_ip[16] = "";
     platform_get_mac_str(mac_str, sizeof(mac_str));
+    platform_get_local_ip(local_ip, sizeof(local_ip));
 
+    // tRPC connectionParams must be a flat Record<string, string>
     cJSON *data = cJSON_CreateObject();
     cJSON_AddStringToObject(data, "clientId",     g_cfg.client_id);
     cJSON_AddStringToObject(data, "clientSecret", g_cfg.client_secret);
     cJSON_AddStringToObject(data, "firmware",     g_cfg.version);
-    if (mac_str[0])
-        cJSON_AddStringToObject(data, "mac", mac_str);
+    cJSON_AddStringToObject(data, "mac",          mac_str);
+    cJSON_AddStringToObject(data, "localIp",      local_ip);
 
-    GW_LOGI(TAG, "connectionParams: clientId=%s mac=%s firmware=%s",
-            g_cfg.client_id, mac_str, g_cfg.version);
+    GW_LOGI(TAG, "connectionParams: clientId=%s mac=%s localIp=%s firmware=%s",
+            g_cfg.client_id, mac_str, local_ip, g_cfg.version);
     return data;
 }
 
@@ -96,575 +101,338 @@ void gateway_core_on_message(const char *data, int len)
     wslink_on_message(g_wslink, data, len);
 }
 
-/* ── Mutation helpers (no more manual JSON framing) ───────────────────────── */
-
-static void send_command_ack(const char *command_id)
-{
-    cJSON *input = cJSON_CreateObject();
-    cJSON_AddStringToObject(input, "commandId", command_id);
-    wslink_mutation(g_wslink, "client.commandAck", input, NULL, NULL);
-}
+/* ── Mutation helper ──────────────────────────────────────────────────────── */
 
 static void send_command_result(const char *command_id, bool success,
                                 cJSON *result, const char *error, bool partial)
 {
     cJSON *input = cJSON_CreateObject();
     cJSON_AddStringToObject(input, "commandId", command_id);
-    cJSON_AddBoolToObject(input, "success", success);
-    if (result)  cJSON_AddItemToObject(input, "result", result);
+    cJSON_AddBoolToObject(input,   "success",   success);
+    if (result)  cJSON_AddItemToObject(input, "result",  result);
     if (error)   cJSON_AddStringToObject(input, "error", error);
     if (partial) cJSON_AddBoolToObject(input, "partial", true);
     wslink_mutation(g_wslink, "client.commandResult", input, NULL, NULL);
 }
 
-/* ── Build POLL_MINERS result array ───────────────────────────────────────── */
+/* ── CIDR helpers ─────────────────────────────────────────────────────────── */
 
-static cJSON *build_poll_result_array(GatewayModule *gw)
+static bool parse_ipv4(const char *str, uint32_t *out)
 {
-    cJSON *arr = cJSON_CreateArray();
-    if (!arr) return NULL;
+    unsigned a, b, c, d;
+    if (sscanf(str, "%u.%u.%u.%u", &a, &b, &c, &d) != 4) return false;
+    if (a > 255 || b > 255 || c > 255 || d > 255)        return false;
+    *out = ((a & 0xFFu) << 24) | ((b & 0xFFu) << 16) |
+           ((c & 0xFFu) <<  8) |  (d & 0xFFu);
+    return true;
+}
 
-    for (int i = 0; i < gw->peer_count; i++) {
-        PeerMinerState *peer = &gw->peers[i];
-
-        cJSON *m = cJSON_CreateObject();
-        cJSON_AddStringToObject(m, "mac", peer->mac_addr);
-        cJSON_AddStringToObject(m, "ip",  peer->ip);
-        cJSON_AddBoolToObject(m, "online", peer->status == PEER_STATUS_ONLINE);
-
-        if (peer->status == PEER_STATUS_ONLINE) {
-            cJSON_AddNumberToObject(m, "hashrate",       peer->hashrate);
-            cJSON_AddNumberToObject(m, "temp",           peer->temp);
-            cJSON_AddNumberToObject(m, "power",          peer->power);
-            cJSON_AddNumberToObject(m, "voltage",        peer->voltage);
-            cJSON_AddNumberToObject(m, "current",        peer->current);
-            cJSON_AddNumberToObject(m, "sharesAccepted", (double)peer->shares_accepted);
-            cJSON_AddNumberToObject(m, "sharesRejected", (double)peer->shares_rejected);
-            cJSON_AddNumberToObject(m, "uptimeSeconds",  (double)peer->uptime_seconds);
-            cJSON_AddNumberToObject(m, "frequency",      peer->frequency);
-
-            if (peer->vr_temp != 0)          cJSON_AddNumberToObject(m, "vrTemp",          peer->vr_temp);
-            if (peer->fan_pct > 0)           cJSON_AddNumberToObject(m, "fanPct",          peer->fan_pct);
-            if (peer->fan_rpm > 0)           cJSON_AddNumberToObject(m, "fanRpm",          peer->fan_rpm);
-            if (peer->wifi_rssi != 0)        cJSON_AddNumberToObject(m, "wifiRssi",        peer->wifi_rssi);
-            if (peer->found_blocks > 0)      cJSON_AddNumberToObject(m, "foundBlocks",     peer->found_blocks);
-            if (peer->best_diff > 0)         cJSON_AddNumberToObject(m, "bestDiff",        peer->best_diff);
-            if (peer->best_session_diff > 0) cJSON_AddNumberToObject(m, "bestSessionDiff", peer->best_session_diff);
-            if (peer->pool_difficulty > 0)   cJSON_AddNumberToObject(m, "poolDiff",        peer->pool_difficulty);
-            if (peer->temp_avg > 0)          cJSON_AddNumberToObject(m, "tempAvg",         peer->temp_avg);
-            if (peer->temp_max > 0)          cJSON_AddNumberToObject(m, "tempMax",         peer->temp_max);
-
-            if (peer->asic_model[0])   cJSON_AddStringToObject(m, "model",       peer->asic_model);
-            if (peer->device_model[0]) cJSON_AddStringToObject(m, "deviceModel", peer->device_model);
-
-            if (peer->pool_count > 0) {
-                cJSON *pools = cJSON_CreateArray();
-                for (int pi = 0; pi < peer->pool_count; pi++) {
-                    PoolInfo *p  = &peer->pools[pi];
-                    cJSON    *pj = cJSON_CreateObject();
-                    cJSON_AddStringToObject(pj, "url",   p->url);
-                    cJSON_AddStringToObject(pj, "user",  p->user);
-                    cJSON_AddBoolToObject(pj,   "active", p->active);
-                    if (p->stratum_diff > 0) cJSON_AddNumberToObject(pj, "diff",     p->stratum_diff);
-                    if (p->accepted > 0)     cJSON_AddNumberToObject(pj, "accepted", (double)p->accepted);
-                    if (p->rejected > 0)     cJSON_AddNumberToObject(pj, "rejected", (double)p->rejected);
-                    cJSON_AddItemToArray(pools, pj);
-                }
-                cJSON_AddItemToObject(m, "pools", pools);
-            }
-        } else if (peer->status == PEER_STATUS_ERROR) {
-            cJSON_AddStringToObject(m, "error", "Poll failed");
-        }
-
-        cJSON_AddItemToArray(arr, m);
-    }
-    return arr;
+static void ip_to_str(uint32_t ip, char *buf, int buf_size)
+{
+    snprintf(buf, buf_size, "%u.%u.%u.%u",
+             (unsigned)((ip >> 24) & 0xFF), (unsigned)((ip >> 16) & 0xFF),
+             (unsigned)((ip >>  8) & 0xFF), (unsigned)( ip        & 0xFF));
 }
 
 /* ── Command handlers ─────────────────────────────────────────────────────── */
 
-static void handle_poll_miners(const char *command_id, cJSON *payload)
-{
-    if (g_gw->SCAN_STATE.scanning) {
-        GW_LOGD(TAG, "Skipping POLL_MINERS during scan");
-        return;
-    }
-
-    cJSON *miners_arr = cJSON_GetObjectItem(payload, "miners");
-    if (!cJSON_IsArray(miners_arr)) return;
-
-    int count = cJSON_GetArraySize(miners_arr);
-    if (count > GATEWAY_MAX_PEERS - 1) count = GATEWAY_MAX_PEERS - 1;
-
-    g_gw->peer_count = 0;
-    g_gw->is_polling = true;
-
-    for (int i = 0; i < count; i++) {
-        cJSON *entry    = cJSON_GetArrayItem(miners_arr, i);
-        cJSON *ip_item  = cJSON_GetObjectItem(entry, "ip");
-        cJSON *mac_item = cJSON_GetObjectItem(entry, "macAddress");
-        cJSON *adp_item = cJSON_GetObjectItem(entry, "adapter");
-
-        if (!cJSON_IsString(ip_item) || !ip_item->valuestring[0]) continue;
-
-        PeerMinerState *peer = &g_gw->peers[g_gw->peer_count];
-        memset(peer, 0, sizeof(PeerMinerState));
-
-        strncpy(peer->ip, ip_item->valuestring, GATEWAY_IP_MAX_LEN - 1);
-        if (cJSON_IsString(mac_item))
-            strncpy(peer->mac_addr, mac_item->valuestring, sizeof(peer->mac_addr) - 1);
-
-        MinerType type = MINER_TYPE_UNKNOWN;
-        if (cJSON_IsString(adp_item))
-            type = miner_type_from_string(adp_item->valuestring);
-        peer->type = type;
-
-        bool ok = poll_miner(peer->ip, peer->type, peer);
-        if (ok) {
-            peer->status              = PEER_STATUS_ONLINE;
-            peer->consecutive_failures = 0;
-            peer->last_seen           = platform_time_ms();
-        } else {
-            peer->consecutive_failures++;
-            peer->status = (peer->consecutive_failures >= 3)
-                           ? PEER_STATUS_OFFLINE : PEER_STATUS_ERROR;
-        }
-        g_gw->peer_count++;
-    }
-
-    /* Include self-stats if the platform mines */
-    if (g_gw->peer_count < GATEWAY_MAX_PEERS) {
-        PeerMinerState *self = &g_gw->peers[g_gw->peer_count];
-        memset(self, 0, sizeof(PeerMinerState));
-        if (platform_get_self_stats(self)) {
-            self->last_seen = platform_time_ms();
-            g_gw->peer_count++;
-        }
-    }
-
-    g_gw->is_polling = false;
-
-    if (command_id) {
-        cJSON *result = build_poll_result_array(g_gw);
-        send_command_result(command_id, true, result, NULL, false);
-    }
-}
-
-/* Scan streaming context */
-typedef struct {
-    const char *command_id;
-    int         pending_count;
-    DiscoveredMiner pending[3];
-} scan_stream_ctx_t;
-
-#define SCAN_BATCH_SIZE 3
-
-static void flush_scan_batch(scan_stream_ctx_t *sctx)
-{
-    if (!sctx->command_id || sctx->pending_count == 0) return;
-
-    for (int i = 0; i < sctx->pending_count; i++) {
-        DiscoveredMiner *miner = &sctx->pending[i];
-
-        cJSON *r = cJSON_CreateObject();
-        cJSON_AddStringToObject(r, "ip",         miner->ip);
-        cJSON_AddStringToObject(r, "status",     "MINER");
-        cJSON_AddStringToObject(r, "macAddress", miner->mac);
-        cJSON_AddStringToObject(r, "adapter",    miner_type_to_adapter_type(miner->type));
-        cJSON_AddStringToObject(r, "deviceName", miner->model[0] ? miner->model : miner->hostname);
-
-        send_command_result(sctx->command_id, true, r, NULL, true);
-    }
-    sctx->pending_count = 0;
-}
-
-static void on_scan_miner_found(const DiscoveredMiner *miner, void *ctx)
-{
-    scan_stream_ctx_t *sctx = (scan_stream_ctx_t *)ctx;
-    sctx->pending[sctx->pending_count++] = *miner;
-    if (sctx->pending_count >= SCAN_BATCH_SIZE)
-        flush_scan_batch(sctx);
-}
-
+/* SCAN_IP_RANGE — TCP probe requested ports per host, stream partials. */
 static void handle_scan_ip_range(const char *command_id, cJSON *payload)
 {
-    if (g_gw->SCAN_STATE.scanning) {
+    if (g_gw->scan_state.scanning) {
         GW_LOGW(TAG, "Scan already in progress");
         return;
     }
+    g_gw->scan_state.scanning       = true;
+    g_gw->scan_state.stop_requested = false;
 
-    if (command_id) send_command_ack(command_id);
-    (void)payload;
-
-    GW_LOGI(TAG, "Starting network scan...");
-    memset(&g_gw->SCAN_STATE, 0, sizeof(ScanState));
-    g_gw->SCAN_STATE.scanning = true;
-    g_scan_stop_requested = false;
-
-    scan_stream_ctx_t stream_ctx = { .command_id = command_id, .pending_count = 0 };
-    run_network_scan(&g_gw->SCAN_STATE, on_scan_miner_found, &stream_ctx);
-    flush_scan_batch(&stream_ctx);
-
-    GW_LOGI(TAG, "Scan complete: %d found", g_gw->SCAN_STATE.result_count);
-
-    if (command_id) {
-        cJSON *diag = cJSON_CreateObject();
-        cJSON_AddNumberToObject(diag, "totalFound", g_gw->SCAN_STATE.result_count);
-        cJSON_AddNumberToObject(diag, "errAlloc",   g_gw->SCAN_STATE.err_alloc);
-        cJSON_AddNumberToObject(diag, "errInit",    g_gw->SCAN_STATE.err_init);
-        cJSON_AddNumberToObject(diag, "errPerform", g_gw->SCAN_STATE.err_perform);
-        cJSON_AddNumberToObject(diag, "errStatus",  g_gw->SCAN_STATE.err_status);
-        cJSON_AddNumberToObject(diag, "errParse",   g_gw->SCAN_STATE.err_parse);
-        cJSON_AddNumberToObject(diag, "freeHeap",   (double)platform_get_free_heap());
-        send_command_result(command_id, true, diag, NULL, false);
-    }
-}
-
-static void handle_stop_scan(const char *command_id, cJSON *payload)
-{
-    g_scan_stop_requested             = true;
-    g_gw->SCAN_STATE.stop_requested   = true;
-    g_gw->SCAN_STATE.scanning         = false;
-
-    if (command_id) send_command_ack(command_id);
-    GW_LOGI(TAG, "Scan stop requested");
-    (void)payload;
-}
-
-/* ── AxeOS flat config helper ─────────────────────────────────────────────── */
-
-static cJSON *flatten_axeos_config(cJSON *config)
-{
-    cJSON *flat    = cJSON_CreateObject();
-    cJSON *perf    = cJSON_GetObjectItem(config, "performance");
-    cJSON *thermal = cJSON_GetObjectItem(config, "thermal");
-    cJSON *pools   = cJSON_GetObjectItem(config, "pools");
-    cJSON *raw     = cJSON_GetObjectItem(config, "raw");
-
-    if (cJSON_IsObject(perf)) {
-        cJSON *v;
-        if ((v = cJSON_GetObjectItem(perf, "frequency"))   && cJSON_IsNumber(v))
-            cJSON_AddNumberToObject(flat, "frequency",   v->valuedouble);
-        if ((v = cJSON_GetObjectItem(perf, "coreVoltage")) && cJSON_IsNumber(v))
-            cJSON_AddNumberToObject(flat, "coreVoltage", v->valuedouble);
-        if ((v = cJSON_GetObjectItem(perf, "powerLimit"))  && cJSON_IsNumber(v))
-            cJSON_AddNumberToObject(flat, "powerLimit",  v->valuedouble);
-    }
-
-    if (cJSON_IsObject(thermal)) {
-        cJSON *v;
-        if ((v = cJSON_GetObjectItem(thermal, "autoFanSpeed"))   && cJSON_IsBool(v))
-            cJSON_AddBoolToObject(flat, "autofanspeed",   cJSON_IsTrue(v));
-        if ((v = cJSON_GetObjectItem(thermal, "minFanSpeed"))    && cJSON_IsNumber(v))
-            cJSON_AddNumberToObject(flat, "minFanSpeed",  v->valuedouble);
-        if ((v = cJSON_GetObjectItem(thermal, "manualFanSpeed")) && cJSON_IsNumber(v))
-            cJSON_AddNumberToObject(flat, "manualFanSpeed", v->valuedouble);
-        if ((v = cJSON_GetObjectItem(thermal, "targetTemp"))     && cJSON_IsNumber(v))
-            cJSON_AddNumberToObject(flat, "temptarget",   v->valuedouble);
-    }
-
-    if (cJSON_IsArray(pools) && cJSON_GetArraySize(pools) > 0) {
-        cJSON *p0    = cJSON_GetArrayItem(pools, 0);
-        cJSON *url0  = cJSON_GetObjectItem(p0, "url");
-        cJSON *user0 = cJSON_GetObjectItem(p0, "username");
-        cJSON *pass0 = cJSON_GetObjectItem(p0, "password");
-
-        if (cJSON_IsString(url0)) {
-            const char *raw_url    = url0->valuestring;
-            const char *host_start = strstr(raw_url, "://");
-            host_start = host_start ? host_start + 3 : raw_url;
-            const char *colon = strrchr(host_start, ':');
-            if (colon) {
-                char host[128] = "";
-                int  port = atoi(colon + 1);
-                int  hlen = (int)(colon - host_start);
-                if (hlen > 0 && hlen < (int)sizeof(host)) {
-                    memcpy(host, host_start, hlen);
-                    host[hlen] = '\0';
-                    cJSON_AddStringToObject(flat, "stratumURL",  host);
-                    cJSON_AddNumberToObject(flat, "stratumPort", port);
-                }
-            } else {
-                cJSON_AddStringToObject(flat, "stratumURL", host_start);
-            }
-        }
-        if (cJSON_IsString(user0)) cJSON_AddStringToObject(flat, "stratumUser",     user0->valuestring);
-        if (cJSON_IsString(pass0)) cJSON_AddStringToObject(flat, "stratumPassword", pass0->valuestring);
-
-        if (cJSON_GetArraySize(pools) > 1) {
-            cJSON *p1    = cJSON_GetArrayItem(pools, 1);
-            cJSON *url1  = cJSON_GetObjectItem(p1, "url");
-            cJSON *user1 = cJSON_GetObjectItem(p1, "username");
-            cJSON *pass1 = cJSON_GetObjectItem(p1, "password");
-            if (cJSON_IsString(url1)) {
-                const char *raw_url    = url1->valuestring;
-                const char *host_start = strstr(raw_url, "://");
-                host_start = host_start ? host_start + 3 : raw_url;
-                const char *colon = strrchr(host_start, ':');
-                if (colon) {
-                    char host[128] = "";
-                    int  port = atoi(colon + 1);
-                    int  hlen = (int)(colon - host_start);
-                    if (hlen > 0 && hlen < (int)sizeof(host)) {
-                        memcpy(host, host_start, hlen);
-                        host[hlen] = '\0';
-                        cJSON_AddStringToObject(flat, "fallbackStratumURL",  host);
-                        cJSON_AddNumberToObject(flat, "fallbackStratumPort", port);
-                    }
-                }
-            }
-            if (cJSON_IsString(user1)) cJSON_AddStringToObject(flat, "fallbackStratumUser",     user1->valuestring);
-            if (cJSON_IsString(pass1)) cJSON_AddStringToObject(flat, "fallbackStratumPassword", pass1->valuestring);
+    /* Parse ports array from payload; default to [80, 4028]. */
+    cJSON *ports_item = cJSON_GetObjectItem(payload, "ports");
+    int port_list[16];
+    int port_count = 0;
+    if (cJSON_IsArray(ports_item)) {
+        int n = cJSON_GetArraySize(ports_item);
+        if (n > 16) n = 16;
+        for (int pi = 0; pi < n; pi++) {
+            cJSON *p = cJSON_GetArrayItem(ports_item, pi);
+            if (cJSON_IsNumber(p))
+                port_list[port_count++] = (int)p->valuedouble;
         }
     }
-
-    if (cJSON_IsObject(raw)) {
-        cJSON *item = NULL;
-        cJSON_ArrayForEach(item, raw) {
-            cJSON_AddItemToObject(flat, item->string, cJSON_Duplicate(item, true));
-        }
+    if (port_count == 0) {
+        port_list[0] = 80;
+        port_list[1] = 4028;
+        port_count   = 2;
     }
 
-    return flat;
-}
-
-static void handle_miner_command(const char *command_id, const char *cmd_type, cJSON *payload)
-{
-    cJSON      *mac_item   = cJSON_GetObjectItem(payload, "macAddress");
-    const char *target_mac = cJSON_IsString(mac_item) ? mac_item->valuestring : "";
-
-    const char *target_ip = NULL;
-    for (int i = 0; i < g_gw->peer_count; i++) {
-        if (strcasecmp(g_gw->peers[i].mac_addr, target_mac) == 0) {
-            target_ip = g_gw->peers[i].ip;
-            break;
-        }
-    }
-
-    if (!target_ip || !target_ip[0]) {
-        if (command_id)
-            send_command_result(command_id, false, NULL, "No IP for target miner", false);
-        return;
-    }
-
-    if (command_id) send_command_ack(command_id);
-
-    MinerType target_type = MINER_TYPE_UNKNOWN;
-    for (int i = 0; i < g_gw->peer_count; i++) {
-        if (strcasecmp(g_gw->peers[i].mac_addr, target_mac) == 0 ||
-            strcmp(g_gw->peers[i].ip, target_ip) == 0) {
-            target_type = g_gw->peers[i].type;
-            break;
-        }
-    }
-    if (target_type == MINER_TYPE_UNKNOWN) {
-        cJSON *adp = cJSON_GetObjectItem(payload, "adapter");
-        if (cJSON_IsString(adp))
-            target_type = miner_type_from_string(adp->valuestring);
-    }
-
-    /* ── Canaan / Avalon: cgminer TCP protocol ──────────────────────────── */
-    if (target_type == MINER_TYPE_CANAAN) {
-        char *resp_buf = (char *)platform_malloc_large(4096);
-        if (!resp_buf) {
-            if (command_id)
-                send_command_result(command_id, false, NULL, "Out of memory", false);
-            return;
-        }
-
-        if (strcmp(cmd_type, "RESTART") == 0) {
-            platform_tcp_send_recv(target_ip, 4028,
-                "{\"command\":\"ascset\",\"parameter\":\"0,reboot,0\"}",
-                resp_buf, 4096, 5000);
-            if (command_id) send_command_result(command_id, true, NULL, NULL, false);
-
-        } else if (strcmp(cmd_type, "IDENTIFY") == 0) {
-            platform_tcp_send_recv(target_ip, 4028,
-                "{\"command\":\"ascidentify\",\"parameter\":\"0\"}",
-                resp_buf, 4096, 5000);
-            if (command_id) send_command_result(command_id, true, NULL, NULL, false);
-
-        } else if (strcmp(cmd_type, "GET_CONFIG") == 0) {
-            cJSON *config_result = cJSON_CreateObject();
-            cJSON_AddBoolToObject(config_result, "cgminer", true);
-
-            if (platform_tcp_send_recv(target_ip, 4028, "{\"command\":\"version\"}", resp_buf, 4096, 5000)) {
-                cJSON *rv = cJSON_Parse(resp_buf);
-                if (rv) {
-                    cJSON *arr = cJSON_GetObjectItem(rv, "VERSION");
-                    if (cJSON_IsArray(arr) && cJSON_GetArraySize(arr) > 0) {
-                        cJSON *prod = cJSON_GetObjectItem(cJSON_GetArrayItem(arr, 0), "PROD");
-                        if (cJSON_IsString(prod))
-                            cJSON_AddStringToObject(config_result, "model", prod->valuestring);
-                    }
-                    cJSON_Delete(rv);
-                }
-            }
-            if (platform_tcp_send_recv(target_ip, 4028, "{\"command\":\"pools\"}", resp_buf, 4096, 5000)) {
-                cJSON *rp = cJSON_Parse(resp_buf);
-                if (rp) {
-                    cJSON *parr = cJSON_GetObjectItem(rp, "POOLS");
-                    if (cJSON_IsArray(parr)) {
-                        cJSON *out_pools = cJSON_CreateArray();
-                        cJSON *pool;
-                        cJSON_ArrayForEach(pool, parr) {
-                            cJSON *po  = cJSON_CreateObject();
-                            cJSON *u   = cJSON_GetObjectItem(pool, "URL");
-                            cJSON *usr = cJSON_GetObjectItem(pool, "User");
-                            if (cJSON_IsString(u))   cJSON_AddStringToObject(po, "url",      u->valuestring);
-                            if (cJSON_IsString(usr)) cJSON_AddStringToObject(po, "username", usr->valuestring);
-                            cJSON_AddItemToArray(out_pools, po);
-                        }
-                        cJSON_AddItemToObject(config_result, "pools", out_pools);
-                    }
-                    cJSON_Delete(rp);
-                }
-            }
-            if (platform_tcp_send_recv(target_ip, 4028, "{\"command\":\"estats\"}", resp_buf, 4096, 5000)) {
-                cJSON *re = cJSON_Parse(resp_buf);
-                if (re) {
-                    cJSON *sarr = cJSON_GetObjectItem(re, "STATS");
-                    if (cJSON_IsArray(sarr) && cJSON_GetArraySize(sarr) > 0) {
-                        cJSON *stats = cJSON_GetArrayItem(sarr, 0);
-                        cJSON *mmid0 = cJSON_GetObjectItem(stats, "MM ID0");
-                        if (!cJSON_IsString(mmid0))
-                            mmid0 = cJSON_GetObjectItem(stats, "MM ID0:Summary");
-                        if (cJSON_IsString(mmid0)) {
-                            char val[64];
-                            if (mmget(mmid0->valuestring, "Freq",      val, sizeof(val))) cJSON_AddNumberToObject(config_result, "frequency",  atof(val));
-                            if (mmget(mmid0->valuestring, "WORKMODE",  val, sizeof(val))) cJSON_AddNumberToObject(config_result, "workMode",   atoi(val));
-                            if (mmget(mmid0->valuestring, "WORKLEVEL", val, sizeof(val))) cJSON_AddNumberToObject(config_result, "workLevel",  atoi(val));
-                            if (mmget(mmid0->valuestring, "MPO",       val, sizeof(val))) cJSON_AddNumberToObject(config_result, "powerLimit", atof(val));
-                            if (mmget(mmid0->valuestring, "TarT",      val, sizeof(val))) cJSON_AddNumberToObject(config_result, "targetTemp", atof(val));
-                            if (mmget(mmid0->valuestring, "FanR",      val, sizeof(val))) cJSON_AddNumberToObject(config_result, "fanSpeed",   atoi(val));
-                        }
-                    }
-                    cJSON_Delete(re);
-                }
-            }
-            if (command_id) send_command_result(command_id, true, config_result, NULL, false);
-
-        } else if (strcmp(cmd_type, "SET_CONFIG") == 0) {
-            cJSON *config      = cJSON_GetObjectItem(payload, "config");
-            bool  needs_reboot = false;
-
-            if (cJSON_IsObject(config)) {
-                cJSON *perf    = cJSON_GetObjectItem(config, "performance");
-                cJSON *thermal = cJSON_GetObjectItem(config, "thermal");
-                cJSON *pools   = cJSON_GetObjectItem(config, "pools");
-
-                if (cJSON_IsObject(perf)) {
-                    cJSON *wm = cJSON_GetObjectItem(perf, "workMode");
-                    if (cJSON_IsNumber(wm)) {
-                        char cmd[128];
-                        snprintf(cmd, sizeof(cmd), "{\"command\":\"ascset\",\"parameter\":\"0,workmode,set,%d\"}", wm->valueint);
-                        platform_tcp_send_recv(target_ip, 4028, cmd, resp_buf, 4096, 5000);
-                        needs_reboot = true;
-                    }
-                    cJSON *wl = cJSON_GetObjectItem(perf, "workLevel");
-                    if (cJSON_IsNumber(wl)) {
-                        char cmd[128];
-                        snprintf(cmd, sizeof(cmd), "{\"command\":\"ascset\",\"parameter\":\"0,worklevel,set,%d\"}", wl->valueint);
-                        platform_tcp_send_recv(target_ip, 4028, cmd, resp_buf, 4096, 5000);
-                        needs_reboot = true;
-                    }
-                }
-                if (cJSON_IsObject(thermal)) {
-                    cJSON *fs = cJSON_GetObjectItem(thermal, "minFanSpeed");
-                    if (cJSON_IsNumber(fs)) {
-                        char cmd[128];
-                        snprintf(cmd, sizeof(cmd), "{\"command\":\"ascset\",\"parameter\":\"0,fan-spd,%d\"}", fs->valueint);
-                        platform_tcp_send_recv(target_ip, 4028, cmd, resp_buf, 4096, 5000);
-                    }
-                }
-                if (cJSON_IsArray(pools)) {
-                    int pcount = cJSON_GetArraySize(pools);
-                    for (int p = 0; p < pcount; p++) {
-                        cJSON *pool = cJSON_GetArrayItem(pools, p);
-                        cJSON *url  = cJSON_GetObjectItem(pool, "url");
-                        cJSON *user = cJSON_GetObjectItem(pool, "username");
-                        cJSON *pass = cJSON_GetObjectItem(pool, "password");
-                        if (cJSON_IsString(url) && cJSON_IsString(user)) {
-                            char cmd[512];
-                            snprintf(cmd, sizeof(cmd),
-                                "{\"command\":\"setpool\",\"parameter\":\"admin,admin,%d,%s,%s,%s\"}",
-                                p, url->valuestring, user->valuestring,
-                                cJSON_IsString(pass) ? pass->valuestring : "");
-                            platform_tcp_send_recv(target_ip, 4028, cmd, resp_buf, 4096, 5000);
-                        }
-                    }
-                    needs_reboot = true;
-                }
-                if (needs_reboot) {
-                    platform_delay_ms(500);
-                    platform_tcp_send_recv(target_ip, 4028,
-                        "{\"command\":\"ascset\",\"parameter\":\"0,reboot,0\"}",
-                        resp_buf, 4096, 5000);
-                }
-            }
-            if (command_id) send_command_result(command_id, true, NULL, NULL, false);
-
-        } else {
-            GW_LOGW(TAG, "Unsupported Canaan command: %s", cmd_type);
-            if (command_id)
-                send_command_result(command_id, false, NULL, "Unsupported command for Canaan miner", false);
-        }
-
-        free(resp_buf);
-        return;
-    }
-
-    /* ── AxeOS / Hammer / Nerd: HTTP ────────────────────────────────────── */
-    char        url[128];
-    const char *method    = "POST";
-    char       *post_data = NULL;
-
-    if (strcmp(cmd_type, "RESTART") == 0) {
-        snprintf(url, sizeof(url), "http://%s/api/system/restart", target_ip);
-    } else if (strcmp(cmd_type, "IDENTIFY") == 0) {
-        snprintf(url, sizeof(url), "http://%s/api/system/identify", target_ip);
-    } else if (strcmp(cmd_type, "GET_CONFIG") == 0) {
-        snprintf(url, sizeof(url), "http://%s/api/system/info", target_ip);
-        method = "GET";
-    } else if (strcmp(cmd_type, "SET_CONFIG") == 0) {
-        snprintf(url, sizeof(url), "http://%s/api/system", target_ip);
-        method = "PATCH";
-        cJSON *config = cJSON_GetObjectItem(payload, "config");
-        if (cJSON_IsObject(config)) {
-            cJSON *flat = flatten_axeos_config(config);
-            post_data = cJSON_PrintUnformatted(flat);
-            cJSON_Delete(flat);
-        }
+    /* Resolve CIDR: use payload field or fall back to local LAN. */
+    char cidr_buf[32] = "";
+    cJSON *cidr_item = cJSON_GetObjectItem(payload, "cidr");
+    if (cJSON_IsString(cidr_item) && cidr_item->valuestring[0]) {
+        strncpy(cidr_buf, cidr_item->valuestring, sizeof(cidr_buf) - 1);
     } else {
-        GW_LOGW(TAG, "Unknown command type: %s", cmd_type);
-        if (command_id)
-            send_command_result(command_id, false, NULL, "Unknown command", false);
+        char local_ip[16] = "", netmask[16] = "";
+        platform_get_local_ip(local_ip, sizeof(local_ip));
+        platform_get_netmask(netmask, sizeof(netmask));
+
+        uint32_t mask = 0, ip4 = 0;
+        parse_ipv4(netmask, &mask);
+        parse_ipv4(local_ip, &ip4);
+
+        int prefix = 0;
+        uint32_t m = mask;
+        while (m & 0x80000000u) { prefix++; m <<= 1; }
+
+        uint32_t net = ip4 & mask;
+        ip_to_str(net, cidr_buf, sizeof(cidr_buf));
+        int len = (int)strlen(cidr_buf);
+        snprintf(cidr_buf + len, sizeof(cidr_buf) - len, "/%d", prefix);
+    }
+
+    GW_LOGI(TAG, "Starting scan: %s (%d ports)", cidr_buf, port_count);
+
+    /* Parse CIDR */
+    uint32_t base_ip = 0;
+    int prefix = 24;
+    char ip_part[16] = "";
+    const char *slash = strchr(cidr_buf, '/');
+    if (slash) {
+        int hlen = (int)(slash - cidr_buf);
+        if (hlen > 0 && hlen < (int)sizeof(ip_part)) {
+            memcpy(ip_part, cidr_buf, hlen);
+            ip_part[hlen] = '\0';
+        }
+        prefix = atoi(slash + 1);
+    } else {
+        strncpy(ip_part, cidr_buf, sizeof(ip_part) - 1);
+    }
+    parse_ipv4(ip_part, &base_ip);
+
+    if (prefix < 16 || prefix > 30) prefix = 24;  /* safety clamp */
+    uint32_t host_bits = (uint32_t)(32 - prefix);
+    uint32_t num_hosts = (1u << host_bits) - 2u;   /* exclude net + broadcast */
+    uint32_t net_addr  = base_ip & ~((1u << host_bits) - 1u);
+
+    int found = 0;
+    char ip_str[16];
+    char port_key[8];
+
+    for (uint32_t i = 1; i <= num_hosts; i++) {
+        if (g_gw->scan_state.stop_requested) break;
+
+        ip_to_str(net_addr + i, ip_str, sizeof(ip_str));
+
+        bool results[16];
+        bool any_open = false;
+        for (int pi = 0; pi < port_count; pi++) {
+            if (g_gw->scan_state.stop_requested) {
+                results[pi] = false;
+            } else {
+                results[pi] = platform_tcp_probe(ip_str, port_list[pi], 20);
+                if (results[pi]) any_open = true;
+            }
+        }
+
+        if (any_open) {
+            cJSON *r     = cJSON_CreateObject();
+            cJSON *ports = cJSON_CreateObject();
+            cJSON_AddStringToObject(r, "ip", ip_str);
+            for (int pi = 0; pi < port_count; pi++) {
+                snprintf(port_key, sizeof(port_key), "%d", port_list[pi]);
+                cJSON_AddBoolToObject(ports, port_key, results[pi]);
+            }
+            cJSON_AddItemToObject(r, "ports", ports);
+            send_command_result(command_id, true, r, NULL, true);
+            found++;
+            GW_LOGI(TAG, "Probe %s: alive", ip_str);
+        }
+    }
+
+    g_gw->scan_state.scanning = false;
+    GW_LOGI(TAG, "Scan done: %d hosts (of %" PRIu32 ")", found, num_hosts);
+
+    cJSON *diag = cJSON_CreateObject();
+    cJSON_AddNumberToObject(diag, "totalFound", found);
+    cJSON_AddNumberToObject(diag, "freeHeap",   (double)platform_get_free_heap());
+    send_command_result(command_id, true, diag, NULL, false);
+}
+
+/* HTTP_REQUEST — one HTTP call, result: { status, body }. */
+static void handle_http_request(const char *command_id, cJSON *payload)
+{
+    cJSON *ip_item      = cJSON_GetObjectItem(payload, "ip");
+    cJSON *port_item    = cJSON_GetObjectItem(payload, "port");
+    cJSON *method_item  = cJSON_GetObjectItem(payload, "method");
+    cJSON *path_item    = cJSON_GetObjectItem(payload, "path");
+    cJSON *body_item    = cJSON_GetObjectItem(payload, "body");
+    cJSON *timeout_item = cJSON_GetObjectItem(payload, "timeoutMs");
+
+    const char *ip        = cJSON_IsString(ip_item)     ? ip_item->valuestring    : "";
+    int         port      = cJSON_IsNumber(port_item)   ? (int)port_item->valuedouble : 80;
+    const char *method    = cJSON_IsString(method_item) ? method_item->valuestring : "GET";
+    const char *path      = cJSON_IsString(path_item)   ? path_item->valuestring  : "/";
+    const char *body      = cJSON_IsString(body_item)   ? body_item->valuestring  : NULL;
+    int         timeout_ms = cJSON_IsNumber(timeout_item) ? (int)timeout_item->valuedouble : 10000;
+
+    if (!ip[0]) {
+        send_command_result(command_id, false, NULL, "Missing ip", false);
+        return;
+    }
+
+    char url[256];
+    snprintf(url, sizeof(url), "http://%s:%d%s", ip, port, path);
+
+    char *resp_buf = (char *)platform_malloc_large(8192);
+    if (!resp_buf) {
+        send_command_result(command_id, false, NULL, "Out of memory", false);
+        return;
+    }
+
+    int status = platform_http_request(url, method, body, resp_buf, 8192, timeout_ms);
+    if (status < 0) {
+        free(resp_buf);
+        char err[128];
+        snprintf(err, sizeof(err), "HTTP %.10s %.100s failed", method, url);
+        send_command_result(command_id, false, NULL, err, false);
+        return;
+    }
+
+    cJSON *result = cJSON_CreateObject();
+    cJSON_AddNumberToObject(result, "status", status);
+    cJSON_AddStringToObject(result, "body",   resp_buf);
+    free(resp_buf);
+
+    GW_LOGD(TAG, "HTTP %s %s -> %d", method, url, status);
+    send_command_result(command_id, true, result, NULL, false);
+}
+
+/* TCP_REQUEST — one send+recv, result: { body }. */
+static void handle_tcp_request(const char *command_id, cJSON *payload)
+{
+    cJSON *ip_item      = cJSON_GetObjectItem(payload, "ip");
+    cJSON *port_item    = cJSON_GetObjectItem(payload, "port");
+    cJSON *data_item    = cJSON_GetObjectItem(payload, "data");
+    cJSON *timeout_item = cJSON_GetObjectItem(payload, "timeoutMs");
+
+    const char *ip        = cJSON_IsString(ip_item)     ? ip_item->valuestring    : "";
+    int         port      = cJSON_IsNumber(port_item)   ? (int)port_item->valuedouble : 4028;
+    const char *data      = cJSON_IsString(data_item)   ? data_item->valuestring  : "";
+    int         timeout_ms = cJSON_IsNumber(timeout_item) ? (int)timeout_item->valuedouble : 8000;
+
+    if (!ip[0]) {
+        send_command_result(command_id, false, NULL, "Missing ip", false);
         return;
     }
 
     char *recv_buf = (char *)platform_malloc_large(4096);
     if (!recv_buf) {
-        if (post_data) free(post_data);
+        send_command_result(command_id, false, NULL, "Out of memory", false);
         return;
     }
 
-    int  status  = platform_http_request(url, method, post_data, recv_buf, 4096, 10000);
-    bool success = (status >= 200 && status < 300);
-    if (post_data) free(post_data);
+    bool ok = platform_tcp_send_recv(ip, port, data, recv_buf, 4096, timeout_ms);
+    if (!ok) {
+        free(recv_buf);
+        char err[64];
+        snprintf(err, sizeof(err), "TCP %s:%d failed", ip, port);
+        send_command_result(command_id, false, NULL, err, false);
+        return;
+    }
 
-    if (command_id) {
-        if (!success) {
-            char err_msg[64];
-            snprintf(err_msg, sizeof(err_msg), "HTTP %d", status);
-            send_command_result(command_id, false, NULL, err_msg, false);
-        } else {
-            cJSON *resp_json = recv_buf[0] ? cJSON_Parse(recv_buf) : NULL;
-            send_command_result(command_id, true, resp_json, NULL, false);
+    cJSON *result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "body", recv_buf);
+    free(recv_buf);
+
+    GW_LOGD(TAG, "TCP %s:%d -> ok", ip, port);
+    send_command_result(command_id, true, result, NULL, false);
+}
+
+/* MAC_LOOKUP — find IP for a MAC via ARP; optionally sweep CIDRs first. */
+static void handle_mac_lookup(const char *command_id, cJSON *payload)
+{
+    cJSON *mac_item   = cJSON_GetObjectItem(payload, "mac");
+    cJSON *cidrs_item = cJSON_GetObjectItem(payload, "cidrs");
+    const char *mac   = cJSON_IsString(mac_item) ? mac_item->valuestring : NULL;
+
+    if (!mac || !mac[0]) {
+        send_command_result(command_id, false, NULL, "Missing mac", false);
+        return;
+    }
+
+    char ip_buf[16] = "";
+    bool found = platform_arp_mac_to_ip(mac, ip_buf, sizeof(ip_buf));
+
+    /* If not in ARP cache and CIDRs provided, TCP-probe each host to warm cache. */
+    if (!found && cJSON_IsArray(cidrs_item)) {
+        int n = cJSON_GetArraySize(cidrs_item);
+        for (int ci = 0; ci < n && !found; ci++) {
+            cJSON *ci_item = cJSON_GetArrayItem(cidrs_item, ci);
+            if (!cJSON_IsString(ci_item)) continue;
+
+            const char *cidr = ci_item->valuestring;
+            char ip_part[16] = "";
+            int prefix = 24;
+            const char *slash = strchr(cidr, '/');
+            if (slash) {
+                int hlen = (int)(slash - cidr);
+                if (hlen > 0 && hlen < (int)sizeof(ip_part)) {
+                    memcpy(ip_part, cidr, hlen);
+                    ip_part[hlen] = '\0';
+                }
+                prefix = atoi(slash + 1);
+            } else {
+                strncpy(ip_part, cidr, sizeof(ip_part) - 1);
+            }
+
+            uint32_t base_ip = 0;
+            parse_ipv4(ip_part, &base_ip);
+            if (prefix < 16 || prefix > 30) prefix = 24;
+            uint32_t host_bits = (uint32_t)(32 - prefix);
+            uint32_t num_hosts = (1u << host_bits) - 2u;
+            uint32_t net_addr  = base_ip & ~((1u << host_bits) - 1u);
+
+            char host_str[16];
+            GW_LOGI(TAG, "MAC_LOOKUP: ARP sweep %s (%" PRIu32 " hosts)", cidr, num_hosts);
+            for (uint32_t i = 1; i <= num_hosts; i++) {
+                ip_to_str(net_addr + i, host_str, sizeof(host_str));
+                platform_tcp_probe(host_str, 80, 50);  /* warms ARP cache */
+            }
+            found = platform_arp_mac_to_ip(mac, ip_buf, sizeof(ip_buf));
         }
     }
 
-    free(recv_buf);
-    GW_LOGI(TAG, "%s -> %s: %s (HTTP %d)", cmd_type, target_ip, success ? "OK" : "FAIL", status);
+    cJSON *result = cJSON_CreateObject();
+    if (found)
+        cJSON_AddStringToObject(result, "ip", ip_buf);
+    else
+        cJSON_AddNullToObject(result, "ip");
+
+    GW_LOGI(TAG, "MAC_LOOKUP %s -> %s", mac, found ? ip_buf : "not found");
+    send_command_result(command_id, true, result, NULL, false);
+}
+
+/* IP_LOOKUP — find MAC for an IP via ARP table. */
+static void handle_ip_lookup(const char *command_id, cJSON *payload)
+{
+    cJSON *ip_item  = cJSON_GetObjectItem(payload, "ip");
+    const char *ip  = cJSON_IsString(ip_item) ? ip_item->valuestring : NULL;
+
+    if (!ip || !ip[0]) {
+        send_command_result(command_id, false, NULL, "Missing ip", false);
+        return;
+    }
+
+    char mac_buf[18] = "";
+    bool found = platform_arp_ip_to_mac(ip, mac_buf, sizeof(mac_buf));
+
+    cJSON *result = cJSON_CreateObject();
+    if (found)
+        cJSON_AddStringToObject(result, "mac", mac_buf);
+    else
+        cJSON_AddNullToObject(result, "mac");
+
+    GW_LOGI(TAG, "IP_LOOKUP %s -> %s", ip, found ? mac_buf : "not found");
+    send_command_result(command_id, true, result, NULL, false);
 }
 
 /* ── onCommand subscription callback ─────────────────────────────────────── */
@@ -683,28 +451,28 @@ static void on_command_event(wslink_result_type_t type, cJSON *data,
     case WSLINK_RESULT_DATA:
         if (!cJSON_IsObject(data)) break;
         {
-            cJSON      *id_item   = cJSON_GetObjectItem(data, "id");
+            cJSON      *id_item   = cJSON_GetObjectItem(data, "commandId");
             cJSON      *type_item = cJSON_GetObjectItem(data, "type");
-            cJSON      *payload   = cJSON_GetObjectItem(data, "payload");
             const char *command_id = cJSON_IsString(id_item)   ? id_item->valuestring   : NULL;
             const char *cmd_type   = cJSON_IsString(type_item) ? type_item->valuestring : "";
 
             GW_LOGI(TAG, "Command: %s (id=%s)", cmd_type, command_id ? command_id : "?");
 
-            if (!cJSON_IsObject(payload)) payload = data;   /* fallback */
+            if (!command_id) {
+                GW_LOGW(TAG, "Command missing commandId, ignoring");
+                break;
+            }
 
-            if (strcmp(cmd_type, "POLL_MINERS") == 0) {
-                handle_poll_miners(command_id, payload);
-            } else if (strcmp(cmd_type, "SCAN_IP_RANGE") == 0) {
-                handle_scan_ip_range(command_id, payload);
-            } else if (strcmp(cmd_type, "STOP_SCAN") == 0) {
-                handle_stop_scan(command_id, payload);
-            } else if (strcmp(cmd_type, "RESTART")    == 0 ||
-                       strcmp(cmd_type, "GET_CONFIG") == 0 ||
-                       strcmp(cmd_type, "SET_CONFIG") == 0 ||
-                       strcmp(cmd_type, "IDENTIFY")   == 0 ||
-                       strcmp(cmd_type, "GET_STATS")  == 0) {
-                handle_miner_command(command_id, cmd_type, payload);
+            if (strcmp(cmd_type, "SCAN_IP_RANGE") == 0) {
+                handle_scan_ip_range(command_id, data);
+            } else if (strcmp(cmd_type, "HTTP_REQUEST") == 0) {
+                handle_http_request(command_id, data);
+            } else if (strcmp(cmd_type, "TCP_REQUEST") == 0) {
+                handle_tcp_request(command_id, data);
+            } else if (strcmp(cmd_type, "MAC_LOOKUP") == 0) {
+                handle_mac_lookup(command_id, data);
+            } else if (strcmp(cmd_type, "IP_LOOKUP") == 0) {
+                handle_ip_lookup(command_id, data);
             } else {
                 GW_LOGD(TAG, "Ignoring command type: %s", cmd_type);
             }
@@ -743,7 +511,7 @@ void gateway_core_init(const GatewayConfig *cfg, GatewayModule *gw_module)
     g_wslink = wslink_create(&wslink_cfg);
 
     /* Register the onCommand subscription once; wslink replays it on every
-     * reconnect, so we never need to call this again. */
+     * reconnect automatically. */
     wslink_subscribe(g_wslink, "client.onCommand", on_command_event, NULL);
 }
 
@@ -768,8 +536,6 @@ void gateway_core_run(void)
         connect_attempts++;
         GW_LOGI(TAG, "Connecting (attempt %d, heap=%u)", connect_attempts, (unsigned)free_heap);
 
-        /* wslink_prepare_url mirrors prepareUrl() from utils.ts:
-         * appends ?connectionParams=1 when the client has connection params. */
         char connect_url[512];
         wslink_prepare_url(g_wslink, g_cfg.url, connect_url, sizeof(connect_url));
         GW_LOGI(TAG, "Connecting to: %s", connect_url);
@@ -789,9 +555,6 @@ void gateway_core_run(void)
 
         connect_attempts = 0;
 
-        /* Main service loop — platform_ws_service() drains the message queue
-         * and calls gateway_core_on_message() → wslink_on_message() for each
-         * incoming frame. */
         int tick = 0;
         while (platform_ws_is_connected()) {
             platform_ws_service();
@@ -801,7 +564,6 @@ void gateway_core_run(void)
                 GW_LOGI(TAG, "Connected (auth=%s, heap=%u)",
                         g_authenticated ? "yes" : "pending",
                         (unsigned)platform_get_free_heap());
-
                 tick = 0;
             }
         }

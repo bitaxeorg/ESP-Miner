@@ -32,13 +32,12 @@ add_executable(gateway
 
     # Portable gateway core
     ../../src/gateway_core.c
-    ../../src/miner_adapter.c
     ../../src/wslink.c
 )
 
 # ── Include dirs ─────────────────────────────────────────────────────────────
 target_include_directories(gateway PRIVATE
-    ../../include          # gateway_types.h, gateway_core.h, gateway_platform.h, miner_adapter.h
+    ../../include          # gateway_types.h, gateway_core.h, gateway_platform.h
     ${LWS_INCLUDE_DIRS}
     ${CURL_INCLUDE_DIRS}
     ${CJSON_INCLUDE_DIRS}

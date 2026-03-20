@@ -187,6 +187,107 @@ void platform_get_hostname(char *buf, size_t buf_size)
     buf[buf_size - 1] = '\0';
 }
 
+// ── ARP ──────────────────────────────────────────────────────────────────────
+
+/* Normalize a MAC string to uppercase colon form for comparison. */
+static void normalize_mac(const char *in, char *out, size_t out_size)
+{
+    int fields[6] = {0};
+    if (sscanf(in, "%x:%x:%x:%x:%x:%x",
+               &fields[0], &fields[1], &fields[2],
+               &fields[3], &fields[4], &fields[5]) == 6) {
+        snprintf(out, out_size, "%02X:%02X:%02X:%02X:%02X:%02X",
+                 fields[0], fields[1], fields[2],
+                 fields[3], fields[4], fields[5]);
+    } else {
+        strncpy(out, in, out_size - 1);
+        out[out_size - 1] = '\0';
+    }
+}
+
+/* Parse one line of `arp -an` output: "? (IP) at MAC on iface ..."
+ * Returns true and fills ip_out / mac_out if the line is valid. */
+static bool parse_arp_line(const char *line, char *ip_out, char *mac_out)
+{
+    /* Expected: ? (192.168.1.1) at aa:bb:cc:dd:ee:ff on en0 ... */
+    const char *lp = strchr(line, '(');
+    const char *rp = lp ? strchr(lp, ')') : NULL;
+    if (!lp || !rp) return false;
+
+    int iplen = (int)(rp - lp - 1);
+    if (iplen <= 0 || iplen >= 16) return false;
+    memcpy(ip_out, lp + 1, iplen);
+    ip_out[iplen] = '\0';
+
+    const char *at = strstr(rp, " at ");
+    if (!at) return false;
+    at += 4;
+
+    /* Skip "incomplete" entries */
+    if (strncmp(at, "(incomplete)", 12) == 0) return false;
+
+    int mlen = 0;
+    while (at[mlen] && at[mlen] != ' ' && at[mlen] != '\n') mlen++;
+    if (mlen < 11 || mlen >= 18) return false;
+    memcpy(mac_out, at, mlen);
+    mac_out[mlen] = '\0';
+    return true;
+}
+
+bool platform_arp_mac_to_ip(const char *mac, char *ip_buf, size_t ip_buf_size)
+{
+    char norm_target[18];
+    normalize_mac(mac, norm_target, sizeof(norm_target));
+
+    FILE *fp = popen("arp -an 2>/dev/null", "r");
+    if (!fp) return false;
+
+    char line[256], ip[16], entry_mac[18], norm_entry[18];
+    bool found = false;
+
+    while (fgets(line, sizeof(line), fp)) {
+        if (!parse_arp_line(line, ip, entry_mac)) continue;
+        normalize_mac(entry_mac, norm_entry, sizeof(norm_entry));
+        if (strcmp(norm_entry, norm_target) == 0) {
+            strncpy(ip_buf, ip, ip_buf_size - 1);
+            ip_buf[ip_buf_size - 1] = '\0';
+            found = true;
+            break;
+        }
+    }
+    pclose(fp);
+    return found;
+}
+
+bool platform_arp_ip_to_mac(const char *ip, char *mac_buf, size_t mac_buf_size)
+{
+    /* Ping first to ensure an ARP entry exists */
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "ping -c1 -t1 %s > /dev/null 2>&1", ip);
+    system(cmd);
+
+    snprintf(cmd, sizeof(cmd), "arp -n %s 2>/dev/null", ip);
+    FILE *fp = popen(cmd, "r");
+    if (!fp) return false;
+
+    char line[256], entry_ip[16], entry_mac[18];
+    bool found = false;
+
+    while (fgets(line, sizeof(line), fp)) {
+        if (!parse_arp_line(line, entry_ip, entry_mac)) continue;
+        if (strcmp(entry_ip, ip) == 0) {
+            char norm[18];
+            normalize_mac(entry_mac, norm, sizeof(norm));
+            strncpy(mac_buf, norm, mac_buf_size - 1);
+            mac_buf[mac_buf_size - 1] = '\0';
+            found = true;
+            break;
+        }
+    }
+    pclose(fp);
+    return found;
+}
+
 // ── Memory ───────────────────────────────────────────────────────────────────
 
 void *platform_malloc_large(size_t size)
@@ -733,11 +834,42 @@ bool platform_tcp_send_recv(const char *ip, int port,
     return total > 0;
 }
 
-// ── Self-stats ───────────────────────────────────────────────────────────────
+// ── TCP probe ─────────────────────────────────────────────────────────────────
 
-bool platform_get_self_stats(PeerMinerState *out)
+bool platform_tcp_probe(const char *ip, int port, int timeout_ms)
 {
-    (void)out;
-    // macOS does not mine; gateway_core skips self-reporting when false is returned.
-    return false;
+    struct sockaddr_in dest;
+    memset(&dest, 0, sizeof(dest));
+    dest.sin_family = AF_INET;
+    dest.sin_port   = htons((uint16_t)port);
+    if (inet_pton(AF_INET, ip, &dest.sin_addr) != 1) return false;
+
+    int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock < 0) return false;
+
+    /* Non-blocking connect + select */
+    int flags = fcntl(sock, F_GETFL, 0);
+    fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+
+    connect(sock, (struct sockaddr *)&dest, sizeof(dest)); /* EINPROGRESS expected */
+
+    struct timeval tv = {
+        .tv_sec  = timeout_ms / 1000,
+        .tv_usec = (timeout_ms % 1000) * 1000,
+    };
+    if (tv.tv_sec == 0 && tv.tv_usec == 0) tv.tv_sec = 1;
+
+    fd_set wfds;
+    FD_ZERO(&wfds);
+    FD_SET(sock, &wfds);
+
+    bool connected = false;
+    if (select(sock + 1, NULL, &wfds, NULL, &tv) == 1) {
+        int err = 0;
+        socklen_t len = sizeof(err);
+        getsockopt(sock, SOL_SOCKET, SO_ERROR, &err, &len);
+        connected = (err == 0);
+    }
+    close(sock);
+    return connected;
 }

@@ -60,8 +60,10 @@ INCLUDE_DIRS
     "thermal"
     "power"
 
-PRIV_REQUIRES
+REQUIRES
     "gateway"
+
+PRIV_REQUIRES
     "app_update"
     "driver"
     "esp_adc"

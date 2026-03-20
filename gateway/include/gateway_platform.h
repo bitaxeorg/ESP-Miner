@@ -7,8 +7,8 @@
  *   gateway/esp32/gateway_platform_esp32.c   — ESP32 / ESP-IDF
  *   gateway/macos/gateway_platform_macos.c   — macOS / POSIX
  *
- * The core (gateway_core.c, miner_adapter.c) calls only these symbols
- * and standard C — no platform SDKs leak into core code.
+ * gateway_core.c calls only these symbols and standard C —
+ * no platform SDKs leak into core code.
  */
 
 #include <stdbool.h>
@@ -130,7 +130,7 @@ int platform_http_request(const char *url,
                            char *resp_buf, int buf_size,
                            int timeout_ms);
 
-// ── TCP (cgminer / Canaan) ─────────────────────────────────────────────────
+// ── TCP ────────────────────────────────────────────────────────────────────
 
 /**
  * Open a TCP connection, send send_buf, read the response into recv_buf,
@@ -142,11 +142,24 @@ bool platform_tcp_send_recv(const char *ip, int port,
                              char *recv_buf, int recv_size,
                              int timeout_ms);
 
-// ── Self-stats (optional — only ESP32 mines) ──────────────────────────────
+/**
+ * Attempt a TCP connect to ip:port and return true if it succeeds within
+ * timeout_ms milliseconds (used for SCAN_IP_RANGE port probing).
+ * The connection is closed immediately after the test.
+ */
+bool platform_tcp_probe(const char *ip, int port, int timeout_ms);
+
+// ── ARP ────────────────────────────────────────────────────────────────────
 
 /**
- * Fill *out with this device's own miner stats.
- * Returns false if this platform does not mine (Mac, CI runner, etc.),
- * in which case *out is untouched and the gateway skips self-reporting.
+ * Look up the IP address for a given MAC in the local ARP table.
+ * mac: canonical colon-separated hex string, any case ("AA:BB:CC:DD:EE:FF").
+ * Returns true and fills ip_buf on success; returns false if not found.
  */
-bool platform_get_self_stats(PeerMinerState *out);
+bool platform_arp_mac_to_ip(const char *mac, char *ip_buf, size_t ip_buf_size);
+
+/**
+ * Look up the MAC address for a given IP in the local ARP table.
+ * Returns true and fills mac_buf (uppercase colon form) on success.
+ */
+bool platform_arp_ip_to_mac(const char *ip, char *mac_buf, size_t mac_buf_size);

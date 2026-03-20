@@ -1,4 +1,4 @@
-# Install script for directory: /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos
+# Install script for directory: /Users/work/code/ESP-Miner-Gateway/gateway/platform/macos
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -38,7 +38,7 @@ if(NOT DEFINED CMAKE_OBJDUMP)
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/bin" TYPE EXECUTABLE FILES "/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/gateway")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/bin" TYPE EXECUTABLE FILES "/Users/work/code/ESP-Miner-Gateway/build-gateway-mac/gateway")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/bin/gateway" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/bin/gateway")
     if(CMAKE_INSTALL_DO_STRIP)
@@ -50,7 +50,7 @@ endif()
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/install_local_manifest.txt"
+  file(WRITE "/Users/work/code/ESP-Miner-Gateway/build-gateway-mac/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()
 if(CMAKE_INSTALL_COMPONENT)
@@ -66,6 +66,6 @@ else()
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/${CMAKE_INSTALL_MANIFEST}"
+  file(WRITE "/Users/work/code/ESP-Miner-Gateway/build-gateway-mac/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

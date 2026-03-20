@@ -57,10 +57,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos
+CMAKE_SOURCE_DIR = /Users/work/code/ESP-Miner-Gateway/gateway/platform/macos
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac
+CMAKE_BINARY_DIR = /Users/work/code/ESP-Miner-Gateway/build-gateway-mac
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -132,9 +132,9 @@ install/strip/fast: preinstall/fast
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/CMakeFiles /Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac//CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/work/code/ESP-Miner-Gateway/build-gateway-mac/CMakeFiles /Users/work/code/ESP-Miner-Gateway/build-gateway-mac//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/work/code/hashly/Esp-Miner-Gateway/build-gateway-mac/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/work/code/ESP-Miner-Gateway/build-gateway-mac/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -174,77 +174,53 @@ gateway/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/build
 .PHONY : gateway/fast
 
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.o: Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.o
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.o
+Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.o: Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.o
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.o
 
 # target to build an object file
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.o
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.o
+Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.o
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.o
 
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.i: Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.i
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.i
+Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.i: Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.i
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.i
 
 # target to preprocess a source file
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.i
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.i
+Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.i
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.i
 
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.s: Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.s
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.s
+Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.s: Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.s
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.s
 
 # target to generate assembly for a file
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.s
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.c.s
+Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.s
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.c.s
 
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.o: Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.o
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.o
+Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.o: Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.o
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.o
 
 # target to build an object file
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.o
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.o
+Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.o
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.o
 
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.i: Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.i
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.i
-
-# target to preprocess a source file
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.i
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.i
-
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.s: Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.s
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.s
-
-# target to generate assembly for a file
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.s
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.c.s
-
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.o: Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.o
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.o
-
-# target to build an object file
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.o
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.o
-
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.i: Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.i
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.i
+Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.i: Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.i
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.i
 
 # target to preprocess a source file
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.i
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.i
+Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.i
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.i
 
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.s: Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.s
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.s
+Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.s: Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.s
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.s
 
 # target to generate assembly for a file
-Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.s
-.PHONY : Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.c.s
+Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/gateway.dir/build.make CMakeFiles/gateway.dir/Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.s
+.PHONY : Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.c.s
 
 gateway_main.o: gateway_main.c.o
 .PHONY : gateway_main.o
@@ -307,15 +283,12 @@ help:
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... gateway"
-	@echo "... Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.o"
-	@echo "... Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.i"
-	@echo "... Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/gateway_core.s"
-	@echo "... Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.o"
-	@echo "... Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.i"
-	@echo "... Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/miner_adapter.s"
-	@echo "... Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.o"
-	@echo "... Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.i"
-	@echo "... Users/work/code/hashly/Esp-Miner-Gateway/gateway/src/wslink.s"
+	@echo "... Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.o"
+	@echo "... Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.i"
+	@echo "... Users/work/code/ESP-Miner-Gateway/gateway/src/gateway_core.s"
+	@echo "... Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.o"
+	@echo "... Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.i"
+	@echo "... Users/work/code/ESP-Miner-Gateway/gateway/src/wslink.s"
 	@echo "... gateway_main.o"
 	@echo "... gateway_main.i"
 	@echo "... gateway_main.s"

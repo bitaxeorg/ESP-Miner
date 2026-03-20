@@ -1,6 +1,6 @@
 CMakeFiles/gateway.dir/gateway_platform_macos.c.o: \
-  /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos/gateway_platform_macos.c \
-  /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos/../../include/gateway_platform.h \
+  /Users/work/code/ESP-Miner-Gateway/gateway/platform/macos/gateway_platform_macos.c \
+  /Users/work/code/ESP-Miner-Gateway/gateway/platform/macos/../../include/gateway_platform.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/17/include/stdbool.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/17/include/stdint.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/stdint.h \
@@ -34,7 +34,7 @@ CMakeFiles/gateway.dir/gateway_platform_macos.c.o: \
   /Library/Developer/CommandLineTools/usr/lib/clang/17/include/__stddef_null.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/17/include/__stddef_max_align_t.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/17/include/__stddef_offsetof.h \
-  /Users/work/code/hashly/Esp-Miner-Gateway/gateway/platform/macos/../../include/gateway_types.h \
+  /Users/work/code/ESP-Miner-Gateway/gateway/platform/macos/../../include/gateway_types.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/stdio.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_stdio.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_bounds.h \
