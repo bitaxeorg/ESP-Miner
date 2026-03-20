@@ -19,13 +19,13 @@ jobs:
         build_type: ["102", "201", "202", "203", "204", "205", "207", "302", "303", "400", "401", "402", "403", "601", "602", "650", "701", "702", "801"]
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: 'recursive'
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22.15.0'
+          node-version: '24.14.0'
       - name: Build web dist
         working-directory: ./main/http_server/axe-os
         run: |
@@ -34,18 +34,18 @@ jobs:
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5.2
+          esp_idf_version: v5.5.3
           target: esp32s3
           command: GITHUB_ACTIONS="true" idf.py build
           path: '.'
       - name: "esp-idf build factory config for ${{ matrix.build_type }}"
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5.2
+          esp_idf_version: v5.5.3
           target: esp32s3
           command: /opt/esp/idf/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py generate config-${{ matrix.build_type }}.cvs config.bin 0x6000
           path: '.'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
           cache: 'pip'

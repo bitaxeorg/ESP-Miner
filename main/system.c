@@ -88,8 +88,8 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->fallback_pool_extranonce_subscribe = nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
 
     // set the pool decode coinbase
-    module->pool_decode_coinbase = nvs_config_get_bool(NVS_CONFIG_STRATUM_DECODE_COINBASE);
-    module->fallback_pool_decode_coinbase = nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE);
+    module->pool_decode_coinbase_tx = nvs_config_get_bool(NVS_CONFIG_STRATUM_DECODE_COINBASE_TX);
+    module->fallback_pool_decode_coinbase_tx = nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX);
 
     // use fallback stratum
     module->use_fallback_stratum = nvs_config_get_bool(NVS_CONFIG_USE_FALLBACK_STRATUM);

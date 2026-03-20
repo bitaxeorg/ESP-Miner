@@ -33,10 +33,10 @@ uint64_t coinbase_decode_varint(const uint8_t *data, int *offset);
 
 /**
  * @brief Decode Bitcoin address from scriptPubKey
- *
+ * 
  * Supports P2PKH, P2SH, P2WPKH, P2WSH, and P2TR address types.
  * Detects network from user_address prefix (bc1/tb1/bcrt1/1/3/m/n/2).
- *
+ * 
  * @param script ScriptPubKey binary data
  * @param script_len Length of scriptPubKey
  * @param output Output buffer for address string
@@ -44,7 +44,7 @@ uint64_t coinbase_decode_varint(const uint8_t *data, int *offset);
  * @param bech32_hrp Bech32 human-readable part ("bc" for mainnet, "tb" for testnet, "bcrt" for regtest)
  * @param is_testnet true for testnet/regtest (affects base58 version bytes)
  */
-void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t script_len,
+void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t script_len, 
                                                 char *output, size_t output_len,
                                                 const char *bech32_hrp, bool is_testnet);
 
@@ -68,7 +68,8 @@ typedef struct {
     int output_count;
     uint64_t total_value_satoshis;
     uint64_t user_value_satoshis;
-    bool decoding_enabled;
+    bool decode_coinbase_tx;
+    bool bip110_signaling; // BIP-110: signaling via version bit 4 (0x00000010)
 } mining_notification_result_t;
 
 /**
@@ -78,7 +79,7 @@ typedef struct {
  * @param extranonce1 Hex string of extranonce1
  * @param extranonce2_len Length of extranonce2 in bytes
  * @param user_address Payout address of the user
- * @param decode_outputs Enable coinbase tx decoding
+ * @param decode_coinbase_tx Enable coinbase tx decoding
  * @param result Pointer to store the results
  * @return esp_err_t
  */
@@ -86,7 +87,7 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
                                  const char *extranonce1,
                                  int extranonce2_len,
                                  const char *user_address,
-                                 bool decode_outputs,
+                                 bool decode_coinbase_tx,
                                  mining_notification_result_t *result);
 
 #endif // COINBASE_DECODER_H

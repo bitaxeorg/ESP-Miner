@@ -31,6 +31,7 @@
 #include "bm1370.h"
 #include "bm1397.h"
 #include "device_config.h"
+#include "hashrate_monitor_task.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
@@ -44,6 +45,9 @@
 
 // Test Power Consumption
 #define POWER_CONSUMPTION_MARGIN 3 //+/- watts
+
+// Test Input Voltage
+#define INPUT_VOLTAGE_MARGIN 0.10f // +/- 10%
 
 // Test Difficulty
 #define DIFFICULTY 16
@@ -145,6 +149,7 @@ esp_err_t test_display(GlobalState * GLOBAL_STATE)
 {
     // Display testing
     if (display_init(GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "DISPLAY test failed!");
         display_msg("DISPLAY:FAIL", GLOBAL_STATE);
         return ESP_FAIL;
     }
@@ -162,6 +167,7 @@ esp_err_t test_input(GlobalState * GLOBAL_STATE)
 {
     // Input testing
     if (input_init(NULL, reset_self_test) != ESP_OK) {
+        ESP_LOGE(TAG, "INPUT test failed!");
         display_msg("INPUT:FAIL", GLOBAL_STATE);
         return ESP_FAIL;
     }
@@ -175,6 +181,7 @@ esp_err_t test_screen(GlobalState * GLOBAL_STATE)
 {
     // Screen testing
     if (screen_start(GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "SCREEN test failed!");
         display_msg("SCREEN:FAIL", GLOBAL_STATE);
         return ESP_FAIL;
     }
@@ -191,6 +198,27 @@ esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE)
     ESP_RETURN_ON_ERROR(VCORE_set_voltage(GLOBAL_STATE, 1.150), TAG, "VCORE set voltage failed!");
 
     return ESP_OK;
+}
+
+static esp_err_t test_input_voltage(GlobalState * GLOBAL_STATE)
+{
+    if (!GLOBAL_STATE->DEVICE_CONFIG.INA260) {
+        return ESP_OK;
+    }
+
+    float input_voltage_mv = Power_get_input_voltage(GLOBAL_STATE);
+    float nominal_mv = GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage * 1000.0f;
+    float margin_mv = nominal_mv * INPUT_VOLTAGE_MARGIN;
+
+    ESP_LOGI(TAG, "Input voltage: %.0f mV (nominal: %.0f mV +/- %.0f mV)", input_voltage_mv, nominal_mv, margin_mv);
+
+    if (input_voltage_mv >= nominal_mv - margin_mv && input_voltage_mv <= nominal_mv + margin_mv) {
+        return ESP_OK;
+    }
+
+    ESP_LOGE(TAG, "Input voltage test failed! %.0f mV, expected %.0f +/- %.0f mV", input_voltage_mv, nominal_mv, margin_mv);
+    display_msg("VIN:FAIL", GLOBAL_STATE);
+    return ESP_FAIL;
 }
 
 esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE)
@@ -328,6 +356,12 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
+    // Input voltage check (INA260 devices only)
+    if (test_input_voltage(GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Input voltage test failed!");
+        tests_done(GLOBAL_STATE, false);
+    }
+
     if (asic_reset() != ESP_OK) {
         ESP_LOGE(TAG, "ASIC reset failed!");
         tests_done(GLOBAL_STATE, false);
@@ -451,6 +485,20 @@ bool self_test(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
+
+    Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 0.1f);
+    while (asic_temp < 40.0f)
+    {
+        snprintf(logString, sizeof(logString),
+                 "ASIC temp > 40°C: %.2f°C\r\n",
+                 asic_temp);
+        display_msg(logString, GLOBAL_STATE);
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+        asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
+    }
+    Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1.0f);
+
+
     uint32_t start_ms = esp_timer_get_time() / 1000;
     uint32_t duration_ms = 0;
     uint32_t counter = 0;
@@ -458,15 +506,71 @@ bool self_test(void * pvParameters)
     uint32_t hashtest_ms = 30000;
     uint32_t last_job_duration = 0;
 
+    int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
+
+    measurement_t** domain_measurements = heap_caps_malloc(asic_count * sizeof(measurement_t*), MALLOC_CAP_SPIRAM);
+    measurement_t* data = heap_caps_malloc(asic_count * hash_domains * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+    for (size_t asic_nr = 0; asic_nr < asic_count; asic_nr++) {
+        domain_measurements[asic_nr] = data + (asic_nr * hash_domains);
+    }
+    measurement_t* total_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+    measurement_t* error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+
+    memset(total_measurement, 0, asic_count * sizeof(measurement_t));
+    memset(domain_measurements[0], 0, asic_count * hash_domains * sizeof(measurement_t));
+    memset(error_measurement, 0, asic_count * sizeof(measurement_t));
+
+    uint32_t last_register_read_ms = 0;
     while (duration_ms < hashtest_ms) {
+        uint32_t now_ms = esp_timer_get_time() / 1000;
+        if (now_ms - last_register_read_ms >= 1000) {
+            ASIC_read_registers(GLOBAL_STATE);
+            last_register_read_ms = now_ms;
+        }
+
         task_result * asic_result = ASIC_process_work(GLOBAL_STATE);
         if (asic_result != NULL) {
+            uint64_t time_us = esp_timer_get_time();
+            if (asic_result->register_type != REGISTER_INVALID) {
+                switch(asic_result->register_type) {
+                    case REGISTER_HASHRATE:
+                        update_hashrate(&total_measurement[asic_result->asic_nr], asic_result->value);
+                        update_hashrate(&domain_measurements[asic_result->asic_nr][0], asic_result->value);
+                        break;
+                    case REGISTER_TOTAL_COUNT:
+                        update_hash_counter(&total_measurement[asic_result->asic_nr], asic_result->value, time_us);
+                        break;
+                    case REGISTER_DOMAIN_0_COUNT:
+                        update_hash_counter(&domain_measurements[asic_result->asic_nr][0], asic_result->value, time_us);
+                        break;
+                    case REGISTER_DOMAIN_1_COUNT:
+                        update_hash_counter(&domain_measurements[asic_result->asic_nr][1], asic_result->value, time_us);
+                        break;
+                    case REGISTER_DOMAIN_2_COUNT:
+                        update_hash_counter(&domain_measurements[asic_result->asic_nr][2], asic_result->value, time_us);
+                        break;
+                    case REGISTER_DOMAIN_3_COUNT:
+                        update_hash_counter(&domain_measurements[asic_result->asic_nr][3], asic_result->value, time_us);
+                        break;
+                    case REGISTER_ERROR_COUNT:
+                        update_hash_counter(&error_measurement[asic_result->asic_nr], asic_result->value, time_us);
+                        break;
+                    case REGISTER_PLL_PARAM:
+                        ESP_LOGD(TAG, "PLL param read asic %d: 0x%08" PRIX32, asic_result->asic_nr, asic_result->value);
+                        break;
+                    case REGISTER_INVALID:
+                        break;
+                }
+                continue;
+            }
+
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(current_job, asic_result->nonce, asic_result->rolled_version);
             if (nonce_diff >= DIFFICULTY) {
                 counter += DIFFICULTY;
                 duration_ms = (esp_timer_get_time() / 1000) - start_ms;
-                hashrate = hashCounterToGhs(duration_ms, counter);
+                hashrate = hashCounterToGhs(duration_ms * 1000, counter);
 
                 ESP_LOGI(TAG, "Nonce %lu Nonce difficulty %.32f.", asic_result->nonce, nonce_diff);
                 ESP_LOGI(TAG, "%f Gh/s  , duration %dms", hashrate, duration_ms);
@@ -484,7 +588,7 @@ bool self_test(void * pvParameters)
                     }
                     last_job_duration = duration_ms;
                     asic_temp = Thermal_get_chip_temp(GLOBAL_STATE);
-                    if (asic_temp > 55) {
+                    if (asic_temp > 62) {
                         snprintf(logString, sizeof(logString), "TEMP:FAIL :%.0f", asic_temp);
                         display_msg(logString, GLOBAL_STATE);
                         tests_done(GLOBAL_STATE, false);
@@ -510,6 +614,24 @@ bool self_test(void * pvParameters)
     if (hashrate < expected_hashrate_mhs) {
         display_msg("HASHRATE:FAIL", GLOBAL_STATE);
         tests_done(GLOBAL_STATE, false);
+    }
+
+    //Check to make sure all domains are contributing to the hashrate
+    for (int asic_nr = 0; asic_nr < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; asic_nr++) {
+        int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
+        for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
+            float domain_hashrate = domain_measurements[asic_nr][domain_nr].hashrate;
+            ESP_LOGI(TAG, "AIC %d Domain %d Hashrate: %.2f Gh/s", asic_nr, domain_nr, domain_hashrate);
+            // divide by 3 because there can be a large variance in hashrate between domains. Just an alive check
+            float expected_domain_hashrate = expected_hashrate_mhs / hash_domains / GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+            if(domain_hashrate < expected_domain_hashrate / 3 || domain_hashrate > expected_domain_hashrate * 3) {
+                ESP_LOGE(TAG, "ASIC %d Domain %d:FAIL - hashrate %.2f Gh/s, expected ~%.2f Gh/s", asic_nr, domain_nr, domain_hashrate, expected_domain_hashrate);
+                char error_buf[30];
+                snprintf(error_buf, 30, "ASIC %d DOMAIN %d:FAIL", asic_nr, domain_nr);
+                display_msg(error_buf, GLOBAL_STATE);
+                tests_done(GLOBAL_STATE, false);
+            }
+        }
     }
 
     if (current_job != NULL) {
@@ -548,9 +670,12 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
             ESP_LOGI(TAG, "Self-test flag cleared");
             nvs_config_set_bool(NVS_CONFIG_SELF_TEST, false);
         }
-        ESP_LOGI(TAG, "SELF-TEST PASS! -- Press RESET button to restart.");
+        ESP_LOGI(TAG, "SELF-TEST PASS! -- Restarting in 10 seconds.");
         GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST PASS!";
-        GLOBAL_STATE->SELF_TEST_MODULE.finished = "Press RESET button to restart.";
+        GLOBAL_STATE->SELF_TEST_MODULE.finished = "Restarting in 10 seconds.";
+        GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        esp_restart();
     } else {
         // isTestFailed
         GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST FAIL!";

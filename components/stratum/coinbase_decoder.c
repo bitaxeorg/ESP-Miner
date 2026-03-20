@@ -8,6 +8,9 @@
 #include <ctype.h>
 #include "mbedtls/sha256.h"
 
+#define BIP110_SIGNAL_BIT 4
+#define BIP110_SIGNAL_EXPIRY_BLOCK 965664
+
 // Wrapper for SHA256 to match libbase58's expected signature
 static bool my_sha256(void *digest, const void *data, size_t datasz) {
     mbedtls_sha256(data, datasz, digest, 0);
@@ -45,21 +48,21 @@ uint64_t coinbase_decode_varint(const uint8_t *data, int *offset) {
     }
 }
 
-void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t script_len,
+void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t script_len, 
                                                 char *output, size_t output_len,
                                                 const char *bech32_hrp, bool is_testnet) {
     if (script_len == 0 || output_len < 65) {
         snprintf(output, output_len, "unknown");
         return;
     }
-
+    
     ensure_base58_init();
-
+    
     uint8_t p2pkh_version = is_testnet ? 0x6F : 0x00;
     uint8_t p2sh_version  = is_testnet ? 0xC4 : 0x05;
 
     // P2PKH: OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
-    if (script_len == 25 && script[0] == OP_DUP && script[1] == OP_HASH160 &&
+    if (script_len == 25 && script[0] == OP_DUP && script[1] == OP_HASH160 && 
         script[2] == OP_PUSHDATA_20 && script[23] == OP_EQUALVERIFY && script[24] == OP_CHECKSIG) {
         size_t b58sz = output_len;
         if (b58check_enc(output, &b58sz, p2pkh_version, script + 3, 20)) {
@@ -70,7 +73,7 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
         bin2hex(script + 3, 20, output + 6, output_len - 6);
         return;
     }
-
+    
     // P2SH: OP_HASH160 <20 bytes> OP_EQUAL
     if (script_len == 23 && script[0] == OP_HASH160 && script[1] == OP_PUSHDATA_20 && script[22] == OP_EQUAL) {
         size_t b58sz = output_len;
@@ -82,7 +85,7 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
         bin2hex(script + 2, 20, output + 5, output_len - 5);
         return;
     }
-
+    
     // P2WPKH: OP_0 <20 bytes>
     if (script_len == 22 && script[0] == OP_0 && script[1] == OP_PUSHDATA_20) {
         if (segwit_addr_encode(output, bech32_hrp, 0, script + 2, 20)) {
@@ -93,7 +96,7 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
         bin2hex(script + 2, 20, output + 7, output_len - 7);
         return;
     }
-
+    
     // P2WSH: OP_0 <32 bytes>
     if (script_len == 34 && script[0] == OP_0 && script[1] == OP_PUSHDATA_32) {
         if (segwit_addr_encode(output, bech32_hrp, 0, script + 2, 32)) {
@@ -104,7 +107,7 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
         bin2hex(script + 2, 32, output + 6, output_len - 6);
         return;
     }
-
+    
     // P2TR: OP_1 <32 bytes>
     if (script_len == 34 && script[0] == OP_1 && script[1] == OP_PUSHDATA_32) {
         if (segwit_addr_encode(output, bech32_hrp, 1, script + 2, 32)) {
@@ -146,14 +149,14 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
                                  const char *extranonce1,
                                  int extranonce2_len,
                                  const char *user_address,
-                                 bool decode_outputs,
+                                 bool decode_coinbase_tx,
                                  mining_notification_result_t *result) {
     if (!notification || !extranonce1 || !result) return ESP_ERR_INVALID_ARG;
 
     // Initialize result
     result->total_value_satoshis = 0;
     result->user_value_satoshis = 0;
-    result->decoding_enabled = decode_outputs;
+    result->decode_coinbase_tx = decode_coinbase_tx;
 
     // Detect network from user address prefix for correct address encoding
     const char *bech32_hrp = "bc";
@@ -195,6 +198,9 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
     result->block_height = 0;
     hex2bin(notification->coinbase_1 + (coinbase_1_offset * 2), (uint8_t *)&result->block_height, block_height_len);
     coinbase_1_offset += block_height_len;
+
+    // Detect BIP-110 signaling: check if bit 4 (0x00000010) is set in version
+    result->bip110_signaling = decode_coinbase_tx && result->block_height < BIP110_SIGNAL_EXPIRY_BLOCK && (notification->version & (1U << BIP110_SIGNAL_BIT)) != 0;
 
     // Calculate remaining scriptsig length (excluding block height part)
     int scriptsig_length = scriptsig_len - 1 - block_height_len;
@@ -299,7 +305,7 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
 
         if (offset + script_len > coinbase_2_len) break;
 
-        if (decode_outputs) {
+        if (decode_coinbase_tx) {
             if (value_satoshis > 0) {            
                 char output_address[MAX_ADDRESS_STRING_LEN];
                 coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN, bech32_hrp, is_testnet);
