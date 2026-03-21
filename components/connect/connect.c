@@ -55,7 +55,7 @@ static const char * TAG = "connect";
 
 static TimerHandle_t ip_acquire_timer = NULL;
 
-static bool is_scanning = false;
+static volatile bool is_scanning = false;
 static uint16_t ap_number = 0;
 static wifi_ap_record_t ap_info[MAX_AP_COUNT];
 static int s_retry_num = 0;
@@ -67,7 +67,9 @@ static void wifi_softap_off(void);
 
 static GlobalState *roam_global_state = NULL;
 static TimerHandle_t roam_timer = NULL;
-static bool roam_in_progress = false;
+static volatile bool roam_in_progress = false;
+static volatile bool is_roam_scan = false;
+static wifi_ap_record_t roam_current_ap;
 
 static void roam_timer_callback(TimerHandle_t xTimer)
 {
@@ -80,20 +82,21 @@ static void roam_timer_callback(TimerHandle_t xTimer)
     }
 
     // Check current RSSI
-    wifi_ap_record_t current_ap;
-    if (esp_wifi_sta_get_ap_info(&current_ap) != ESP_OK) {
+    if (esp_wifi_sta_get_ap_info(&roam_current_ap) != ESP_OK) {
         return;
     }
 
-    if (current_ap.rssi >= ROAM_RSSI_THRESHOLD) {
-        ESP_LOGD(TAG, "Roam check: RSSI %d is good enough, skipping", current_ap.rssi);
+    if (roam_current_ap.rssi >= ROAM_RSSI_THRESHOLD) {
+        ESP_LOGD(TAG, "Roam check: RSSI %d is good enough, skipping", roam_current_ap.rssi);
         return;
     }
 
     ESP_LOGI(TAG, "Roam check: RSSI %d is below threshold %d, scanning for better AP...",
-             current_ap.rssi, ROAM_RSSI_THRESHOLD);
+             roam_current_ap.rssi, ROAM_RSSI_THRESHOLD);
 
-    // Do a background scan (non-blocking)
+    // Start a non-blocking scan filtered to our SSID.
+    // Results are handled in WIFI_EVENT_SCAN_DONE to avoid blocking the timer task
+    // and to prevent stack overflow from large scan result arrays.
     wifi_scan_config_t scan_config = {
         .ssid = (uint8_t *)roam_global_state->SYSTEM_MODULE.ssid,
         .bssid = NULL,
@@ -105,48 +108,10 @@ static void roam_timer_callback(TimerHandle_t xTimer)
     };
 
     is_scanning = true;
-    if (esp_wifi_scan_start(&scan_config, true) != ESP_OK) {
+    is_roam_scan = true;
+    if (esp_wifi_scan_start(&scan_config, false) != ESP_OK) {
         is_scanning = false;
-        return;
-    }
-
-    uint16_t num_found = MAX_AP_COUNT;
-    wifi_ap_record_t scan_results[MAX_AP_COUNT];
-    if (esp_wifi_scan_get_ap_records(&num_found, scan_results) != ESP_OK) {
-        is_scanning = false;
-        return;
-    }
-    is_scanning = false;
-
-    // Find the best AP with matching SSID (excluding current BSSID)
-    int8_t best_rssi = current_ap.rssi;
-    int best_idx = -1;
-    for (int i = 0; i < num_found; i++) {
-        if (strcmp((char *)scan_results[i].ssid, roam_global_state->SYSTEM_MODULE.ssid) != 0) {
-            continue;
-        }
-        if (memcmp(scan_results[i].bssid, current_ap.bssid, 6) == 0) {
-            continue;
-        }
-        if (scan_results[i].rssi > best_rssi) {
-            best_rssi = scan_results[i].rssi;
-            best_idx = i;
-        }
-    }
-
-    if (best_idx >= 0 && (best_rssi - current_ap.rssi) >= ROAM_RSSI_HYSTERESIS) {
-        ESP_LOGD(TAG, "Roam: found better AP %02x:%02x:%02x:%02x:%02x:%02x (RSSI %d vs current %d), switching...",
-                 scan_results[best_idx].bssid[0], scan_results[best_idx].bssid[1],
-                 scan_results[best_idx].bssid[2], scan_results[best_idx].bssid[3],
-                 scan_results[best_idx].bssid[4], scan_results[best_idx].bssid[5],
-                 best_rssi, current_ap.rssi);
-        roam_in_progress = true;
-        esp_wifi_disconnect();
-        // The disconnect event handler will trigger reconnect,
-        // and WIFI_CONNECT_AP_BY_SIGNAL will pick the best AP
-    } else {
-        ESP_LOGI(TAG, "Roam check: no significantly better AP found (best candidate RSSI: %d, current: %d)",
-                 best_rssi, current_ap.rssi);
+        is_roam_scan = false;
     }
 }
 
@@ -239,8 +204,67 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
     if (event_base == WIFI_EVENT)
     {
         if (event_id == WIFI_EVENT_SCAN_DONE) {
-            esp_wifi_scan_get_ap_num(&ap_number);
             ESP_LOGI(TAG, "Wi-Fi Scan Done");
+
+            if (is_roam_scan) {
+                // Roam-initiated scan: process results on heap to avoid stack overflow,
+                // and consume them here so the regular ap_info path is not touched.
+                is_roam_scan = false;
+                uint16_t num_found = 0;
+                esp_wifi_scan_get_ap_num(&num_found);
+
+                wifi_ap_record_t *scan_results = malloc(num_found * sizeof(wifi_ap_record_t));
+                if (scan_results == NULL) {
+                    ESP_LOGE(TAG, "Roam scan: failed to allocate %u record(s)", num_found);
+                    is_scanning = false;
+                    return;
+                }
+
+                if (esp_wifi_scan_get_ap_records(&num_found, scan_results) != ESP_OK) {
+                    ESP_LOGE(TAG, "Roam scan: failed to get AP records");
+                    free(scan_results);
+                    is_scanning = false;
+                    return;
+                }
+                is_scanning = false;
+
+                // Find the best AP with matching SSID (excluding current BSSID)
+                int8_t best_rssi = roam_current_ap.rssi;
+                int best_idx = -1;
+                for (int i = 0; i < num_found; i++) {
+                    if (strcmp((char *)scan_results[i].ssid, roam_global_state->SYSTEM_MODULE.ssid) != 0) {
+                        continue;
+                    }
+                    if (memcmp(scan_results[i].bssid, roam_current_ap.bssid, 6) == 0) {
+                        continue;
+                    }
+                    if (scan_results[i].rssi > best_rssi) {
+                        best_rssi = scan_results[i].rssi;
+                        best_idx = i;
+                    }
+                }
+
+                if (best_idx >= 0 && (best_rssi - roam_current_ap.rssi) >= ROAM_RSSI_HYSTERESIS) {
+                    ESP_LOGI(TAG, "Roam: found better AP %02x:%02x:%02x:%02x:%02x:%02x (RSSI %d vs current %d), switching...",
+                             scan_results[best_idx].bssid[0], scan_results[best_idx].bssid[1],
+                             scan_results[best_idx].bssid[2], scan_results[best_idx].bssid[3],
+                             scan_results[best_idx].bssid[4], scan_results[best_idx].bssid[5],
+                             best_rssi, roam_current_ap.rssi);
+                    roam_in_progress = true;
+                    esp_wifi_disconnect();
+                    // The disconnect event handler will trigger reconnect,
+                    // and WIFI_CONNECT_AP_BY_SIGNAL will pick the best AP
+                } else {
+                    ESP_LOGI(TAG, "Roam check: no significantly better AP found (best candidate RSSI: %d, current: %d)",
+                             best_rssi, roam_current_ap.rssi);
+                }
+
+                free(scan_results);
+                return;
+            }
+
+            // Regular user-initiated scan: store results in global ap_info for wifi_scan()
+            esp_wifi_scan_get_ap_num(&ap_number);
             if (esp_wifi_scan_get_ap_records(&ap_number, ap_info) != ESP_OK) {
                 ESP_LOGI(TAG, "Failed esp_wifi_scan_get_ap_records");
             }
