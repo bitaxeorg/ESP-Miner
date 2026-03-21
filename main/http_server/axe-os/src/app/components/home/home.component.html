@@ -216,16 +216,16 @@
                     <h6 class="flex justify-content-between mb-1">
                         Power<span>{{info.power}} W</span>
                     </h6>
-                    <p-progressBar [value]="(info.power / info.maxPower)" [styleClass]="'p-progressbar--thin'">
+                    <p-progressBar [value]="(info.power / info.maxPower) * 100" [styleClass]="'p-progressbar--thin'">
                         <ng-template pTemplate="content" let-value></ng-template>
                     </p-progressBar>
                 </div>
-
+                
                 <div class="mb-3">
                     <h6 class="flex justify-content-between mb-1">
-                        Current<span>{{info.current | number: '1.1-1'}} A</span>
+                        Current<span>{{info.power / info.voltage | number: '1.1-1'}} A</span>
                     </h6>
-                    <p-progressBar [value]="(info.current / (info.maxPower / info.nominalVoltage)) * 100" [styleClass]="'p-progressbar--thin'">
+                    <p-progressBar [value]="((info.power / info.voltage) / (info.maxPower / info.nominalVoltage)) * 100" [styleClass]="'p-progressbar--thin'">
                         <ng-template pTemplate="content" let-value></ng-template>
                     </p-progressBar>
                 </div>
@@ -362,7 +362,7 @@
                 <div class="flex flex-nowrap justify-content-between mb-3 relative">
                     <h4 class="mb-0">
                         Pool
-                        
+                        <a
                             *ngIf="(quickLink$ | async) as quickLink"
                             [href]="quickLink"
                             target="_blank"
