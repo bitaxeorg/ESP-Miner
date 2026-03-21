@@ -216,7 +216,7 @@
                     <h6 class="flex justify-content-between mb-1">
                         Power<span>{{info.power}} W</span>
                     </h6>
-                    <p-progressBar [value]="(info.power / info.maxPower) * 100" [styleClass]="'p-progressbar--thin'">
+                    <p-progressBar [value]="(info.power / info.maxPower)" [styleClass]="'p-progressbar--thin'">
                         <ng-template pTemplate="content" let-value></ng-template>
                     </p-progressBar>
                 </div>
