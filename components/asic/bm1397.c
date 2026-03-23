@@ -177,11 +177,14 @@ void BM1397_send_hash_frequency(float target_freq)
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
 }
 
-uint8_t BM1397_init(float frequency, uint16_t asic_count, uint16_t difficulty)
+uint8_t BM1397_init(void * pvParameters)
 {
+    GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
+
     // send the init command
     _send_read_address();
 
+    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int chip_counter = count_asic_chips(asic_count, BM1397_CHIP_ID, BM1397_CHIP_ID_RESPONSE_LENGTH);
 
     if (chip_counter == 0) {
@@ -210,6 +213,8 @@ uint8_t BM1397_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     unsigned char init4[9] = {0x00, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x80, 0x74}; // init4 - init_4_?
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, BM1397_SERIALTX_DEBUG);
 
+    uint16_t difficulty = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
+
     //set difficulty mask
     uint8_t difficulty_mask[6];
     get_difficulty_mask(difficulty, difficulty_mask);
@@ -224,7 +229,7 @@ uint8_t BM1397_init(float frequency, uint16_t asic_count, uint16_t difficulty)
     BM1397_set_default_baud();
 
     //ramp up the hash frequency
-    do_frequency_transition(frequency, BM1397_send_hash_frequency);
+    do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
 
     return chip_counter;
 }
