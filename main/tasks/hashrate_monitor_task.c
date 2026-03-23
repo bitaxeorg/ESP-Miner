@@ -40,9 +40,14 @@ static float sum_hashrates(measurement_t * measurement, int asic_count)
     return total;
 }
 
-static void clear_measurements(GlobalState * GLOBAL_STATE)
+void hashrate_monitor_reset_measurements(void *pvParameters)
 {
+    GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;    
     HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
+
+    if (!HASHRATE_MONITOR_MODULE->is_initialized) {
+        return;
+    }
 
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
@@ -67,7 +72,7 @@ void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t t
 {
     uint64_t previous_time_us = measurement->time_us;
     if (previous_time_us != 0) {
-        uint32_t duration_us = time_us - previous_time_us;
+        uint64_t duration_us = time_us - previous_time_us;
         uint32_t counter = value - measurement->value; // Compute counter difference, handling uint32_t wraparound
         measurement->hashrate = hashCounterToGhs(duration_us, counter);
     }
@@ -147,7 +152,7 @@ void hashrate_monitor_task(void *pvParameters)
     }
     HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
 
-    clear_measurements(GLOBAL_STATE);
+    hashrate_monitor_reset_measurements(GLOBAL_STATE);
 
     init_averages();
 
