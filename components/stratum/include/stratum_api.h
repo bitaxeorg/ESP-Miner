@@ -68,6 +68,10 @@ typedef struct
     uint32_t new_difficulty;
     // mining.set_version_mask
     uint32_t version_mask;
+    // client.reconnect
+    char * reconnect_hostname;
+    int reconnect_port;
+    int reconnect_wait;
     // result
     bool response_success;
     char * error_str;
@@ -105,5 +109,7 @@ int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, cons
                             const uint32_t version_bits);
 
 float STRATUM_V1_get_response_time_ms(int request_id, int64_t receive_time_us);
+
+bool is_same_domain(const char * host_a, const char * host_b);
 
 #endif // STRATUM_API_H

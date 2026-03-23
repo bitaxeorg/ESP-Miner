@@ -207,3 +207,38 @@ TEST_CASE("Parse stratum error array format", "[stratum]")
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
     TEST_ASSERT_EQUAL_STRING("Job not found", stratum_api_v1_message.error_str);
 }
+
+TEST_CASE("Parse client.reconnect with all params", "[stratum]")
+{
+    StratumApiV1Message msg = {};
+    const char *json_string = "{\"id\":null,\"method\":\"client.reconnect\",\"params\":[\"us1.pool.example.com\",3333,5]}";
+    STRATUM_V1_parse(&msg, json_string);
+    TEST_ASSERT_EQUAL(CLIENT_RECONNECT, msg.method);
+    TEST_ASSERT_EQUAL_STRING("us1.pool.example.com", msg.reconnect_hostname);
+    TEST_ASSERT_EQUAL(3333, msg.reconnect_port);
+    TEST_ASSERT_EQUAL(5, msg.reconnect_wait);
+    free(msg.reconnect_hostname);
+}
+
+TEST_CASE("Parse client.reconnect with no params", "[stratum]")
+{
+    StratumApiV1Message msg = {};
+    const char *json_string = "{\"id\":null,\"method\":\"client.reconnect\"}";
+    STRATUM_V1_parse(&msg, json_string);
+    TEST_ASSERT_EQUAL(CLIENT_RECONNECT, msg.method);
+    TEST_ASSERT_NULL(msg.reconnect_hostname);
+    TEST_ASSERT_EQUAL(0, msg.reconnect_port);
+    TEST_ASSERT_EQUAL(0, msg.reconnect_wait);
+}
+
+TEST_CASE("is_same_domain allows subdomain", "[stratum]")
+{
+    TEST_ASSERT_TRUE(is_same_domain("us1.pool.example.com", "pool.example.com"));
+    TEST_ASSERT_TRUE(is_same_domain("pool.example.com", "us1.pool.example.com"));
+}
+
+TEST_CASE("is_same_domain rejects different domain", "[stratum]")
+{
+    TEST_ASSERT_FALSE(is_same_domain("evil.com", "pool.example.com"));
+    TEST_ASSERT_FALSE(is_same_domain("pool.example.com.evil.com", "pool.example.com"));
+}
