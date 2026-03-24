@@ -60,7 +60,7 @@ void FAN_CONTROLLER_task(void * pvParameters)
                     exit(EXIT_FAILURE);
                 }
             }
-        } else if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+        } else if (!GLOBAL_STATE->ASIC_initalized) {
             if (fabs(power_management->fan_perc - 30) > EPSILON) {
                 ESP_LOGI(TAG, "Mining paused, setting fan to 30%%");
                 power_management->fan_perc = 30;

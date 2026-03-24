@@ -443,7 +443,7 @@ void stratum_task(void * pvParameters)
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
     while (1) {
-        if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+        if (!GLOBAL_STATE->ASIC_initalized) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             continue;
         }
@@ -566,7 +566,7 @@ void stratum_task(void * pvParameters)
                 break;
             }
 
-            if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+            if (!GLOBAL_STATE->ASIC_initalized) {
                 free(line);
                 ESP_LOGI(TAG, "Mining paused, disconnecting from pool");
                 retry_attempts = 0;

@@ -43,7 +43,10 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     // Wind frequency down to 50 MHz before cutting power. This also updates
     // the transition tracker so the ramp starts from 50 MHz on next start,
     // rather than the stale pre-reset frequency.
-    ASIC_set_frequency(GLOBAL_STATE, 50);
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = 50;
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
+
+    ASIC_set_frequency(GLOBAL_STATE);
 
     // Cut ASIC power and hold in reset
     VCORE_set_voltage(GLOBAL_STATE, 0.0f);
@@ -77,6 +80,7 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
     uart_flush(UART_NUM_1);
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
+    POWER_MANAGEMENT_init_frequency(GLOBAL_STATE);
     // Stabilization delay of 2000ms prevents race conditions where tasks are
     // just starting to use the ASIC while power management tries to change frequency
     uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, 2000);
