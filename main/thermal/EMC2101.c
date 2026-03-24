@@ -30,7 +30,6 @@ esp_err_t EMC2101_init(int temp_offset_param)
     // set the TACH input
     ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_REG_CONFIG, 0x04), TAG, "Failed to set TACH input");
 
-
     //! deprecated bit was never set successfully
     // --- Configure Fan Settings (Register 0x4A) ---
     // Start with a base configuration:
@@ -43,6 +42,7 @@ esp_err_t EMC2101_init(int temp_offset_param)
     // //if (invertPolarity) {
         ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_FAN_CONFIG, 0b00100011), TAG, "Failed to configure fan settings");
     // //}
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_PWM_FREQ, 0x07), TAG, "Failed to set PWM frequency");
     
 
 
@@ -74,7 +74,7 @@ esp_err_t EMC2101_set_fan_speed(float percent)
 {
     uint8_t speed;
 
-    speed = (uint8_t) (63.0 * percent);
+    speed = (uint8_t) (14.0 * percent);
     ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(emc2101_dev_handle, EMC2101_REG_FAN_SETTING, speed), TAG, "Failed to set fan speed");
     return ESP_OK;
 }
