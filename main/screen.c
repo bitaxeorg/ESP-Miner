@@ -551,7 +551,11 @@ static void screen_update_cb(lv_timer_t * timer)
 
     if (current_chip_temp != power_management->chip_temp_avg) {
         if (power_management->chip_temp_avg > 0) {
-            lv_label_set_text_fmt(stats_temp_label, "Temp: %.1f°C", power_management->chip_temp_avg);    
+            if (power_management->chip_temp2_avg > 0) {
+                lv_label_set_text_fmt(stats_temp_label, "Temp: %.1f°C/%.1f°C", power_management->chip_temp_avg, power_management->chip_temp2_avg);
+            } else {
+                lv_label_set_text_fmt(stats_temp_label, "Temp: %.1f°C", power_management->chip_temp_avg);
+            }
         }
         current_chip_temp = power_management->chip_temp_avg;
     }
@@ -615,7 +619,7 @@ static void screen_update_cb(lv_timer_t * timer)
         current_shares_rejected = shares_rejected;
         current_work_received = work_received;
     } else {
-        lv_label_set_text(notification_label, "");
+        lv_label_set_text(notification_label, module->mining_paused ? "▐▐" : "");
     }
 
     if (module->show_new_block) {

@@ -14,6 +14,7 @@
 #include "utils.h"
 #include "coinbase_decoder.h"
 #include <esp_heap_caps.h>
+#include "hashrate_monitor_task.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
@@ -242,6 +243,9 @@ void cleanQueue(GlobalState * GLOBAL_STATE) {
         GLOBAL_STATE->valid_jobs[i] = 0;
     }
     pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+    
+    // Reset hashrate measurements to prevent spike on reconnection
+    hashrate_monitor_reset_measurements(GLOBAL_STATE);
 }
 
 void stratum_reset_uid(GlobalState * GLOBAL_STATE)
@@ -439,6 +443,11 @@ void stratum_task(void * pvParameters)
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
     while (1) {
+        if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
         if (!is_wifi_connected()) {
             ESP_LOGI(TAG, "WiFi disconnected, attempting to reconnect...");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
@@ -553,6 +562,14 @@ void stratum_task(void * pvParameters)
             if (!line) {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
                 retry_attempts++;
+                stratum_close_connection(GLOBAL_STATE);
+                break;
+            }
+
+            if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+                free(line);
+                ESP_LOGI(TAG, "Mining paused, disconnecting from pool");
+                retry_attempts = 0;
                 stratum_close_connection(GLOBAL_STATE);
                 break;
             }

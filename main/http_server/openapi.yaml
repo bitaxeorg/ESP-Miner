@@ -198,6 +198,7 @@ components:
         - coinbaseValueTotalSatoshis
         - coinbaseValueUserSatoshis
         - hashrateMonitor
+        - miningPaused
       properties:
         ASICModel:
           type: string
@@ -487,6 +488,9 @@ components:
               description: Hashrate register value per ASIC
               items:
                 $ref: '#/components/schemas/HashrateMonitorAsic'
+        miningPaused:
+          type: boolean
+          description: Whether mining is currently paused
 
     SystemASIC:
       type: object
@@ -814,6 +818,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SystemStatistics'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/pause:
+    post:
+      summary: Pause mining
+      description: Pauses mining activity
+      operationId: pauseMining
+      tags:
+        - system
+      responses:
+        '200':
+          description: Mining paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/resume:
+    post:
+      summary: Resume mining
+      description: Resumes mining activity
+      operationId: resumeMining
+      tags:
+        - system
+      responses:
+        '200':
+          description: Mining resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

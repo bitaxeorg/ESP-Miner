@@ -10,7 +10,8 @@ import {
   SystemASIC as ISystemASIC,
   SystemASICASICModelEnum,
   SystemService as GeneratedSystemService,
-  Settings
+  Settings,
+  GenericResponse
 } from 'src/app/generated';
 
 import { environment } from '../../environments/environment';
@@ -140,6 +141,7 @@ export class SystemApiService {
         coinbaseOutputs: [{value: 50, address: "payoutaddress"}],
         coinbaseValueTotalSatoshis: 50,
         coinbaseValueUserSatoshis: 50,
+        miningPaused: false,
       }
     ).pipe(delay(1000));
   }
@@ -236,6 +238,30 @@ export class SystemApiService {
     }
 
     return of('Block found notification dismissed (mock)');
+  }
+
+  public pauseMining(uri: string = '') {
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.pauseMining();
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/pause`, {});
+    }
+
+    return of<GenericResponse>({ message: 'Mining paused' });
+  }
+
+  public resumeMining(uri: string = '') {
+    if (environment.production && this.generatedSystemService && !uri) {
+      return this.generatedSystemService.resumeMining();
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/resume`, {});
+    }
+
+    return of<GenericResponse>({ message: 'Mining resumed' });
   }
 
   public identify(uri: string = '') {

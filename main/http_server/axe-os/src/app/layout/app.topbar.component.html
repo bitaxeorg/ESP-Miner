@@ -40,6 +40,15 @@
             <li>
                 <a class="block py-2 text-white cursor-pointer"
                     tooltipPosition="bottom"
+                    [pTooltip]="isMiningPaused ? 'Resume Mining' : 'Pause Mining'"
+                    (click)="toggleMiningPaused()"
+                >
+                    <i class="pi text-xl block" [ngClass]="isMiningPaused ? 'pi-play-circle' : 'pi-pause-circle'"></i>
+                </a>
+            </li>
+            <li>
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
                     pTooltip="Restart"
                     (click)="restart()"
                 >

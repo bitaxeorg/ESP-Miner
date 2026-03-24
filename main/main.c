@@ -21,6 +21,8 @@
 #include "connect.h"
 #include "asic_reset.h"
 #include "asic_init.h"
+#include "filesystem.h"
+#include "input.h"
 
 static GlobalState GLOBAL_STATE;
 
@@ -73,25 +75,30 @@ void app_main(void)
         return;
     }
 
-    if (self_test(&GLOBAL_STATE))
+    if (self_test_init(&GLOBAL_STATE) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init self test");
         return;
+    }
 
     SYSTEM_init_system(&GLOBAL_STATE);
 
-    // init AP and connect to wifi
-    wifi_init(&GLOBAL_STATE);
+    if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        wifi_init(&GLOBAL_STATE);
+    }
 
     SYSTEM_init_peripherals(&GLOBAL_STATE);
 
     if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating power management task");
     }
-    if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating fan controller task");
-    }
 
-    // start the API for AxeOS
-    start_rest_server((void *) &GLOBAL_STATE);
+    if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating fan controller task");
+        }
+        // start the API for AxeOS
+        start_rest_server((void *) &GLOBAL_STATE);
+    }
 
     // After mounting SPIFFS
     SYSTEM_init_versions(&GLOBAL_STATE);
@@ -113,15 +120,23 @@ void app_main(void)
         return;
     }
 
-    if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating stratum admin task");
-    }
     if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating stratum miner task");
     }
     if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating asic result task");
     }
+
+    if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating stratum admin task");
+        }
+    } else {
+        if (xTaskCreate(self_test_task, "self_test", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating self test task");
+        }
+    }
+
     if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) !=
         pdPASS) {
         ESP_LOGE(TAG, "Error creating hashrate monitor task");

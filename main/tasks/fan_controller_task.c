@@ -60,6 +60,14 @@ void FAN_CONTROLLER_task(void * pvParameters)
                     exit(EXIT_FAILURE);
                 }
             }
+        } else if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+            if (fabs(power_management->fan_perc - 30) > EPSILON) {
+                ESP_LOGI(TAG, "Mining paused, setting fan to 30%%");
+                power_management->fan_perc = 30;
+                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 0.3f) != ESP_OK) {
+                    exit(EXIT_FAILURE);
+                }
+            }
         } else {
             //enable the PID auto control for the FAN if set
             if (nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED)) {
