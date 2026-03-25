@@ -16,9 +16,9 @@
 #define MAX_AP_COUNT 20
 
 // Roaming configuration
-#define ROAM_CHECK_INTERVAL_MS   (90 * 1000)  // Check every 90 seconds
-#define ROAM_RSSI_THRESHOLD      (-70)         // Only consider roaming if current RSSI is below this
-#define ROAM_RSSI_HYSTERESIS     (10)          // New AP must be at least this much better (dB)
+#define ROAM_RSSI_THRESHOLD      (-67)         // RSSI low event triggers at this level (dBm)
+#define ROAM_RSSI_HYSTERESIS     (8)           // New AP must be at least this much better (dB)
+#define ROAM_BACKOFF_MS          (30 * 1000)   // Minimum time between roam scans
 
 #if CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK
 #define ESP_WIFI_SAE_MODE WPA3_SAE_PWE_HUNT_AND_PECK
@@ -66,12 +66,12 @@ static void wifi_softap_on(void);
 static void wifi_softap_off(void);
 
 static GlobalState *roam_global_state = NULL;
-static TimerHandle_t roam_timer = NULL;
 static volatile bool roam_in_progress = false;
 static volatile bool is_roam_scan = false;
 static wifi_ap_record_t roam_current_ap;
+static TickType_t last_roam_scan_tick = 0;
 
-static void roam_timer_callback(TimerHandle_t xTimer)
+static void roam_trigger_scan(void)
 {
     if (roam_global_state == NULL || !roam_global_state->SYSTEM_MODULE.is_connected) {
         return;
@@ -81,22 +81,19 @@ static void roam_timer_callback(TimerHandle_t xTimer)
         return;
     }
 
-    // Check current RSSI
+    // Back-off: don't scan more often than ROAM_BACKOFF_MS
+    TickType_t now = xTaskGetTickCount();
+    if ((now - last_roam_scan_tick) < pdMS_TO_TICKS(ROAM_BACKOFF_MS)) {
+        ESP_LOGD(TAG, "Roam scan skipped: backoff period active");
+        return;
+    }
+
     if (esp_wifi_sta_get_ap_info(&roam_current_ap) != ESP_OK) {
         return;
     }
 
-    if (roam_current_ap.rssi >= ROAM_RSSI_THRESHOLD) {
-        ESP_LOGD(TAG, "Roam check: RSSI %d is good enough, skipping", roam_current_ap.rssi);
-        return;
-    }
+    ESP_LOGI(TAG, "Roam: RSSI low (%d dBm), scanning for better AP...", roam_current_ap.rssi);
 
-    ESP_LOGI(TAG, "Roam check: RSSI %d is below threshold %d, scanning for better AP...",
-             roam_current_ap.rssi, ROAM_RSSI_THRESHOLD);
-
-    // Start a non-blocking scan filtered to our SSID.
-    // Results are handled in WIFI_EVENT_SCAN_DONE to avoid blocking the timer task
-    // and to prevent stack overflow from large scan result arrays.
     wifi_scan_config_t scan_config = {
         .ssid = (uint8_t *)roam_global_state->SYSTEM_MODULE.ssid,
         .bssid = NULL,
@@ -109,6 +106,7 @@ static void roam_timer_callback(TimerHandle_t xTimer)
 
     is_scanning = true;
     is_roam_scan = true;
+    last_roam_scan_tick = now;
     if (esp_wifi_scan_start(&scan_config, false) != ESP_OK) {
         is_scanning = false;
         is_roam_scan = false;
@@ -212,6 +210,12 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
                 is_roam_scan = false;
                 uint16_t num_found = 0;
                 esp_wifi_scan_get_ap_num(&num_found);
+
+                if (num_found == 0) {
+                    ESP_LOGI(TAG, "Roam scan: no APs found");
+                    is_scanning = false;
+                    return;
+                }
 
                 wifi_ap_record_t *scan_results = malloc(num_found * sizeof(wifi_ap_record_t));
                 if (scan_results == NULL) {
@@ -353,6 +357,11 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
             clients_connected_to_ap -= 1;
         }
+
+        if (event_id == WIFI_EVENT_STA_BSS_RSSI_LOW) {
+            ESP_LOGI(TAG, "RSSI low event triggered, checking for better AP...");
+            roam_trigger_scan();
+        }
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
@@ -372,7 +381,13 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         strcpy(GLOBAL_STATE->SYSTEM_MODULE.wifi_status, "Connected!");
 
         wifi_softap_off();
-        
+
+        // Enable RSSI monitoring so the driver fires WIFI_EVENT_STA_BSS_RSSI_LOW
+        if (roam_global_state != NULL) {
+            esp_wifi_set_rssi_threshold(ROAM_RSSI_THRESHOLD);
+            ESP_LOGI(TAG, "RSSI threshold set to %d dBm for roaming", ROAM_RSSI_THRESHOLD);
+        }
+
         // Create IPv6 link-local address after WiFi connection
         esp_netif_t *netif = event->esp_netif;
         esp_err_t ipv6_err = esp_netif_create_ip6_linklocal(netif);
@@ -603,15 +618,10 @@ void wifi_init(void * pvParameters)
 
         ESP_LOGI(TAG, "wifi_init_sta finished.");
 
-        // Start periodic roaming check
+        // Enable event-driven roaming (RSSI threshold set after IP is acquired)
         roam_global_state = GLOBAL_STATE;
-        roam_timer = xTimerCreate("roam_timer", pdMS_TO_TICKS(ROAM_CHECK_INTERVAL_MS),
-                                  pdTRUE, NULL, roam_timer_callback);
-        if (roam_timer != NULL) {
-            xTimerStart(roam_timer, 0);
-            ESP_LOGI(TAG, "WiFi roaming check enabled (interval: %ds, threshold: %ddBm)",
-                     ROAM_CHECK_INTERVAL_MS / 1000, ROAM_RSSI_THRESHOLD);
-        }
+        ESP_LOGI(TAG, "WiFi roaming enabled (RSSI threshold: %d dBm, hysteresis: %d dB)",
+                 ROAM_RSSI_THRESHOLD, ROAM_RSSI_HYSTERESIS);
 
         return;
     }
