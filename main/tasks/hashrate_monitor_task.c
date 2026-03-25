@@ -158,19 +158,34 @@ void hashrate_monitor_task(void *pvParameters)
 
     HASHRATE_MONITOR_MODULE->is_initialized = true;
 
+    bool was_asic_initialized = false;
     TickType_t taskWakeTime = xTaskGetTickCount();
     while (1) {
-        ASIC_read_registers(GLOBAL_STATE);
+        bool is_asic_initialized = GLOBAL_STATE->ASIC_initalized;
 
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        if (was_asic_initialized && !is_asic_initialized) {
+            // ASIC just stopped (pause or overheat): clear measurements so that
+            // time_us resets to 0. This prevents update_hash_counter from computing
+            // a huge uint32_t wraparound diff (counter resets to 0 on ASIC reset)
+            // which would cause a hashrate spike when resuming.
+            hashrate_monitor_reset_measurements(GLOBAL_STATE);
+        }
+        was_asic_initialized = is_asic_initialized;
 
-        float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
-        float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
+        if (is_asic_initialized) {
+            ASIC_read_registers(GLOBAL_STATE);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
 
-        SYSTEM_MODULE->current_hashrate = current_hashrate;
-        SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
+            float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
+            float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
 
-        if(current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
+            SYSTEM_MODULE->current_hashrate = current_hashrate;
+            SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
+
+            if (current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
+        } else {
+            SYSTEM_MODULE->current_hashrate = 0;
+        }
 
         vTaskDelayUntil(&taskWakeTime, POLL_RATE / portTICK_PERIOD_MS);
     }

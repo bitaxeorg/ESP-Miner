@@ -619,7 +619,7 @@ static void screen_update_cb(lv_timer_t * timer)
         current_shares_rejected = shares_rejected;
         current_work_received = work_received;
     } else {
-        lv_label_set_text(notification_label, "");
+        lv_label_set_text(notification_label, module->mining_paused ? "▐▐" : "");
     }
 
     if (module->show_new_block) {
