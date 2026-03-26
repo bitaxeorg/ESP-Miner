@@ -622,6 +622,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.calculateAverage(efficiencies);
   }
 
+  trackByIndex(index: number, _item: any) {
+    return index;
+  }
+
   getPayoutPercentage(info: ISystemInfo) {
     if (info.coinbaseValueTotalSatoshis) {
       return (info.coinbaseValueUserSatoshis ?? 0) / info.coinbaseValueTotalSatoshis * 100;
@@ -660,7 +664,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
-    if (info.coinbaseOutputs.length > 0) {
+    if (info.coinbaseOutputs && info.coinbaseOutputs?.length > 0) {
       let percentage = this.getPayoutPercentage(info);
       updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
       updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
@@ -721,17 +725,18 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   public getAsicsAmount(info: ISystemInfo): number {
-    return info.hashrateMonitor.asics.length;
+    return info.hashrateMonitor?.asics?.length ?? 0;
   }
 
   public getAsicDomainsAmount(info: ISystemInfo): number {
-    return info.hashrateMonitor.asics[0]?.domains?.length ?? 0;
+    return info.hashrateMonitor?.asics?.[0]?.domains?.length ?? 0;
   }
 
   public getHeatmapColor(info: ISystemInfo, domainHashrate: number): string {
-    const ratio = Math.max(0, Math.min(2, (domainHashrate / info.expectedHashrate) * this.getAsicsAmount(info)) * this.getAsicDomainsAmount(info));
-    const deviation = Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
-    const t = 1 - Math.pow(1 - deviation, 3);
+    const expectedHashrate = info.expectedHashrate || 1;
+    const ratio = Math.max(0, Math.min(2, (domainHashrate / expectedHashrate) * this.getAsicsAmount(info)) * this.getAsicDomainsAmount(info));
+    const deviation = isNaN(ratio) ? 1 : Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
+    const t = 1 - Math.pow(1 - deviation, 1.5); // Exponent controls graduality (lower = more gradual, 7 was very steep)
     const target = ratio > 1 ? 255 : 0; // gradient from 0: black, 1: primary-color, 2: white
 
     const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
@@ -825,6 +830,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   static cbFormatValue(value: number, datasetLabel: eChartLabel, args?: any): string {
+    if (value === undefined || value === null) return '';
     switch (datasetLabel) {
       case eChartLabel.hashrate:
       case eChartLabel.hashrate_1m:
