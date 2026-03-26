@@ -15,6 +15,7 @@
 #include "coinbase_decoder.h"
 #include <esp_heap_caps.h>
 #include "hashrate_monitor_task.h"
+#include "esp_transport_ssl.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
@@ -301,9 +302,12 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
 
-        esp_err_t err = esp_transport_connect(transport, primary_stratum_url, primary_stratum_port, TRANSPORT_TIMEOUT_MS);
+        if (tls != DISABLED) {
+            esp_transport_ssl_set_common_name(transport, primary_stratum_url);
+        }
+        esp_err_t err = esp_transport_connect(transport, conn_info.host_ip, primary_stratum_port, TRANSPORT_TIMEOUT_MS);
         if (err != ESP_OK) {
-            ESP_LOGD(TAG, "Heartbeat. Failed connect check: %s:%d (errno %d: %s)", primary_stratum_url, primary_stratum_port, err, strerror(err));
+            ESP_LOGD(TAG, "Heartbeat. Failed connect check: %s:%d (%s) (errno %d: %s)", primary_stratum_url, primary_stratum_port, conn_info.host_ip, err, strerror(err));
             esp_transport_close(transport);
             vTaskDelay(60000 / portTICK_PERIOD_MS);
             continue;
@@ -517,8 +521,13 @@ void stratum_task(void * pvParameters)
         }
         retry_critical_attempts = 0;
 
-        ESP_LOGI(TAG, "Transport initialized, connecting to %s:%d", stratum_url, port);
-        esp_err_t ret = esp_transport_connect(GLOBAL_STATE->transport, stratum_url, port, TRANSPORT_TIMEOUT_MS);
+        // Use the already-resolved IP to avoid a second DNS lookup inside esp_transport_connect.
+        // This prevents long DNS timeouts from blocking the lwIP stack and starving the HTTP server.
+        if (tls != DISABLED) {
+            esp_transport_ssl_set_common_name(GLOBAL_STATE->transport, stratum_url);
+        }
+        ESP_LOGI(TAG, "Transport initialized, connecting to %s:%d (%s)", stratum_url, port, conn_info.host_ip);
+        esp_err_t ret = esp_transport_connect(GLOBAL_STATE->transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
         if (ret != ESP_OK) {
             retry_attempts ++;
             ESP_LOGE(TAG, "Transport unable to connect to %s:%d (errno %d). Attempt: %d", stratum_url, port, ret, retry_attempts);
