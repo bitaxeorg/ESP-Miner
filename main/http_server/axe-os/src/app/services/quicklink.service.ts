@@ -33,6 +33,7 @@ export class QuicklinkService {
       { search: 'parasite.wtf', url: `https://parasite.space/user/${user}` },
       { regex: /^(eu|au)?solo[46]?.ckpool\.org/, url: `https://$1solostats.ckpool.org/users/${user}` },
       { search: 'atlaspool.io', url: `https://atlaspool.io/dashboard.html?wallet=${user}` },
+      { regex: /^(.+?)(?:-[a-z]{2})?\.kryptex\.network/, url: `https://pool.kryptex.com/$1/miner/stats/${user.replace(/^solo:/, '')}` },
     ];
 
     for (const pool of pools) {
