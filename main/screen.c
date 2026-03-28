@@ -105,8 +105,6 @@ static uint64_t current_work_received;
 static int8_t current_rssi_value;
 static int current_block_height;
 
-static bool self_test_finished;
-
 static screen_t get_current_screen() {
     lv_obj_t * active_screen = lv_screen_active();
     for (screen_t scr = 0; scr < MAX_SCREENS; scr++) {
@@ -134,10 +132,7 @@ static lv_obj_t * create_scr_self_test() {
 
     self_test_message_label = lv_label_create(scr);
     self_test_result_label = lv_label_create(scr);
-
     self_test_finished_label = lv_label_create(scr);
-    lv_obj_set_width(self_test_finished_label, LV_HOR_RES);
-    lv_label_set_long_mode(self_test_finished_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     return scr;
 }
@@ -449,8 +444,7 @@ static void screen_update_cb(lv_timer_t * timer)
         
         lv_label_set_text(self_test_message_label, self_test->message);
         
-        if (self_test->is_finished && !self_test_finished) {
-            self_test_finished = true;
+        if (self_test->is_finished) {
             lv_label_set_text(self_test_result_label, self_test->result);
             lv_label_set_text(self_test_finished_label, self_test->finished);
         }

@@ -86,16 +86,22 @@ void app_main(void)
         wifi_init(&GLOBAL_STATE);
     }
 
-    SYSTEM_init_peripherals(&GLOBAL_STATE);
-
-    if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating power management task");
-    }
-
-    if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-        if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-            ESP_LOGE(TAG, "Error creating fan controller task");
+    esp_err_t system_init_ret = SYSTEM_init_peripherals(&GLOBAL_STATE);
+    
+    if (system_init_ret == ESP_OK) {
+        if (xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating power management task");
         }
+        if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+            if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating fan controller task");
+            }
+        }
+    } else {
+        ESP_LOGE(TAG, "Critical peripheral initialization failure (%s). Entering degraded mode.", esp_err_to_name(GLOBAL_STATE.SELF_TEST_MODULE.system_init_ret));
+    }
+    
+    if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
         // start the API for AxeOS
         start_rest_server((void *) &GLOBAL_STATE);
     }
@@ -116,32 +122,37 @@ void app_main(void)
 
     queue_init(&GLOBAL_STATE.stratum_queue);
 
-    if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
-        return;
-    }
-
-    if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating stratum miner task");
-    }
-    if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating asic result task");
-    }
-
-    if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-        if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-            ESP_LOGE(TAG, "Error creating stratum admin task");
+    if (system_init_ret == ESP_OK) {
+        if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
+            return;
         }
-    } else {
+
+        if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating stratum miner task");
+        }
+        if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating asic result task");
+        }
+
+        if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+            if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating stratum admin task");
+            }
+        }
+
+        if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) !=
+            pdPASS) {
+            ESP_LOGE(TAG, "Error creating hashrate monitor task");
+        }
+        if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+            ESP_LOGE(TAG, "Error creating statistics task");
+        }
+    }
+
+    if (GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        GLOBAL_STATE.SELF_TEST_MODULE.system_init_ret = system_init_ret;
         if (xTaskCreate(self_test_task, "self_test", 8192, (void *) &GLOBAL_STATE, 10, NULL) != pdPASS) {
             ESP_LOGE(TAG, "Error creating self test task");
         }
-    }
-
-    if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) !=
-        pdPASS) {
-        ESP_LOGE(TAG, "Error creating hashrate monitor task");
-    }
-    if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
-        ESP_LOGE(TAG, "Error creating statistics task");
     }
 }

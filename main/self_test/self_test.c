@@ -1,13 +1,8 @@
 #include <string.h>
-
-// #include "freertos/event_groups.h"
-// #include "freertos/timers.h"
 #include "driver/gpio.h"
-
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_check.h"
-#include "esp_psram.h"
 
 #include "DS4432U.h"
 #include "thermal.h"
@@ -15,8 +10,6 @@
 #include "power.h"
 #include "nvs_config.h"
 #include "global_state.h"
-
-#include "asic.h"
 #include "asic_reset.h"
 #include "device_config.h"
 #include "hashrate_monitor_task.h"
@@ -219,7 +212,7 @@ void self_test_task(void * pvParameters)
     if (!GLOBAL_STATE->SELF_TEST_MODULE.is_active) return;
 
     // Check if we already have an error message from peripheral initialization
-    if (GLOBAL_STATE->SELF_TEST_MODULE.message != NULL && strlen(GLOBAL_STATE->SELF_TEST_MODULE.message) > 0) {
+    if (GLOBAL_STATE->SELF_TEST_MODULE.system_init_ret != ESP_OK) {
         ESP_LOGE(TAG, "Aborting self-test due to initialization failure: %s", GLOBAL_STATE->SELF_TEST_MODULE.message);
         tests_done(GLOBAL_STATE, false);
     }
@@ -422,8 +415,12 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
         }
         ESP_LOGI(TAG, "SELF-TEST PASS! -- Restarting in 10 seconds.");
         GLOBAL_STATE->SELF_TEST_MODULE.result = "SELF-TEST PASS!";
-        GLOBAL_STATE->SELF_TEST_MODULE.finished = "Restarting in 10 seconds.";
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        char logString[21];
+        for (int i = 10; i > 0; i--) {
+            snprintf(logString, sizeof(logString), "Restarting in %d...", i);
+            GLOBAL_STATE->SELF_TEST_MODULE.finished = logString;
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
         esp_restart();
     } else {
         // isTestFailed

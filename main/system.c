@@ -208,7 +208,9 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     if (ret != ESP_OK) {
         self_test_show_message(GLOBAL_STATE, "FILESYS:FAIL");
         ESP_LOGE(TAG, "Filesystem init failed");
-        return ret;
+        if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
+            return ret;
+        }
     }
 
     // Initialize the core voltage regulator

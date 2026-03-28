@@ -101,6 +101,7 @@ typedef struct
     char *message;
     char *result;
     char *finished;
+    esp_err_t system_init_ret;
 } SelfTestModule;
 
 typedef struct
