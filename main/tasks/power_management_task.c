@@ -20,7 +20,7 @@
 #include "asic_reset.h"
 #include "driver/uart.h"
 
-#define POLL_RATE 1800
+#define POLL_RATE 100
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define SAFE_TEMP 45.0
