@@ -58,7 +58,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE]          = {.nvs_key_name = "stratumxnsub",    .type = TYPE_BOOL,  .default_value = {.b   = (bool)STRATUM_EXTRANONCE_SUBSCRIBE},          .rest_name = "stratumExtranonceSubscribe",         .min = 0,  .max = 1},
     [NVS_CONFIG_STRATUM_TLS]                           = {.nvs_key_name = "stratumtls",      .type = TYPE_U16,   .default_value = {.u16 = (uint16_t)CONFIG_STRATUM_TLS},                .rest_name = "stratumTLS",                         .min = 0,  .max = 3},
     [NVS_CONFIG_STRATUM_CERT]                          = {.nvs_key_name = "stratumcert",     .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_CERT},                 .rest_name = "stratumCert",                        .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_STRATUM_DECODE_COINBASE]               = {.nvs_key_name = "stratumdecode",   .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "stratumDecodeCoinbase",              .min = 0,  .max = 1},
+    [NVS_CONFIG_STRATUM_DECODE_COINBASE_TX]            = {.nvs_key_name = "stratumdecode",   .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "stratumDecodeCoinbase",              .min = 0,  .max = 1},
     [NVS_CONFIG_FALLBACK_STRATUM_URL]                  = {.nvs_key_name = "fbstratumurl",    .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_URL},         .rest_name = "fallbackStratumURL",                 .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_FALLBACK_STRATUM_PORT]                 = {.nvs_key_name = "fbstratumport",   .type = TYPE_U16,   .default_value = {.u16 = CONFIG_FALLBACK_STRATUM_PORT},                .rest_name = "fallbackStratumPort",                .min = 0,  .max = UINT16_MAX},
     [NVS_CONFIG_FALLBACK_STRATUM_USER]                 = {.nvs_key_name = "fbstratumuser",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_USER},        .rest_name = "fallbackStratumUser",                .min = 0,  .max = NVS_STR_LIMIT},
@@ -67,7 +67,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE] = {.nvs_key_name = "stratumfbxnsub",  .type = TYPE_BOOL,  .default_value = {.b   = (bool)FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE}, .rest_name = "fallbackStratumExtranonceSubscribe", .min = 0,  .max = 1},
     [NVS_CONFIG_FALLBACK_STRATUM_TLS]                  = {.nvs_key_name = "fbstratumtls",    .type = TYPE_U16,   .default_value = {.u16 = (uint16_t)CONFIG_FALLBACK_STRATUM_TLS},       .rest_name = "fallbackStratumTLS",                 .min = 0,  .max = 3},
     [NVS_CONFIG_FALLBACK_STRATUM_CERT]                 = {.nvs_key_name = "fbstratumcert",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_CERT},        .rest_name = "fallbackStratumCert",                .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE]      = {.nvs_key_name = "fbstratumdecode", .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "fallbackStratumDecodeCoinbase",      .min = 0,  .max = 1},
+    [NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX]   = {.nvs_key_name = "fbstratumdecode", .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "fallbackStratumDecodeCoinbase",      .min = 0,  .max = 1},
     [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstartum",    .type = TYPE_BOOL,                                                                         .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
 
     [NVS_CONFIG_ASIC_FREQUENCY]                        = {.nvs_key_name = "asicfrequency_f", .type = TYPE_FLOAT, .default_value = {.f   = CONFIG_ASIC_FREQUENCY},                       .rest_name = "frequency",                          .min = 1,  .max = UINT16_MAX},
@@ -137,7 +137,7 @@ static void get_nvs_key_name(const Settings * setting, const int index, char des
     } else {
         strncpy(dest, setting->nvs_key_name, NVS_KEY_NAME_MAX_SIZE);
     }
-}      
+}
 
 static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
 {
@@ -273,17 +273,17 @@ esp_err_t nvs_config_init(void)
         setting->value = calloc(count, sizeof(ConfigValue));
 
         for (int idx = 0; idx < count; idx++) {
-            char key[NVS_KEY_NAME_MAX_SIZE];
-            get_nvs_key_name(setting, idx, key);
+            char nvs_key[NVS_KEY_NAME_MAX_SIZE];
+            get_nvs_key_name(setting, idx, nvs_key);
 
             switch (setting->type) {
                 case TYPE_STR: {
                     size_t len = 0;
-                    esp_err_t ret = nvs_get_str(handle, key, NULL, &len);
+                    esp_err_t ret = nvs_get_str(handle, nvs_key, NULL, &len);
                     if (ret == ESP_OK && len > 1) {
                         char *buf = malloc(len);
                         if (buf) {
-                            ret = nvs_get_str(handle, key, buf, &len);
+                            ret = nvs_get_str(handle, nvs_key, buf, &len);
                             if (ret == ESP_OK) {
                                 setting->value[idx].str = buf;
                                 break;
@@ -298,32 +298,32 @@ esp_err_t nvs_config_init(void)
                 }
                 case TYPE_U16: {
                     uint16_t val;
-                    ret = nvs_get_u16(handle, key, &val);
+                    ret = nvs_get_u16(handle, nvs_key, &val);
                     setting->value[idx].u16 = (ret == ESP_OK) ? val : setting->default_value.u16;
                     break;
                 }
                 case TYPE_I32: {
                     int32_t val;
-                    ret = nvs_get_i32(handle, key, &val);
+                    ret = nvs_get_i32(handle, nvs_key, &val);
                     setting->value[idx].i32 = (ret == ESP_OK) ? val : setting->default_value.i32;
                     break;
                 }
                 case TYPE_U64: {
                     uint64_t val;
-                    ret = nvs_get_u64(handle, key, &val);
+                    ret = nvs_get_u64(handle, nvs_key, &val);
                     setting->value[idx].u64 = (ret == ESP_OK) ? val : setting->default_value.u64;
                     break;
                 }
                 case TYPE_FLOAT: {
                     char buf[32];
                     size_t len = sizeof(buf);
-                    ret = nvs_get_str(handle, key, buf, &len);
+                    ret = nvs_get_str(handle, nvs_key, buf, &len);
                     setting->value[idx].f = (ret == ESP_OK) ? atof(buf) : setting->default_value.f;
                     break;
                 }
                 case TYPE_BOOL: {
                     uint16_t val;
-                    ret = nvs_get_u16(handle, key, &val);
+                    ret = nvs_get_u16(handle, nvs_key, &val);
                     setting->value[idx].b = (ret == ESP_OK) ? (val != 0) : setting->default_value.b;
                     break;
                 }

@@ -54,6 +54,8 @@ void ASIC_result_task(void *pvParameters)
         //log the ASIC response
         ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", active_job->jobid, asic_result->asic_nr, asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
 
+        if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) continue;
+
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)
         {

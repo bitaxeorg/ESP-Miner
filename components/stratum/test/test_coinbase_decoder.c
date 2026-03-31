@@ -119,3 +119,73 @@ TEST_CASE("Decode P2TR address", "[coinbase_decoder]")
     
     TEST_ASSERT_EQUAL_STRING("bc1pllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqc0cgpt", output);
 }
+
+TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
+{
+    // Create a mining_notify without BIP-110 bit set
+    mining_notify notify = { 0 };
+    notify.version = 0x20000000;  // No BIP-110 signaling
+    notify.job_id = "test_job";
+    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b03a5020cfabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
+    notify.coinbase_2 = "41903d4c1b2f736c7573682f0000000003ca890d27000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3a4cb4cb2ddfc37c41baf5ef6b6b4899e3253a8f1dfc7e5dd68a5b5b27005014ef0000000000000000266a24aa21a9ed5caa249f1af9fbf71c986fea8e076ca34ae3514fb2f86400561b28c7b15949bf00000000";
+    
+    mining_notification_result_t result = { 0 };
+    
+    // Use valid extranonce1 (8 hex chars = 4 bytes)
+    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_FALSE(result.bip110_signaling);
+}
+
+TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
+{
+    // Create a mining_notify with BIP-110 bit set (bit 4 = 0x00000010)
+    mining_notify notify = { 0 };
+    notify.version = 0x20000010;  // Version with BIP-110 signaling
+    notify.job_id = "test_job";
+    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b03a5020cfabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
+    notify.coinbase_2 = "41903d4c1b2f736c7573682f0000000003ca890d27000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3a4cb4cb2ddfc37c41baf5ef6b6b4899e3253a8f1dfc7e5dd68a5b5b27005014ef0000000000000000266a24aa21a9ed5caa249f1af9fbf71c986fea8e076ca34ae3514fb2f86400561b28c7b15949bf00000000";
+    
+    mining_notification_result_t result = { 0 };
+    
+    // Use valid extranonce1 (8 hex chars = 4 bytes)
+    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_TRUE(result.bip110_signaling);
+}
+
+TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
+{
+    // Create a mining_notify with BIP-110 bit set (bit 4 = 0x00000010)
+    mining_notify notify = { 0 };
+    notify.version = 0x20000010;  // Version with BIP-110 signaling
+    notify.job_id = "test_job";
+    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b031fbc0efabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
+    notify.coinbase_2 = "41903d4c1b2f736c7573682f0000000003ca890d27000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3a4cb4cb2ddfc37c41baf5ef6b6b4899e3253a8f1dfc7e5dd68a5b5b27005014ef0000000000000000266a24aa21a9ed5caa249f1af9fbf71c986fea8e076ca34ae3514fb2f86400561b28c7b15949bf00000000";
+    
+    mining_notification_result_t result = { 0 };
+    
+    // Use valid extranonce1 (8 hex chars = 4 bytes)
+    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL(965663, result.block_height);
+    TEST_ASSERT_TRUE(result.bip110_signaling);
+}
+
+TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
+{
+    // Create a mining_notify with BIP-110 bit set (bit 4 = 0x00000010)
+    mining_notify notify = { 0 };
+    notify.version = 0x20000010;  // Version with BIP-110 signaling
+    notify.job_id = "test_job";
+    notify.coinbase_1 = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0320bc0efabe6d6d379ae882651f6469f2ed6b8b40a4f9a4b41fd838a3ad6de8cba775f4e8f1d3080100000000000000";
+    notify.coinbase_2 = "41903d4c1b2f736c7573682f0000000003ca890d27000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c2952534b424c4f434b3a4cb4cb2ddfc37c41baf5ef6b6b4899e3253a8f1dfc7e5dd68a5b5b27005014ef0000000000000000266a24aa21a9ed5caa249f1af9fbf71c986fea8e076ca34ae3514fb2f86400561b28c7b15949bf00000000";
+    
+    mining_notification_result_t result = { 0 };
+    
+    // Use valid extranonce1 (8 hex chars = 4 bytes)
+    esp_err_t err = coinbase_process_notification(&notify, "01020304", 8, "", true, &result);
+    TEST_ASSERT_EQUAL(ESP_OK, err);
+    TEST_ASSERT_EQUAL(965664, result.block_height);
+    TEST_ASSERT_FALSE(result.bip110_signaling);
+}
