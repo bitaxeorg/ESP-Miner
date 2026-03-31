@@ -13,13 +13,13 @@
     width: 100%;
     border-collapse: separate;
     border-spacing: 1px;
-    table-layout: fixes;
+    table-layout: fixed;
 
     th {
         padding: 0;
     }
 
-    &[style*="background"] {
-        transition: background 250ms;
+    td {
+        transition: background-color 2s ease-in-out;
     }
 }
