@@ -833,6 +833,10 @@ paths:
       summary: Get best difficulty share scoreboard
       description: Returns top 20 best difficulty shares
       operationId: getSystemScoreboard
+      tags:
+        - system
+      responses:
+        '200':      
           description: Successful operation
           content:
             application/json:
