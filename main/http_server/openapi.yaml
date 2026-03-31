@@ -139,6 +139,7 @@ components:
         - freeHeapInternal
         - freeHeapSpiram
         - frequency
+        - actualFrequency
         - hashRate
         - hashRate_1m
         - hashRate_10m
@@ -192,11 +193,13 @@ components:
         - blockHeight
         - scriptsig
         - networkDifficulty
+        - blockSignals
         - blockFound
         - coinbaseOutputs
         - coinbaseValueTotalSatoshis
         - coinbaseValueUserSatoshis
         - hashrateMonitor
+        - miningPaused
       properties:
         ASICModel:
           type: string
@@ -282,6 +285,9 @@ components:
         frequency:
           type: number
           description: ASIC frequency in MHz
+        actualFrequency:
+          type: number
+          description: Real-time ASIC frequency in MHz
         hashRate:
           type: number
           description: Current hashrate in Gh/s
@@ -443,6 +449,11 @@ components:
         networkDifficulty:
           type: number
           description: Current network difficulty
+        blockSignals:
+          type: array
+          description: Active block signaling (e.g., BIP-110)
+          items:
+            type: string
         blockFound:
           type: number
           description: Number of blocks found
@@ -481,6 +492,9 @@ components:
               description: Hashrate register value per ASIC
               items:
                 $ref: '#/components/schemas/HashrateMonitorAsic'
+        miningPaused:
+          type: boolean
+          description: Whether mining is currently paused
 
     SystemASIC:
       type: object
@@ -808,6 +822,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SystemStatistics'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/pause:
+    post:
+      summary: Pause mining
+      description: Pauses mining activity
+      operationId: pauseMining
+      tags:
+        - system
+      responses:
+        '200':
+          description: Mining paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/resume:
+    post:
+      summary: Resume mining
+      description: Resumes mining activity
+      operationId: resumeMining
+      tags:
+        - system
+      responses:
+        '200':
+          description: Mining resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

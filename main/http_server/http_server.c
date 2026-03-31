@@ -302,33 +302,6 @@ esp_err_t is_network_allowed(httpd_req_t * req)
     return ESP_FAIL;
 }
 
-esp_err_t init_fs(void)
-{
-    esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = NULL, .max_files = 5, .format_if_mount_failed = false};
-    esp_err_t ret = esp_vfs_spiffs_register(&conf);
-
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
-            ESP_LOGE(TAG, "Failed to mount or format filesystem");
-        } else if (ret == ESP_ERR_NOT_FOUND) {
-            ESP_LOGE(TAG, "Failed to find SPIFFS partition");
-        } else {
-            ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
-        }
-        return ESP_FAIL;
-    }
-
-    size_t total = 0, used = 0;
-    ret = esp_spiffs_info(NULL, &total, &used);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)", esp_err_to_name(ret));
-    } else {
-        ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
-    }
-
-    return ESP_OK;
-}
-
 /* Function for stopping the webserver */
 void stop_webserver(httpd_handle_t server)
 {
@@ -792,6 +765,58 @@ static esp_err_t POST_dismiss_block_found(httpd_req_t * req)
     return res;
 }
 
+static esp_err_t POST_mining_pause(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    GLOBAL_STATE->SYSTEM_MODULE.mining_paused = true;
+    ESP_LOGI(TAG, "Mining paused by API request");
+
+    httpd_resp_set_type(req, "application/json");
+    cJSON * resp = cJSON_CreateObject();
+    if (resp == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Internal error");
+        return ESP_OK;
+    }
+    cJSON_AddStringToObject(resp, "message", "Mining paused");
+    esp_err_t res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
+    cJSON_Delete(resp);
+    return res;
+}
+
+static esp_err_t POST_mining_resume(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
+    ESP_LOGI(TAG, "Mining resumed by API request");
+
+    httpd_resp_set_type(req, "application/json");
+    cJSON * resp = cJSON_CreateObject();
+    if (resp == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Internal error");
+        return ESP_OK;
+    }
+    cJSON_AddStringToObject(resp, "message", "Mining resumed");
+    esp_err_t res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
+    cJSON_Delete(resp);
+    return res;
+}
+
 static const char* esp_reset_reason_to_string(esp_reset_reason_t reason) {
     switch (reason) {
         case ESP_RST_UNKNOWN:    return "Reset reason can not be determined";
@@ -882,6 +907,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
     cJSON_AddNumberToObject(root, "coreVoltageActual", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.core_voltage);
     cJSON_AddFloatToObject(root, "frequency", frequency);
+    cJSON_AddFloatToObject(root, "actualFrequency", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency);    
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
     cJSON_AddStringToObject(root, "hostname", hostname);
@@ -913,7 +939,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "stratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddNumberToObject(root, "stratumTLS", nvs_config_get_u16(NVS_CONFIG_STRATUM_TLS));
     cJSON_AddStringToObject(root, "stratumCert", stratumCert);
-    cJSON_AddNumberToObject(root, "stratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_STRATUM_DECODE_COINBASE));
+    cJSON_AddNumberToObject(root, "stratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_STRATUM_DECODE_COINBASE_TX));
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
     cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT));
     cJSON_AddStringToObject(root, "fallbackStratumUser", fallbackStratumUser);
@@ -921,7 +947,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddNumberToObject(root, "fallbackStratumTLS", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS));
     cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
-    cJSON_AddNumberToObject(root, "fallbackStratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE));
+    cJSON_AddNumberToObject(root, "fallbackStratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX));
     cJSON_AddFloatToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
 
     cJSON_AddStringToObject(root, "version", GLOBAL_STATE->SYSTEM_MODULE.version);
@@ -933,6 +959,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
     cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE));
+    cJSON_AddBoolToObject(root, "miningPaused", GLOBAL_STATE->SYSTEM_MODULE.mining_paused);
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED));
     cJSON_AddStringToObject(root, "display", display);
     cJSON_AddNumberToObject(root, "rotation", nvs_config_get_u16(NVS_CONFIG_ROTATION));
@@ -961,6 +988,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         cJSON_AddNumberToObject(root, "blockHeight", GLOBAL_STATE->block_height);
         cJSON_AddStringToObject(root, "scriptsig", GLOBAL_STATE->scriptsig);
         cJSON_AddNumberToObject(root, "networkDifficulty", GLOBAL_STATE->network_nonce_diff);
+
+        cJSON *block_signals_array = cJSON_CreateArray();
+        for (int i = 0; i < GLOBAL_STATE->block_signals_count; i++) {
+            cJSON_AddItemToArray(block_signals_array, cJSON_CreateString(GLOBAL_STATE->block_signals[i]));
+        }
+        cJSON_AddItemToObject(root, "blockSignals", block_signals_array);
 
         cJSON *outputs_array = cJSON_CreateArray();
         for (int i = 0; i < GLOBAL_STATE->coinbase_output_count; i++) {
@@ -1287,13 +1320,6 @@ esp_err_t start_rest_server(void * pvParameters)
     asic_api_init(GLOBAL_STATE);
     const char * base_path = "";
 
-    bool enter_recovery = false;
-    if (init_fs() != ESP_OK) {
-        // Unable to initialize the web app filesystem.
-        // Enter recovery mode
-        enter_recovery = true;
-    }
-
     REST_CHECK(base_path, "wrong base path", err);
     rest_server_context_t * rest_context = calloc(1, sizeof(rest_server_context_t));
     REST_CHECK(rest_context, "No memory for rest context", err);
@@ -1379,16 +1405,24 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &system_restart_uri);
 
-    httpd_uri_t system_restart_options_uri = {
-        .uri = "/api/system/restart", 
-        .method = HTTP_OPTIONS, 
-        .handler = handle_options_request, 
-        .user_ctx = NULL
+    httpd_uri_t system_mining_pause_uri = {
+        .uri = "/api/system/pause",
+        .method = HTTP_POST,
+        .handler = POST_mining_pause,
+        .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &system_restart_options_uri);
+    httpd_register_uri_handler(server, &system_mining_pause_uri);
+
+    httpd_uri_t system_mining_resume_uri = {
+        .uri = "/api/system/resume",
+        .method = HTTP_POST,
+        .handler = POST_mining_resume,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_mining_resume_uri);
 
     httpd_uri_t system_dismiss_block_found_uri = {
-        .uri = "/api/system/blockFound/dismiss", 
+        .uri = "/api/system/blockFound/dismiss",
         .method = HTTP_POST, 
         .handler = POST_dismiss_block_found, 
         .user_ctx = NULL
@@ -1428,7 +1462,7 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &ws);
 
-    if (enter_recovery) {
+    if (!GLOBAL_STATE->filesystem_is_available) {
         /* Make default route serve Recovery */
         httpd_uri_t recovery_implicit_get_uri = {
             .uri = "/*", .method = HTTP_GET, 

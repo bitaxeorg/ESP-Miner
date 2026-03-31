@@ -10,17 +10,21 @@ static const char * TAG = "EMC2103";
 static i2c_master_dev_handle_t EMC2103_dev_handle;
 
 static int temp_offset;
+static int flip;
 
 /**
  * @brief Initialize the EMC2103 sensor.
+ * @param temp_offset_param Temperature offset
+ * @param flip_param Flip sensor 1 and 2
  *
  * @return esp_err_t ESP_OK on success, or an error code on failure.
  */
-esp_err_t EMC2103_init(int temp_offset_param)
+esp_err_t EMC2103_init(int temp_offset_param, bool flip_param)
 {
     ESP_LOGI(TAG, "Initializing EMC2103 (Temperature offset: %d° C)", temp_offset_param);
     
     temp_offset = temp_offset_param;
+    flip = flip_param;
 
     if (i2c_bitaxe_add_device(EMC2103_I2CADDR_DEFAULT, &EMC2103_dev_handle, TAG) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add device");
@@ -152,7 +156,11 @@ static float get_external_temp(int i, uint8_t msb_register, uint8_t lsb_register
  */
 float EMC2103_get_external_temp(void)
 {
-    return get_external_temp(1, EMC2103_EXTERNAL_TEMP1_MSB, EMC2103_EXTERNAL_TEMP1_LSB);
+    if (flip) {
+        return get_external_temp(2, EMC2103_EXTERNAL_TEMP2_MSB, EMC2103_EXTERNAL_TEMP2_LSB);
+    } else {
+        return get_external_temp(1, EMC2103_EXTERNAL_TEMP1_MSB, EMC2103_EXTERNAL_TEMP1_LSB);
+    }
 }
 
 /**
@@ -162,5 +170,9 @@ float EMC2103_get_external_temp(void)
  */
 float EMC2103_get_external_temp2(void)
 {
-    return get_external_temp(2, EMC2103_EXTERNAL_TEMP2_MSB, EMC2103_EXTERNAL_TEMP2_LSB);
+    if (flip) {
+        return get_external_temp(1, EMC2103_EXTERNAL_TEMP1_MSB, EMC2103_EXTERNAL_TEMP1_LSB);
+    } else {
+        return get_external_temp(2, EMC2103_EXTERNAL_TEMP2_MSB, EMC2103_EXTERNAL_TEMP2_LSB);
+    }
 }

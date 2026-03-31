@@ -8,6 +8,9 @@
 #include <ctype.h>
 #include "mbedtls/sha256.h"
 
+#define BIP110_SIGNAL_BIT 4
+#define BIP110_SIGNAL_EXPIRY_BLOCK 965664
+
 // Wrapper for SHA256 to match libbase58's expected signature
 static bool my_sha256(void *digest, const void *data, size_t datasz) {
     mbedtls_sha256(data, datasz, digest, 0);
@@ -144,14 +147,14 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
                                  const char *extranonce1,
                                  int extranonce2_len,
                                  const char *user_address,
-                                 bool decode_outputs,
+                                 bool decode_coinbase_tx,
                                  mining_notification_result_t *result) {
     if (!notification || !extranonce1 || !result) return ESP_ERR_INVALID_ARG;
 
     // Initialize result
     result->total_value_satoshis = 0;
     result->user_value_satoshis = 0;
-    result->decoding_enabled = decode_outputs;
+    result->decode_coinbase_tx = decode_coinbase_tx;
 
     // 1. Calculate difficulty
     result->network_difficulty = networkDifficulty(notification->target);
@@ -177,6 +180,9 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
     result->block_height = 0;
     hex2bin(notification->coinbase_1 + (coinbase_1_offset * 2), (uint8_t *)&result->block_height, block_height_len);
     coinbase_1_offset += block_height_len;
+
+    // Detect BIP-110 signaling: check if bit 4 (0x00000010) is set in version
+    result->bip110_signaling = decode_coinbase_tx && result->block_height < BIP110_SIGNAL_EXPIRY_BLOCK && (notification->version & (1U << BIP110_SIGNAL_BIT)) != 0;
 
     // Calculate remaining scriptsig length (excluding block height part)
     int scriptsig_length = scriptsig_len - 1 - block_height_len;
@@ -245,10 +251,14 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
     
     int offset = coinbase_2_offset;
     
-    // Skip sequence (4 bytes)
+    // Read sequence (4 bytes) for BIP-54 detection
     if (offset + 4 > coinbase_2_len) {
         free(coinbase_2_bin);
         return ESP_ERR_INVALID_ARG; // No room for outputs, but valid notification processed so far
+    }
+    uint32_t nSequence = 0;
+    for (int i = 0; i < 4; i++) {
+        nSequence |= ((uint32_t)coinbase_2_bin[offset + i]) << (i * 8);
     }
     offset += 4;
     
@@ -267,8 +277,8 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
         if (offset + 8 > coinbase_2_len) break;
 
         uint64_t value_satoshis = 0;
-        for (int j = 0; j < 8; j++) {
-            value_satoshis |= ((uint64_t)coinbase_2_bin[offset + j]) << (j * 8);
+        for (int i = 0; i < 8; i++) {
+            value_satoshis |= ((uint64_t)coinbase_2_bin[offset + i]) << (i * 8);
         }
         offset += 8;
 
@@ -281,7 +291,7 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
 
         if (offset + script_len > coinbase_2_len) break;
 
-        if (decode_outputs) {
+        if (decode_coinbase_tx) {
             if (value_satoshis > 0) {            
                 char output_address[MAX_ADDRESS_STRING_LEN];
                 coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN);
@@ -307,6 +317,17 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
 
         offset += script_len;
     }
+    
+    // Read nLockTime (4 bytes at the end of the transaction) for BIP-54 detection
+    uint32_t nLockTime = 0;
+    if (offset + 4 <= coinbase_2_len) {
+        for (int i = 0; i < 4; i++) {
+            nLockTime |= ((uint32_t)coinbase_2_bin[offset + i]) << (i * 8);
+        }
+    }
+    
+    // Detect BIP-54 signaling: nLockTime = block_height - 1 AND nSequence != 0xffffffff
+    result->bip54_signaling = decode_coinbase_tx && (nLockTime == result->block_height - 1) && (nSequence != 0xffffffff);
     
     free(coinbase_2_bin);
     return ESP_OK;

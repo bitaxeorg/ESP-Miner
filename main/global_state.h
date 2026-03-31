@@ -21,6 +21,8 @@
 
 #define HISTORY_LENGTH 100
 #define DIFF_STRING_SIZE 10
+#define MAX_BLOCK_SIGNALS 8
+#define MAX_BLOCK_SIGNAL_LEN 16
 
 typedef struct {
     char message[64];
@@ -67,8 +69,8 @@ typedef struct
     uint16_t fallback_pool_difficulty;
     bool pool_extranonce_subscribe;
     bool fallback_pool_extranonce_subscribe;
-    bool pool_decode_coinbase;
-    bool fallback_pool_decode_coinbase;
+    bool pool_decode_coinbase_tx;
+    bool fallback_pool_decode_coinbase_tx;
     float response_time;
     bool use_fallback_stratum;
     uint16_t pool_is_tls;
@@ -80,6 +82,7 @@ typedef struct
     bool is_using_fallback;
     char pool_connection_info[64];
     bool overheat_mode;
+    bool mining_paused;
     uint16_t power_fault;
     uint32_t lastClockSync;
     bool is_screen_active;
@@ -98,6 +101,7 @@ typedef struct
     char *message;
     char *result;
     char *finished;
+    esp_err_t system_init_ret;
 } SelfTestModule;
 
 typedef struct
@@ -143,6 +147,7 @@ typedef struct
 
     bool ASIC_initalized;
     bool psram_is_available;
+    bool filesystem_is_available;
 
     int block_height;
     char scriptsig[128];
@@ -152,6 +157,8 @@ typedef struct
     uint64_t coinbase_value_user_satoshis;
     uint64_t network_nonce_diff;
     char network_diff_string[DIFF_STRING_SIZE];
+    char block_signals[MAX_BLOCK_SIGNALS][MAX_BLOCK_SIGNAL_LEN];
+    int block_signals_count;
 } GlobalState;
 
 #endif /* GLOBAL_STATE_H_ */

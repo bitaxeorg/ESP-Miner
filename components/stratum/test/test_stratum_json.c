@@ -174,3 +174,36 @@ TEST_CASE("Parse stratum result alternative error", "[stratum]")
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
     TEST_ASSERT_EQUAL_STRING("Above target 2", stratum_api_v1_message.error_str);
 }
+
+TEST_CASE("Parse stratum result with error string (Stale)", "[stratum]")
+{
+    StratumApiV1Message stratum_api_v1_message = {};
+    const char *json_string = "{\"result\":false,\"error\":\"Stale\",\"id\":618}";
+    STRATUM_V1_parse(&stratum_api_v1_message, json_string);
+    TEST_ASSERT_EQUAL(618, stratum_api_v1_message.message_id);
+    TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
+    TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
+    TEST_ASSERT_EQUAL_STRING("Stale", stratum_api_v1_message.error_str);
+}
+
+TEST_CASE("Parse stratum result with null result and error string", "[stratum]")
+{
+    StratumApiV1Message stratum_api_v1_message = {};
+    const char *json_string = "{\"result\":null,\"error\":\"Stale\",\"id\":618}";
+    STRATUM_V1_parse(&stratum_api_v1_message, json_string);
+    TEST_ASSERT_EQUAL(618, stratum_api_v1_message.message_id);
+    TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
+    TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
+    TEST_ASSERT_EQUAL_STRING("Stale", stratum_api_v1_message.error_str);
+}
+
+TEST_CASE("Parse stratum error array format", "[stratum]")
+{
+    StratumApiV1Message stratum_api_v1_message = {};
+    const char *json_string = "{\"id\":4,\"result\":null,\"error\":[21,\"Job not found\",\"\"]}";
+    STRATUM_V1_parse(&stratum_api_v1_message, json_string);
+    TEST_ASSERT_EQUAL(4, stratum_api_v1_message.message_id);
+    TEST_ASSERT_EQUAL(STRATUM_RESULT_SETUP, stratum_api_v1_message.method);
+    TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
+    TEST_ASSERT_EQUAL_STRING("Job not found", stratum_api_v1_message.error_str);
+}

@@ -94,6 +94,12 @@ curl http://YOUR-BITAXE-IP/api/system/wifi/scan
 # Restart the system
 curl -X POST http://YOUR-BITAXE-IP/api/system/restart
 
+# Pause mining
+curl -X POST http://YOUR-BITAXE-IP/api/system/pause
+
+# Resume mining
+curl -X POST http://YOUR-BITAXE-IP/api/system/resume
+
 # Let the device say Hi!
 curl -X POST http://YOUR-BITAXE-IP/api/system/identify
 
