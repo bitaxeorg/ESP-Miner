@@ -79,15 +79,15 @@ void coinbase_decode_address_from_scriptpubkey(const uint8_t *script, size_t scr
  */
 typedef struct {
     double network_difficulty;
-    uint32_t block_height;
-    char *scriptsig; // Allocated, must be freed by caller
-    coinbase_output_t outputs[MAX_COINBASE_TX_OUTPUTS];
-    int output_count;
     uint64_t total_value_satoshis;
     uint64_t user_value_satoshis;
+    uint32_t block_height;
+    int output_count;
     bool decode_coinbase_tx;
     bool bip54_signaling;  // BIP-54: nLockTime = height - 1 && nSequence != 0xffffffff
     bool bip110_signaling; // BIP-110: signaling via version bit 4 (0x00000010)
+    char *scriptsig; // Allocated, must be freed by caller
+    coinbase_output_t outputs[MAX_COINBASE_TX_OUTPUTS];
 } mining_notification_result_t;
 
 /**
