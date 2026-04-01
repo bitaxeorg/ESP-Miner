@@ -46,6 +46,7 @@
 #include "http_server.h"
 #include "system.h"
 #include "websocket.h"
+#include "log_buffer.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -119,6 +120,36 @@ DataSource strToDataSource(const char * sourceStr)
         if (strcmp(sourceStr, STATS_LABEL_RESPONSE_TIME) == 0) return SRC_RESPONSE_TIME;
     }
     return SRC_NONE;
+}
+
+static esp_err_t GET_system_logs(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"bitaxe-logs.txt\"");
+
+    uint64_t abs_pos = 0; /* Request reading from the absolute beginning */
+    char chunk[4096];
+    size_t read_bytes;
+    esp_err_t res = ESP_OK;
+
+    while ((read_bytes = log_buffer_read_absolute(&abs_pos, chunk, sizeof(chunk))) > 0) {
+        res = httpd_resp_send_chunk(req, chunk, read_bytes);
+        if (res != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to send chunk: %s", esp_err_to_name(res));
+            break;
+        }
+    }
+
+    /* Send empty chunk to terminate transfer */
+    if (res == ESP_OK) {
+        res = httpd_resp_send_chunk(req, NULL, 0);
+    }
+
+    return res;
 }
 
 static GlobalState * GLOBAL_STATE;
@@ -1381,7 +1412,7 @@ esp_err_t start_rest_server(void * pvParameters)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 24;
+    config.max_uri_handlers = 25;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
 
@@ -1450,6 +1481,15 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &wifi_scan_get_uri);
+
+    /* URI handler for fetching system logs */
+    httpd_uri_t system_logs_get_uri = {
+        .uri = "/api/system/logs",
+        .method = HTTP_GET,
+        .handler = GET_system_logs,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_logs_get_uri);
 
     httpd_uri_t system_identify_uri = {
         .uri = "/api/system/identify", .method = HTTP_POST, 

@@ -91,6 +91,30 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.logs.length = 0;
   }
 
+  public downloadLogs() {
+    const url = `http://${window.location.host}/api/system/logs`;
+    fetch(url)
+      .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.blob();
+      })
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'bitaxe-logs.txt';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        this.toastr.success("Logs downloaded successfully");
+      })
+      .catch(error => {
+        console.error('There was a problem with the fetch operation:', error);
+        this.toastr.error("Failed to download logs");
+      });
+  }
+
   ngAfterViewChecked(): void {
     if(this.stopScroll == true){
       return;

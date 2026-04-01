@@ -27,6 +27,13 @@
                 </p-button>
                 <p-button
                     pp-button
+                    icon="pi pi-download"
+                    (click)="downloadLogs()"
+                    pTooltip="Download Logs"
+                    tooltipPosition="left">
+                </p-button>
+                <p-button
+                    pp-button
                     icon="pi pi-trash"
                     (click)="clearLogs()"
                     pTooltip="Clear Logs"
