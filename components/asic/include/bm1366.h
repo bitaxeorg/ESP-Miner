@@ -16,9 +16,9 @@ typedef struct __attribute__((__packed__))
     uint8_t starting_nonce[4];
     uint8_t nbits[4];
     uint8_t ntime[4];
-    uint8_t version[4];
     uint8_t merkle_root[32];
     uint8_t prev_block_hash[32];
+    uint8_t version[4];
 } BM1366_job;
 
 uint8_t BM1366_init(void * GLOBAL_STATE);
