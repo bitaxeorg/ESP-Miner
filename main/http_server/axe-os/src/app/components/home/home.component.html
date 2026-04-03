@@ -248,9 +248,9 @@
 
                 <div class="mb-3">
                     <h6 class="flex justify-content-between mb-1">
-                        ASIC Frequency<span>{{info.frequency}} MHz</span>
+                        ASIC Frequency<span>{{info.actualFrequency}} MHz</span>
                     </h6>
-                    <p-progressBar [value]="(info.frequency / maxFrequency) * 100" [styleClass]="'p-progressbar--thin'">
+                    <p-progressBar [value]="(info.actualFrequency / maxFrequency) * 100" [styleClass]="'p-progressbar--thin'">
                         <ng-template pTemplate="content" let-value></ng-template>
                     </p-progressBar>
                 </div>
@@ -409,7 +409,7 @@
                         {{ info.responseTime | number:'1.1-1' }} ms
                     </ng-container>
                 </div>
-                <div class="flex flex-nowrap" *ngIf="info.coinbaseOutputs.length > 0">
+                <div class="flex flex-nowrap" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
                     @let percentage = getPayoutPercentage(info);
                     <ng-container *ngIf="percentage >= 95">
                         <div class="col-fixed-width text-500">
@@ -474,7 +474,7 @@
                         {{ info.scriptsig }}
                     </div>
                 </div>
-                <div class="flex flex-nowrap justify-content-between" *ngIf="info.coinbaseOutputs.length > 0">
+                <div class="flex flex-nowrap justify-content-between" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
                     <div class="col-fixed-width text-500">
                         <tooltip-text-icon text="Value" tooltip="Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options." />
                     </div>
@@ -482,7 +482,7 @@
                         {{ info.coinbaseValueTotalSatoshis | sats }}
                     </ng-container>
                 </div>                
-                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.coinbaseOutputs.length > 0">
+                <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
                     <div class="col-fixed-width text-500">
                         <span>Outputs</span>
                     </div>
@@ -501,7 +501,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-nowrap align-items-baseline" *ngIf="info.coinbaseOutputs.length == 0">
+                <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) == 0">
                     <div class="col-fixed-width text-500">
                         Amount
                     </div>
@@ -529,14 +529,14 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr class="cursor-pointer" *ngFor="let asic of info.hashrateMonitor.asics; let i = index"
+                            <tr class="cursor-pointer" *ngFor="let asic of info.hashrateMonitor?.asics; let i = index; trackBy: trackByIndex"
                                     [pTooltip]="(asicAmount > 1 ? 'ASIC ' + (i + 1) + ' - ' : '') + 'Error count: ' + asic.errorCount"
                                     tooltipPosition="bottom">
                                 <td *ngIf="asicAmount > 1" class="text-500 text-left">
                                     {{ i + 1 }}
                                 </td>
-                                <td *ngFor="let domain of asic.domains"
-                                    [style.background]="getHeatmapColor(info, domain)"
+                                <td *ngFor="let domain of asic?.domains; trackBy: trackByIndex"
+                                    [style.backgroundColor]="getHeatmapColor(info, domain)"
                                     [style.height]="(asicAmount <= 2 ? '2rem' : null)"
                                     class="text-center">
                                     <span class="text-xs">{{ domain | hashSuffix }}</span>

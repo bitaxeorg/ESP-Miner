@@ -21,13 +21,13 @@ uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            return BM1397_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1397_init(GLOBAL_STATE);
         case BM1366:
-            return BM1366_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1366_init(GLOBAL_STATE);
         case BM1368:
-            return BM1368_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1368_init(GLOBAL_STATE);
         case BM1370:
-            return BM1370_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1370_init(GLOBAL_STATE);
     }
     return ESP_OK;
 }
@@ -98,23 +98,22 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
     }
 }
 
-bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float frequency)
+void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            do_frequency_transition(frequency, BM1397_send_hash_frequency);
-            return true;
+            do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
+            return;
         case BM1366:
-            do_frequency_transition(frequency, BM1366_send_hash_frequency);
-            return true;
+            do_frequency_transition(GLOBAL_STATE, BM1366_send_hash_frequency);
+            return;
         case BM1368:
-            do_frequency_transition(frequency, BM1368_send_hash_frequency);
-            return true;
+            do_frequency_transition(GLOBAL_STATE, BM1368_send_hash_frequency);
+            return;
         case BM1370:
-            do_frequency_transition(frequency, BM1370_send_hash_frequency);
-            return true;
+            do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
+            return;
     }
-    return false;
 }
 
 double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)

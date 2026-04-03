@@ -20,7 +20,7 @@
 #include "asic_reset.h"
 #include "driver/uart.h"
 
-#define POLL_RATE 1800
+#define POLL_RATE 100
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define SAFE_TEMP 45.0
@@ -43,7 +43,10 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     // Wind frequency down to 50 MHz before cutting power. This also updates
     // the transition tracker so the ramp starts from 50 MHz on next start,
     // rather than the stale pre-reset frequency.
-    ASIC_set_frequency(GLOBAL_STATE, 50);
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = 50;
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
+
+    ASIC_set_frequency(GLOBAL_STATE);
 
     // Cut ASIC power and hold in reset
     VCORE_set_voltage(GLOBAL_STATE, 0.0f);
@@ -77,6 +80,7 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
     uart_flush(UART_NUM_1);
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
+    POWER_MANAGEMENT_init_frequency(GLOBAL_STATE);
     // Stabilization delay of 2000ms prevents race conditions where tasks are
     // just starting to use the ASIC while power management tries to change frequency
     uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, 2000);
@@ -90,9 +94,9 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
     return chip_count;
 }
 
-static float expected_hashrate(GlobalState * GLOBAL_STATE, float frequency)
+static float expected_hashrate(GlobalState * GLOBAL_STATE)
 {
-    return frequency * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
+    return GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
 }
 
 void POWER_MANAGEMENT_init_frequency(void * pvParameters)
@@ -102,7 +106,8 @@ void POWER_MANAGEMENT_init_frequency(void * pvParameters)
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = frequency;
-    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = expected_hashrate(GLOBAL_STATE, frequency);
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = 50.0;    
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = expected_hashrate(GLOBAL_STATE);
     
     char expected_hashrate_str[16] = {0};
     suffixString(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate * 1e6, expected_hashrate_str, sizeof(expected_hashrate_str), 0);
@@ -242,12 +247,10 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         if (asic_frequency != last_asic_frequency) {
             ESP_LOGI(TAG, "New ASIC frequency requested: %g MHz (current: %g MHz)", asic_frequency, last_asic_frequency);
             
-            bool success = ASIC_set_frequency(GLOBAL_STATE, asic_frequency);
-            
-            if (success) {
-                power_management->frequency_value = asic_frequency;
-                power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE, asic_frequency);
-            }
+            power_management->frequency_value = asic_frequency;
+            power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE);
+
+            ASIC_set_frequency(GLOBAL_STATE);
             
             last_asic_frequency = asic_frequency;
         }
