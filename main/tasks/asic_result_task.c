@@ -7,7 +7,8 @@
 #include "esp_log.h"
 #include "nvs_config.h"
 #include "utils.h"
-#include "stratum_task.h"
+#include "stratum_v2_task.h"
+#include "sv2_protocol.h"
 #include "hashrate_monitor_task.h"
 #include "asic.h"
 
@@ -24,8 +25,7 @@ void ASIC_result_task(void *pvParameters)
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
         }
-        
-        //task_result *asic_result = (*GLOBAL_STATE->ASIC_functions.receive_result_fn)(GLOBAL_STATE);
+
         task_result *asic_result = ASIC_process_work(GLOBAL_STATE);
 
         if (asic_result == NULL)
@@ -57,20 +57,47 @@ void ASIC_result_task(void *pvParameters)
 
         if (nonce_diff >= active_job->pool_diff)
         {
-            char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-            int ret = STRATUM_V1_submit_share(
-                GLOBAL_STATE->transport,
-                GLOBAL_STATE->send_uid++,
-                user,
-                active_job->jobid,
-                active_job->extranonce2,
-                active_job->ntime,
-                asic_result->nonce,
-                asic_result->rolled_version ^ active_job->version);
+            int ret;
+
+            if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+                // SV2: submit with binary protocol
+                uint32_t sv2_job_id = (uint32_t)strtoul(active_job->jobid, NULL, 10);
+
+                if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
+                    sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
+                    // SV2 spec: extranonce_size is the miner's rollable portion.
+                    // The pool prepends its extranonce_prefix separately.
+                    uint8_t en2_len = conn->extranonce_size;
+                    uint8_t extranonce_2[32];
+                    hex2bin(active_job->extranonce2, extranonce_2, en2_len);
+                    ret = stratum_v2_submit_share_extended(GLOBAL_STATE, sv2_job_id,
+                                                           asic_result->nonce,
+                                                           active_job->ntime,
+                                                           asic_result->rolled_version,
+                                                           extranonce_2, en2_len);
+                } else {
+                    ret = stratum_v2_submit_share(GLOBAL_STATE, sv2_job_id,
+                                                   asic_result->nonce,
+                                                   active_job->ntime,
+                                                   asic_result->rolled_version);
+                }
+            } else {
+                // V1: submit with JSON-RPC
+                char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+                ret = STRATUM_V1_submit_share(
+                    GLOBAL_STATE->transport,
+                    GLOBAL_STATE->send_uid++,
+                    user,
+                    active_job->jobid,
+                    active_job->extranonce2,
+                    active_job->ntime,
+                    asic_result->nonce,
+                    asic_result->rolled_version ^ active_job->version);
+            }
 
             if (ret < 0) {
-                ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
-                stratum_close_connection(GLOBAL_STATE);
+                ESP_LOGW(TAG, "Failed to submit share (ret=%d, errno=%d: %s)",
+                         ret, errno, strerror(errno));
             }
         }
 

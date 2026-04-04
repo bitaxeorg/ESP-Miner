@@ -12,6 +12,16 @@ interface ITlsOption {
   label: string;
 }
 
+interface IProtocolOption {
+  value: number;
+  label: string;
+}
+
+interface IChannelOption {
+  value: number;
+  label: string;
+}
+
 @Component({
   selector: 'app-pool',
   templateUrl: './pool.component.html',
@@ -33,6 +43,18 @@ export class PoolComponent implements OnInit {
     { value: 2, label: 'TLS (Custom CA certificate)' }
   ];
 
+  public protocolOptions: IProtocolOption[] = [
+    { value: 0, label: 'Stratum V1' },
+    { value: 1, label: 'Stratum V2' }
+  ];
+
+  public sv2ChannelOptions: IChannelOption[] = [
+    { value: 0, label: 'Extended Channels' },
+    { value: 1, label: 'Standard Channels' }
+  ];
+
+  public asicModel: string = '';
+
   @Input() uri = '';
 
   constructor(
@@ -48,6 +70,7 @@ export class PoolComponent implements OnInit {
         this.loadingService.lockUIUntilComplete()
       )
       .subscribe(info => {
+        this.asicModel = info.ASICModel || '';
         this.form = this.fb.group({
           stratumURL: [info.stratumURL, [
             Validators.required,
@@ -59,6 +82,8 @@ export class PoolComponent implements OnInit {
             Validators.min(0),
             Validators.max(65535)
           ]],
+          stratumProtocol: [info.stratumProtocol || 0],
+          stratumV2AuthorityPubkey: [info.stratumV2AuthorityPubkey || '', [this.base58Validator()]],
           stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == true, [Validators.required]],
           stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
           stratumUser: [info.stratumUser, [Validators.required]],
@@ -81,7 +106,11 @@ export class PoolComponent implements OnInit {
           fallbackStratumCert: [info.fallbackStratumCert],
           fallbackStratumDecodeCoinbase: [info.fallbackStratumDecodeCoinbase == true, [Validators.required]],
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
-          fallbackStratumPassword: ['*****', [Validators.required]]
+          fallbackStratumPassword: ['*****', [Validators.required]],
+          fallbackStratumProtocol: [info.fallbackStratumProtocol || 0],
+          fallbackStratumV2AuthorityPubkey: [info.fallbackStratumV2AuthorityPubkey || '', [this.base58Validator()]],
+          stratumV2ChannelType: [info.stratumV2ChannelType ?? 0],
+          fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType ?? 0]
         });
 
         const setupTlsValidation = (tlsControlName: string, certControlName: string) => {
@@ -232,6 +261,26 @@ export class PoolComponent implements OnInit {
     };
   }
 
+  private base58Validator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value?.trim();
+      if (!value) return null;
+
+      // Base58 alphabet (no 0, O, I, l)
+      const base58Regex = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
+      if (!base58Regex.test(value)) {
+        return { invalidBase58: true };
+      }
+
+      // SV2 authority pubkeys are typically 51-52 characters
+      if (value.length < 40 || value.length > 52) {
+        return { invalidBase58Length: true };
+      }
+
+      return null;
+    };
+  }
+
   trackByFn(index: number, option: ITlsOption): number {
     return option.value;
   }
@@ -243,5 +292,27 @@ export class PoolComponent implements OnInit {
 
   isAnyPoolUsingDefaultAddress(): boolean {
     return this.pools.some(pool => this.isUsingDefaultAddress(pool));
+  }
+
+  isStratumV2Enabled(): boolean {
+    return this.form?.get('stratumProtocol')?.value === 1;
+  }
+
+  isFallbackStratumV2Enabled(): boolean {
+    return this.form?.get('fallbackStratumProtocol')?.value === 1;
+  }
+
+  isPoolV2Enabled(pool: PoolType): boolean {
+    return pool === 'stratum' ? this.isStratumV2Enabled() : this.isFallbackStratumV2Enabled();
+  }
+
+  isStandardChannelDisabled(): boolean {
+    return this.asicModel === 'BM1397';
+  }
+
+  isPoolV2Extended(pool: PoolType): boolean {
+    if (!this.isPoolV2Enabled(pool)) return false;
+    const key = pool === 'stratum' ? 'stratumV2ChannelType' : 'fallbackStratumV2ChannelType';
+    return this.form?.get(key)?.value === 0;
   }
 }
