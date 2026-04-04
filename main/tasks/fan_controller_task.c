@@ -20,9 +20,9 @@
 #define POLL_TIME_MS 100
 #define LOG_TIME_MS 2000
 
-#define PID_P 3.0
+#define PID_P 5.0
 #define PID_I 0.1
-#define PID_D 1.0
+#define PID_D 2.0
 
 static const char * TAG = "fan_controller";
 
@@ -37,6 +37,7 @@ void FAN_CONTROLLER_task(void * pvParameters)
     float pid_setPoint = nvs_config_get_u16(NVS_CONFIG_TEMP_TARGET);
     uint16_t pid_output_min = 0;
     int log_counter = 0;
+    float filtered_input = -1.0f;
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
@@ -45,7 +46,6 @@ void FAN_CONTROLLER_task(void * pvParameters)
     // Initialize PID controller with pid_d_startup and PID_REVERSE directly
     pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, PID_P, PID_I, PID_D, PID_P_ON_E, PID_REVERSE);
     pid_set_sample_time(&pid, POLL_TIME_MS); // Sample time in ms
-    pid_set_mode(&pid, AUTOMATIC);        // This calls pid_initialize() internally
 
     ESP_LOGI(TAG, "P:%.1f I:%.1f D:%.1f", pid.dispKp, pid.dispKi, pid.dispKd);
 
@@ -57,6 +57,14 @@ void FAN_CONTROLLER_task(void * pvParameters)
                 ESP_LOGW(TAG, "Overheat mode, setting fan to 100%%");
                 power_management->fan_perc = 100;
                 if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1.0f) != ESP_OK) {
+                    exit(EXIT_FAILURE);
+                }
+            }
+        } else if (!GLOBAL_STATE->ASIC_initalized) {
+            if (fabs(power_management->fan_perc - 30) > EPSILON) {
+                ESP_LOGI(TAG, "Mining paused, setting fan to 30%%");
+                power_management->fan_perc = 30;
+                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 0.3f) != ESP_OK) {
                     exit(EXIT_FAILURE);
                 }
             }
@@ -73,11 +81,27 @@ void FAN_CONTROLLER_task(void * pvParameters)
                     pid_set_output_limits(&pid, pid_output_min, 100);
                 }
 
-                if (power_management->chip_temp_avg >= 0) { // Ignore invalid temperature readings (-1)
+                if (power_management->chip_temp_avg > 0) { // Ignore uninitialized or invalid temperature readings
+                    float raw_temp;
                     if (power_management->chip_temp2_avg > power_management->chip_temp_avg) {
-                        pid_input = power_management->chip_temp2_avg;
+                        raw_temp = power_management->chip_temp2_avg;
                     } else {
-                        pid_input = power_management->chip_temp_avg;
+                        raw_temp = power_management->chip_temp_avg;
+                    }
+                    
+                    // Simple EMA filter to reduce jitter from sensor noise
+                    // alpha = 0.2 means 20% new value, 80% old value
+                    if (filtered_input < 0) {
+                        filtered_input = raw_temp;
+                    } else {
+                        filtered_input = (0.2f * raw_temp) + (0.8f * filtered_input);
+                    }
+                    pid_input = filtered_input;
+                    
+                    // Initialize PID on first valid temperature reading
+                    if (pid_get_mode(&pid) == MANUAL) {
+                        pid_set_mode(&pid, AUTOMATIC);
+                        ESP_LOGI(TAG, "PID initialized at %.1f °C", pid_input);
                     }
                     
                     pid_compute(&pid);

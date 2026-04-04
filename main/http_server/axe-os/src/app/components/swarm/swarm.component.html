@@ -126,6 +126,15 @@
                                     styleClass="button-icon-small"
                                     (click)="edit(axe)" />
                                 <p-button
+                                    [icon]="'pi text-sm ' + (axe.miningPaused ? 'pi-play-circle' : 'pi-pause-circle')"
+                                    pp-button
+                                    [pTooltip]="axe.miningPaused ? 'Resume Mining' : 'Pause Mining'"
+                                    tooltipPosition="top"
+                                    severity="secondary"
+                                    class="inline-block"
+                                    styleClass="button-icon-small"
+                                    (click)="postAction(axe, axe.miningPaused ? 'resume' : 'pause')" />
+                                <p-button
                                     icon="pi pi-refresh text-sm"
                                     pp-button
                                     pTooltip="Restart"
@@ -295,6 +304,15 @@
                                     class="inline-block"
                                     styleClass="button-icon"
                                     (click)="edit(axe)" />
+                                <p-button
+                                    [icon]="'pi ' + (axe.miningPaused ? 'pi-play-circle' : 'pi-pause-circle')"
+                                    pp-button
+                                    [pTooltip]="axe.miningPaused ? 'Resume Mining' : 'Pause Mining'"
+                                    tooltipPosition="top"
+                                    severity="secondary"
+                                    class="inline-block"
+                                    styleClass="button-icon"
+                                    (click)="postAction(axe, axe.miningPaused ? 'resume' : 'pause')" />
                                 <p-button
                                     icon="pi pi-refresh"
                                     pp-button

@@ -211,6 +211,8 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
 
     // Check if ASIC is initialized before trying to send work
     if (!GLOBAL_STATE->ASIC_initalized) {
+        // Clean up the job since we're not sending it
+        // Note: This job was never stored in active_jobs, so it's safe to free
         ESP_LOGW(TAG, "ASIC not initialized, skipping job send");
         free(next_job->jobid);
         free(next_job->extranonce2);

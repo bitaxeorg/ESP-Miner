@@ -468,6 +468,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   getDeviceNotification(axe: any): { color: string; msg: string } | undefined {
     switch (true) {
+      case !!axe.miningPaused:
+        return { color: 'yellow', msg: 'Paused' };
       case axe.overheat_mode === 1:
         return { color: 'red', msg: 'Overheated' };
       case !!axe.power_fault:

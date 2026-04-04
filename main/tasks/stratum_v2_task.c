@@ -255,8 +255,8 @@ static void stratum_v2_decode_coinbase(GlobalState *GLOBAL_STATE, sv2_conn_t *co
 {
     bool use_fallback = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
     bool decode_coinbase = use_fallback
-        ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_decode_coinbase
-        : GLOBAL_STATE->SYSTEM_MODULE.pool_decode_coinbase;
+        ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_decode_coinbase_tx
+        : GLOBAL_STATE->SYSTEM_MODULE.pool_decode_coinbase_tx;
 
     // Check for BIP141 SegWit marker/flag in prefix (bytes[4]==0x00, bytes[5]!=0x00).
     // Some SV2 pools send the coinbase in witness format; the V1 decoder expects
@@ -364,7 +364,7 @@ static void stratum_v2_decode_coinbase(GlobalState *GLOBAL_STATE, sv2_conn_t *co
     GLOBAL_STATE->coinbase_value_total_satoshis = result->total_value_satoshis;
     ESP_LOGI(TAG, "Coinbase outputs: %d, total value: %llu%s",
              result->output_count, result->total_value_satoshis,
-             result->decoding_enabled ? " sats" : "");
+             result->decode_coinbase_tx ? " sats" : "");
 
     if (result->output_count != GLOBAL_STATE->coinbase_output_count ||
         memcmp(result->outputs, GLOBAL_STATE->coinbase_outputs,

@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "common.h"
+#include "asic_common.h"
 #include "serial.h"
 #include "esp_log.h"
 #include "crc.h"
