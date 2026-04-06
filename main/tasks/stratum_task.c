@@ -448,6 +448,8 @@ void stratum_task(void * pvParameters)
     STRATUM_V1_initialize_buffer();
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
+    bool reconnect_override = false;
+    char * reconnect_hostname_alloc = NULL;
 
     xTaskCreateWithCaps(stratum_primary_heartbeat, "stratum primary heartbeat", 8192, pvParameters, 1, NULL, MALLOC_CAP_SPIRAM);
 
@@ -489,8 +491,14 @@ void stratum_task(void * pvParameters)
             retry_attempts = 0;
         }
 
-        stratum_url = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
-        port = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
+        if (reconnect_override) {
+            reconnect_override = false;
+        } else {
+            free(reconnect_hostname_alloc);
+            reconnect_hostname_alloc = NULL;
+            stratum_url = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
+            port = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
+        }
         extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
         difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
 
@@ -632,8 +640,36 @@ void stratum_task(void * pvParameters)
             } else if (stratum_api_v1_message.method == MINING_PING) { 
                 STRATUM_V1_pong(GLOBAL_STATE->transport, stratum_api_v1_message.message_id);
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
-                ESP_LOGE(TAG, "Pool requested client reconnect...");
+                ESP_LOGI(TAG, "Pool requested client reconnect...");
+
+                if (stratum_api_v1_message.reconnect_hostname != NULL) {
+                    const char * req_host = stratum_api_v1_message.reconnect_hostname;
+                    bool allowed = is_same_domain(req_host, GLOBAL_STATE->SYSTEM_MODULE.pool_url);
+                    if (!allowed) {
+                        allowed = is_same_domain(req_host, GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url);
+                    }
+                    if (allowed) {
+                        free(reconnect_hostname_alloc);
+                        reconnect_hostname_alloc = stratum_api_v1_message.reconnect_hostname;
+                        stratum_api_v1_message.reconnect_hostname = NULL;
+                        stratum_url = reconnect_hostname_alloc;
+                        ESP_LOGI(TAG, "Reconnect: using hostname %s", stratum_url);
+                    } else {
+                        ESP_LOGW(TAG, "Reconnect: ignoring disallowed hostname %s", req_host);
+                    }
+                }
+                if (stratum_api_v1_message.reconnect_port > 0) {
+                    port = stratum_api_v1_message.reconnect_port;
+                    ESP_LOGI(TAG, "Reconnect: using port %d", port);
+                }
+
+                reconnect_override = true;
                 stratum_close_connection(GLOBAL_STATE);
+
+                if (stratum_api_v1_message.reconnect_wait > 0) {
+                    ESP_LOGI(TAG, "Reconnect: waiting %d seconds", stratum_api_v1_message.reconnect_wait);
+                    vTaskDelay((stratum_api_v1_message.reconnect_wait * 1000) / portTICK_PERIOD_MS);
+                }
                 break;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
                 float response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id, receive_time_us);
@@ -670,6 +706,10 @@ void stratum_task(void * pvParameters)
         if (stratum_api_v1_message.error_str) {
             free(stratum_api_v1_message.error_str);
             stratum_api_v1_message.error_str = NULL;
+        }
+        if (stratum_api_v1_message.reconnect_hostname) {
+            free(stratum_api_v1_message.reconnect_hostname);
+            stratum_api_v1_message.reconnect_hostname = NULL;
         }
     }
     vTaskDelete(NULL);

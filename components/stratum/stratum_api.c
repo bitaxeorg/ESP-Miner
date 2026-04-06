@@ -223,6 +223,21 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             result = MINING_SET_EXTRANONCE;
         } else if (strcmp("client.reconnect", method_json->valuestring) == 0) {
             result = CLIENT_RECONNECT;
+            cJSON * params = cJSON_GetObjectItem(json, "params");
+            if (params != NULL && cJSON_IsArray(params)) {
+                cJSON * hostname = cJSON_GetArrayItem(params, 0);
+                cJSON * port_json = cJSON_GetArrayItem(params, 1);
+                cJSON * wait_json = cJSON_GetArrayItem(params, 2);
+                if (hostname != NULL && cJSON_IsString(hostname) && strlen(hostname->valuestring) > 0) {
+                    message->reconnect_hostname = strdup(hostname->valuestring);
+                }
+                if (port_json != NULL && cJSON_IsNumber(port_json) && port_json->valueint > 0) {
+                    message->reconnect_port = port_json->valueint;
+                }
+                if (wait_json != NULL && cJSON_IsNumber(wait_json) && wait_json->valueint > 0) {
+                    message->reconnect_wait = wait_json->valueint;
+                }
+            }
         } else if (strcmp("mining.ping", method_json->valuestring) == 0) {
             result = MINING_PING;
         } else {
@@ -533,4 +548,36 @@ int STRATUM_V1_configure_version_rolling(esp_transport_handle_t transport, int s
     debug_stratum_tx(configure_msg);
 
     return esp_transport_write(transport, configure_msg, strlen(configure_msg), TRANSPORT_TIMEOUT_MS);
+}
+
+bool is_same_domain(const char * host_a, const char * host_b)
+{
+    if (host_a == NULL || host_b == NULL) return false;
+    if (strcmp(host_a, host_b) == 0) return true;
+
+    size_t len_a = strlen(host_a);
+    size_t len_b = strlen(host_b);
+
+    // Check if one is a subdomain of the other
+    if (len_a > len_b + 1 && host_a[len_a - len_b - 1] == '.' &&
+        strcmp(host_a + len_a - len_b, host_b) == 0 &&
+        strchr(host_b, '.') != NULL) {
+        return true;
+    }
+    if (len_b > len_a + 1 && host_b[len_b - len_a - 1] == '.' &&
+        strcmp(host_b + len_b - len_a, host_a) == 0 &&
+        strchr(host_a, '.') != NULL) {
+        return true;
+    }
+
+    // Check same-depth siblings
+    const char * suffix_a = strchr(host_a, '.');
+    const char * suffix_b = strchr(host_b, '.');
+    if (suffix_a != NULL && suffix_b != NULL &&
+        strchr(suffix_a + 1, '.') != NULL &&
+        strcmp(suffix_a, suffix_b) == 0) {
+        return true;
+    }
+
+    return false;
 }
