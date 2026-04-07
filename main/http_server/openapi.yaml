@@ -872,7 +872,7 @@ paths:
                       type: string
                       description: Version bits of the share
 
-/api/system/pause:
+  /api/system/pause:
     post:
       summary: Pause mining
       description: Pauses mining activity
