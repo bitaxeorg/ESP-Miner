@@ -13,6 +13,7 @@
 
 #include "log_buffer.h"
 #include "websocket.h"
+#include "esp_cache.h"
 
 static const char * TAG = "log_buffer";
 
@@ -22,12 +23,22 @@ static const char * TAG = "log_buffer";
 typedef struct {
     uint32_t magic;
     uint64_t total_written;
+    uint32_t checksum;
 } log_buffer_header_t;
+
+static uint32_t calculate_header_checksum(const log_buffer_header_t *h)
+{
+    uint32_t checksum = h->magic;
+    checksum ^= (uint32_t)(h->total_written & 0xFFFFFFFF);
+    checksum ^= (uint32_t)(h->total_written >> 32);
+    return checksum;
+}
 
 static EXT_RAM_NOINIT_ATTR log_buffer_header_t s_header;
 static EXT_RAM_NOINIT_ATTR char s_buffer[LOG_BUFFER_SIZE];
 
 static SemaphoreHandle_t s_log_mutex = NULL;
+static char s_vprintf_buffer[2048];
 
 static void ring_write(const char *data, size_t len)
 {
@@ -38,12 +49,19 @@ static void ring_write(const char *data, size_t len)
 
     if (len <= till_end) {
         memcpy(&s_buffer[write_offset], data, len);
+        esp_cache_msync(&s_buffer[write_offset], len, ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
     } else {
         memcpy(&s_buffer[write_offset], data, till_end);
+        esp_cache_msync(&s_buffer[write_offset], till_end, ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
         memcpy(s_buffer, data + till_end, len - till_end);
+        esp_cache_msync(s_buffer, len - till_end, ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
     }
 
     s_header.total_written += len;
+    
+    // Update header checksum and flush header
+    s_header.checksum = calculate_header_checksum(&s_header);
+    esp_cache_msync(&s_header, sizeof(s_header), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
 }
 
 static int log_buffer_vprintf(const char *format, va_list args)
@@ -53,37 +71,53 @@ static int log_buffer_vprintf(const char *format, va_list args)
         return vprintf(format, args);
     }
 
+    if (xSemaphoreTakeRecursive(s_log_mutex, portMAX_DELAY) != pdTRUE) {
+        return vprintf(format, args);
+    }
+
+    char *output = NULL;
     va_list args_copy;
+
+    // Try using static buffer first to avoid malloc
     va_copy(args_copy, args);
-    int needed = vsnprintf(NULL, 0, format, args_copy);
+    int needed = vsnprintf(s_vprintf_buffer, sizeof(s_vprintf_buffer), format, args_copy);
     va_end(args_copy);
 
-    if (needed < 0) return 0;
+    if (needed < 0) {
+        xSemaphoreGiveRecursive(s_log_mutex);
+        return 0;
+    }
 
-    char *output = (char *)heap_caps_malloc(needed + 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    if (!output) {
-        output = (char *)heap_caps_malloc(needed + 1, MALLOC_CAP_SPIRAM);
+    if (needed < sizeof(s_vprintf_buffer)) {
+        output = s_vprintf_buffer;
+    } else {
+        // Fallback to malloc for long lines
+        output = (char *)heap_caps_malloc(needed + 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        if (!output) {
+            output = (char *)heap_caps_malloc(needed + 1, MALLOC_CAP_SPIRAM);
+        }
+
+        if (output) {
+            va_copy(args_copy, args);
+            vsnprintf(output, needed + 1, format, args_copy);
+            va_end(args_copy);
+        }
     }
 
     if (output) {
-        va_copy(args_copy, args);
-        vsnprintf(output, needed + 1, format, args_copy);
-        va_end(args_copy);
-
-        if (xSemaphoreTakeRecursive(s_log_mutex, portMAX_DELAY) == pdTRUE) {
-            ring_write(output, needed);
-            websocket_log_notify();
-            xSemaphoreGiveRecursive(s_log_mutex);
-        }
-
+        ring_write(output, needed);
+        websocket_log_notify();
         fputs(output, stdout);
         
-        free(output);
+        if (output != s_vprintf_buffer) {
+            free(output);
+        }
     } else {
         /* Emergency fallback if absolutely out of memory */
         vprintf(format, args);
     }
 
+    xSemaphoreGiveRecursive(s_log_mutex);
     return needed;
 }
 
@@ -95,13 +129,23 @@ void log_buffer_init(void)
         return;
     }
 
-    if (s_header.magic != LOG_BUFFER_MAGIC) {
+    uint32_t expected_checksum = calculate_header_checksum(&s_header);
+
+    if (s_header.magic != LOG_BUFFER_MAGIC || s_header.checksum != expected_checksum) {
         memset(s_buffer, 0, LOG_BUFFER_SIZE);
+        esp_cache_msync(s_buffer, LOG_BUFFER_SIZE, ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+
         s_header.total_written = 0;
         s_header.magic = LOG_BUFFER_MAGIC;
-        ESP_LOGI(TAG, "Cold boot, buffer initialized (%d KB)\n", LOG_BUFFER_SIZE / 1024);
+        s_header.checksum = calculate_header_checksum(&s_header);
+        esp_cache_msync(&s_header, sizeof(s_header), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+
+        ESP_LOGI(TAG, "Cold boot or corrupted header, buffer initialized (%d KB)\n", LOG_BUFFER_SIZE / 1024);
     } else {
         ESP_LOGI(TAG, "Soft reboot detected, %" PRIu64 " bytes of logs preserved", s_header.total_written);
+
+        const char * reboot_msg = "\n--- SYSTEM RESTART ---\n";
+        ring_write(reboot_msg, strlen(reboot_msg));        
     }
 
     esp_log_set_vprintf(log_buffer_vprintf);
@@ -139,8 +183,11 @@ size_t log_buffer_read_absolute(uint64_t *abs_pos, char *dest, size_t max_len)
     if (total >= LOG_BUFFER_SIZE && req_pos < total - LOG_BUFFER_SIZE) {
         req_pos = total - LOG_BUFFER_SIZE;
         
-        // Find next newline
+        // Find next newline to resync to a line boundary.
+        // Limit scan to 4KB to avoid holding the mutex for too long.
         size_t available_scan = (size_t)(total - req_pos);
+        if (available_scan > 4096) available_scan = 4096;
+
         for (size_t i = 0; i < available_scan; i++) {
             if (s_buffer[(req_pos + i) % LOG_BUFFER_SIZE] == '\n') {
                 req_pos += i + 1;
