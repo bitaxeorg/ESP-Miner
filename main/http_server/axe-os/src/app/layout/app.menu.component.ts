@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Observable, shareReplay } from 'rxjs';
 import { SystemApiService } from '../services/system.service';
 import { LayoutService } from './service/app.layout.service';
-import { SystemInfo as ISystemInfo } from 'src/app/generated';
+import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 
 @Component({
   selector: 'app-menu',
