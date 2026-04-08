@@ -8,8 +8,9 @@ import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { MenuItem } from 'primeng/api';
 
 @Component({
-  selector: 'app-topbar',
-  templateUrl: './app.topbar.component.html'
+    selector: 'app-topbar',
+    templateUrl: './app.topbar.component.html',
+    standalone: false
 })
 export class AppTopBarComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();

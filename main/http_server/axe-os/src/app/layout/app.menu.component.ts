@@ -5,8 +5,9 @@ import { LayoutService } from './service/app.layout.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 
 @Component({
-  selector: 'app-menu',
-  templateUrl: './app.menu.component.html'
+    selector: 'app-menu',
+    templateUrl: './app.menu.component.html',
+    standalone: false
 })
 export class AppMenuComponent implements OnInit {
   public info$!: Observable<ISystemInfo>;

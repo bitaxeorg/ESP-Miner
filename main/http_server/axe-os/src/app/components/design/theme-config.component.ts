@@ -13,8 +13,8 @@ interface ThemeOption {
 }
 
 @Component({
-  selector: 'app-theme-config',
-  template: `
+    selector: 'app-theme-config',
+    template: `
     <div class="card">
       <div class="grid">
         <div class="col-12">
@@ -50,7 +50,8 @@ interface ThemeOption {
       </div>
     </div>
   `,
-  styleUrls: ['./design-component.scss']
+    styleUrls: ['./design-component.scss'],
+    standalone: false
 })
 export class ThemeConfigComponent implements OnInit {
   selectedScheme: string;

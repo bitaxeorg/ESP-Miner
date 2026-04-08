@@ -7,6 +7,8 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { ToastrModule } from 'ngx-toastr';
+import { providePrimeNG } from 'primeng/config';
+import Aura from '@primeuix/themes/aura';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -45,7 +47,6 @@ import { DialogService, DialogListComponent } from './services/dialog.service';
 
 const components = [
   AppComponent,
-  EditComponent,
   NetworkEditComponent,
   HomeComponent,
   ModalComponent,
@@ -54,7 +55,6 @@ const components = [
   ConfettiComponent,
   SnowflakesComponent,
   NetworkComponent,
-  SettingsComponent,
   LogsComponent,
   SystemComponent,
   UpdateComponent,
@@ -65,14 +65,7 @@ const components = [
   declarations: [
     ...components,
 
-    ANSIPipe,
-    DateAgoPipe,
     SwarmComponent,
-    SettingsComponent,
-    HashSuffixPipe,
-    DiffSuffixPipe,
-    AddressPipe,
-    SatsPipe,
     ThemeConfigComponent,
     DesignComponent,
     PoolComponent,
@@ -92,7 +85,15 @@ const components = [
     AppLayoutModule,
     MessageModule,
     TooltipModule,
-    DialogModule
+    DialogModule,
+    EditComponent,
+    SettingsComponent,
+    ANSIPipe,
+    DateAgoPipe,
+    HashSuffixPipe,
+    DiffSuffixPipe,
+    AddressPipe,
+    SatsPipe,
   ],
   providers: [
     { provide: LocationStrategy, useClass: HashLocationStrategy },
@@ -100,7 +101,19 @@ const components = [
     Api,
     DialogService,
     PrimeDialogService,
-    provideHttpClient()
+    provideHttpClient(),
+    providePrimeNG({
+        theme: {
+            preset: Aura,
+            options: {
+                darkModeSelector: '.dark-mode',
+                cssLayer: {
+                    name: 'primeng',
+                    order: 'primeng, axe-os'
+                }
+            }
+        }
+    })
   ],
   bootstrap: [AppComponent]
 })

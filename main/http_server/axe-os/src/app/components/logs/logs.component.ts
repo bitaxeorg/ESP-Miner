@@ -5,9 +5,10 @@ import { ToastrService } from 'ngx-toastr';
 import { WebsocketService } from 'src/app/services/web-socket.service';
 
 @Component({
-  selector: 'app-logs',
-  templateUrl: './logs.component.html',
-  styleUrl: './logs.component.scss'
+    selector: 'app-logs',
+    templateUrl: './logs.component.html',
+    styleUrl: './logs.component.scss',
+    standalone: false
 })
 export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
 

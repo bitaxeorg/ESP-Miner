@@ -13,9 +13,10 @@ import { SystemInfo } from 'src/app/generated/models';
 const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 
 @Component({
-  selector: 'app-update',
-  templateUrl: './update.component.html',
-  styleUrls: ['./update.component.scss']
+    selector: 'app-update',
+    templateUrl: './update.component.html',
+    styleUrls: ['./update.component.scss'],
+    standalone: false
 })
 export class UpdateComponent {
 

@@ -11,61 +11,101 @@
 }
 
 @import "app/layout/styles/layout/layout.scss";
-@import "app/layout/styles/theme/themes/vela/bitaxe/theme.scss";
 
 @import "app/layout/styles/modules/primeicons.css";
-@import "app/layout/styles/modules/primeng.min.css";
 
 @import "../node_modules/primeflex/primeflex.min.css";
 
 
 /* You can add global styles to this file, and also import other style files */
-p-chart>div {
-    position: relative;
-    min-height: 40vh;
-}
-
-.card {
-    &.chart {
-        padding: 10px;
+@layer axe-os {
+    :root {
+        --topbar-height: 5rem;
+        --p-button-padding-y: 0.65rem;
+        --p-button-padding-x: 1.25rem;
+        --p-select-padding-y: 0.6rem;
+        --p-select-padding-x: 0.85rem;
+        --p-inputtext-padding-y: 0.6rem;
+        --p-inputtext-padding-x: 0.85rem;
+        --p-checkbox-width: 22px;
+        --p-checkbox-height: 22px;
+        --p-slider-track-size: 6px;
+        --p-slider-handle-width: 14px;
+        --p-slider-handle-height: 14px;
+        --p-progressbar-background: rgba(255, 255, 255, 0.1);
+        --p-progressbar-value-background: var(--primary-color);
     }
-}
 
-.hover-next-input:hover + * {
-    .p-dropdown {
-        border-color: var(--checkbox-hover-bg);
+    /* Compatibility aliases for PrimeNG 19 renames */
+    .p-select { @extend .p-dropdown !optional; }
+    .p-toggleswitch { @extend .p-inputswitch !optional; }
+
+    p-chart>div {
+        position: relative;
+        min-height: 40vh;
     }
-    .p-slider {
-        .p-slider-handle {
+
+    .card {
+        &.chart {
+            padding: 10px;
+        }
+    }
+
+    .hover-next-input:hover + * {
+        .p-dropdown, .p-select {
             border-color: var(--checkbox-hover-bg);
-            background-color: var(--checkbox-hover-bg);
         }
+        .p-slider {
+            .p-slider-handle {
+                border-color: var(--checkbox-hover-bg);
+                background-color: var(--checkbox-hover-bg);
+            }
+            .p-slider-range {
+                background-color: var(--checkbox-hover-bg);
+            }
+        }
+    }
+
+    /* PrimeNG Component Theme Overrides */
+    .p-slider {
         .p-slider-range {
-            background-color: var(--checkbox-hover-bg);
+            background: var(--slider-range-bg);
+        }
+        .p-slider-handle {
+            background: var(--slider-handle-bg);
+            border: 2px solid var(--slider-handle-bg);
+
+            &:focus {
+                box-shadow: var(--focus-ring);
+            }
         }
     }
-}
 
-/* PrimeNG Component Theme Overrides */
-.p-slider {
-    .p-slider-range {
-        background: var(--slider-range-bg);
-    }
-    .p-slider-handle {
-        background: var(--slider-handle-bg);
-        border: 2px solid var(--slider-handle-bg);
+    .p-checkbox {
+        &:not(.p-checkbox-disabled) {
+            .p-checkbox-box {
+                &.p-focus,
+                &:hover {
+                    border-color: var(--checkbox-hover-bg);
+                }
 
-        &:focus {
-            box-shadow: var(--focus-ring);
+                &.p-highlight {
+                    border-color: var(--checkbox-border);
+                    background: var(--checkbox-bg);
+
+                    &:hover {
+                        background: var(--checkbox-hover-bg);
+                        border-color: var(--checkbox-hover-bg);
+                    }
+                }
+            }
         }
     }
-}
 
-.p-checkbox {
-    &:not(.p-checkbox-disabled) {
-        .p-checkbox-box {
-            &.p-focus,
-            &:hover {
+    .p-radiobutton {
+        .p-radiobutton-box {
+            &:not(.p-disabled):not(.p-highlight):hover,
+            &:not(.p-disabled).p-focus {
                 border-color: var(--checkbox-hover-bg);
             }
 
@@ -73,190 +113,175 @@ p-chart>div {
                 border-color: var(--checkbox-border);
                 background: var(--checkbox-bg);
 
-                &:hover {
+                &:not(.p-disabled):hover {
                     background: var(--checkbox-hover-bg);
                     border-color: var(--checkbox-hover-bg);
                 }
             }
         }
     }
-}
 
-.p-radiobutton {
-    .p-radiobutton-box {
-        &:not(.p-disabled):not(.p-highlight):hover,
-        &:not(.p-disabled).p-focus {
-            border-color: var(--checkbox-hover-bg);
-        }
-
-        &.p-highlight {
-            border-color: var(--checkbox-border);
-            background: var(--checkbox-bg);
-
-            &:not(.p-disabled):hover {
-                background: var(--checkbox-hover-bg);
-                border-color: var(--checkbox-hover-bg);
-            }
-        }
-    }
-}
-
-.p-button:not(.p-button-secondary) {
-    background: var(--button-bg);
-    border: 1px solid var(--button-bg);
-
-    &:enabled:hover {
-        background: var(--button-hover-bg);
-        border-color: var(--button-hover-bg);
-    }
-}
-
-.p-button.p-button-text.color-dot {
-    &:enabled:hover {
+    .p-button:not(.p-button-secondary) {
         background: var(--button-bg);
-    }
-    &:focus {
-        box-shadow: none;
-    }
-    &:enabled:focus {
-        box-shadow: none;
-    }
-}
+        border: 1px solid var(--button-bg);
+        padding: var(--p-button-padding-y) var(--p-button-padding-x);
 
-// Remove focus ring from theme color buttons
-button.color-dot {
-    &:focus {
-        outline: none !important;
-        box-shadow: none !important;
-    }
-}
-
-.p-togglebutton {
-    &.p-highlight {
-        background: var(--togglebutton-bg);
-        border-color: var(--togglebutton-bg);
-
-        &:hover {
-            background: var(--togglebutton-hover-bg);
-            border-color: var(--togglebutton-hover-bg);
+        &:enabled:hover {
+            background: var(--button-hover-bg);
+            border-color: var(--button-hover-bg);
         }
     }
-}
 
-.p-inputtext {
-    background: transparent !important;
-    transition: none !important;
-    box-shadow: none !important;
-    outline: none !important;
-
-    &:enabled:hover,
-    &:enabled:focus {
-        border-color: var(--togglebutton-hover-bg) !important;
-    }
-}
-
-/* Progress Bar Theme Override */
-.p-progressbar {
-    background: var(--progressbar-bg);
-
-    .p-progressbar-value {
-        background: var(--progressbar-value-bg);
+    .p-button.p-button-text.color-dot {
+        &:enabled:hover {
+            background: var(--button-bg);
+        }
+        &:focus {
+            box-shadow: none;
+        }
+        &:enabled:focus {
+            box-shadow: none;
+        }
     }
 
-    &--thin {
-        height: 6px !important;
-    }
-}
-
-/* Dropdown Theme*/
-.p-dropdown {
-    background: transparent !important;
-    transition: none !important;
-    box-shadow: none !important;
-    outline: none !important;
-
-    &:hover,
-    &:focus,
-    &.p-dropdown-open,
-    &:not(.p-disabled).p-focus {
-        border-color: var(--togglebutton-hover-bg) !important;
+    // Remove focus ring from theme color buttons
+    button.color-dot {
+        &:focus {
+            outline: none !important;
+            box-shadow: none !important;
+        }
     }
 
-    .p-dropdown-panel {
-        background: var(--surface-overlay) !important;
+    .p-togglebutton {
+        &.p-highlight {
+            background: var(--togglebutton-bg);
+            border-color: var(--togglebutton-bg);
 
-        .p-dropdown-items {
-            padding: 0;
-
-            .p-dropdown-item {
-                &:hover {
-                    background: var(--highlight-bg) !important;
-                    color: var(--highlight-text-color) !important;
-                }
-
-                &.p-highlight {
-                    background: var(--highlight-bg) !important;
-                    color: var(--highlight-text-color) !important;
-                }
+            &:hover {
+                background: var(--togglebutton-hover-bg);
+                border-color: var(--togglebutton-hover-bg);
             }
         }
     }
 
-    .p-overlay {
-        left: -1px !important;
-        right: -1px !important;
-    }
+    .p-inputtext {
+        background: transparent !important;
+        transition: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+        padding: var(--p-inputtext-padding-y) var(--p-inputtext-padding-x);
 
-    &--small {
-        .p-dropdown-label,
-        .p-dropdown-item {
-            font-size: small;
-        }
-        .p-dropdown-label {
-            padding: 0.3rem 0 0.3rem 0.7rem;
+        &:enabled:hover,
+        &:enabled:focus {
+            border-color: var(--togglebutton-hover-bg) !important;
         }
     }
-}
 
-.p-button-icon {
-    font-size: 1.2rem;
-}
+    /* Progress Bar Theme Override */
+    .p-progressbar {
+        background: var(--p-progressbar-background);
 
-.p-dialog {
-    @extend .card;
-    margin: 1rem;
+        .p-progressbar-value {
+            background: var(--p-progressbar-value-background);
+        }
 
-    &-header,
-    &-content {
-        padding: 0;
-        margin: 0;
-        background: none;
+        &--thin {
+            height: 6px !important;
+        }
     }
 
-    &-header {
-        margin: 0 0 2rem;
+    /* Dropdown Theme*/
+    .p-dropdown, .p-select {
+        background: transparent !important;
+        transition: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+        padding: var(--p-select-padding-y) var(--p-select-padding-x);
+
+        &:hover,
+        &:focus,
+        &.p-dropdown-open,
+        &.p-select-open,
+        &:not(.p-disabled).p-focus {
+            border-color: var(--togglebutton-hover-bg) !important;
+        }
+
+        .p-dropdown-panel, .p-select-panel {
+            background: var(--surface-overlay) !important;
+
+            .p-dropdown-items, .p-select-items {
+                padding: 0;
+
+                .p-dropdown-item, .p-select-item {
+                    &:hover {
+                        background: var(--highlight-bg) !important;
+                        color: var(--highlight-text-color) !important;
+                    }
+
+                    &.p-highlight {
+                        background: var(--highlight-bg) !important;
+                        color: var(--highlight-text-color) !important;
+                    }
+                }
+            }
+        }
+
+        .p-overlay {
+            left: -1px !important;
+            right: -1px !important;
+        }
+
+        &--small {
+            .p-dropdown-label, .p-select-label,
+            .p-dropdown-item, .p-select-item {
+                font-size: small;
+            }
+            .p-dropdown-label, .p-select-label {
+                padding: 0.3rem 0 0.3rem 0.7rem;
+            }
+        }
     }
 
-    &-header-icon {
-        @extend .p-button;
-        width: 2.2rem;
-        height: 2.2rem;
-        color: #fff;
-        border-radius: 0;
+    .p-button-icon {
+        font-size: 1.2rem;
     }
 
-    &-title {
-        @extend h2;
-        margin: 0;
+    .p-dialog {
+        @extend .card;
+        margin: 1rem;
+
+        &-header,
+        &-content {
+            padding: 0;
+            margin: 0;
+            background: none;
+        }
+
+        &-header {
+            margin: 0 0 2rem;
+        }
+
+        &-header-icon {
+            @extend .p-button;
+            width: 2.2rem;
+            height: 2.2rem;
+            color: #fff;
+            border-radius: 0;
+        }
+
+        &-title {
+            @extend h2;
+            margin: 0;
+        }
     }
-}
 
-.line-break-anywhere {
-    line-break: anywhere;
-}
+    .line-break-anywhere {
+        line-break: anywhere;
+    }
 
-.text-monospace {
-    line-break: anywhere;
-    font-family: monospace;
-    font-size: medium;
+    .text-monospace {
+        line-break: anywhere;
+        font-family: monospace;
+        font-size: medium;
+    }
 }

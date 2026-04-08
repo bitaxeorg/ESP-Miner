@@ -46,9 +46,10 @@ interface ISystemInfoError {
 const HOME_CHART_DATA_SOURCES = 'HOME_CHART_DATA_SOURCES';
 
 @Component({
-  selector: 'app-home',
-  templateUrl: './home.component.html',
-  styleUrls: ['./home.component.scss']
+    selector: 'app-home',
+    templateUrl: './home.component.html',
+    styleUrls: ['./home.component.scss'],
+    standalone: false
 })
 export class HomeComponent implements OnInit, OnDestroy {
   public messages: ISystemMessage[] = [];

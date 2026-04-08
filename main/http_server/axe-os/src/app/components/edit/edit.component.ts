@@ -1,11 +1,19 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
-import { FormBuilder, FormGroup, FormControl, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { ActivatedRoute } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { ButtonModule } from 'primeng/button';
+import { CheckboxModule } from 'primeng/checkbox';
+import { DropdownModule } from 'primeng/dropdown';
+import { MessageModule } from 'primeng/message';
+import { SliderModule } from 'primeng/slider';
+import { TooltipModule } from 'primeng/tooltip';
+import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 
 type Dropdown = {
   name: string;
@@ -16,8 +24,20 @@ const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1
 const STATS_FREQUENCY_STEPS = [0, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
 
 @Component({
-  selector: 'app-edit',
-  templateUrl: './edit.component.html'
+    selector: 'app-edit',
+    templateUrl: './edit.component.html',
+    standalone: true,
+    imports: [
+        CommonModule,
+        ReactiveFormsModule,
+        ButtonModule,
+        CheckboxModule,
+        DropdownModule,
+        MessageModule,
+        SliderModule,
+        TooltipModule,
+        DateAgoPipe,
+    ]
 })
 
 export class EditComponent implements OnInit, OnDestroy, OnChanges {
