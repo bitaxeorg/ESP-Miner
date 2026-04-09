@@ -10,6 +10,7 @@
 #include "stratum_task.h"
 #include "hashrate_monitor_task.h"
 #include "asic.h"
+#include "scoreboard.h"
 
 static const char *TAG = "asic_result";
 
@@ -55,6 +56,7 @@ void ASIC_result_task(void *pvParameters)
 
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) continue;
 
+        uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)
         {
             char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
@@ -66,7 +68,7 @@ void ASIC_result_task(void *pvParameters)
                 active_job->extranonce2,
                 active_job->ntime,
                 asic_result->nonce,
-                asic_result->rolled_version ^ active_job->version);
+                version_bits);
 
             if (ret < 0) {
                 ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
@@ -75,5 +77,7 @@ void ASIC_result_task(void *pvParameters)
         }
 
         SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, job_id);
+
+        scoreboard_add(&GLOBAL_STATE->SYSTEM_MODULE.scoreboard, nonce_diff, active_job->jobid, active_job->extranonce2, active_job->ntime, asic_result->nonce, version_bits);
     }
 }

@@ -81,6 +81,9 @@ void app_main(void)
     }
 
     SYSTEM_init_system(&GLOBAL_STATE);
+    if (scoreboard_init(&GLOBAL_STATE.SYSTEM_MODULE.scoreboard) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init scoreboard");
+    }
 
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
         wifi_init(&GLOBAL_STATE);

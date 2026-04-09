@@ -13,6 +13,7 @@
 #include <math.h>
 #include "display.h"
 #include "theme_api.h"
+#include "scoreboard.h"
 
 #define NVS_CONFIG_NAMESPACE "main"
 #define NVS_STR_LIMIT (4000 - 1) // See nvs_set_str
@@ -92,6 +93,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_SWARM]                                 = {.nvs_key_name = "swarmconfig",     .type = TYPE_STR},
     [NVS_CONFIG_THEME_SCHEME]                          = {.nvs_key_name = "themescheme",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_THEME}},
     [NVS_CONFIG_THEME_COLORS]                          = {.nvs_key_name = "themecolors",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_COLORS}},
+    [NVS_CONFIG_SCOREBOARD]                            = {.nvs_key_name = "scoreboard",      .type = TYPE_STR,   .array_size = MAX_SCOREBOARD},
     
     [NVS_CONFIG_BOARD_VERSION]                         = {.nvs_key_name = "boardversion",    .type = TYPE_STR,   .default_value = {.str = "000"}},
     [NVS_CONFIG_DEVICE_MODEL]                          = {.nvs_key_name = "devicemodel",     .type = TYPE_STR,   .default_value = {.str = "unknown"}},
@@ -130,7 +132,7 @@ static void get_nvs_key_name(const Settings * setting, const int index, char des
 {
     if (setting->array_size > 0) {
         int width = 1;
-        for (int t = setting->array_size; t >= 10 && width < 5; t /= 10) width++;
+        for (int t = setting->array_size - 1; t >= 10 && width < 5; t /= 10) width++;
         snprintf(dest, NVS_KEY_NAME_MAX_SIZE, "%s_%0*d", setting->nvs_key_name, width, index + 1);
     } else {
         strncpy(dest, setting->nvs_key_name, NVS_KEY_NAME_MAX_SIZE);
