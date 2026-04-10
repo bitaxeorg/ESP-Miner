@@ -22,8 +22,8 @@ static const char * TAG = "log_buffer";
 
 typedef struct {
     uint32_t magic;
-    uint64_t total_written;
     uint32_t checksum;
+    uint64_t total_written;
 } log_buffer_header_t;
 
 static uint32_t calculate_header_checksum(const log_buffer_header_t *h)
