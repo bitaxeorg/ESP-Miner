@@ -220,6 +220,15 @@
                         <ng-template pTemplate="content" let-value></ng-template>
                     </p-progressBar>
                 </div>
+                
+                <div class="mb-3">
+                    <h6 class="flex justify-content-between mb-1">
+                        Current<span>{{info.power / info.voltage | number: '1.1-1'}} A</span>
+                    </h6>
+                    <p-progressBar [value]="((info.power / info.voltage) / (info.maxPower / info.nominalVoltage)) * 100" [styleClass]="'p-progressbar--thin'">
+                        <ng-template pTemplate="content" let-value></ng-template>
+                    </p-progressBar>
+                </div>
 
                 <div class="mb-3">
                     <h6 class="flex justify-content-between mb-1">
