@@ -94,6 +94,8 @@ void cpu_monitor_task(void *pvParameters) {
     while (1) {
         float idle_percent = (ulTaskGetIdleRunTimePercentForCore(0) + ulTaskGetIdleRunTimePercentForCore(1)) / 2.0f;
         float current_usage = 100.0f - idle_percent;
+        if (current_usage < 0.0f) current_usage = 0.0f;
+        if (current_usage > 100.0f) current_usage = 100.0f;
         
         if (avg_usage < 0) {
             avg_usage = current_usage; // First sample
