@@ -38,9 +38,9 @@ static const char *TAG = "hashrate_monitor";
 
 // Hashrate anomaly detection state
 static float highest_hashrate = 0.0f;
-static uint8_t low_hashrate_count = 0;
+static uint8_t consecutive_anomaly_count = 0;
 static int reinitiate_count = 0;
-static float lower_threshold_hashrate_pct = 0.82f; // 82% of expected hashrate (recomputed at startup)
+static float lower_threshold_hashrate_pct = 0.82f; // Fallback threshold; recomputed dynamically once expected hashrate is known
 static float upper_threshold_hashrate_pct = 1.50f; // 150% of expected hashrate
 
 static float sum_hashrates(measurement_t * measurement, int asic_count)
@@ -168,15 +168,15 @@ void check_hashrate_anomaly(void *pvParameters, float current_hashrate)
     bool is_high_anomaly = current_hashrate > expected_hashrate * upper_threshold_hashrate_pct;
 
     if (is_low_anomaly || is_high_anomaly) {
-        low_hashrate_count++;
+        consecutive_anomaly_count++;
         ESP_LOGW(TAG, "Abnormal hashrate detected: %.3f Gh/s (expected: %.3f Gh/s). Count: %d",
-                 current_hashrate, expected_hashrate, low_hashrate_count);
+                 current_hashrate, expected_hashrate, consecutive_anomaly_count);
     } else {
-        low_hashrate_count = 0;
+        consecutive_anomaly_count = 0;
         return;
     }
 
-    if (low_hashrate_count >= ANOMALY_CONSECUTIVE_THRESHOLD) {
+    if (consecutive_anomaly_count >= ANOMALY_CONSECUTIVE_THRESHOLD) {
         reinitiate_count++;
         ESP_LOGW(TAG, "Reinitiating ASICs due to sustained abnormal hashrate. Reinitiate count: %d", reinitiate_count);
 
@@ -200,7 +200,7 @@ void check_hashrate_anomaly(void *pvParameters, float current_hashrate)
             ESP_LOGE(TAG, "ASIC recovery failed - chip count 0");
         }
 
-        low_hashrate_count = 0;
+        consecutive_anomaly_count = 0;
     }
 }
 
@@ -260,19 +260,21 @@ void hashrate_monitor_task(void *pvParameters)
             float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
             float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
 
-            // Track highest observed hashrate
-            if (current_hashrate > highest_hashrate) {
-                highest_hashrate = current_hashrate;
-                ESP_LOGI(TAG, "New highest hashrate: %.3f Gh/s", highest_hashrate);
-            }
-
             SYSTEM_MODULE->current_hashrate = current_hashrate;
             SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
 
             if (current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
 
-            // Check for sustained hashrate anomalies and auto-recover if needed
+            // Check for sustained hashrate anomalies and auto-recover if needed.
+            // Must run before updating highest_hashrate so the low-anomaly guard
+            // (current < highest) correctly ignores the initial ramp-up phase.
             check_hashrate_anomaly(pvParameters, current_hashrate);
+
+            // Track highest observed hashrate (after anomaly check)
+            if (current_hashrate > highest_hashrate) {
+                highest_hashrate = current_hashrate;
+                ESP_LOGI(TAG, "New highest hashrate: %.3f Gh/s", highest_hashrate);
+            }
         } else {
             SYSTEM_MODULE->current_hashrate = 0;
         }
