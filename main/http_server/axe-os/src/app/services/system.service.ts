@@ -29,6 +29,18 @@ export class SystemApiService {
     @Optional() private api: Api
   ) { }
 
+  public downloadLogs(uri: string = ''): Observable<Blob> {
+    if (environment.production && this.api && !uri) {
+      return from(this.api.invoke(functions.downloadSystemLogs, {}) as Promise<Blob>);
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.get(`${uri}/api/system/logs`, { responseType: 'blob' });
+    }
+
+    return of(new Blob(['Mock logs content'], { type: 'text/plain' })).pipe(delay(1000));
+  }
+
   public getInfo(uri: string = ''): Observable<ISystemInfo> {
     if (environment.production && this.api && !uri) {
       return from(this.api.invoke(functions.getSystemInfo, {})).pipe(timeout(API_TIMEOUT));

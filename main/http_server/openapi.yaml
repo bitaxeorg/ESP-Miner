@@ -813,6 +813,26 @@ paths:
         '500':
           description: Internal server error
 
+  /api/system/logs:
+    get:
+      summary: Download system logs
+      description: Returns the current system logs as a text file
+      operationId: downloadSystemLogs
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            text/plain:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
   /api/system/asic:
     get:
       summary: Get ASIC settings information
