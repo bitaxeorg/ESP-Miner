@@ -10,15 +10,23 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "esp_heap_caps.h"
+#include "esp_bit_defs.h"
+#include "esp_private/startup_internal.h"
 
 #include "log_buffer.h"
 #include "websocket.h"
 #include "esp_cache.h"
+#include "esp_psram.h"
+#include "esp_system.h"
+#include "esp_private/system_internal.h"
+#include "esp_rom_sys.h"
 
 static const char * TAG = "log_buffer";
 
 // Increment this when log_buffer_header_t struct changes
 #define LOG_BUFFER_MAGIC 0xB17A5E10 
+#define RTC_LOG_MAGIC    0x80071062
 
 typedef struct {
     uint32_t magic;
@@ -34,8 +42,21 @@ static uint32_t calculate_header_checksum(const log_buffer_header_t *h)
     return checksum;
 }
 
+static uint32_t calculate_rtc_checksum(const rtc_log_header_t *h)
+{
+    uint32_t checksum = h->magic;
+    checksum ^= h->len;
+    return checksum;
+}
+
 static EXT_RAM_NOINIT_ATTR log_buffer_header_t s_header;
 static EXT_RAM_NOINIT_ATTR char s_buffer[LOG_BUFFER_SIZE];
+
+static RTC_NOINIT_ATTR char s_rtc_log_area[RTC_LOG_BUFFER_SIZE + sizeof(rtc_log_header_t)];
+#define RTC_LOG_BUFFER_INTERNAL (s_rtc_log_area)
+
+#define S_RTC_HEADER (*(rtc_log_header_t *)RTC_LOG_BUFFER_INTERNAL)
+#define S_RTC_BUFFER ((char *)(RTC_LOG_BUFFER_INTERNAL + sizeof(rtc_log_header_t)))
 
 static SemaphoreHandle_t s_log_mutex = NULL;
 static char s_vprintf_buffer[2048];
@@ -107,18 +128,63 @@ static int log_buffer_vprintf(const char *format, va_list args)
     if (output) {
         ring_write(output, needed);
         websocket_log_notify();
-        fputs(output, stdout);
         
         if (output != s_vprintf_buffer) {
             free(output);
         }
-    } else {
-        /* Emergency fallback if absolutely out of memory */
-        vprintf(format, args);
     }
+
+    // Standard UART handover: use the original format and args
+    vprintf(format, args);
 
     xSemaphoreGiveRecursive(s_log_mutex);
     return needed;
+}
+
+static int log_buffer_vprintf_early(const char *format, va_list args)
+{
+    // NO MUTEX here, we are in early boot
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int needed = vsnprintf(s_vprintf_buffer, sizeof(s_vprintf_buffer), format, args_copy);
+    va_end(args_copy);
+
+    if (needed > 0) {
+        // Write to RTC buffer
+        size_t available = RTC_LOG_BUFFER_SIZE - S_RTC_HEADER.len;
+        size_t to_copy = (needed < available) ? needed : available;
+        if (to_copy > 0) {
+            memcpy(&S_RTC_BUFFER[S_RTC_HEADER.len], s_vprintf_buffer, to_copy);
+            S_RTC_HEADER.len += to_copy;
+            S_RTC_HEADER.checksum = calculate_rtc_checksum(&S_RTC_HEADER);
+        }
+        // Also print to UART
+        vprintf(format, args);
+    }
+    return needed;
+}
+
+void log_buffer_early_init(void)
+{
+    // By using the 's_rtc_log_area' variable with RTC_NOINIT_ATTR,
+    // the linker automatically reserves this space from the RTC heap.
+    
+    // Check RTC header
+    if (S_RTC_HEADER.magic != RTC_LOG_MAGIC || S_RTC_HEADER.checksum != calculate_rtc_checksum(&S_RTC_HEADER)) {
+        S_RTC_HEADER.magic = RTC_LOG_MAGIC;
+        S_RTC_HEADER.len = 0;
+        S_RTC_HEADER.checksum = calculate_rtc_checksum(&S_RTC_HEADER);
+    }
+
+    esp_log_set_vprintf(log_buffer_vprintf_early);
+}
+
+// Use ESP_SYSTEM_INIT_FN to ensure this is called as early as possible
+// during application startup, before heap/PSRAM initialization logs are lost.
+ESP_SYSTEM_INIT_FN(log_buffer_early_init_hook, CORE, BIT(0), 100)
+{
+    log_buffer_early_init();
+    return ESP_OK;
 }
 
 void log_buffer_init(void)
@@ -146,6 +212,16 @@ void log_buffer_init(void)
 
         const char * reboot_msg = "\n--- SYSTEM RESTART ---\n";
         ring_write(reboot_msg, strlen(reboot_msg));        
+    }
+
+    // Drain RTC buffer into main buffer
+    if (S_RTC_HEADER.magic == RTC_LOG_MAGIC && S_RTC_HEADER.checksum == calculate_rtc_checksum(&S_RTC_HEADER)) {
+        if (S_RTC_HEADER.len > 0 && S_RTC_HEADER.len <= RTC_LOG_BUFFER_SIZE) {
+            ring_write(S_RTC_BUFFER, S_RTC_HEADER.len);
+            // Clear RTC buffer for next use
+            S_RTC_HEADER.len = 0;
+            S_RTC_HEADER.checksum = calculate_rtc_checksum(&S_RTC_HEADER);
+        }
     }
 
     esp_log_set_vprintf(log_buffer_vprintf);

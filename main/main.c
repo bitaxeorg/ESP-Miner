@@ -32,9 +32,10 @@ static const char * TAG = "bitaxe";
 
 void app_main(void)
 {
+    log_buffer_init();
+
     if (esp_psram_is_initialized()) {
         GLOBAL_STATE.psram_is_available = true;
-        log_buffer_init();
     }
 
     ESP_LOGI(TAG, "Welcome to the bitaxe - FOSS || GTFO!");

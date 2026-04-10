@@ -1,5 +1,4 @@
 import { provideRouter } from '@angular/router';
-import { ANSIPipe } from 'src/app/pipes/ansi.pipe';
 import { InputTextModule } from 'primeng/inputtext';
 import { CommonModule } from '@angular/common';
 import { SystemApiService } from 'src/app/services/system.service';
@@ -17,7 +16,7 @@ describe('LogsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [LogsComponent, ANSIPipe],
+      declarations: [LogsComponent],
       imports: [
         CommonModule,
         ButtonModule,
