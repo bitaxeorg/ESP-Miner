@@ -8,6 +8,8 @@
 #include "asic_common.h"
 #include "asic.h"
 #include "utils.h"
+#include "asic_init.h"
+#include "driver/uart.h"
 
 #define EPSILON 0.0001f
 
@@ -28,6 +30,13 @@ static float hashrate_1h_prev;
 static float hashrate_1h[HASHRATE_1H_SIZE];
 
 static const char *TAG = "hashrate_monitor";
+
+// Hashrate anomaly detection state
+static float highest_hashrate = 0.0f;
+static uint8_t low_hashrate_count = 0;
+static int reinitiate_count = 0;
+static float lower_threshold_hashrate_pct = 0.82f; // 82% of expected hashrate (recomputed at startup)
+static float upper_threshold_hashrate_pct = 1.50f; // 150% of expected hashrate
 
 static float sum_hashrates(measurement_t * measurement, int asic_count)
 {
@@ -135,6 +144,55 @@ static void update_hashrate_averages(SystemModule * SYSTEM_MODULE)
     poll_count++;
 }
 
+void check_hashrate_anomaly(void *pvParameters, float current_hashrate)
+{
+    GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
+    float expected_hashrate = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
+
+    // Skip if expected hashrate is not set yet or mining is paused
+    if (expected_hashrate <= 0.0f || GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+        return;
+    }
+
+    if (current_hashrate < highest_hashrate
+        && (current_hashrate < expected_hashrate * lower_threshold_hashrate_pct
+            || current_hashrate > expected_hashrate * upper_threshold_hashrate_pct)) {
+        low_hashrate_count++;
+        ESP_LOGW(TAG, "Abnormal hashrate detected: %.3f Gh/s (expected: %.3f Gh/s). Count: %d",
+                 current_hashrate, expected_hashrate, low_hashrate_count);
+    } else {
+        low_hashrate_count = 0;
+        return;
+    }
+
+    if (low_hashrate_count >= 3) {
+        reinitiate_count++;
+        ESP_LOGW(TAG, "Reinitiating ASICs due to sustained abnormal hashrate. Reinitiate count: %d", reinitiate_count);
+
+        // Mark ASIC as uninitialized to stop tasks from using UART
+        GLOBAL_STATE->ASIC_initalized = false;
+        // Give tasks time to complete any current UART operation
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+
+        // Flush UART buffers to clear stale data
+        uart_flush(UART_NUM_1);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+
+        // Perform live recovery with stabilization delay
+        uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, 2000);
+
+        if (chip_count > 0) {
+            ESP_LOGI(TAG, "ASIC recovery successful, resuming normal operation.");
+            // Reset measurements to avoid hashrate spike from stale counters
+            hashrate_monitor_reset_measurements(GLOBAL_STATE);
+        } else {
+            ESP_LOGE(TAG, "ASIC recovery failed - chip count 0");
+        }
+
+        low_hashrate_count = 0;
+    }
+}
+
 void hashrate_monitor_task(void *pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
@@ -143,6 +201,14 @@ void hashrate_monitor_task(void *pvParameters)
 
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
+
+    // Compute dynamic lower hashrate threshold based on hardware configuration.
+    // A single domain drop on one ASIC out of the total should be detectable.
+    float expected_hr = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
+    if (expected_hr > 0.0f && asic_count > 0 && hash_domains > 0) {
+        lower_threshold_hashrate_pct = 1.0f - ((expected_hr / asic_count / hash_domains * 2.0f) / expected_hr);
+        ESP_LOGI(TAG, "Hashrate anomaly lower threshold: %.0f%% of expected", lower_threshold_hashrate_pct * 100.0f);
+    }
 
     HASHRATE_MONITOR_MODULE->total_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
     measurement_t* data = heap_caps_malloc(asic_count * hash_domains * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
@@ -179,10 +245,19 @@ void hashrate_monitor_task(void *pvParameters)
             float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
             float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
 
+            // Track highest observed hashrate
+            if (current_hashrate > highest_hashrate) {
+                highest_hashrate = current_hashrate;
+                ESP_LOGI(TAG, "New highest hashrate: %.3f Gh/s", highest_hashrate);
+            }
+
             SYSTEM_MODULE->current_hashrate = current_hashrate;
             SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
 
             if (current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
+
+            // Check for sustained hashrate anomalies and auto-recover if needed
+            check_hashrate_anomaly(pvParameters, current_hashrate);
         } else {
             SYSTEM_MODULE->current_hashrate = 0;
         }
