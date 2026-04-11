@@ -202,13 +202,15 @@ void check_hashrate_anomaly(void *pvParameters, float current_hashrate)
         ESP_LOGI(TAG, "ASIC recovery successful");
         hashrate_monitor_reset_measurements(GLOBAL_STATE);
         warmup_complete = false;
+        recovery_count = 0;
     } else {
-        ESP_LOGE(TAG, "ASIC recovery failed (chip count 0)");
+        ESP_LOGE(TAG, "ASIC recovery failed (chip count 0), rebooting");
+        esp_restart();
     }
 
     consecutive_anomaly_count = 0;
 
-    if (chip_count == 0 || recovery_count >= MAX_RECOVERY_ATTEMPTS) {
+    if (recovery_count >= MAX_RECOVERY_ATTEMPTS) {
         ESP_LOGE(TAG, "Rebooting after %d recovery attempts", recovery_count);
         esp_restart();
     }
