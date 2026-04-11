@@ -25,14 +25,11 @@ void update_hashrate(measurement_t * measurement, uint32_t value);
 void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t time_us);
 
 /**
- * Check for sustained hashrate anomalies and auto-recover ASICs if needed.
+ * Monitor hashrate for anomalies and trigger ASIC recovery or reboot.
  *
- * When the hashrate drops below a dynamic lower threshold or exceeds an upper
- * threshold for multiple consecutive polls, this function reinitializes the
- * ASICs using live recovery mode to restore normal operation without a full
- * system reboot.
- *
- * Inspired by TinyChipHub ESP-Miner-TCH stability improvements.
+ * After warmup, if hashrate stays below 75% or above 150% of expected
+ * for multiple consecutive polls, ASICs are reinitialized. A full reboot
+ * is triggered if recovery fails or after repeated attempts.
  */
 void check_hashrate_anomaly(void *pvParameters, float current_hashrate);
 
