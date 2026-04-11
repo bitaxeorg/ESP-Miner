@@ -118,6 +118,11 @@ static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
 
         /* Check for hostname conflicts */
         char *final_hostname = check_and_resolve_hostname_conflict(hostname, current_ip);
+        if (final_hostname == NULL) {
+            ESP_LOGE(TAG, "Failed to resolve hostname conflicts, skipping mDNS hostname setup");
+            free(hostname);
+            return;
+        }
 
         /* Set mDNS hostname */
         err = mdns_hostname_set(final_hostname);
@@ -176,6 +181,10 @@ esp_err_t update_mdns_hostname(const char *new_hostname, GlobalState *GLOBAL_STA
 
     /* Check for hostname conflicts and resolve if needed */
     char *resolved_hostname = check_and_resolve_hostname_conflict(new_hostname, current_ip);
+    if (resolved_hostname == NULL) {
+        ESP_LOGE(TAG, "Failed to resolve hostname conflicts");
+        return ESP_ERR_NO_MEM;
+    }
 
     /* If the hostname was resolved to a different one, update NVS */
     if (strcmp(resolved_hostname, new_hostname) != 0) {
@@ -494,6 +503,10 @@ static char* generate_unique_hostname(const char *base) {
     char suffix[6];
     snprintf(suffix, sizeof(suffix), "-%02x%02x", mac[4], mac[5]);
     char *new_hostname = malloc(strlen(base) + strlen(suffix) + 1);
+    if (new_hostname == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for unique hostname");
+        return NULL;
+    }
     strcpy(new_hostname, base);
     strcat(new_hostname, suffix);
     return new_hostname;
@@ -517,8 +530,12 @@ static char* check_and_resolve_hostname_conflict(const char *hostname, const cha
     }
 
     if (strcmp(ip_str, current_ip) != 0) {
-        // Different IP, conflict detected
         char *new_hostname = generate_unique_hostname(hostname);
+        if (new_hostname == NULL) {
+            ESP_LOGW(TAG, "mDNS conflict detected for '%s' but could not generate unique name, keeping original", hostname);
+            mdns_query_results_free(results);
+            return strdup(hostname);
+        }
         ESP_LOGI(TAG, "mDNS conflict detected for '%s' at %s, renaming to '%s'", hostname, ip_str, new_hostname);
         nvs_config_set_string(NVS_CONFIG_HOSTNAME, new_hostname);
         mdns_query_results_free(results);
