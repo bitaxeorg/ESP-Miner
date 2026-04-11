@@ -3,6 +3,7 @@ SRCS
     "adc.c"
     "i2c_bitaxe.c"
     "main.c"
+    "log_buffer.c"
     "nvs_config.c"
     "display.c"
     "screen.c"
@@ -18,6 +19,7 @@ SRCS
     "./bap/bap_handlers.c"
     "./bap/bap_subscription.c"
     "device_config.c"
+    "task_monitor.c"
     "./http_server/http_server.c"
     "./http_server/websocket.c"
     "./http_server/theme_api.c"
@@ -28,6 +30,7 @@ SRCS
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
     "./tasks/statistics_task.c"
+    "./tasks/scoreboard.c"
     "./tasks/hashrate_monitor_task.c"
     "./tasks/fan_controller_task.c"
     "./thermal/EMC2101.c"
@@ -75,6 +78,7 @@ PRIV_REQUIRES
     "vfs"
     "esp_driver_i2c"
     "tcp_transport"
+    "esp_mm"
 
 EMBED_FILES "http_server/recovery_page.html"
 )

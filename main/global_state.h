@@ -14,6 +14,7 @@
 #include "work_queue.h"
 #include "device_config.h"
 #include "display.h"
+#include "scoreboard.h"
 #include "esp_transport.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
@@ -72,6 +73,8 @@ typedef struct
     bool pool_decode_coinbase_tx;
     bool fallback_pool_decode_coinbase_tx;
     float response_time;
+    float process_time;
+    float cpu_usage;
     bool use_fallback_stratum;
     uint16_t pool_is_tls;
     uint16_t fallback_pool_is_tls;
@@ -92,6 +95,7 @@ typedef struct
     char * asic_status;
     char * version;
     char * axeOSVersion;
+    Scoreboard scoreboard;
 } SystemModule;
 
 typedef struct
@@ -134,7 +138,7 @@ typedef struct
     uint8_t * valid_jobs;
     pthread_mutex_t valid_jobs_lock;
 
-    uint32_t pool_difficulty;
+    double pool_difficulty;
     bool new_set_mining_difficulty_msg;
     uint32_t version_mask;
     bool new_stratum_version_rolling_msg;

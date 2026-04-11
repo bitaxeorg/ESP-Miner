@@ -9,7 +9,7 @@
                 <ng-container *ngIf="checkLatestRelease == false; else afterCheck">
                     <h3>Latest Release: <p-button (onClick)="handleReleaseCheck()">Check</p-button></h3>
 
-                    <app-modal [headline]="'Privacy Warning'">
+                    <app-modal #privacyModal [headline]="'Privacy Warning'">
                         <p>
                             Please note, this will connect to <strong>github.com</strong> to check for the latest release.
                         </p>
@@ -22,7 +22,7 @@
                         </p>
                         <div class="flex gap-3 mt-5">
                             <p-button (onClick)="continueReleaseCheck(ignoreWarning.model)">Continue</p-button>
-                            <p-button styleClass="p-button-secondary" (onClick)="modalComponent.isVisible = false">Cancel</p-button>
+                            <p-button styleClass="p-button-secondary" (onClick)="privacyModal.isVisible = false">Cancel</p-button>
                         </div>
                     </app-modal>
                 </ng-container>
@@ -47,11 +47,11 @@
                             </div>
                         </div>
 
-                        <a class="text-500 underline block mt-3 cursor-pointer" (click)="modalComponent.isVisible = true">
+                        <a class="text-500 underline block mt-3 cursor-pointer" (click)="releaseNotesModal.isVisible = true">
                             Release Notes
                         </a>
 
-                        <app-modal [headline]="latestRelease.name">
+                        <app-modal #releaseNotesModal [headline]="latestRelease.name">
                             <div [innerHTML]="simpleMarkdownParser(latestRelease.body)"></div>
                         </app-modal>
                     </ng-container>
@@ -60,7 +60,7 @@
         </div>
         <div class="col-12 lg:col-6 xl:col-4">
             <div class="card h-full">
-                <h3>Update AxeOS <span *ngIf="websiteUpdateProgress != null">{{websiteUpdateProgress}} %</span></h3>
+                <h3>Update AxeOS</h3>
 
                 <p-fileUpload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
                     [auto]="true" chooseLabel="Browse"></p-fileUpload>
@@ -70,7 +70,7 @@
         </div>
         <div class="col-12 lg:col-6 xl:col-4">
             <div class="card h-full">
-                <h3>Update Firmware <span *ngIf="firmwareUpdateProgress != null">{{firmwareUpdateProgress}} %</span></h3>
+                <h3>Update Firmware</h3>
                 <p-fileUpload #firmwareUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaUpdate($event)"
                     [auto]="true" chooseLabel="Browse"></p-fileUpload>
 
@@ -80,3 +80,38 @@
         </div>
     </div>
 </div>
+<app-modal #progressModal [headline]="'Updating ' + updateTarget" [closable]="updateStatus !== 'progress'">
+    <div class="flex flex-column align-items-center justify-content-center p-4">
+        <ng-container *ngIf="updateStatus === 'progress'">
+            <div class="text-xl mb-3" *ngIf="updateTarget === 'AxeOS' && websiteUpdateProgress !== null">
+                Uploading... {{ websiteUpdateProgress }}%
+            </div>
+            <div class="text-xl mb-3" *ngIf="updateTarget === 'Firmware' && firmwareUpdateProgress !== null">
+                Uploading... {{ firmwareUpdateProgress }}%
+            </div>
+            <div class="text-xl mb-3" *ngIf="(updateTarget === 'AxeOS' && websiteUpdateProgress === null) || (updateTarget === 'Firmware' && firmwareUpdateProgress === null)">
+                Applying update...
+            </div>
+            <p-progressBar class="w-full" [styleClass]="'instant-progress'" [showValue]="false" [value]="updateTarget === 'AxeOS' ? websiteUpdateProgress : firmwareUpdateProgress" [style]="{'height': '1.5rem', 'width': '100%'}"></p-progressBar>
+            <div class="text-center mt-3 text-500">
+                Please do not disconnect the power.
+            </div>
+        </ng-container>
+
+        <ng-container *ngIf="updateStatus === 'success'">
+            <i class="pi pi-check-circle text-green-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
+            <div class="text-lg text-center">{{ updateMessage }}</div>
+            <div class="mt-4" *ngIf="updateTarget !== 'AxeOS'">
+                <p-button (onClick)="progressModal.isVisible = false">Close</p-button>
+            </div>
+        </ng-container>
+
+        <ng-container *ngIf="updateStatus === 'error'">
+            <i class="pi pi-times-circle text-red-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
+            <div class="text-lg text-center text-red-500">{{ updateMessage }}</div>
+             <div class="mt-4">
+                <p-button (onClick)="progressModal.isVisible = false">Close</p-button>
+            </div>
+        </ng-container>
+    </div>
+</app-modal>

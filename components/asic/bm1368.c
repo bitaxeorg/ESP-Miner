@@ -265,7 +265,7 @@ task_result * BM1368_process_work(void * pvParameters)
 
     memset(&result, 0, sizeof(task_result));
 
-    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result.timestamp_us) == ESP_FAIL) {
         return NULL;
     }
 
@@ -287,7 +287,6 @@ task_result * BM1368_process_work(void * pvParameters)
     uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
     uint8_t small_core_id = asic_result.job.id & 0x0f;
     uint32_t version_bits = (ntohs(asic_result.job.version) << 13);
-    ESP_LOGI(TAG, "Job ID: %02X, Asic nr: %d, Core: %d/%d, Ver: %08" PRIX32, job_id, asic_nr, core_id, small_core_id, version_bits);    
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
@@ -302,6 +301,8 @@ task_result * BM1368_process_work(void * pvParameters)
     result.nonce = asic_result.job.nonce;
     result.rolled_version = rolled_version;
     result.asic_nr = asic_nr;
+    result.core_id = core_id;
+    result.small_core_id = small_core_id;
 
     return &result;
 }

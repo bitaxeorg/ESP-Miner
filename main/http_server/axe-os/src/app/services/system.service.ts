@@ -8,6 +8,7 @@ import {
   SystemInfo as ISystemInfo,
   SystemStatistics as ISystemStatistics,
   SystemAsic as ISystemASIC,
+  SystemScoreboardEntry as ISystemScoreboardEntry,
   Settings,
   GenericResponse
 } from '../generated/models';
@@ -27,6 +28,18 @@ export class SystemApiService {
     private httpClient: HttpClient,
     @Optional() private api: Api
   ) { }
+
+  public downloadLogs(uri: string = ''): Observable<Blob> {
+    if (environment.production && this.api && !uri) {
+      return from(this.api.invoke(functions.downloadSystemLogs, {}) as Promise<Blob>);
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.get(`${uri}/api/system/logs`, { responseType: 'blob' });
+    }
+
+    return of(new Blob(['Mock logs content'], { type: 'text/plain' })).pipe(delay(1000));
+  }
 
   public getInfo(uri: string = ''): Observable<ISystemInfo> {
     if (environment.production && this.api && !uri) {
@@ -55,6 +68,7 @@ export class SystemApiService {
         errorPercentage: 0.2,
         bestDiff: 238214491,
         bestSessionDiff: 21212121,
+        cpuUsage: 12.5,
         freeHeap: 200504,
         freeHeapInternal: 200504,
         freeHeapSpiram: 200504,
@@ -217,6 +231,35 @@ export class SystemApiService {
     });
   }
 
+  public getScoreboard(uri: string = ''): Observable<ISystemScoreboardEntry[]> {
+    if (environment.production) {
+      return this.httpClient.get<ISystemScoreboardEntry[]>(`${uri}/api/system/scoreboard`).pipe(timeout(5000));
+    }
+
+    // Mock data for development
+    return of([
+      {
+        rank: 0,
+        since: 3606,
+        difficulty: 2000,
+        job_id: "123456",
+        extranonce2: "000000",
+        ntime: 61125,
+        nonce: "00000000",
+        version_bits: "20000000"
+      },
+      {
+        rank: 1,
+        since: 3605,
+        difficulty: 1000,
+        job_id: "123457",
+        extranonce2: "000001",
+        ntime: 61126,
+        nonce: "00000001",
+        version_bits: "20000000"
+      }]).pipe(delay(1000));
+  }
+
   public restart(uri: string = ''): Observable<GenericResponse> {
     if (environment.production && this.api && !uri) {
       return from(this.api.invoke(functions.restartSystem, {}) as Promise<GenericResponse>);
@@ -320,16 +363,10 @@ export class SystemApiService {
   }
 
   public performOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
-    if (environment.production && this.api) {
-      return from(this.api.invoke$Response(functions.updateFirmware, { body: file }));
-    }
     return this.otaUpdate(file, '/api/system/OTA');
   }
 
   public performWWWOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
-    if (environment.production && this.api) {
-      return from(this.api.invoke$Response(functions.updateWebInterface, { body: file }));
-    }
     return this.otaUpdate(file, '/api/system/OTAWWW');
   }
 
