@@ -19,36 +19,34 @@
         >{{info.hostname}}</span>
 
         <ul *ngIf="!isAPMode" class="flex ml-auto list-none p-0 m-0 gap-4 lg:flex-order-2">
-            <ng-container *ngIf="dashboardEdit.isActive$ | async">
-                <li class="hidden md:block">
-                    <a class="block py-2 text-white cursor-pointer"
-                        tooltipPosition="bottom"
-                        [pTooltip]="(dashboardEdit.editMode$ | async) ? 'Save Layout' : 'Edit Layout'"
-                        (click)="dashboardEdit.toggleEditMode()"
-                    >
-                        <i class="pi text-xl block"
-                            [ngClass]="(dashboardEdit.editMode$ | async) ? 'pi-save' : 'pi-th-large'"></i>
-                    </a>
-                </li>
-                <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
-                    <a class="block py-2 text-white cursor-pointer"
-                        tooltipPosition="bottom"
-                        pTooltip="Widgets"
-                        (click)="widgetPanel.toggle($event)"
-                    >
-                        <i class="pi pi-list-check text-xl block"></i>
-                    </a>
-                </li>
-                <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
-                    <a class="block py-2 text-white cursor-pointer"
-                        tooltipPosition="bottom"
-                        pTooltip="Reset Layout"
-                        (click)="dashboardEdit.requestReset()"
-                    >
-                        <i class="pi pi-replay text-xl block"></i>
-                    </a>
-                </li>
-            </ng-container>
+            <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
+                    pTooltip="Widgets"
+                    (click)="widgetPanel.toggle($event)"
+                >
+                    <i class="pi pi-list-check text-xl block"></i>
+                </a>
+            </li>
+            <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
+                    pTooltip="Reset Layout"
+                    (click)="dashboardEdit.requestReset()"
+                >
+                    <i class="pi pi-replay text-xl block"></i>
+                </a>
+            </li>
+            <li class="hidden md:block">
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
+                    [pTooltip]="(dashboardEdit.editMode$ | async) ? 'Save Layout' : 'Edit Layout'"
+                    (click)="dashboardEdit.toggleEditMode()"
+                >
+                    <i class="pi text-xl block"
+                        [ngClass]="(dashboardEdit.editMode$ | async) ? 'pi-save' : 'pi-th-large'"></i>
+                </a>
+            </li>
             <li>
                 <a class="block py-2 text-white cursor-pointer"
                     tooltipPosition="bottom"

@@ -270,7 +270,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.grid.on('resizestop', (_event: Event, el: GridItemHTMLElement) => {
       if (el.gridstackNode?.id === 'chart') {
-        setTimeout(() => this.chart?.chart?.resize(), 50);
+        setTimeout(() => this.chart?.chart?.resize(), 100);
       }
     });
   }
@@ -410,6 +410,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     };
 
     this.chartOptions = {
+      responsive: true,
       animation: false,
       maintainAspectRatio: false,
       onResize: (chart: any, size: { width: number; height: number }) => {
@@ -419,7 +420,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         chart.options.scales.y.ticks.font = tickFont;
         chart.options.scales.y2.ticks.font = tickFont;
         // Hide x-axis labels when chart is very short to reclaim space
-        chart.options.scales.x.ticks.display = size.height > 150;
+        chart.options.scales.x.ticks.display = size.height > 100;
       },
       plugins: {
         legend: {
