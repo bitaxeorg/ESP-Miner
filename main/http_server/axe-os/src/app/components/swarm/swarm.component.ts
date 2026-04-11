@@ -10,6 +10,7 @@ import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { ModalComponent } from '../modal/modal.component';
 
 const SWARM_DATA = 'SWARM_DATA';
+const SWARM_VERSION = 'SWARM_VERSION';
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 const SWARM_SORTING = 'SWARM_SORTING';
 const SWARM_GRID_VIEW = 'SWARM_GRID_VIEW';
@@ -61,6 +62,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public filterText = '';
 
   public currentDeviceIp: string | null = null;
+  private currentDeviceVersion: string | null = null;
 
   @HostListener('document:keydown.esc', ['$event'])
   onEscKey() {
@@ -105,15 +107,6 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    const swarmData = this.localStorageService.getObject(SWARM_DATA);
-
-    if (swarmData == null) {
-      this.scanNetwork();
-    } else {
-      this.swarm = swarmData;
-      this.refreshList(true);
-    }
-
     this.staticMenuDesktopSubscription = this.layoutService.getStaticMenuDesktopInactive$()
       .subscribe(inactive => {
         this.staticMenuDesktopInactive = inactive;
@@ -128,17 +121,51 @@ export class SwarmComponent implements OnInit, OnDestroy {
       }
     }, 1000);
 
-    // Fetch current device IP for isThisDevice
     this.httpClient.get(`http://${window.location.hostname}/api/system/info`).subscribe({
-      next: (response: any) => this.currentDeviceIp = response.ip,
-      error: () => this.currentDeviceIp = null
+      next: (response: any) => {
+        this.currentDeviceIp = response.ip;
+        this.currentDeviceVersion = response.version;
+        this.initSwarm(response.version);
+      },
+      error: () => {
+        this.currentDeviceIp = null;
+        this.currentDeviceVersion = null;
+        this.initSwarm(null);
+      }
     });
+  }
+
+  private initSwarm(firmwareVersion: string | null) {
+    const swarmData = this.localStorageService.getObject(SWARM_DATA);
+    const storedVersion = this.localStorageService.getItem(SWARM_VERSION);
+
+    const versionMatch = firmwareVersion && storedVersion === firmwareVersion;
+
+    if (swarmData == null || !versionMatch) {
+      if (swarmData != null && !versionMatch) {
+        this.localStorageService.removeItem(SWARM_DATA);
+      }
+      if (!firmwareVersion) {
+        this.localStorageService.removeItem(SWARM_VERSION);
+      }
+      this.scanNetwork();
+    } else {
+      this.swarm = swarmData;
+      this.refreshList(true);
+    }
   }
 
   ngOnDestroy(): void {
     this.staticMenuDesktopSubscription.unsubscribe();
     window.clearInterval(this.refreshIntervalRef);
     this.form.reset();
+  }
+
+  private saveSwarmData() {
+    this.localStorageService.setObject(SWARM_DATA, this.swarm);
+    if (this.currentDeviceVersion) {
+      this.localStorageService.setItem(SWARM_VERSION, this.currentDeviceVersion);
+    }
   }
 
   private ipToInt(ip: string): number {
@@ -158,7 +185,7 @@ private isIpAddress(value: string): boolean {
   // Utility method to get the link URL for a device
   // Falls back to IP for older devices without mDNS
   public getDeviceLink(device: SwarmDevice): string {
-    return device['fullHostname'] || device.connectionAddress;
+    return device['fullHostname'] || device.connectionAddress || device.address || '';
   }
 
   private intToIp(int: number): string {
@@ -212,7 +239,7 @@ private isIpAddress(value: string): boolean {
         });
         this.swarm = [...this.swarm, ...newItems];
         this.sortSwarm();
-        this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.saveSwarmData();
         this.calculateTotals();
       },
       complete: () => {
@@ -289,7 +316,7 @@ private isIpAddress(value: string): boolean {
       };
       this.swarm.push(device);
       this.sortSwarm();
-      this.localStorageService.setObject(SWARM_DATA, this.swarm);
+      this.saveSwarmData();
       this.calculateTotals();
     });
   }
@@ -329,7 +356,7 @@ private isIpAddress(value: string): boolean {
 
   public remove(device: any) {
     this.swarm = this.swarm.filter(axe => axe.address !== device.address);
-    this.localStorageService.setObject(SWARM_DATA, this.swarm);
+    this.saveSwarmData();
     this.calculateTotals();
   }
 
@@ -339,13 +366,19 @@ private isIpAddress(value: string): boolean {
     const existingDevice = this.swarm.find(axeOs => axeOs.connectionAddress === address);
     return of({
       ...existingDevice,
+      address: existingDevice?.address || address,
+      connectionAddress: address,
+      ASICModel: existingDevice?.ASICModel || '',
+      deviceModel: existingDevice?.deviceModel || 'Other',
+      swarmColor: existingDevice?.swarmColor || 'gray',
+      asicCount: existingDevice?.asicCount || 1,
       hashRate: 0,
       sharesAccepted: 0,
       power: 0,
       voltage: 0,
       temp: 0,
       bestDiff: 0,
-      version: 0,
+      version: '',
       uptimeSeconds: 0,
       poolDifficulty: 0,
     });
@@ -364,7 +397,7 @@ private isIpAddress(value: string): boolean {
       next: (result) => {
         this.swarm = result;
         this.sortSwarm();
-        this.localStorageService.setObject(SWARM_DATA, this.swarm);
+        this.saveSwarmData();
         this.calculateTotals();
         this.isRefreshing = false;
       },
@@ -390,16 +423,17 @@ private isIpAddress(value: string): boolean {
   private sortSwarm() {
     this.swarm.sort((a, b) => {
       let comparison = 0;
-      const fieldType = typeof a[this.selectedSort.sortField];
+      const aVal = a[this.selectedSort.sortField];
+      const bVal = b[this.selectedSort.sortField];
+      const fieldType = typeof aVal;
 
       if (this.selectedSort.sortField === 'address') {
-        const aValue = a[this.selectedSort.sortField];
-        const bValue = b[this.selectedSort.sortField];
+        const aValue = aVal || '';
+        const bValue = bVal || '';
         const aIsIp = this.isIpAddress(aValue);
         const bIsIp = this.isIpAddress(bValue);
 
         if (aIsIp && bIsIp) {
-          // Both are IPs, sort numerically
           const aOctets = aValue.split('.').map(Number);
           const bOctets = bValue.split('.').map(Number);
           for (let i = 0; i < 4; i++) {
@@ -409,16 +443,14 @@ private isIpAddress(value: string): boolean {
             }
           }
         } else if (!aIsIp && !bIsIp) {
-          // Both are hostnames, sort alphabetically
           comparison = aValue.localeCompare(bValue);
         } else {
-          // Mixed, sort IPs before hostnames
           comparison = aIsIp ? -1 : 1;
         }
       } else if (fieldType === 'number') {
-        comparison = a[this.selectedSort.sortField] - b[this.selectedSort.sortField];
+        comparison = (aVal || 0) - (bVal || 0);
       } else if (fieldType === 'string') {
-        comparison = a[this.selectedSort.sortField].localeCompare(b[this.selectedSort.sortField], undefined, { numeric: true });
+        comparison = (aVal || '').localeCompare(bVal || '', undefined, { numeric: true });
       }
       return this.selectedSort.sortDirection === 'asc' ? comparison : -comparison;
     });
@@ -579,9 +611,9 @@ private isIpAddress(value: string): boolean {
     const filter = this.filterText.toLowerCase();
 return this.swarm.filter(axe =>
       this.getDeviceDisplayName(axe).toLowerCase().includes(filter) ||
-      axe.ASICModel.toLowerCase().includes(filter) ||
-      axe.deviceModel.toLowerCase().includes(filter) ||
-      axe.address.toLowerCase().includes(filter)
+      (axe.ASICModel || '').toLowerCase().includes(filter) ||
+      (axe.deviceModel || '').toLowerCase().includes(filter) ||
+      (axe.address || '').toLowerCase().includes(filter)
     );
   }
 
