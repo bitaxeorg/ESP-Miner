@@ -64,13 +64,34 @@ static wifi_ap_record_t ap_info[MAX_AP_COUNT];
 static int s_retry_num = 0;
 static int clients_connected_to_ap = 0;
 static bool mdns_initialized = false;
+static bool mdns_init_in_progress = false;
 
 static const char *get_wifi_reason_string(int reason);
 static void wifi_softap_on(void);
 static void wifi_softap_off(void);
 
+static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE);
 static char* generate_unique_hostname(const char *base);
 static char* check_and_resolve_hostname_conflict(const char *hostname, const char *current_ip);
+
+static void mdns_init_task(void *pvParameters) {
+    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+    initialize_mdns_if_needed(GLOBAL_STATE);
+    mdns_init_in_progress = false;
+    vTaskDelete(NULL);
+}
+
+static void spawn_mdns_init_if_needed(GlobalState *GLOBAL_STATE) {
+    if (mdns_initialized || mdns_init_in_progress) {
+        return;
+    }
+    mdns_init_in_progress = true;
+    BaseType_t ret = xTaskCreate(mdns_init_task, "mdns_init", 4096, GLOBAL_STATE, 5, NULL);
+    if (ret != pdPASS) {
+        ESP_LOGW(TAG, "Failed to create mDNS init task");
+        mdns_init_in_progress = false;
+    }
+}
 
 static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
     if (mdns_initialized) {
@@ -374,7 +395,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             ESP_LOGE(TAG, "Failed to create IPv6 link-local address: %s", esp_err_to_name(ipv6_err));
         }
 
-        initialize_mdns_if_needed(GLOBAL_STATE);
+        spawn_mdns_init_if_needed(GLOBAL_STATE);
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
@@ -407,7 +428,7 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
             ESP_LOGI(TAG, "IPv6 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
         }
 
-        initialize_mdns_if_needed(GLOBAL_STATE);
+        spawn_mdns_init_if_needed(GLOBAL_STATE);
     }
 }
 
@@ -480,7 +501,7 @@ static char* generate_unique_hostname(const char *base) {
 
 static char* check_and_resolve_hostname_conflict(const char *hostname, const char *current_ip) {
     mdns_result_t *results = NULL;
-    esp_err_t err = mdns_query_generic(hostname, NULL, NULL, MDNS_TYPE_A, MDNS_QUERY_MULTICAST, 3000, 1, &results);
+    esp_err_t err = mdns_query_generic(hostname, NULL, NULL, MDNS_TYPE_A, MDNS_QUERY_MULTICAST, 1000, 1, &results);
     if (err != ESP_OK || !results || !results->addr) {
         // No A record found, no conflict
         if (results) mdns_query_results_free(results);
