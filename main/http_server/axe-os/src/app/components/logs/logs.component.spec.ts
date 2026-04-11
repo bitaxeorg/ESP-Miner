@@ -5,6 +5,8 @@ import { provideToastr } from 'ngx-toastr';
 import { ButtonModule } from 'primeng/button';
 import { ReactiveFormsModule } from '@angular/forms';
 import { TooltipModule } from 'primeng/tooltip';
+import { provideHttpClient } from '@angular/common/http';
+import { SystemApiService } from 'src/app/services/system.service';
 
 describe('LogsComponent', () => {
   let component: LogsComponent;
@@ -14,7 +16,11 @@ describe('LogsComponent', () => {
     await TestBed.configureTestingModule({
       declarations: [LogsComponent],
       imports: [ButtonModule, ReactiveFormsModule, TooltipModule],
-      providers: [provideToastr()]
+      providers: [
+        provideToastr(),
+        provideHttpClient(),
+        SystemApiService
+      ]
     })
     .compileComponents();
     
