@@ -542,8 +542,8 @@ private isIpAddress(value: string): boolean {
 
   get sortOptions() {
     return [
-      { label: 'Hostname (Z-A)', value: { sortField: 'hostname', sortDirection: 'desc' } },
-      { label: 'Hostname (A-Z)', value: { sortField: 'hostname', sortDirection: 'asc' } },
+      { label: 'Hostname', value: { sortField: 'hostname', sortDirection: 'desc' } },
+      { label: 'Hostname', value: { sortField: 'hostname', sortDirection: 'asc' } },
       { label: 'Address', value: { sortField: 'address', sortDirection: 'desc' } },
       { label: 'Address', value: { sortField: 'address', sortDirection: 'asc' } },
       { label: 'Hashrate', value: { sortField: 'hashRate', sortDirection: 'desc' } },
