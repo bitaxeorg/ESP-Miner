@@ -210,6 +210,24 @@ export class HomeComponent implements OnInit, OnDestroy {
     clearTimeout(this.resizeTimer);
     this.resizeTimer = setTimeout(() => {
       this.grid?.cellHeight(this.getCellHeight());
+
+      if (this.grid) {
+        const isMobile = window.innerWidth < 768;
+        const chartNode = this.grid.engine.nodes.find(n => n.id === 'chart');
+        
+        if (chartNode && chartNode.el) {
+          if (!isMobile && !chartNode.el.dataset['desktopH']) {
+            chartNode.el.dataset['desktopH'] = String(chartNode.h);
+          }
+          
+          const targetH = isMobile ? 8 : (chartNode.el.dataset['desktopH'] ? parseInt(chartNode.el.dataset['desktopH'], 10) : 21);
+          
+          if (chartNode.h !== targetH) {
+            this.grid.update(chartNode.el, { h: targetH });
+          }
+        }
+      }
+
       this.chart?.chart?.resize();
     }, 200);
   }
@@ -262,6 +280,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     const savedLayout = this.storageService.getObject(DASHBOARD_LAYOUT_KEY);
     this.grid.load(savedLayout ?? WIDGET_DEFAULTS);
 
+    // After loading, ensure mobile layout gets the proper chart height if loaded on mobile
+    if (window.innerWidth < 768) {
+      const chartNode = this.grid.engine.nodes.find(n => n.id === 'chart');
+      if (chartNode && chartNode.el && chartNode.h !== 8) {
+        if (!chartNode.el.dataset['desktopH']) {
+          chartNode.el.dataset['desktopH'] = String(chartNode.h);
+        }
+        this.grid.update(chartNode.el, { h: 8 });
+      }
+    }
+
     setTimeout(() => this.chart?.chart?.resize(), 100);
 
     this.grid.on('change', () => {
@@ -270,6 +299,10 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.grid.on('resizestop', (_event: Event, el: GridItemHTMLElement) => {
       if (el.gridstackNode?.id === 'chart') {
+        const isMobile = window.innerWidth < 768;
+        if (!isMobile && el.gridstackNode.h) {
+           el.dataset['desktopH'] = String(el.gridstackNode.h);
+        }
         setTimeout(() => this.chart?.chart?.resize(), 100);
       }
     });
