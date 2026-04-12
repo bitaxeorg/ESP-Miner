@@ -1,7 +1,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-#include "string.h"
 #include "global_state.h"
 
 #define MAX_TASKS 40
@@ -20,7 +19,7 @@ void task_monitor_task(void *pvParameters) {
     }
 
     while (1) {
-        uint32_t total_runtime1 = 0;
+        uint64_t total_runtime1 = 0;
         uint32_t num_tasks1 = uxTaskGetSystemState(task_array1, MAX_TASKS, &total_runtime1);
         if (num_tasks1 == 0) {
             ESP_LOGE(TAG, "Failed to get initial task state");
@@ -31,7 +30,7 @@ void task_monitor_task(void *pvParameters) {
         // Wait for the interval
         vTaskDelay(pdMS_TO_TICKS(INTERVAL_MS));
 
-        uint32_t total_runtime2 = 0;
+        uint64_t total_runtime2 = 0;
         uint32_t num_tasks2 = uxTaskGetSystemState(task_array2, MAX_TASKS, &total_runtime2);
         if (num_tasks2 == 0) {
             ESP_LOGE(TAG, "Failed to get second task state");
@@ -39,7 +38,7 @@ void task_monitor_task(void *pvParameters) {
         }
 
         // Compute total delta (elapsed wall time in timer units)
-        uint32_t total_delta = total_runtime2 - total_runtime1;
+        uint64_t total_delta = total_runtime2 - total_runtime1;
         if (total_delta == 0) {
             ESP_LOGI(TAG, "No runtime change in interval");
             continue;
@@ -56,7 +55,7 @@ void task_monitor_task(void *pvParameters) {
 
         // Process each task in array2 (current tasks)
         for (uint32_t j = 0; j < num_tasks2; j++) {
-            uint32_t task_delta = task_array2[j].ulRunTimeCounter;
+            uint64_t task_delta = task_array2[j].ulRunTimeCounter;
 
             // Look for match in array1
             for (uint32_t i = 0; i < num_tasks1; i++) {
@@ -68,9 +67,9 @@ void task_monitor_task(void *pvParameters) {
 
             // If not found, it's a new task: delta remains run2 (all during interval)
             double delta_percentage = (task_delta * 100.0) / total_delta;
-            uint32_t lifetime_runtime = task_array2[j].ulRunTimeCounter;
+            uint64_t lifetime_runtime = task_array2[j].ulRunTimeCounter;
             double lifetime_percentage = (lifetime_runtime * 100.0) / total_runtime2;
-            printf("%-20s\t%u\t\t\t%.2f%%\t\t%u\t\t\t%.2f%%\n", task_array2[j].pcTaskName, (unsigned int)task_delta, delta_percentage, (unsigned int)lifetime_runtime, lifetime_percentage);
+            printf("%-20s\t%llu\t\t\t%.2f%%\t\t%llu\t\t\t%.2f%%\n", task_array2[j].pcTaskName, task_delta, delta_percentage, lifetime_runtime, lifetime_percentage);
         }
         printf("\n");
 
@@ -92,11 +91,11 @@ void cpu_monitor_task(void *pvParameters) {
     const float alpha = 0.5f;
 
     while (1) {
-        uint32_t idleTimeCore0 = ulTaskGetIdleRunTimePercentForCore(0);
-        uint32_t idleTimeCore1 = ulTaskGetIdleRunTimePercentForCore(1);
+        uint64_t idleTimeCore0 = ulTaskGetIdleRunTimePercentForCore(0);
+        uint64_t idleTimeCore1 = ulTaskGetIdleRunTimePercentForCore(1);
         // The task idle timer counter can overflow, ignore invalid statistics
         if (idleTimeCore0 <= 100 && idleTimeCore1 <= 100) {
-            float current_idle = (idleTimeCore0 + idleTimeCore1) * 0.5f;
+            double current_idle = (idleTimeCore0 + idleTimeCore1) * 0.5f;
             if (avg_idle < 0) {
                 avg_idle = current_idle; // First sample
             } else {
