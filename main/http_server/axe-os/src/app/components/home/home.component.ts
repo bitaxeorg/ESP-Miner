@@ -125,6 +125,31 @@ export class HomeComponent implements OnInit, OnDestroy {
   public hiddenWidgets = new Set<string>();
   private stashedWidgets = new Map<string, HTMLElement>();
 
+  private currentInterval: any = HomeComponent.ADAPTIVE_TICK_INTERVALS[0];
+  private chartWidth: number = 800;
+
+  private static readonly ADAPTIVE_TICK_INTERVALS = [
+    { unit: 'second', step: 1, ms: 1000 },
+    { unit: 'second', step: 2, ms: 2000 },
+    { unit: 'second', step: 5, ms: 5000 },
+    { unit: 'second', step: 10, ms: 10000 },
+    { unit: 'second', step: 15, ms: 15000 },
+    { unit: 'second', step: 30, ms: 30000 },
+    { unit: 'minute', step: 1, ms: 60000 },
+    { unit: 'minute', step: 2, ms: 120000 },
+    { unit: 'minute', step: 5, ms: 300000 },
+    { unit: 'minute', step: 10, ms: 600000 },
+    { unit: 'minute', step: 15, ms: 900000 },
+    { unit: 'minute', step: 30, ms: 1800000 },
+    { unit: 'hour', step: 1, ms: 3600000 },
+    { unit: 'hour', step: 2, ms: 7200000 },
+    { unit: 'hour', step: 4, ms: 14400000 },
+    { unit: 'hour', step: 6, ms: 21600000 },
+    { unit: 'hour', step: 12, ms: 43200000 },
+    { unit: 'day', step: 1, ms: 86400000 },
+    { unit: 'day', step: 2, ms: 172800000 } // Max data retention is 1 month
+  ];
+
   private pageDefaultTitle: string = '';
   private destroy$ = new Subject<void>();
   private infoSubscription?: Subscription;
@@ -414,6 +439,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       animation: false,
       maintainAspectRatio: false,
       onResize: (chart: any, size: { width: number; height: number }) => {
+        this.chartWidth = size.width;
         const fontSize = Math.max(8, Math.min(12, Math.round(size.width / 50)));
         const tickFont = { size: fontSize };
         chart.options.scales.x.ticks.font = tickFont;
@@ -421,6 +447,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         chart.options.scales.y2.ticks.font = tickFont;
         // Hide x-axis labels when chart is very short to reclaim space
         chart.options.scales.x.ticks.display = size.height > 100;
+        this.updateAdaptiveTicks();
       },
       plugins: {
         legend: {
@@ -447,10 +474,53 @@ export class HomeComponent implements OnInit, OnDestroy {
         x: {
           type: 'time',
           time: {
-            unit: 'hour', // Set the unit to 'minute'
+            displayFormats: {
+              millisecond: 'HH:mm:ss',
+              second: 'HH:mm:ss',
+              minute: 'HH:mm',
+              hour: 'HH:mm',
+            }
           },
           ticks: {
-            color: textColorSecondary
+            color: textColorSecondary,
+            autoSkip: false
+          },
+          afterBuildTicks: (axis: any) => {
+            if (!this.currentInterval) return;
+
+            const ticks = [];
+            const start = new Date(axis.min);
+            
+            // Align start to the unit boundary (human readable)
+            start.setMilliseconds(0);
+            if (this.currentInterval.unit === 'second') {
+              const s = start.getSeconds();
+              start.setSeconds(s - (s % this.currentInterval.step));
+            } else {
+              start.setSeconds(0);
+              if (this.currentInterval.unit === 'minute') {
+                const m = start.getMinutes();
+                start.setMinutes(m - (m % this.currentInterval.step));
+              } else {
+                start.setMinutes(0);
+                if (this.currentInterval.unit === 'hour') {
+                  const h = start.getHours();
+                  start.setHours(h - (h % this.currentInterval.step));
+                } else {
+                  start.setHours(0);
+                }
+              }
+            }
+
+            let curr = start.getTime();
+            // Start the first tick inside or exactly at the min boundary
+            while (curr < axis.min) curr += this.currentInterval.ms;
+
+            while (curr <= axis.max) {
+              ticks.push({ value: curr });
+              curr += this.currentInterval.ms;
+            }
+            axis.ticks = ticks;
           },
           grid: {
             color: surfaceBorder,
@@ -554,7 +624,14 @@ export class HomeComponent implements OnInit, OnDestroy {
             this.chartY2Data.push(0.0);
           }
 
-          this.limitDataPoints();
+          let statsFrequency = 0;
+          if (stats.statistics.length >= 2 && idxTimestamp !== -1) {
+            const totalDurationMs = stats.statistics[stats.statistics.length - 1][idxTimestamp] - stats.statistics[0][idxTimestamp];
+            statsFrequency = Math.floor(totalDurationMs / (stats.statistics.length - 1) / 1000);
+          }
+
+          this.limitDataPoints(statsFrequency);
+          this.updateAdaptiveTicks();
         });
         if (!this.liveDataStarted) {
           this.liveDataStarted = true;
@@ -626,7 +703,8 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.chartY1Data.push(HomeComponent.getDataForLabel(chartY1DataLabel, info));
           this.chartY2Data.push(HomeComponent.getDataForLabel(chartY2DataLabel, info));
 
-          this.limitDataPoints();
+          this.limitDataPoints(info.statsFrequency);
+          this.updateAdaptiveTicks();
 
           this.chartData.datasets[0].label = chartY1DataLabel;
           this.chartData.datasets[1].label = chartY2DataLabel;
@@ -948,13 +1026,68 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.chartY2Data.length = 0;
   }
 
-  public limitDataPoints() {
-    if (this.dataLabel.length >= 720) {
-      this.dataLabel.shift();
-      this.hashrateData.shift();
-      this.powerData.shift();
-      this.chartY1Data.shift();
-      this.chartY2Data.shift();
+  public limitDataPoints(statsFrequency: number = 0) {
+    const limit = 720;
+    if (this.dataLabel.length <= limit) return;
+
+    const statsFrequencyMs = (statsFrequency || 30) * 1000;
+    const windowDurationMs = limit * statsFrequencyMs;
+
+    while (this.dataLabel.length > limit) {
+      const currentSpan = this.dataLabel[this.dataLabel.length - 1] - this.dataLabel[0];
+      let indexToRemove = 0;
+
+      // If the window is not full, thin based on significance (Triangle Area)
+      if (currentSpan < windowDurationMs) {
+        let minScore = Infinity;
+
+        for (let i = 0; i < this.dataLabel.length - 1; i++) {
+          const gapLeft = i > 0 ? this.dataLabel[i] - this.dataLabel[i - 1] : Infinity;
+          const gapRight = this.dataLabel[i + 1] - this.dataLabel[i];
+
+          if (gapLeft <= statsFrequencyMs || gapRight <= statsFrequencyMs) {
+            const t1 = i > 0 ? this.dataLabel[i - 1] : this.dataLabel[i] - gapRight;
+            const t2 = this.dataLabel[i];
+            const t3 = this.dataLabel[i + 1];
+            const v1 = i > 0 ? this.hashrateData[i - 1] : this.hashrateData[i];
+            const v2 = this.hashrateData[i];
+            const v3 = this.hashrateData[i + 1];
+
+            const score = Math.abs(t1 * (v2 - v3) + t2 * (v3 - v1) + t3 * (v1 - v2));
+            if (score < minScore) {
+              minScore = score;
+              indexToRemove = i;
+            }
+          }
+        }
+      }
+
+      this.dataLabel.splice(indexToRemove, 1);
+      this.hashrateData.splice(indexToRemove, 1);
+      this.powerData.splice(indexToRemove, 1);
+      this.chartY1Data.splice(indexToRemove, 1);
+      this.chartY2Data.splice(indexToRemove, 1);
+    }
+
+    if (this.chartData) {
+      this.chartData = { ...this.chartData };
+    }
+  }
+
+  public updateAdaptiveTicks() {
+    if (this.dataLabel.length < 2) return;
+
+    const totalSpanMs = this.dataLabel[this.dataLabel.length - 1] - this.dataLabel[0];
+
+    const maxTicks = Math.min(16, Math.max(3, Math.floor(this.chartWidth / 80)));
+
+    this.currentInterval = HomeComponent.ADAPTIVE_TICK_INTERVALS.find(i => totalSpanMs / i.ms < maxTicks + 1) || 
+                           HomeComponent.ADAPTIVE_TICK_INTERVALS[HomeComponent.ADAPTIVE_TICK_INTERVALS.length - 1];
+    
+    const xAxis = (this.chartOptions.scales as any).x;
+    if (xAxis.time.unit !== this.currentInterval.unit || xAxis.time.stepSize !== this.currentInterval.step) {
+      xAxis.time.unit = this.currentInterval.unit;
+      xAxis.time.stepSize = this.currentInterval.step;
     }
   }
 
