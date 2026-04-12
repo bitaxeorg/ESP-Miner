@@ -93,17 +93,15 @@ void cpu_monitor_task(void *pvParameters) {
     while (1) {
         uint64_t idleTimeCore0 = ulTaskGetIdleRunTimePercentForCore(0);
         uint64_t idleTimeCore1 = ulTaskGetIdleRunTimePercentForCore(1);
-        // The task idle timer counter can overflow, ignore invalid statistics
-        if (idleTimeCore0 <= 100 && idleTimeCore1 <= 100) {
-            double current_idle = (idleTimeCore0 + idleTimeCore1) * 0.5f;
-            if (avg_idle < 0) {
-                avg_idle = current_idle; // First sample
-            } else {
-                avg_idle = (alpha * current_idle) + ((1.0f - alpha) * avg_idle);
-            }
-    
-            GLOBAL_STATE->SYSTEM_MODULE.cpu_usage = 100.0f - avg_idle;
+
+        double current_idle = (idleTimeCore0 + idleTimeCore1) * 0.5f;
+        if (avg_idle < 0) {
+            avg_idle = current_idle; // First sample
+        } else {
+            avg_idle = (alpha * current_idle) + ((1.0f - alpha) * avg_idle);
         }
+
+        GLOBAL_STATE->SYSTEM_MODULE.cpu_usage = 100.0f - avg_idle;
         
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
