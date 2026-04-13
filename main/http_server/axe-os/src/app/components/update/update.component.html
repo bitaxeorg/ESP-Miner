@@ -115,3 +115,59 @@
         </ng-container>
     </div>
 </app-modal>
+
+<div class="card mt-4">
+    <h3 class="mb-4">Installed Firmware</h3>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-500 font-medium pb-2">Partition</th>
+                    <th class="text-500 font-medium pb-2">Version</th>
+                    <th class="text-500 font-medium pb-2">Status</th>
+                    <th class="text-500 font-medium pb-2 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let partition of (info$ | async)?.partitions" [ngClass]="{'active': partition.isCurrent}">
+                    <td>
+                        <i class="pi pi-box mr-2"></i>
+                        {{ partition.label }}
+                        <p-badge *ngIf="partition.isFactory" value="Factory" severity="info" class="ml-2"></p-badge>
+                    </td>
+                    <td class="font-monospace">
+                        {{ partition.version || 'Empty / Invalid' }}
+                    </td>
+                        <td>
+                            <p-tag *ngIf="partition.isCurrent" value="Running" severity="success"></p-tag>
+                            <span *ngIf="!partition.isCurrent" class="text-500">Standby</span>
+                        </td>
+                        <td class="text-right">
+                            <div class="flex gap-2 justify-content-end align-items-center">
+                                <p-button 
+                                    *ngIf="!partition.isCurrent && partition.version" 
+                                    label="Boot" 
+                                    icon="pi pi-caret-right"
+                                    (onClick)="switchPartition(partition.label)"
+                                    styleClass="p-button-sm">
+                                </p-button>
+                                <span *ngIf="partition.isCurrent" class="text-500 italic">Active</span>
+                                <span *ngIf="!partition.isCurrent && !partition.version" class="text-500 italic">No valid firmware</span>
+                            </div>
+                        </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="flex justify-content-end mt-4">
+        <p-button 
+            label="Restart Device" 
+            icon="pi pi-refresh" 
+            severity="danger"
+            (onClick)="restart()"
+            styleClass="p-button-sm">
+        </p-button>
+    </div>
+</div>

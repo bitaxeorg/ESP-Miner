@@ -187,4 +187,30 @@ export class UpdateComponent {
 
     this.localStorageService.setBool(IGNORE_RELEASE_CHECK_WARNING, true);
   }
+
+  public switchPartition(label: string): void {
+    if (confirm(`Set ${label} as the next boot partition? You will need to restart the device to apply this change.`)) {
+      this.systemService.switchBootPartition(label).subscribe({
+        next: (resp) => {
+          this.toastrService.success(resp.message);
+        },
+        error: (err) => {
+          this.toastrService.error(err.error?.message || err.message || 'Failed to switch partition');
+        }
+      });
+    }
+  }
+
+  public restart(): void {
+    if (confirm('Are you sure you want to restart the device?')) {
+      this.systemService.restart().subscribe({
+        next: () => {
+          this.toastrService.success('Restart command sent.');
+        },
+        error: (err) => {
+          this.toastrService.error(err.error?.message || err.message || 'Failed to restart device');
+        }
+      });
+    }
+  }
 }

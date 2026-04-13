@@ -149,6 +149,12 @@ export class SystemApiService {
         overheat_mode: 0,
         statsLimit: 720,
 
+        partitions: [
+          { label: 'factory', version: 'v2.11.0', isCurrent: false, isFactory: true },
+          { label: 'ota_0', version: 'v2.12.0', isCurrent: true, isFactory: false },
+          { label: 'ota_1', version: 'v2.10.0', isCurrent: false, isFactory: false }
+        ],
+
         blockHeight: 811111,
         scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",
         networkDifficulty: 155970000000000,
@@ -378,6 +384,18 @@ export class SystemApiService {
 
   public performWWWOTAUpdate(file: File | Blob): Observable<HttpEvent<string>> {
     return this.otaUpdate(file, '/api/system/OTAWWW');
+  }
+
+  public switchBootPartition(partition: string, uri: string = ''): Observable<GenericResponse> {
+    if (environment.production && this.api && !uri) {
+      return from(this.api.invoke(functions.setBootPartition as any, { body: { partition } }) as Promise<GenericResponse>);
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/system/boot`, { partition });
+    }
+
+    return of({ message: `Successfully switched to ${partition} (mock)` }).pipe(delay(1000));
   }
 
   public getAsicSettings(uri: string = ''): Observable<ISystemASIC> {

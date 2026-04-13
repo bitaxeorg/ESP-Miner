@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <string.h>
+#include "esp_partition.h"
 #include "esp_wifi.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
@@ -289,6 +291,38 @@ static void system_api_add_block_info(cJSON *root, GlobalState *g) {
     }
 }
 
+static void system_api_add_partitions(cJSON *root) {
+    if (!root) return;
+
+    cJSON *partitions_array = cJSON_CreateArray();
+    cJSON_AddItemToObject(root, "partitions", partitions_array);
+
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
+    while (it != NULL) {
+        const esp_partition_t *p = esp_partition_get(it);
+
+        // We only care about factory, ota_0, ota_1
+        if (strcmp(p->label, "factory") == 0 || strcmp(p->label, "ota_0") == 0 || strcmp(p->label, "ota_1") == 0) {
+            cJSON *p_obj = cJSON_CreateObject();
+            cJSON_AddStringToObject(p_obj, "label", p->label);
+            cJSON_AddBoolToObject(p_obj, "isCurrent", (p == running));
+            cJSON_AddBoolToObject(p_obj, "isFactory", (p->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY));
+
+            esp_app_desc_t app_desc;
+            if (esp_ota_get_partition_description(p, &app_desc) == ESP_OK) {
+                cJSON_AddStringToObject(p_obj, "version", app_desc.version);
+            } else {
+                cJSON_AddNullToObject(p_obj, "version");
+            }
+            cJSON_AddItemToArray(partitions_array, p_obj);
+        }
+
+        it = esp_partition_next(it);
+    }
+    esp_partition_iterator_release(it);
+}
+
 cJSON* system_api_get_full_json(GlobalState *g) {
     if (!g) return NULL;
     cJSON *root = cJSON_CreateObject();
@@ -297,6 +331,7 @@ cJSON* system_api_get_full_json(GlobalState *g) {
     system_api_add_telemetry(root, g);
     system_api_add_config(root, g);
     system_api_add_hashrate_monitor(root, g);
+    system_api_add_partitions(root);
 
     // Arrays that involve global state loops (not simple addition)
     system_api_add_rejected_reasons(root, g);

@@ -887,6 +887,75 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     return res;
 }
 
+static esp_err_t POST_system_boot(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    size_t total_len = req->content_len;
+    if (total_len == 0) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty request body");
+    }
+
+    char *buf = malloc(total_len + 1);
+    if (!buf) {
+        return httpd_resp_send_500(req);
+    }
+
+    int ret = httpd_req_recv(req, buf, total_len);
+    if (ret <= 0) {
+        free(buf);
+        return httpd_resp_send_500(req);
+    }
+    buf[ret] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+    if (!root) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    }
+
+    cJSON *p_label = cJSON_GetObjectItem(root, "partition");
+    if (!cJSON_IsString(p_label)) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing partition label");
+    }
+
+    const esp_partition_t *p = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, p_label->valuestring);
+    if (p == NULL) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Partition not found");
+    }
+
+    esp_app_desc_t app_desc;
+    if (esp_ota_get_partition_description(p, &app_desc) != ESP_OK) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No valid firmware found on partition");
+    }
+
+    esp_err_t err = esp_ota_set_boot_partition(p);
+    cJSON_Delete(root);
+
+    if (err != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to set boot partition");
+    }
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddStringToObject(resp, "message", "Next boot partition set successfully. Please restart to apply.");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t send_res = HTTP_send_json(req, resp, NULL);
+    cJSON_Delete(resp);
+
+    return send_res;
+}
+
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
@@ -1276,6 +1345,15 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_info_get_uri);
+
+    /* URI handler for setting boot partition */
+    httpd_uri_t system_boot_post_uri = {
+        .uri = "/api/system/boot", 
+        .method = HTTP_POST, 
+        .handler = POST_system_boot, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_boot_post_uri);
 
     /* URI handler for fetching system asic values */
     httpd_uri_t system_asic_get_uri = {
