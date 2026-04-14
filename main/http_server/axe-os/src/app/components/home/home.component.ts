@@ -50,17 +50,17 @@ const DASHBOARD_LAYOUT_KEY = 'DASHBOARD_LAYOUT_V1';
 const HIDDEN_WIDGETS_KEY = 'DASHBOARD_HIDDEN_WIDGETS';
 
 const WIDGET_DEFAULTS: WidgetDef[] = [
-  { id: 'hashrate',    label: 'Hashrate',            x: 0, y: 0,  w: 3,  h: 5,  minW: 2, minH: 4 },
-  { id: 'efficiency',  label: 'Efficiency',          x: 3, y: 0,  w: 3,  h: 5,  minW: 2, minH: 4 },
-  { id: 'shares',      label: 'Shares',              x: 6, y: 0,  w: 3,  h: 5,  minW: 2, minH: 4 },
-  { id: 'bestdiff',    label: 'Best Difficulty',     x: 9, y: 0,  w: 3,  h: 5,  minW: 2, minH: 4 },
-  { id: 'chart',       label: 'Chart',               x: 0, y: 5,   w: 12, h: 21, minW: 4, minH: 8 },
-  { id: 'power',       label: 'Power',               x: 0, y: 26,  w: 4,  h: 7,  minW: 2, minH: 5 },
-  { id: 'heat',        label: 'Heat',                x: 4, y: 26,  w: 4,  h: 7,  minW: 2, minH: 5 },
-  { id: 'fan',         label: 'Fan',                 x: 8, y: 26,  w: 4,  h: 7,  minW: 2, minH: 5 },
-  { id: 'pool',        label: 'Pool',                x: 0, y: 33,  w: 4,  h: 6,  minW: 2, minH: 4 },
-  { id: 'blockheader', label: 'Block Header',        x: 4, y: 33,  w: 4,  h: 6,  minW: 2, minH: 4 },
-  { id: 'registers',   label: 'Hashrate Registers',  x: 8, y: 33,  w: 4,  h: 6,  minW: 2, minH: 4 },
+  { id: 'hashrate',    label: 'Hashrate',            x: 0, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
+  { id: 'efficiency',  label: 'Efficiency',          x: 3, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
+  { id: 'shares',      label: 'Shares',              x: 6, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
+  { id: 'bestdiff',    label: 'Best Difficulty',     x: 9, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
+  { id: 'chart',       label: 'Chart',               x: 0, y: 5,   w: 12, h: 23, minW: 4, minH: 10 },
+  { id: 'power',       label: 'Power',               x: 0, y: 28,  w: 4,  h: 7,  minW: 2, minH: 3 },
+  { id: 'heat',        label: 'Heat',                x: 4, y: 28,  w: 4,  h: 7,  minW: 2, minH: 3 },
+  { id: 'fan',         label: 'Fan',                 x: 8, y: 28,  w: 4,  h: 7,  minW: 2, minH: 3 },
+  { id: 'pool',        label: 'Pool',                x: 0, y: 35,  w: 4,  h: 6,  minW: 2, minH: 3 },
+  { id: 'blockheader', label: 'Block Header',        x: 4, y: 35,  w: 4,  h: 6,  minW: 2, minH: 3 },
+  { id: 'registers',   label: 'Hashrate Registers',  x: 8, y: 35,  w: 4,  h: 6,  minW: 2, minH: 3 },
 ];
 
 @Component({
@@ -198,37 +198,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.loadPreviousData();
   }
 
-  private getCellHeight(): number {
-    if (window.innerWidth < 768) {
-      return 50; // mobile: large enough for card content, prevents scrollbars
-    }
-    return Math.max(40, Math.round(window.innerHeight * 0.02)); // desktop: scales on large monitors
-  }
 
   @HostListener('window:resize')
   onWindowResize() {
     clearTimeout(this.resizeTimer);
     this.resizeTimer = setTimeout(() => {
-      this.grid?.cellHeight(this.getCellHeight());
-
-      if (this.grid) {
-        const isMobile = window.innerWidth < 768;
-        const chartNode = this.grid.engine.nodes.find(n => n.id === 'chart');
-        
-        if (chartNode && chartNode.el) {
-          if (!isMobile && !chartNode.el.dataset['desktopH']) {
-            chartNode.el.dataset['desktopH'] = String(chartNode.h);
-          }
-          
-          const targetH = isMobile ? 8 : (chartNode.el.dataset['desktopH'] ? parseInt(chartNode.el.dataset['desktopH'], 10) : 21);
-          
-          if (chartNode.h !== targetH) {
-            this.grid.update(chartNode.el, { h: targetH });
-          }
-        }
-      }
-
       this.chart?.chart?.resize();
+      this.grid?.compact();
     }, 200);
   }
 
@@ -261,7 +237,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.grid = GridStack.init({
       column: 12,
-      cellHeight: this.getCellHeight(),
+      cellHeight: 39,
       margin: 8,
       float: false,
       disableResize: true,
@@ -280,16 +256,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     const savedLayout = this.storageService.getObject(DASHBOARD_LAYOUT_KEY);
     this.grid.load(savedLayout ?? WIDGET_DEFAULTS);
 
-    // After loading, ensure mobile layout gets the proper chart height if loaded on mobile
-    if (window.innerWidth < 768) {
-      const chartNode = this.grid.engine.nodes.find(n => n.id === 'chart');
-      if (chartNode && chartNode.el && chartNode.h !== 8) {
-        if (!chartNode.el.dataset['desktopH']) {
-          chartNode.el.dataset['desktopH'] = String(chartNode.h);
-        }
-        this.grid.update(chartNode.el, { h: 8 });
-      }
-    }
 
     setTimeout(() => this.chart?.chart?.resize(), 100);
 
