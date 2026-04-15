@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListener } from '@angular/core';
+import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListener, effect } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, catchError, of, combineLatest } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup } from '@angular/forms';
@@ -12,6 +12,7 @@ import { ShareRejectionExplanationService } from 'src/app/services/share-rejecti
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
+import { LayoutService } from 'src/app/layout/service/app.layout.service';
 import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated/models';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
@@ -46,7 +47,7 @@ interface ISystemInfoError {
 }
 
 const HOME_CHART_DATA_SOURCES = 'HOME_CHART_DATA_SOURCES';
-const DASHBOARD_LAYOUT_KEY = 'DASHBOARD_LAYOUT_V1';
+const DASHBOARD_LAYOUT_KEY = 'DASHBOARD_LAYOUT_V2';
 const HIDDEN_WIDGETS_KEY = 'DASHBOARD_HIDDEN_WIDGETS';
 const DEFAULT_CELL_HEIGHT = 40;
 
@@ -145,9 +146,20 @@ export class HomeComponent implements OnInit, OnDestroy {
     private toastr: ToastrService,
     private shareRejectReasonsService: ShareRejectionExplanationService,
     private storageService: LocalStorageService,
-    private dashboardEditService: DashboardEditService
+    private dashboardEditService: DashboardEditService,
+    public layoutService: LayoutService
   ) {
     this.initializeChart();
+
+    effect(() => {
+      // Refresh grid when wide view toggles
+      if (this.layoutService.isWideView() !== undefined) {
+        setTimeout(() => {
+          this.grid?.compact();
+          this.chart?.chart?.resize();
+        }, 100);
+      }
+    });
   }
 
   ngOnInit(): void {
