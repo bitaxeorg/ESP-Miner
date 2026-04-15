@@ -310,11 +310,12 @@ int sv2_parse_set_target(const uint8_t *payload, uint32_t len,
 }
 
 int sv2_parse_submit_shares_success(const uint8_t *payload, uint32_t len,
-                                    uint32_t *channel_id)
+                                    uint32_t *channel_id, uint32_t *accepted_count)
 {
     // channel_id(4) + last_seq(4) + accepted_count(4) + shares_sum(8) = 20 bytes
     if (len < 20) return -1;
     *channel_id = read_u32_le(payload);
+    *accepted_count = read_u32_le(payload + 8);
     return 0;
 }
 

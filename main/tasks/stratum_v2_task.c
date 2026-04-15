@@ -931,16 +931,18 @@ void stratum_v2_task(void *pvParameters)
                     break;
 
                 case SV2_MSG_SUBMIT_SHARES_SUCCESS: {
-                    uint32_t channel_id;
-                    if (sv2_parse_submit_shares_success(recv_buf, hdr.msg_length, &channel_id) == 0) {
+                    uint32_t channel_id, accepted_count;
+                    if (sv2_parse_submit_shares_success(recv_buf, hdr.msg_length, &channel_id, &accepted_count) == 0) {
                         if (stratum_v2_last_submit_time_us > 0) {
                             float response_time_ms = (float)(esp_timer_get_time() - stratum_v2_last_submit_time_us) / 1000.0f;
-                            ESP_LOGI(TAG, "Share accepted (%.1f ms)", response_time_ms);
+                            ESP_LOGI(TAG, "Shares accepted: %lu (%.1f ms)", accepted_count, response_time_ms);
                             GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
                         } else {
-                            ESP_LOGI(TAG, "Share accepted");
+                            ESP_LOGI(TAG, "Shares accepted: %lu", accepted_count);
                         }
-                        SYSTEM_notify_accepted_share(GLOBAL_STATE);
+                        for (uint32_t i = 0; i < accepted_count; i++) {
+                            SYSTEM_notify_accepted_share(GLOBAL_STATE);
+                        }
                     }
                     break;
                 }
