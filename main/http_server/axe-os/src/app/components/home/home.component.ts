@@ -254,7 +254,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       float: false,
       disableResize: true,
       disableDrag: true,
-      animate: true,
+      animate: false,
       columnOpts: {
         breakpointForWindow: true,
         breakpoints: [
