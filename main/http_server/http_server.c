@@ -885,6 +885,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         return ESP_OK;
     }
 
+    char * network_mode = nvs_config_get_string(NVS_CONFIG_NETWORK_MODE);
     char * ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
     char * hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
     char * ipv4 = GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str;
@@ -902,9 +903,6 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     esp_wifi_get_mac(WIFI_IF_STA, mac);
     char formattedMac[18];
     snprintf(formattedMac, sizeof(formattedMac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-    int8_t wifi_rssi = -90;
-    get_wifi_current_rssi(&wifi_rssi);
 
     cJSON * root = cJSON_CreateObject();
     cJSON_AddFloatToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
@@ -938,14 +936,20 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "coreVoltage", nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
     cJSON_AddNumberToObject(root, "coreVoltageActual", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.core_voltage);
     cJSON_AddFloatToObject(root, "frequency", frequency);
+    cJSON_AddStringToObject(root, "networkMode", network_mode);
     cJSON_AddFloatToObject(root, "actualFrequency", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency);    
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
     cJSON_AddStringToObject(root, "hostname", hostname);
     cJSON_AddStringToObject(root, "ipv4", ipv4);
     cJSON_AddStringToObject(root, "ipv6", ipv6);
-    cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
-    cJSON_AddNumberToObject(root, "wifiRSSI", wifi_rssi);
+    cJSON_AddStringToObject(root, "wifiStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status); // backwards compatibility
+    cJSON_AddStringToObject(root, "networkStatus", GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
+    if (GLOBAL_STATE->SYSTEM_MODULE.network_mode == NETWORK_MODE_WIFI) {
+        int8_t wifi_rssi = -90;
+        get_wifi_current_rssi(&wifi_rssi);
+        cJSON_AddNumberToObject(root, "wifiRSSI", wifi_rssi);
+    }
     cJSON_AddNumberToObject(root, "apEnabled", GLOBAL_STATE->SYSTEM_MODULE.ap_enabled);
     cJSON_AddNumberToObject(root, "sharesAccepted", GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
     cJSON_AddNumberToObject(root, "sharesRejected", GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
@@ -1065,6 +1069,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     free(ssid);
     free(hostname);
+    free(network_mode);
     free(stratumURL);
     free(fallbackStratumURL);
     free(stratumCert);

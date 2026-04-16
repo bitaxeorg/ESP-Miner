@@ -226,15 +226,6 @@ static void set_socket_options(esp_transport_handle_t transport)
     }
 }
 
-bool is_wifi_connected() {
-    wifi_ap_record_t ap_info;
-    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
 void cleanQueue(GlobalState * GLOBAL_STATE) {
     ESP_LOGI(TAG, "Clean Jobs: clearing queue");
     queue_clear(&GLOBAL_STATE->stratum_queue);
@@ -280,7 +271,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 
         ESP_LOGD(TAG, "Running Heartbeat on: %s!", primary_stratum_url);
 
-        if (!is_wifi_connected()) {
+        if (!GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
             ESP_LOGD(TAG, "Heartbeat. Failed WiFi check!");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
             continue;
@@ -454,7 +445,7 @@ void stratum_task(void * pvParameters)
             continue;
         }
 
-        if (!is_wifi_connected()) {
+        if (!GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
             ESP_LOGI(TAG, "WiFi disconnected, attempting to reconnect...");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
             continue;
