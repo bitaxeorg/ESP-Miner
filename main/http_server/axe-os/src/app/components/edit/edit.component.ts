@@ -346,4 +346,17 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     return !! Object.entries(this.form.controls)
       .filter(([field, control]) => control.dirty && !this.noRestartFields.includes(field)).length
   }
+
+  resetBestDifficulty() {
+    this.systemService.resetBestDifficulty(this.uri)
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => {
+          this.toastr.success('Best difficulty has been reset.');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error('Failed to reset best difficulty: ' + err.message);
+        }
+      });
+  }
 }

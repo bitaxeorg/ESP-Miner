@@ -1011,6 +1011,25 @@ paths:
         '500':
           description: Internal server error
 
+  /api/system/resetBestDifficulty:
+    post:
+      summary: Reset best difficulty
+      description: Resets the best difficulty value in persistent storage
+      operationId: resetBestDifficulty
+      tags:
+        - system
+      responses:
+        '200':
+          description: Best difficulty reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
   /api/system:
     patch:
       summary: Update system settings

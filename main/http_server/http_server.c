@@ -523,6 +523,36 @@ static esp_err_t handle_options_request(httpd_req_t * req)
     return ESP_OK;
 }
 
+// Handler to reset best difficulty
+static esp_err_t POST_reset_best_difficulty(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    // Set CORS headers
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    // Reset best difficulty in global state
+    GLOBAL_STATE->SYSTEM_MODULE.best_nonce_diff = 0;
+    GLOBAL_STATE->SYSTEM_MODULE.best_diff_string[0] = '\0';
+    nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, 0);
+
+    httpd_resp_set_type(req, "application/json");
+    cJSON * root = cJSON_CreateObject();
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_OK;
+    }
+    cJSON_AddStringToObject(root, "message", "Best difficulty has been reset.");
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+    cJSON_Delete(root);
+    return res;
+}
+
 bool check_settings_and_update(const cJSON * const root)
 {
     bool result = true;
@@ -1558,6 +1588,14 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &update_system_settings_uri);
+
+        httpd_uri_t reset_best_diff_uri = {
+            .uri      = "/api/system/resetBestDifficulty",
+            .method   = HTTP_POST,
+            .handler  = POST_reset_best_difficulty,
+            .user_ctx = rest_context
+        };
+        httpd_register_uri_handler(server, &reset_best_diff_uri);
 
     httpd_uri_t update_post_ota_firmware = {
         .uri = "/api/system/OTA", 
