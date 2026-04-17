@@ -16,6 +16,7 @@
 #include <esp_heap_caps.h>
 #include "hashrate_monitor_task.h"
 #include "esp_transport_ssl.h"
+#include "freertos/task.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
@@ -42,6 +43,14 @@
 static const char * TAG = "stratum_task";
 
 static StratumApiV1Message stratum_api_v1_message = {};
+
+static int stratum_get_next_uid(GlobalState * GLOBAL_STATE)
+{
+    taskENTER_CRITICAL(&GLOBAL_STATE->stratum_mux);
+    int uid = GLOBAL_STATE->send_uid++;
+    taskEXIT_CRITICAL(&GLOBAL_STATE->stratum_mux);
+    return uid;
+}
 
 static const char * primary_stratum_url;
 static uint16_t primary_stratum_port;
@@ -252,14 +261,22 @@ void cleanQueue(GlobalState * GLOBAL_STATE) {
 void stratum_reset_uid(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Resetting stratum uid");
+    taskENTER_CRITICAL(&GLOBAL_STATE->stratum_mux);
     GLOBAL_STATE->send_uid = 1;
+    taskEXIT_CRITICAL(&GLOBAL_STATE->stratum_mux);
 }
 
 void stratum_close_connection(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGE(TAG, "Shutting down socket and restarting...");
-    esp_transport_close(GLOBAL_STATE->transport);
+    taskENTER_CRITICAL(&GLOBAL_STATE->stratum_mux);
+    esp_transport_handle_t transport = GLOBAL_STATE->transport;
     GLOBAL_STATE->transport = NULL;
+    taskEXIT_CRITICAL(&GLOBAL_STATE->stratum_mux);
+
+    if (transport != NULL) {
+        esp_transport_close(transport);
+    }
     cleanQueue(GLOBAL_STATE);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
@@ -383,9 +400,9 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
         ESP_LOGI(TAG, "BIP-54 signaling detected");
     }
     if (result->bip110_signaling) {
-        strncpy(GLOBAL_STATE->block_signals[0], "BIP-110", MAX_BLOCK_SIGNAL_LEN - 1);
-        GLOBAL_STATE->block_signals[0][MAX_BLOCK_SIGNAL_LEN - 1] = '\0';
-        GLOBAL_STATE->block_signals_count = 1;
+        strncpy(GLOBAL_STATE->block_signals[GLOBAL_STATE->block_signals_count], "BIP-110", MAX_BLOCK_SIGNAL_LEN - 1);
+        GLOBAL_STATE->block_signals[GLOBAL_STATE->block_signals_count][MAX_BLOCK_SIGNAL_LEN - 1] = '\0';
+        GLOBAL_STATE->block_signals_count++;
         ESP_LOGI(TAG, "BIP-110 signaling detected");
     }
 
@@ -553,15 +570,15 @@ void stratum_task(void * pvParameters)
 
         ///// Start Stratum Action
         // mining.configure - ID: 1
-        STRATUM_V1_configure_version_rolling(GLOBAL_STATE->transport, GLOBAL_STATE->send_uid++, &GLOBAL_STATE->version_mask);
+        STRATUM_V1_configure_version_rolling(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), &GLOBAL_STATE->version_mask);
 
         // mining.subscribe - ID: 2
-        STRATUM_V1_subscribe(GLOBAL_STATE->transport, GLOBAL_STATE->send_uid++, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+        STRATUM_V1_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
 
         char * username = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
         char * password = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_pass : GLOBAL_STATE->SYSTEM_MODULE.pool_pass;
 
-        int authorize_message_id = GLOBAL_STATE->send_uid++;
+        int authorize_message_id = stratum_get_next_uid(GLOBAL_STATE);
 
         //mining.authorize - ID: 3
         STRATUM_V1_authorize(GLOBAL_STATE->transport, authorize_message_id, username, password);
@@ -653,11 +670,11 @@ void stratum_task(void * pvParameters)
                     ESP_LOGI(TAG, "setup message accepted");
                     uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
                     if (stratum_api_v1_message.message_id == authorize_message_id && difficulty > 0) {
-                        STRATUM_V1_suggest_difficulty(GLOBAL_STATE->transport, GLOBAL_STATE->send_uid++, difficulty);
+                        STRATUM_V1_suggest_difficulty(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), difficulty);
                     }
                     bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
                     if (extranonce_subscribe) {
-                        STRATUM_V1_extranonce_subscribe(GLOBAL_STATE->transport, GLOBAL_STATE->send_uid++);
+                        STRATUM_V1_extranonce_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE));
                     }
                 } else {
                     ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);

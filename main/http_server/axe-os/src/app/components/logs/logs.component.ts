@@ -21,16 +21,8 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   public stopScroll: boolean = false;
 
-  public isExpanded: boolean = false;
-
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
-  @HostListener('document:keydown.esc', ['$event'])
-  onEscKey() {
-    if (this.isExpanded) {
-      this.isExpanded = false;
-    }
-  }
 
   @Input() uri = '';
 

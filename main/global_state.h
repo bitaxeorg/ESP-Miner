@@ -3,13 +3,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "asic_common.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/portmacro.h"
 #include "power_management_task.h"
 #include "hashrate_monitor_task.h"
-#include "serial.h"
-#include "stratum_api.h"
 #include "coinbase_decoder.h"
 #include "work_queue.h"
 #include "device_config.h"
@@ -92,6 +90,8 @@ typedef struct
     bool is_firmware_update;
     char firmware_update_filename[20];
     char firmware_update_status[20];
+    bool hardware_fault;
+    char hardware_fault_msg[64];
     char * asic_status;
     char * version;
     char * axeOSVersion;
@@ -144,6 +144,7 @@ typedef struct
     bool new_stratum_version_rolling_msg;
 
     esp_transport_handle_t transport;
+    portMUX_TYPE stratum_mux;
     
     // A message ID that must be unique per request that expects a response.
     // For requests not expecting a response (called notifications), this is null.

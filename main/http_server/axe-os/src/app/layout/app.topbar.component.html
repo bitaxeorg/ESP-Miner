@@ -31,6 +31,16 @@
             <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
                 <a class="block py-2 text-white cursor-pointer"
                     tooltipPosition="bottom"
+                    [pTooltip]="layoutService.isWideView() ? 'Standard Width' : 'Wide View'"
+                    (click)="layoutService.toggleWideView()"
+                >
+                    <i class="pi text-xl block"
+                        [ngClass]="layoutService.isWideView() ? 'pi-window-minimize' : 'pi-window-maximize'"></i>
+                </a>
+            </li>
+            <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
                     pTooltip="Reset Layout"
                     (click)="dashboardEdit.requestReset()"
                 >

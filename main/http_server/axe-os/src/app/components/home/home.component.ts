@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListener } from '@angular/core';
+import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListener, effect } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, catchError, of, combineLatest } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup } from '@angular/forms';
@@ -12,6 +12,7 @@ import { ShareRejectionExplanationService } from 'src/app/services/share-rejecti
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
+import { LayoutService } from 'src/app/layout/service/app.layout.service';
 import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated/models';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
@@ -33,7 +34,8 @@ type MessageType =
   | 'FALLBACK_STRATUM'
   | 'VERSION_MISMATCH'
   | 'NOT_SOLO_MINING'
-  | 'NO_MINING_REWARD';
+  | 'NO_MINING_REWARD'
+  | 'HARDWARE_FAULT';
 
 interface ISystemMessage {
   type: MessageType;
@@ -145,9 +147,20 @@ export class HomeComponent implements OnInit, OnDestroy {
     private toastr: ToastrService,
     private shareRejectReasonsService: ShareRejectionExplanationService,
     private storageService: LocalStorageService,
-    private dashboardEditService: DashboardEditService
+    private dashboardEditService: DashboardEditService,
+    public layoutService: LayoutService
   ) {
     this.initializeChart();
+
+    effect(() => {
+      // Refresh grid when wide view toggles
+      if (this.layoutService.isWideView() !== undefined) {
+        setTimeout(() => {
+          this.grid?.compact();
+          this.chart?.chart?.resize();
+        }, 100);
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -242,7 +255,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       float: false,
       disableResize: true,
       disableDrag: true,
-      animate: true,
+      animate: false,
       columnOpts: {
         breakpointForWindow: true,
         breakpoints: [
@@ -872,6 +885,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!(info as any).miningPaused, 'MINING_PAUSED', 'warn', 'Mining is paused');
     updateMessage(info.overheat_mode === 1, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
+    updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
