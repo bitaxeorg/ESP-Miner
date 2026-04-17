@@ -11,7 +11,7 @@
     "build:no-api-gen": "ng build --configuration=production && gzipper compress --gzip --gzip-level 9 --exclude woff2 ./dist/axe-os && node only-gzip.js && node generate-version.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
-    "test:ci": "npm run generate:api && ng test --watch=false --browsers=ChromeHeadless --reporters junit",
+    "test:ci": "npm run generate:api && ng test --watch=false --browsers=ChromeHeadlessCI --reporters progress,junit",
     "generate:api": "rimraf ./src/app/generated && ng-openapi-gen",
     "bundle-report": "ng build --configuration=production --stats-json && webpack-bundle-analyzer dist/axe-os/stats.json"
   },
