@@ -66,11 +66,18 @@ idf.py build test
 ```
 
 ### Axe-OS Frontend
-Angular unit tests use Karma and Jasmine. We use a specific CI command to generate JUnit reports.
+Angular unit tests use Karma and Jasmine. We use a specific CI command for CI environments which ensures consistent reporting and uses a headless browser.
+
+**Execution:**
 ```bash
 cd main/http_server/axe-os
 npm run test:ci
 ```
+
+**Key Points:**
+- `npm run test:ci` automatically runs `npm run generate:api` before executing `ng test`.
+- It uses a custom `ChromeHeadlessCI` launcher (defined in `karma.conf.js`) with `--no-sandbox` to ensure stability in containerized CI environments.
+- Unit tests are highly isolated. **Reminder:** Components with many dependencies (like `HomeComponent`) must have all services, pipes, and sub-components explicitly declared or provided in the `TestBed`.
 
 ## CI/CD Setup
 
@@ -82,5 +89,7 @@ We use GitHub Actions for automated testing and releases.
 - **`release.yml`**: Handles automated releases and binary packaging.
 
 ## AI Agent Tips
-- **API Generation**: If you modify `openapi.yaml`, you **must** run `npm run generate:api` in the `axe-os` directory to update the TypeScript services.
+- **API Generation**: If you modify `openapi.yaml`, you **must** run `npm run generate:api` in the `axe-os` directory to update the TypeScript services. This is also automatically handled by `npm run build` and `npm run test:ci`.
+- **Node Environment**: If `node` or `npm` are not in your global path, check for local installations in `/home/mutatrum/.nvm`. You can source them using `export PATH=/home/mutatrum/.nvm/versions/node/v[version]/bin:$PATH`.
+- **Modern Angular Testing**: Use functional providers like `provideRouter([])` and `provideHttpClient()` instead of deprecated class-based modules like `RouterTestingModule`.
 - **PSRAM**: Bitaxe heavily relies on PSRAM. Always check `esp_psram_is_initialized()` before allocating large buffers in the backend.
