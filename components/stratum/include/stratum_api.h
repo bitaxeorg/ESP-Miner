@@ -90,6 +90,8 @@ int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const c
 
 void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
 
+void STRATUM_V1_reset_message(StratumApiV1Message *message);
+
 void STRATUM_V1_free_mining_notify(mining_notify *params);
 
 int STRATUM_V1_authorize(esp_transport_handle_t transport, int send_uid, const char *username, const char *pass);

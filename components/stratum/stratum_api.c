@@ -195,8 +195,35 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
     return line;
 }
 
+void STRATUM_V1_reset_message(StratumApiV1Message *message)
+{
+    if (message->error_str) {
+        free(message->error_str);
+        message->error_str = NULL;
+    }
+    if (message->extranonce_str) {
+        free(message->extranonce_str);
+        message->extranonce_str = NULL;
+    }
+    if (message->mining_notification) {
+        // mining_notification is usually handled by ownership transfer in stratum_task.c
+        // but if it wasn't enqueued, we must free it here to avoid leaks.
+        // In most cases where it *is* enqueued, the caller should have NULLed the pointer
+        // after enqueuing.
+        STRATUM_V1_free_mining_notify(message->mining_notification);
+        message->mining_notification = NULL;
+    }
+    message->method = STRATUM_UNKNOWN;
+    message->message_id = -1;
+    message->response_success = false;
+    message->new_difficulty = 0;
+    message->version_mask = 0;
+}
+
 void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
 {
+    STRATUM_V1_reset_message(message);
+
     ESP_LOGI(TAG, "rx: %s", stratum_json); // debug incoming stratum messages
 
     cJSON * json = cJSON_Parse(stratum_json);
@@ -246,7 +273,6 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         // if it's an error, then it's a fail
         } else if (error_json != NULL && !cJSON_IsNull(error_json)) {
             message->response_success = false;
-            message->error_str = strdup("unknown");
             if (parsed_id < 5) {
                 result = STRATUM_RESULT_SETUP;
             } else {
@@ -263,6 +289,9 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             } else if (cJSON_IsString(error_json)) {
                 message->error_str = strdup(cJSON_GetStringValue(error_json));
             }
+            if (message->error_str == NULL) {
+                message->error_str = strdup("unknown");
+            }
 
         // if the result is a boolean, then parse it
         } else if (cJSON_IsBool(result_json)) {
@@ -275,11 +304,12 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 message->response_success = true;
             } else {
                 message->response_success = false;
-                message->error_str = strdup("unknown");
                 if (cJSON_IsString(reject_reason_json)) {
                     message->error_str = strdup(cJSON_GetStringValue(reject_reason_json));
                 } else if (cJSON_IsString(error_json)) {
                     message->error_str = strdup(cJSON_GetStringValue(error_json));
+                } else {
+                    message->error_str = strdup("unknown");
                 }                
             }
         
