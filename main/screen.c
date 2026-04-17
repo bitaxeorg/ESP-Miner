@@ -105,8 +105,6 @@ static uint64_t current_work_received;
 static int8_t current_rssi_value;
 static int current_block_height;
 
-static bool self_test_finished;
-
 static screen_t get_current_screen() {
     lv_obj_t * active_screen = lv_screen_active();
     for (screen_t scr = 0; scr < MAX_SCREENS; scr++) {
@@ -134,10 +132,7 @@ static lv_obj_t * create_scr_self_test() {
 
     self_test_message_label = lv_label_create(scr);
     self_test_result_label = lv_label_create(scr);
-
     self_test_finished_label = lv_label_create(scr);
-    lv_obj_set_width(self_test_finished_label, LV_HOR_RES);
-    lv_label_set_long_mode(self_test_finished_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     return scr;
 }
@@ -375,6 +370,10 @@ static void scr_create_overlay()
 
 static bool screen_show(screen_t screen)
 {
+    if (!lvgl_port_lock(0)) {
+        return false;
+    }
+
     if (SCR_CAROUSEL_START > screen) {
         lv_display_trigger_activity(NULL);
     }
@@ -385,15 +384,17 @@ static bool screen_show(screen_t screen)
         lv_obj_t * scr = screens[screen];
 
         is_valid = lv_obj_is_valid(scr);
-        if (is_valid && lvgl_port_lock(0)) {
+        if (is_valid) {
             bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
             lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
-            lvgl_port_unlock();
         }
 
         current_screen_time_ms = 0;
         current_screen_delay_ms = delays_ms[screen];
     }
+
+    lvgl_port_unlock();
+
     return is_valid;
 }
 
@@ -449,8 +450,7 @@ static void screen_update_cb(lv_timer_t * timer)
         
         lv_label_set_text(self_test_message_label, self_test->message);
         
-        if (self_test->is_finished && !self_test_finished) {
-            self_test_finished = true;
+        if (self_test->is_finished) {
             lv_label_set_text(self_test_result_label, self_test->result);
             lv_label_set_text(self_test_finished_label, self_test->finished);
         }
@@ -619,7 +619,7 @@ static void screen_update_cb(lv_timer_t * timer)
         current_shares_rejected = shares_rejected;
         current_work_received = work_received;
     } else {
-        lv_label_set_text(notification_label, "");
+        lv_label_set_text(notification_label, module->mining_paused ? "▐▐" : "");
     }
 
     if (module->show_new_block) {
@@ -661,13 +661,13 @@ static void uptime_update_cb(lv_timer_t * timer)
         uptime_seconds %= 60;
 
         if (days > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lud %luh %lum %lus", days, hours, minutes, uptime_seconds);
         } else if (hours > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %luh %lum %lus", hours, minutes, uptime_seconds);
         } else if (minutes > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lum %lus", minutes, uptime_seconds);
         } else {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lus", uptime_seconds);
         }
 
         if (strcmp(lv_label_get_text(wifi_uptime_label), uptime) != 0) {

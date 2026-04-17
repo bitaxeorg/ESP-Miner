@@ -7,7 +7,6 @@ import { LocalStorageService } from 'src/app/local-storage.service';
 import { LayoutService } from "../../layout/service/app.layout.service";
 import { SystemApiService } from 'src/app/services/system.service';
 import { ModalComponent } from '../modal/modal.component';
-import { SystemInfo as ISystemInfo } from 'src/app/generated';
 
 const SWARM_DATA = 'SWARM_DATA';
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
@@ -468,6 +467,8 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
   getDeviceNotification(axe: any): { color: string; msg: string } | undefined {
     switch (true) {
+      case !!axe.miningPaused:
+        return { color: 'yellow', msg: 'Paused' };
       case axe.overheat_mode === 1:
         return { color: 'red', msg: 'Overheated' };
       case !!axe.power_fault:

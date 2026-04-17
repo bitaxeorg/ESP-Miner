@@ -19,6 +19,44 @@
         >{{info.hostname}}</span>
 
         <ul *ngIf="!isAPMode" class="flex ml-auto list-none p-0 m-0 gap-4 lg:flex-order-2">
+            <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
+                    pTooltip="Widgets"
+                    (click)="widgetPanel.toggle($event)"
+                >
+                    <i class="pi pi-list-check text-xl block"></i>
+                </a>
+            </li>
+            <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
+                    [pTooltip]="layoutService.isWideView() ? 'Standard Width' : 'Wide View'"
+                    (click)="layoutService.toggleWideView()"
+                >
+                    <i class="pi text-xl block"
+                        [ngClass]="layoutService.isWideView() ? 'pi-window-minimize' : 'pi-window-maximize'"></i>
+                </a>
+            </li>
+            <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
+                    pTooltip="Reset Layout"
+                    (click)="dashboardEdit.requestReset()"
+                >
+                    <i class="pi pi-replay text-xl block"></i>
+                </a>
+            </li>
+            <li class="hidden md:block">
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
+                    [pTooltip]="(dashboardEdit.editMode$ | async) ? 'Save Layout' : 'Edit Layout'"
+                    (click)="dashboardEdit.toggleEditMode()"
+                >
+                    <i class="pi text-xl block"
+                        [ngClass]="(dashboardEdit.editMode$ | async) ? 'pi-save' : 'pi-th-large'"></i>
+                </a>
+            </li>
             <li>
                 <a class="block py-2 text-white cursor-pointer"
                     tooltipPosition="bottom"
@@ -40,6 +78,15 @@
             <li>
                 <a class="block py-2 text-white cursor-pointer"
                     tooltipPosition="bottom"
+                    [pTooltip]="isMiningPaused ? 'Resume Mining' : 'Pause Mining'"
+                    (click)="toggleMiningPaused()"
+                >
+                    <i class="pi text-xl block" [ngClass]="isMiningPaused ? 'pi-play-circle' : 'pi-pause-circle'"></i>
+                </a>
+            </li>
+            <li>
+                <a class="block py-2 text-white cursor-pointer"
+                    tooltipPosition="bottom"
                     pTooltip="Restart"
                     (click)="restart()"
                 >
@@ -47,6 +94,20 @@
                 </a>
             </li>
         </ul>
+
+        <p-overlayPanel #widgetPanel>
+            <div class="flex flex-column gap-2">
+                <div *ngFor="let widget of dashboardEdit.widgetDefs" class="flex align-items-center gap-2">
+                    <p-checkbox
+                        [binary]="true"
+                        [ngModel]="dashboardEdit.isWidgetVisible(widget.id)"
+                        (onChange)="dashboardEdit.toggleWidgetRequested$.next(widget.id)"
+                        [inputId]="'widget-' + widget.id">
+                    </p-checkbox>
+                    <label [for]="'widget-' + widget.id" class="text-sm cursor-pointer white-space-nowrap">{{ widget.label }}</label>
+                </div>
+            </div>
+        </p-overlayPanel>
     </ng-container>
 
     <button *ngIf="!isAPMode" #menubutton class="p-link layout-topbar-button"

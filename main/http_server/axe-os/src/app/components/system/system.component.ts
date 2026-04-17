@@ -6,7 +6,7 @@ import { SystemApiService } from 'src/app/services/system.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
-import { SystemInfo as ISystemInfo, SystemASIC as ISystemASIC, GenericResponse, } from 'src/app/generated';
+import { SystemInfo as ISystemInfo, SystemAsic as ISystemASIC, GenericResponse, } from 'src/app/generated/models';
 
 type TableRow = {
   label: string;
@@ -96,6 +96,7 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Wi-Fi IPv4', value: data.info.ipv4},
       { label: 'Wi-Fi IPv6', value: data.info.ipv6, class: 'pb-3', isSensitiveData: true},
       { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3', isSensitiveData: true },
+      { label: 'CPU Usage', value: data.info.cpuUsage.toFixed(1) + '%'},
       { label: 'Free Heap Memory', value: ByteSuffixPipe.transform(data.info.freeHeap)},
       { label: '• Internal', value: ByteSuffixPipe.transform(data.info.freeHeapInternal)},
       { label: '• Spiram', value: ByteSuffixPipe.transform(data.info.freeHeapSpiram), class: 'pb-3' },

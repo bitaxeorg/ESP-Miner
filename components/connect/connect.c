@@ -238,8 +238,8 @@ static void event_handler(void * arg, esp_event_base_t event_base, int32_t event
         ESP_LOGI(TAG, "IPv4 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str);
         s_retry_num = 0;
 
-        xTimerStop(ip_acquire_timer, 0);
-            if (ip_acquire_timer != NULL) {
+        if (ip_acquire_timer != NULL) {
+            xTimerStop(ip_acquire_timer, 0);
         }
 
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
@@ -459,9 +459,6 @@ void wifi_init(void * pvParameters)
 
         free(wifi_pass);
 
-        /* Start Wi-Fi */
-        ESP_ERROR_CHECK(esp_wifi_start());
-
         /* Disable power savings for best performance */
         ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
@@ -477,9 +474,10 @@ void wifi_init(void * pvParameters)
 
         free(hostname);
 
-        ESP_LOGI(TAG, "wifi_init_sta finished.");
+        /* Start Wi-Fi */
+        ESP_ERROR_CHECK(esp_wifi_start());
 
-        return;
+        ESP_LOGI(TAG, "wifi_init_sta finished.");
     }
 }
 

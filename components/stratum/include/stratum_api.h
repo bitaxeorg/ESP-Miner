@@ -13,6 +13,7 @@
 #define COINBASE2_SIZE 128
 #define MAX_REQUEST_IDS 1024
 #define MAX_EXTRANONCE_2_LEN 32
+#define MAX_POOL_MESSAGE_LEN 256
 
 typedef enum
 {
@@ -26,7 +27,8 @@ typedef enum
     STRATUM_RESULT_SETUP,
     STRATUM_RESULT_VERSION_MASK,
     STRATUM_RESULT_SUBSCRIBE,
-    CLIENT_RECONNECT
+    CLIENT_RECONNECT,
+    CLIENT_SHOW_MESSAGE
 } stratum_method;
 
 typedef enum
@@ -65,7 +67,7 @@ typedef struct
     // mining.notify
     mining_notify *mining_notification;
     // mining.set_difficulty
-    uint32_t new_difficulty;
+    double new_difficulty;
     // mining.set_version_mask
     uint32_t version_mask;
     // result
@@ -102,7 +104,7 @@ int STRATUM_V1_extranonce_subscribe(esp_transport_handle_t transport, int send_u
 
 int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, const char *username, const char *job_id,
                             const char *extranonce_2, const uint32_t ntime, const uint32_t nonce,
-                            const uint32_t version_bits);
+                            const uint32_t version_bits, uint64_t *out_sent_time_us);
 
 float STRATUM_V1_get_response_time_ms(int request_id, int64_t receive_time_us);
 

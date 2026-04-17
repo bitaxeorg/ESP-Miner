@@ -1,10 +1,12 @@
 #include <string.h>
 #include <stdbool.h>
+#include <math.h>
 
 #include "asic_common.h"
 #include "serial.h"
 #include "esp_log.h"
 #include "crc.h"
+#include "esp_timer.h"
 
 #define PREAMBLE 0xAA55
 
@@ -22,18 +24,6 @@ unsigned char _reverse_bits(unsigned char num)
     }
 
     return reversed;
-}
-
-int _largest_power_of_two(int num)
-{
-    int power = 0;
-
-    while (num > 1) {
-        num = num >> 1;
-        power++;
-    }
-
-    return 1 << power;
 }
 
 int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response_length)
@@ -88,9 +78,12 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
     return chip_counter;
 }
 
-esp_err_t receive_work(uint8_t * buffer, int buffer_size)
+esp_err_t receive_work(uint8_t * buffer, int buffer_size, uint64_t *out_timestamp_us)
 {
     int received = SERIAL_rx(buffer, buffer_size, 10000);
+    if (out_timestamp_us) {
+        *out_timestamp_us = esp_timer_get_time();
+    }
 
     if (received < 0) {
         ESP_LOGE(TAG, "UART error in serial RX");
@@ -127,12 +120,22 @@ esp_err_t receive_work(uint8_t * buffer, int buffer_size)
     return ESP_OK;
 }
 
-void get_difficulty_mask(uint16_t difficulty, uint8_t *job_difficulty_mask)
+void get_difficulty_mask(double difficulty, uint8_t *job_difficulty_mask)
 {
     // The mask must be a power of 2 so there are no holes
     // Correct:   {0b00000000, 0b00000000, 0b11111111, 0b11111111}
     // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
-    difficulty = _largest_power_of_two(difficulty) - 1;
+
+    // Round up to ensure we don't make difficulty harder than requested, then convert to int
+    uint32_t diff_int = (uint32_t)ceil(difficulty);
+
+    // Calculate largest power of 2 <= diff_int (inline of former _largest_power_of_two)
+    int power = 0;
+    while (diff_int > 1) {
+        diff_int = diff_int >> 1;
+        power++;
+    }
+    uint32_t mask = (1 << power) - 1;
 
     job_difficulty_mask[0] = 0x00;
     job_difficulty_mask[1] = 0x14; // TICKET_MASK
@@ -140,8 +143,8 @@ void get_difficulty_mask(uint16_t difficulty, uint8_t *job_difficulty_mask)
     // convert difficulty into char array
     // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
     // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
-    job_difficulty_mask[2] = _reverse_bits((difficulty >> 24) & 0xFF);
-    job_difficulty_mask[3] = _reverse_bits((difficulty >> 16) & 0xFF);
-    job_difficulty_mask[4] = _reverse_bits((difficulty >>  8) & 0xFF);
-    job_difficulty_mask[5] = _reverse_bits( difficulty        & 0xFF);
+    job_difficulty_mask[2] = _reverse_bits((mask >> 24) & 0xFF);
+    job_difficulty_mask[3] = _reverse_bits((mask >> 16) & 0xFF);
+    job_difficulty_mask[4] = _reverse_bits((mask >>  8) & 0xFF);
+    job_difficulty_mask[5] = _reverse_bits( mask        & 0xFF);
 }

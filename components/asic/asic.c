@@ -21,15 +21,16 @@ uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            return BM1397_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1397_init(GLOBAL_STATE);
         case BM1366:
-            return BM1366_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1366_init(GLOBAL_STATE);
         case BM1368:
-            return BM1368_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1368_init(GLOBAL_STATE);
         case BM1370:
-            return BM1370_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty);
+            return BM1370_init(GLOBAL_STATE);
     }
-    return ESP_OK;
+    ESP_LOGE(TAG, "Unknown ASIC id %d", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+    return 0;
 }
 
 task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
@@ -44,6 +45,7 @@ task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
         case BM1370:
             return BM1370_process_work(GLOBAL_STATE);
     }
+    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot process work", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
     return NULL;
 }
 
@@ -59,6 +61,7 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
         case BM1370:
             return BM1370_set_max_baud();
     }
+    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set max baud", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
     return 0;
 }
 
@@ -76,6 +79,9 @@ void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job)
             break;
         case BM1370:
             BM1370_send_work(GLOBAL_STATE, next_job);
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown ASIC id %d — cannot send work", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
             break;
     }
 }
@@ -95,26 +101,29 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
         case BM1370:
             BM1370_set_version_mask(mask);
             break;
+        default:
+            ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set version mask", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+            break;
     }
 }
 
-bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float frequency)
+void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
-            do_frequency_transition(frequency, BM1397_send_hash_frequency);
-            return true;
+            do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
+            return;
         case BM1366:
-            do_frequency_transition(frequency, BM1366_send_hash_frequency);
-            return true;
+            do_frequency_transition(GLOBAL_STATE, BM1366_send_hash_frequency);
+            return;
         case BM1368:
-            do_frequency_transition(frequency, BM1368_send_hash_frequency);
-            return true;
+            do_frequency_transition(GLOBAL_STATE, BM1368_send_hash_frequency);
+            return;
         case BM1370:
-            do_frequency_transition(frequency, BM1370_send_hash_frequency);
-            return true;
+            do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
+            return;
     }
-    return false;
+    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
 }
 
 double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
@@ -129,6 +138,7 @@ double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
         case BM1370:
             return 500 / GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     }
+    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot compute job frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
     return 500;
 }
 
@@ -146,6 +156,9 @@ void ASIC_read_registers(GlobalState * GLOBAL_STATE)
             break;
         case BM1370:
             BM1370_read_registers();
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown ASIC id %d — cannot read registers", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
             break;
     }
 }

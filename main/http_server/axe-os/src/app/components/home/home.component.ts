@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, Input, OnDestroy } from '@angular/core';
+import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListener, effect } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, catchError, of, combineLatest } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormGroup } from '@angular/forms';
@@ -12,7 +12,8 @@ import { ShareRejectionExplanationService } from 'src/app/services/share-rejecti
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { ThemeService } from 'src/app/services/theme.service';
-import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated';
+import { LayoutService } from 'src/app/layout/service/app.layout.service';
+import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated/models';
 import { Title } from '@angular/platform-browser';
 import { UIChart } from 'primeng/chart';
 import { SelectItem } from 'primeng/api';
@@ -20,17 +21,21 @@ import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
 import { LocalStorageService } from 'src/app/local-storage.service';
+import { GridStack, GridItemHTMLElement } from 'gridstack';
+import { DashboardEditService, WidgetDef } from 'src/app/services/dashboard-edit.service';
 
 type PoolLabel = 'Primary' | 'Fallback';
 type MessageType =
   | 'SYSTEM_INFO_ERROR'
+  | 'MINING_PAUSED'
   | 'DEVICE_OVERHEAT'
   | 'POWER_FAULT'
   | 'FREQUENCY_LOW'
   | 'FALLBACK_STRATUM'
   | 'VERSION_MISMATCH'
   | 'NOT_SOLO_MINING'
-  | 'NO_MINING_REWARD';
+  | 'NO_MINING_REWARD'
+  | 'HARDWARE_FAULT';
 
 interface ISystemMessage {
   type: MessageType;
@@ -43,6 +48,23 @@ interface ISystemInfoError {
 }
 
 const HOME_CHART_DATA_SOURCES = 'HOME_CHART_DATA_SOURCES';
+const DASHBOARD_LAYOUT_KEY = 'DASHBOARD_LAYOUT_V1';
+const HIDDEN_WIDGETS_KEY = 'DASHBOARD_HIDDEN_WIDGETS';
+const DEFAULT_CELL_HEIGHT = 40;
+
+const WIDGET_DEFAULTS: WidgetDef[] = [
+  { id: 'hashrate',    label: 'Hashrate',            x: 0, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
+  { id: 'efficiency',  label: 'Efficiency',          x: 3, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
+  { id: 'shares',      label: 'Shares',              x: 6, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
+  { id: 'bestdiff',    label: 'Best Difficulty',     x: 9, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
+  { id: 'chart',       label: 'Chart',               x: 0, y: 5,   w: 12, h: 0,  minW: 4, minH: 8 },
+  { id: 'power',       label: 'Power',               x: 0, y: 5,   w: 4,  h: 7,  minW: 2, minH: 3 },
+  { id: 'heat',        label: 'Heat',                x: 4, y: 5,   w: 4,  h: 7,  minW: 2, minH: 3 },
+  { id: 'fan',         label: 'Fan',                 x: 8, y: 5,   w: 4,  h: 7,  minW: 2, minH: 3 },
+  { id: 'pool',        label: 'Pool',                x: 0, y: 12,  w: 4,  h: 6,  minW: 2, minH: 3 },
+  { id: 'blockheader', label: 'Block Header',        x: 4, y: 12,  w: 4,  h: 6,  minW: 2, minH: 3 },
+  { id: 'registers',   label: 'Hashrate Registers',  x: 8, y: 12,  w: 4,  h: 6,  minW: 2, minH: 3 },
+];
 
 @Component({
   selector: 'app-home',
@@ -92,9 +114,25 @@ export class HomeComponent implements OnInit, OnDestroy {
   @ViewChild('chart')
   private chart?: UIChart
 
+  private gridStackEl?: ElementRef<HTMLElement>;
+  @ViewChild('gridStack', { static: false })
+  set gridStackRef(el: ElementRef<HTMLElement>) {
+    if (el && !this.grid) {
+      this.gridStackEl = el;
+      this.initGridStack();
+    }
+  }
+  private grid!: GridStack;
+  public editMode = false;
+  public widgetDefs = WIDGET_DEFAULTS;
+  public hiddenWidgets = new Set<string>();
+  private stashedWidgets = new Map<string, HTMLElement>();
+
   private pageDefaultTitle: string = '';
   private destroy$ = new Subject<void>();
   private infoSubscription?: Subscription;
+  private liveDataStarted = false;
+  private resizeTimer: any;
   public form!: FormGroup;
 
   @Input() uri = '';
@@ -108,12 +146,45 @@ export class HomeComponent implements OnInit, OnDestroy {
     private loadingService: LoadingService,
     private toastr: ToastrService,
     private shareRejectReasonsService: ShareRejectionExplanationService,
-    private storageService: LocalStorageService
+    private storageService: LocalStorageService,
+    private dashboardEditService: DashboardEditService,
+    public layoutService: LayoutService
   ) {
     this.initializeChart();
+
+    effect(() => {
+      // Refresh grid when wide view toggles
+      if (this.layoutService.isWideView() !== undefined) {
+        setTimeout(() => {
+          this.grid?.compact();
+          this.chart?.chart?.resize();
+        }, 100);
+      }
+    });
   }
 
   ngOnInit(): void {
+    this.dashboardEditService.widgetDefs = this.widgetDefs;
+    this.dashboardEditService.isActive$.next(true);
+
+    this.dashboardEditService.editMode$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(mode => {
+        this.editMode = mode;
+        if (this.grid) {
+          this.grid.enableMove(mode);
+          this.grid.enableResize(mode);
+        }
+      });
+
+    this.dashboardEditService.resetRequested$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.resetLayout());
+
+    this.dashboardEditService.toggleWidgetRequested$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(id => this.toggleWidgetVisibility(id));
+
     this.themeService.getThemeSettings()
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
@@ -132,15 +203,156 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.form = this.fb.group(JSON.parse(dataSources));
 
     this.form.valueChanges.subscribe(() => {
-      this.updateSystem();
+      this.storageService.setItem(HOME_CHART_DATA_SOURCES, JSON.stringify(this.form.getRawValue()));
+      this.infoSubscription?.unsubscribe();
+      this.clearDataPoints();
+      this.loadPreviousData();
     })
 
     this.loadPreviousData();
   }
 
+  @HostListener('window:resize')
+  onWindowResize() {
+    clearTimeout(this.resizeTimer);
+    this.resizeTimer = setTimeout(() => {
+      this.chart?.chart?.resize();
+      this.grid?.compact();
+    }, 200);
+  }
+
   ngOnDestroy() {
+    clearTimeout(this.resizeTimer);
+    this.dashboardEditService.isActive$.next(false);
+    this.dashboardEditService.editMode$.next(false);
     this.destroy$.next();
     this.destroy$.complete();
+    this.grid?.destroy(false);
+  }
+
+  private initGridStack(): void {
+    // Load hidden widgets before grid init
+    const savedHidden = this.storageService.getObject(HIDDEN_WIDGETS_KEY);
+    if (Array.isArray(savedHidden)) {
+      this.hiddenWidgets = new Set(savedHidden);
+    }
+    this.dashboardEditService.hiddenWidgets = new Set(this.hiddenWidgets);
+
+    // Stash hidden items out of the container before gridstack initializes
+    const container = this.gridStackEl!.nativeElement;
+    this.hiddenWidgets.forEach(id => {
+      const el = container.querySelector(`[gs-id="${id}"]`) as HTMLElement;
+      if (el) {
+        el.remove();
+        this.stashedWidgets.set(id, el);
+      }
+    });
+
+    this.grid = GridStack.init({
+      column: 12,
+      cellHeight: DEFAULT_CELL_HEIGHT,
+      margin: 8,
+      float: false,
+      disableResize: true,
+      disableDrag: true,
+      animate: false,
+      columnOpts: {
+        breakpointForWindow: true,
+        breakpoints: [
+          { w: 768, c: 1 },
+          { w: 1200, c: 6 },
+        ],
+        layout: 'list',
+      },
+    }, this.gridStackEl!.nativeElement);
+
+    const savedLayout = this.storageService.getObject(DASHBOARD_LAYOUT_KEY);
+    this.grid.load(savedLayout ?? this.getInitialLayout());
+
+    setTimeout(() => this.chart?.chart?.resize(), 100);
+
+    this.grid.on('change', () => {
+      this.saveLayout();
+    });
+
+    this.grid.on('resizestop', (_event: Event, el: GridItemHTMLElement) => {
+      if (el.gridstackNode?.id === 'chart') {
+        const isMobile = window.innerWidth < 768;
+        if (!isMobile && el.gridstackNode.h) {
+           el.dataset['desktopH'] = String(el.gridstackNode.h);
+        }
+        setTimeout(() => this.chart?.chart?.resize(), 100);
+      }
+    });
+  }
+
+  private saveLayout(): void {
+    const layout = this.grid.save(false);
+    this.storageService.setObject(DASHBOARD_LAYOUT_KEY, layout as object);
+  }
+
+  public toggleEditMode(): void {
+    this.dashboardEditService.toggleEditMode();
+  }
+
+  public resetLayout(): void {
+    localStorage.removeItem(DASHBOARD_LAYOUT_KEY);
+    localStorage.removeItem(HIDDEN_WIDGETS_KEY);
+    this.grid.load(this.getInitialLayout());
+  }
+
+  private getInitialLayout(): WidgetDef[] {
+    const chartDef = WIDGET_DEFAULTS.find(d => d.id === 'chart');
+    if (!chartDef) return WIDGET_DEFAULTS;
+
+    // The old layout set the chart height to 40vh. In gridstack, you need to set the height of 
+    // the card, so there's 100px to compensate for the dropdowns and padding.
+    const CHART_CHROME_PX = 100;
+    const targetPx = (window.innerHeight * 0.40) + CHART_CHROME_PX;
+    const chartH = Math.max(chartDef.minH ?? 8, Math.round(targetPx / DEFAULT_CELL_HEIGHT));
+
+    return WIDGET_DEFAULTS.map(widget => {
+      const w = { ...widget };
+      if (w.id === chartDef.id) {
+        w.h = chartH;
+      } else if (w.y >= chartDef.y) {
+        // Shift everything at or below the chart position
+        w.y += chartH;
+      }
+      return w;
+    });
+  }
+
+  public isWidgetVisible(id: string): boolean {
+    return !this.hiddenWidgets.has(id);
+  }
+
+  public toggleWidgetVisibility(id: string): void {
+    if (this.hiddenWidgets.has(id)) {
+      // Show widget — restore stashed DOM element
+      this.hiddenWidgets.delete(id);
+      const stashed = this.stashedWidgets.get(id);
+      if (stashed) {
+        this.stashedWidgets.delete(id);
+        this.grid.addWidget(stashed);
+      }
+    } else {
+      // Hide widget — remove from grid and stash the DOM element
+      const el = this.gridStackEl!.nativeElement.querySelector(`[gs-id="${id}"]`) as GridItemHTMLElement;
+      if (el) {
+        this.grid.removeWidget(el, false);
+        el.remove();
+        this.stashedWidgets.set(id, el);
+      }
+      this.hiddenWidgets.add(id);
+    }
+    this.saveHiddenWidgets();
+    this.saveLayout();
+  }
+
+  private saveHiddenWidgets(): void {
+    this.storageService.setObject(HIDDEN_WIDGETS_KEY, [...this.hiddenWidgets]);
+    this.dashboardEditService.hiddenWidgets = new Set(this.hiddenWidgets);
   }
 
   private updateChartColors() {
@@ -231,8 +443,18 @@ export class HomeComponent implements OnInit, OnDestroy {
     };
 
     this.chartOptions = {
+      responsive: true,
       animation: false,
       maintainAspectRatio: false,
+      onResize: (chart: any, size: { width: number; height: number }) => {
+        const fontSize = Math.max(8, Math.min(12, Math.round(size.width / 50)));
+        const tickFont = { size: fontSize };
+        chart.options.scales.x.ticks.font = tickFont;
+        chart.options.scales.y.ticks.font = tickFont;
+        chart.options.scales.y2.ticks.font = tickFont;
+        // Hide x-axis labels when chart is very short to reclaim space
+        chart.options.scales.x.ticks.display = size.height > 100;
+      },
       plugins: {
         legend: {
           display: false
@@ -366,8 +588,11 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
 
           this.limitDataPoints();
-        }),
-        this.startGetLiveData();
+        });
+        if (!this.liveDataStarted) {
+          this.liveDataStarted = true;
+          this.startGetLiveData();
+        }
       });
   }
 
@@ -621,6 +846,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.calculateAverage(efficiencies);
   }
 
+  trackByIndex(index: number, _item: any) {
+    return index;
+  }
+
   getPayoutPercentage(info: ISystemInfo) {
     if (info.coinbaseValueTotalSatoshis) {
       return (info.coinbaseValueUserSatoshis ?? 0) / info.coinbaseValueTotalSatoshis * 100;
@@ -653,12 +882,14 @@ export class HomeComponent implements OnInit, OnDestroy {
     };
 
     updateMessage(!!systemInfoError.duration, 'SYSTEM_INFO_ERROR', 'error', `Unable to reach the device for ${DateAgoPipe.transform(systemInfoError.duration, { strict: true })}`);
+    updateMessage(!!(info as any).miningPaused, 'MINING_PAUSED', 'warn', 'Mining is paused');
     updateMessage(info.overheat_mode === 1, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
+    updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
-    if (info.coinbaseOutputs.length > 0) {
+    if (info.coinbaseOutputs && info.coinbaseOutputs?.length > 0) {
       let percentage = this.getPayoutPercentage(info);
       updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
       updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
@@ -719,17 +950,18 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   public getAsicsAmount(info: ISystemInfo): number {
-    return info.hashrateMonitor.asics.length;
+    return info.hashrateMonitor?.asics?.length ?? 0;
   }
 
   public getAsicDomainsAmount(info: ISystemInfo): number {
-    return info.hashrateMonitor.asics[0]?.domains?.length ?? 0;
+    return info.hashrateMonitor?.asics?.[0]?.domains?.length ?? 0;
   }
 
   public getHeatmapColor(info: ISystemInfo, domainHashrate: number): string {
-    const ratio = Math.max(0, Math.min(2, (domainHashrate / info.expectedHashrate) * this.getAsicsAmount(info)) * this.getAsicDomainsAmount(info));
-    const deviation = Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
-    const t = 1 - Math.pow(1 - deviation, 3);
+    const expectedHashrate = info.expectedHashrate || 1;
+    const ratio = Math.max(0, Math.min(2, (domainHashrate / expectedHashrate) * this.getAsicsAmount(info)) * this.getAsicDomainsAmount(info));
+    const deviation = isNaN(ratio) ? 1 : Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
+    const t = 1 - Math.pow(1 - deviation, 1.5); // Exponent controls graduality (lower = more gradual, 7 was very steep)
     const target = ratio > 1 ? 255 : 0; // gradient from 0: black, 1: primary-color, 2: white
 
     const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
@@ -823,6 +1055,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   static cbFormatValue(value: number, datasetLabel: eChartLabel, args?: any): string {
+    if (value === undefined || value === null) return '';
     switch (datasetLabel) {
       case eChartLabel.hashrate:
       case eChartLabel.hashrate_1m:
