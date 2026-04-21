@@ -1,20 +1,13 @@
 #include <string.h>
-#include "INA260.h"
+#include <math.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "global_state.h"
 #include "fan_controller_task.h"
-#include "math.h"
-#include "mining.h"
 #include "nvs_config.h"
-#include "serial.h"
-#include "TPS546.h"
-#include "vcore.h"
 #include "thermal.h"
 #include "PID.h"
-#include "power.h"
-#include "asic.h"
 
 #define EPSILON 0.0001f
 #define POLL_TIME_MS 100
@@ -25,6 +18,31 @@
 #define PID_D 2.0
 
 static const char * TAG = "fan_controller";
+static const char * prev_context = "";
+
+static void update_fan_speed(GlobalState * GLOBAL_STATE, float target_perc, const char * context)
+{
+    if (target_perc > 100.0f) target_perc = 100.0f;
+    if (target_perc < 0.0f) target_perc = 0.0f;
+
+    bool target_changed = fabs(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc - target_perc) > EPSILON;
+    if (strcmp(context, prev_context) != 0) {
+        prev_context = context;
+        ESP_LOGI(TAG, "Set to %s mode, fan speed: %.1f%%", context, target_perc);
+    } else {
+        if (target_changed && strcmp(context, "Auto") != 0) {
+            ESP_LOGI(TAG, "%s mode, fan speed: %.1f%%", context, target_perc);
+        }
+    }
+    if (target_changed) {
+        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc = target_perc;
+        if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, target_perc / 100.0f) != ESP_OK) {
+            ESP_LOGE(TAG, "FATAL: Fan Control Failed (%s). Flagging hardware fault.", context);
+            GLOBAL_STATE->SYSTEM_MODULE.hardware_fault = true;
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg, sizeof(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg), "Fan Control Failed (%s)", context);
+        }
+    }
+}
 
 void FAN_CONTROLLER_task(void * pvParameters)
 {
@@ -47,27 +65,13 @@ void FAN_CONTROLLER_task(void * pvParameters)
     pid_init(&pid, &pid_input, &pid_output, &pid_setPoint, PID_P, PID_I, PID_D, PID_P_ON_E, PID_REVERSE);
     pid_set_sample_time(&pid, POLL_TIME_MS); // Sample time in ms
 
-    ESP_LOGI(TAG, "P:%.1f I:%.1f D:%.1f", pid.dispKp, pid.dispKi, pid.dispKd);
-
     TickType_t taskWakeTime = xTaskGetTickCount();
 
     while (1) {
         if (nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE)) {
-            if (fabs(power_management->fan_perc - 100) > EPSILON) {
-                ESP_LOGW(TAG, "Overheat mode, setting fan to 100%%");
-                power_management->fan_perc = 100;
-                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 1.0f) != ESP_OK) {
-                    exit(EXIT_FAILURE);
-                }
-            }
-        } else if (!GLOBAL_STATE->ASIC_initalized) {
-            if (fabs(power_management->fan_perc - 30) > EPSILON) {
-                ESP_LOGI(TAG, "Mining paused, setting fan to 30%%");
-                power_management->fan_perc = 30;
-                if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 0.3f) != ESP_OK) {
-                    exit(EXIT_FAILURE);
-                }
-            }
+            update_fan_speed(GLOBAL_STATE, 100.0f, "Overheat");
+        } else if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+            update_fan_speed(GLOBAL_STATE, 30.0f, "Paused");
         } else {
             //enable the PID auto control for the FAN if set
             if (nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED)) {
@@ -101,46 +105,27 @@ void FAN_CONTROLLER_task(void * pvParameters)
                     // Initialize PID on first valid temperature reading
                     if (pid_get_mode(&pid) == MANUAL) {
                         pid_set_mode(&pid, AUTOMATIC);
-                        ESP_LOGI(TAG, "PID initialized at %.1f °C", pid_input);
+                        ESP_LOGI(TAG, "PID initialized at %.1f°C (P:%.1f I:%.1f D:%.1f", pid_input, pid.dispKp, pid.dispKi, pid.dispKd);
                     }
                     
                     pid_compute(&pid);
-                    // Clamp PID output to valid range to prevent overshoot above 100%
-                    if (pid_output > 100) pid_output = 100;
-                    if (pid_output < 0) pid_output = 0;
+
                     // Uncomment for debugging PID output directly after compute
                     // ESP_LOGD(TAG, "DEBUG: PID raw output: %.2f%%, Input: %.1f, SetPoint: %.1f", pid_output, pid_input, pid_setPoint);
 
-                    if (fabs(power_management->fan_perc - pid_output) > EPSILON) {
-                        power_management->fan_perc = pid_output;
-                        if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, pid_output / 100.0f) != ESP_OK) {
-                            exit(EXIT_FAILURE);
-                        }
-                    }
+                    update_fan_speed(GLOBAL_STATE, pid_output, "Auto");
 
                     log_counter += POLL_TIME_MS;
                     if (log_counter >= LOG_TIME_MS) {
                         log_counter -= LOG_TIME_MS;
-                        ESP_LOGI(TAG, "Temp: %.1f °C, SetPoint: %.1f °C, Output: %.1f%%", pid_input, pid_setPoint, pid_output);
+                        ESP_LOGI(TAG, "Temp: %.1f°C, SetPoint: %.1f°C, Output: %.1f%%", pid_input, pid_setPoint, pid_output);
                     }
                 } else {
-                    if (fabs(power_management->fan_perc - 70) > EPSILON) {
-                        ESP_LOGI(TAG, "Temperature sensor starting up, setting fan to 70%%");
-                        power_management->fan_perc = 70;
-                        if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, 0.7f) != ESP_OK) {
-                            exit(EXIT_FAILURE);
-                        }
-                    }
+                    update_fan_speed(GLOBAL_STATE, 70.0f, "Startup");
                 }
             } else { // Manual fan speed
-                uint16_t fan_perc = nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED);
-                if (fan_perc > 100) fan_perc = 100;
-                if (fabs(power_management->fan_perc - fan_perc) > EPSILON) {
-                    power_management->fan_perc = fan_perc;
-                    if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_perc / 100.0f) != ESP_OK) {
-                        exit(EXIT_FAILURE);
-                    }
-                }
+                uint16_t fan_perc_target = nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED);
+                update_fan_speed(GLOBAL_STATE, (float)fan_perc_target, "Manual");
             }
         }
 

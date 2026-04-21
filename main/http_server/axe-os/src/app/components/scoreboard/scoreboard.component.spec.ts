@@ -1,6 +1,14 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-
+import { provideRouter } from '@angular/router';
+import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
+import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
+import { TooltipModule } from 'primeng/tooltip';
+import { CommonModule } from '@angular/common';
+import { LocalStorageService } from 'src/app/local-storage.service';
+import { LoadingService } from 'src/app/services/loading.service';
+import { SystemApiService } from 'src/app/services/system.service';
+import { provideHttpClient } from '@angular/common/http';
 import { ScoreboardComponent } from './scoreboard.component';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 describe('ScoreboardComponent', () => {
   let component: ScoreboardComponent;
@@ -8,7 +16,15 @@ describe('ScoreboardComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ScoreboardComponent]
+      declarations: [ScoreboardComponent, DiffSuffixPipe, DateAgoPipe],
+      imports: [CommonModule, TooltipModule],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        SystemApiService,
+        LoadingService,
+        LocalStorageService
+      ]
     })
     .compileComponents();
 

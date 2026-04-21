@@ -4,6 +4,7 @@ import { ToastrService } from 'ngx-toastr';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LayoutService } from './service/app.layout.service';
 import { SensitiveData } from 'src/app/services/sensitive-data.service';
+import { DashboardEditService } from 'src/app/services/dashboard-edit.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { MenuItem } from 'primeng/api';
 
@@ -28,6 +29,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
     private systemService: SystemApiService,
     private toastr: ToastrService,
     private sensitiveData: SensitiveData,
+    public dashboardEdit: DashboardEditService,
   ) {
     this.info$ = this.systemService.getInfo().pipe(shareReplay({refCount: true, bufferSize: 1}))
   }

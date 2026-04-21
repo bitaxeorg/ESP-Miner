@@ -11,6 +11,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { SidebarModule } from 'primeng/sidebar';
 import { SliderModule } from 'primeng/slider';
 import { InputTextareaModule } from 'primeng/inputtextarea';
+import { OverlayPanelModule } from 'primeng/overlaypanel';
 import { ProgressBarModule } from 'primeng/progressbar';
 
 const primeNgModules = [
@@ -26,6 +27,7 @@ const primeNgModules = [
     InputGroupAddonModule,
     RadioButtonModule,
     InputTextareaModule,
+    OverlayPanelModule,
     ProgressBarModule,
 ];
 

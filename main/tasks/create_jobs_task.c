@@ -15,6 +15,9 @@
 
 static const char *TAG = "create_jobs_task";
 
+#define MAX_EXTRANONCE2_LEN 32
+#define MAX_EXTRANONCE2_STR (MAX_EXTRANONCE2_LEN * 2 + 1)
+
 static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, double difficulty);
 
 void create_jobs_task(void *pvParameters)
@@ -87,7 +90,11 @@ void create_jobs_task(void *pvParameters)
 
 static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, double difficulty)
 {
-    char extranonce_2_str[GLOBAL_STATE->extranonce_2_len * 2 + 1];
+    if (GLOBAL_STATE->extranonce_2_len > MAX_EXTRANONCE2_LEN) {
+        ESP_LOGE(TAG, "extranonce_2_len %d exceeds maximum %d, skipping job", GLOBAL_STATE->extranonce_2_len, MAX_EXTRANONCE2_LEN);
+        return;
+    }
+    char extranonce_2_str[MAX_EXTRANONCE2_STR];
     extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len, extranonce_2_str);
 
     //print generated extranonce_2

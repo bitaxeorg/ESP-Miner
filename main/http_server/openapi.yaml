@@ -358,6 +358,9 @@ components:
         power_fault:
           type: string
           description: Voltage regulator fault reason, if any
+        hardware_fault:
+          type: string
+          description: Hardware/Peripheral fault reason, if any
         resetReason:
           type: string
           description: Reason for the last system reset
