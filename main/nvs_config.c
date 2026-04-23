@@ -85,7 +85,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_MANUAL_FAN_SPEED]                      = {.nvs_key_name = "manualfanspeed",  .type = TYPE_U16,   .default_value = {.u16 = 100},                                         .rest_name = "manualFanSpeed",                     .min = 0,  .max = 100},
     [NVS_CONFIG_MIN_FAN_SPEED]                         = {.nvs_key_name = "minfanspeed",     .type = TYPE_U16,   .default_value = {.u16 = 25},                                          .rest_name = "minFanSpeed",                        .min = 0,  .max = 99},
     [NVS_CONFIG_TEMP_TARGET]                           = {.nvs_key_name = "temptarget",      .type = TYPE_U16,   .default_value = {.u16 = 60},                                          .rest_name = "temptarget",                         .min = 35, .max = 66},
-    [NVS_CONFIG_OVERHEAT_MODE]                         = {.nvs_key_name = "overheat_mode",   .type = TYPE_BOOL,                                                                         .rest_name = "overheat_mode",                      .min = 0,  .max = 0},
+    [NVS_CONFIG_OVERHEAT_MODE]                         = {.nvs_key_name = "overheat_mode",   .type = TYPE_BOOL,                                                                         .rest_name = "overheatMode",                       .min = 0,  .max = 0},
 
     [NVS_CONFIG_STATISTICS_FREQUENCY]                  = {.nvs_key_name = "statsFrequency",  .type = TYPE_U16,                                                                          .rest_name = "statsFrequency",                     .min = 0,  .max = UINT16_MAX},
 

@@ -523,6 +523,19 @@ static esp_err_t handle_options_request(httpd_req_t * req)
     return ESP_OK;
 }
 
+// Returns the JSON value for a setting, or NULL if absent.
+// Supports a legacy snake_case alias for keys we have renamed.
+static cJSON * get_setting_item(const cJSON * const root, NvsConfigKey key, const char * rest_name)
+{
+    cJSON * item = cJSON_GetObjectItem(root, rest_name);
+    if (item) return item;
+    if (key == NVS_CONFIG_OVERHEAT_MODE) {
+        // Deprecated: accept "overheat_mode" for legacy clients.
+        return cJSON_GetObjectItem(root, "overheat_mode");
+    }
+    return NULL;
+}
+
 bool check_settings_and_update(const cJSON * const root)
 {
     bool result = true;
@@ -531,7 +544,7 @@ bool check_settings_and_update(const cJSON * const root)
         Settings *setting = nvs_config_get_settings(key);
         if (!setting->rest_name) continue;
 
-        cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
+        cJSON * item = get_setting_item(root, key, setting->rest_name);
         if (!item) continue;
 
         switch (setting->type) {
@@ -607,7 +620,7 @@ bool check_settings_and_update(const cJSON * const root)
             Settings *setting = nvs_config_get_settings(key);
             if (!setting || !setting->rest_name) continue;
 
-            cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
+            cJSON * item = get_setting_item(root, key, setting->rest_name);
             if (!item) continue;
 
             switch(setting->type) {
@@ -990,7 +1003,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "resetReason", esp_reset_reason_to_string(esp_reset_reason()));
     cJSON_AddStringToObject(root, "runningPartition", esp_ota_get_running_partition()->label);
 
-    cJSON_AddNumberToObject(root, "overheat_mode", nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE));
+    bool overheat_mode_value = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
+    cJSON_AddNumberToObject(root, "overheatMode", overheat_mode_value);
+    // Deprecated: use "overheatMode" instead. Retained for backward compatibility.
+    cJSON_AddNumberToObject(root, "overheat_mode", overheat_mode_value);
     cJSON_AddBoolToObject(root, "miningPaused", GLOBAL_STATE->SYSTEM_MODULE.mining_paused);
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED));
     cJSON_AddStringToObject(root, "display", display);

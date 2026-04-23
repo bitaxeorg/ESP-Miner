@@ -137,7 +137,7 @@ export class SystemApiService {
 
         boardtemp1: 30,
         boardtemp2: 40,
-        overheat_mode: 0,
+        overheatMode: 0,
 
         blockHeight: 811111,
         scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",

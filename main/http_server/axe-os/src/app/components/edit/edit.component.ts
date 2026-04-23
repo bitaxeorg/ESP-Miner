@@ -164,7 +164,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           minfanspeed: [info.minFanSpeed, [Validators.required]],
           manualFanSpeed: [info.manualFanSpeed, [Validators.required]],
           temptarget: [info.temptarget, [Validators.required]],
-          overheat_mode: [info.overheat_mode, [Validators.required]],
+          overheatMode: [info.overheatMode ?? info.overheat_mode, [Validators.required]],
           statsFrequency: [info.statsFrequency, [
             Validators.required,
             Validators.min(0),
@@ -243,7 +243,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   disableOverheatMode() {
-    this.form.patchValue({ overheat_mode: 0 });
+    this.form.patchValue({ overheatMode: 0 });
     this.updateSystem();
   }
 
@@ -337,7 +337,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       'autofanspeed',
       'manualFanSpeed',
       'temptarget',
-      'overheat_mode',
+      'overheatMode',
       'statsFrequency'
     ];
   }

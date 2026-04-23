@@ -157,7 +157,7 @@ components:
         - maxPower
         - minFanSpeed
         - nominalVoltage
-        - overheat_mode
+        - overheatMode
         - overclockEnabled
         - poolConnectionInfo
         - poolDifficulty
@@ -340,9 +340,13 @@ components:
         nominalVoltage:
           type: integer
           description: Nominal board voltage
-        overheat_mode:
+        overheatMode:
           type: number
           description: Overheat protection mode
+        overheat_mode:
+          type: number
+          deprecated: true
+          description: Deprecated alias for overheatMode. Will be removed in a future release.
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
@@ -713,9 +717,16 @@ components:
           enum: [0, 1]
           examples:
             - 0
-        overheat_mode:
+        overheatMode:
           type: integer
           description: Overheat protection mode (0=disabled)
+          enum: [0]
+          examples:
+            - 0
+        overheat_mode:
+          type: integer
+          deprecated: true
+          description: Deprecated alias for overheatMode. Will be removed in a future release.
           enum: [0]
           examples:
             - 0

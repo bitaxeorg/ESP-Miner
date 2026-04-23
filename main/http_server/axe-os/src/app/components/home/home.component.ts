@@ -961,7 +961,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     updateMessage(!!systemInfoError.duration, 'SYSTEM_INFO_ERROR', 'error', `Unable to reach the device for ${DateAgoPipe.transform(systemInfoError.duration, { strict: true })}`);
     updateMessage(!!(info as any).miningPaused, 'MINING_PAUSED', 'warn', 'Mining is paused');
-    updateMessage(info.overheat_mode === 1, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
+    updateMessage((info.overheatMode ?? info.overheat_mode) === 1, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
