@@ -22,8 +22,7 @@ void do_frequency_transition(void * pvParameters, set_hash_frequency_fn set_freq
 
     if (fabs(target_frequency - current_frequency) < STEP_SIZE) {
         current_frequency = target_frequency;
-        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = current_frequency;
-        set_frequency_fn(current_frequency);
+        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = set_frequency_fn(current_frequency);
         return;
     }
 
@@ -40,8 +39,7 @@ void do_frequency_transition(void * pvParameters, set_hash_frequency_fn set_freq
             current_step += signum;
 
             current_frequency = current_step * STEP_SIZE;
-            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = current_frequency;
-            set_frequency_fn(current_frequency);
+            GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = set_frequency_fn(current_frequency);
             
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
@@ -49,8 +47,7 @@ void do_frequency_transition(void * pvParameters, set_hash_frequency_fn set_freq
     
     if (fabs(current_frequency - target_frequency) > EPSILON) {
         current_frequency = target_frequency;
-        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = current_frequency;
-        set_frequency_fn(current_frequency);
+        GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = set_frequency_fn(current_frequency);
     }
     
     ESP_LOGI(TAG, "Successfully transitioned to %g MHz", target_frequency);
