@@ -64,11 +64,16 @@ export class NetworkEditComponent implements OnInit {
       form.ssid = form.ssid.trim();
     }
 
+    // Hostname is applied live; only Wi-Fi changes require a restart.
+    const restartRequired = this.form.controls['ssid'].dirty || this.form.controls['wifiPass'].dirty;
+
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.warning('You must restart this device after saving for changes to take effect.');
+          if (restartRequired) {
+            this.toastr.warning('You must restart this device after saving for changes to take effect.');
+          }
           this.toastr.success('Saved network settings');
           this.savedChanges = true;
         },
