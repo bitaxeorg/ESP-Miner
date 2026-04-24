@@ -72,6 +72,9 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
   }
 
   public restart() {
+    if (!window.confirm('Restart the device? Current mining work will be lost.')) {
+      return;
+    }
     this.systemService.restart().subscribe({
       next: () => this.toastr.success('Device restarted'),
       error: () => this.toastr.error('Restart failed')
