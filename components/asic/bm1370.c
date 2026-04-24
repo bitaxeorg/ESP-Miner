@@ -142,6 +142,32 @@ void BM1370_set_version_mask(uint32_t version_mask)
     _send_BM1370(TYPE_CMD | GROUP_ALL | CMD_WRITE, version_cmd, 6, BM1370_SERIALTX_DEBUG);
 }
 
+void BM1370_set_hash_counting_number(uint32_t hcn) {
+    uint8_t set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x00, 0x00};
+    set_10_hash_counting[2] = (hcn >> 24) & 0xFF;
+    set_10_hash_counting[3] = (hcn >> 16) & 0xFF;
+    set_10_hash_counting[4] = (hcn >> 8) & 0xFF;
+    set_10_hash_counting[5] = hcn & 0xFF;
+    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1370_SERIALTX_DEBUG);
+}
+
+void BM1370_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores) 
+{   
+    int cores_up = _next_power_of_two(cores);
+    int asic_count_up =  _next_power_of_two(asic_count);
+
+    // HCN hash counting number (the size of the nonce space)
+    float hcn_space = (float)NONCE_SPACE / cores_up / asic_count_up;
+    double hcn_max = hcn_space * (double)FREQ_MULT / frequency * 0.5f; 
+    // BM1370 has a HW errata of 134 per clock cycle
+    // use 2x value overwise we can get duplicates
+    int hcn_error = 2 * 134;
+    double hcn_frac = nonce_percent * (hcn_max - hcn_error);
+    uint32_t hcn_register_value = (uint32_t)hcn_frac;
+
+    BM1370_set_hash_counting_number(hcn_register_value);
+}
+
 void BM1370_send_hash_frequency(float target_freq) 
 {
     uint8_t fb_divider, refdiv, postdiv1, postdiv2;
@@ -260,15 +286,10 @@ uint8_t BM1370_init(void * pvParameters)
     //ramp up the hash frequency
     do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
 
-    //register 10 is still a bit of a mystery. discussion: https://github.com/bitaxeorg/ESP-Miner/pull/167
+    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+    int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
 
-    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x11, 0x5A}; //S19k Pro Default
-    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x14, 0x46}; //S19XP-Luxos Default
-    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x15, 0x1C}; //S19XP-Stock Default
-    //unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x15, 0xA4}; //S21-Stock Default
-    unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x1E, 0xB5}; //S21 Pro-Stock Default
-    // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x0F, 0x00, 0x00}; //supposedly the "full" 32bit nonce range
-    _send_BM1370((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1370_SERIALTX_DEBUG);
+    BM1370_set_nonce_space(1.0, frequency, asic_count, cores);
 
     return chip_counter;
 }
