@@ -23,7 +23,6 @@ typedef void (*set_hash_frequency_fn)(float frequency);
  * 
  * @param pvParameters Pointer to the GlobalState structure
  * @param set_frequency_fn Function pointer to the appropriate ASIC's set_hash_frequency function
- * @param asic_type The type of ASIC chip (for logging purposes only)
  */
 void do_frequency_transition(void * pvParameters, set_hash_frequency_fn set_frequency_fn);
 

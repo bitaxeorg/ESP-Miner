@@ -1,13 +1,14 @@
 import { CanActivateFn, Router } from '@angular/router';
 import { inject } from '@angular/core';
-import { Observable, map, catchError, of } from 'rxjs';
-import { SystemApiService } from '../services/system.service';
+import { Observable, map, catchError, of, take } from 'rxjs';
+import { LiveDataService } from '../services/live-data.service';
 
 export const ApModeGuard: CanActivateFn = (): Observable<boolean> => {
-  const systemService = inject(SystemApiService);
+  const liveDataService = inject(LiveDataService);
   const router = inject(Router);
 
-  return systemService.getInfo().pipe(
+  return liveDataService.info$.pipe(
+    take(1),
     map(info => {
       if (info.apEnabled) {
         router.navigate(['/ap']);

@@ -1,7 +1,10 @@
 #ifndef STATISTICS_TASK_H_
 #define STATISTICS_TASK_H_
 
+#include <stdbool.h>
 #include <stdint.h>
+
+#define MAX_STATISTICS_COUNT 720
 
 typedef struct StatisticsData * StatisticsDataPtr;
 

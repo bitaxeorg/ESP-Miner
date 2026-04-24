@@ -4,7 +4,8 @@ import { FormBuilder, FormGroup, Validators, ValidatorFn, ValidationErrors, Abst
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
-import { Observable } from 'rxjs';
+import { LiveDataService } from 'src/app/services/live-data.service';
+import { first } from 'rxjs';
 
 type PoolType = 'stratum' | 'fallbackStratum';
 
@@ -39,13 +40,15 @@ export class PoolComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private systemService: SystemApiService,
+    private liveDataService: LiveDataService,
     private toastr: ToastrService,
     private loadingService: LoadingService
   ) { }
 
   ngOnInit(): void {
-    this.systemService.getInfo(this.uri)
+    this.liveDataService.info$
       .pipe(
+        first(),
         this.loadingService.lockUIUntilComplete()
       )
       .subscribe(info => {

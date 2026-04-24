@@ -1,8 +1,9 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { Observable, Subject, combineLatest, switchMap, shareReplay, first, takeUntil, map, timer } from 'rxjs';
+import { Observable, Subject, combineLatest, shareReplay, first, takeUntil, map } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
 import { SystemApiService } from 'src/app/services/system.service';
+import { LiveDataService } from 'src/app/services/live-data.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
@@ -29,20 +30,20 @@ type CombinedData = {
 export class SystemComponent implements OnInit, OnDestroy {
   public info$: Observable<ISystemInfo>;
   public asic$: Observable<ISystemASIC>;
-  public combinedData$: Observable<{ info: ISystemInfo, asic: ISystemASIC }>
+  public combinedData$: Observable<CombinedData>;
+  public isConnected$: Observable<boolean>;
 
   private destroy$ = new Subject<void>();
 
   constructor(
     private systemService: SystemApiService,
+    private liveDataService: LiveDataService,
     private loadingService: LoadingService,
     private toastr: ToastrService,
   ) {
-    this.info$ = timer(0, 5000).pipe(
-      switchMap(() => this.systemService.getInfo()),
-      shareReplay({ refCount: true, bufferSize: 1 })
-    );
-
+    this.info$ = this.liveDataService.info$;
+    this.isConnected$ = this.liveDataService.connected$;
+    
     this.asic$ = this.systemService.getAsicSettings().pipe(
       shareReplay({ refCount: true, bufferSize: 1 })
     );

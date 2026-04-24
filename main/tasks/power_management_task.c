@@ -1,20 +1,12 @@
-#include <string.h>
-#include "INA260.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "global_state.h"
-#include "math.h"
-#include "mining.h"
 #include "nvs_config.h"
-#include "serial.h"
-#include "TPS546.h"
 #include "vcore.h"
 #include "thermal.h"
-#include "PID.h"
 #include "power.h"
 #include "asic.h"
-#include "bm1370.h"
 #include "utils.h"
 #include "asic_init.h"
 #include "asic_reset.h"
@@ -106,7 +98,7 @@ void POWER_MANAGEMENT_init_frequency(void * pvParameters)
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = frequency;
-    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = 50.0;    
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = 50.0;
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = expected_hashrate(GLOBAL_STATE);
     
     char expected_hashrate_str[16] = {0};

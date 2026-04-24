@@ -6,8 +6,10 @@ import { finalize } from 'rxjs/operators';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { DialogService } from 'src/app/services/dialog.service';
 import { LoadingService } from 'src/app/services/loading.service';
+import { LiveDataService } from 'src/app/services/live-data.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { WifiNetwork } from 'src/app/generated/models';
+import { first } from 'rxjs/operators';
 
 @Component({
   selector: 'app-network-edit',
@@ -27,6 +29,7 @@ export class NetworkEditComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private systemService: SystemApiService,
+    private liveDataService: LiveDataService,
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private http: HttpClient,
@@ -35,8 +38,8 @@ export class NetworkEditComponent implements OnInit {
 
   }
   ngOnInit(): void {
-    this.systemService.getInfo(this.uri)
-      .pipe(this.loadingService.lockUIUntilComplete())
+    this.liveDataService.info$
+      .pipe(first(), this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
         this.form = this.fb.group({
           hostname: [info.hostname, [Validators.required]],
