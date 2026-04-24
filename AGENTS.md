@@ -90,7 +90,7 @@ We use GitHub Actions for automated testing and releases.
 
 ## AI Agent Tips
 - **API Generation**: If you modify `openapi.yaml`, you **must** run `npm run generate:api` in the `axe-os` directory to update the TypeScript services. This is also automatically handled by `npm run build` and `npm run test:ci`.
-- **Node Environment**: If `node` or `npm` are not in your global path, check for local installations in `/home/mutatrum/.nvm`. You can source them using `export PATH=/home/mutatrum/.nvm/versions/node/v[version]/bin:$PATH`.
+- **Node Environment**: If `node` or `npm` are not in your global path, check for local installations in `~/.nvm`. You can source them using `export PATH=~/.nvm/versions/node/v[version]/bin:$PATH`.
 - **Modern Angular Testing**: Use functional providers like `provideRouter([])` and `provideHttpClient()` instead of deprecated class-based modules like `RouterTestingModule`.
 - **PSRAM**: Bitaxe heavily relies on PSRAM. Always check `esp_psram_is_initialized()` before allocating large buffers in the backend.
 - **Mock Data Parity**: When updating `openapi.yaml` and regenerating the API, you **must** update the mock data in `main/http_server/axe-os/src/app/services/system.service.ts`. The TypeScript compiler will fail if properties are missing from the `of()` calls used for development.
