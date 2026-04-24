@@ -237,3 +237,18 @@ float hashCounterToGhs(uint64_t duration_us, uint32_t counter)
     float hashrate = counter / seconds * (float)HASH_CNT_LSB; // Make sure it stays in float
     return hashrate / 1e9f; // Convert to Gh/s
 }
+
+void url_decode(char *dst, const char *src) {
+    while (*src) {
+        if ((*src == '%') && src[1] && src[2]) {
+            *dst++ = (hex_val_table[(unsigned char)src[1]] << 4) | hex_val_table[(unsigned char)src[2]];
+            src += 3;
+        } else if (*src == '+') {
+            *dst++ = ' ';
+            src++;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
+}
