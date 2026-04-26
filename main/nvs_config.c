@@ -14,6 +14,7 @@
 #include "display.h"
 #include "theme_api.h"
 #include "scoreboard.h"
+#include "cJSON.h"
 
 #define NVS_CONFIG_NAMESPACE "main"
 #define NVS_STR_LIMIT (4000 - 1) // See nvs_set_str
@@ -93,7 +94,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_SELF_TEST]                             = {.nvs_key_name = "selftest",        .type = TYPE_BOOL},
     [NVS_CONFIG_SWARM]                                 = {.nvs_key_name = "swarmconfig",     .type = TYPE_STR},
     [NVS_CONFIG_THEME_SCHEME]                          = {.nvs_key_name = "themescheme",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_THEME}},
-    [NVS_CONFIG_THEME_COLORS]                          = {.nvs_key_name = "themecolors",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_COLORS}},
+    [NVS_CONFIG_THEME_COLOR]                           = {.nvs_key_name = "themecolor",      .type = TYPE_STR,   .default_value = {.str = DEFAULT_COLOR}},
     [NVS_CONFIG_SCOREBOARD]                            = {.nvs_key_name = "scoreboard",      .type = TYPE_STR,   .array_size = MAX_SCOREBOARD},
     
     [NVS_CONFIG_BOARD_VERSION]                         = {.nvs_key_name = "boardversion",    .type = TYPE_STR,   .default_value = {.str = "000"}},
@@ -162,6 +163,30 @@ static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
             if (ret == ESP_OK) {
                 ESP_LOGI(TAG, "Migrating NVS config %s to %s (%d)", FALLBACK_KEY_FANSPEED, setting->nvs_key_name, val);
                 nvs_set_u16(handle, setting->nvs_key_name, val);
+            }
+        }
+    }
+    if (key == NVS_CONFIG_THEME_COLOR) {
+        if (nvs_find_key(handle, setting->nvs_key_name, NULL) == ESP_ERR_NVS_NOT_FOUND) {
+            size_t len = 0;
+            esp_err_t ret = nvs_get_str(handle, "themecolors", NULL, &len);
+            if (ret == ESP_OK && len > 1) {
+                char *buf = malloc(len);
+                if (buf) {
+                    ret = nvs_get_str(handle, "themecolors", buf, &len);
+                    if (ret == ESP_OK) {
+                        cJSON *root = cJSON_Parse(buf);
+                        if (root) {
+                            cJSON *primary = cJSON_GetObjectItem(root, "--primary-color");
+                            if (primary && primary->valuestring) {
+                                ESP_LOGI(TAG, "Migrating NVS config themecolors to %s (%s)", setting->nvs_key_name, primary->valuestring);
+                                nvs_set_str(handle, setting->nvs_key_name, primary->valuestring);
+                            }
+                            cJSON_Delete(root);
+                        }
+                    }
+                    free(buf);
+                }
             }
         }
     }
