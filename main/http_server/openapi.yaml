@@ -130,6 +130,7 @@ components:
         - fallbackStratumTLS
         - fallbackStratumCert
         - fallbackStratumDecodeCoinbase
+        - fallbackStratumShareWarning
         - fanrpm
         - fan2rpm
         - fanspeed
@@ -180,6 +181,7 @@ components:
         - stratumTLS
         - stratumCert
         - stratumDecodeCoinbase
+        - stratumShareWarning
         - temp
         - temp2
         - uptimeSeconds
@@ -199,6 +201,8 @@ components:
         - coinbaseOutputs
         - coinbaseValueTotalSatoshis
         - coinbaseValueUserSatoshis
+        - coinbaseOthersCount
+        - coinbaseOthersValueSatoshis
         - hashrateMonitor
         - miningPaused
       properties:
@@ -256,6 +260,9 @@ components:
         fallbackStratumDecodeCoinbase:
           type: boolean
           description: Enable fallback pool coinbase transaction decoding
+        fallbackStratumShareWarning:
+          type: boolean
+          description: Show a dashboard warning when the user's payout share of the coinbase reward is low. Disable for pools that distribute payouts directly via many coinbase outputs (e.g. PPLNS direct payout).
         fanrpm:
           type: number
           description: Current fan speed in RPM
@@ -414,6 +421,9 @@ components:
         stratumDecodeCoinbase:
           type: boolean
           description: Enable primary pool coinbase transaction decoding
+        stratumShareWarning:
+          type: boolean
+          description: Show a dashboard warning when the user's payout share of the coinbase reward is low. Disable for pools that distribute payouts directly via many coinbase outputs (e.g. PPLNS direct payout).
         temp:
           type: number
           description: Average chip temperature
@@ -489,6 +499,12 @@ components:
         coinbaseValueUserSatoshis:
           type: integer
           description: User's portion of coinbase value in satoshis
+        coinbaseOthersCount:
+          type: integer
+          description: Number of additional coinbase outputs not contained in `coinbaseOutputs` (e.g. PPLNS direct payouts beyond the array capacity)
+        coinbaseOthersValueSatoshis:
+          type: integer
+          description: Sum of value (in satoshis) of the aggregated additional outputs counted in `coinbaseOthersCount`
         hashrateMonitor:
           type: object
           required:

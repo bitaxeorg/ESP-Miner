@@ -423,12 +423,16 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
     }
 
     GLOBAL_STATE->coinbase_value_total_satoshis = result->total_value_satoshis;
-    ESP_LOGI(TAG, "Coinbase outputs: %d, total value: %llu%s", result->output_count, result->total_value_satoshis, result->decode_coinbase_tx ? " sats" : "");
-    
+    ESP_LOGI(TAG, "Coinbase outputs: %d (+%d aggregated), total value: %llu%s", result->output_count, result->others_count, result->total_value_satoshis, result->decode_coinbase_tx ? " sats" : "");
+
     if (result->output_count != GLOBAL_STATE->coinbase_output_count ||
+        result->others_count != GLOBAL_STATE->coinbase_others_count ||
+        result->others_value_satoshis != GLOBAL_STATE->coinbase_others_value_satoshis ||
         memcmp(result->outputs, GLOBAL_STATE->coinbase_outputs, sizeof(coinbase_output_t) * result->output_count) != 0) {
-            
+
         GLOBAL_STATE->coinbase_output_count = result->output_count;
+        GLOBAL_STATE->coinbase_others_count = result->others_count;
+        GLOBAL_STATE->coinbase_others_value_satoshis = result->others_value_satoshis;
         memcpy(GLOBAL_STATE->coinbase_outputs, result->outputs, sizeof(coinbase_output_t) * result->output_count);
         GLOBAL_STATE->coinbase_value_user_satoshis = result->user_value_satoshis;
         for (int i = 0; i < result->output_count; i++) {
@@ -441,6 +445,9 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
             } else {
                 ESP_LOGI(TAG, "  Output %d: %s", i, result->outputs[i].address);
             }
+        }
+        if (result->others_count > 0) {
+            ESP_LOGI(TAG, "  + %d other output(s) aggregated (%llu sat)", result->others_count, result->others_value_satoshis);
         }
     }
 
