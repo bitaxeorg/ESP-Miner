@@ -8,6 +8,9 @@
 #include "asic_common.h"
 #include "asic.h"
 #include "utils.h"
+#include "esp_system.h"
+#include "asic_init.h"
+#include "driver/uart.h"
 
 #define EPSILON 0.0001f
 
@@ -20,6 +23,16 @@
 #define DIV_10M (HASHRATE_1M_SIZE)
 #define DIV_1H (HASHRATE_10M_SIZE * DIV_10M)
 
+// Consecutive anomalous polls before triggering ASIC recovery
+#define ANOMALY_CONSECUTIVE_THRESHOLD 3
+// Delay after ASIC recovery before resuming normal operation
+#define RECOVERY_STABILIZATION_DELAY_MS 2000
+// Max recovery attempts before forcing a full reboot
+#define MAX_RECOVERY_ATTEMPTS 3
+// Lower/upper hashrate thresholds relative to expected hashrate
+#define LOWER_HASHRATE_THRESHOLD 0.75f
+#define UPPER_HASHRATE_THRESHOLD 1.50f
+
 static unsigned long poll_count = 0;
 static float hashrate_1m[HASHRATE_1M_SIZE];
 static float hashrate_10m_prev;
@@ -28,6 +41,10 @@ static float hashrate_1h_prev;
 static float hashrate_1h[HASHRATE_1H_SIZE];
 
 static const char *TAG = "hashrate_monitor";
+
+static uint8_t consecutive_anomaly_count = 0;
+static int recovery_count = 0;
+static bool warmup_complete = false;
 
 static float sum_hashrates(measurement_t * measurement, int asic_count)
 {
@@ -141,6 +158,70 @@ static void update_hashrate_averages(SystemModule * SYSTEM_MODULE)
     poll_count++;
 }
 
+void check_hashrate_anomaly(void *pvParameters, float current_hashrate)
+{
+    GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
+    float expected_hashrate = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate;
+
+    if (expected_hashrate <= 0.0f || GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+        return;
+    }
+
+    // Skip anomaly detection until hashrate has reached at least 50% of expected (warmup)
+    if (!warmup_complete) {
+        if (current_hashrate >= expected_hashrate * 0.5f) {
+            warmup_complete = true;
+            ESP_LOGI(TAG, "Warmup complete, enabling anomaly detection");
+        }
+        return;
+    }
+
+    bool is_low  = current_hashrate < expected_hashrate * LOWER_HASHRATE_THRESHOLD;
+    bool is_high = current_hashrate > expected_hashrate * UPPER_HASHRATE_THRESHOLD;
+
+    if (is_low || is_high) {
+        consecutive_anomaly_count++;
+        ESP_LOGW(TAG, "Abnormal hashrate: %.3f Gh/s (expected: %.3f Gh/s), count: %d",
+                 current_hashrate, expected_hashrate, consecutive_anomaly_count);
+    } else {
+        consecutive_anomaly_count = 0;
+        return;
+    }
+
+    if (consecutive_anomaly_count < ANOMALY_CONSECUTIVE_THRESHOLD) {
+        return;
+    }
+
+    recovery_count++;
+    ESP_LOGW(TAG, "ASIC recovery #%d due to sustained abnormal hashrate", recovery_count);
+
+    // Stop tasks from using UART, then wait for current operations to finish
+    GLOBAL_STATE->ASIC_initalized = false;
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+
+    uart_flush(UART_NUM_1);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
+    uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, RECOVERY_STABILIZATION_DELAY_MS);
+
+    if (chip_count > 0) {
+        ESP_LOGI(TAG, "ASIC recovery successful");
+        hashrate_monitor_reset_measurements(GLOBAL_STATE);
+        warmup_complete = false;
+        recovery_count = 0;
+    } else {
+        ESP_LOGE(TAG, "ASIC recovery failed (chip count 0), rebooting");
+        esp_restart();
+    }
+
+    consecutive_anomaly_count = 0;
+
+    if (recovery_count >= MAX_RECOVERY_ATTEMPTS) {
+        ESP_LOGE(TAG, "Rebooting after %d recovery attempts", recovery_count);
+        esp_restart();
+    }
+}
+
 void hashrate_monitor_task(void *pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
@@ -192,6 +273,8 @@ void hashrate_monitor_task(void *pvParameters)
             SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
 
             if (current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
+
+            check_hashrate_anomaly(pvParameters, current_hashrate);
         } else {
             SYSTEM_MODULE->current_hashrate = 0;
         }
