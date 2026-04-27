@@ -973,9 +973,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
     if (info.coinbaseOutputs && info.coinbaseOutputs?.length > 0) {
+      const warningEnabled = !!(info.isUsingFallbackStratum ? info.fallbackStratumShareWarning : info.stratumShareWarning);
       let percentage = this.getPayoutPercentage(info);
-      updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
-      updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
+      updateMessage(warningEnabled && percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
+      updateMessage(warningEnabled && percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
     }
   }
 
@@ -1214,6 +1215,52 @@ export class HomeComponent implements OnInit, OnDestroy {
   getAddressPart(user: string): string {
     const dotIndex = user.lastIndexOf('.');
     return dotIndex !== -1 ? user.substring(0, dotIndex) : user;
+  }
+
+  // Cap the number of coinbase output rows shown on the dashboard. PPLNS-style pools that pay
+  // miners directly via the coinbase tx can have 30+ outputs; rendering them all stretches the
+  // card. The remainder (plus any outputs already aggregated server-side beyond
+  // MAX_COINBASE_TX_OUTPUTS) is folded into the "+ N other recipient(s)" summary row.
+  private static readonly VISIBLE_COINBASE_OUTPUTS = 5;
+
+  // Builds the dashboard view of the coinbase outputs: user's payout output(s) on top, followed
+  // by the next highest-priority entries up to VISIBLE_COINBASE_OUTPUTS, with everything else
+  // collapsed into an "others" summary together with the server-side aggregate.
+  getCoinbaseDisplay(info: ISystemInfo): {
+    visible: { value: number, address: string }[],
+    othersCount: number,
+    othersValueSatoshis: number,
+  } {
+    const outputs = info.coinbaseOutputs ?? [];
+    const aggregatedCount = info.coinbaseOthersCount ?? 0;
+    const aggregatedValue = info.coinbaseOthersValueSatoshis ?? 0;
+
+    let ordered = outputs;
+    if (outputs.length > 1 && this.activePoolUser) {
+      const userAddr = this.getAddressPart(this.activePoolUser);
+      const user: typeof outputs = [];
+      const rest: typeof outputs = [];
+      for (const o of outputs) {
+        (o.address === userAddr ? user : rest).push(o);
+      }
+      if (user.length) {
+        ordered = [...user, ...rest];
+      }
+    }
+
+    const limit = HomeComponent.VISIBLE_COINBASE_OUTPUTS;
+    if (ordered.length <= limit) {
+      return { visible: ordered, othersCount: aggregatedCount, othersValueSatoshis: aggregatedValue };
+    }
+
+    const visible = ordered.slice(0, limit);
+    const hidden = ordered.slice(limit);
+    const hiddenValue = hidden.reduce((sum, o) => sum + (o.value ?? 0), 0);
+    return {
+      visible,
+      othersCount: aggregatedCount + hidden.length,
+      othersValueSatoshis: aggregatedValue + hiddenValue,
+    };
   }
 
   getSuffixPart(user: string): string {
