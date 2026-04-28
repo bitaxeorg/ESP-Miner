@@ -149,7 +149,7 @@ void BM1397_set_version_mask(uint32_t version_mask) {
     // placeholder
 }
 
-void BM1397_send_hash_frequency(float target_freq)
+float BM1397_send_hash_frequency(float target_freq)
 {
     uint8_t fb_divider, refdiv, postdiv1, postdiv2;
     float frequency;
@@ -175,6 +175,8 @@ void BM1397_send_hash_frequency(float target_freq)
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
+
+    return frequency;
 }
 
 uint8_t BM1397_init(void * pvParameters)
@@ -305,7 +307,7 @@ task_result *BM1397_process_work(void *pvParameters)
 
     memset(&result, 0, sizeof(task_result));
 
-    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result)) == ESP_FAIL) {
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result.timestamp_us) == ESP_FAIL) {
         return NULL;
     }
 
@@ -365,16 +367,15 @@ task_result *BM1397_process_work(void *pvParameters)
 
     uint32_t nonce_h = ntohl(asic_result.job.nonce);
     uint8_t asic_nr = (uint8_t)((nonce_h >> 17) & 0xff) / address_interval;
+    uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
+    uint8_t small_core_id = asic_result.job.id & 0x0f;
 
     result.job_id = rx_job_id;
     result.nonce = asic_result.job.nonce;
     result.rolled_version = rolled_version;
     result.asic_nr = asic_nr;
-
-    uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
-    uint8_t small_core_id = asic_result.job.id & 0x0f;
-
-    ESP_LOGI(TAG, "Job ID: %02X, Asic nr: %d, Core: %d/%d, Ver: %08" PRIX32, rx_job_id, asic_nr, core_id, small_core_id, rolled_version);    
+    result.core_id = core_id;
+    result.small_core_id = small_core_id;
 
     return &result;
 }

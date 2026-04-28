@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { WebsocketService } from 'src/app/services/web-socket.service';
+import { SystemApiService } from 'src/app/services/system.service';
 
 @Component({
   selector: 'app-logs',
@@ -10,6 +11,7 @@ import { WebsocketService } from 'src/app/services/web-socket.service';
   styleUrl: './logs.component.scss'
 })
 export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
+  public loadingLogs: boolean = false;
 
   public form!: FormGroup;
 
@@ -19,22 +21,15 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   public stopScroll: boolean = false;
 
-  public isExpanded: boolean = false;
-
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
-  @HostListener('document:keydown.esc', ['$event'])
-  onEscKey() {
-    if (this.isExpanded) {
-      this.isExpanded = false;
-    }
-  }
 
   @Input() uri = '';
 
   constructor(
     private fb: FormBuilder,
     private websocketService: WebsocketService,
+    private systemApiService: SystemApiService,
     private toastr: ToastrService,
   ) {}
 
@@ -89,6 +84,29 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   public clearLogs() {
     this.logs.length = 0;
+  }
+
+  public downloadLogs() {
+    this.loadingLogs = true;
+    this.systemApiService.downloadLogs(this.uri).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'bitaxe-logs.txt';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        this.toastr.success("Logs downloaded successfully");
+        this.loadingLogs = false;
+      },
+      error: (error) => {
+        console.error('There was a problem with the log download:', error);
+        this.toastr.error("Failed to download logs");
+        this.loadingLogs = false;
+      }
+    });
   }
 
   ngAfterViewChecked(): void {

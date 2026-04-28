@@ -117,6 +117,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 
     // Initialize mutexes
     pthread_mutex_init(&GLOBAL_STATE->valid_jobs_lock, NULL);
+    GLOBAL_STATE->stratum_mux = (portMUX_TYPE)portMUX_INITIALIZER_UNLOCKED;
 }
 
 void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {

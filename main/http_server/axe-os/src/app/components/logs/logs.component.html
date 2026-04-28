@@ -1,5 +1,5 @@
 
-<div *ngIf="form != null" class="card" [ngClass]="{'is-expanded': isExpanded}">
+<div *ngIf="form != null" class="card">
     <form [formGroup]="form">
         <div class="flex justify-content-between flex-column md:align-items-center md:flex-row mb-3">
             <h2 class="mb-0 h-3rem">
@@ -27,18 +27,20 @@
                 </p-button>
                 <p-button
                     pp-button
+                    icon="pi pi-{{loadingLogs ? 'spinner pi-spin' : 'download'}}"
+                    [disabled]="loadingLogs"
+                    (click)="downloadLogs()"
+                    pTooltip="Download Logs"
+                    tooltipPosition="left">
+                </p-button>
+                <p-button
+                    pp-button
                     icon="pi pi-trash"
                     (click)="clearLogs()"
                     pTooltip="Clear Logs"
                     tooltipPosition="left">
                 </p-button>
-                <p-button
-                    pp-button
-                    icon="pi pi-window-{{isExpanded ? 'minimize' : 'maximize'}}"
-                    (click)="isExpanded = !isExpanded"
-                    pTooltip="{{isExpanded ? 'Minimize' : 'Maximize'}} Logs"
-                    tooltipPosition="left">
-                </p-button>
+
             </nav>
         </div>
 

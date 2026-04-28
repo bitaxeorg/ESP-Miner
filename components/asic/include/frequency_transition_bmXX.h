@@ -13,7 +13,7 @@ extern const char *FREQUENCY_TRANSITION_TAG;
  * 
  * @param frequency The frequency to set in MHz
  */
-typedef void (*set_hash_frequency_fn)(float frequency);
+typedef float (*set_hash_frequency_fn)(float frequency);
 
 /**
  * @brief Transition the ASIC frequency to a target value

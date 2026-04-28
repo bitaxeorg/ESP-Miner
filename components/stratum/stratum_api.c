@@ -195,8 +195,35 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
     return line;
 }
 
+void STRATUM_V1_reset_message(StratumApiV1Message *message)
+{
+    if (message->error_str) {
+        free(message->error_str);
+        message->error_str = NULL;
+    }
+    if (message->extranonce_str) {
+        free(message->extranonce_str);
+        message->extranonce_str = NULL;
+    }
+    if (message->mining_notification) {
+        // mining_notification is usually handled by ownership transfer in stratum_task.c
+        // but if it wasn't enqueued, we must free it here to avoid leaks.
+        // In most cases where it *is* enqueued, the caller should have NULLed the pointer
+        // after enqueuing.
+        STRATUM_V1_free_mining_notify(message->mining_notification);
+        message->mining_notification = NULL;
+    }
+    message->method = STRATUM_UNKNOWN;
+    message->message_id = -1;
+    message->response_success = false;
+    message->new_difficulty = 0;
+    message->version_mask = 0;
+}
+
 void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
 {
+    STRATUM_V1_reset_message(message);
+
     ESP_LOGI(TAG, "rx: %s", stratum_json); // debug incoming stratum messages
 
     cJSON * json = cJSON_Parse(stratum_json);
@@ -225,6 +252,8 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             result = CLIENT_RECONNECT;
         } else if (strcmp("mining.ping", method_json->valuestring) == 0) {
             result = MINING_PING;
+        } else if (strcmp("client.show_message", method_json->valuestring) == 0) {
+            result = CLIENT_SHOW_MESSAGE;
         } else {
             ESP_LOGI(TAG, "unhandled method in stratum message: %s", stratum_json);
         }
@@ -244,7 +273,6 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         // if it's an error, then it's a fail
         } else if (error_json != NULL && !cJSON_IsNull(error_json)) {
             message->response_success = false;
-            message->error_str = strdup("unknown");
             if (parsed_id < 5) {
                 result = STRATUM_RESULT_SETUP;
             } else {
@@ -261,6 +289,9 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
             } else if (cJSON_IsString(error_json)) {
                 message->error_str = strdup(cJSON_GetStringValue(error_json));
             }
+            if (message->error_str == NULL) {
+                message->error_str = strdup("unknown");
+            }
 
         // if the result is a boolean, then parse it
         } else if (cJSON_IsBool(result_json)) {
@@ -273,11 +304,12 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 message->response_success = true;
             } else {
                 message->response_success = false;
-                message->error_str = strdup("unknown");
                 if (cJSON_IsString(reject_reason_json)) {
                     message->error_str = strdup(cJSON_GetStringValue(reject_reason_json));
                 } else if (cJSON_IsString(error_json)) {
                     message->error_str = strdup(cJSON_GetStringValue(error_json));
+                } else {
+                    message->error_str = strdup("unknown");
                 }                
             }
         
@@ -388,7 +420,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         message->mining_notification = new_work;
     } else if (message->method == MINING_SET_DIFFICULTY) {
         cJSON * params = cJSON_GetObjectItem(json, "params");
-        uint32_t difficulty = cJSON_GetArrayItem(params, 0)->valueint;
+        double difficulty = cJSON_GetArrayItem(params, 0)->valuedouble;
         message->new_difficulty = difficulty;
     } else if (message->method == MINING_SET_VERSION_MASK) {
         cJSON * params = cJSON_GetObjectItem(json, "params");
@@ -405,6 +437,23 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         }
         message->extranonce_str = strdup(extranonce_str);
         message->extranonce_2_len = extranonce_2_len;
+    } else if (message->method == CLIENT_SHOW_MESSAGE) {
+        cJSON * params = cJSON_GetObjectItem(json, "params");
+        if (params && cJSON_IsArray(params) && cJSON_GetArraySize(params) > 0) {
+            cJSON * msg_item = cJSON_GetArrayItem(params, 0);
+            if (msg_item && cJSON_IsString(msg_item)) {
+                // Cap the pool message length to MAX_POOL_MESSAGE_LEN (256)
+                size_t msg_len = strlen(msg_item->valuestring);
+                if (msg_len > MAX_POOL_MESSAGE_LEN) {
+                    char capped_msg[MAX_POOL_MESSAGE_LEN + 1];
+                    strncpy(capped_msg, msg_item->valuestring, MAX_POOL_MESSAGE_LEN);
+                    capped_msg[MAX_POOL_MESSAGE_LEN] = '\0';
+                    ESP_LOGI(TAG, "Pool message: %s...", capped_msg);
+                } else {
+                    ESP_LOGI(TAG, "Pool message: %s", msg_item->valuestring);
+                }
+            }
+        }
     }
     done:
     cJSON_Delete(json);
@@ -420,12 +469,12 @@ void STRATUM_V1_free_mining_notify(mining_notify * params)
     free(params);
 }
 
-static void stamp_tx(int request_id)
+static void stamp_tx(int request_id, uint64_t timestamp_us)
 {
     if (request_id >= 1) {
         RequestTiming *timing = get_request_timing(request_id);
         if (timing) {
-            timing->timestamp_us = esp_timer_get_time();
+            timing->timestamp_us = timestamp_us;
             timing->tracking = true;
         }
     }
@@ -507,19 +556,26 @@ int STRATUM_V1_pong(esp_transport_handle_t transport, int message_id)
 /// @param ntime The hex-encoded time value use in the block header.
 /// @param nonce The hex-encoded nonce value to use in the block header.
 /// @param version_bits The hex-encoded version bits set by miner (BIP310).
+/// @param out_sent_time_us Pointer to store the time when the share was sent.
 int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, const char * username, const char * job_id,
                             const char * extranonce_2, const uint32_t ntime,
-                            const uint32_t nonce, const uint32_t version_bits)
+                            const uint32_t nonce, const uint32_t version_bits, uint64_t *out_sent_time_us)
 {
     char submit_msg[BUFFER_SIZE];
     snprintf(submit_msg, sizeof(submit_msg),
         "{\"id\":%d,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%08lx\",\"%08lx\",\"%08lx\"]}\n",
         send_uid, username, job_id, extranonce_2, ntime, nonce, version_bits);
-    debug_stratum_tx(submit_msg);
 
     int ret = esp_transport_write(transport, submit_msg, strlen(submit_msg), TRANSPORT_TIMEOUT_MS);
 
-    stamp_tx(send_uid);
+    uint64_t now = esp_timer_get_time();
+    if (out_sent_time_us) {
+        *out_sent_time_us = now;
+    }
+
+    debug_stratum_tx(submit_msg);
+    
+    stamp_tx(send_uid, now);
 
     return ret;
 }

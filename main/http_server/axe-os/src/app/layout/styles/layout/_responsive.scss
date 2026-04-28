@@ -4,7 +4,13 @@
         margin-left: auto !important;
         margin-right: auto !important;
     }
+}
 
+.layout-full-width {
+    .layout-main {
+        width: 100% !important;
+        max-width: none !important;
+    }
 }
 
 @media (min-width: 992px) {

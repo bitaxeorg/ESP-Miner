@@ -50,7 +50,7 @@ TEST_CASE("Decode P2PKH address", "[coinbase_decoder]")
     };
     char output[MAX_ADDRESS_STRING_LEN];
     
-    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bc", false);
     
     TEST_ASSERT_EQUAL_STRING("1DYwPTnC4NgEmoqbLbcRqoSzVeH3ehmGbV", output);
 }
@@ -66,7 +66,7 @@ TEST_CASE("Decode P2SH address", "[coinbase_decoder]")
     };
     char output[MAX_ADDRESS_STRING_LEN];
     
-    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bc", false);
     
     TEST_ASSERT_EQUAL_STRING("33MGnVL6rnKqt6Jjt3HbRqWJrhwy65dMhS", output);
 }
@@ -81,7 +81,7 @@ TEST_CASE("Decode P2WPKH address", "[coinbase_decoder]")
     };
     char output[MAX_ADDRESS_STRING_LEN];
     
-    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bc", false);
     
     TEST_ASSERT_EQUAL_STRING("bc1q42aueh0wluqpzg3ng32kvaugnx4thnxa7y625x", output);
 }
@@ -98,7 +98,7 @@ TEST_CASE("Decode P2WSH address", "[coinbase_decoder]")
     };
     char output[MAX_ADDRESS_STRING_LEN];
     
-    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bc", false);
     
     TEST_ASSERT_EQUAL_STRING("bc1qqypqxpq9qcrsszg2pvxq6rs0zqg3yyc5z5tpwxqergd3c8g7rusqyp0mu0", output);
 }
@@ -115,10 +115,97 @@ TEST_CASE("Decode P2TR address", "[coinbase_decoder]")
     };
     char output[MAX_ADDRESS_STRING_LEN];
     
-    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output));
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bc", false);
     
     TEST_ASSERT_EQUAL_STRING("bc1pllhdmn9m42vcsamx24zrxgs3qrl7ahwvhw4fnzrhve25gvezzyqqc0cgpt", output);
 }
+
+// Testnet address tests
+
+TEST_CASE("Decode testnet P2PKH address", "[coinbase_decoder]")
+{
+    // Same hash as mainnet P2PKH test, but with testnet version byte (0x6F)
+    uint8_t script[] = {
+        0x76, 0xa9, 0x14,
+        0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab,
+        0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0x88, 0xac
+    };
+    char output[MAX_ADDRESS_STRING_LEN];
+
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "tb", true);
+
+    // Testnet P2PKH addresses start with 'm' or 'n'
+    TEST_ASSERT_TRUE(output[0] == 'm' || output[0] == 'n');
+}
+
+TEST_CASE("Decode testnet P2SH address", "[coinbase_decoder]")
+{
+    // Same hash as mainnet P2SH test, but with testnet version byte (0xC4)
+    uint8_t script[] = {
+        0xa9, 0x14,
+        0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12, 0x34,
+        0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12, 0x34, 0x56, 0x78,
+        0x87
+    };
+    char output[MAX_ADDRESS_STRING_LEN];
+
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "tb", true);
+
+    // Testnet P2SH addresses start with '2'
+    TEST_ASSERT_EQUAL_CHAR('2', output[0]);
+}
+
+TEST_CASE("Decode testnet P2WPKH address", "[coinbase_decoder]")
+{
+    // Same hash as mainnet P2WPKH test, but with "tb" HRP
+    uint8_t script[] = {
+        0x00, 0x14,
+        0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33,
+        0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd
+    };
+    char output[MAX_ADDRESS_STRING_LEN];
+
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "tb", true);
+
+    TEST_ASSERT_TRUE(strncmp(output, "tb1q", 4) == 0);
+}
+
+TEST_CASE("Decode testnet P2TR address", "[coinbase_decoder]")
+{
+    // Same hash as mainnet P2TR test, but with "tb" HRP
+    uint8_t script[] = {
+        0x51, 0x20,
+        0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
+        0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00,
+        0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
+        0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00
+    };
+    char output[MAX_ADDRESS_STRING_LEN];
+
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "tb", true);
+
+    TEST_ASSERT_TRUE(strncmp(output, "tb1p", 4) == 0);
+}
+
+TEST_CASE("Decode regtest P2WPKH address", "[coinbase_decoder]")
+{
+    // Same hash as mainnet P2WPKH test, but with "bcrt" HRP
+    uint8_t script[] = {
+        0x00, 0x14,
+        0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33,
+        0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd
+    };
+    char output[MAX_ADDRESS_STRING_LEN];
+
+    coinbase_decode_address_from_scriptpubkey(script, sizeof(script), output, sizeof(output), "bcrt", true);
+
+    TEST_ASSERT_TRUE(strncmp(output, "bcrt1q", 6) == 0);
+}
+
+// Network auto-detection tests via coinbase_process_notification are
+// integration-level — the detection logic is tested implicitly through
+// the address prefix matching in the full processing pipeline.
 
 TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
 {

@@ -370,6 +370,10 @@ static void scr_create_overlay()
 
 static bool screen_show(screen_t screen)
 {
+    if (!lvgl_port_lock(0)) {
+        return false;
+    }
+
     if (SCR_CAROUSEL_START > screen) {
         lv_display_trigger_activity(NULL);
     }
@@ -380,15 +384,17 @@ static bool screen_show(screen_t screen)
         lv_obj_t * scr = screens[screen];
 
         is_valid = lv_obj_is_valid(scr);
-        if (is_valid && lvgl_port_lock(0)) {
+        if (is_valid) {
             bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
             lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
-            lvgl_port_unlock();
         }
 
         current_screen_time_ms = 0;
         current_screen_delay_ms = delays_ms[screen];
     }
+
+    lvgl_port_unlock();
+
     return is_valid;
 }
 
@@ -655,13 +661,13 @@ static void uptime_update_cb(lv_timer_t * timer)
         uptime_seconds %= 60;
 
         if (days > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lud %luh %lum %lus", days, hours, minutes, uptime_seconds);
         } else if (hours > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %luh %lum %lus", hours, minutes, uptime_seconds);
         } else if (minutes > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lum %lus", minutes, uptime_seconds);
         } else {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lus", uptime_seconds);
         }
 
         if (strcmp(lv_label_get_text(wifi_uptime_label), uptime) != 0) {

@@ -135,6 +135,7 @@ components:
         - fanspeed
         - temptarget
         - rotation
+        - cpuUsage
         - freeHeap
         - freeHeapInternal
         - freeHeapSpiram
@@ -273,6 +274,9 @@ components:
         rotation:
           type: number
           description: Screen rotation setting (0, 90, 180, 270)
+        cpuUsage:
+          type: number
+          description: CPU usage percentage
         freeHeap:
           type: number
           description: Available heap memory in bytes
@@ -354,6 +358,9 @@ components:
         power_fault:
           type: string
           description: Voltage regulator fault reason, if any
+        hardware_fault:
+          type: string
+          description: Hardware/Peripheral fault reason, if any
         resetReason:
           type: string
           description: Reason for the last system reset
@@ -580,6 +587,41 @@ components:
             items:
               type: number
 
+    SystemScoreboardEntry:
+      type: object
+      required:
+        - difficulty
+        - job_id
+        - extranonce2
+        - ntime
+        - nonce
+        - version_bits
+      properties:
+        rank:
+          type: number
+          description: Rank of the share in the scoreboard
+        since:
+          type: number
+          description: Time since share found in seconds
+        difficulty:
+          type: number
+          description: Difficulty of the share
+        job_id:
+          type: string
+          description: Job ID of the share
+        extranonce2:
+          type: string
+          description: Extranonce2 of the share
+        ntime:
+          type: number
+          description: Ntime of the share
+        nonce:
+          type: string
+          description: Nonce of the share
+        version_bits:
+          type: string
+          description: Version bits of the share
+
     Settings:
       type: object
       properties:
@@ -745,6 +787,7 @@ paths:
           content:
             application/json:
               schema:
+                title: SystemWifiScan
                 type: object
                 required:
                   - networks
@@ -772,6 +815,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SystemInfo'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/logs:
+    get:
+      summary: Download system logs
+      description: Returns the current system logs as a text file
+      operationId: downloadSystemLogs
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            text/plain:
+              schema:
+                type: string
+                format: binary
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':
@@ -826,6 +889,23 @@ paths:
           description: Unauthorized - Client not in allowed network range
         '500':
           description: Internal server error
+
+  /api/system/scoreboard:
+    get:
+      summary: Get best difficulty share scoreboard
+      description: Returns top 20 best difficulty shares
+      operationId: getSystemScoreboard
+      tags:
+        - system
+      responses:
+        '200':      
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SystemScoreboardEntry'
 
   /api/system/pause:
     post:
