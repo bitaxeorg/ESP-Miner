@@ -38,19 +38,21 @@ typedef struct
 
     bool pool_extranonce_subscribe;
     bool pool_decode_coinbase_tx;
+    bool fallback_pool_extranonce_subscribe;
+    bool fallback_pool_decode_coinbase_tx;
+
     uint16_t pool_difficulty;
     uint16_t pool_tls;
     uint16_t pool_port;
+    uint16_t fallback_pool_difficulty;
+    uint16_t fallback_pool_tls;
+    uint16_t fallback_pool_port;
+
     char * pool_url;
     char * pool_user;
     char * pool_pass;
     char * pool_cert;
 
-    bool fallback_pool_extranonce_subscribe;
-    bool fallback_pool_decode_coinbase_tx;
-    uint16_t fallback_pool_difficulty;
-    uint16_t fallback_pool_tls;
-    uint16_t fallback_pool_port;
     char * fallback_pool_url;
     char * fallback_pool_user;
     char * fallback_pool_pass;
@@ -73,18 +75,19 @@ typedef struct
     bool show_new_block;
     int block_found;
 
-    int64_t start_time;
-    uint64_t work_received;
     uint32_t shares_accepted;
     uint32_t shares_rejected;
 
     int rejected_reason_stats_count;
     RejectedReasonStat rejected_reason_stats[10];
 
+    uint64_t work_received;
+    int64_t start_time;
+
     uint64_t best_nonce_diff;
-    char best_diff_string[DIFF_STRING_SIZE];
+    char best_diff_string[8];
     uint64_t best_session_nonce_diff;
-    char best_session_diff_string[DIFF_STRING_SIZE];
+    char best_session_diff_string[8];
 
     char * ssid;
     char ap_ssid[12];
