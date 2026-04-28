@@ -313,6 +313,12 @@ components:
         hostname:
           type: string
           description: Device hostname
+        fullHostname:
+          type: string
+          description: Full hostname including .local domain for mDNS
+        mdnsHostname:
+          type: string
+          description: mDNS/Bonjour hostname for network discovery
         idfVersion:
           type: string
           description: ESP-IDF version

@@ -43,4 +43,8 @@ export class LocalStorageService {
     const value = localStorage.getItem(key);
     return value ? Number(value) : null;
   }
+
+  removeItem(key: string) {
+    localStorage.removeItem(key);
+  }
 }
