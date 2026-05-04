@@ -196,6 +196,8 @@ void hashrate_monitor_task(void *pvParameters)
             SYSTEM_MODULE->current_hashrate = 0;
         }
 
+        SYSTEM_noinit_update(SYSTEM_MODULE);
+
         vTaskDelayUntil(&taskWakeTime, POLL_RATE / portTICK_PERIOD_MS);
     }
 }

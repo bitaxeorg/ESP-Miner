@@ -41,9 +41,9 @@ void create_jobs_task(void *pvParameters)
     ESP_LOGI(TAG, "ASIC Ready!");
     
     while (1) {
-        uint64_t start_time = esp_timer_get_time();
+        uint64_t start_time_us = esp_timer_get_time();
         mining_notify *new_mining_notification = (mining_notify *)queue_dequeue_timeout(&GLOBAL_STATE->stratum_queue, timeout_ms);
-        timeout_ms -= (esp_timer_get_time() - start_time) / 1000;
+        timeout_ms -= (esp_timer_get_time() - start_time_us) / 1000;
 
         if (new_mining_notification != NULL) {
             if (current_mining_notification != NULL) {
