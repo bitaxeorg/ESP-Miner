@@ -29,6 +29,6 @@ int BM1366_set_default_baud(void);
 void BM1366_send_hash_frequency(float frequency);
 task_result * BM1366_process_work(void * GLOBAL_STATE);
 void BM1366_read_registers(void);
-void BM1366_set_nonce_space(void * GLOBAL_STATE);
+void BM1366_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores);
 
 #endif /* BM1366_H_ */

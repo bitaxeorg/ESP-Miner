@@ -129,7 +129,6 @@ void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
     int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
-    
 
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -158,7 +157,7 @@ double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
             // no version-rolling so same Nonce Space is splitted between Big Cores
-            return calculate_bm_timeout_ms(freq, asic_count, small_cores, cores, 4.0, 1.0, asic_default_timeout_divided);
+            return calculate_bm_timeout_ms(freq, asic_count, small_cores, cores, 4, 1.0, asic_default_timeout_divided);
         case BM1366:
         case BM1368:
         case BM1370:
