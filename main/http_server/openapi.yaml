@@ -201,6 +201,7 @@ components:
         - coinbaseValueUserSatoshis
         - hashrateMonitor
         - miningPaused
+        - statsLimit
       properties:
         ASICModel:
           type: string
@@ -502,6 +503,9 @@ components:
         miningPaused:
           type: boolean
           description: Whether mining is currently paused
+        statsLimit:
+          type: integer
+          description: Maximum number of statistics data points
 
     SystemASIC:
       type: object

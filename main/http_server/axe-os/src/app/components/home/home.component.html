@@ -118,7 +118,7 @@
 
                             <div>
                                 <span class="text-green-500 font-medium white-space-nowrap">
-                                    {{getEfficiencyAverage() | number: '1.2-2'}} J/Th
+                                    {{getEfficiencyAverage(info) | number: '1.2-2'}} J/Th
                                 </span>
                                 <span class="text-500">
                                     Average
@@ -136,7 +136,10 @@
                 <div class="card mb-0">
                     <div class="flex justify-content-between mb-3">
                         <div>
-                            <span class="block text-lg font-medium mb-3">Shares</span>
+                            <span class="block text-lg font-medium mb-3">
+                                Shares
+                                <i class="pi pi-arrow-up transition-opacity transition-duration-500 ml-2" [ngClass]="{'opacity-100 text-green-500': flashShare, 'opacity-0': !flashShare}" pTooltip="Share Sent" tooltipPosition="top"></i>
+                            </span>
                             <div class="text-900 font-medium text-2xl">
                                 {{info.sharesAccepted | number: '1.0-0'}}
                             </div>
@@ -267,14 +270,14 @@
                         </strong>
                     </div>
 
-                <div class="mb-3">
-                    <h6 class="flex justify-content-between mb-1">
-                        ASIC Frequency<span>{{info.actualFrequency | number: '1.0-4'}} MHz</span>
-                    </h6>
-                    <p-progressBar [value]="(info.actualFrequency / maxFrequency) * 100" [styleClass]="'p-progressbar--thin'">
-                        <ng-template pTemplate="content" let-value></ng-template>
-                    </p-progressBar>
-                </div>
+                    <div class="mb-3">
+                        <h6 class="flex justify-content-between mb-1">
+                            ASIC Frequency<span>{{info.actualFrequency | number: '1.0-4'}} MHz</span>
+                        </h6>
+                        <p-progressBar [value]="(info.actualFrequency / maxFrequency) * 100" [styleClass]="'p-progressbar--thin'">
+                            <ng-template pTemplate="content" let-value></ng-template>
+                        </p-progressBar>
+                    </div>
 
                     <div>
                         <h6 class="flex justify-content-between mb-1">
@@ -478,6 +481,7 @@
                 <div class="card">
                     <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis">
                         Block Header
+                        <i class="pi pi-arrow-down transition-opacity transition-duration-500 ml-2 text-sm vertical-align-middle" [ngClass]="{'opacity-100 text-blue-500': flashJob, 'opacity-0': !flashJob}" pTooltip="New Job Received" tooltipPosition="top"></i>
                         <span *ngIf="info.blockSignals && info.blockSignals.length > 0" class="vertical-align-bottom ml-2">
                             <span *ngFor="let signal of info.blockSignals" class="p-badge p-badge-success ml-1">{{ signal }}</span>
                         </span>
@@ -509,7 +513,7 @@
                             {{ info.scriptsig }}
                         </div>
                     </div>
-                <div class="flex flex-nowrap justify-content-between" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
+                    <div class="flex flex-nowrap justify-content-between" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
                         <div class="col-fixed-width text-500">
                             <tooltip-text-icon text="Value" tooltip="Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options." />
                         </div>
@@ -517,7 +521,7 @@
                             {{ info.coinbaseValueTotalSatoshis | sats }}
                         </ng-container>
                     </div>
-                <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
+                    <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
                         <div class="col-fixed-width text-500">
                             <span>Outputs</span>
                         </div>
@@ -536,7 +540,7 @@
                             </div>
                         </div>
                     </div>
-                <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) == 0">
+                    <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) == 0">
                         <div class="col-fixed-width text-500">
                             Amount
                         </div>

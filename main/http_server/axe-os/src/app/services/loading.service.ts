@@ -14,10 +14,8 @@ export class LoadingService {
     return <T>(source: Observable<T>): Observable<T> => {
       return new Observable(subscriber => {
         this.loading$.next(true);
-        source.subscribe({
-          next: (value) => {
-            subscriber.next(value);
-          },
+        const subscription = source.subscribe({
+          next: (value) => subscriber.next(value),
           error: (err) => {
             this.loading$.next(false);
             subscriber.error(err);
@@ -26,7 +24,12 @@ export class LoadingService {
             this.loading$.next(false);
             subscriber.complete();
           }
-        })
+        });
+
+        return () => {
+          this.loading$.next(false);
+          subscription.unsubscribe();
+        };
       });
     }
   }
