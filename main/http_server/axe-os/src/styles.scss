@@ -27,13 +27,6 @@
     --togglebutton-bg: #F80421;
     --togglebutton-hover-bg: #e63c2e;
     
-    --surface-ground: #070D17;
-    --surface-card: #0B1219;
-    --surface-border: #454d59;
-    --card-border: #1A2632;
-    --text-color: rgba(255, 255, 255, 0.87);
-    --text-color-secondary: rgba(255, 255, 255, 0.6);
-    --maskbg: rgba(0, 0, 0, 0.4);
 
     /* Layout & Sizing */
     font-size: 14px;
@@ -41,19 +34,13 @@
     --sidebar-width: 12rem;
     --transition-duration: 0.2s;
     --card-shadow: 0 2px 1px -1px rgba(0, 0, 0, 0.2), 0 1px 1px 0 rgba(0, 0, 0, 0.14), 0 1px 3px 0 rgba(0, 0, 0, 0.12);
-
-    /* Aura Token Overrides (Point to reactive variables) */
+    
+    /* Branding Mappings (Bridge custom JS variables to PrimeNG tokens) */
     --p-primary-color: var(--primary-color);
     --p-primary-500: var(--primary-color);
     --p-primary-hover-color: var(--button-hover-bg);
     --p-primary-contrast-color: var(--primary-color-text);
     
-    --p-content-background: var(--surface-ground);
-    --p-card-background: var(--surface-card);
-    --p-content-border-color: var(--surface-border);
-    --p-text-color: var(--text-color);
-    --p-text-muted-color: var(--text-color-secondary);
-
     --p-select-hover-border-color: var(--primary-color);
     --p-dropdown-hover-border-color: var(--primary-color);
 
@@ -65,7 +52,7 @@
     --p-select-option-selected-color: #ffffff;
     
     --p-select-list-background: var(--p-card-background);
-    --p-select-list-border-color: var(--surface-border);
+    --p-select-list-border-color: var(--p-content-border-color);
 
     --p-checkbox-background: transparent;
     --p-checkbox-hover-border-color: var(--checkbox-hover-bg);
@@ -139,19 +126,6 @@
         --font-family: var(--p-font-family);
         --border-radius: var(--p-border-radius);
 
-        /* Semantic surface aliases for PrimeFlex layout classes */
-        /* These point to the Aura tokens which in turn point to the JS source variables */
-        --surface-a: var(--p-card-background);
-        --surface-b: var(--p-content-background);
-        --surface-c: rgba(255, 255, 255, 0.03);
-        --surface-d: var(--p-content-border-color);
-        --surface-e: var(--p-card-background);
-        --surface-f: var(--p-card-background);
-        
-        --surface-overlay: var(--p-card-background);
-        --surface-hover: rgba(255, 255, 255, 0.03);
-        
-        --maskbg: var(--p-mask-background);
         --focus-ring: var(--p-focus-ring-shadow);
 
         /* PrimeFlex color variable aliases */

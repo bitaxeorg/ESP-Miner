@@ -435,8 +435,8 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
-    const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
+    const textColorSecondary = documentStyle.getPropertyValue('--p-text-muted-color');
+    const surfaceBorder = documentStyle.getPropertyValue('--p-content-border-color');
     const primaryColor = documentStyle.getPropertyValue('--primary-color');
 
     this.chartData = {
