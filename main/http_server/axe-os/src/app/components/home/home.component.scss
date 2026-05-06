@@ -17,6 +17,8 @@
 
     td {
         transition: background-color 2s ease-in-out;
+        background-color: var(--heatmap-bg);
+        color: contrast-color(var(--primary-color));
     }
 }
 
