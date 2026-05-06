@@ -14,6 +14,7 @@ struct StatisticsData
     float hashrate_1h;
     float errorPercentage;
     float chipTemperature;
+    float chipTemperature2;
     float vrTemperature;
     float power;
     float voltage;

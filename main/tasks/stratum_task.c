@@ -618,6 +618,7 @@ void stratum_task(void * pvParameters)
                 }
                 queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
                 decode_mining_notification(GLOBAL_STATE, stratum_api_v1_message.mining_notification);
+                stratum_api_v1_message.mining_notification = NULL;
             } else if (stratum_api_v1_message.method == MINING_SET_DIFFICULTY) {
                 ESP_LOGI(TAG, "Set pool difficulty: %.2f", stratum_api_v1_message.new_difficulty);
                 GLOBAL_STATE->pool_difficulty = stratum_api_v1_message.new_difficulty;
@@ -638,6 +639,7 @@ void stratum_task(void * pvParameters)
                 ESP_LOGI(TAG, "Set extranonce: %s, extranonce_2_len: %d", stratum_api_v1_message.extranonce_str, stratum_api_v1_message.extranonce_2_len);
                 char * old_extranonce_str = GLOBAL_STATE->extranonce_str;
                 GLOBAL_STATE->extranonce_str = stratum_api_v1_message.extranonce_str;
+                stratum_api_v1_message.extranonce_str = NULL;
                 GLOBAL_STATE->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
                 free(old_extranonce_str);
             } else if (stratum_api_v1_message.method == MINING_PING) { 
@@ -678,11 +680,7 @@ void stratum_task(void * pvParameters)
                     ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);
                 }
             }
-        }
-
-        if (stratum_api_v1_message.error_str) {
-            free(stratum_api_v1_message.error_str);
-            stratum_api_v1_message.error_str = NULL;
+            STRATUM_V1_reset_message(&stratum_api_v1_message);
         }
     }
     vTaskDelete(NULL);

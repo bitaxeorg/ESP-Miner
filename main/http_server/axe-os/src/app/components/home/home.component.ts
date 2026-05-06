@@ -220,12 +220,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.loadingService.loading$.next(true);
 
     let dataSources = this.storageService.getItem(HOME_CHART_DATA_SOURCES);
-    if (dataSources === null) {
-      dataSources = `{"chartY1Data":"${chartLabelKey(eChartLabel.hashrate)}",`;
-      dataSources += `"chartY2Data":"${chartLabelKey(eChartLabel.asicTemp)}"}`;
+    let parsedConfig: any = { chartY1Data: chartLabelKey(eChartLabel.hashrate), chartY2Data: chartLabelKey(eChartLabel.asicTemp) };
+    
+    if (dataSources !== null) {
+      try {
+        const stored = JSON.parse(dataSources);
+        if (stored.chartY1Data) parsedConfig.chartY1Data = stored.chartY1Data;
+        if (stored.chartY2Data) parsedConfig.chartY2Data = stored.chartY2Data;
+      } catch (e) { }
     }
 
-    this.form = this.fb.group(JSON.parse(dataSources));
+    this.form = this.fb.group(parsedConfig);
 
     this.form.valueChanges.subscribe(() => {
       this.storageService.setItem(HOME_CHART_DATA_SOURCES, JSON.stringify(this.form.getRawValue()));
@@ -1132,7 +1137,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.hashrate_10m:
       case eChartLabel.hashrate_1h:      return info.expectedHashrate;
       case eChartLabel.errorPercentage:  return 1;
-      case eChartLabel.asicTemp:         return this.maxTemp;
+      case eChartLabel.asicTemp:
+      case eChartLabel.asicTemp2:        return this.maxTemp;
       case eChartLabel.vrTemp:           return this.maxTemp + 25;
       case eChartLabel.asicVoltage:      return info.coreVoltage;
       case eChartLabel.voltage:          return info.nominalVoltage + .5;
@@ -1154,6 +1160,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.hashrate_1h:        return info.hashRate_1h;
       case eChartLabel.errorPercentage:    return info.errorPercentage;
       case eChartLabel.asicTemp:           return info.temp;
+      case eChartLabel.asicTemp2:          return info.temp2;
       case eChartLabel.vrTemp:             return info.vrTemp;
       case eChartLabel.asicVoltage:        return info.coreVoltageActual;
       case eChartLabel.voltage:            return info.voltage;
@@ -1173,6 +1180,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     switch (label) {
       case eChartLabel.errorPercentage:  return {suffix: ' %', precision: 2};
       case eChartLabel.asicTemp:
+      case eChartLabel.asicTemp2:
       case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};
       case eChartLabel.asicVoltage:
       case eChartLabel.voltage:          return {suffix: ' V', precision: 1};
@@ -1216,6 +1224,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   dataSourceLabels(info: ISystemInfo) {
     return Object.entries(eChartLabel)
       .filter(([key, ]) => key !== 'vrTemp' || info.vrTemp)
+      .filter(([key, ]) => key !== 'asicTemp2' || (info.temp2 && info.temp2 !== -1))
+      .filter(([key, ]) => key !== 'fanRpm' || info.fanrpm)
+      .filter(([key, ]) => key !== 'fan2Rpm' || info.fan2rpm)
       .map(([key, value]) => ({name: value, value: key}));
   }
 }

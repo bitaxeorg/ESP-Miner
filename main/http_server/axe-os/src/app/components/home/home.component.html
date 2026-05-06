@@ -269,7 +269,7 @@
 
                 <div class="mb-3">
                     <h6 class="flex justify-content-between mb-1">
-                        ASIC Frequency<span>{{info.actualFrequency}} MHz</span>
+                        ASIC Frequency<span>{{info.actualFrequency | number: '1.0-4'}} MHz</span>
                     </h6>
                     <p-progressBar [value]="(info.actualFrequency / maxFrequency) * 100" [styleClass]="'p-progressbar--thin'">
                         <ng-template pTemplate="content" let-value></ng-template>

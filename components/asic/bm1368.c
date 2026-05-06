@@ -147,7 +147,7 @@ void BM1368_set_nonce_space(double nonce_percent, float frequency, uint16_t asic
     BM1368_set_hash_counting_number(hcn_register_value);
 }
 
-void BM1368_send_hash_frequency(float target_freq) 
+float BM1368_send_hash_frequency(float target_freq)
 {
     uint8_t fb_divider, refdiv, postdiv1, postdiv2;
     float new_freq;
@@ -161,6 +161,8 @@ void BM1368_send_hash_frequency(float target_freq)
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, freqbuf, sizeof(freqbuf), BM1368_SERIALTX_DEBUG);
 
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, new_freq);
+
+    return new_freq;
 }
 
 uint8_t BM1368_init(void * pvParameters)

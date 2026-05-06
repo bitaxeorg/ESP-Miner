@@ -148,7 +148,7 @@ void BM1397_set_version_mask(uint32_t version_mask)
     // placeholder
 }
 
-void BM1397_send_hash_frequency(float target_freq)
+float BM1397_send_hash_frequency(float target_freq)
 {
     uint8_t fb_divider, refdiv, postdiv1, postdiv2;
     float frequency;
@@ -174,6 +174,8 @@ void BM1397_send_hash_frequency(float target_freq)
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
+
+    return frequency;
 }
 
 uint8_t BM1397_init(void * pvParameters)
