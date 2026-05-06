@@ -650,11 +650,12 @@ void stratum_task(void * pvParameters)
                 break;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
                 float response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id, receive_time_us);
+
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "message result accepted");
                     if (response_time_ms >= 0) {
-                        ESP_LOGI(TAG, "Stratum response time: %.1f ms", response_time_ms);
                         GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
+                        ESP_LOGI(TAG, "Stratum response time: %.1f ms", response_time_ms);
                         SYSTEM_notify_accepted_share(GLOBAL_STATE);
                     }
                 } else {

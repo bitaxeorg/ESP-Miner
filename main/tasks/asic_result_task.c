@@ -27,20 +27,18 @@ void ASIC_result_task(void *pvParameters)
             continue;
         }
         
-        //task_result *asic_result = (*GLOBAL_STATE->ASIC_functions.receive_result_fn)(GLOBAL_STATE);
-        task_result *asic_result = ASIC_process_work(GLOBAL_STATE);
-
-        if (asic_result == NULL)
+        task_result asic_result;
+        if (!ASIC_process_work(GLOBAL_STATE, &asic_result))
         {
             continue;
         }
 
-        if (asic_result->register_type != REGISTER_INVALID) {
-            hashrate_monitor_register_read(GLOBAL_STATE, asic_result->register_type, asic_result->asic_nr, asic_result->value, asic_result->timestamp_us);
+        if (asic_result.register_type != REGISTER_INVALID) {
+            hashrate_monitor_register_read(GLOBAL_STATE, asic_result.register_type, asic_result.asic_nr, asic_result.value, asic_result.timestamp_us);
             continue;
         }
 
-        uint8_t job_id = asic_result->job_id;
+        uint8_t job_id = asic_result.job_id;
 
         pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
         bool valid = (GLOBAL_STATE->valid_jobs[job_id] != 0);
@@ -53,11 +51,11 @@ void ASIC_result_task(void *pvParameters)
             continue;
         }
         // check the nonce difficulty
-        double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
+        double nonce_diff = test_nonce_value(active_job, asic_result.nonce, asic_result.rolled_version);
 
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) continue;
 
-        uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
+        uint32_t version_bits = asic_result.rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)
         {
             char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
@@ -78,7 +76,7 @@ void ASIC_result_task(void *pvParameters)
                     active_job->jobid,
                     active_job->extranonce2,
                     active_job->ntime,
-                    asic_result->nonce,
+                    asic_result.nonce,
                     version_bits,
                     &sent_time_us);
 
@@ -87,17 +85,17 @@ void ASIC_result_task(void *pvParameters)
                     // stratum_task recv loop will detect a broken connection on its next read and handle reconnection
                 }
 
-                float process_time = (sent_time_us - asic_result->timestamp_us) / 1000.0f;
+                float process_time = (sent_time_us - asic_result.timestamp_us) / 1000.0f;
                 GLOBAL_STATE->SYSTEM_MODULE.process_time = process_time;
                 ESP_LOGI(TAG, "Processing time: %0.1f ms", process_time);
             }
         }
 
         //log the ASIC response
-        ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, Core: %d/%d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %g.", active_job->jobid, asic_result->asic_nr, asic_result->core_id, asic_result->small_core_id, asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
+        ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, Core: %d/%d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %g.", active_job->jobid, asic_result.asic_nr, asic_result.core_id, asic_result.small_core_id, asic_result.rolled_version, asic_result.nonce, nonce_diff, active_job->pool_diff);
 
         SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, job_id);
 
-        scoreboard_add(&GLOBAL_STATE->SYSTEM_MODULE.scoreboard, nonce_diff, active_job->jobid, active_job->extranonce2, active_job->ntime, asic_result->nonce, version_bits);
+        scoreboard_add(&GLOBAL_STATE->SYSTEM_MODULE.scoreboard, nonce_diff, active_job->jobid, active_job->extranonce2, active_job->ntime, asic_result.nonce, version_bits);
     }
 }

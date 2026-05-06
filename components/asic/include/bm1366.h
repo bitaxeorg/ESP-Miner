@@ -27,7 +27,7 @@ void BM1366_set_version_mask(uint32_t version_mask);
 int BM1366_set_max_baud(void);
 int BM1366_set_default_baud(void);
 float BM1366_send_hash_frequency(float frequency);
-task_result * BM1366_process_work(void * GLOBAL_STATE);
+bool BM1366_process_work(void * pvParameters, task_result * result);
 void BM1366_read_registers(void);
 void BM1366_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores);
 
