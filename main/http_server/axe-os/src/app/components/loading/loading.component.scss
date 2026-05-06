@@ -7,14 +7,14 @@
 
     --padding: 2rem;
 
-    @media (max-width: 768px) {
-        --padding: 1rem;
-    }
-
     left: var(--padding);
     right: var(--padding);
     top: calc(var(--topbar-height) + var(--padding));
     padding-bottom: calc(var(--topbar-height) + var(--padding));
+
+    @media (max-width: 768px) {
+        --padding: 1rem;
+    }
 
     ::ng-deep .menuIsVisible & {
         @media screen and (min-width: 992px) {
@@ -22,6 +22,7 @@
         }
     }
 }
+
 
 figure {
     height: 100%;

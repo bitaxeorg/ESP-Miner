@@ -1,8 +1,9 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
 @Pipe({
-  name: 'address',
-  pure: true
+    name: 'address',
+    pure: true,
+    standalone: true
 })
 export class AddressPipe implements PipeTransform {
   private static _this = new AddressPipe();

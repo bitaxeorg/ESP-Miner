@@ -24,7 +24,7 @@ td {
     }
 }
 tbody tr {
-    border-top: 1px solid var(--surface-border);
+    border-top: 1px solid var(--p-content-border-color);
 
     &:last-child td {
         padding-bottom: 0;
@@ -44,5 +44,14 @@ tbody tr {
     .p-button.button-icon-small {
         width: 1.5rem;
         height: 1.5rem;
+    }
+}
+
+a {
+    color: #ffffff !important;
+    text-decoration: none;
+
+    &:hover {
+        text-decoration: underline;
     }
 }

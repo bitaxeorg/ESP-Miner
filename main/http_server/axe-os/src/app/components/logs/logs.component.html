@@ -7,17 +7,16 @@
             </h2>
 
             <nav class="flex gap-3 w-full md:w-6">
-                <span class="w-full p-input-icon-left">
-                    <i class="pi pi-filter"></i>
+                <p-iconfield class="w-full">
+                    <p-inputicon styleClass="pi pi-filter"></p-inputicon>
                     <input
                         pInputText
                         type="text"
-                        class="w-full"
                         autocomplete="off"
                         placeholder="Case-sensitive filter"
                         id="filter"
                         formControlName="filter"/>
-                </span>
+                </p-iconfield>
                 <p-button
                     pp-button
                     icon="pi pi-{{stopScroll ? 'play' : 'pause'}}"

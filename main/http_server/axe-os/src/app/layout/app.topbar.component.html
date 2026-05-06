@@ -13,7 +13,7 @@
     </a>
 
     <ng-container *ngIf="info$ | async as info">
-        <span class="text-500 select-none absolute left-0 bottom-0 ml-6 md:ml-7 mb-1"
+        <span class="text-color-secondary select-none absolute left-0 bottom-0 ml-6 md:ml-7 mb-1"
             tooltipPosition="bottom"
             pTooltip="Hostname"
         >{{info.hostname}}</span>
@@ -95,7 +95,7 @@
             </li>
         </ul>
 
-        <p-overlayPanel #widgetPanel>
+        <p-overlaypanel #widgetPanel>
             <div class="flex flex-column gap-2">
                 <div *ngFor="let widget of dashboardEdit.widgetDefs" class="flex align-items-center gap-2">
                     <p-checkbox
@@ -107,7 +107,7 @@
                     <label [for]="'widget-' + widget.id" class="text-sm cursor-pointer white-space-nowrap">{{ widget.label }}</label>
                 </div>
             </div>
-        </p-overlayPanel>
+        </p-overlaypanel>
     </ng-container>
 
     <button *ngIf="!isAPMode" #menubutton class="p-link layout-topbar-button"

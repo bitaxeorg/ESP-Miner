@@ -34,29 +34,29 @@
 
                         <ng-container *ngIf="!info.power_fault; else powerFault">
                             <div class="flex align-items-center justify-content-between gap-2 mb-3">
-                                <span class="text-900 font-medium text-2xl white-space-nowrap">
+                                <span class="font-medium text-2xl white-space-nowrap">
                                     {{info.hashRate | hashSuffix}}
                                 </span>
                                 <table class="text-sm">
                                     <thead>
                                         <tr>
-                                            <th class="p-0 text-400 font-normal line-height-1">
+                                            <th class="p-0 text-color-secondary font-normal line-height-1">
                                                 <tooltip-text-icon class="pl-2"
                                                     text="Error"
                                                     tooltip="Hash error percentage as reported by the ASIC. A small amount of errors every few seconds is normal. Frequency changes, agressive overclocking, undervoltage or a bad power supply can significantly increase the error rate."
                                                 />
                                             </th>
-                                            <th *ngIf="info.expectedHashrate" class="p-0 pl-3 text-400 font-normal line-height-1">
+                                            <th *ngIf="info.expectedHashrate" class="p-0 pl-3 text-color-secondary font-normal line-height-1">
                                                 Expected
                                             </th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td class="p-0 text-center text-800 line-height-1">
+                                            <td class="p-0 text-center line-height-1">
                                                 {{info.errorPercentage | number: '1.2-2'}}%
                                             </td>
-                                            <td *ngIf="info.expectedHashrate" class="p-0 pl-3 text-center text-800 line-height-1 white-space-nowrap">
+                                            <td *ngIf="info.expectedHashrate" class="p-0 pl-3 text-center line-height-1 white-space-nowrap">
                                                 {{info.expectedHashrate | hashSuffix: { tickmark: true } }}
                                             </td>
                                         </tr>
@@ -64,10 +64,10 @@
                                 </table>
                             </div>
 
-                            <table class="px-1 border-1 border-50 border-round-xs">
+                            <table class="px-1 border-1 border-round-xs">
                                 <thead>
                                     <tr>
-                                        <th *ngFor="let i of hashrateAverages" class="p-0 text-500 font-normal line-height-1">
+                                        <th *ngFor="let i of hashrateAverages" class="p-0 text-color-secondary font-normal line-height-1">
                                             {{i.label}}
                                         </th>
                                     </tr>
@@ -95,20 +95,20 @@
 
                         <ng-container *ngIf="!info.power_fault; else powerFault">
                             <div class="flex align-items-center justify-content-between gap-2 mb-3">
-                                <span class="text-900 font-medium text-2xl white-space-nowrap">
+                                <span class="font-medium text-2xl white-space-nowrap">
                                     {{getEfficiency(info) | number: '1.2-2'}} J/Th
                                 </span>
                                 <table class="text-sm">
                                     <thead>
                                         <tr>
-                                            <th class="p-0 text-400 font-normal line-height-1">
+                                            <th class="p-0 text-color-secondary font-normal line-height-1">
                                                 Expected
                                             </th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td class="p-0 text-center text-800 line-height-1 white-space-nowrap">
+                                            <td class="p-0 text-center line-height-1 white-space-nowrap">
                                                 {{getExpectedEfficiency(info) | number: '1.2-2'}} J/Th
                                             </td>
                                         </tr>
@@ -120,7 +120,7 @@
                                 <span class="text-green-500 font-medium white-space-nowrap">
                                     {{getEfficiencyAverage() | number: '1.2-2'}} J/Th
                                 </span>
-                                <span class="text-500">
+                                <span class="text-color-secondary">
                                     Average
                                 </span>
                             </div>
@@ -137,21 +137,21 @@
                     <div class="flex justify-content-between mb-3">
                         <div>
                             <span class="block text-lg font-medium mb-3">Shares</span>
-                            <div class="text-900 font-medium text-2xl">
+                            <div class="font-medium text-2xl">
                                 {{info.sharesAccepted | number: '1.0-0'}}
                             </div>
                         </div>
                     </div>
                     <div *ngIf="info.sharesRejected === 0">
                         <span class="text-red-500 font-medium">0 </span>
-                        <span class="text-500">rejected</span>
+                        <span class="text-color-secondary">rejected</span>
                     </div>
                     <ng-container *ngIf="info.sharesRejected > 0">
                         <div *ngFor="let sharesRejectedReason of getSortedRejectionReasons(info); trackBy: trackByReason">
                             <span class="text-red-500 font-medium">
                                 {{ sharesRejectedReason.count | number: '1.0-0' }}
                             </span>
-                            <span class="text-500">
+                            <span class="text-color-secondary">
                                 {{ sharesRejectedReason.message }}
                             </span>
                             <tooltip-text-icon
@@ -171,11 +171,11 @@
                     <div class="flex justify-content-between mb-3">
                         <div>
                             <span class="block text-lg font-medium mb-3">Best Difficulty</span>
-                            <div class="text-900 font-medium text-2xl">
+                            <div class="font-medium text-2xl">
                                 <span class="cursor-pointer" pTooltip="{{info.bestDiff | number:'1.0-0'}}" tooltipPosition="bottom">
                                     {{info.bestDiff | diffSuffix}}
                                 </span>
-                                <span class="text-500 text-lg">all-time best</span>
+                                <span class="text-color-secondary text-lg">all-time best</span>
                                 <span class="text-sm font-medium mb-3" *ngIf="info.networkDifficulty">
                                     <tooltip-text-icon
                                         [text]="'(' + getNetworkDifficultyPercentage(info) + '%)'"
@@ -187,10 +187,10 @@
                         </div>
                     </div>
                     <div>
-                        <span class="text-900 font-medium cursor-pointer" pTooltip="{{info.bestSessionDiff | number:'1.0-0'}}" tooltipPosition="bottom">
+                        <span class="font-medium cursor-pointer" pTooltip="{{info.bestSessionDiff | number:'1.0-0'}}" tooltipPosition="bottom">
                             {{info.bestSessionDiff | diffSuffix}}
                         </span>
-                        <span class="text-500 text-lg">session best</span>
+                        <span class="text-color-secondary text-lg">session best</span>
                         <span class="text-sm font-medium mb-3"> ({{ info.uptimeSeconds | dateAgo: { intervals: 2, strict:true, short:true } }})</span>
                     </div>
                 </div>
@@ -209,14 +209,18 @@
                                     optionLabel="name"
                                     optionValue="value"
                                     formControlName="chartY1Data"
-                                    styleClass="w-10rem border-100 p-dropdown--small">
+                                    appendTo="body"
+                                    panelStyleClass="p-dropdown--small"
+                                    styleClass="w-10rem p-dropdown--small">
                                 </p-dropdown>
                                 <p-dropdown
                                     [options]="dataSourceLabels(info)"
                                     optionLabel="name"
                                     optionValue="value"
                                     formControlName="chartY2Data"
-                                    styleClass="w-10rem border-100 p-dropdown--small">
+                                    appendTo="body"
+                                    panelStyleClass="p-dropdown--small"
+                                    styleClass="w-10rem p-dropdown--small">
                                 </p-dropdown>
                             </div>
 
@@ -237,9 +241,9 @@
                         <h6 class="flex justify-content-between mb-1">
                             Power<span>{{info.power}} W</span>
                         </h6>
-                        <p-progressBar [value]="(info.power / info.maxPower) * 100" [styleClass]="'p-progressbar--thin'">
+                        <p-progressbar [value]="(info.power / info.maxPower) * 100" [styleClass]="'p-progressbar--thin'">
                             <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressBar>
+                        </p-progressbar>
                     </div>
 
                     <div class="mb-3">
@@ -247,10 +251,10 @@
                             Input Voltage<span>{{info.voltage}} V</span>
                         </h6>
                         <div class="relative">
-                            <p-progressBar [value]="(info.voltage / (info.nominalVoltage + .5)) * 100"
+                            <p-progressbar [value]="(info.voltage / (info.nominalVoltage + .5)) * 100"
                                 [styleClass]="'p-progressbar--thin'">
                                 <ng-template pTemplate="content" let-value></ng-template>
-                            </p-progressBar>
+                            </p-progressbar>
 
                             <!-- Conditional marker based on nominal voltage-->
                             <div class="absolute bg-white h-full top-0"
@@ -271,18 +275,18 @@
                     <h6 class="flex justify-content-between mb-1">
                         ASIC Frequency<span>{{info.actualFrequency | number: '1.0-4'}} MHz</span>
                     </h6>
-                    <p-progressBar [value]="(info.actualFrequency / maxFrequency) * 100" [styleClass]="'p-progressbar--thin'">
+                    <p-progressbar [value]="(info.actualFrequency / maxFrequency) * 100" [styleClass]="'p-progressbar--thin'">
                         <ng-template pTemplate="content" let-value></ng-template>
-                    </p-progressBar>
+                    </p-progressbar>
                 </div>
 
                     <div>
                         <h6 class="flex justify-content-between mb-1">
                             Measured ASIC Voltage<span>{{info.coreVoltageActual}} V</span>
                         </h6>
-                        <p-progressBar [value]="(info.coreVoltageActual / 1.8) * 100" [styleClass]="'p-progressbar--thin'">
+                        <p-progressbar [value]="(info.coreVoltageActual / 1.8) * 100" [styleClass]="'p-progressbar--thin'">
                             <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressBar>
+                        </p-progressbar>
                     </div>
                 </div>
             </div>
@@ -308,9 +312,9 @@
                                 </ng-container>
                             </span>
                         </h6>
-                        <p-progressBar [value]="(info.temp / maxTemp) * 100" [styleClass]="'p-progressbar--thin'">
+                        <p-progressbar [value]="(info.temp / maxTemp) * 100" [styleClass]="'p-progressbar--thin'">
                             <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressBar>
+                        </p-progressbar>
 
                         <strong class="text-red-500" *ngIf="info.temp >= 70">
                             Danger: High Temperature
@@ -324,9 +328,9 @@
                                 {{info.temp2}} &deg;C
                             </span>
                         </h6>
-                        <p-progressBar [value]="(info.temp2 / maxTemp) * 100" [styleClass]="'p-progressbar--thin'">
+                        <p-progressbar [value]="(info.temp2 / maxTemp) * 100" [styleClass]="'p-progressbar--thin'">
                             <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressBar>
+                        </p-progressbar>
 
                         <strong class="text-red-500" *ngIf="info.temp2 >= 70">
                             Danger: High Temperature
@@ -337,9 +341,9 @@
                         <h6 class="flex justify-content-between mb-1">
                             Voltage Regulator Temperature<span>{{info.vrTemp}} &deg;C</span>
                         </h6>
-                        <p-progressBar [value]="(info.vrTemp / 120) * 100" [styleClass]="'p-progressbar--thin'">
+                        <p-progressbar [value]="(info.vrTemp / 120) * 100" [styleClass]="'p-progressbar--thin'">
                             <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressBar>
+                        </p-progressbar>
 
                         <strong class="text-red-500" *ngIf="info.vrTemp >= 105">
                             Danger: High Temperature
@@ -368,9 +372,9 @@
 
                             <span>{{info.fanspeed.toFixed(1)}} %</span>
                         </h6>
-                        <p-progressBar [value]="info.fanspeed" [styleClass]="'p-progressbar--thin'">
+                        <p-progressbar [value]="info.fanspeed" [styleClass]="'p-progressbar--thin'">
                             <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressBar>
+                        </p-progressbar>
                     </div>
                 </div>
             </div>
@@ -403,12 +407,14 @@
                                 optionLabel="label"
                                 optionValue="value"
                                 (onChange)="onPoolChange($event)"
-                                styleClass="border-100 p-dropdown--small absolute right-0"
+                                appendTo="body"
+                                panelStyleClass="p-dropdown--small"
+                                styleClass="p-dropdown--small absolute right-0"
                             />
                         </div>
 
                         <div class="flex flex-nowrap">
-                            <div class="col-fixed-width text-500">
+                            <div class="col-fixed-width text-color-secondary">
                                 <span>URL</span>
                             </div>
                             <div>
@@ -420,7 +426,7 @@
                         </div>
 
                         <div class="flex flex-nowrap align-items-baseline">
-                            <div class="col-fixed-width text-500">
+                            <div class="col-fixed-width text-color-secondary">
                                 User
                             </div>
 
@@ -430,7 +436,7 @@
                         </div>
 
                         <div class="flex flex-nowrap">
-                            <div class="col-fixed-width text-500">
+                            <div class="col-fixed-width text-color-secondary">
                                 <tooltip-text-icon
                                     text="Time"
                                     tooltip="Time it takes for the pool to respond to a share"
@@ -443,7 +449,7 @@
                         <div class="flex flex-nowrap" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
                             @let percentage = getPayoutPercentage(info);
                             <ng-container *ngIf="percentage >= 95">
-                                <div class="col-fixed-width text-500">
+                                <div class="col-fixed-width text-color-secondary">
                                     <tooltip-text-icon text="Fee" tooltip="Percentage of the bitcoin block reward that will be paid out to the pool if you find a block." />
                                 </div>
                                 <div [style.color]="percentage < 100 ? 'inherit' : 'green'">
@@ -451,7 +457,7 @@
                                 </div>
                             </ng-container>
                             <ng-container *ngIf="percentage < 95">
-                                <div class="col-fixed-width text-500">
+                                <div class="col-fixed-width text-color-secondary">
                                     <tooltip-text-icon text="Share" tooltip="Percentage of the bitcoin block reward that will be paid out to your address if you find a block." />
                                 </div>
                                 <div *ngIf="percentage !== -1; else noValue" [style.color]="'red'">
@@ -460,7 +466,7 @@
                             </ng-container>
                         </div>
                         <div class="flex flex-nowrap">
-                            <div class="col-fixed-width text-500">
+                            <div class="col-fixed-width text-color-secondary">
                                 <span>Difficulty</span>
                             </div>
                             <ng-container *ngIf="info.poolDifficulty > 0; else noValue">
@@ -484,7 +490,7 @@
                     </h4>
 
                     <div class="flex flex-nowrap">
-                        <div class="col-fixed-width text-500">
+                        <div class="col-fixed-width text-color-secondary">
                             <span>Height</span>
                         </div>
                         <div>
@@ -493,7 +499,7 @@
                     </div>
 
                     <div class="flex flex-nowrap">
-                        <div class="col-fixed-width text-500">
+                        <div class="col-fixed-width text-color-secondary">
                             <span>Difficulty</span>
                         </div>
                         <div *ngIf="info.networkDifficulty" class="cursor-pointer" pTooltip="{{info.networkDifficulty | number:'1.0-0'}}" tooltipPosition="bottom">
@@ -502,7 +508,7 @@
                     </div>
 
                     <div class="flex flex-nowrap align-items-baseline">
-                        <div class="col-fixed-width text-500">
+                        <div class="col-fixed-width text-color-secondary">
                             <span>Scriptsig</span>
                         </div>
                         <div class="text-monospace text-sm">
@@ -510,7 +516,7 @@
                         </div>
                     </div>
                 <div class="flex flex-nowrap justify-content-between" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
-                        <div class="col-fixed-width text-500">
+                        <div class="col-fixed-width text-color-secondary">
                             <tooltip-text-icon text="Value" tooltip="Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options." />
                         </div>
                         <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
@@ -518,7 +524,7 @@
                         </ng-container>
                     </div>
                 <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
-                        <div class="col-fixed-width text-500">
+                        <div class="col-fixed-width text-color-secondary">
                             <span>Outputs</span>
                         </div>
                         <div class="w-full">
@@ -537,7 +543,7 @@
                         </div>
                     </div>
                 <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) == 0">
-                        <div class="col-fixed-width text-500">
+                        <div class="col-fixed-width text-color-secondary">
                             Amount
                         </div>
                         <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
@@ -570,7 +576,7 @@
                             <tr class="cursor-pointer" *ngFor="let asic of info.hashrateMonitor?.asics; let i = index; trackBy: trackByIndex"
                                         [pTooltip]="(asicAmount > 1 ? 'ASIC ' + (i + 1) + ' - ' : '') + 'Error count: ' + asic.errorCount"
                                         tooltipPosition="bottom">
-                                    <td *ngIf="asicAmount > 1" class="text-500 text-left">
+                                    <td *ngIf="asicAmount > 1" class="text-color-secondary text-left">
                                         {{ i + 1 }}
                                     </td>
                                 <td *ngFor="let domain of asic?.domains; trackBy: trackByIndex"

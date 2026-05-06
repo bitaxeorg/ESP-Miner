@@ -4,9 +4,10 @@ import { Observable } from 'rxjs';
 import { NetworkEditComponent } from '../network-edit/network.edit.component';
 
 @Component({
-  selector: 'app-network',
-  templateUrl: './network.component.html',
-  styleUrls: ['./network.component.scss'],
+    selector: 'app-network',
+    templateUrl: './network.component.html',
+    styleUrls: ['./network.component.scss'],
+    standalone: false
 })
 export class NetworkComponent implements AfterViewInit {
   form$!: Observable<FormGroup | null>;

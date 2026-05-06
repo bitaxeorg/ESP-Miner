@@ -6,9 +6,10 @@ import { WebsocketService } from 'src/app/services/web-socket.service';
 import { SystemApiService } from 'src/app/services/system.service';
 
 @Component({
-  selector: 'app-logs',
-  templateUrl: './logs.component.html',
-  styleUrl: './logs.component.scss'
+    selector: 'app-logs',
+    templateUrl: './logs.component.html',
+    styleUrl: './logs.component.scss',
+    standalone: false
 })
 export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
   public loadingLogs: boolean = false;

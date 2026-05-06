@@ -16,8 +16,8 @@ describe('ScoreboardComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ScoreboardComponent, DiffSuffixPipe, DateAgoPipe],
-      imports: [CommonModule, TooltipModule],
+      declarations: [ScoreboardComponent],
+      imports: [CommonModule, TooltipModule, DiffSuffixPipe, DateAgoPipe],
       providers: [
         provideRouter([]),
         provideHttpClient(),

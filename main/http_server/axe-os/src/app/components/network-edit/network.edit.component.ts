@@ -10,9 +10,10 @@ import { SystemApiService } from 'src/app/services/system.service';
 import { WifiNetwork } from 'src/app/generated/models';
 
 @Component({
-  selector: 'app-network-edit',
-  templateUrl: './network.edit.component.html',
-  styleUrls: ['./network.edit.component.scss']
+    selector: 'app-network-edit',
+    templateUrl: './network.edit.component.html',
+    styleUrls: ['./network.edit.component.scss'],
+    standalone: false
 })
 export class NetworkEditComponent implements OnInit {
   private formSubject = new BehaviorSubject<FormGroup | null>(null);

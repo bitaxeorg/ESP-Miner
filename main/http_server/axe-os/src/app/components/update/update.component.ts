@@ -13,9 +13,10 @@ import { SystemInfo } from 'src/app/generated/models';
 const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 
 @Component({
-  selector: 'app-update',
-  templateUrl: './update.component.html',
-  styleUrls: ['./update.component.scss']
+    selector: 'app-update',
+    templateUrl: './update.component.html',
+    styleUrls: ['./update.component.scss'],
+    standalone: false
 })
 export class UpdateComponent {
 
@@ -161,7 +162,7 @@ export class UpdateComponent {
       .replace(/(https?:\/\/github\.com\/.+\/(.+[^\s])+)/gim, (match, p1, p2) => `<a href="${p1}" target="_blank">${match.includes('/pull/') ? '#' : ''}${p2}</a>`) // Regular links
       .replace(/@([^\s]+)/gim, ' <a href="https://github.com/$1" target="_blank">@$1</a> ') // Username links
       .replace(/^\s*[-+*]\s?(.+)$/gim, '<li>$1</li>') // Unordered list
-      .replace(/`([^`]+)`/gim, '<code class="surface-100">$1</code>') // Code
+      .replace(/`([^`]+)`/gim, '<code class="bg-surface-100 border-round px-1">$1</code>') // Code
       .replace(/\r\n\r\n/gim, '<br>'); // Breaks
 
     return toHTML.trim();

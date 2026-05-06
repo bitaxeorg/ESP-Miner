@@ -23,8 +23,9 @@ type CombinedData = {
 };
 
 @Component({
-  selector: 'app-system',
-  templateUrl: './system.component.html',
+    selector: 'app-system',
+    templateUrl: './system.component.html',
+    standalone: false
 })
 export class SystemComponent implements OnInit, OnDestroy {
   public info$: Observable<ISystemInfo>;

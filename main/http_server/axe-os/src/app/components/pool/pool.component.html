@@ -31,16 +31,17 @@
                 </div>
                 <div class="field grid p-fluid">
                     <label [htmlFor]="pool + 'Password'" class="col-12 md:col-2 md:mb-0">Password</label>
-                    <div class="col-12 md:col-10 p-input-icon-right">
-                        <i *ngIf="form.get(pool + 'Password')?.dirty" class="pi cursor-pointer"
-                        [ngClass]="{'pi-eye': !showPassword[pool], 'pi-eye-slash': showPassword[pool]}"
-                        (click)="showPassword[pool] = !showPassword[pool]"></i>
-                        <input pInputText [id]="pool + 'Password'" [formControlName]="pool + 'Password'"
-                            [type]="showPassword[pool] ? 'text' : 'password'" />
+                    <div class="col-12 md:col-10">
+                        <p-iconfield iconPosition="right">
+                            <p-inputicon *ngIf="form.get(pool + 'Password')?.dirty" styleClass="pi cursor-pointer {{!showPassword[pool] ? 'pi-eye' : 'pi-eye-slash'}}"
+                            (click)="showPassword[pool] = !showPassword[pool]"></p-inputicon>
+                            <input pInputText [id]="pool + 'Password'" [formControlName]="pool + 'Password'"
+                                [type]="showPassword[pool] ? 'text' : 'password'" />
+                        </p-iconfield>
                     </div>
                 </div>
 
-                <fieldset class="m-0 p-0 mt-4 border-200 border-bottom-none border-left-none border-right-none">
+                <fieldset class="m-0 p-0 mt-4 border-bottom-none border-left-none border-right-none">
                     <legend class="p-0 pr-3">
                         <label class="cursor-pointer">
                             <input type="checkbox" hidden (click)="showAdvancedOptions[pool] = !showAdvancedOptions[pool]">
@@ -93,12 +94,12 @@
                             <div class="col-12 md:col-10">
                                 <div class="flex flex-wrap gap-3">
                                     <div *ngFor="let option of tlsOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
-                                        <p-radioButton
+                                        <p-radiobutton
                                             [name]="pool + 'TLS'"
                                             [value]="option.value"
                                             [formControlName]="pool + 'TLS'"
                                             [inputId]="pool + 'TLS_' + option.value">
-                                        </p-radioButton>
+                                        </p-radiobutton>
                                         <label [for]="pool + 'TLS_' + option.value" class="ml-2 cursor-pointer">
                                             {{ option.label }}
                                         </label>
