@@ -940,6 +940,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     return -1;
   }
 
+  isShareWarningEnabled(info: ISystemInfo): boolean {
+    return !!(info.isUsingFallbackStratum ? info.fallbackStratumShareWarning : info.stratumShareWarning);
+  }
+
   public handleSystemMessages(info: ISystemInfo, systemInfoError: ISystemInfoError) {
     const updateMessage = (
       condition: boolean,
@@ -973,9 +977,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
     if (info.coinbaseOutputs && info.coinbaseOutputs?.length > 0) {
+      const warningEnabled = !!(info.isUsingFallbackStratum ? info.fallbackStratumShareWarning : info.stratumShareWarning);
       let percentage = this.getPayoutPercentage(info);
-      updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
-      updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
+      updateMessage(warningEnabled && percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
+      updateMessage(warningEnabled && percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
     }
   }
 
@@ -1214,6 +1219,20 @@ export class HomeComponent implements OnInit, OnDestroy {
   getAddressPart(user: string): string {
     const dotIndex = user.lastIndexOf('.');
     return dotIndex !== -1 ? user.substring(0, dotIndex) : user;
+  }
+
+  // Returns the coinbase outputs with the user's own payout output(s) listed first.
+  // The backend caps the array at MAX_COINBASE_TX_OUTPUTS and aggregates the remainder into
+  // info.coinbaseOthersCount / coinbaseOthersValueSatoshis, which the template renders directly.
+  getOrderedCoinbaseOutputs(info: ISystemInfo): { value: number, address: string }[] {
+    const outputs = info.coinbaseOutputs ?? [];
+    if (outputs.length <= 1 || !this.activePoolUser) return outputs;
+
+    const userAddr = this.getAddressPart(this.activePoolUser);
+    const user = outputs.filter(o => o.address === userAddr);
+    if (!user.length) return outputs;
+    const rest = outputs.filter(o => o.address !== userAddr);
+    return [...user, ...rest];
   }
 
   getSuffixPart(user: string): string {

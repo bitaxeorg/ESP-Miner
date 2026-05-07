@@ -156,6 +156,8 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
     // Initialize result
     result->total_value_satoshis = 0;
     result->user_value_satoshis = 0;
+    result->others_count = 0;
+    result->others_value_satoshis = 0;
     result->decode_coinbase_tx = decode_coinbase_tx;
 
     // Detect network from user address prefix for correct address encoding
@@ -310,25 +312,51 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
         if (offset + script_len > coinbase_2_len) break;
 
         if (decode_coinbase_tx) {
-            if (value_satoshis > 0) {            
+            if (value_satoshis > 0) {
                 char output_address[MAX_ADDRESS_STRING_LEN];
                 coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN, bech32_hrp, is_testnet);
                 bool is_user_address = strncmp(user_address, output_address, strlen(output_address)) == 0;
 
                 if (is_user_address) result->user_value_satoshis += value_satoshis;
 
-                if (i < MAX_COINBASE_TX_OUTPUTS) {
-                    strncpy(result->outputs[i].address, output_address, MAX_ADDRESS_STRING_LEN);
-                    result->outputs[i].value_satoshis = value_satoshis;
-                    result->outputs[i].is_user_output = is_user_address;
-                    result->output_count++;
+                if (result->output_count < MAX_COINBASE_TX_OUTPUTS) {
+                    int idx = result->output_count++;
+                    strncpy(result->outputs[idx].address, output_address, MAX_ADDRESS_STRING_LEN);
+                    result->outputs[idx].value_satoshis = value_satoshis;
+                    result->outputs[idx].is_user_output = is_user_address;
+                } else {
+                    // Array full. Always keep the user's output and the highest-value
+                    // non-user outputs; push the rest into the "others" bucket. Find the
+                    // smallest non-user, non-zero-value entry as the eviction candidate.
+                    int evict_idx = -1;
+                    uint64_t evict_min = UINT64_MAX;
+                    for (int j = 0; j < MAX_COINBASE_TX_OUTPUTS; j++) {
+                        if (result->outputs[j].is_user_output) continue;
+                        if (result->outputs[j].value_satoshis == 0) continue; // preserve OP_RETURN/witness commitment
+                        if (result->outputs[j].value_satoshis < evict_min) {
+                            evict_min = result->outputs[j].value_satoshis;
+                            evict_idx = j;
+                        }
+                    }
+
+                    bool replace = (evict_idx >= 0) && (is_user_address || value_satoshis > evict_min);
+                    if (replace) {
+                        result->others_count++;
+                        result->others_value_satoshis += result->outputs[evict_idx].value_satoshis;
+                        strncpy(result->outputs[evict_idx].address, output_address, MAX_ADDRESS_STRING_LEN);
+                        result->outputs[evict_idx].value_satoshis = value_satoshis;
+                        result->outputs[evict_idx].is_user_output = is_user_address;
+                    } else {
+                        result->others_count++;
+                        result->others_value_satoshis += value_satoshis;
+                    }
                 }
             } else {
-                if (i < MAX_COINBASE_TX_OUTPUTS) {
-                    coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, result->outputs[i].address, MAX_ADDRESS_STRING_LEN, bech32_hrp, is_testnet);
-                    result->outputs[i].value_satoshis = 0;
-                    result->outputs[i].is_user_output = false;
-                    result->output_count++;
+                if (result->output_count < MAX_COINBASE_TX_OUTPUTS) {
+                    int idx = result->output_count++;
+                    coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, result->outputs[idx].address, MAX_ADDRESS_STRING_LEN, bech32_hrp, is_testnet);
+                    result->outputs[idx].value_satoshis = 0;
+                    result->outputs[idx].is_user_output = false;
                 }
             }
         }
