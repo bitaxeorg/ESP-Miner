@@ -19,9 +19,12 @@
 
 static const char *TAG = "create_jobs_task";
 
-static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, uint32_t difficulty);
-static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *job, uint32_t difficulty);
-static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *job, uint32_t difficulty, uint64_t extranonce_2_counter);
+#define MAX_EXTRANONCE2_LEN 32
+#define MAX_EXTRANONCE2_STR (MAX_EXTRANONCE2_LEN * 2 + 1)
+
+static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, double difficulty);
+static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *job, double difficulty);
+static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *job, double difficulty, uint64_t extranonce_2_counter);
 
 // Free a work item using the correct free function for the protocol it was created under
 static void free_work_item(GlobalState *GLOBAL_STATE, void *work, stratum_protocol_t protocol)
@@ -50,7 +53,7 @@ void create_jobs_task(void *pvParameters)
         GLOBAL_STATE->valid_jobs[i] = 0;
     }
 
-    uint32_t difficulty = GLOBAL_STATE->pool_difficulty;
+    double difficulty = GLOBAL_STATE->pool_difficulty;
     void *current_work = NULL;
     stratum_protocol_t current_work_protocol = GLOBAL_STATE->stratum_protocol;
     uint64_t extranonce_2 = 0;
@@ -115,7 +118,7 @@ void create_jobs_task(void *pvParameters)
             current_work = new_work;
 
             if (GLOBAL_STATE->new_set_mining_difficulty_msg) {
-                ESP_LOGI(TAG, "New pool difficulty %lu", GLOBAL_STATE->pool_difficulty);
+                ESP_LOGI(TAG, "New pool difficulty %.2f", GLOBAL_STATE->pool_difficulty);
                 difficulty = GLOBAL_STATE->pool_difficulty;
                 GLOBAL_STATE->new_set_mining_difficulty_msg = false;
             }
@@ -185,9 +188,13 @@ void create_jobs_task(void *pvParameters)
     }
 }
 
-static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, uint32_t difficulty)
+static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, double difficulty)
 {
-    char extranonce_2_str[GLOBAL_STATE->extranonce_2_len * 2 + 1];
+    if (GLOBAL_STATE->extranonce_2_len > MAX_EXTRANONCE2_LEN) {
+        ESP_LOGE(TAG, "extranonce_2_len %d exceeds maximum %d, skipping job", GLOBAL_STATE->extranonce_2_len, MAX_EXTRANONCE2_LEN);
+        return;
+    }
+    char extranonce_2_str[MAX_EXTRANONCE2_STR];
     extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len, extranonce_2_str);
 
     uint8_t coinbase_tx_hash[32];
@@ -226,7 +233,7 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
 // Construct bm_job directly from SV2 fields (no coinbase/merkle computation needed).
 // Standard channels rely on version rolling for unique work — the ASIC rolls the
 // version bits using version_mask, giving different midstates per nonce search space.
-static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *sv2_job, uint32_t difficulty)
+static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *sv2_job, double difficulty)
 {
     bm_job *next_job = malloc(sizeof(bm_job));
     if (next_job == NULL) {
@@ -300,7 +307,7 @@ static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *sv2_job, uin
 // Extended channel work generation: compute coinbase hash from prefix+extranonce+suffix,
 // then merkle root from merkle path, then midstates. extranonce_2 provides unique work.
 static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_job,
-                                   uint32_t difficulty, uint64_t extranonce_2_counter)
+                                   double difficulty, uint64_t extranonce_2_counter)
 {
     sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
     if (!conn) return;

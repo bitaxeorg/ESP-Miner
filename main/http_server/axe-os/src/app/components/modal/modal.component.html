@@ -1,9 +1,9 @@
 <ng-container *ngIf="isVisible">
-    <div class="modal-backdrop" (click)="isVisible = false"></div>
+    <div class="modal-backdrop" (click)="closable ? isVisible = false : null"></div>
     <div class="modal card">
         <header class="flex justify-content-between align-items-center p-3 pb-5">
             <h2 class="m-0">{{headline}}</h2>
-            <p-button icon="pi pi-times" pp-button class="close" (click)="isVisible = false"></p-button>
+            <p-button *ngIf="closable" icon="pi pi-times" pp-button class="close" (click)="isVisible = false"></p-button>
         </header>
 
         <main class="overflow-y-auto flex-1 p-0 px-3">

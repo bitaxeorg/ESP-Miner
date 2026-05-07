@@ -47,6 +47,7 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
 
     ASIC_set_frequency(GLOBAL_STATE);
+    ASIC_set_nonce_space(GLOBAL_STATE);
 
     // Cut ASIC power and hold in reset
     VCORE_set_voltage(GLOBAL_STATE, 0.0f);
@@ -132,7 +133,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
-    bool is_user_paused = false;
+    bool is_paused = false;
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -142,26 +143,24 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
-        power_management->power = Power_get_power(GLOBAL_STATE);
-        power_management->current = Power_get_current(GLOBAL_STATE);
+        Power_get_output(GLOBAL_STATE, &power_management->power, &power_management->current);
         power_management->core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
 
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
         power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
-        // User requested pause
-        if (sys_module->mining_paused && !is_user_paused) {
+        // User requested pause or hardware fault
+        if ((sys_module->mining_paused || sys_module->hardware_fault) && !is_paused) {
             mining_stop(GLOBAL_STATE);
-            is_user_paused = true;
-        // User requested resume
-        } else if (!sys_module->mining_paused && is_user_paused) {
+            is_paused = true;
+        } else if (!sys_module->mining_paused && !sys_module->hardware_fault && is_paused) {
             mining_start(GLOBAL_STATE);
-            is_user_paused = false;
+            is_paused = false;
         }
 
-        // If we've paused, skip doing anything else
-        if (is_user_paused) {
+        // If we've paused or have a hardware fault, skip doing anything else
+        if (is_paused || sys_module->hardware_fault) {
             vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
             continue;
         }
@@ -251,6 +250,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE);
 
             ASIC_set_frequency(GLOBAL_STATE);
+            ASIC_set_nonce_space(GLOBAL_STATE);
             
             last_asic_frequency = asic_frequency;
         }

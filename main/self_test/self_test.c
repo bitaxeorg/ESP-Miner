@@ -139,7 +139,10 @@ static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
     float target_power = (float) GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
     float margin = (float) POWER_CONSUMPTION_MARGIN;
 
-    float power = Power_get_power(GLOBAL_STATE);
+    float power = 0;
+    float current = 0;
+    
+    Power_get_output(GLOBAL_STATE, &power, &current);
     ESP_LOGI(TAG, "Power: %.2f W", power);
 
     if (power <= target_power + margin) {

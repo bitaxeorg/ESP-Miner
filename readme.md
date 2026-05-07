@@ -59,7 +59,9 @@ Available API endpoints:
 * `/api/system/asic` Get ASIC settings information
 * `/api/system/statistics` Get system statistics (data logging should be activated)
 * `/api/system/statistics/dashboard` Get system statistics for dashboard
+* `/api/system/scoreboard` Get top 20 highest difficulty shares
 * `/api/system/wifi/scan` Scan for available Wi-Fi networks
+* `/api/system/logs` Download system logs
 
 **POST**
 
@@ -89,6 +91,9 @@ curl http://YOUR-BITAXE-IP/api/system/statistics/dashboard
 
 # Get available Wi-Fi networks
 curl http://YOUR-BITAXE-IP/api/system/wifi/scan
+
+# Download system logs
+curl http://YOUR-BITAXE-IP/api/system/logs
 
 
 # Restart the system

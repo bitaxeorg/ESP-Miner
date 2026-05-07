@@ -1,0 +1,6 @@
+{
+  "$schema": "node_modules/ng-openapi-gen/ng-openapi-gen-schema.json",
+  "input": "../openapi.yaml",
+  "output": "src/app/generated",
+  "ignoreUnusedModels": false
+}
