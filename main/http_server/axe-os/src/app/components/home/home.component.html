@@ -521,26 +521,24 @@
                         <div class="col-fixed-width text-500">
                             <span>Outputs</span>
                         </div>
-                        <ng-container *ngIf="getCoinbaseDisplay(info) as cb">
-                            <div class="w-full">
-                                <div *ngFor="let output of cb.visible; let i = index" class="flex justify-content-between">
-                                    @if (output.value > 0) {
-                                        @if (output.address === getAddressPart(activePoolUser)) {
-                                            <span><span class="text-monospace text-sm font-bold" pTooltip="Your payout address" tooltipPosition="top" sensitive-data>{{ output.address | address }}</span>&nbsp;<i class="pi pi-star-fill text-xs"></i></span>
-                                        } @else {
-                                            <span class="text-monospace text-sm" pTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
-                                        }
-                                        <span class="text-sm">{{ output.value | sats }}</span>
+                        <div class="w-full">
+                            <div *ngFor="let output of getOrderedCoinbaseOutputs(info); let i = index" class="flex justify-content-between">
+                                @if (output.value > 0) {
+                                    @if (output.address === getAddressPart(activePoolUser)) {
+                                        <span><span class="text-monospace text-sm font-bold" pTooltip="Your payout address" tooltipPosition="top" sensitive-data>{{ output.address | address }}</span>&nbsp;<i class="pi pi-star-fill text-xs"></i></span>
                                     } @else {
-                                        <span class="text-monospace text-xs">{{ output.address }}</span>
+                                        <span class="text-monospace text-sm" pTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
                                     }
-                                </div>
-                                <div *ngIf="cb.othersCount > 0" class="flex justify-content-between">
-                                    <span class="text-sm text-500" pTooltip="Additional payout outputs not shown individually. Total value is aggregated here." tooltipPosition="top">+ {{ cb.othersCount }} other recipient{{ cb.othersCount === 1 ? '' : 's' }}</span>
-                                    <span class="text-sm">{{ cb.othersValueSatoshis | sats }}</span>
-                                </div>
+                                    <span class="text-sm">{{ output.value | sats }}</span>
+                                } @else {
+                                    <span class="text-monospace text-xs">{{ output.address }}</span>
+                                }
                             </div>
-                        </ng-container>
+                            <div *ngIf="(info.coinbaseOthersCount ?? 0) > 0" class="flex justify-content-between">
+                                <span class="text-sm text-500" pTooltip="Additional payout outputs not shown individually. Total value is aggregated here." tooltipPosition="top">+ {{ info.coinbaseOthersCount }} other recipient{{ info.coinbaseOthersCount === 1 ? '' : 's' }}</span>
+                                <span class="text-sm">{{ info.coinbaseOthersValueSatoshis | sats }}</span>
+                            </div>
+                        </div>
                     </div>
                 <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) == 0">
                         <div class="col-fixed-width text-500">

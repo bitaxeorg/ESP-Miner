@@ -1213,50 +1213,18 @@ export class HomeComponent implements OnInit, OnDestroy {
     return dotIndex !== -1 ? user.substring(0, dotIndex) : user;
   }
 
-  // Cap the number of coinbase output rows shown on the dashboard. PPLNS-style pools that pay
-  // miners directly via the coinbase tx can have 30+ outputs; rendering them all stretches the
-  // card. The remainder (plus any outputs already aggregated server-side beyond
-  // MAX_COINBASE_TX_OUTPUTS) is folded into the "+ N other recipient(s)" summary row.
-  private static readonly VISIBLE_COINBASE_OUTPUTS = 4;
-
-  // Builds the dashboard view of the coinbase outputs: user's payout output(s) on top, followed
-  // by the next highest-priority entries up to VISIBLE_COINBASE_OUTPUTS, with everything else
-  // collapsed into an "others" summary together with the server-side aggregate.
-  getCoinbaseDisplay(info: ISystemInfo): {
-    visible: { value: number, address: string }[],
-    othersCount: number,
-    othersValueSatoshis: number,
-  } {
+  // Returns the coinbase outputs with the user's own payout output(s) listed first.
+  // The backend caps the array at MAX_COINBASE_TX_OUTPUTS and aggregates the remainder into
+  // info.coinbaseOthersCount / coinbaseOthersValueSatoshis, which the template renders directly.
+  getOrderedCoinbaseOutputs(info: ISystemInfo): { value: number, address: string }[] {
     const outputs = info.coinbaseOutputs ?? [];
-    const aggregatedCount = info.coinbaseOthersCount ?? 0;
-    const aggregatedValue = info.coinbaseOthersValueSatoshis ?? 0;
+    if (outputs.length <= 1 || !this.activePoolUser) return outputs;
 
-    let ordered = outputs;
-    if (outputs.length > 1 && this.activePoolUser) {
-      const userAddr = this.getAddressPart(this.activePoolUser);
-      const user: typeof outputs = [];
-      const rest: typeof outputs = [];
-      for (const o of outputs) {
-        (o.address === userAddr ? user : rest).push(o);
-      }
-      if (user.length) {
-        ordered = [...user, ...rest];
-      }
-    }
-
-    const limit = HomeComponent.VISIBLE_COINBASE_OUTPUTS;
-    if (ordered.length <= limit) {
-      return { visible: ordered, othersCount: aggregatedCount, othersValueSatoshis: aggregatedValue };
-    }
-
-    const visible = ordered.slice(0, limit);
-    const hidden = ordered.slice(limit);
-    const hiddenValue = hidden.reduce((sum, o) => sum + (o.value ?? 0), 0);
-    return {
-      visible,
-      othersCount: aggregatedCount + hidden.length,
-      othersValueSatoshis: aggregatedValue + hiddenValue,
-    };
+    const userAddr = this.getAddressPart(this.activePoolUser);
+    const user = outputs.filter(o => o.address === userAddr);
+    if (!user.length) return outputs;
+    const rest = outputs.filter(o => o.address !== userAddr);
+    return [...user, ...rest];
   }
 
   getSuffixPart(user: string): string {
