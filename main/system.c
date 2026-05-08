@@ -11,6 +11,7 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "esp_check.h"
+#include "esp_attr.h"
 
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
@@ -19,7 +20,7 @@
 #include "lwip/inet.h"
 
 #include "system.h"
-#include "i2c_bitaxe.h"
+#include "global_state.h"
 #include "INA260.h"
 #include "adc.h"
 #include "connect.h"
@@ -32,6 +33,22 @@
 #include "utils.h"
 #include "self_test.h"
 #include "filesystem.h"
+
+#define NVS_COUNTER_UPDATE_INTERVAL_MS 60 * 60 * 1000  // Update NVS once per hour
+#define NOINIT_SENTINEL_VALUE 0x4C4F4732       // "LOG2" in hex
+
+typedef struct
+{
+    uint64_t total_uptime;            // Total uptime in seconds
+    uint64_t cumulative_hashes_high;  // High 64 bits of 128-bit cumulative hash count
+    uint64_t cumulative_hashes_low;   // Low 64 bits of 128-bit cumulative hash count
+    uint32_t sentinel;                // Magic value to detect valid noinit data
+} NoinitState;    
+
+__NOINIT_ATTR static NoinitState noinit_state; // Noinit state survives soft reboots but is lost on power cycle
+static uint64_t last_update_time_ms;
+static uint64_t last_nvs_write_time_ms;
+static uint64_t total_uptime_at_system_start;
 
 static const char * TAG = "system";
 
@@ -47,10 +64,34 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->shares_rejected = 0;
     module->best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF);
     module->best_session_nonce_diff = 0;
-    module->start_time = esp_timer_get_time();
+    module->start_time_us = esp_timer_get_time();
     module->lastClockSync = 0;
     module->block_found = 0;
     module->show_new_block = false;
+
+    if (noinit_state.sentinel != NOINIT_SENTINEL_VALUE) {
+        noinit_state.sentinel = NOINIT_SENTINEL_VALUE;
+        noinit_state.total_uptime = 0;
+        noinit_state.cumulative_hashes_high = 0;
+        noinit_state.cumulative_hashes_low = 0;
+    }
+
+    // Load values from NVS (persist across power cycle)
+    uint64_t nvs_total_uptime = nvs_config_get_u64(NVS_CONFIG_TOTAL_UPTIME);
+    if (nvs_total_uptime > noinit_state.total_uptime) {
+        noinit_state.total_uptime = nvs_total_uptime;
+    }
+    total_uptime_at_system_start = noinit_state.total_uptime;
+
+    uint64_t nvs_hashes_high = nvs_config_get_u64(NVS_CONFIG_CUMULATIVE_HASHES_HIGH);
+    uint64_t nvs_hashes_low = nvs_config_get_u64(NVS_CONFIG_CUMULATIVE_HASHES_LOW);
+    if (nvs_hashes_high > noinit_state.cumulative_hashes_high) {
+        noinit_state.cumulative_hashes_high = nvs_hashes_high;
+        noinit_state.cumulative_hashes_low = nvs_hashes_low;
+    } else if (nvs_hashes_high == noinit_state.cumulative_hashes_high &&
+               nvs_hashes_low > noinit_state.cumulative_hashes_low) {
+        noinit_state.cumulative_hashes_low = nvs_hashes_low;
+    }
 
     // Initialize network address strings
     strcpy(module->ip_addr_str, "");
@@ -120,7 +161,8 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     GLOBAL_STATE->stratum_mux = (portMUX_TYPE)portMUX_INITIALIZER_UNLOCKED;
 }
 
-void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {
+void SYSTEM_init_versions(GlobalState * GLOBAL_STATE)
+{
     const esp_app_desc_t *app_desc = esp_app_get_description();
     
     // Store the firmware version
@@ -336,4 +378,73 @@ static esp_err_t ensure_overheat_mode_config() {
     ESP_LOGI(TAG, "Existing overheat_mode value: %d", overheat_mode);
 
     return ESP_OK;
+}
+
+void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE)
+{
+    uint64_t current_time_ms = esp_timer_get_time() / 1000;
+    
+    // Initialize last_update_time on first call
+    if (last_update_time_ms == 0) {
+        last_update_time_ms = current_time_ms;
+        last_nvs_write_time_ms = current_time_ms;
+        return;
+    }
+
+    uint64_t elapsed_ms = current_time_ms - last_update_time_ms;
+    last_update_time_ms = current_time_ms;
+    
+    // Only update if at least 1 second has passed
+    if (elapsed_ms < 1000) {
+        return;
+    }
+    
+    SYSTEM_MODULE->uptime_seconds = (esp_timer_get_time() - SYSTEM_MODULE->start_time_us) / 1000000;
+    noinit_state.total_uptime = total_uptime_at_system_start + SYSTEM_MODULE->uptime_seconds;
+    
+    // Update cumulative hashes: hashrate (GH/s) × milliseconds × 1e6 = raw hashes
+    uint64_t hashes_done = elapsed_ms * 1e6 * SYSTEM_MODULE->current_hashrate;
+    uint64_t new_low = noinit_state.cumulative_hashes_low + hashes_done;
+    if (new_low < noinit_state.cumulative_hashes_low) {
+        noinit_state.cumulative_hashes_high++;
+    }
+    noinit_state.cumulative_hashes_low = new_low;
+
+    // Persist to NVS once per hour to reduce wear
+    if (current_time_ms - last_nvs_write_time_ms >= NVS_COUNTER_UPDATE_INTERVAL_MS) {
+        nvs_config_set_u64(NVS_CONFIG_TOTAL_UPTIME, noinit_state.total_uptime);
+        nvs_config_set_u64(NVS_CONFIG_CUMULATIVE_HASHES_HIGH, noinit_state.cumulative_hashes_high);
+        nvs_config_set_u64(NVS_CONFIG_CUMULATIVE_HASHES_LOW, noinit_state.cumulative_hashes_low);
+        last_nvs_write_time_ms = current_time_ms;
+    }
+}
+
+uint64_t SYSTEM_noinit_get_total_uptime_seconds()
+{
+    return noinit_state.total_uptime;
+}
+
+// Convert 128-bit to double: high * 2^64 + low. Loses precision for very large values, but sufficient for display
+double SYSTEM_noinit_get_total_hashes()
+{
+    return (double)noinit_state.cumulative_hashes_high * 18446744073709551616.0 + (double)noinit_state.cumulative_hashes_low;
+}
+
+double SYSTEM_noinit_get_total_log2_work()
+{
+    // If high part is 0, just compute log2 of low part
+    if (noinit_state.cumulative_hashes_high == 0) {
+        if (noinit_state.cumulative_hashes_low == 0) {
+            return 0.0;
+        }
+        return log2((double)noinit_state.cumulative_hashes_low);
+    }
+    
+    // For 128-bit value: log2(high * 2^64 + low) = 64 + log2(high + low/2^64)
+    // Since low/2^64 is very small compared to high, we approximate:
+    // log2(high * 2^64 + low) ≈ 64 + log2(high) for large values
+    // More precise: 64 + log2(high + low/2^64)
+    double high_plus_fraction = (double)noinit_state.cumulative_hashes_high + 
+                                (double)noinit_state.cumulative_hashes_low / 18446744073709551616.0;
+    return 64.0 + log2(high_plus_fraction);
 }

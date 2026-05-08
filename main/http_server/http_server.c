@@ -964,7 +964,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         cJSON_AddItemToArray(error_array, error_obj);
     }
 
-    cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000);
+    cJSON_AddNumberToObject(root, "uptimeSeconds", GLOBAL_STATE->SYSTEM_MODULE.uptime_seconds);
+    cJSON_AddNumberToObject(root, "totalUptimeSeconds", SYSTEM_noinit_get_total_uptime_seconds());
+    cJSON_AddNumberToObject(root, "totalHashes", SYSTEM_noinit_get_total_hashes());
+    cJSON_AddNumberToObject(root, "totalLog2Work", SYSTEM_noinit_get_total_log2_work());
     cJSON_AddNumberToObject(root, "smallCoreCount", GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count);
     cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);

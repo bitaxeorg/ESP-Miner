@@ -7,6 +7,7 @@ import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
 import { SystemInfo as ISystemInfo, SystemAsic as ISystemASIC, GenericResponse, } from 'src/app/generated/models';
+import { formatNumber } from '@angular/common';
 
 type TableRow = {
   label: string;
@@ -89,6 +90,9 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Board Version', value: data.info.boardVersion },
       { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds) },
+      { label: 'Total Uptime', value: DateAgoPipe.transform(data.info.totalUptimeSeconds || 0) },
+      { label: 'Total Work (log2)', value: (data.info.totalLog2Work || 0).toFixed(6) },
+      { label: 'Total Hashes', value: formatNumber(data.info.totalHashes || 0, 'en-us')},
       { label: 'Reset Reason', value: data.info.resetReason, class: 'pb-3' },
       { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitiveData: true },
       { label: 'Wi-Fi Status', value: data.info.wifiStatus },

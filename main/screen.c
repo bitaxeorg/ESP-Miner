@@ -83,6 +83,7 @@ static float current_hashrate;
 static float current_power;
 static uint64_t current_difficulty;
 static float current_chip_temp;
+static uint32_t current_uptime_seconds;
 
 #define NOTIFICATION_SHARE_ACCEPTED (1 << 0)
 #define NOTIFICATION_SHARE_REJECTED (1 << 1)
@@ -651,26 +652,26 @@ static void uptime_update_cb(lv_timer_t * timer)
 {
     if (wifi_uptime_label) {
         char uptime[50];
-        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
-
-        uint32_t days = uptime_seconds / (24 * 3600);
-        uptime_seconds %= (24 * 3600);
-        uint32_t hours = uptime_seconds / 3600;
-        uptime_seconds %= 3600;
-        uint32_t minutes = uptime_seconds / 60;
-        uptime_seconds %= 60;
-
-        if (days > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lud %luh %lum %lus", days, hours, minutes, uptime_seconds);
-        } else if (hours > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %luh %lum %lus", hours, minutes, uptime_seconds);
-        } else if (minutes > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lum %lus", minutes, uptime_seconds);
-        } else {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lus", uptime_seconds);
-        }
-
-        if (strcmp(lv_label_get_text(wifi_uptime_label), uptime) != 0) {
+        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time_us) / 1000000;
+        if (current_uptime_seconds != uptime_seconds) {
+            current_uptime_seconds = uptime_seconds;
+            uint32_t days = uptime_seconds / (24 * 3600);
+            uptime_seconds %= (24 * 3600);
+            uint32_t hours = uptime_seconds / 3600;
+            uptime_seconds %= 3600;
+            uint32_t minutes = uptime_seconds / 60;
+            uptime_seconds %= 60;
+    
+            if (days > 0) {
+                snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
+            } else if (hours > 0) {
+                snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
+            } else if (minutes > 0) {
+                snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
+            } else {
+                snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
+            }
+    
             lv_label_set_text(wifi_uptime_label, uptime);
         }
     }

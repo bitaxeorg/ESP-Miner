@@ -13,4 +13,9 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg);
 void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id);
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime);
 
+void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE);
+uint64_t SYSTEM_noinit_get_total_uptime_seconds();
+double SYSTEM_noinit_get_total_hashes();
+double SYSTEM_noinit_get_total_log2_work();
+
 #endif /* SYSTEM_H_ */
