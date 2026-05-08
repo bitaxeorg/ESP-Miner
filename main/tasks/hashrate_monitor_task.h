@@ -5,9 +5,9 @@
 #include <pthread.h>
 
 typedef struct {
+    float hashrate;
     uint32_t value;
     uint64_t time_us;
-    float hashrate;
 } measurement_t;
 
 typedef struct {

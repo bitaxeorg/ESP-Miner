@@ -9,9 +9,9 @@
 
 // Structure to hold WiFi scan results
 typedef struct {
-    char ssid[33];  // 32 chars + null terminator
     int8_t rssi;
     wifi_auth_mode_t authmode;
+    char ssid[33];  // 32 chars + null terminator
 } wifi_ap_record_simple_t;
 
 void toggle_wifi_softap(void);
