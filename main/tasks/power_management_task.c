@@ -39,6 +39,7 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
 
     ASIC_set_frequency(GLOBAL_STATE);
+    ASIC_set_nonce_space(GLOBAL_STATE);
 
     // Cut ASIC power and hold in reset
     VCORE_set_voltage(GLOBAL_STATE, 0.0f);
@@ -241,6 +242,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE);
 
             ASIC_set_frequency(GLOBAL_STATE);
+            ASIC_set_nonce_space(GLOBAL_STATE);
             
             last_asic_frequency = asic_frequency;
         }
