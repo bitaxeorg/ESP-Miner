@@ -19,8 +19,11 @@
 
 static const char *TAG = "sv2_noise";
 
-#define TRANSPORT_TIMEOUT_MS 5000
-#define RECV_TIMEOUT_MS      (60 * 3 * 1000)
+#define TRANSPORT_TIMEOUT_MS    5000
+#define RECV_TIMEOUT_MS         (60 * 3 * 1000)
+// Handshake should complete within seconds; if the server doesn't respond fast we
+// want to fail and reconnect rather than block here for 3 minutes.
+#define HANDSHAKE_TIMEOUT_MS    10000
 
 // Noise protocol name used to initialize h and ck
 static const char NOISE_PROTOCOL_NAME[] = "Noise_NX_Secp256k1+EllSwift_ChaChaPoly_SHA256";
@@ -40,11 +43,11 @@ struct sv2_noise_ctx {
 
 // --- Transport helpers ---
 
-static int noise_recv_exact(esp_transport_handle_t transport, uint8_t *buf, int len)
+static int noise_recv_exact(esp_transport_handle_t transport, uint8_t *buf, int len, int timeout_ms)
 {
     int received = 0;
     while (received < len) {
-        int r = esp_transport_read(transport, (char *)buf + received, len - received, RECV_TIMEOUT_MS);
+        int r = esp_transport_read(transport, (char *)buf + received, len - received, timeout_ms);
         if (r <= 0) {
             ESP_LOGE(TAG, "recv failed: r=%d", r);
             return -1;
@@ -332,7 +335,7 @@ int sv2_noise_handshake(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     // Step 5: Receive 234 bytes (responder's message = Act 2)
     uint8_t resp[234];
     ESP_LOGI(TAG, "<- Waiting for server response...");
-    if (noise_recv_exact(transport, resp, 234) != 0) {
+    if (noise_recv_exact(transport, resp, 234, HANDSHAKE_TIMEOUT_MS) != 0) {
         ESP_LOGE(TAG, "Failed to receive server Noise response");
         return -1;
     }
@@ -542,7 +545,7 @@ int sv2_noise_recv(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
 
     // Receive and decrypt header (22 bytes -> 6 bytes)
     uint8_t enc_hdr[22];
-    if (noise_recv_exact(transport, enc_hdr, 22) != 0) {
+    if (noise_recv_exact(transport, enc_hdr, 22, RECV_TIMEOUT_MS) != 0) {
         return -1;
     }
 
@@ -570,7 +573,7 @@ int sv2_noise_recv(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
     uint8_t *enc_payload = malloc(enc_len);
     if (!enc_payload) return -1;
 
-    if (noise_recv_exact(transport, enc_payload, enc_len) != 0) {
+    if (noise_recv_exact(transport, enc_payload, enc_len, RECV_TIMEOUT_MS) != 0) {
         free(enc_payload);
         return -1;
     }
