@@ -1,6 +1,7 @@
 #include "esp_log.h"
 #include "esp_transport.h"
 #include "esp_transport_tcp.h"
+#include <lwip/sockets.h>
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "system.h"
@@ -713,8 +714,18 @@ void stratum_v2_task(void *pvParameters)
             continue;
         }
 
+        // Mirror SV1's IPv4/IPv6 indicator in the URL tooltip — the Mode field
+        // already conveys the protocol (SV2 Standard/Extended Channel), and Noise
+        // encryption is implied for SV2.
+        const char *ip_protocol = "IPv4";
+        struct sockaddr_storage peer_addr;
+        socklen_t peer_len = sizeof(peer_addr);
+        int sock = esp_transport_get_socket(transport);
+        if (sock >= 0 && getpeername(sock, (struct sockaddr *)&peer_addr, &peer_len) == 0) {
+            ip_protocol = (peer_addr.ss_family == AF_INET6) ? "IPv6" : "IPv4";
+        }
         snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
-                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2+Noise");
+                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "%s", ip_protocol);
 
         ESP_LOGI(TAG, "Encrypted channel established (ChaCha20-Poly1305) (free heap: %lu)",
                  (unsigned long)esp_get_free_heap_size());
