@@ -14,12 +14,12 @@ interface ITlsOption {
 }
 
 interface IProtocolOption {
-  value: number;
+  value: 'SV1' | 'SV2';
   label: string;
 }
 
 interface IChannelOption {
-  value: number;
+  value: 'standard' | 'extended';
   label: string;
 }
 
@@ -45,13 +45,13 @@ export class PoolComponent implements OnInit {
   ];
 
   public protocolOptions: IProtocolOption[] = [
-    { value: 0, label: 'Stratum V1' },
-    { value: 1, label: 'Stratum V2' }
+    { value: 'SV1', label: 'Stratum V1' },
+    { value: 'SV2', label: 'Stratum V2' }
   ];
 
   public sv2ChannelOptions: IChannelOption[] = [
-    { value: 0, label: 'Extended Channels' },
-    { value: 1, label: 'Standard Channels' }
+    { value: 'extended', label: 'Extended Channels' },
+    { value: 'standard', label: 'Standard Channels' }
   ];
 
   public asicModel: string = '';
@@ -83,7 +83,7 @@ export class PoolComponent implements OnInit {
             Validators.min(0),
             Validators.max(65535)
           ]],
-          stratumProtocol: [info.stratumProtocol || 0],
+          stratumProtocol: [info.stratumProtocol || 'SV1'],
           stratumV2AuthorityPubkey: [info.stratumV2AuthorityPubkey || '', [this.base58Validator()]],
           stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == true, [Validators.required]],
           stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
@@ -108,10 +108,10 @@ export class PoolComponent implements OnInit {
           fallbackStratumDecodeCoinbase: [info.fallbackStratumDecodeCoinbase == true, [Validators.required]],
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
           fallbackStratumPassword: ['*****', [Validators.required]],
-          fallbackStratumProtocol: [info.fallbackStratumProtocol || 0],
+          fallbackStratumProtocol: [info.fallbackStratumProtocol || 'SV1'],
           fallbackStratumV2AuthorityPubkey: [info.fallbackStratumV2AuthorityPubkey || '', [this.base58Validator()]],
-          stratumV2ChannelType: [info.stratumV2ChannelType ?? 0],
-          fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType ?? 0]
+          stratumV2ChannelType: [info.stratumV2ChannelType || 'standard'],
+          fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType || 'standard']
         });
 
         const setupTlsValidation = (tlsControlName: string, certControlName: string) => {
@@ -282,7 +282,7 @@ export class PoolComponent implements OnInit {
     };
   }
 
-  trackByFn(index: number, option: ITlsOption): number {
+  trackByFn(index: number, option: { value: string | number }): string | number {
     return option.value;
   }
 
@@ -296,11 +296,11 @@ export class PoolComponent implements OnInit {
   }
 
   isStratumV2Enabled(): boolean {
-    return this.form?.get('stratumProtocol')?.value === 1;
+    return this.form?.get('stratumProtocol')?.value === 'SV2';
   }
 
   isFallbackStratumV2Enabled(): boolean {
-    return this.form?.get('fallbackStratumProtocol')?.value === 1;
+    return this.form?.get('fallbackStratumProtocol')?.value === 'SV2';
   }
 
   isPoolV2Enabled(pool: PoolType): boolean {
@@ -314,6 +314,6 @@ export class PoolComponent implements OnInit {
   isPoolV2Extended(pool: PoolType): boolean {
     if (!this.isPoolV2Enabled(pool)) return false;
     const key = pool === 'stratum' ? 'stratumV2ChannelType' : 'fallbackStratumV2ChannelType';
-    return this.form?.get(key)?.value === 0;
+    return this.form?.get(key)?.value === 'extended';
   }
 }

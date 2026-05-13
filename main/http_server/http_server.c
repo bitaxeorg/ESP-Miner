@@ -160,6 +160,34 @@ static esp_err_t GET_system_logs(httpd_req_t *req)
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
 
+// Protocol and channel-type are stored as u16 in NVS but exposed as strings via the REST API
+// so the frontend doesn't need to decode numeric enums.
+static const char * stratum_protocol_to_string(uint16_t v)
+{
+    return v == 1 ? "SV2" : "SV1";
+}
+
+static int stratum_protocol_from_string(const char *s, uint16_t *out)
+{
+    if (!s) return -1;
+    if (strcmp(s, "SV1") == 0) { *out = 0; return 0; }
+    if (strcmp(s, "SV2") == 0) { *out = 1; return 0; }
+    return -1;
+}
+
+static const char * sv2_channel_type_to_string(uint16_t v)
+{
+    return v == 1 ? "extended" : "standard";
+}
+
+static int sv2_channel_type_from_string(const char *s, uint16_t *out)
+{
+    if (!s) return -1;
+    if (strcmp(s, "standard") == 0) { *out = 0; return 0; }
+    if (strcmp(s, "extended") == 0) { *out = 1; return 0; }
+    return -1;
+}
+
 esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_len)
 {
     const char * response = cJSON_PrintBuffered(item, *prebuffer_len, true);
@@ -536,6 +564,26 @@ bool check_settings_and_update(const cJSON * const root)
 {
     bool result = true;
 
+    // Validate the string-enum fields (handled outside the rest_name table).
+    struct {
+        const char *json_key;
+        int (*parse)(const char *, uint16_t *);
+    } string_enum_fields[] = {
+        { "stratumProtocol",              stratum_protocol_from_string },
+        { "fallbackStratumProtocol",      stratum_protocol_from_string },
+        { "stratumV2ChannelType",         sv2_channel_type_from_string },
+        { "fallbackStratumV2ChannelType", sv2_channel_type_from_string },
+    };
+    for (size_t i = 0; i < sizeof(string_enum_fields) / sizeof(string_enum_fields[0]); i++) {
+        cJSON *item = cJSON_GetObjectItem(root, string_enum_fields[i].json_key);
+        if (!item) continue;
+        uint16_t v;
+        if (!cJSON_IsString(item) || string_enum_fields[i].parse(item->valuestring, &v) != 0) {
+            ESP_LOGW(TAG, "Invalid value for '%s'", string_enum_fields[i].json_key);
+            result = false;
+        }
+    }
+
     for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
         Settings *setting = nvs_config_get_settings(key);
         if (!setting->rest_name) continue;
@@ -638,6 +686,29 @@ bool check_settings_and_update(const cJSON * const root)
                 case TYPE_FLOAT:
                     nvs_config_set_float(key, (float)item->valuedouble);
                     break;
+            }
+        }
+
+        // Special-case: protocol and channel-type are exposed as strings via the API
+        // (no rest_name in nvs_config table), parse to u16 here.
+        struct {
+            const char *json_key;
+            NvsConfigKey nvs_key;
+            int (*parse)(const char *, uint16_t *);
+        } string_enum_fields[] = {
+            { "stratumProtocol",              NVS_CONFIG_STRATUM_PROTOCOL,          stratum_protocol_from_string },
+            { "fallbackStratumProtocol",      NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL, stratum_protocol_from_string },
+            { "stratumV2ChannelType",         NVS_CONFIG_SV2_CHANNEL_TYPE,          sv2_channel_type_from_string },
+            { "fallbackStratumV2ChannelType", NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE, sv2_channel_type_from_string },
+        };
+        for (size_t i = 0; i < sizeof(string_enum_fields) / sizeof(string_enum_fields[0]); i++) {
+            cJSON *item = cJSON_GetObjectItem(root, string_enum_fields[i].json_key);
+            if (!item || !cJSON_IsString(item)) continue;
+            uint16_t v;
+            if (string_enum_fields[i].parse(item->valuestring, &v) == 0) {
+                nvs_config_set_u16(string_enum_fields[i].nvs_key, v);
+            } else {
+                ESP_LOGW(TAG, "Invalid value for %s: %s", string_enum_fields[i].json_key, item->valuestring);
             }
         }
     }
@@ -976,8 +1047,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT));
-    cJSON_AddNumberToObject(root, "stratumProtocol", nvs_config_get_u16(NVS_CONFIG_STRATUM_PROTOCOL));
-    cJSON_AddNumberToObject(root, "activeStratumProtocol", (int)GLOBAL_STATE->stratum_protocol);
+    cJSON_AddStringToObject(root, "stratumProtocol",
+                            stratum_protocol_to_string(nvs_config_get_u16(NVS_CONFIG_STRATUM_PROTOCOL)));
     const char *protocol_label = "SV1";
     if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
         protocol_label = stratum_v2_is_extended_channel(GLOBAL_STATE)
@@ -985,7 +1056,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     }
     cJSON_AddStringToObject(root, "activeProtocolLabel", protocol_label);
     cJSON_AddStringToObject(root, "stratumV2AuthorityPubkey", sv2AuthPubkey);
-    cJSON_AddNumberToObject(root, "stratumV2ChannelType", nvs_config_get_u16(NVS_CONFIG_SV2_CHANNEL_TYPE));
+    cJSON_AddStringToObject(root, "stratumV2ChannelType",
+                            sv2_channel_type_to_string(nvs_config_get_u16(NVS_CONFIG_SV2_CHANNEL_TYPE)));
     cJSON_AddStringToObject(root, "stratumUser", stratumUser);
     cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY));
     cJSON_AddNumberToObject(root, "stratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE));
@@ -999,10 +1071,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
     cJSON_AddNumberToObject(root, "fallbackStratumTLS", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS));
     cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
-    cJSON_AddNumberToObject(root, "fallbackStratumProtocol", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL));
+    cJSON_AddStringToObject(root, "fallbackStratumProtocol",
+                            stratum_protocol_to_string(nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL)));
     cJSON_AddNumberToObject(root, "fallbackStratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX));
     cJSON_AddStringToObject(root, "fallbackStratumV2AuthorityPubkey", fallbackSv2AuthPubkey);
-    cJSON_AddNumberToObject(root, "fallbackStratumV2ChannelType", nvs_config_get_u16(NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE));
+    cJSON_AddStringToObject(root, "fallbackStratumV2ChannelType",
+                            sv2_channel_type_to_string(nvs_config_get_u16(NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE)));
     cJSON_AddFloatToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
     cJSON_AddFloatToObject(root, "cpuUsage", GLOBAL_STATE->SYSTEM_MODULE.cpu_usage);
 

@@ -259,14 +259,16 @@ components:
           type: boolean
           description: Enable fallback pool coinbase transaction decoding
         fallbackStratumProtocol:
-          type: number
-          description: Fallback stratum protocol version (0=V1, 1=V2)
+          type: string
+          enum: [SV1, SV2]
+          description: Configured fallback stratum protocol
         fallbackStratumV2AuthorityPubkey:
           type: string
           description: Fallback SV2 authority public key for certificate verification (base58-encoded)
         fallbackStratumV2ChannelType:
-          type: number
-          description: Fallback SV2 channel type (0=extended, 1=standard)
+          type: string
+          enum: [standard, extended]
+          description: Configured fallback SV2 channel type
         fanrpm:
           type: number
           description: Current fan speed in RPM
@@ -408,11 +410,9 @@ components:
           type: number
           description: Primary stratum server port
         stratumProtocol:
-          type: number
-          description: Stratum protocol version (0=V1, 1=V2)
-        activeStratumProtocol:
-          type: number
-          description: Active runtime stratum protocol (0=V1, 1=V2), may differ from configured when using fallback
+          type: string
+          enum: [SV1, SV2]
+          description: Configured stratum protocol
         activeProtocolLabel:
           type: string
           description: Human-readable label for the active protocol (e.g. "SV1", "SV2 Extended Channel")
@@ -420,8 +420,9 @@ components:
           type: string
           description: SV2 authority public key for certificate verification (base58-encoded)
         stratumV2ChannelType:
-          type: number
-          description: SV2 channel type (0=extended, 1=standard)
+          type: string
+          enum: [standard, extended]
+          description: Configured SV2 channel type
         stratumSuggestedDifficulty:
           type: number
           description: Pool suggested difficulty
@@ -694,11 +695,17 @@ components:
           examples:
             - 3333
         stratumProtocol:
-          type: integer
-          description: Stratum protocol version (0=V1, 1=V2)
-          enum: [0, 1]
+          type: string
+          description: Stratum protocol
+          enum: [SV1, SV2]
           examples:
-            - 0
+            - "SV1"
+        stratumV2ChannelType:
+          type: string
+          description: SV2 channel type
+          enum: [standard, extended]
+          examples:
+            - "standard"
         stratumV2AuthorityPubkey:
           type: string
           description: Optional SV2 authority public key for certificate verification (base58-encoded)
@@ -715,11 +722,17 @@ components:
           examples:
             - 3333
         fallbackStratumProtocol:
-          type: integer
-          description: Fallback stratum protocol version (0=V1, 1=V2)
-          enum: [0, 1]
+          type: string
+          description: Fallback stratum protocol
+          enum: [SV1, SV2]
           examples:
-            - 0
+            - "SV1"
+        fallbackStratumV2ChannelType:
+          type: string
+          description: Fallback SV2 channel type
+          enum: [standard, extended]
+          examples:
+            - "standard"
         fallbackStratumV2AuthorityPubkey:
           type: string
           description: Optional fallback SV2 authority public key for certificate verification (base58-encoded)

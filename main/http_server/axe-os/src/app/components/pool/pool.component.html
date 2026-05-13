@@ -97,19 +97,19 @@
                                                 [value]="option.value"
                                                 [formControlName]="pool === 'stratum' ? 'stratumV2ChannelType' : 'fallbackStratumV2ChannelType'"
                                                 [inputId]="(pool === 'stratum' ? 'stratumV2ChannelType_' : 'fallbackStratumV2ChannelType_') + option.value"
-                                                [disabled]="option.value === 1 && isStandardChannelDisabled()">
+                                                [disabled]="option.value === 'standard' && isStandardChannelDisabled()">
                                             </p-radioButton>
                                             <label [for]="(pool === 'stratum' ? 'stratumV2ChannelType_' : 'fallbackStratumV2ChannelType_') + option.value"
                                                 class="ml-2 cursor-pointer"
-                                                [class.text-400]="option.value === 1 && isStandardChannelDisabled()">
+                                                [class.text-400]="option.value === 'standard' && isStandardChannelDisabled()">
                                                 {{ option.label }}
                                             </label>
                                         </div>
                                     </div>
-                                    <small class="block text-blue-600 mt-2" *ngIf="(pool === 'stratum' ? form.get('stratumV2ChannelType')?.value : form.get('fallbackStratumV2ChannelType')?.value) === 0">
+                                    <small class="block text-blue-600 mt-2" *ngIf="(pool === 'stratum' ? form.get('stratumV2ChannelType')?.value : form.get('fallbackStratumV2ChannelType')?.value) === 'extended'">
                                         Recommended for external SV2 pools. The pool sends the coinbase template, enabling transaction verification.
                                     </small>
-                                    <small class="block text-orange-600 mt-2" *ngIf="(pool === 'stratum' ? form.get('stratumV2ChannelType')?.value : form.get('fallbackStratumV2ChannelType')?.value) === 1">
+                                    <small class="block text-orange-600 mt-2" *ngIf="(pool === 'stratum' ? form.get('stratumV2ChannelType')?.value : form.get('fallbackStratumV2ChannelType')?.value) === 'standard'">
                                         Only use with a self-deployed local SV2 node or JD client. Not supported on Bitaxe Max (BM1397).
                                     </small>
                                     <small class="block text-400 mt-2" *ngIf="isStandardChannelDisabled()">
