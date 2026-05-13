@@ -384,10 +384,6 @@ void stratum_v1_task(void *pvParameters)
     bool use_fallback = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
     char *stratum_url = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
     uint16_t port = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
-    bool extranonce_subscribe = use_fallback ?
-        GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
-    uint16_t difficulty = use_fallback ?
-        GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
 
     // Set V1-specific free function for the work queue
     GLOBAL_STATE->stratum_queue.free_fn = (void (*)(void *))STRATUM_V1_free_mining_notify;
