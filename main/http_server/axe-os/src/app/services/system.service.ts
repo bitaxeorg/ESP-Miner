@@ -94,7 +94,7 @@ export class SystemApiService {
         ASICModel: "BM1370" as any,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
-        stratumProtocol: "SV1",
+        stratumProtocol: "SV1" as const,
         activeProtocolLabel: "SV1",
         stratumV2AuthorityPubkey: "",
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
