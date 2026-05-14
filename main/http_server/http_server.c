@@ -175,16 +175,18 @@ static int stratum_protocol_from_string(const char *s, uint16_t *out)
     return -1;
 }
 
+// NVS storage uses the same numeric values as the SV2_CHANNEL_* enum in sv2_protocol.h:
+// 0 = SV2_CHANNEL_EXTENDED, 1 = SV2_CHANNEL_STANDARD. The string mapping must follow.
 static const char * sv2_channel_type_to_string(uint16_t v)
 {
-    return v == 1 ? "extended" : "standard";
+    return v == 1 ? "standard" : "extended";
 }
 
 static int sv2_channel_type_from_string(const char *s, uint16_t *out)
 {
     if (!s) return -1;
-    if (strcmp(s, "standard") == 0) { *out = 0; return 0; }
-    if (strcmp(s, "extended") == 0) { *out = 1; return 0; }
+    if (strcmp(s, "extended") == 0) { *out = 0; return 0; }
+    if (strcmp(s, "standard") == 0) { *out = 1; return 0; }
     return -1;
 }
 
