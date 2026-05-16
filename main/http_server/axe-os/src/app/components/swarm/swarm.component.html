@@ -191,14 +191,14 @@
                             </div>
                             <div>
                                 <span *ngIf="axe.vrTemp" class="text-500 cursor-pointer mr-2" [ngClass]="{'text-red-500': axe.vrTemp > 105}" pTooltip="Voltage Regulator Temperature" tooltipPosition="top">
-                                    {{axe.vrTemp | number: '1.0-1'}} °C
+                                    {{axe.vrTemp | number: '1.0-1'}} &deg;C
                                 </span>
                                 <span *ngIf="axe.temp2 > 0" class="cursor-pointer mr-2" [ngClass]="{'text-red-500': axe.temp2 > 70}" pTooltip="ASIC Temperature 2" tooltipPosition="top">
-                                    {{axe.temp2 | number: '1.0-1'}} °C
+                                    {{axe.temp2 | number: '1.0-1'}} &deg;C
                                 </span>
                                 <span class="cursor-pointer" [ngClass]="{'text-red-500': axe.temp > 70}" pTooltip="ASIC Temperature{{ axe.temp2 > 0 ? ' 1' : '' }}" tooltipPosition="top">
                                     <ng-container *ngIf="axe.temp > 0; else noValue">
-                                        {{axe.temp | number: '1.0-1'}} °C
+                                        {{axe.temp | number: '1.0-1'}} &deg;C
                                     </ng-container>
                                 </span>
                             </div>
@@ -282,14 +282,14 @@
                             <td>
                                 <p class="cursor-pointer m-0" [ngClass]="{'text-red-500': axe.temp > 70}" pTooltip="ASIC Temperature{{ axe.temp2 > 0 ? ' 1' : '' }}" tooltipPosition="top">
                                     <ng-container *ngIf="axe.temp > 0; else noValue">
-                                        {{axe.temp | number: '1.0-1'}} °C
+                                        {{axe.temp | number: '1.0-1'}} &deg;C
                                     </ng-container>
                                 </p>
                                 <p *ngIf="axe.temp2 > 0" class="cursor-pointer m-0" [ngClass]="{'text-red-500': axe.temp2 > 70}" pTooltip="ASIC Temperature 2" tooltipPosition="top">
-                                    {{axe.temp2 | number: '1.0-1'}} °C
+                                    {{axe.temp2 | number: '1.0-1'}} &deg;C
                                 </p>
                                 <p *ngIf="axe.vrTemp" class="text-500 cursor-pointer m-0" [ngClass]="{'text-red-500': axe.vrTemp > 105}" pTooltip="Voltage Regulator Temperature" tooltipPosition="top">
-                                    {{axe.vrTemp | number: '1.0-1'}} °C
+                                    {{axe.vrTemp | number: '1.0-1'}} &deg;C
                                 </p>
                             </td>
                             <td>{{axe.poolDifficulty}}</td>

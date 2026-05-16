@@ -729,7 +729,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         this.maxPower = Math.max(info.maxPower, info.power);
         this.nominalVoltage = info.nominalVoltage;
-        this.maxTemp = Math.max(75, info.temp);
+        this.maxTemp = Math.max(75, info.temp || 0, info.temp2 || 0, info.temptarget || 0);
         this.maxRpm = Math.max(7000, info.fanrpm, info.fan2rpm);
         this.maxFrequency = Math.max(800, info.frequency);
 
@@ -873,7 +873,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       parts.push(
         info.hostname,
         (info.hashRate ? HashSuffixPipe.transform(info.hashRate) : ''),
-        (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} °C` : ''),
+        (info.temp ? `${info.temp}${info.temp2 > -1 ? `/${info.temp2}` : ''}${info.vrTemp ? `/${info.vrTemp}` : ''} &deg;C` : ''),
         (!info.power_fault ? `${info.power} W` : ''),
         (info.bestDiff ? DiffSuffixPipe.transform(info.bestDiff) : ''),
       );
@@ -1189,7 +1189,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.errorPercentage:  return {suffix: ' %', precision: 2};
       case eChartLabel.asicTemp:
       case eChartLabel.asicTemp2:
-      case eChartLabel.vrTemp:           return {suffix: ' °C', precision: 1};
+      case eChartLabel.vrTemp:           return {suffix: ' &deg;C', precision: 1};
       case eChartLabel.asicVoltage:
       case eChartLabel.voltage:          return {suffix: ' V', precision: 1};
       case eChartLabel.power:            return {suffix: ' W', precision: 1};
