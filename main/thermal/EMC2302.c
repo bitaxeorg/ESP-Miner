@@ -51,6 +51,11 @@ esp_err_t EMC2302_init()
 
     ESP_LOGI(TAG, "EMC2302 init");
 
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2302_dev_handle, EMC2302_PWM_BASEF123, 0x00), TAG, "Failed to set PWM base frequency");
+
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2302_dev_handle, EMC2302_PWM1_DIVIDE, 0x01), TAG, "Failed to set PWM1 divider");
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2302_dev_handle, EMC2302_PWM2_DIVIDE, 0x01), TAG, "Failed to set PWM2 divider");
+
     // Set the minimum fan speed measured and reported to 500 RPM
     ESP_RETURN_ON_ERROR(set_fan_range(EMC2302_FAN1_CONFIG1, RNG_500_RPM, &fan1_multiplier), TAG, "Failed to set fan 1 config");
     ESP_RETURN_ON_ERROR(set_fan_range(EMC2302_FAN2_CONFIG1, RNG_500_RPM, &fan2_multiplier), TAG, "Failed to set fan 2 config");
