@@ -1,0 +1,44 @@
+<div class="card">
+  <div class="grid">
+    <div class="col-12">
+      <h5>Color Scheme</h5>
+      <div class="flex gap-3">
+        <div class="flex align-items-center">
+          <p-radioButton name="colorScheme" [value]="'dark'" [(ngModel)]="selectedScheme"
+            (onClick)="changeColorScheme('dark')" inputId="dark"></p-radioButton>
+          <label for="dark" class="ml-2">Dark</label>
+        </div>
+        <div class="flex align-items-center">
+          <p-radioButton name="colorScheme" [value]="'light'" [(ngModel)]="selectedScheme"
+            (onClick)="changeColorScheme('light')" inputId="light"></p-radioButton>
+          <label for="light" class="ml-2">Light</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 mt-4">
+      <h5>Theme Color</h5>
+      <div class="grid gap-2">
+        <div *ngFor="let theme of themes" class="col-2 theme-color">
+          <button pButton [class]="'p-button-rounded p-button-text color-dot'"
+                  [style.--dot-bg]="theme.primaryColor"
+                  [style.backgroundColor]="'var(--dot-bg)'"
+                  style="width: 2rem; height: 2rem; border: none;"
+                  (click)="changeTheme(theme)">
+            <i *ngIf="theme.primaryColor === currentColor" class="pi pi-check selected-icon"></i>
+          </button>
+          <div class="text-sm mt-1">{{theme.name}}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 mt-4">
+      <h5>Custom Color</h5>
+      <div class="flex align-items-center gap-3">
+        <input type="color" [ngModel]="currentColor" (change)="onCustomColorChange($event)" 
+               style="width: 3rem; height: 3rem; border: 1px solid var(--surface-border); border-radius: 50%; cursor: pointer; background: transparent; padding: 0;">
+        <span class="text-lg font-mono">{{currentColor}}</span>
+      </div>
+    </div>
+  </div>
+</div>

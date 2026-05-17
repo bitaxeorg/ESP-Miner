@@ -10,7 +10,7 @@
   position: relative;
 
   .selected-icon {
-    color: white;
+    color: contrast-color(var(--dot-bg));
     font-size: 1rem;
     position: absolute;
     top: 50%;
