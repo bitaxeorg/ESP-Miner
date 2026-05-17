@@ -39,6 +39,8 @@ export class AppMenuComponent implements OnInit {
           { separator: true },
 
           { label: 'Whitepaper', icon: 'pi pi-fw pi-bitcoin', command: () => window.open('/bitcoin.pdf', '_blank') },
+          { separator: true },
+          { image: '/api/screen/stream' }
         ]
       }
     ];
