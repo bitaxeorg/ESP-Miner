@@ -11,6 +11,17 @@
 #include "hashrate_monitor_task.h"
 #include "cjson_utils.h"
 #include "statistics_task.h"
+#include "stratum_v2_task.h"
+
+static const char * stratum_protocol_to_string(uint16_t v)
+{
+    return v == 1 ? "SV2" : "SV1";
+}
+
+static const char * sv2_channel_type_to_string(uint16_t v)
+{
+    return v == 1 ? "standard" : "extended";
+}
 
 static const char *get_reset_reason_str(esp_reset_reason_t reason)
 {
@@ -172,6 +183,33 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddStringToObject(root, "fallbackStratumCert", f_cert ? f_cert : "");
     free(f_cert);
     cJSON_AddBoolToObject(root, "fallbackStratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX));
+
+    cJSON_AddStringToObject(root, "stratumProtocol",
+                            stratum_protocol_to_string(nvs_config_get_u16(NVS_CONFIG_STRATUM_PROTOCOL)));
+
+    const char *protocol_label = "SV1";
+    if (g->stratum_protocol == STRATUM_V2) {
+        protocol_label = stratum_v2_is_extended_channel(g)
+            ? "SV2 Extended Channel" : "SV2 Standard Channel";
+    }
+    cJSON_AddStringToObject(root, "activeProtocolLabel", protocol_label);
+
+    char *sv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_SV2_AUTHORITY_PUBKEY);
+    cJSON_AddStringToObject(root, "stratumV2AuthorityPubkey", sv2AuthPubkey ? sv2AuthPubkey : "");
+    free(sv2AuthPubkey);
+
+    cJSON_AddStringToObject(root, "stratumV2ChannelType",
+                            sv2_channel_type_to_string(nvs_config_get_u16(NVS_CONFIG_SV2_CHANNEL_TYPE)));
+
+    char *fallbackSv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY);
+    cJSON_AddStringToObject(root, "fallbackStratumV2AuthorityPubkey", fallbackSv2AuthPubkey ? fallbackSv2AuthPubkey : "");
+    free(fallbackSv2AuthPubkey);
+
+    cJSON_AddStringToObject(root, "fallbackStratumV2ChannelType",
+                            sv2_channel_type_to_string(nvs_config_get_u16(NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE)));
+
+    cJSON_AddStringToObject(root, "fallbackStratumProtocol",
+                            stratum_protocol_to_string(nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL)));
 
     // User Preferences
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) ? 1 : 0);
