@@ -26,6 +26,22 @@
     "Job not found": "While this share was being submitted, the network had already found a new block, making this share invalid.",
     "Duplicate share": "This share has already been submitted.",
     "Difficulty too low": "The submitted share does not meet the minimum required difficulty."
+  },
+  {
+    "Invalid subscription message": "The miner's mining.subscribe request was malformed.",
+    "Invalid configuration message": "The miner's mining.configure request was malformed.",
+    "Invalid authorization message": "The miner's mining.authorize request was malformed.",
+    "Invalid Bitcoin address": "The submitted username is not a valid Bitcoin address.",
+    "Invalid suggest difficulty message": "The mining.suggest_difficulty request was malformed.",
+    "Suggest difficulty is disabled for this connection": "This pool port does not allow miners to suggest a difficulty.",
+    "Invalid mining submit message": "The mining.submit request was malformed.",
+    "Unauthorized worker": "This worker has not been authorized — submit mining.authorize first.",
+    "Not subscribed": "This connection has not subscribed — submit mining.subscribe first.",
+    "stale": "While this share was being submitted, the network had already found a new block, making this share invalid.",
+    "invalid-channel-id": "The SV2 channel ID in the share submission is not known to the pool.",
+    "invalid-job-id": "The job ID in the share submission is not known to the pool.",
+    "stale-share": "While this share was being submitted, the network had already found a new block, making this share invalid.",
+    "difficulty-too-low": "The submitted share does not meet the required difficulty."
   }
 ]
   
