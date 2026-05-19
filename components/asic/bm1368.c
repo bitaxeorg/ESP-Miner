@@ -124,6 +124,29 @@ void BM1368_set_version_mask(uint32_t version_mask)
     _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, version_cmd, 6, BM1368_SERIALTX_DEBUG);
 }
 
+void BM1368_set_hash_counting_number(uint32_t hcn) {
+    uint8_t set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x00, 0x00};
+    set_10_hash_counting[2] = (hcn >> 24) & 0xFF;
+    set_10_hash_counting[3] = (hcn >> 16) & 0xFF;
+    set_10_hash_counting[4] = (hcn >> 8) & 0xFF;
+    set_10_hash_counting[5] = hcn & 0xFF;
+    _send_BM1368((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1368_SERIALTX_DEBUG);
+}
+
+void BM1368_set_nonce_space(double nonce_percent, float frequency, uint16_t asic_count, uint16_t cores) 
+{   
+    int cores_up = _next_power_of_two(cores);
+    int asic_count_up =  _next_power_of_two(asic_count);
+
+    // HCN hash counting number (the size of the nonce space)
+    float hcn_space = (float)NONCE_SPACE / cores_up / asic_count_up;
+    double hcn_max = hcn_space * (double)FREQ_MULT / frequency * 0.5f; 
+    double hcn_frac = nonce_percent * hcn_max;
+    uint32_t hcn_register_value = (uint32_t)hcn_frac;
+
+    BM1368_set_hash_counting_number(hcn_register_value);
+}
+
 float BM1368_send_hash_frequency(float target_freq)
 {
     uint8_t fb_divider, refdiv, postdiv1, postdiv2;
@@ -204,7 +227,10 @@ uint8_t BM1368_init(void * pvParameters)
 
     do_frequency_transition(GLOBAL_STATE, BM1368_send_hash_frequency);
 
-    _send_BM1368(TYPE_CMD | GROUP_ALL | CMD_WRITE, (uint8_t[]){0x00, 0x10, 0x00, 0x00, 0x15, 0xa4}, 6, false);
+    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+    int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
+
+    BM1368_set_nonce_space(1.0, frequency, asic_count,cores);
     BM1368_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
     return chip_counter;

@@ -159,7 +159,7 @@
                         <span class="md:hidden mr-1">Data Logging</span>Disabled
                     </ng-container>
                     <ng-container *ngIf="this.form.controls['statsFrequency'].value > 0">
-                        <span class="md:hidden mr-1">Log Data</span>Every {{form.controls['statsFrequency'].value | dateAgo: {strict: true} }} for {{(form.controls['statsFrequency'].value * 720) | dateAgo}}
+                        <span class="md:hidden mr-1">Log Data</span>Every {{form.controls['statsFrequency'].value | dateAgo: {strict: true} }} for {{(form.controls['statsFrequency'].value * statsLimit) | dateAgo}}
                     </ng-container>
                 </label>
                 <p-slider [min]="0" [max]="statsFrequencyMaxSteps" [step]="1" [formControl]="statsFrequencyControl"></p-slider>

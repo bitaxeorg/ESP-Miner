@@ -315,6 +315,7 @@ void BAP_handle_settings(const char *parameter, const char *value) {
                 bap_global_state->POWER_MANAGEMENT_MODULE.frequency_value = target_frequency;
 
                 ASIC_set_frequency(bap_global_state);
+                ASIC_set_nonce_space(bap_global_state);
 
                 //ESP_LOGI(TAG, "Frequency successfully set to %.2f MHz", target_frequency);
 
