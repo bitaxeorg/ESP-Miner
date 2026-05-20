@@ -147,8 +147,7 @@ void create_jobs_task(void *pvParameters)
             // Causing huge amount of duplicated shares
             if (clean) {
                 extranonce_2 = 0;
-            }
-            if (!clean) {
+            } else {
                 continue;
             }
         } else {
