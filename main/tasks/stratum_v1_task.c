@@ -189,7 +189,7 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
         struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
         if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr) && addr6->sin6_scope_id != 0) {
             char zone[16];
-            snprintf(zone, sizeof(zone), "%%%lu", (unsigned long)addr6->sin6_scope_id);
+            snprintf(zone, sizeof(zone), "%%%" PRIu32, addr6->sin6_scope_id);
             strncat(conn_info->host_ip, zone,
                     sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
             // Ensure null termination

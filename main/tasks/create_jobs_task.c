@@ -288,7 +288,7 @@ static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *sv2_job, dou
 
     // SV2 job metadata
     char jobid_str[16];
-    snprintf(jobid_str, sizeof(jobid_str), "%lu", sv2_job->job_id);
+    snprintf(jobid_str, sizeof(jobid_str), "%" PRIu32, sv2_job->job_id);
     next_job->jobid = strdup(jobid_str);
     next_job->extranonce2 = strdup(""); // unused in SV2 standard
     next_job->version_mask = version_mask;
@@ -390,7 +390,7 @@ static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_
 
     // Job metadata
     char jobid_str[16];
-    snprintf(jobid_str, sizeof(jobid_str), "%lu", ext_job->job_id);
+    snprintf(jobid_str, sizeof(jobid_str), "%" PRIu32, ext_job->job_id);
     next_job->jobid = strdup(jobid_str);
 
     // Store extranonce_2 as hex for share submission

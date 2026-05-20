@@ -69,7 +69,7 @@ void task_monitor_task(void *pvParameters) {
             double delta_percentage = (task_delta * 100.0) / total_delta;
             uint64_t lifetime_runtime = task_array2[j].ulRunTimeCounter;
             double lifetime_percentage = (lifetime_runtime * 100.0) / total_runtime2;
-            printf("%-20s\t%llu\t\t\t%.2f%%\t\t%llu\t\t\t%.2f%%\n", task_array2[j].pcTaskName, task_delta, delta_percentage, lifetime_runtime, lifetime_percentage);
+            printf("%-20s\t%" PRIu64 "\t\t\t%.2f%%\t\t%" PRIu64 "\t\t\t%.2f%%\n", task_array2[j].pcTaskName, task_delta, delta_percentage, lifetime_runtime, lifetime_percentage);
         }
         printf("\n");
 
