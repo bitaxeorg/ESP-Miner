@@ -589,8 +589,9 @@ void stratum_v1_task(void *pvParameters)
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {
                 // Reset retry attempts after successfully receiving data.
                 retry_attempts = 0;
-                consecutive_pool_failures = 0;
-                GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
+                // Tell the coordinator setup succeeded so it clears its
+                // failure counter and pools_unavailable.
+                protocol_coordinator_notify_success();
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "setup message accepted");
                     uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
