@@ -217,7 +217,7 @@ TEST_CASE("Parse stratum error array format", "[stratum]")
     TEST_ASSERT_EQUAL_STRING("Job not found", stratum_api_v1_message.error_str);
 }
 
-TEST_CASE("Parse stratum error jsonrpc object with code", "[stratum]
+TEST_CASE("Parse stratum error jsonrpc object with code", "[stratum]")
 {
     StratumApiV1Message stratum_api_v1_message = {};
     const char *json_string = "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":22,\"message\":\"duplicate share\",\"data\":null},\"id\":120}";
