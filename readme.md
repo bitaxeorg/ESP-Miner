@@ -74,6 +74,11 @@ Available API endpoints:
 
 * `/api/system` Update system settings
 
+**WEBSOCKETS**
+
+* `/api/ws` Text stream log
+* `/api/ws/live` JSONp stream of partial system info updates
+
 ### API examples in `curl`:
 
 ```bash
@@ -125,6 +130,12 @@ curl -X POST \
 curl -X PATCH http://YOUR-BITAXE-IP/api/system \
      -H "Content-Type: application/json" \
      -d '{"fanspeed": "desired_speed_value"}'
+
+# Stream logs
+websocat ws://YOUR-BITAXE-IP/api/ws
+
+# Stream Info API
+websocat ws://YOUR-BITAXE-IP/api/ws/live
 ```
 
 ## Administration

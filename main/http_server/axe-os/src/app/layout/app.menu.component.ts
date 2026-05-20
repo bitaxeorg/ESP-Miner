@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { Observable, shareReplay } from 'rxjs';
-import { SystemApiService } from '../services/system.service';
+import { Observable } from 'rxjs';
+import { LiveDataService } from '../services/live-data.service';
 import { LayoutService } from './service/app.layout.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 
@@ -9,14 +9,15 @@ import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
   templateUrl: './app.menu.component.html'
 })
 export class AppMenuComponent implements OnInit {
-  public info$!: Observable<ISystemInfo>;
+  public info$: Observable<ISystemInfo>;
 
   model: any[] = [];
 
-  constructor(public layoutService: LayoutService,
-    private systemService: SystemApiService,
+  constructor(
+    public layoutService: LayoutService,
+    private liveDataService: LiveDataService
   ) {
-    this.info$ = this.systemService.getInfo().pipe(shareReplay({ refCount: true, bufferSize: 1 }))
+    this.info$ = this.liveDataService.info$;
   }
 
   ngOnInit() {

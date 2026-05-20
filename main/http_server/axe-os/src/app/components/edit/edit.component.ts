@@ -2,8 +2,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, FormControl, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable } from 'rxjs';
+import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable, first } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
+import { LiveDataService } from 'src/app/services/live-data.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { ActivatedRoute } from '@angular/router';
 
@@ -13,7 +14,7 @@ type Dropdown = {
 }[]
 
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
-const STATS_FREQUENCY_STEPS = [0, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
+const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
 
 @Component({
   selector: 'app-edit',
@@ -43,10 +44,12 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public rotations = [0, 90, 180, 270];
   public displayTimeoutControl: FormControl;
   public statsFrequencyControl: FormControl;
+  public statsLimit: number = 720;
 
   constructor(
     private fb: FormBuilder,
     private systemService: SystemApiService,
+    private liveDataService: LiveDataService,
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private route: ActivatedRoute,
@@ -124,9 +127,9 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     const deviceUri = this.uri || '';
 
 
-    // Fetch both system info and ASIC settings in parallel
+    // Fetch both system info (from live stream) and ASIC settings in parallel
     forkJoin({
-      info: this.systemService.getInfo(deviceUri),
+      info: this.liveDataService.info$.pipe(first()),
       asic: this.systemService.getAsicSettings(deviceUri)
     })
     .pipe(
@@ -139,9 +142,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       this.frequencyOptions = asic.frequencyOptions;
       this.defaultVoltage = asic.defaultVoltage;
       this.voltageOptions = asic.voltageOptions;
+      this.statsLimit = info.statsLimit || 720;
 
       // Check if overclock is enabled in NVS
-      if (info.overclockEnabled === 1) {
+      if (info.overclockEnabled) {
         this.settingsUnlocked = true;
         console.log(
           '🎉 Overclock mode is enabled from NVS settings!\n' +

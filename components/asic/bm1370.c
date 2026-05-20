@@ -11,10 +11,7 @@
 #include "frequency_transition_bmXX.h"
 #include "pll.h"
 
-#include <math.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
 
