@@ -4,12 +4,23 @@ import { FormBuilder, FormGroup, Validators, ValidatorFn, ValidationErrors, Abst
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
-import { Observable } from 'rxjs';
+import { LiveDataService } from 'src/app/services/live-data.service';
+import { first } from 'rxjs';
 
 type PoolType = 'stratum' | 'fallbackStratum';
 
 interface ITlsOption {
   value: number;
+  label: string;
+}
+
+interface IProtocolOption {
+  value: 'SV1' | 'SV2';
+  label: string;
+}
+
+interface IChannelOption {
+  value: 'standard' | 'extended';
   label: string;
 }
 
@@ -34,21 +45,33 @@ export class PoolComponent implements OnInit {
     { value: 2, label: 'TLS (Custom CA certificate)' }
   ];
 
+  public protocolOptions: IProtocolOption[] = [
+    { value: 'SV1', label: 'Stratum V1' },
+    { value: 'SV2', label: 'Stratum V2' }
+  ];
+
+  public sv2ChannelOptions: IChannelOption[] = [
+    { value: 'extended', label: 'Extended Channels' },
+    { value: 'standard', label: 'Standard Channels' }
+  ];
+
+  public asicModel: string = '';
+
   @Input() uri = '';
 
   constructor(
     private fb: FormBuilder,
     private systemService: SystemApiService,
+    private liveDataService: LiveDataService,
     private toastr: ToastrService,
     private loadingService: LoadingService
   ) { }
 
   ngOnInit(): void {
-    this.systemService.getInfo(this.uri)
-      .pipe(
-        this.loadingService.lockUIUntilComplete()
-      )
+    this.liveDataService.info$
+      .pipe(first(), this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
+        this.asicModel = info.ASICModel || '';
         this.form = this.fb.group({
           stratumURL: [info.stratumURL, [
             Validators.required,
@@ -60,6 +83,8 @@ export class PoolComponent implements OnInit {
             Validators.min(0),
             Validators.max(65535)
           ]],
+          stratumProtocol: [info.stratumProtocol || 'SV1'],
+          stratumV2AuthorityPubkey: [info.stratumV2AuthorityPubkey || '', [this.base58Validator()]],
           stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == true, [Validators.required]],
           stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
           stratumUser: [info.stratumUser, [Validators.required]],
@@ -82,7 +107,11 @@ export class PoolComponent implements OnInit {
           fallbackStratumCert: [info.fallbackStratumCert],
           fallbackStratumDecodeCoinbase: [info.fallbackStratumDecodeCoinbase == true, [Validators.required]],
           fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
-          fallbackStratumPassword: ['*****', [Validators.required]]
+          fallbackStratumPassword: ['*****', [Validators.required]],
+          fallbackStratumProtocol: [info.fallbackStratumProtocol || 'SV1'],
+          fallbackStratumV2AuthorityPubkey: [info.fallbackStratumV2AuthorityPubkey || '', [this.base58Validator()]],
+          stratumV2ChannelType: [info.stratumV2ChannelType || 'standard'],
+          fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType || 'standard']
         });
 
         const setupTlsValidation = (tlsControlName: string, certControlName: string) => {
@@ -233,7 +262,27 @@ export class PoolComponent implements OnInit {
     };
   }
 
-  trackByFn(index: number, option: ITlsOption): number {
+  private base58Validator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value?.trim();
+      if (!value) return null;
+
+      // Base58 alphabet (no 0, O, I, l)
+      const base58Regex = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
+      if (!base58Regex.test(value)) {
+        return { invalidBase58: true };
+      }
+
+      // SV2 authority pubkeys are typically 51-52 characters
+      if (value.length < 40 || value.length > 52) {
+        return { invalidBase58Length: true };
+      }
+
+      return null;
+    };
+  }
+
+  trackByFn(index: number, option: { value: string | number }): string | number {
     return option.value;
   }
 
@@ -244,5 +293,27 @@ export class PoolComponent implements OnInit {
 
   isAnyPoolUsingDefaultAddress(): boolean {
     return this.pools.some(pool => this.isUsingDefaultAddress(pool));
+  }
+
+  isStratumV2Enabled(): boolean {
+    return this.form?.get('stratumProtocol')?.value === 'SV2';
+  }
+
+  isFallbackStratumV2Enabled(): boolean {
+    return this.form?.get('fallbackStratumProtocol')?.value === 'SV2';
+  }
+
+  isPoolV2Enabled(pool: PoolType): boolean {
+    return pool === 'stratum' ? this.isStratumV2Enabled() : this.isFallbackStratumV2Enabled();
+  }
+
+  isStandardChannelDisabled(): boolean {
+    return this.asicModel === 'BM1397';
+  }
+
+  isPoolV2Extended(pool: PoolType): boolean {
+    if (!this.isPoolV2Enabled(pool)) return false;
+    const key = pool === 'stratum' ? 'stratumV2ChannelType' : 'fallbackStratumV2ChannelType';
+    return this.form?.get(key)?.value === 'extended';
   }
 }

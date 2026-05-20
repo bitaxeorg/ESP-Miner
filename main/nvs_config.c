@@ -6,7 +6,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
-#include <freertos/event_groups.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -113,6 +112,15 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_TPS546]                                = {.nvs_key_name = "TPS546",          .type = TYPE_BOOL},
     [NVS_CONFIG_TMP1075]                               = {.nvs_key_name = "TMP1075",         .type = TYPE_BOOL},
     [NVS_CONFIG_POWER_CONSUMPTION_TARGET]              = {.nvs_key_name = "power_cons_tgt",  .type = TYPE_U16},
+    // Protocol and channel-type are TYPE_U16 internally but exposed as strings via the API
+    // (see http_server.c GET/PATCH special-case handling). rest_name is omitted so the generic
+    // PATCH loop does not handle them as numeric.
+    [NVS_CONFIG_STRATUM_PROTOCOL]                      = {.nvs_key_name = "stratumprot",     .type = TYPE_U16,   .default_value = {.u16 = 0},                           .min = 0,  .max = 1},
+    [NVS_CONFIG_SV2_AUTHORITY_PUBKEY]                  = {.nvs_key_name = "sv2authpubkey",   .type = TYPE_STR,   .default_value = {.str = ""},                           .rest_name = "stratumV2AuthorityPubkey",                 .min = 0,  .max = 52},
+    [NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL]            = {.nvs_key_name = "fbstratumprot",   .type = TYPE_U16,   .default_value = {.u16 = 0},                            .min = 0,  .max = 1},
+    [NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY]        = {.nvs_key_name = "fbsv2authpubk",   .type = TYPE_STR,   .default_value = {.str = ""},                            .rest_name = "fallbackStratumV2AuthorityPubkey",          .min = 0,  .max = 52},
+    [NVS_CONFIG_SV2_CHANNEL_TYPE]                     = {.nvs_key_name = "sv2chantype",     .type = TYPE_U16,   .default_value = {.u16 = 0},                             .min = 0,  .max = 1},
+    [NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE]            = {.nvs_key_name = "fbSv2ChanType",   .type = TYPE_U16,   .default_value = {.u16 = 0},                             .min = 0,  .max = 1},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
