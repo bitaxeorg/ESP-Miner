@@ -56,11 +56,6 @@ static int stratum_get_next_uid(GlobalState * GLOBAL_STATE)
     return uid;
 }
 
-static const char * primary_stratum_url;
-static uint16_t primary_stratum_port;
-static uint16_t primary_stratum_tls;
-static char * primary_stratum_cert;
-
 struct timeval tcp_snd_timeout = {
     .tv_sec = 5,
     .tv_usec = 0
@@ -283,143 +278,6 @@ void stratum_v1_close_connection(GlobalState *GLOBAL_STATE)
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
-// Try a single subscribe/authorize handshake against a pool to verify it's
-// actually serving work. Returns true only when the pool responds with a
-// mining.notify line within TRANSPORT_TIMEOUT_MS.
-static bool stratum_probe_pool(GlobalState * GLOBAL_STATE, const char * url, uint16_t port,
-                                tls_mode tls, char * cert, const char * user, const char * pass)
-{
-    if (url == NULL || url[0] == '\0') {
-        return false;
-    }
-
-    stratum_connection_info_t conn_info;
-    if (resolve_stratum_address(url, port, &conn_info) != ESP_OK) {
-        return false;
-    }
-
-    esp_transport_handle_t transport = STRATUM_V1_transport_init(tls, cert);
-    if (transport == NULL) {
-        return false;
-    }
-
-    if (tls != DISABLED) {
-        esp_transport_ssl_set_common_name(transport, url);
-    }
-
-    bool ok = false;
-    if (esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS) == ESP_OK) {
-        set_socket_options(transport);
-
-        int send_uid = 1;
-        STRATUM_V1_subscribe(transport, send_uid++, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
-        STRATUM_V1_authorize(transport, send_uid++, user, pass);
-
-        char recv_buffer[BUFFER_SIZE];
-        memset(recv_buffer, 0, BUFFER_SIZE);
-        int bytes_received = esp_transport_read(transport, recv_buffer, BUFFER_SIZE - 1, TRANSPORT_TIMEOUT_MS);
-        ok = (bytes_received > 0 && strstr(recv_buffer, "mining.notify") != NULL);
-    }
-
-    esp_transport_close(transport);
-    return ok;
-}
-
-void stratum_primary_heartbeat(void * pvParameters)
-{
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
-    ESP_LOGI(TAG, "Starting heartbeat thread for primary pool: %s:%d", primary_stratum_url, primary_stratum_port);
-    vTaskDelay(10000 / portTICK_PERIOD_MS);
-
-    while (1)
-    {
-        // Auto-pause recovery: when all pools have been marked unreachable,
-        // probe them here so we can resume mining as soon as one comes back.
-        if (GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable) {
-            if (!is_wifi_connected()) {
-                vTaskDelay(10000 / portTICK_PERIOD_MS);
-                continue;
-            }
-
-            bool prefer_fallback = GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum;
-            char * fallback_url = GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url;
-            bool has_fallback = (fallback_url != NULL && fallback_url[0] != '\0');
-
-            bool primary_ok = stratum_probe_pool(
-                GLOBAL_STATE,
-                primary_stratum_url, primary_stratum_port,
-                primary_stratum_tls, primary_stratum_cert,
-                GLOBAL_STATE->SYSTEM_MODULE.pool_user,
-                GLOBAL_STATE->SYSTEM_MODULE.pool_pass);
-
-            bool fallback_ok = false;
-            if (has_fallback && (!primary_ok || prefer_fallback)) {
-                fallback_ok = stratum_probe_pool(
-                    GLOBAL_STATE,
-                    fallback_url, GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port,
-                    GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_tls,
-                    GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_cert,
-                    GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user,
-                    GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_pass);
-            }
-
-            if (prefer_fallback && fallback_ok) {
-                ESP_LOGI(TAG, "Pool recovery: fallback reachable, resuming mining.");
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
-                GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
-                continue;
-            }
-            if (primary_ok) {
-                ESP_LOGI(TAG, "Pool recovery: primary reachable, resuming mining.");
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
-                GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
-                continue;
-            }
-            if (fallback_ok) {
-                ESP_LOGI(TAG, "Pool recovery: fallback reachable, resuming mining.");
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = true;
-                GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = false;
-                continue;
-            }
-
-            vTaskDelay(60000 / portTICK_PERIOD_MS);
-            continue;
-        }
-
-        if (GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback == false) {
-            vTaskDelay(10000 / portTICK_PERIOD_MS);
-            continue;
-        }
-
-        ESP_LOGD(TAG, "Running Heartbeat on: %s!", primary_stratum_url);
-
-        if (!is_wifi_connected()) {
-            ESP_LOGD(TAG, "Heartbeat. Failed WiFi check!");
-            vTaskDelay(10000 / portTICK_PERIOD_MS);
-            continue;
-        }
-
-        if (!stratum_probe_pool(GLOBAL_STATE,
-                                primary_stratum_url, primary_stratum_port,
-                                primary_stratum_tls, primary_stratum_cert,
-                                GLOBAL_STATE->SYSTEM_MODULE.pool_user,
-                                GLOBAL_STATE->SYSTEM_MODULE.pool_pass)) {
-            vTaskDelay(60000 / portTICK_PERIOD_MS);
-            continue;
-        }
-
-        if (!GLOBAL_STATE->SYSTEM_MODULE.use_fallback_stratum) {
-            ESP_LOGI(TAG, "Heartbeat successful and in fallback mode. Switching back to primary.");
-            GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
-            stratum_close_connection(GLOBAL_STATE);
-            continue;
-        }
-
-        vTaskDelay(60000 / portTICK_PERIOD_MS);
-    }
-}
-
 static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
 {
     mining_notification_result_t *result = heap_caps_malloc(sizeof(mining_notification_result_t), MALLOC_CAP_SPIRAM);
@@ -512,11 +370,6 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
 void stratum_v1_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
-
-    primary_stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pool_url;
-    primary_stratum_port = GLOBAL_STATE->SYSTEM_MODULE.pool_port;
-    primary_stratum_tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
-    primary_stratum_cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
 
     bool use_fallback = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
     char *stratum_url = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
