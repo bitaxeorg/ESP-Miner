@@ -246,7 +246,7 @@ static void system_api_add_hashrate_monitor(cJSON *root, GlobalState *g) {
         cJSON_AddItemToArray(asics, asic);
         
         cJSON_AddNumberToObject(asic, "total", g->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
-        cJSON_AddNumberToObject(asic, "errorCount", (double)g->HASHRATE_MONITOR_MODULE.error_measurement[i].hashrate);
+        cJSON_AddNumberToObject(asic, "errorCount", g->HASHRATE_MONITOR_MODULE.error_measurement[i].value);
         
         cJSON *domains = cJSON_CreateArray();
         cJSON_AddItemToObject(asic, "domains", domains);
