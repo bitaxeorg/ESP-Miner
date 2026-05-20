@@ -114,6 +114,8 @@
     --p-message-success-background: #c8e6c9;
     --p-message-success-color: #256029;
     --p-message-success-border-color: #a5d6a7;
+    --p-message-content-padding: 1rem;
+    --p-message-border-radius: 0.5rem;
 }
 
 @layer axe-os {
@@ -147,6 +149,10 @@
     /* Compatibility aliases for PrimeNG 19 renames */
     .p-select { @extend .p-dropdown !optional; }
     .p-toggleswitch { @extend .p-inputswitch !optional; }
+
+    .p-message-content {
+        justify-content: center;
+    }
 
     p-chart>div {
         position: relative;

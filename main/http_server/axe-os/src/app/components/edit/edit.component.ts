@@ -14,6 +14,7 @@ import { DropdownModule } from 'primeng/dropdown';
 import { MessageModule } from 'primeng/message';
 import { SliderModule } from 'primeng/slider';
 import { TooltipModule } from 'primeng/tooltip';
+import { InputTextModule } from 'primeng/inputtext';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 
 type Dropdown = {
@@ -34,6 +35,7 @@ const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 
         ButtonModule,
         CheckboxModule,
         DropdownModule,
+        InputTextModule,
         MessageModule,
         SliderModule,
         TooltipModule,

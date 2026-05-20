@@ -11,7 +11,8 @@
         <p-message
             [severity]="message.severity"
             [text]="message.text"
-            [styleClass]="'w-full mb-3 py-3 border-round-lg'"
+            [icon]="message.severity === 'info' ? 'pi pi-info-circle' : message.severity === 'warn' ? 'pi pi-exclamation-triangle' : 'pi pi-times-circle'"
+            [styleClass]="'w-full mb-3 border-round-lg'"
         />
     </ng-container>
 
