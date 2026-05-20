@@ -380,11 +380,6 @@ void stratum_v1_task(void *pvParameters)
 
     STRATUM_V1_initialize_buffer();
     int retry_attempts = 0;
-    // Counts how many pools in a row have exhausted MAX_RETRY_ATTEMPTS without
-    // a successful stratum setup. When this reaches the configured threshold
-    // (1 if only a primary is configured, 2 when there's also a fallback),
-    // we set pools_unavailable so power management cuts ASIC power.
-    int consecutive_pool_failures = 0;
     int retry_critical_attempts = 0;
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
@@ -409,28 +404,9 @@ void stratum_v1_task(void *pvParameters)
 
         if (retry_attempts >= MAX_RETRY_ATTEMPTS)
         {
-            bool has_fallback = (GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url != NULL &&
-                                 GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url[0] != '\0');
-
-            consecutive_pool_failures++;
-            int trigger_threshold = has_fallback ? 2 : 1;
-            if (consecutive_pool_failures >= trigger_threshold) {
-                ESP_LOGW(TAG, "All configured pools unreachable, pausing mining to conserve power.");
-                GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable = true;
-                consecutive_pool_failures = 0;
-            }
-
-            if (!has_fallback) {
-                ESP_LOGI(TAG, "Unable to switch to fallback. No url configured. (retries: %d)...", retry_attempts);
-                GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = false;
-                retry_attempts = 0;
-                continue;
-            }
-
-            GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
-            
-            // Reset share stats at failover
-            // Notify coordinator and exit — let it handle fallback decisions
+            // Notify the coordinator and exit. The coordinator owns the
+            // "all pools unreachable" decision, pool swapping, and power-pause
+            // recovery — see protocol_coordinator.c.
             ESP_LOGW(TAG, "Max V1 retry attempts reached (%d), notifying coordinator", retry_attempts);
             stratum_v1_close_connection(GLOBAL_STATE);
             protocol_coordinator_notify_failure();
