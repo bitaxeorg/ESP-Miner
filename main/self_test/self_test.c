@@ -344,7 +344,7 @@ void self_test_task(void * pvParameters)
         }
 
         uint32_t remaining = (hashtest_ms - ((esp_timer_get_time() / 1000) - start_ms)) / 1000;
-        snprintf(logString, sizeof(logString), "%.0f Gh/s %.1f°C %lds", hashrate, asic_temp, remaining);
+        snprintf(logString, sizeof(logString), "%.0f Gh/s %.1f°C %" PRIu32 "s", hashrate, asic_temp, remaining);
         ESP_LOGI(TAG, "%s", logString);
 
         self_test_show_message(GLOBAL_STATE, logString);
