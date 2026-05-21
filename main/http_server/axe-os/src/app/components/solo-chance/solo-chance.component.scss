@@ -1,0 +1,39 @@
+:host {
+  .table-container {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .solo-chance-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    // Table header styling
+    thead tr th {
+      padding: 1rem;
+      font-weight: 600;
+      text-align: left;
+      border-bottom: 1px solid;
+      border-color: dimgray;
+    }
+
+    // Table body styling
+    tbody tr {
+      td {
+        padding: 1rem;
+        border-bottom: 1px solid;
+        border-color: dimgray;
+      }
+    }
+  }
+
+  // Legend styling
+  ul {
+    list-style: none;
+    padding-left: 0;
+
+    li {
+      padding: 0.25rem 0;
+    }
+  }
+}
