@@ -51,7 +51,7 @@ export class ThemeService {
   private themeSettings$ = this.themeSettingsSubject.asObservable();
 
   constructor(private http: HttpClient) {
-    if (environment.production) {
+    if (!environment.mock) {
       this.http.get<ThemeSettings>('/api/theme').pipe(
         catchError(() => of(this.mockSettings)),
         tap(settings => this.themeSettingsSubject.next(settings))
@@ -64,7 +64,7 @@ export class ThemeService {
   }
 
   saveThemeSettings(settings: ThemeSettings): Observable<void> {
-    if (environment.production) {
+    if (!environment.mock) {
       return this.http.post<void>('/api/theme', settings).pipe(
         tap(() => this.themeSettingsSubject.next(settings))
       );
