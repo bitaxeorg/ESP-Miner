@@ -144,7 +144,7 @@ static void get_nvs_key_name(const Settings * setting, const int index, char des
         for (int t = setting->array_size - 1; t >= 10 && width < 5; t /= 10) width++;
         snprintf(dest, NVS_KEY_NAME_MAX_SIZE, "%s_%0*d", setting->nvs_key_name, width, index + 1);
     } else {
-        strncpy(dest, setting->nvs_key_name, NVS_KEY_NAME_MAX_SIZE);
+        snprintf(dest, NVS_KEY_NAME_MAX_SIZE, "%s", setting->nvs_key_name);
     }
 }
 

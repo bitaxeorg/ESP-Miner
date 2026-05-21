@@ -19,11 +19,17 @@ typedef enum {
     COORD_STATE_IDLE = 0,
     COORD_STATE_RUNNING_PRIMARY,
     COORD_STATE_RUNNING_FALLBACK,
+    // Entered when consecutive pool failures hit the configured threshold.
+    // No protocol task is running; the coordinator probes pools periodically
+    // and resumes mining as soon as one is reachable. While in this state,
+    // pools_unavailable is true so power management cuts ASIC power.
+    COORD_STATE_PAUSED,
 } coordinator_state_t;
 
 // Internal event types
 typedef enum {
     COORD_EVENT_PROTOCOL_FAILED = 0,
+    COORD_EVENT_PROTOCOL_SUCCESS,
     COORD_EVENT_V1_TASK_EXITED,
     COORD_EVENT_V2_TASK_EXITED,
 } coordinator_event_t;
@@ -31,6 +37,8 @@ typedef enum {
 #define TRANSPORT_TIMEOUT_MS 5000
 #define HEARTBEAT_INTERVAL_MS 60000
 #define INITIAL_HEARTBEAT_DELAY_MS 10000
+// While paused (all pools unreachable), probe again on this cadence.
+#define RECOVERY_PROBE_INTERVAL_MS 30000
 #define BUFFER_SIZE 1024
 
 static const char *TAG = "protocol_coordinator";
@@ -51,6 +59,13 @@ static bool s_heartbeat_enabled = false;
 static const char *s_primary_url = NULL;
 static uint16_t s_primary_port = 0;
 
+// Number of consecutive pools (primary and/or fallback) that have exhausted
+// their retry budget without a successful setup. When this reaches
+// pool_failure_threshold(), we enter COORD_STATE_PAUSED and set
+// pools_unavailable so power management cuts ASIC power.
+// Reset on COORD_EVENT_PROTOCOL_SUCCESS.
+static int s_consecutive_pool_failures = 0;
+
 void protocol_coordinator_init(GlobalState *gs)
 {
     s_global_state = gs;
@@ -58,11 +73,20 @@ void protocol_coordinator_init(GlobalState *gs)
     s_v1_should_shutdown = false;
     s_v2_should_shutdown = false;
     s_heartbeat_enabled = false;
+    s_consecutive_pool_failures = 0;
 }
 
 void protocol_coordinator_notify_failure(void)
 {
     coordinator_event_t evt = COORD_EVENT_PROTOCOL_FAILED;
+    if (s_event_queue) {
+        xQueueSend(s_event_queue, &evt, 0);
+    }
+}
+
+void protocol_coordinator_notify_success(void)
+{
+    coordinator_event_t evt = COORD_EVENT_PROTOCOL_SUCCESS;
     if (s_event_queue) {
         xQueueSend(s_event_queue, &evt, 0);
     }
@@ -204,28 +228,32 @@ static void stop_running_task(GlobalState *gs)
     }
 }
 
-// Probe whether the primary pool is reachable (TCP connect test for SV2)
-static bool heartbeat_probe_sv2(void)
+// TCP connect probe (used for SV2 — full noise handshake is too expensive)
+static bool probe_pool_sv2(const char *url, uint16_t port)
 {
+    if (url == NULL || url[0] == '\0' || port == 0) return false;
+
     esp_transport_handle_t probe = esp_transport_tcp_init();
     if (!probe) return false;
 
-    esp_err_t err = esp_transport_connect(probe, s_primary_url, s_primary_port, TRANSPORT_TIMEOUT_MS);
+    esp_err_t err = esp_transport_connect(probe, url, port, TRANSPORT_TIMEOUT_MS);
     esp_transport_close(probe);
     esp_transport_destroy(probe);
 
     return (err == ESP_OK);
 }
 
-// Probe whether the primary pool is reachable (subscribe/authorize test for V1)
-static bool heartbeat_probe_v1(GlobalState *gs)
+// Subscribe/authorize probe for V1 — succeeds only if the pool responds with
+// a mining.notify line, confirming it's actually serving work.
+static bool probe_pool_v1(GlobalState *gs, const char *url, uint16_t port,
+                          tls_mode tls, char *cert, const char *user, const char *pass)
 {
-    tls_mode tls = gs->SYSTEM_MODULE.pool_tls;
-    char *cert = gs->SYSTEM_MODULE.pool_cert;
+    if (url == NULL || url[0] == '\0' || port == 0) return false;
+
     esp_transport_handle_t transport = STRATUM_V1_transport_init(tls, cert);
     if (!transport) return false;
 
-    esp_err_t err = esp_transport_connect(transport, s_primary_url, s_primary_port, TRANSPORT_TIMEOUT_MS);
+    esp_err_t err = esp_transport_connect(transport, url, port, TRANSPORT_TIMEOUT_MS);
     if (err != ESP_OK) {
         esp_transport_close(transport);
         esp_transport_destroy(transport);
@@ -234,7 +262,7 @@ static bool heartbeat_probe_v1(GlobalState *gs)
 
     int send_uid = 1;
     STRATUM_V1_subscribe(transport, send_uid++, gs->DEVICE_CONFIG.family.asic.name);
-    STRATUM_V1_authorize(transport, send_uid++, gs->SYSTEM_MODULE.pool_user, gs->SYSTEM_MODULE.pool_pass);
+    STRATUM_V1_authorize(transport, send_uid++, user, pass);
 
     char recv_buffer[BUFFER_SIZE];
     memset(recv_buffer, 0, BUFFER_SIZE);
@@ -244,6 +272,24 @@ static bool heartbeat_probe_v1(GlobalState *gs)
     esp_transport_destroy(transport);
 
     return (bytes_received > 0 && strstr(recv_buffer, "mining.notify") != NULL);
+}
+
+// Probe a pool using the appropriate protocol for it.
+static bool probe_pool(GlobalState *gs, bool use_fallback)
+{
+    stratum_protocol_t protocol = use_fallback ? s_fallback_protocol : s_primary_protocol;
+    const char *url   = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_url   : gs->SYSTEM_MODULE.pool_url;
+    uint16_t    port  = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_port  : gs->SYSTEM_MODULE.pool_port;
+
+    if (protocol == STRATUM_V2) {
+        return probe_pool_sv2(url, port);
+    }
+
+    tls_mode tls       = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_tls  : gs->SYSTEM_MODULE.pool_tls;
+    char     *cert     = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_cert : gs->SYSTEM_MODULE.pool_cert;
+    const char *user   = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_user : gs->SYSTEM_MODULE.pool_user;
+    const char *pass   = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_pass : gs->SYSTEM_MODULE.pool_pass;
+    return probe_pool_v1(gs, url, port, tls, cert, user, pass);
 }
 
 // Switch from primary to fallback pool.
@@ -303,45 +349,135 @@ static void do_heartbeat_probe(GlobalState *gs)
 
     ESP_LOGD(TAG, "Heartbeat: probing primary pool %s:%d", s_primary_url, s_primary_port);
 
-    bool primary_reachable;
-    if (s_primary_protocol == STRATUM_V2) {
-        primary_reachable = heartbeat_probe_sv2();
-    } else {
-        primary_reachable = heartbeat_probe_v1(gs);
-    }
-
-    if (primary_reachable) {
+    if (probe_pool(gs, /*use_fallback=*/false)) {
         switch_to_primary(gs);
     } else {
         ESP_LOGD(TAG, "Primary pool still unreachable");
     }
 }
 
+// Number of consecutive pool failures that triggers entering the paused state.
+// With both primary and fallback configured we tolerate one failure per pool;
+// with only one pool configured we pause on its first exhaustion.
+static int pool_failure_threshold(GlobalState *gs)
+{
+    return has_fallback_pool(gs) ? 2 : 1;
+}
+
+// All configured pools have exhausted retries. Set pools_unavailable so power
+// management cuts ASIC power, and park the coordinator until a probe succeeds.
+static void enter_paused_state(GlobalState *gs)
+{
+    s_state = COORD_STATE_PAUSED;
+    gs->SYSTEM_MODULE.pools_unavailable = true;
+    s_heartbeat_enabled = false;
+    ESP_LOGW(TAG, "All configured pools unreachable, pausing mining to conserve power.");
+}
+
+// Resume mining on the given pool after a successful recovery probe.
+// Used only from the paused state — caller must have already verified the
+// pool is reachable.
+static void resume_on_pool(GlobalState *gs, bool use_fallback)
+{
+    s_consecutive_pool_failures = 0;
+    gs->SYSTEM_MODULE.pools_unavailable = false;
+    gs->SYSTEM_MODULE.is_using_fallback = use_fallback;
+
+    stratum_protocol_t proto = use_fallback ? s_fallback_protocol : s_primary_protocol;
+    gs->stratum_protocol = proto;
+    s_running_protocol = proto;
+    s_state = use_fallback ? COORD_STATE_RUNNING_FALLBACK : COORD_STATE_RUNNING_PRIMARY;
+
+    queue_clear(&gs->stratum_queue);
+    reset_share_stats(gs);
+
+    ESP_LOGI(TAG, "Pool recovery: %s pool reachable, resuming mining (%s)",
+             use_fallback ? "fallback" : "primary",
+             proto == STRATUM_V2 ? "SV2" : "V1");
+
+    start_protocol_task(gs, proto);
+
+    // Only run the auto-switch-back heartbeat for *automatic* failovers
+    // (user did not explicitly choose the fallback pool).
+    s_heartbeat_enabled = use_fallback && !gs->SYSTEM_MODULE.use_fallback_stratum;
+}
+
+// Probe pools while paused. Tries the user-preferred pool first, then the other.
+// Resumes mining as soon as one is reachable.
+static void try_resume_from_paused(GlobalState *gs)
+{
+    if (!is_wifi_connected()) {
+        return;
+    }
+
+    bool prefer_fallback = gs->SYSTEM_MODULE.use_fallback_stratum && has_fallback_pool(gs);
+
+    if (prefer_fallback) {
+        if (probe_pool(gs, /*use_fallback=*/true)) {
+            resume_on_pool(gs, /*use_fallback=*/true);
+            return;
+        }
+        if (probe_pool(gs, /*use_fallback=*/false)) {
+            resume_on_pool(gs, /*use_fallback=*/false);
+            return;
+        }
+    } else {
+        if (probe_pool(gs, /*use_fallback=*/false)) {
+            resume_on_pool(gs, /*use_fallback=*/false);
+            return;
+        }
+        if (has_fallback_pool(gs) && probe_pool(gs, /*use_fallback=*/true)) {
+            resume_on_pool(gs, /*use_fallback=*/true);
+            return;
+        }
+    }
+
+    ESP_LOGD(TAG, "Recovery probe: no pool reachable, staying paused");
+}
+
 // Handle an event from the event queue
 static void handle_event(GlobalState *gs, coordinator_event_t evt)
 {
     switch (evt) {
-        case COORD_EVENT_PROTOCOL_FAILED:
-            ESP_LOGW(TAG, "Protocol failure reported (state=%d)", s_state);
-
-            if (s_state == COORD_STATE_RUNNING_PRIMARY) {
-                // Primary failed — switch to fallback if configured
-                if (has_fallback_pool(gs)) {
-                    switch_to_fallback(gs);
-                } else {
-                    // No fallback — restart the primary task after a delay
-                    ESP_LOGW(TAG, "No fallback configured, restarting primary task");
-                    vTaskDelay(pdMS_TO_TICKS(5000));
-                    reset_share_stats(gs);
-                    start_protocol_task(gs, s_primary_protocol);
-                }
-            } else if (s_state == COORD_STATE_RUNNING_FALLBACK) {
-                // Fallback also failed — restart the fallback task after a delay
-                ESP_LOGW(TAG, "Fallback pool also failed, restarting fallback task");
-                vTaskDelay(pdMS_TO_TICKS(5000));
-                reset_share_stats(gs);
-                start_protocol_task(gs, s_running_protocol);
+        case COORD_EVENT_PROTOCOL_FAILED: {
+            if (s_state == COORD_STATE_PAUSED) {
+                // Stray failure from a task that exited after we already paused — ignore.
+                break;
             }
+            s_consecutive_pool_failures++;
+            int threshold = pool_failure_threshold(gs);
+            ESP_LOGW(TAG, "Protocol failure reported (state=%d, failures=%d/%d)",
+                     s_state, s_consecutive_pool_failures, threshold);
+
+            if (s_consecutive_pool_failures >= threshold) {
+                enter_paused_state(gs);
+                break;
+            }
+
+            // Below threshold — try the other pool. This only fires when a
+            // fallback exists (otherwise threshold=1 and we paused above).
+            if (s_state == COORD_STATE_RUNNING_PRIMARY) {
+                switch_to_fallback(gs);
+            } else if (s_state == COORD_STATE_RUNNING_FALLBACK) {
+                ESP_LOGI(TAG, "Fallback failed, trying primary");
+                queue_clear(&gs->stratum_queue);
+                reset_share_stats(gs);
+                gs->SYSTEM_MODULE.is_using_fallback = false;
+                gs->stratum_protocol = s_primary_protocol;
+                s_running_protocol = s_primary_protocol;
+                s_state = COORD_STATE_RUNNING_PRIMARY;
+                start_protocol_task(gs, s_primary_protocol);
+                s_heartbeat_enabled = false;
+            }
+            break;
+        }
+
+        case COORD_EVENT_PROTOCOL_SUCCESS:
+            if (s_consecutive_pool_failures > 0 || gs->SYSTEM_MODULE.pools_unavailable) {
+                ESP_LOGI(TAG, "Pool connection succeeded — clearing failure state");
+            }
+            s_consecutive_pool_failures = 0;
+            gs->SYSTEM_MODULE.pools_unavailable = false;
             break;
 
         case COORD_EVENT_V1_TASK_EXITED:
@@ -391,9 +527,14 @@ void protocol_coordinator_task(void *pvParameters)
     // Main non-blocking event loop
     while (1) {
         coordinator_event_t evt;
-        TickType_t wait = s_heartbeat_enabled
-            ? pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS)
-            : portMAX_DELAY;
+        TickType_t wait;
+        if (s_state == COORD_STATE_PAUSED) {
+            wait = pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS);
+        } else if (s_heartbeat_enabled) {
+            wait = pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS);
+        } else {
+            wait = portMAX_DELAY;
+        }
 
         bool was_heartbeat_enabled = s_heartbeat_enabled;
 
@@ -405,6 +546,9 @@ void protocol_coordinator_task(void *pvParameters)
                 heartbeat_initial_delay = true;
                 heartbeat_delay_start = esp_timer_get_time();
             }
+        } else if (s_state == COORD_STATE_PAUSED) {
+            // Recovery probe — try to bring a pool back online.
+            try_resume_from_paused(gs);
         } else if (s_heartbeat_enabled) {
             // Timeout expired — time for a heartbeat probe
             if (heartbeat_initial_delay) {

@@ -905,6 +905,8 @@ void stratum_v2_task(void *pvParameters)
 
         // Connection successful, reset retry counter
         retry_attempts = 0;
+        // Tell the coordinator so it clears its failure counter and pools_unavailable.
+        protocol_coordinator_notify_success();
 
         {
             float elapsed_ms = (float)(esp_timer_get_time() - connect_start_us) / 1000.0f;
