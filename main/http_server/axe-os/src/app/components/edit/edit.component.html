@@ -1,6 +1,6 @@
 <form *ngIf="form" [formGroup]="form">
     <div class="card">
-        <p-message *ngIf="settingsUnlocked" severity="warn" styleClass="w-full mb-3 py-4 border-round-xl"
+        <p-message *ngIf="settingsUnlocked" severity="warn" icon="pi pi-exclamation-triangle" styleClass="w-full mb-3 border-round-xl"
             text="Custom settings can cause damage & system instability. Only modify these settings if you understand the risks of running outside designed parameters.">
         </p-message>
 

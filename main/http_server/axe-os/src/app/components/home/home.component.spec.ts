@@ -42,13 +42,7 @@ describe('HomeComponent', () => {
         HomeComponent,
         TooltipTextIconComponent,
         ConfettiComponent,
-        SnowflakesComponent,
-        HashSuffixPipe,
-        DiffSuffixPipe,
-        DateAgoPipe,
-        AddressPipe,
-        SatsPipe,
-        ByteSuffixPipe
+        SnowflakesComponent
       ],
       imports: [
         ReactiveFormsModule,
@@ -58,7 +52,13 @@ describe('HomeComponent', () => {
         DropdownModule,
         ChartModule,
         ProgressBarModule,
-        TooltipModule
+        TooltipModule,
+        HashSuffixPipe,
+        DiffSuffixPipe,
+        DateAgoPipe,
+        AddressPipe,
+        SatsPipe,
+        ByteSuffixPipe
       ],
       providers: [
         provideRouter([]),

@@ -10,7 +10,8 @@ const SWARM_SORTING = 'SCOREBOARD_SORTING';
 @Component({
   selector: 'app-scoreboard',
   templateUrl: './scoreboard.component.html',
-  styleUrls: ['./scoreboard.component.scss']
+  styleUrls: ['./scoreboard.component.scss'],
+  standalone: false
 })
 export class ScoreboardComponent implements OnInit, OnDestroy {
   public scoreboard$: Observable<ISystemScoreboardEntry[]>;

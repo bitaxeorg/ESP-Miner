@@ -12,9 +12,10 @@ import { WifiNetwork } from 'src/app/generated/models';
 import { first } from 'rxjs/operators';
 
 @Component({
-  selector: 'app-network-edit',
-  templateUrl: './network.edit.component.html',
-  styleUrls: ['./network.edit.component.scss']
+    selector: 'app-network-edit',
+    templateUrl: './network.edit.component.html',
+    styleUrls: ['./network.edit.component.scss'],
+    standalone: false
 })
 export class NetworkEditComponent implements OnInit {
   private formSubject = new BehaviorSubject<FormGroup | null>(null);

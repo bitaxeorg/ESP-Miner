@@ -46,7 +46,8 @@ import { LayoutService } from './service/app.layout.service';
             })),
             transition('collapsed <=> expanded', animate('400ms cubic-bezier(0.86, 0, 0.07, 1)'))
         ])
-    ]
+    ],
+    standalone: false
 })
 export class AppMenuitemComponent implements OnInit, OnDestroy {
 

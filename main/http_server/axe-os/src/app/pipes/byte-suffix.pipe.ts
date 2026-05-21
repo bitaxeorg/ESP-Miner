@@ -1,7 +1,8 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
 @Pipe({
-  name: 'byteSuffix'
+    name: 'byteSuffix',
+    standalone: true
 })
 export class ByteSuffixPipe implements PipeTransform {
 
