@@ -32,6 +32,9 @@ type MessageType =
   | 'POWER_FAULT'
   | 'FREQUENCY_LOW'
   | 'FALLBACK_STRATUM'
+  | 'GRIDPOOL_STATUS_ERROR'
+  | 'GRIDPOOL_ON_DECK'
+  | 'GRIDPOOL_WINNER'
   | 'VERSION_MISMATCH'
   | 'NOT_SOLO_MINING'
   | 'NO_MINING_REWARD'
@@ -39,7 +42,7 @@ type MessageType =
 
 interface ISystemMessage {
   type: MessageType;
-  severity: 'error' | 'warn' | 'info';
+  severity: 'error' | 'warn' | 'info' | 'success';
   text: string;
 }
 interface ISystemInfoError {
@@ -47,23 +50,37 @@ interface ISystemInfoError {
   startTime: number | null;
 }
 
+interface IGridpoolPayoutEntry {
+  value?: number;
+  address?: string;
+  payoutAddress?: string;
+  walletAddress?: string;
+  username?: string;
+  userName?: string;
+  user?: string;
+  worker?: string;
+  difficulty?: number;
+  diffString?: string;
+}
+
 const HOME_CHART_DATA_SOURCES = 'HOME_CHART_DATA_SOURCES';
 const DASHBOARD_LAYOUT_KEY = 'DASHBOARD_LAYOUT_V1';
 const HIDDEN_WIDGETS_KEY = 'DASHBOARD_HIDDEN_WIDGETS';
+const SHOW_ODDS_KEY = 'DASHBOARD_SHOW_ODDS';
 const DEFAULT_CELL_HEIGHT = 40;
 
 const WIDGET_DEFAULTS: WidgetDef[] = [
   { id: 'hashrate',    label: 'Hashrate',            x: 0, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
   { id: 'efficiency',  label: 'Efficiency',          x: 3, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
   { id: 'shares',      label: 'Shares',              x: 6, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
-  { id: 'bestdiff',    label: 'Best Difficulty',     x: 9, y: 0,   w: 3,  h: 5,  minW: 2, minH: 3 },
+  { id: 'bestdiff',    label: 'Best Difficulty',     x: 9, y: 0,   w: 3,  h: 7,  minW: 2, minH: 3 },
   { id: 'chart',       label: 'Chart',               x: 0, y: 5,   w: 12, h: 0,  minW: 4, minH: 8 },
   { id: 'power',       label: 'Power',               x: 0, y: 5,   w: 4,  h: 7,  minW: 2, minH: 3 },
   { id: 'heat',        label: 'Heat',                x: 4, y: 5,   w: 4,  h: 7,  minW: 2, minH: 3 },
   { id: 'fan',         label: 'Fan',                 x: 8, y: 5,   w: 4,  h: 7,  minW: 2, minH: 3 },
-  { id: 'pool',        label: 'Pool',                x: 0, y: 12,  w: 4,  h: 6,  minW: 2, minH: 3 },
-  { id: 'blockheader', label: 'Block Header',        x: 4, y: 12,  w: 4,  h: 6,  minW: 2, minH: 3 },
-  { id: 'registers',   label: 'Hashrate Registers',  x: 8, y: 12,  w: 4,  h: 6,  minW: 2, minH: 3 },
+  { id: 'pool',        label: 'Work Mode',           x: 0, y: 12,  w: 4,  h: 7,  minW: 2, minH: 3 },
+  { id: 'blockheader', label: 'Block Header',        x: 8, y: 12,  w: 4,  h: 6,  minW: 2, minH: 3 },
+  { id: 'registers',   label: 'Hashrate Registers',  x: 0, y: 19,  w: 4,  h: 6,  minW: 2, minH: 3 },
 ];
 
 @Component({
@@ -99,6 +116,11 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolUser!: string;
   public activePoolLabel!: PoolLabel;
   public responseTime!: number;
+  public gridpoolOnDeckList: IGridpoolPayoutEntry[] = [];
+  public gridpoolWinnersList: IGridpoolPayoutEntry[] = [];
+  public gridpoolNetworkState: any = null;
+  public gridpoolHubConnected = false;
+  public showOdds = localStorage.getItem(SHOW_ODDS_KEY) === '1';
 
   public systemInfoError$ = new BehaviorSubject<ISystemInfoError>({
     duration: 0,
@@ -159,6 +181,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   private liveDataStarted = false;
   private resizeTimer: any;
   public form!: FormGroup;
+  private gridpoolHubSocket?: WebSocket;
+  private gridpoolHubBaseUrl = '';
+  private gridpoolHubConnecting = false;
 
   @Input() uri = '';
 
@@ -257,6 +282,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.dashboardEditService.editMode$.next(false);
     this.destroy$.next();
     this.destroy$.complete();
+    this.closeGridpoolHub();
     this.grid?.destroy(false);
   }
 
@@ -774,6 +800,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
         this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
         this.responseTime = info.responseTime;
+        this.ensureGridpoolHub(info);
       }),
       map(info => {
         info.power = parseFloat(info.power.toFixed(1));
@@ -933,6 +960,211 @@ export class HomeComponent implements OnInit, OnDestroy {
     return info.activeProtocolLabel ?? 'SV1';
   }
 
+  getGridpoolMode(info: ISystemInfo): string {
+    if (info.gridpoolEnabled !== 1) return 'Stratum';
+    return info.gridpoolRewardMode === 'solo' ? 'Solo Yolo' : 'GridPool Split';
+  }
+
+  getWorkModeLabel(info: ISystemInfo): string {
+    if (info.gridpoolEnabled === 1) {
+      return info.gridpoolRewardMode === 'solo' || (info.gridpoolRewardMode === 'split' && info.gridpoolReachable !== 1 && info.gridpoolFallbackToStratum === 0)
+        ? 'Solo Yolo'
+        : 'Solo GridPool Split';
+    }
+    return info.isUsingFallbackStratum ? 'Stratum Fallback' : 'Stratum Primary';
+  }
+
+  getGridpoolRuntimeStatus(info: ISystemInfo): string {
+    if (info.gridpoolRewardMode === 'solo') return 'Pure solo';
+    if (info.gridpoolReachable === 1) return 'Reachable';
+    return info.gridpoolFallbackToStratum === 1 ? 'Fallback to Stratum' : 'Fallback to Solo Yolo';
+  }
+
+  private normalizeGridpoolBaseUrl(value?: string): string {
+    const raw = (value || '').trim();
+    return raw ? raw.replace(/\/+$/, '') : 'https://gridpool.net';
+  }
+
+  private closeGridpoolHub(): void {
+    if (this.gridpoolHubSocket) {
+      this.gridpoolHubSocket.close();
+      this.gridpoolHubSocket = undefined;
+    }
+    this.gridpoolHubConnected = false;
+    this.gridpoolHubConnecting = false;
+  }
+
+  private ensureGridpoolHub(info: ISystemInfo): void {
+    const shouldConnect = info.gridpoolEnabled === 1 && info.gridpoolRewardMode !== 'solo';
+    const baseUrl = this.normalizeGridpoolBaseUrl(info.gridpoolBootUrl);
+    if (!shouldConnect) {
+      this.closeGridpoolHub();
+      this.gridpoolHubBaseUrl = '';
+      this.gridpoolOnDeckList = [];
+      this.gridpoolWinnersList = [];
+      return;
+    }
+    if (this.gridpoolHubSocket && this.gridpoolHubBaseUrl === baseUrl) return;
+    if (this.gridpoolHubConnecting && this.gridpoolHubBaseUrl === baseUrl) return;
+
+    this.closeGridpoolHub();
+    this.gridpoolHubBaseUrl = baseUrl;
+    this.gridpoolHubConnecting = true;
+
+    fetch(`${baseUrl}/poolStatsHub/negotiate?negotiateVersion=1`, { method: 'POST' })
+      .then(response => response.json())
+      .then(negotiate => {
+        if (this.gridpoolHubBaseUrl !== baseUrl || !negotiate?.connectionToken) return;
+        const wsUrl = `${baseUrl.replace(/^http/i, 'ws')}/poolStatsHub?id=${encodeURIComponent(negotiate.connectionToken)}`;
+        const socket = new WebSocket(wsUrl);
+        this.gridpoolHubSocket = socket;
+        socket.onopen = () => {
+          socket.send('{"protocol":"json","version":1}\x1e');
+          this.gridpoolHubConnected = true;
+          this.gridpoolHubConnecting = false;
+        };
+        socket.onmessage = event => this.handleGridpoolHubMessage(String(event.data));
+        socket.onerror = () => {
+          this.gridpoolHubConnected = false;
+          this.gridpoolHubConnecting = false;
+        };
+        socket.onclose = () => {
+          if (this.gridpoolHubSocket === socket) {
+            this.gridpoolHubSocket = undefined;
+            this.gridpoolHubConnected = false;
+            this.gridpoolHubConnecting = false;
+          }
+        };
+      })
+      .catch(() => {
+        this.gridpoolHubConnected = false;
+        this.gridpoolHubConnecting = false;
+      });
+  }
+
+  private handleGridpoolHubMessage(payload: string): void {
+    for (const part of payload.split('\x1e')) {
+      if (!part || part === '{}') continue;
+      let message: any;
+      try {
+        message = JSON.parse(part);
+      } catch {
+        continue;
+      }
+      if (message?.target === 'UpdateOnDeck') {
+        this.gridpoolOnDeckList = Array.isArray(message.arguments?.[0]) ? message.arguments[0] : [];
+      } else if (message?.target === 'UpdateWinners') {
+        this.gridpoolWinnersList = Array.isArray(message.arguments?.[0]) ? message.arguments[0] : [];
+      } else if (message?.target === 'UpdateNetworkState') {
+        this.gridpoolNetworkState = message.arguments?.[0] ?? null;
+      }
+    }
+  }
+
+  private minerSearchValue(info: ISystemInfo): string {
+    return (info.gridpoolPayoutAddress || this.getAddressPart(this.activePoolUser || '') || '').toLowerCase();
+  }
+
+  private gridpoolEntryMatches(entry: IGridpoolPayoutEntry, info: ISystemInfo): boolean {
+    const search = this.minerSearchValue(info);
+    if (!search) return false;
+    const values = [
+      entry.address,
+      entry.payoutAddress,
+      entry.walletAddress,
+      entry.username,
+      entry.userName,
+      entry.user,
+      entry.worker,
+    ].map(value => (value || '').toLowerCase());
+    return values.some(value => value === search || value.startsWith(`${search}.`));
+  }
+
+  getGridpoolOnDeckMatches(info: ISystemInfo): IGridpoolPayoutEntry[] {
+    return this.gridpoolOnDeckList.filter(entry => this.gridpoolEntryMatches(entry, info));
+  }
+
+  getGridpoolOnDeckSlotCount(info: ISystemInfo): number {
+    const matches = this.getGridpoolOnDeckMatches(info);
+    return matches.length || info.gridpoolWinnerSlots || 0;
+  }
+
+  getGridpoolWinnerMatches(info: ISystemInfo): IGridpoolPayoutEntry[] {
+    const matches = this.gridpoolWinnersList.filter(entry => this.gridpoolEntryMatches(entry, info));
+    if (matches.length > 0 || !info.gridpoolWinnerSlots) return matches;
+    return Array.from({ length: info.gridpoolWinnerSlots }, () => ({ value: info.gridpoolWinnerValueSats / info.gridpoolWinnerSlots }));
+  }
+
+  getGridpoolValueSats(entries: IGridpoolPayoutEntry[], fallback = 0): number {
+    const total = entries.reduce((sum, entry) => sum + (entry.value || 0), 0);
+    return total || fallback;
+  }
+
+  getGridpoolBestOnDeckDisplay(info: ISystemInfo): string {
+    const best = this.gridpoolOnDeckList[0];
+    return best?.diffString || info.gridpoolBestOnDeckDifficultyDisplay || '--';
+  }
+
+  getGridpoolWorstOnDeckDisplay(info: ISystemInfo): string {
+    const worst = this.gridpoolOnDeckList[this.gridpoolOnDeckList.length - 1];
+    return worst?.diffString || info.gridpoolCurrentOnDeckFloorDifficultyDisplay || info.gridpoolMinimumDifficultyToEnterDisplay || '--';
+  }
+
+  private parseHashrateToThs(value?: string): number {
+    const match = (value || '').trim().match(/^([\d.]+)\s*([KMGTPE]?H)\/s$/i);
+    if (!match) return 0;
+    const amount = Number(match[1]);
+    const unit = match[2].toUpperCase();
+    const scale: Record<string, number> = { 'KH': 1e-9, 'MH': 1e-6, 'GH': 1e-3, 'TH': 1, 'PH': 1e3, 'EH': 1e6 };
+    return amount * (scale[unit] ?? 0);
+  }
+
+  private formatDuration(seconds: number): string {
+    if (!isFinite(seconds) || seconds <= 0) return '--';
+    const units = [
+      { label: 'y', value: 365 * 24 * 3600 },
+      { label: 'd', value: 24 * 3600 },
+      { label: 'h', value: 3600 },
+      { label: 'm', value: 60 },
+    ];
+    for (const unit of units) {
+      if (seconds >= unit.value) {
+        return `${(seconds / unit.value).toLocaleString(undefined, { maximumFractionDigits: seconds / unit.value < 10 ? 1 : 0 })} ${unit.label}`;
+      }
+    }
+    return `${seconds.toFixed(0)} s`;
+  }
+
+  getSoloBlockMeanTime(info: ISystemInfo): string {
+    const hps = (info.hashRate || 0) * 1e9;
+    return this.formatDuration(((info.networkDifficulty || 0) * 4294967296) / hps);
+  }
+
+  getGridpoolTeamBlockMeanTime(info: ISystemInfo): string {
+    const teamThs = this.gridpoolNetworkState?.currentRoundObservedHashrateThs || this.parseHashrateToThs(info.gridpoolTeamHashrateDisplay);
+    return this.formatDuration(((info.networkDifficulty || 0) * 4294967296) / (teamThs * 1e12));
+  }
+
+  getGridpoolSlotMeanTime(info: ISystemInfo): string {
+    const teamThs = this.gridpoolNetworkState?.currentRoundObservedHashrateThs || this.parseHashrateToThs(info.gridpoolTeamHashrateDisplay);
+    const bitaxeThs = (info.hashRate || 0) / 1000;
+    const slots = info.gridpoolSharedWinnerSlotCount || 299;
+    if (!teamThs || !bitaxeThs || !slots) return '--';
+    const expectedSlotsPerRound = Math.max((bitaxeThs / teamThs) * slots, 0);
+    return this.formatDuration(600 / Math.max(expectedSlotsPerRound, 0.000001));
+  }
+
+  setShowOdds(value: boolean): void {
+    this.showOdds = value;
+    localStorage.setItem(SHOW_ODDS_KEY, value ? '1' : '0');
+  }
+
+  getShortGridpoolValue(value?: string): string {
+    if (!value) return '--';
+    if (value.length <= 18) return value;
+    return `${value.slice(0, 8)}...${value.slice(-8)}`;
+  }
+
   hasCoinbaseVisibility(info: ISystemInfo): boolean {
     return info.blockHeight > 0;
   }
@@ -979,6 +1211,11 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
+    updateMessage(info.gridpoolEnabled === 1 && info.gridpoolRewardMode !== 'solo' && info.gridpoolReachable !== 1, 'GRIDPOOL_STATUS_ERROR', 'warn', `GridPool Boot is not reachable${info.gridpoolLastError ? ': ' + info.gridpoolLastError : ''}`);
+    const onDeckMatches = this.getGridpoolOnDeckMatches(info);
+    const winnerMatches = this.getGridpoolWinnerMatches(info);
+    updateMessage(onDeckMatches.length > 0, 'GRIDPOOL_ON_DECK', 'success', `Your address is on the GridPool On Deck List with ${onDeckMatches.length} slot${onDeckMatches.length === 1 ? '' : 's'} worth ${(this.getGridpoolValueSats(onDeckMatches) / 100000000).toFixed(8)} BTC if it holds.`);
+    updateMessage(winnerMatches.length > 0, 'GRIDPOOL_WINNER', 'success', `Your address is on the GridPool Winners List with ${winnerMatches.length} locked slot${winnerMatches.length === 1 ? '' : 's'} worth ${(this.getGridpoolValueSats(winnerMatches, info.gridpoolWinnerValueSats || 0) / 100000000).toFixed(8)} BTC.`);
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);

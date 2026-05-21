@@ -40,6 +40,7 @@ static coordinator_state_t s_state = COORD_STATE_IDLE;
 static QueueHandle_t s_event_queue = NULL;
 static volatile bool s_v1_should_shutdown = false;
 static volatile bool s_v2_should_shutdown = false;
+static bool s_gridpool_direct_mode = false;
 
 // Protocol tracking
 static stratum_protocol_t s_primary_protocol;
@@ -58,6 +59,7 @@ void protocol_coordinator_init(GlobalState *gs)
     s_v1_should_shutdown = false;
     s_v2_should_shutdown = false;
     s_heartbeat_enabled = false;
+    s_gridpool_direct_mode = false;
 }
 
 void protocol_coordinator_notify_failure(void)
@@ -204,6 +206,73 @@ static void stop_running_task(GlobalState *gs)
     }
 }
 
+static void set_gridpool_direct_connection_info(GlobalState *gs)
+{
+    snprintf(gs->SYSTEM_MODULE.pool_connection_info,
+             sizeof(gs->SYSTEM_MODULE.pool_connection_info),
+             "GridPool Direct");
+}
+
+static void start_configured_protocol_task(GlobalState *gs)
+{
+    if (gs->SYSTEM_MODULE.is_using_fallback) {
+        gs->stratum_protocol = s_fallback_protocol;
+        s_running_protocol = s_fallback_protocol;
+        s_state = COORD_STATE_RUNNING_FALLBACK;
+        start_protocol_task(gs, s_fallback_protocol);
+        s_heartbeat_enabled = false;
+    } else {
+        gs->stratum_protocol = s_primary_protocol;
+        s_running_protocol = s_primary_protocol;
+        s_state = COORD_STATE_RUNNING_PRIMARY;
+        start_protocol_task(gs, s_primary_protocol);
+    }
+}
+
+static void enter_gridpool_direct_mode(GlobalState *gs)
+{
+    if (s_gridpool_direct_mode) {
+        set_gridpool_direct_connection_info(gs);
+        return;
+    }
+
+    ESP_LOGI(TAG, "GridPool direct mode enabled; stopping Stratum protocol task");
+    if (s_state != COORD_STATE_IDLE) {
+        stop_running_task(gs);
+    }
+
+    queue_clear(&gs->stratum_queue);
+    s_state = COORD_STATE_IDLE;
+    s_heartbeat_enabled = false;
+    s_gridpool_direct_mode = true;
+    set_gridpool_direct_connection_info(gs);
+}
+
+static void leave_gridpool_direct_mode(GlobalState *gs)
+{
+    if (!s_gridpool_direct_mode) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "GridPool direct mode disabled; restoring Stratum protocol task");
+    s_gridpool_direct_mode = false;
+    start_configured_protocol_task(gs);
+}
+
+static bool should_run_gridpool_direct_mode(GlobalState *gs)
+{
+    if (!nvs_config_get_bool(NVS_CONFIG_GRIDPOOL_ENABLED)) {
+        return false;
+    }
+    if (!nvs_config_get_bool(NVS_CONFIG_GRIDPOOL_FALLBACK_TO_STRATUM)) {
+        return true;
+    }
+
+    SystemModule *module = &gs->SYSTEM_MODULE;
+    return module->gridpool_template_reachable ||
+           (module->gridpool_template_runs == 0 && module->gridpool_template_failures == 0);
+}
+
 // Probe whether the primary pool is reachable (TCP connect test for SV2)
 static bool heartbeat_probe_sv2(void)
 {
@@ -320,6 +389,11 @@ static void do_heartbeat_probe(GlobalState *gs)
 // Handle an event from the event queue
 static void handle_event(GlobalState *gs, coordinator_event_t evt)
 {
+    if (s_gridpool_direct_mode) {
+        ESP_LOGI(TAG, "Ignoring Stratum coordinator event while GridPool direct mode is active (evt=%d)", evt);
+        return;
+    }
+
     switch (evt) {
         case COORD_EVENT_PROTOCOL_FAILED:
             ESP_LOGW(TAG, "Protocol failure reported (state=%d)", s_state);
@@ -363,19 +437,10 @@ void protocol_coordinator_task(void *pvParameters)
     s_primary_protocol = gs->stratum_protocol;
     s_fallback_protocol = gs->SYSTEM_MODULE.fallback_pool_protocol;
 
-    // Start initial protocol task
-    if (gs->SYSTEM_MODULE.is_using_fallback) {
-        // User explicitly selected fallback — use fallback protocol
-        gs->stratum_protocol = s_fallback_protocol;
-        s_running_protocol = s_fallback_protocol;
-        s_state = COORD_STATE_RUNNING_FALLBACK;
-        start_protocol_task(gs, s_fallback_protocol);
-        // User chose fallback, no heartbeat
-        s_heartbeat_enabled = false;
+    if (should_run_gridpool_direct_mode(gs)) {
+        enter_gridpool_direct_mode(gs);
     } else {
-        s_running_protocol = s_primary_protocol;
-        s_state = COORD_STATE_RUNNING_PRIMARY;
-        start_protocol_task(gs, s_primary_protocol);
+        start_configured_protocol_task(gs);
     }
 
     ESP_LOGI(TAG, "Protocol coordinator started (primary: %s, fallback: %s, state: %d)",
@@ -387,34 +452,45 @@ void protocol_coordinator_task(void *pvParameters)
     // before probing primary pool
     bool heartbeat_initial_delay = false;
     int64_t heartbeat_delay_start = 0;
+    int64_t last_heartbeat_us = esp_timer_get_time();
 
     // Main non-blocking event loop
     while (1) {
         coordinator_event_t evt;
-        TickType_t wait = s_heartbeat_enabled
-            ? pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS)
-            : portMAX_DELAY;
-
         bool was_heartbeat_enabled = s_heartbeat_enabled;
 
-        if (xQueueReceive(s_event_queue, &evt, wait) == pdTRUE) {
+        if (xQueueReceive(s_event_queue, &evt, pdMS_TO_TICKS(1000)) == pdTRUE) {
             handle_event(gs, evt);
 
             // Detect heartbeat disabled→enabled transition, reset initial delay
             if (s_heartbeat_enabled && !was_heartbeat_enabled) {
                 heartbeat_initial_delay = true;
                 heartbeat_delay_start = esp_timer_get_time();
+                last_heartbeat_us = heartbeat_delay_start;
             }
-        } else if (s_heartbeat_enabled) {
-            // Timeout expired — time for a heartbeat probe
+        }
+
+        if (should_run_gridpool_direct_mode(gs)) {
+            enter_gridpool_direct_mode(gs);
+            continue;
+        }
+
+        leave_gridpool_direct_mode(gs);
+
+        if (s_heartbeat_enabled) {
+            int64_t now_us = esp_timer_get_time();
             if (heartbeat_initial_delay) {
-                int64_t elapsed_ms = (esp_timer_get_time() - heartbeat_delay_start) / 1000;
+                int64_t elapsed_ms = (now_us - heartbeat_delay_start) / 1000;
                 if (elapsed_ms < INITIAL_HEARTBEAT_DELAY_MS) {
                     continue;
                 }
                 heartbeat_initial_delay = false;
             }
-            do_heartbeat_probe(gs);
+
+            if ((now_us - last_heartbeat_us) / 1000 >= HEARTBEAT_INTERVAL_MS) {
+                last_heartbeat_us = now_us;
+                do_heartbeat_probe(gs);
+            }
         }
     }
 

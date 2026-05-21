@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_check.h"
@@ -412,6 +413,33 @@ void screen_next()
     } while (!screen_show(next_scr));
 }
 
+static const char *screen_gridpool_rpc_display(void)
+{
+    static char rpc_display[96] = "";
+    static bool initialized = false;
+
+    if (!initialized) {
+        char *rpc_url = nvs_config_get_string(NVS_CONFIG_GRIDPOOL_BITCOIN_RPC_URL);
+        const char *start = rpc_url ? strstr(rpc_url, "://") : NULL;
+        start = start ? start + 3 : rpc_url;
+        const char *end = start ? strpbrk(start, "/?#") : NULL;
+        size_t len = start ? (end ? (size_t)(end - start) : strlen(start)) : 0;
+        if (len >= sizeof(rpc_display)) {
+            len = sizeof(rpc_display) - 1;
+        }
+        if (len > 0) {
+            memcpy(rpc_display, start, len);
+            rpc_display[len] = '\0';
+        } else {
+            snprintf(rpc_display, sizeof(rpc_display), "Bitcoin RPC");
+        }
+        free(rpc_url);
+        initialized = true;
+    }
+
+    return rpc_display;
+}
+
 static void screen_update_cb(lv_timer_t * timer)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -517,7 +545,9 @@ static void screen_update_cb(lv_timer_t * timer)
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
-    char *pool_url = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
+    const char *pool_url = nvs_config_get_bool(NVS_CONFIG_GRIDPOOL_ENABLED)
+                               ? screen_gridpool_rpc_display()
+                               : (module->is_using_fallback ? module->fallback_pool_url : module->pool_url);
     if (strcmp(lv_label_get_text(urls_mining_url_label), pool_url) != 0) {
         lv_label_set_text(urls_mining_url_label, pool_url);
     }

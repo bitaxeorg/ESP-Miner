@@ -23,6 +23,21 @@ interface IChannelOption {
   label: string;
 }
 
+interface IGridpoolAuthOption {
+  value: 'none' | 'basic';
+  label: string;
+}
+
+interface IGridpoolRewardOption {
+  value: 'split' | 'solo';
+  label: string;
+}
+
+interface IGridpoolFallbackOption {
+  value: number;
+  label: string;
+}
+
 @Component({
   selector: 'app-pool',
   templateUrl: './pool.component.html',
@@ -36,6 +51,7 @@ export class PoolComponent implements OnInit {
 
   public pools: PoolType[] = ['stratum', 'fallbackStratum'];
   public showPassword = { 'stratum': false, 'fallbackStratum': false };
+  public showGridpoolRpcPassword = false;
   public showAdvancedOptions = { 'stratum': false, 'fallbackStratum': false };
 
   public tlsOptions: ITlsOption[] = [
@@ -52,6 +68,21 @@ export class PoolComponent implements OnInit {
   public sv2ChannelOptions: IChannelOption[] = [
     { value: 'extended', label: 'Extended Channels' },
     { value: 'standard', label: 'Standard Channels' }
+  ];
+
+  public gridpoolAuthOptions: IGridpoolAuthOption[] = [
+    { value: 'basic', label: 'Username / Password' },
+    { value: 'none', label: 'No Authentication' }
+  ];
+
+  public gridpoolRewardOptions: IGridpoolRewardOption[] = [
+    { value: 'split', label: 'GridPool Split' },
+    { value: 'solo', label: 'Solo Yolo' }
+  ];
+
+  public gridpoolFallbackOptions: IGridpoolFallbackOption[] = [
+    { value: 1, label: 'Fallback to Stratum pools' },
+    { value: 0, label: 'Fallback to pure solo mode' }
   ];
 
   public asicModel: string = '';
@@ -111,8 +142,30 @@ export class PoolComponent implements OnInit {
           fallbackStratumProtocol: [info.fallbackStratumProtocol || 'SV1'],
           fallbackStratumV2AuthorityPubkey: [info.fallbackStratumV2AuthorityPubkey || '', [this.base58Validator()]],
           stratumV2ChannelType: [info.stratumV2ChannelType || 'standard'],
-          fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType || 'standard']
+          fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType || 'standard'],
+          gridpoolEnabled: [info.gridpoolEnabled === 1],
+          gridpoolBootUrl: [info.gridpoolBootUrl || 'https://gridpool.net', [this.httpUrlValidator()]],
+          gridpoolBitcoinRpcUrl: [info.gridpoolBitcoinRpcUrl || '', [this.optionalHttpUrlValidator()]],
+          gridpoolBitcoinRpcAuthMode: [info.gridpoolBitcoinRpcAuthMode || 'basic'],
+          gridpoolBitcoinRpcUsername: [info.gridpoolBitcoinRpcUsername || ''],
+          gridpoolBitcoinRpcPassword: ['*****'],
+          gridpoolPayoutAddress: [info.gridpoolPayoutAddress || ''],
+          gridpoolMinSubmitDifficulty: [info.gridpoolMinSubmitDifficulty ?? 1, [Validators.min(0)]],
+          gridpoolRewardMode: [info.gridpoolRewardMode || 'split'],
+          gridpoolFallbackToStratum: [info.gridpoolFallbackToStratum !== 0 ? 1 : 0]
         });
+
+        const applyGridpoolBootUrlValidation = () => {
+          const enabled = this.form.get('gridpoolEnabled')?.value === true;
+          const bootUrlControl = this.form.get('gridpoolBootUrl');
+
+          if (enabled) {
+            bootUrlControl?.setValidators([Validators.required, this.httpUrlValidator()]);
+          } else {
+            bootUrlControl?.setValidators([this.httpUrlValidator()]);
+          }
+          bootUrlControl?.updateValueAndValidity();
+        };
 
         const setupTlsValidation = (tlsControlName: string, certControlName: string) => {
           this.form.get(tlsControlName)?.valueChanges.subscribe(value => {
@@ -132,10 +185,12 @@ export class PoolComponent implements OnInit {
         // Setup tls validation
         setupTlsValidation('stratumTLS', 'stratumCert');
         setupTlsValidation('fallbackStratumTLS', 'fallbackStratumCert');
+        this.form.get('gridpoolEnabled')?.valueChanges.subscribe(() => applyGridpoolBootUrlValidation());
 
         // Trigger initial validation
         this.form.get('stratumTLS')?.updateValueAndValidity();
         this.form.get('fallbackStratumTLS')?.updateValueAndValidity();
+        applyGridpoolBootUrlValidation();
       });
   }
 
@@ -148,6 +203,12 @@ export class PoolComponent implements OnInit {
     if (form.fallbackStratumPassword === '*****') {
       delete form.fallbackStratumPassword;
     }
+    if (form.gridpoolBitcoinRpcPassword === '*****') {
+      delete form.gridpoolBitcoinRpcPassword;
+    }
+
+    form.gridpoolEnabled = form.gridpoolEnabled ? 1 : 0;
+    form.gridpoolFallbackToStratum = Number(form.gridpoolFallbackToStratum) ? 1 : 0;
 
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
@@ -188,6 +249,18 @@ export class PoolComponent implements OnInit {
       return { cleanUrl: url.slice(0, match.index), port };
     }
     return { cleanUrl: url };
+  }
+
+  private httpUrlValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = (control.value || '').trim();
+      if (!value) return null;
+      return /^https?:\/\/.+/i.test(value) ? null : { invalidUrl: true };
+    };
+  }
+
+  private optionalHttpUrlValidator(): ValidatorFn {
+    return this.httpUrlValidator();
   }
 
   public onUrlChange(poolType: PoolType) {

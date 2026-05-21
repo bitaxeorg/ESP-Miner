@@ -7,8 +7,8 @@
             </div>
         </div>
         <ng-container *ngFor="let pool of pools">
-            <h2 *ngIf="pool === 'stratum'">Pool Configuration</h2>
-            <h2 *ngIf="pool === 'fallbackStratum'" class="mt-5">Fallback Pool Configuration</h2>
+            <h2 *ngIf="pool === 'stratum'">Stratum Mode</h2>
+            <h2 *ngIf="pool === 'fallbackStratum'" class="mt-5">Fallback Stratum Pool</h2>
 
             <div class="card">
                 <div class="field grid p-fluid">
@@ -234,6 +234,151 @@
                 </fieldset>
             </div>
         </ng-container>
+
+        <h2 class="mt-5">Sovereign Work Generation</h2>
+        <div class="card">
+            <div class="field-checkbox grid">
+                <div class="col-1 md:col-10 md:flex-order-2">
+                    <p-checkbox name="gridpoolEnabled" inputId="gridpoolEnabled" formControlName="gridpoolEnabled" [binary]="true"></p-checkbox>
+                </div>
+                <label for="gridpoolEnabled" class="col-11 m-0 pb-0 pl-3 md:col-2 md:flex-order-1 md:pl-2">
+                    <tooltip-text-icon
+                        text="Prefer local work generation"
+                        tooltip="This setting will use the Bitcoin RPC at the specified URL to fetch block templates, generate work on this ESP32, and submit any found blocks directly back to that Bitcoin node. This mode removes the need for a separate Stratum server."
+                    />
+                </label>
+            </div>
+
+            <fieldset class="m-0 p-0 mt-4 border-200 border-bottom-none border-left-none border-right-none">
+                <legend class="p-0 pr-3">Bitcoin RPC</legend>
+
+                <div class="field grid p-fluid mt-4">
+                    <label for="gridpoolBitcoinRpcUrl" class="col-12 md:col-2 md:mb-0">RPC URL</label>
+                    <div class="col-12 md:col-10">
+                        <input pInputText id="gridpoolBitcoinRpcUrl" formControlName="gridpoolBitcoinRpcUrl" type="text" />
+                        <small *ngIf="form.get('gridpoolBitcoinRpcUrl')?.errors?.['invalidUrl']" class="block text-red-500 mt-1">
+                            Enter an HTTP or HTTPS URL.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="field grid p-fluid">
+                    <label class="col-12 mb-2 md:col-2 md:mb-0">RPC Auth</label>
+                    <div class="col-12 md:col-10">
+                        <div class="flex flex-wrap gap-3">
+                            <div *ngFor="let option of gridpoolAuthOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
+                                <p-radioButton
+                                    name="gridpoolBitcoinRpcAuthMode"
+                                    [value]="option.value"
+                                    formControlName="gridpoolBitcoinRpcAuthMode"
+                                    [inputId]="'gridpoolBitcoinRpcAuthMode_' + option.value">
+                                </p-radioButton>
+                                <label [for]="'gridpoolBitcoinRpcAuthMode_' + option.value" class="ml-2 cursor-pointer">
+                                    {{ option.label }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <ng-container *ngIf="form.get('gridpoolBitcoinRpcAuthMode')?.value === 'basic'">
+                    <div class="field grid p-fluid">
+                        <label for="gridpoolBitcoinRpcUsername" class="col-12 md:col-2 md:mb-0">RPC User</label>
+                        <div class="col-12 md:col-10">
+                            <input pInputText id="gridpoolBitcoinRpcUsername" formControlName="gridpoolBitcoinRpcUsername" sensitive-data type="text" />
+                        </div>
+                    </div>
+
+                    <div class="field grid p-fluid">
+                        <label for="gridpoolBitcoinRpcPassword" class="col-12 md:col-2 md:mb-0">RPC Password</label>
+                        <div class="col-12 md:col-10 p-input-icon-right">
+                            <i *ngIf="form.get('gridpoolBitcoinRpcPassword')?.dirty" class="pi cursor-pointer"
+                            [ngClass]="{'pi-eye': !showGridpoolRpcPassword, 'pi-eye-slash': showGridpoolRpcPassword}"
+                            (click)="showGridpoolRpcPassword = !showGridpoolRpcPassword"></i>
+                            <input pInputText id="gridpoolBitcoinRpcPassword" formControlName="gridpoolBitcoinRpcPassword"
+                                [type]="showGridpoolRpcPassword ? 'text' : 'password'" />
+                        </div>
+                    </div>
+                </ng-container>
+            </fieldset>
+
+            <div class="field grid p-fluid mt-4">
+                <label for="gridpoolPayoutAddress" class="col-12 md:col-2 md:mb-0">Payout Address</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="gridpoolPayoutAddress" formControlName="gridpoolPayoutAddress" sensitive-data type="text" />
+                </div>
+            </div>
+
+            <div class="field grid p-fluid">
+                <label for="gridpoolBootUrl" class="col-12 md:col-2 md:mb-0">GridPool Node URL</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="gridpoolBootUrl" formControlName="gridpoolBootUrl" type="text" />
+                    <small *ngIf="form.get('gridpoolBootUrl')?.errors?.['invalidUrl']" class="block text-red-500 mt-1">
+                        Enter an HTTP or HTTPS URL.
+                    </small>
+                </div>
+            </div>
+
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0">Reward Mode</label>
+                <div class="col-12 md:col-10">
+                    <div class="flex flex-wrap gap-3">
+                        <div *ngFor="let option of gridpoolRewardOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
+                            <p-radioButton
+                                name="gridpoolRewardMode"
+                                [value]="option.value"
+                                formControlName="gridpoolRewardMode"
+                                [inputId]="'gridpoolRewardMode_' + option.value">
+                            </p-radioButton>
+                            <label [for]="'gridpoolRewardMode_' + option.value" class="ml-2 cursor-pointer">
+                                <ng-container *ngIf="option.value === 'split'; else plainRewardModeLabel">
+                                    <tooltip-text-icon
+                                        [text]="option.label"
+                                        tooltip="Uses the decentralized GridPool network to split rewards and reduce variance. Block subsidy is divided evenly between the 300 miners with the top 300 difficulty shares from the previous round. Roughly 300x better odds for 1/300th of the block reward. Block finder takes all transaction fees + 1 slot. Resistant to block-witholding attacks and transaction censorship."
+                                    />
+                                </ng-container>
+                                <ng-template #plainRewardModeLabel>{{ option.label }}</ng-template>
+                            </label>
+                        </div>
+                    </div>
+                    <small class="block text-500 mt-2">
+                        GridPool Split shares the subsidy with the current team list. Solo Yolo pays the whole block reward to this device's payout address.
+                    </small>
+                </div>
+            </div>
+
+            <div class="field grid p-fluid">
+                <label class="col-12 mb-2 md:col-2 md:mb-0">Fallback</label>
+                <div class="col-12 md:col-10">
+                    <small class="block text-500 mb-2">Fallback behavior if the GridPool network is unreachable.</small>
+                    <div class="flex flex-wrap gap-3">
+                        <div *ngFor="let option of gridpoolFallbackOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
+                            <p-radioButton
+                                name="gridpoolFallbackToStratum"
+                                [value]="option.value"
+                                formControlName="gridpoolFallbackToStratum"
+                                [inputId]="'gridpoolFallbackToStratum_' + option.value">
+                            </p-radioButton>
+                            <label [for]="'gridpoolFallbackToStratum_' + option.value" class="ml-2 cursor-pointer">
+                                {{ option.label }}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field grid p-fluid">
+                <label for="gridpoolMinSubmitDifficulty" class="col-12 md:col-2 md:mb-0">
+                    <tooltip-text-icon
+                        text="Min Submit Diff"
+                        tooltip="Local floor for future GridPool direct share submission."
+                    />
+                </label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="gridpoolMinSubmitDifficulty" formControlName="gridpoolMinSubmitDifficulty" type="number" />
+                </div>
+            </div>
+        </div>
 
         <div class="flex mt-5 gap-3">
             <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"

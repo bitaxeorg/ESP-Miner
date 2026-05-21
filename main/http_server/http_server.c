@@ -979,6 +979,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     char * fallbackStratumCert = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_CERT);
     char * sv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_SV2_AUTHORITY_PUBKEY);
     char * fallbackSv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY);
+    char * gridpoolBootUrl = nvs_config_get_string(NVS_CONFIG_GRIDPOOL_BOOT_URL);
+    char * gridpoolBitcoinRpcUrl = nvs_config_get_string(NVS_CONFIG_GRIDPOOL_BITCOIN_RPC_URL);
+    char * gridpoolBitcoinRpcAuthMode = nvs_config_get_string(NVS_CONFIG_GRIDPOOL_BITCOIN_RPC_AUTH_MODE);
+    char * gridpoolBitcoinRpcUsername = nvs_config_get_string(NVS_CONFIG_GRIDPOOL_BITCOIN_RPC_USERNAME);
+    char * gridpoolPayoutAddress = nvs_config_get_string(NVS_CONFIG_GRIDPOOL_PAYOUT_ADDRESS);
+    char * gridpoolRewardMode = nvs_config_get_string(NVS_CONFIG_GRIDPOOL_REWARD_MODE);
     char * display = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
     
@@ -1052,7 +1058,9 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddStringToObject(root, "stratumProtocol",
                             stratum_protocol_to_string(nvs_config_get_u16(NVS_CONFIG_STRATUM_PROTOCOL)));
     const char *protocol_label = "SV1";
-    if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+    if (nvs_config_get_bool(NVS_CONFIG_GRIDPOOL_ENABLED)) {
+        protocol_label = (gridpoolRewardMode && strcmp(gridpoolRewardMode, "solo") == 0) ? "Solo Yolo" : "GridPool Direct";
+    } else if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
         protocol_label = stratum_v2_is_extended_channel(GLOBAL_STATE)
             ? "SV2 Extended Channel" : "SV2 Standard Channel";
     }
@@ -1081,6 +1089,92 @@ static esp_err_t GET_system_info(httpd_req_t * req)
                             sv2_channel_type_to_string(nvs_config_get_u16(NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE)));
     cJSON_AddFloatToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
     cJSON_AddFloatToObject(root, "cpuUsage", GLOBAL_STATE->SYSTEM_MODULE.cpu_usage);
+
+    cJSON_AddNumberToObject(root, "gridpoolEnabled", nvs_config_get_bool(NVS_CONFIG_GRIDPOOL_ENABLED) ? 1 : 0);
+    cJSON_AddStringToObject(root, "gridpoolBootUrl", gridpoolBootUrl);
+    cJSON_AddStringToObject(root, "gridpoolBitcoinRpcUrl", gridpoolBitcoinRpcUrl);
+    cJSON_AddStringToObject(root, "gridpoolBitcoinRpcAuthMode", gridpoolBitcoinRpcAuthMode);
+    cJSON_AddStringToObject(root, "gridpoolBitcoinRpcUsername", gridpoolBitcoinRpcUsername);
+    cJSON_AddStringToObject(root, "gridpoolPayoutAddress", gridpoolPayoutAddress);
+    cJSON_AddNumberToObject(root, "gridpoolMinSubmitDifficulty", (double)nvs_config_get_u64(NVS_CONFIG_GRIDPOOL_MIN_SUBMIT_DIFFICULTY));
+    cJSON_AddStringToObject(root, "gridpoolRewardMode", gridpoolRewardMode && gridpoolRewardMode[0] ? gridpoolRewardMode : "split");
+    cJSON_AddNumberToObject(root, "gridpoolFallbackToStratum", nvs_config_get_bool(NVS_CONFIG_GRIDPOOL_FALLBACK_TO_STRATUM) ? 1 : 0);
+    cJSON_AddNumberToObject(root, "gridpoolReachable", GLOBAL_STATE->SYSTEM_MODULE.gridpool_reachable ? 1 : 0);
+    cJSON_AddNumberToObject(root, "gridpoolHttpStatus", GLOBAL_STATE->SYSTEM_MODULE.gridpool_http_status);
+    cJSON_AddStringToObject(root, "gridpoolStatus", GLOBAL_STATE->SYSTEM_MODULE.gridpool_status);
+    cJSON_AddStringToObject(root, "gridpoolLastError", GLOBAL_STATE->SYSTEM_MODULE.gridpool_last_error);
+    cJSON_AddNumberToObject(root, "gridpoolLastSuccessTime", GLOBAL_STATE->SYSTEM_MODULE.gridpool_last_success_time);
+    cJSON_AddNumberToObject(root, "gridpoolLastAttemptTime", GLOBAL_STATE->SYSTEM_MODULE.gridpool_last_attempt_time);
+    cJSON_AddNumberToObject(root, "gridpoolPayoutSequence", (double)GLOBAL_STATE->SYSTEM_MODULE.gridpool_payout_sequence);
+    cJSON_AddNumberToObject(root, "gridpoolAdviceSequence", (double)GLOBAL_STATE->SYSTEM_MODULE.gridpool_advice_sequence);
+    cJSON_AddNumberToObject(root, "gridpoolPayoutCount", GLOBAL_STATE->SYSTEM_MODULE.gridpool_payout_count);
+    cJSON_AddNumberToObject(root, "gridpoolCoinbaseOutputCount", GLOBAL_STATE->SYSTEM_MODULE.gridpool_coinbase_output_count);
+    cJSON_AddNumberToObject(root, "gridpoolCurrentRound", GLOBAL_STATE->SYSTEM_MODULE.gridpool_current_round);
+    cJSON_AddStringToObject(root, "gridpoolCurrentStateId", GLOBAL_STATE->SYSTEM_MODULE.gridpool_current_state_id);
+    cJSON_AddStringToObject(root, "gridpoolCandidateStateId", GLOBAL_STATE->SYSTEM_MODULE.gridpool_candidate_state_id);
+    cJSON_AddNumberToObject(root, "gridpoolSharedWinnerSlotCount", GLOBAL_STATE->SYSTEM_MODULE.gridpool_shared_winner_slot_count);
+    cJSON_AddNumberToObject(root, "gridpoolOnDeckCount", GLOBAL_STATE->SYSTEM_MODULE.gridpool_on_deck_count);
+    cJSON_AddNumberToObject(root, "gridpoolOpenOnDeckSlots", GLOBAL_STATE->SYSTEM_MODULE.gridpool_open_on_deck_slots);
+    cJSON_AddStringToObject(root, "gridpoolCurrentTipHash", GLOBAL_STATE->SYSTEM_MODULE.gridpool_current_tip_hash);
+    cJSON_AddNumberToObject(root, "gridpoolCurrentTipHeight", GLOBAL_STATE->SYSTEM_MODULE.gridpool_current_tip_height);
+    cJSON_AddNumberToObject(root, "gridpoolMinimumDifficultyToEnter", GLOBAL_STATE->SYSTEM_MODULE.gridpool_minimum_difficulty_to_enter);
+    cJSON_AddStringToObject(root, "gridpoolMinimumDifficultyToEnterDisplay", GLOBAL_STATE->SYSTEM_MODULE.gridpool_minimum_difficulty_to_enter_display);
+    cJSON_AddNumberToObject(root, "gridpoolBestOnDeckDifficulty", GLOBAL_STATE->SYSTEM_MODULE.gridpool_best_on_deck_difficulty);
+    cJSON_AddStringToObject(root, "gridpoolBestOnDeckDifficultyDisplay", GLOBAL_STATE->SYSTEM_MODULE.gridpool_best_on_deck_difficulty_display);
+    cJSON_AddNumberToObject(root, "gridpoolCurrentOnDeckFloorDifficulty", GLOBAL_STATE->SYSTEM_MODULE.gridpool_current_on_deck_floor_difficulty);
+    cJSON_AddStringToObject(root, "gridpoolCurrentOnDeckFloorDifficultyDisplay", GLOBAL_STATE->SYSTEM_MODULE.gridpool_current_on_deck_floor_difficulty_display);
+    cJSON_AddStringToObject(root, "gridpoolTeamHashrateDisplay", GLOBAL_STATE->SYSTEM_MODULE.gridpool_team_hashrate_display);
+    cJSON_AddNumberToObject(root, "gridpoolWinnerSlots", GLOBAL_STATE->SYSTEM_MODULE.gridpool_winner_slots);
+    cJSON_AddNumberToObject(root, "gridpoolWinnerValueSats", (double)GLOBAL_STATE->SYSTEM_MODULE.gridpool_winner_value_sats);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateReachable", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_reachable ? 1 : 0);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateHttpStatus", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_http_status);
+    cJSON_AddStringToObject(root, "gridpoolTemplateStatus", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_status);
+    cJSON_AddStringToObject(root, "gridpoolTemplateLastError", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_last_error);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateLastSuccessTime", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_last_success_time);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateLastAttemptTime", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_last_attempt_time);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateRuns", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_runs);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateFailures", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_failures);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateHeight", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_height);
+    cJSON_AddStringToObject(root, "gridpoolTemplatePrevHash", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_prev_hash);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateTxCount", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_tx_count);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateMerklePathCount", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_merkle_path_count);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateCoinbaseBytes", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_coinbase_bytes);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateBytes", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_bytes);
+    cJSON_AddNumberToObject(root, "gridpoolTemplatePayoutBytes", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_payout_bytes);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateGridpoolOutputs", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_gridpool_outputs);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateSlot0ValueSats", (double)GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_slot0_value_sats);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateTotalMs", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_total_ms);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateRpcMs", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_rpc_ms);
+    cJSON_AddNumberToObject(root, "gridpoolTemplatePayoutMs", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_payout_ms);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateParseMs", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_parse_ms);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateBuildMs", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_build_ms);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateHeapBefore", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_heap_before);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateHeapAfter", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_heap_after);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateInternalHeapBefore", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_internal_heap_before);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateInternalHeapAfter", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_internal_heap_after);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateSpiramHeapBefore", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_spiram_heap_before);
+    cJSON_AddNumberToObject(root, "gridpoolTemplateSpiramHeapAfter", GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_spiram_heap_after);
+    cJSON_AddNumberToObject(root, "gridpoolDirectJobsSent", GLOBAL_STATE->SYSTEM_MODULE.gridpool_direct_jobs_sent);
+    cJSON_AddNumberToObject(root, "gridpoolShareSubmits", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_submits);
+    cJSON_AddNumberToObject(root, "gridpoolShareAccepted", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_accepted);
+    cJSON_AddNumberToObject(root, "gridpoolShareDuplicate", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_duplicate);
+    cJSON_AddNumberToObject(root, "gridpoolShareRejected", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_rejected);
+    cJSON_AddNumberToObject(root, "gridpoolShareSkipped", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_skipped);
+    cJSON_AddNumberToObject(root, "gridpoolShareHttpStatus", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_http_status);
+    cJSON_AddStringToObject(root, "gridpoolShareStatus", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_status);
+    cJSON_AddStringToObject(root, "gridpoolShareLastError", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_last_error);
+    cJSON_AddStringToObject(root, "gridpoolShareBlockHash", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_block_hash);
+    cJSON_AddNumberToObject(root, "gridpoolShareLastSubmitTime", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_last_submit_time);
+    cJSON_AddNumberToObject(root, "gridpoolShareSubmitMs", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_submit_ms);
+    cJSON_AddNumberToObject(root, "gridpoolShareLastDifficulty", GLOBAL_STATE->SYSTEM_MODULE.gridpool_share_last_difficulty);
+    cJSON_AddNumberToObject(root, "gridpoolBlockSubmits", GLOBAL_STATE->SYSTEM_MODULE.gridpool_block_submits);
+    cJSON_AddNumberToObject(root, "gridpoolBlockAccepted", GLOBAL_STATE->SYSTEM_MODULE.gridpool_block_accepted);
+    cJSON_AddNumberToObject(root, "gridpoolBlockRejected", GLOBAL_STATE->SYSTEM_MODULE.gridpool_block_rejected);
+    cJSON_AddNumberToObject(root, "gridpoolBlockHttpStatus", GLOBAL_STATE->SYSTEM_MODULE.gridpool_block_http_status);
+    cJSON_AddStringToObject(root, "gridpoolBlockStatus", GLOBAL_STATE->SYSTEM_MODULE.gridpool_block_status);
+    cJSON_AddStringToObject(root, "gridpoolBlockLastError", GLOBAL_STATE->SYSTEM_MODULE.gridpool_block_last_error);
+    cJSON_AddNumberToObject(root, "gridpoolBlockLastSubmitTime", GLOBAL_STATE->SYSTEM_MODULE.gridpool_block_last_submit_time);
+    cJSON_AddNumberToObject(root, "gridpoolBlockSubmitMs", GLOBAL_STATE->SYSTEM_MODULE.gridpool_block_submit_ms);
 
     cJSON_AddStringToObject(root, "version", GLOBAL_STATE->SYSTEM_MODULE.version);
     cJSON_AddStringToObject(root, "axeOSVersion", GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
@@ -1178,6 +1272,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     free(fallbackStratumCert);
     free(sv2AuthPubkey);
     free(fallbackSv2AuthPubkey);
+    free(gridpoolBootUrl);
+    free(gridpoolBitcoinRpcUrl);
+    free(gridpoolBitcoinRpcAuthMode);
+    free(gridpoolBitcoinRpcUsername);
+    free(gridpoolPayoutAddress);
+    free(gridpoolRewardMode);
     free(stratumUser);
     free(fallbackStratumUser);
     free(display);

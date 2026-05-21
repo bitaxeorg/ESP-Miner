@@ -58,7 +58,7 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
     GLOBAL_STATE->ASIC_initalized = true;
     
     if (stabilization_delay_ms > 0) {
-        ESP_LOGI(TAG, "Waiting %u ms for tasks to stabilize...", stabilization_delay_ms);
+        ESP_LOGI(TAG, "Waiting %lu ms for tasks to stabilize...", (unsigned long)stabilization_delay_ms);
         vTaskDelay(stabilization_delay_ms / portTICK_PERIOD_MS);
     }
 

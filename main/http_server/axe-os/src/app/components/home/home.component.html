@@ -193,6 +193,44 @@
                         <span class="text-500 text-lg">session best</span>
                         <span class="text-sm font-medium mb-3"> ({{ info.uptimeSeconds | dateAgo: { intervals: 2, strict:true, short:true } }})</span>
                     </div>
+                    <div class="field-checkbox mt-3 mb-2">
+                        <p-checkbox
+                            inputId="showOdds"
+                            [binary]="true"
+                            [ngModel]="showOdds"
+                            (ngModelChange)="setShowOdds($event)">
+                        </p-checkbox>
+                        <label for="showOdds" class="ml-2 cursor-pointer">Ok, tell me the odds</label>
+                    </div>
+                    <ng-container *ngIf="showOdds">
+                        <ng-container *ngIf="info.gridpoolEnabled === 1 && info.gridpoolRewardMode !== 'solo'; else bestDiffSoloOdds">
+                            <div class="flex flex-nowrap">
+                                <div class="col-fixed-width text-500">
+                                    <tooltip-text-icon text="Team Block" tooltip="Mean time for the GridPool team to find a Bitcoin block at current team hashrate and network difficulty." />
+                                </div>
+                                <span>{{ getGridpoolTeamBlockMeanTime(info) }}</span>
+                            </div>
+                            <div class="flex flex-nowrap">
+                                <div class="col-fixed-width text-500">
+                                    <tooltip-text-icon text="Your Slot" tooltip="Mean time for this Bitaxe to earn one team payout slot, approximated from this hashrate versus team hashrate." />
+                                </div>
+                                <span>{{ getGridpoolSlotMeanTime(info) }}</span>
+                            </div>
+                            <div class="flex flex-nowrap">
+                                <div class="col-fixed-width text-500">Slots</div>
+                                <span>{{ getGridpoolOnDeckSlotCount(info) }} on deck / {{ getGridpoolWinnerMatches(info).length }} locked</span>
+                            </div>
+                        </ng-container>
+
+                        <ng-template #bestDiffSoloOdds>
+                            <div class="flex flex-nowrap">
+                                <div class="col-fixed-width text-500">
+                                    <tooltip-text-icon text="Block" tooltip="Mean time for this Bitaxe to find a Bitcoin block at current hashrate and network difficulty." />
+                                </div>
+                                <span>{{ getSoloBlockMeanTime(info) }}</span>
+                            </div>
+                        </ng-template>
+                    </ng-container>
                 </div>
             </div>
         </div>
@@ -379,102 +417,80 @@
         <!-- Pool -->
         <div class="grid-stack-item" gs-id="pool">
             <div class="grid-stack-item-content">
-                <ng-container *ngIf="activePoolUser">
-                    <div class="card">
-                        <div class="flex flex-nowrap justify-content-between mb-3 relative">
-                            <h4 class="mb-0">
-                                Pool
-                                <a
-                                    *ngIf="(quickLink$ | async) as quickLink"
-                                    [href]="quickLink"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="ml-1"
-                                    [attr.aria-label]="'Open pool dashboard in new tab'"
-                                    pTooltip="Open pool dashboard"
-                                    tooltipPosition="top"
-                                >
-                                    <i class="pi pi-external-link"></i>
-                                </a>
-                            </h4>
-                            <p-dropdown
-                                [options]="(pools$ | async) ?? []"
-                                [(ngModel)]="activePoolLabel"
-                                optionLabel="label"
-                                optionValue="value"
-                                (onChange)="onPoolChange($event)"
-                                styleClass="border-100 p-dropdown--small absolute right-0"
+                <div class="card">
+                    <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis">
+                        Work Mode - {{ getWorkModeLabel(info) }}
+                    </h4>
+
+                    <ng-container *ngIf="info.gridpoolEnabled !== 1">
+                        <div class="flex flex-nowrap">
+                            <div class="col-fixed-width text-500">URL</div>
+                            <tooltip-text-icon
+                                text="{{ activePoolURL }}:{{activePoolPort}}"
+                                tooltip="{{ info.poolConnectionInfo }}"
                             />
                         </div>
-
-                        <div class="flex flex-nowrap">
-                            <div class="col-fixed-width text-500">
-                                <span>URL</span>
-                            </div>
-                            <div>
-                                <tooltip-text-icon
-                                    text="{{ activePoolURL }}:{{activePoolPort}}"
-                                    tooltip="{{ info.poolConnectionInfo }}"
-                                />
-                            </div>
-                        </div>
-
                         <div class="flex flex-nowrap align-items-baseline">
-                            <div class="col-fixed-width text-500">
-                                User
-                            </div>
-
+                            <div class="col-fixed-width text-500">User</div>
                             <div pTooltip="{{ activePoolUser }}" tooltipPosition="top" sensitive-data>
                                 <span class="text-monospace font-bold">{{ getAddressPart(activePoolUser) | address }}</span>{{ getSuffixPart(activePoolUser) }}
                             </div>
                         </div>
-
                         <div class="flex flex-nowrap">
                             <div class="col-fixed-width text-500">
-                                <tooltip-text-icon
-                                    text="Time"
-                                    tooltip="Time it takes for the pool to respond to a share"
-                                />
+                                <tooltip-text-icon text="Time" tooltip="Time it takes for the pool to respond to a share" />
                             </div>
                             <ng-container *ngIf="info.responseTime > 0; else noValue">
                                 {{ info.responseTime | number:'1.1-1' }} ms
                             </ng-container>
                         </div>
-                        <div class="flex flex-nowrap" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
-                            @let percentage = getPayoutPercentage(info);
-                            <ng-container *ngIf="percentage >= 95">
-                                <div class="col-fixed-width text-500">
-                                    <tooltip-text-icon text="Fee" tooltip="Percentage of the bitcoin block reward that will be paid out to the pool if you find a block." />
-                                </div>
-                                <div [style.color]="percentage < 100 ? 'inherit' : 'green'">
-                                    {{ 100 - percentage | number:'1.0-1' }}%
-                                </div>
-                            </ng-container>
-                            <ng-container *ngIf="percentage < 95">
-                                <div class="col-fixed-width text-500">
-                                    <tooltip-text-icon text="Share" tooltip="Percentage of the bitcoin block reward that will be paid out to your address if you find a block." />
-                                </div>
-                                <div *ngIf="percentage !== -1; else noValue" [style.color]="'red'">
-                                    {{ percentage | number:'1.0-1' }}%
-                                </div>
-                            </ng-container>
-                        </div>
                         <div class="flex flex-nowrap">
-                            <div class="col-fixed-width text-500">
-                                <span>Difficulty</span>
-                            </div>
+                            <div class="col-fixed-width text-500">Difficulty</div>
                             <ng-container *ngIf="info.poolDifficulty > 0; else noValue">
                                 {{ info.poolDifficulty }}
                             </ng-container>
                         </div>
                         <div class="flex flex-nowrap">
-                            <div class="col-fixed-width text-500">
-                                <span>Mode</span>
-                            </div>
+                            <div class="col-fixed-width text-500">Protocol</div>
                             <div>{{ getProtocolLabel(info) }}</div>
                         </div>
-                    </div>
-                </ng-container>
+                    </ng-container>
+
+                    <ng-container *ngIf="info.gridpoolEnabled === 1">
+                        <div class="flex flex-nowrap align-items-baseline">
+                            <div class="col-fixed-width text-500">URL</div>
+                            <div class="text-sm break-all" pTooltip="{{ info.gridpoolBootUrl }}" tooltipPosition="top">
+                                {{ info.gridpoolRewardMode === 'solo' ? info.gridpoolBitcoinRpcUrl : info.gridpoolBootUrl }}
+                            </div>
+                        </div>
+                        <div class="flex flex-nowrap">
+                            <div class="col-fixed-width text-500">Status</div>
+                            <span class="p-badge" [ngClass]="info.gridpoolRewardMode === 'solo' || info.gridpoolReachable === 1 ? 'p-badge-success' : 'p-badge-warning'">
+                                {{ getGridpoolRuntimeStatus(info) }}
+                            </span>
+                        </div>
+                        <ng-container *ngIf="info.gridpoolRewardMode !== 'solo'">
+                            <div class="flex flex-nowrap">
+                                <div class="col-fixed-width text-500">Team</div>
+                                <span>{{ info.gridpoolTeamHashrateDisplay || '--' }}</span>
+                            </div>
+                            <div class="flex flex-nowrap">
+                                <div class="col-fixed-width text-500">Best</div>
+                                <span>{{ getGridpoolBestOnDeckDisplay(info) }}</span>
+                            </div>
+                            <div class="flex flex-nowrap">
+                                <div class="col-fixed-width text-500">
+                                    <tooltip-text-icon text="Floor" tooltip="Lowest On Deck difficulty. A new share generally needs to beat this to take a payout slot." />
+                                </div>
+                                <span>{{ getGridpoolWorstOnDeckDisplay(info) }}</span>
+                            </div>
+                        </ng-container>
+                        <div class="flex flex-nowrap">
+                            <div class="col-fixed-width text-500">Template</div>
+                            <span>{{ info.gridpoolTemplateStatus || '--' }}</span>
+                        </div>
+                    </ng-container>
+                </div>
             </div>
         </div>
 
@@ -512,7 +528,7 @@
                             <span>Scriptsig</span>
                         </div>
                         <div class="text-monospace text-sm">
-                            {{ info.scriptsig }}
+                            {{ info.scriptsig || '--' }}
                         </div>
                     </div>
                 <div class="flex flex-nowrap justify-content-between" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
@@ -546,8 +562,8 @@
                         <div class="col-fixed-width text-500">
                             Amount
                         </div>
-                        <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
-                            {{ info.coinbaseValueTotalSatoshis / 100_000_000 }}
+                        <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0; else noValue">
+                            {{ info.coinbaseValueTotalSatoshis | sats }}
                         </ng-container>
                     </div>
                 </div>

@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <limits.h>
 #include "display.h"
 #include "theme_api.h"
 #include "scoreboard.h"
@@ -32,6 +33,18 @@
 
 #define FALLBACK_KEY_ASICFREQUENCY "asicfrequency" // Since v2.10.0 (https://github.com/bitaxeorg/ESP-Miner/pull/1051)
 #define FALLBACK_KEY_FANSPEED "fanspeed"           // Since v2.11.0 (https://github.com/bitaxeorg/ESP-Miner/pull/1331)
+
+#ifdef CONFIG_GRIDPOOL_ENABLED
+    #define GRIDPOOL_ENABLED 1
+#else
+    #define GRIDPOOL_ENABLED 0
+#endif
+
+#ifdef CONFIG_GRIDPOOL_FALLBACK_TO_STRATUM
+    #define GRIDPOOL_FALLBACK_TO_STRATUM 1
+#else
+    #define GRIDPOOL_FALLBACK_TO_STRATUM 0
+#endif
 
 typedef struct {
     NvsConfigKey key;
@@ -122,6 +135,17 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY]        = {.nvs_key_name = "fbsv2authpubk",   .type = TYPE_STR,   .default_value = {.str = ""},                            .rest_name = "fallbackStratumV2AuthorityPubkey",          .min = 0,  .max = 52},
     [NVS_CONFIG_SV2_CHANNEL_TYPE]                     = {.nvs_key_name = "sv2chantype",     .type = TYPE_U16,   .default_value = {.u16 = 0},                             .min = 0,  .max = 1},
     [NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE]            = {.nvs_key_name = "fbSv2ChanType",   .type = TYPE_U16,   .default_value = {.u16 = 0},                             .min = 0,  .max = 1},
+
+    [NVS_CONFIG_GRIDPOOL_ENABLED]                      = {.nvs_key_name = "gridpoolen",      .type = TYPE_BOOL,  .default_value = {.b   = (bool)GRIDPOOL_ENABLED},       .rest_name = "gridpoolEnabled",                      .min = 0,  .max = 1},
+    [NVS_CONFIG_GRIDPOOL_BOOT_URL]                     = {.nvs_key_name = "gridpoolboot",    .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_GRIDPOOL_BOOT_URL}, .rest_name = "gridpoolBootUrl",                    .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_GRIDPOOL_BITCOIN_RPC_URL]              = {.nvs_key_name = "gprpcurl",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_GRIDPOOL_BITCOIN_RPC_URL}, .rest_name = "gridpoolBitcoinRpcUrl",        .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_GRIDPOOL_BITCOIN_RPC_AUTH_MODE]        = {.nvs_key_name = "gprpcauth",       .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_GRIDPOOL_BITCOIN_RPC_AUTH_MODE}, .rest_name = "gridpoolBitcoinRpcAuthMode", .min = 0,  .max = 16},
+    [NVS_CONFIG_GRIDPOOL_BITCOIN_RPC_USERNAME]         = {.nvs_key_name = "gprpcuser",       .type = TYPE_STR,   .default_value = {.str = ""},                           .rest_name = "gridpoolBitcoinRpcUsername",             .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_GRIDPOOL_BITCOIN_RPC_PASSWORD]         = {.nvs_key_name = "gprpcpass",       .type = TYPE_STR,   .default_value = {.str = ""},                           .rest_name = "gridpoolBitcoinRpcPassword",             .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_GRIDPOOL_PAYOUT_ADDRESS]               = {.nvs_key_name = "gppayoutaddr",    .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_GRIDPOOL_PAYOUT_ADDRESS}, .rest_name = "gridpoolPayoutAddress",          .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_GRIDPOOL_MIN_SUBMIT_DIFFICULTY]        = {.nvs_key_name = "gpminsubmit",     .type = TYPE_U64,   .default_value = {.u64 = CONFIG_GRIDPOOL_MIN_SUBMIT_DIFFICULTY}, .rest_name = "gridpoolMinSubmitDifficulty", .min = 0,  .max = INT_MAX},
+    [NVS_CONFIG_GRIDPOOL_REWARD_MODE]                  = {.nvs_key_name = "gprewardmode",    .type = TYPE_STR,   .default_value = {.str = "split"},                       .rest_name = "gridpoolRewardMode",              .min = 0,  .max = 16},
+    [NVS_CONFIG_GRIDPOOL_FALLBACK_TO_STRATUM]          = {.nvs_key_name = "gpfallback",      .type = TYPE_BOOL,  .default_value = {.b   = (bool)GRIDPOOL_FALLBACK_TO_STRATUM}, .rest_name = "gridpoolFallbackToStratum",     .min = 0,  .max = 1},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
@@ -281,10 +305,10 @@ esp_err_t nvs_config_init(void)
     nvs_stats_t stats;
     err = nvs_get_stats(NULL, &stats);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "Used entries: %lu", stats.used_entries);
-        ESP_LOGI(TAG, "Free entries: %lu", stats.free_entries);
-        ESP_LOGI(TAG, "Available entries: %lu", stats.available_entries);
-        ESP_LOGI(TAG, "Total entries: %lu", stats.total_entries);
+        ESP_LOGI(TAG, "Used entries: %u", (unsigned)stats.used_entries);
+        ESP_LOGI(TAG, "Free entries: %u", (unsigned)stats.free_entries);
+        ESP_LOGI(TAG, "Available entries: %u", (unsigned)stats.available_entries);
+        ESP_LOGI(TAG, "Total entries: %u", (unsigned)stats.total_entries);
     } else {
         ESP_LOGE(TAG, "Error getting NVS stats: %s\n", esp_err_to_name(err));
     }

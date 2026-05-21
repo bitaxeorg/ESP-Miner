@@ -11,6 +11,7 @@
 #include "sv2_protocol.h"
 #include "hashrate_monitor_task.h"
 #include "asic.h"
+#include "gridpool_status_client.h"
 #include "freertos/task.h"
 #include "scoreboard.h"
 
@@ -60,7 +61,35 @@ void ASIC_result_task(void *pvParameters)
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)
         {
-            if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+            bool gridpool_enabled = gridpool_direct_is_enabled();
+            if (active_job->source == BM_JOB_SOURCE_GRIDPOOL_DIRECT) {
+                if (gridpool_enabled) {
+                    double network_diff = networkDifficulty(active_job->target);
+                    if (nonce_diff >= network_diff) {
+                        ESP_LOGI(TAG, "GridPool direct job found a Bitcoin block candidate; submitting to local RPC node");
+                        esp_err_t block_ret = gridpool_direct_submit_block(GLOBAL_STATE,
+                                                                           active_job,
+                                                                           asic_result->nonce,
+                                                                           asic_result->rolled_version);
+                        if (block_ret != ESP_OK) {
+                            ESP_LOGE(TAG, "Failed to submit Bitcoin block candidate: %s", esp_err_to_name(block_ret));
+                        }
+                    }
+                    esp_err_t ret = gridpool_direct_submit_share(GLOBAL_STATE,
+                                                                 active_job,
+                                                                 asic_result->nonce,
+                                                                 asic_result->rolled_version,
+                                                                 nonce_diff,
+                                                                 asic_result->timestamp_us);
+                    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+                        ESP_LOGW(TAG, "Failed to submit GridPool share: %s", esp_err_to_name(ret));
+                    }
+                } else {
+                    ESP_LOGW(TAG, "Dropping stale GridPool share while GridPool direct mode is disabled");
+                }
+            } else if (gridpool_enabled && GLOBAL_STATE->SYSTEM_MODULE.gridpool_template_reachable) {
+                ESP_LOGW(TAG, "Dropping stale Stratum share while GridPool direct mode is enabled");
+            } else if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
                 // SV2: submit with binary protocol
                 int ret;
                 uint32_t sv2_job_id = (uint32_t)strtoul(active_job->jobid, NULL, 10);

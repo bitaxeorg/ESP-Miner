@@ -203,6 +203,91 @@ components:
         - coinbaseValueUserSatoshis
         - hashrateMonitor
         - miningPaused
+        - gridpoolEnabled
+        - gridpoolBootUrl
+        - gridpoolBitcoinRpcUrl
+        - gridpoolBitcoinRpcAuthMode
+        - gridpoolBitcoinRpcUsername
+        - gridpoolPayoutAddress
+        - gridpoolMinSubmitDifficulty
+        - gridpoolRewardMode
+        - gridpoolFallbackToStratum
+        - gridpoolReachable
+        - gridpoolHttpStatus
+        - gridpoolStatus
+        - gridpoolLastError
+        - gridpoolLastSuccessTime
+        - gridpoolLastAttemptTime
+        - gridpoolPayoutSequence
+        - gridpoolAdviceSequence
+        - gridpoolPayoutCount
+        - gridpoolCoinbaseOutputCount
+        - gridpoolCurrentRound
+        - gridpoolCurrentStateId
+        - gridpoolCandidateStateId
+        - gridpoolSharedWinnerSlotCount
+        - gridpoolOnDeckCount
+        - gridpoolOpenOnDeckSlots
+        - gridpoolCurrentTipHash
+        - gridpoolCurrentTipHeight
+        - gridpoolMinimumDifficultyToEnter
+        - gridpoolMinimumDifficultyToEnterDisplay
+        - gridpoolBestOnDeckDifficulty
+        - gridpoolBestOnDeckDifficultyDisplay
+        - gridpoolCurrentOnDeckFloorDifficulty
+        - gridpoolCurrentOnDeckFloorDifficultyDisplay
+        - gridpoolTeamHashrateDisplay
+        - gridpoolWinnerSlots
+        - gridpoolWinnerValueSats
+        - gridpoolTemplateReachable
+        - gridpoolTemplateHttpStatus
+        - gridpoolTemplateStatus
+        - gridpoolTemplateLastError
+        - gridpoolTemplateLastSuccessTime
+        - gridpoolTemplateLastAttemptTime
+        - gridpoolTemplateRuns
+        - gridpoolTemplateFailures
+        - gridpoolTemplateHeight
+        - gridpoolTemplatePrevHash
+        - gridpoolTemplateTxCount
+        - gridpoolTemplateMerklePathCount
+        - gridpoolTemplateCoinbaseBytes
+        - gridpoolTemplateBytes
+        - gridpoolTemplatePayoutBytes
+        - gridpoolTemplateGridpoolOutputs
+        - gridpoolTemplateSlot0ValueSats
+        - gridpoolTemplateTotalMs
+        - gridpoolTemplateRpcMs
+        - gridpoolTemplatePayoutMs
+        - gridpoolTemplateParseMs
+        - gridpoolTemplateBuildMs
+        - gridpoolTemplateHeapBefore
+        - gridpoolTemplateHeapAfter
+        - gridpoolTemplateInternalHeapBefore
+        - gridpoolTemplateInternalHeapAfter
+        - gridpoolTemplateSpiramHeapBefore
+        - gridpoolTemplateSpiramHeapAfter
+        - gridpoolDirectJobsSent
+        - gridpoolShareSubmits
+        - gridpoolShareAccepted
+        - gridpoolShareDuplicate
+        - gridpoolShareRejected
+        - gridpoolShareSkipped
+        - gridpoolShareHttpStatus
+        - gridpoolShareStatus
+        - gridpoolShareLastError
+        - gridpoolShareBlockHash
+        - gridpoolShareLastSubmitTime
+        - gridpoolShareSubmitMs
+        - gridpoolShareLastDifficulty
+        - gridpoolBlockSubmits
+        - gridpoolBlockAccepted
+        - gridpoolBlockRejected
+        - gridpoolBlockHttpStatus
+        - gridpoolBlockStatus
+        - gridpoolBlockLastError
+        - gridpoolBlockLastSubmitTime
+        - gridpoolBlockSubmitMs
       properties:
         ASICModel:
           type: string
@@ -529,6 +614,262 @@ components:
         miningPaused:
           type: boolean
           description: Whether mining is currently paused
+        gridpoolEnabled:
+          type: integer
+          description: Whether GridPool direct status polling is enabled (0=no, 1=yes)
+        gridpoolBootUrl:
+          type: string
+          description: Selected GridPool Boot node base URL
+        gridpoolBitcoinRpcUrl:
+          type: string
+          description: Local Bitcoin RPC URL for future direct template building
+        gridpoolBitcoinRpcAuthMode:
+          type: string
+          description: Bitcoin RPC authentication mode for future direct template building
+        gridpoolBitcoinRpcUsername:
+          type: string
+          description: Bitcoin RPC username for future direct template building
+        gridpoolPayoutAddress:
+          type: string
+          description: Slot-0 payout address for future GridPool direct work
+        gridpoolMinSubmitDifficulty:
+          type: number
+          description: Local minimum share difficulty for future GridPool direct submission
+        gridpoolRewardMode:
+          type: string
+          description: Direct work reward mode
+          enum: [split, solo]
+        gridpoolFallbackToStratum:
+          type: integer
+          description: Whether future GridPool direct mode should fall back to Stratum (0=no, 1=yes)
+        gridpoolReachable:
+          type: integer
+          description: Whether the configured GridPool Boot node was reachable on the last poll (0=no, 1=yes)
+        gridpoolHttpStatus:
+          type: integer
+          description: HTTP status returned by the most recent GridPool request
+        gridpoolStatus:
+          type: string
+          description: GridPool Boot reachability status
+        gridpoolLastError:
+          type: string
+          description: Most recent GridPool polling error
+        gridpoolLastSuccessTime:
+          type: integer
+          description: Device uptime seconds when GridPool was last reached
+        gridpoolLastAttemptTime:
+          type: integer
+          description: Device uptime seconds when GridPool polling was last attempted
+        gridpoolPayoutSequence:
+          type: number
+          description: Sequence value from /api/mining/payouts
+        gridpoolAdviceSequence:
+          type: number
+          description: Sequence value from /api/mining/share-advice
+        gridpoolPayoutCount:
+          type: integer
+          description: Number of GridPool payout entries returned by Boot
+        gridpoolCoinbaseOutputCount:
+          type: integer
+          description: Number of required GridPool coinbase outputs returned by Boot
+        gridpoolCurrentRound:
+          type: integer
+          description: Current GridPool round number
+        gridpoolCurrentStateId:
+          type: string
+          description: Current GridPool state ID
+        gridpoolCandidateStateId:
+          type: string
+          description: Candidate GridPool state ID
+        gridpoolSharedWinnerSlotCount:
+          type: integer
+          description: Current shared winner slot count
+        gridpoolOnDeckCount:
+          type: integer
+          description: Current GridPool on-deck share count
+        gridpoolOpenOnDeckSlots:
+          type: integer
+          description: Number of open GridPool on-deck slots
+        gridpoolCurrentTipHash:
+          type: string
+          description: Bitcoin tip hash reported by GridPool Boot
+        gridpoolCurrentTipHeight:
+          type: integer
+          description: Bitcoin tip height reported by GridPool Boot
+        gridpoolMinimumDifficultyToEnter:
+          type: number
+          description: Minimum computed difficulty needed to enter the GridPool on-deck list
+        gridpoolMinimumDifficultyToEnterDisplay:
+          type: string
+          description: Display value for minimum difficulty needed to enter the GridPool on-deck list
+        gridpoolBestOnDeckDifficulty:
+          type: number
+          description: Best difficulty currently reported on the GridPool on-deck list
+        gridpoolBestOnDeckDifficultyDisplay:
+          type: string
+          description: Display value for the best GridPool on-deck difficulty
+        gridpoolCurrentOnDeckFloorDifficulty:
+          type: number
+          description: Current GridPool on-deck floor difficulty
+        gridpoolCurrentOnDeckFloorDifficultyDisplay:
+          type: string
+          description: Display value for the current GridPool on-deck floor difficulty
+        gridpoolTeamHashrateDisplay:
+          type: string
+          description: GridPool observed team hashrate display value
+        gridpoolWinnerSlots:
+          type: integer
+          description: Count of current GridPool winner slots matching this miner address
+        gridpoolWinnerValueSats:
+          type: integer
+          description: Current locked GridPool winner payout value matching this miner address
+        gridpoolTemplateReachable:
+          type: integer
+          description: Whether direct template generation is currently healthy (0=no, 1=yes)
+        gridpoolTemplateHttpStatus:
+          type: integer
+          description: HTTP status from the most recent Bitcoin RPC template request
+        gridpoolTemplateStatus:
+          type: string
+          description: Direct template generation status
+        gridpoolTemplateLastError:
+          type: string
+          description: Most recent direct template generation error
+        gridpoolTemplateLastSuccessTime:
+          type: integer
+          description: Device uptime seconds when direct template generation last succeeded
+        gridpoolTemplateLastAttemptTime:
+          type: integer
+          description: Device uptime seconds when direct template generation was last attempted
+        gridpoolTemplateRuns:
+          type: integer
+          description: Count of successful direct template refreshes
+        gridpoolTemplateFailures:
+          type: integer
+          description: Count of failed direct template refreshes
+        gridpoolTemplateHeight:
+          type: integer
+          description: Height of the cached direct template
+        gridpoolTemplatePrevHash:
+          type: string
+          description: Previous block hash of the cached direct template
+        gridpoolTemplateTxCount:
+          type: integer
+          description: Number of selected transactions in the cached direct template
+        gridpoolTemplateMerklePathCount:
+          type: integer
+          description: Merkle path branch count for direct work
+        gridpoolTemplateCoinbaseBytes:
+          type: integer
+          description: Serialized direct coinbase transaction size in bytes
+        gridpoolTemplateBytes:
+          type: integer
+          description: Bitcoin RPC template response size in bytes
+        gridpoolTemplatePayoutBytes:
+          type: integer
+          description: GridPool payout response size in bytes
+        gridpoolTemplateGridpoolOutputs:
+          type: integer
+          description: Number of GridPool split payout outputs in the direct coinbase
+        gridpoolTemplateSlot0ValueSats:
+          type: integer
+          description: Slot-0 block finder output value in satoshis
+        gridpoolTemplateTotalMs:
+          type: integer
+          description: Total direct template refresh time in milliseconds
+        gridpoolTemplateRpcMs:
+          type: integer
+          description: Bitcoin RPC getblocktemplate time in milliseconds
+        gridpoolTemplatePayoutMs:
+          type: integer
+          description: GridPool payout refresh time in milliseconds
+        gridpoolTemplateParseMs:
+          type: integer
+          description: Direct template parse time in milliseconds
+        gridpoolTemplateBuildMs:
+          type: integer
+          description: Direct ASIC job build time in milliseconds
+        gridpoolTemplateHeapBefore:
+          type: integer
+          description: Free heap before direct template refresh
+        gridpoolTemplateHeapAfter:
+          type: integer
+          description: Free heap after direct template refresh
+        gridpoolTemplateInternalHeapBefore:
+          type: integer
+          description: Free internal heap before direct template refresh
+        gridpoolTemplateInternalHeapAfter:
+          type: integer
+          description: Free internal heap after direct template refresh
+        gridpoolTemplateSpiramHeapBefore:
+          type: integer
+          description: Free SPIRAM heap before direct template refresh
+        gridpoolTemplateSpiramHeapAfter:
+          type: integer
+          description: Free SPIRAM heap after direct template refresh
+        gridpoolDirectJobsSent:
+          type: integer
+          description: Count of direct ASIC jobs sent
+        gridpoolShareSubmits:
+          type: integer
+          description: Count of GridPool share submissions attempted
+        gridpoolShareAccepted:
+          type: integer
+          description: Count of GridPool shares accepted
+        gridpoolShareDuplicate:
+          type: integer
+          description: Count of GridPool duplicate share responses
+        gridpoolShareRejected:
+          type: integer
+          description: Count of GridPool shares rejected
+        gridpoolShareSkipped:
+          type: integer
+          description: Count of GridPool shares skipped locally
+        gridpoolShareHttpStatus:
+          type: integer
+          description: HTTP status from the most recent GridPool share submit
+        gridpoolShareStatus:
+          type: string
+          description: Most recent GridPool share submit status
+        gridpoolShareLastError:
+          type: string
+          description: Most recent GridPool share submit error
+        gridpoolShareBlockHash:
+          type: string
+          description: Header hash of the most recent GridPool share
+        gridpoolShareLastSubmitTime:
+          type: integer
+          description: Device uptime seconds when the last GridPool share was submitted
+        gridpoolShareSubmitMs:
+          type: integer
+          description: Most recent GridPool share submit time in milliseconds
+        gridpoolShareLastDifficulty:
+          type: number
+          description: Difficulty of the most recent GridPool share
+        gridpoolBlockSubmits:
+          type: integer
+          description: Count of Bitcoin submitblock attempts
+        gridpoolBlockAccepted:
+          type: integer
+          description: Count of Bitcoin submitblock responses accepted by the RPC node
+        gridpoolBlockRejected:
+          type: integer
+          description: Count of Bitcoin submitblock responses rejected by the RPC node
+        gridpoolBlockHttpStatus:
+          type: integer
+          description: HTTP status from the most recent submitblock request
+        gridpoolBlockStatus:
+          type: string
+          description: Most recent submitblock status
+        gridpoolBlockLastError:
+          type: string
+          description: Most recent submitblock error
+        gridpoolBlockLastSubmitTime:
+          type: integer
+          description: Device uptime seconds when submitblock was last attempted
+        gridpoolBlockSubmitMs:
+          type: integer
+          description: Most recent submitblock time in milliseconds
 
     SystemASIC:
       type: object
@@ -740,6 +1081,56 @@ components:
           maxLength: 52
           examples:
             - ""
+        gridpoolEnabled:
+          type: integer
+          description: Enable GridPool direct status polling (0=disabled, 1=enabled)
+          enum: [0, 1]
+          examples:
+            - 0
+        gridpoolBootUrl:
+          type: string
+          description: GridPool Boot node base URL
+          examples:
+            - "https://gridpool.net"
+        gridpoolBitcoinRpcUrl:
+          type: string
+          description: Local Bitcoin Core or Knots JSON-RPC URL for future direct template building
+          examples:
+            - "http://192.168.1.10:8332"
+        gridpoolBitcoinRpcAuthMode:
+          type: string
+          description: Bitcoin RPC authentication mode
+          enum: [none, basic]
+          examples:
+            - "basic"
+        gridpoolBitcoinRpcUsername:
+          type: string
+          description: Bitcoin RPC username
+        gridpoolBitcoinRpcPassword:
+          type: string
+          description: Bitcoin RPC password
+          writeOnly: true
+        gridpoolPayoutAddress:
+          type: string
+          description: Slot-0 payout address for GridPool direct work
+        gridpoolMinSubmitDifficulty:
+          type: number
+          description: Local minimum share difficulty for future GridPool direct submission
+          minimum: 0
+          examples:
+            - 1
+        gridpoolRewardMode:
+          type: string
+          description: Direct work reward mode
+          enum: [split, solo]
+          examples:
+            - "split"
+        gridpoolFallbackToStratum:
+          type: integer
+          description: Fall back to Stratum when GridPool direct mode is unavailable (0=disabled, 1=enabled)
+          enum: [0, 1]
+          examples:
+            - 1
         ssid:
           type: string
           description: WiFi network SSID

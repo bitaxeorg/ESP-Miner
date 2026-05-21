@@ -65,6 +65,53 @@ menu "Bitaxe Configuration"
             The BM1397 hash frequency
 endmenu
 
+menu "GridPool Direct Configuration"
+
+    config GRIDPOOL_ENABLED
+        bool "Enable GridPool direct mode status"
+        default n
+        help
+            Enables read-only GridPool status polling. This does not change ASIC work generation.
+
+    config GRIDPOOL_BOOT_URL
+        string "GridPool Boot URL"
+        default "https://gridpool.net"
+        help
+            Base URL for the selected GridPool Boot node.
+
+    config GRIDPOOL_BITCOIN_RPC_URL
+        string "Bitcoin RPC URL"
+        default ""
+        help
+            Local Bitcoin Core or Knots JSON-RPC URL for future direct template building.
+
+    config GRIDPOOL_BITCOIN_RPC_AUTH_MODE
+        string "Bitcoin RPC authentication mode"
+        default "basic"
+        help
+            Authentication mode for the future Bitcoin RPC client.
+
+    config GRIDPOOL_PAYOUT_ADDRESS
+        string "GridPool payout address"
+        default ""
+        help
+            Slot-0 payout address for future GridPool direct work.
+
+    config GRIDPOOL_MIN_SUBMIT_DIFFICULTY
+        int "GridPool minimum submit difficulty"
+        range 0 2147483647
+        default 1
+        help
+            Local minimum share difficulty for future GridPool direct submission.
+
+    config GRIDPOOL_FALLBACK_TO_STRATUM
+        bool "Fallback to Stratum when GridPool is unavailable"
+        default y
+        help
+            Future GridPool direct mode should fall back to configured Stratum mining when possible.
+
+endmenu
+
 menu "Stratum Configuration"
 
     config STRATUM_URL
