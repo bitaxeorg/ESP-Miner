@@ -129,8 +129,6 @@ void create_jobs_task(void *pvParameters)
                 GLOBAL_STATE->new_stratum_version_rolling_msg = false;
             }
 
-            extranonce_2 = 0;
-
             // Check clean_jobs flag
             bool clean;
             if (current_work_protocol == STRATUM_V2) {
@@ -142,7 +140,14 @@ void create_jobs_task(void *pvParameters)
             } else {
                 clean = ((mining_notify *)current_work)->clean_jobs;
             }
-            if (!clean) {
+            // Reset extranonce2 only if clean_jobs == true.
+            // Because if also reset when clean_jobs == false.
+            // It will reproduce the same values.
+            // So the same solution(s) will be sent a second time.
+            // Causing huge amount of duplicated shares
+            if (clean) {
+                extranonce_2 = 0;
+            } else {
                 continue;
             }
         } else {
