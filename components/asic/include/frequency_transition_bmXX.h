@@ -13,7 +13,7 @@ extern const char *FREQUENCY_TRANSITION_TAG;
  * 
  * @param frequency The frequency to set in MHz
  */
-typedef void (*set_hash_frequency_fn)(float frequency);
+typedef float (*set_hash_frequency_fn)(float frequency);
 
 /**
  * @brief Transition the ASIC frequency to a target value
@@ -21,10 +21,9 @@ typedef void (*set_hash_frequency_fn)(float frequency);
  * This function gradually adjusts the ASIC frequency to reach the target value,
  * stepping up or down in increments to ensure stability.
  * 
- * @param target_frequency The target frequency in MHz
+ * @param pvParameters Pointer to the GlobalState structure
  * @param set_frequency_fn Function pointer to the appropriate ASIC's set_hash_frequency function
- * @param asic_type The type of ASIC chip (for logging purposes only)
  */
-void do_frequency_transition(float target_frequency, set_hash_frequency_fn set_frequency_fn);
+void do_frequency_transition(void * pvParameters, set_hash_frequency_fn set_frequency_fn);
 
 #endif // FREQUENCY_TRANSITION_H

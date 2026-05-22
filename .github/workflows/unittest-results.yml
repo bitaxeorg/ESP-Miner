@@ -5,6 +5,8 @@ on:
     workflows: ["Unit Test"]
     types:
       - completed
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 permissions: {}
 
 jobs:

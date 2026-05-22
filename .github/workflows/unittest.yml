@@ -1,5 +1,7 @@
 name: Unit Test
 on: [push, pull_request]
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: read
@@ -47,3 +49,29 @@ jobs:
             echo "::error ::Detected $FAILURES test failures."
             exit 1
           fi
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.14.0'
+
+      - name: Run frontend tests
+        working-directory: ./main/http_server/axe-os
+        run: |
+          npm ci
+          npm run test:ci
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-results
+          path: main/http_server/axe-os/report.xml

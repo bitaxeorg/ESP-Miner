@@ -1,12 +1,13 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { Observable, Subject, combineLatest, switchMap, shareReplay, first, takeUntil, map, timer } from 'rxjs';
+import { Observable, Subject, combineLatest, shareReplay, first, takeUntil, map } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
 import { SystemApiService } from 'src/app/services/system.service';
+import { LiveDataService } from 'src/app/services/live-data.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
-import { SystemInfo as ISystemInfo, SystemASIC as ISystemASIC, GenericResponse, } from 'src/app/generated';
+import { SystemInfo as ISystemInfo, SystemAsic as ISystemASIC, GenericResponse, } from 'src/app/generated/models';
 
 type TableRow = {
   label: string;
@@ -29,20 +30,20 @@ type CombinedData = {
 export class SystemComponent implements OnInit, OnDestroy {
   public info$: Observable<ISystemInfo>;
   public asic$: Observable<ISystemASIC>;
-  public combinedData$: Observable<{ info: ISystemInfo, asic: ISystemASIC }>
+  public combinedData$: Observable<CombinedData>;
+  public isConnected$: Observable<boolean>;
 
   private destroy$ = new Subject<void>();
 
   constructor(
     private systemService: SystemApiService,
+    private liveDataService: LiveDataService,
     private loadingService: LoadingService,
     private toastr: ToastrService,
   ) {
-    this.info$ = timer(0, 5000).pipe(
-      switchMap(() => this.systemService.getInfo()),
-      shareReplay({ refCount: true, bufferSize: 1 })
-    );
-
+    this.info$ = this.liveDataService.info$;
+    this.isConnected$ = this.liveDataService.connected$;
+    
     this.asic$ = this.systemService.getAsicSettings().pipe(
       shareReplay({ refCount: true, bufferSize: 1 })
     );
@@ -53,13 +54,9 @@ export class SystemComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.loadingService.loading$.next(true);
-
     this.combinedData$
-      .pipe(first(), takeUntil(this.destroy$))
-      .subscribe({
-        next: () => this.loadingService.loading$.next(false)
-      });
+      .pipe(first(), this.loadingService.lockUIUntilComplete(), takeUntil(this.destroy$))
+      .subscribe();
   }
 
   ngOnDestroy() {
@@ -96,6 +93,7 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Wi-Fi IPv4', value: data.info.ipv4},
       { label: 'Wi-Fi IPv6', value: data.info.ipv6, class: 'pb-3', isSensitiveData: true},
       { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3', isSensitiveData: true },
+      { label: 'CPU Usage', value: data.info.cpuUsage.toFixed(1) + '%'},
       { label: 'Free Heap Memory', value: ByteSuffixPipe.transform(data.info.freeHeap)},
       { label: '• Internal', value: ByteSuffixPipe.transform(data.info.freeHeapInternal)},
       { label: '• Spiram', value: ByteSuffixPipe.transform(data.info.freeHeapSpiram), class: 'pb-3' },

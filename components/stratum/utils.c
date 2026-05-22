@@ -123,7 +123,7 @@ void reverse_endianness_per_word(uint8_t data[32])
     d[7] = __builtin_bswap32(d[7]);
 }
 
-// static const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
+const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
 static const double bits192 = 6277101735386680763835789423207666416102355444464034512896.0;
 static const double bits128 = 340282366920938463463374607431768211456.0;
 static const double bits64 = 18446744073709551616.0;
@@ -236,4 +236,19 @@ float hashCounterToGhs(uint64_t duration_us, uint32_t counter)
     float seconds = duration_us / 1000000.0;
     float hashrate = counter / seconds * (float)HASH_CNT_LSB; // Make sure it stays in float
     return hashrate / 1e9f; // Convert to Gh/s
+}
+
+void url_decode(char *dst, const char *src) {
+    while (*src) {
+        if ((*src == '%') && src[1] && src[2]) {
+            *dst++ = (hex_val_table[(unsigned char)src[1]] << 4) | hex_val_table[(unsigned char)src[2]];
+            src += 3;
+        } else if (*src == '+') {
+            *dst++ = ' ';
+            src++;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
 }

@@ -1,10 +1,12 @@
 #include <string.h>
 #include <stdbool.h>
+#include <math.h>
 
 #include "asic_common.h"
 #include "serial.h"
 #include "esp_log.h"
 #include "crc.h"
+#include "esp_timer.h"
 
 #define PREAMBLE 0xAA55
 
@@ -34,6 +36,20 @@ int _largest_power_of_two(int num)
     }
 
     return 1 << power;
+}
+
+int _next_power_of_two(int num)
+{
+    if (num <= 1)
+        return 1;
+
+    int power = 1;
+
+    while (power < num) {
+        power <<= 1;
+    }
+
+    return power;
 }
 
 int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response_length)
@@ -88,9 +104,12 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
     return chip_counter;
 }
 
-esp_err_t receive_work(uint8_t * buffer, int buffer_size)
+esp_err_t receive_work(uint8_t * buffer, int buffer_size, uint64_t *out_timestamp_us)
 {
     int received = SERIAL_rx(buffer, buffer_size, 10000);
+    if (out_timestamp_us) {
+        *out_timestamp_us = esp_timer_get_time();
+    }
 
     if (received < 0) {
         ESP_LOGE(TAG, "UART error in serial RX");
@@ -127,12 +146,22 @@ esp_err_t receive_work(uint8_t * buffer, int buffer_size)
     return ESP_OK;
 }
 
-void get_difficulty_mask(uint16_t difficulty, uint8_t *job_difficulty_mask)
+void get_difficulty_mask(double difficulty, uint8_t *job_difficulty_mask)
 {
     // The mask must be a power of 2 so there are no holes
     // Correct:   {0b00000000, 0b00000000, 0b11111111, 0b11111111}
     // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
-    difficulty = _largest_power_of_two(difficulty) - 1;
+
+    // Round up to ensure we don't make difficulty harder than requested, then convert to int
+    uint32_t diff_int = (uint32_t)ceil(difficulty);
+
+    // Calculate largest power of 2 <= diff_int (inline of former _largest_power_of_two)
+    int power = 0;
+    while (diff_int > 1) {
+        diff_int = diff_int >> 1;
+        power++;
+    }
+    uint32_t mask = (1 << power) - 1;
 
     job_difficulty_mask[0] = 0x00;
     job_difficulty_mask[1] = 0x14; // TICKET_MASK
@@ -140,8 +169,36 @@ void get_difficulty_mask(uint16_t difficulty, uint8_t *job_difficulty_mask)
     // convert difficulty into char array
     // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
     // Ex: 512 = {0b00000000, 0b00000000, 0b00000001, 0b11111111}, {0x00, 0x00, 0x01, 0xff}
-    job_difficulty_mask[2] = _reverse_bits((difficulty >> 24) & 0xFF);
-    job_difficulty_mask[3] = _reverse_bits((difficulty >> 16) & 0xFF);
-    job_difficulty_mask[4] = _reverse_bits((difficulty >>  8) & 0xFF);
-    job_difficulty_mask[5] = _reverse_bits( difficulty        & 0xFF);
+    job_difficulty_mask[2] = _reverse_bits((mask >> 24) & 0xFF);
+    job_difficulty_mask[3] = _reverse_bits((mask >> 16) & 0xFF);
+    job_difficulty_mask[4] = _reverse_bits((mask >>  8) & 0xFF);
+    job_difficulty_mask[5] = _reverse_bits( mask        & 0xFF);
+}
+
+double calculate_bm_timeout_ms(float frequency_mhz, size_t asic_count, size_t small_cores, size_t cores, size_t version_size, float timeout_percent, double default_time_ms)
+{
+    if (asic_count <= 0)
+        return default_time_ms;
+
+    // Round up to the nearest power of 2 some asic constants
+    int cores_up = _next_power_of_two((int)cores);
+    int small_cores_up = _next_power_of_two((int)small_cores);
+    int asic_count_up = _next_power_of_two((int)asic_count);
+
+    if ((small_cores_up < cores_up) || (frequency_mhz <= 0.0f))
+        return default_time_ms;
+
+    // Calulate the time to scan the full nonce * version space
+    // effectively how many iterations we have to do
+    // First we remove the paralell nonces/versions
+    // then we end up with `time = space / frequency`
+    double midstates = (double)small_cores_up / (double)cores_up;
+    double serial_versions = (double)version_size / midstates;
+    double serial_nonces = (double)NONCE_SPACE / (double)cores_up / (double)asic_count_up;
+    double fullspace_timeout_ms = serial_versions * serial_nonces / ((double)frequency_mhz * 1000.0);
+
+    if (!(fullspace_timeout_ms > 0.0))
+        return default_time_ms;
+
+    return (double)timeout_percent * fullspace_timeout_ms;
 }

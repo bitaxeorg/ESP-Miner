@@ -20,6 +20,7 @@ export class QuicklinkService {
   public getQuickLink(stratumURL: string, stratumUser: string): string | undefined {
     const user = stratumUser.split('.')[0];
 
+    // Match entries against a lowercased stratum URL.
     const pools: Pool[] = [
       { search: 'public-pool.io', url: `https://web.public-pool.io/#/app/${user}` },
       { search: 'nerdminer.de', url: `https://pool.nerdminer.de/#/app/${user}` },
@@ -33,14 +34,18 @@ export class QuicklinkService {
       { search: 'parasite.wtf', url: `https://parasite.space/user/${user}` },
       { regex: /^(eu|au)?solo[46]?.ckpool\.org/, url: `https://$1solostats.ckpool.org/users/${user}` },
       { search: 'atlaspool.io', url: `https://atlaspool.io/dashboard.html?wallet=${user}` },
+      { regex: /^(eu\.|tinyminer\.)?m45core\.com$/, url: `https://$1m45core.com/user/${user}` },
     ];
 
+    const normalizedStratumURL = stratumURL.toLowerCase();
+
     for (const pool of pools) {
-      if ('search' in pool && stratumURL.includes(pool.search)) {
+      if ('search' in pool
+        && (normalizedStratumURL === pool.search || normalizedStratumURL.endsWith(`.${pool.search}`))) {
         return pool.url;
       }
       if ('regex' in pool) {
-        const match = pool.regex.exec(stratumURL);
+        const match = pool.regex.exec(normalizedStratumURL);
         if (match) return pool.url.replace(/\$(\d+)/g, (_, group) => match[+group] ?? '');
       }
     }

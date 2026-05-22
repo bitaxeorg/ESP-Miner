@@ -19,6 +19,8 @@ void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32]);
 
 void reverse_endianness_per_word(uint8_t data[32]);
 
+extern const double truediffone;
+
 double le256todouble(const void *target);
 
 void prettyHex(unsigned char *buf, int len);
@@ -28,6 +30,8 @@ double networkDifficulty(uint32_t nBits);
 void suffixString(uint64_t val, char * buf, size_t bufsiz, int sigdigits);
 
 float hashCounterToGhs(uint64_t duration_us, uint32_t counter);
+
+void url_decode(char *dst, const char *src);
 
 #define STRATUM_DEFAULT_VERSION_MASK 0x1fffe000
 

@@ -1,26 +1,18 @@
-#include <string.h>
-#include "INA260.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "global_state.h"
-#include "math.h"
-#include "mining.h"
 #include "nvs_config.h"
-#include "serial.h"
-#include "TPS546.h"
 #include "vcore.h"
 #include "thermal.h"
-#include "PID.h"
 #include "power.h"
 #include "asic.h"
-#include "bm1370.h"
 #include "utils.h"
 #include "asic_init.h"
 #include "asic_reset.h"
 #include "driver/uart.h"
 
-#define POLL_RATE 1800
+#define POLL_RATE 100
 #define MAX_TEMP 90.0
 #define THROTTLE_TEMP 75.0
 #define SAFE_TEMP 45.0
@@ -43,7 +35,11 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     // Wind frequency down to 50 MHz before cutting power. This also updates
     // the transition tracker so the ramp starts from 50 MHz on next start,
     // rather than the stale pre-reset frequency.
-    ASIC_set_frequency(GLOBAL_STATE, 50);
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = 50;
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
+
+    ASIC_set_frequency(GLOBAL_STATE);
+    ASIC_set_nonce_space(GLOBAL_STATE);
 
     // Cut ASIC power and hold in reset
     VCORE_set_voltage(GLOBAL_STATE, 0.0f);
@@ -77,6 +73,7 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
     uart_flush(UART_NUM_1);
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
+    POWER_MANAGEMENT_init_frequency(GLOBAL_STATE);
     // Stabilization delay of 2000ms prevents race conditions where tasks are
     // just starting to use the ASIC while power management tries to change frequency
     uint8_t chip_count = asic_initialize(GLOBAL_STATE, ASIC_INIT_RECOVERY, 2000);
@@ -90,9 +87,9 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
     return chip_count;
 }
 
-static float expected_hashrate(GlobalState * GLOBAL_STATE, float frequency)
+static float expected_hashrate(GlobalState * GLOBAL_STATE)
 {
-    return frequency * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
+    return GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value * GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count * GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0;
 }
 
 void POWER_MANAGEMENT_init_frequency(void * pvParameters)
@@ -102,7 +99,8 @@ void POWER_MANAGEMENT_init_frequency(void * pvParameters)
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = frequency;
-    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = expected_hashrate(GLOBAL_STATE, frequency);
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = 50.0;
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = expected_hashrate(GLOBAL_STATE);
     
     char expected_hashrate_str[16] = {0};
     suffixString(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate * 1e6, expected_hashrate_str, sizeof(expected_hashrate_str), 0);
@@ -127,7 +125,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     uint16_t last_known_asic_voltage = 0;
     float last_known_asic_frequency = 0.0;
-    bool is_user_paused = false;
+    bool is_paused = false;
 
     while (1) {
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
@@ -137,26 +135,24 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         }
 
         power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
-        power_management->power = Power_get_power(GLOBAL_STATE);
-        power_management->current = Power_get_current(GLOBAL_STATE);
+        Power_get_output(GLOBAL_STATE, &power_management->power, &power_management->current);
         power_management->core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
 
         power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
         power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
-        // User requested pause
-        if (sys_module->mining_paused && !is_user_paused) {
+        // User requested pause or hardware fault
+        if ((sys_module->mining_paused || sys_module->hardware_fault) && !is_paused) {
             mining_stop(GLOBAL_STATE);
-            is_user_paused = true;
-        // User requested resume
-        } else if (!sys_module->mining_paused && is_user_paused) {
+            is_paused = true;
+        } else if (!sys_module->mining_paused && !sys_module->hardware_fault && is_paused) {
             mining_start(GLOBAL_STATE);
-            is_user_paused = false;
+            is_paused = false;
         }
 
-        // If we've paused, skip doing anything else
-        if (is_user_paused) {
+        // If we've paused or have a hardware fault, skip doing anything else
+        if (is_paused || sys_module->hardware_fault) {
             vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
             continue;
         }
@@ -242,12 +238,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         if (asic_frequency != last_asic_frequency) {
             ESP_LOGI(TAG, "New ASIC frequency requested: %g MHz (current: %g MHz)", asic_frequency, last_asic_frequency);
             
-            bool success = ASIC_set_frequency(GLOBAL_STATE, asic_frequency);
-            
-            if (success) {
-                power_management->frequency_value = asic_frequency;
-                power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE, asic_frequency);
-            }
+            power_management->frequency_value = asic_frequency;
+            power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE);
+
+            ASIC_set_frequency(GLOBAL_STATE);
+            ASIC_set_nonce_space(GLOBAL_STATE);
             
             last_asic_frequency = asic_frequency;
         }

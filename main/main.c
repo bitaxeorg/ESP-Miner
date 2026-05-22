@@ -10,7 +10,7 @@
 #include "system.h"
 #include "http_server.h"
 #include "serial.h"
-#include "stratum_task.h"
+#include "protocol_coordinator.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
 #include "nvs_config.h"
@@ -21,8 +21,10 @@
 #include "connect.h"
 #include "asic_reset.h"
 #include "asic_init.h"
+#include "task_monitor.h"
 #include "filesystem.h"
 #include "input.h"
+#include "log_buffer.h"
 
 static GlobalState GLOBAL_STATE;
 
@@ -33,13 +35,24 @@ static const char * TAG = "bitaxe";
 
 void app_main(void)
 {
+    if (esp_psram_is_initialized()) {
+        GLOBAL_STATE.psram_is_available = true;
+        log_buffer_init();
+    }
+
     ESP_LOGI(TAG, "Welcome to the bitaxe - FOSS || GTFO!");
 
+    if (xTaskCreate(cpu_monitor_task, "cpu_monitor", 4096, (void *)&GLOBAL_STATE, 1, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating cpu monitor task");
+    }
+#ifdef CONFIG_ENABLE_TASK_MONITOR
+    if (xTaskCreate(task_monitor_task, "task_monitor", 8192, NULL, 1, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating task monitor task");
+    }
+#endif
+  
     if (!esp_psram_is_initialized()) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32 device!");
-        GLOBAL_STATE.psram_is_available = false;
-    } else {
-        GLOBAL_STATE.psram_is_available = true;
     }
 
     // Initialize RST pin to low early to minimize ASIC power consumption
@@ -86,6 +99,9 @@ void app_main(void)
     }
 
     SYSTEM_init_system(&GLOBAL_STATE);
+    if (scoreboard_init(&GLOBAL_STATE.SYSTEM_MODULE.scoreboard) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init scoreboard");
+    }
 
     if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
         wifi_init(&GLOBAL_STATE);
@@ -139,19 +155,17 @@ void app_main(void)
             ESP_LOGE(TAG, "Error creating asic result task");
         }
 
-        if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-            if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
-                ESP_LOGE(TAG, "Error creating stratum admin task");
-            }
-        }
-
-        if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) !=
-            pdPASS) {
+        if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
             ESP_LOGE(TAG, "Error creating hashrate monitor task");
         }
         if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
             ESP_LOGE(TAG, "Error creating statistics task");
         }
+    }
+
+    protocol_coordinator_init(&GLOBAL_STATE);
+    if (xTaskCreate(protocol_coordinator_task, "protocol coord", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating protocol coordinator task");
     }
 
     if (GLOBAL_STATE.SELF_TEST_MODULE.is_active) {

@@ -33,6 +33,26 @@ void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2, 
     double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len, dest);
 }
 
+void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
+                                    const uint8_t *extranonce_prefix, size_t ep_len,
+                                    const uint8_t *extranonce_2, size_t e2_len,
+                                    const uint8_t *suffix, size_t suffix_len,
+                                    uint8_t dest[32])
+{
+    size_t total_len = prefix_len + ep_len + e2_len + suffix_len;
+    uint8_t *buf = malloc(total_len);
+    if (!buf) return;
+
+    size_t offset = 0;
+    memcpy(buf + offset, prefix, prefix_len);   offset += prefix_len;
+    memcpy(buf + offset, extranonce_prefix, ep_len); offset += ep_len;
+    memcpy(buf + offset, extranonce_2, e2_len); offset += e2_len;
+    memcpy(buf + offset, suffix, suffix_len);
+
+    double_sha256_bin(buf, total_len, dest);
+    free(buf);
+}
+
 void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_t merkle_branches[][32], const int num_merkle_branches, uint8_t dest[32])
 {
     uint8_t both_merkles[64];
@@ -46,7 +66,7 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
 }
 
 // take a mining_notify struct with ascii hex strings and convert it to a bm_job struct
-void construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], const uint32_t version_mask, const uint32_t difficulty, bm_job *new_job)
+void construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], const uint32_t version_mask, const double difficulty, bm_job *new_job)
 {
     new_job->version = params->version;
     new_job->target = params->target;
@@ -112,10 +132,6 @@ void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[sta
 }
 
 ///////cgminer nonce testing
-/* truediffone == 0x00000000FFFF0000000000000000000000000000000000000000000000000000
- */
-static const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
-
 /* testing a nonce and return the diff - 0 means invalid */
 double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version)
 {

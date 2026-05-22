@@ -1,13 +1,15 @@
 import { Component, ViewChild } from '@angular/core';
-import { Observable, switchMap, shareReplay, map, timer, distinctUntilChanged } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
 import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
+import { LiveDataService } from 'src/app/services/live-data.service';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
+import { SystemInfo } from 'src/app/generated/models';
 
 const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 
@@ -18,35 +20,37 @@ const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 })
 export class UpdateComponent {
 
-  public firmwareUpdateProgress: number | null = null;
-  public websiteUpdateProgress: number | null = null;
+  public firmwareUpdateProgress: number = 0;
+  public websiteUpdateProgress: number = 0;
 
   public checkLatestRelease: boolean = false;
   public latestRelease$: Observable<any>;
 
-  public info$: Observable<any>;
+  public info$: Observable<SystemInfo>;
 
   @ViewChild('firmwareUpload') firmwareUpload!: FileUpload;
   @ViewChild('websiteUpload') websiteUpload!: FileUpload;
 
-  @ViewChild(ModalComponent) modalComponent!: ModalComponent;
+  @ViewChild('privacyModal') privacyModal?: ModalComponent;
+  @ViewChild('progressModal') progressModal?: ModalComponent;
+
+  public updateTarget: string = '';
+  public updateStatus: 'progress' | 'success' | 'error' = 'progress';
+  public updateMessage: string = '';
 
   constructor(
     private systemService: SystemApiService,
+    private liveDataService: LiveDataService,
     private toastrService: ToastrService,
     private loadingService: LoadingService,
     private githubUpdateService: GithubUpdateService,
     private localStorageService: LocalStorageService,
   ) {
     this.latestRelease$ = this.githubUpdateService.getReleases().pipe(map(releases => {
-      return releases[0];
+      return (releases as any)[0];
     }));
 
-    this.info$ = timer(0, 5000).pipe(
-      switchMap(() => this.systemService.getInfo()),
-      distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr)),
-      shareReplay({ refCount: true, bufferSize: 1 })
-    );
+    this.info$ = this.liveDataService.info$;
   }
 
   otaUpdate(event: FileUploadHandlerEvent) {
@@ -58,30 +62,40 @@ export class UpdateComponent {
       return;
     }
 
+    this.updateTarget = 'Firmware';
+    this.updateStatus = 'progress';
+    this.updateMessage = '';
+    if (this.progressModal) {
+      this.progressModal.isVisible = true;
+    }
+
     this.systemService.performOTAUpdate(file)
-      .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
-        next: (event) => {
+        next: (event: any) => {
           if (event.type === HttpEventType.UploadProgress) {
             this.firmwareUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
           } else if (event.type === HttpEventType.Response) {
             if (event.ok) {
-              this.toastrService.success('Firmware updated. Device has been successfully restarted.');
-
+              this.toastrService.success('Device restarted');
+              this.updateStatus = 'success';
+              this.updateMessage = 'Firmware updated. Device has been successfully restarted.';
             } else {
-              this.toastrService.error(event.statusText);
+              this.updateStatus = 'error';
+              this.updateMessage = event.statusText || 'An unknown error occurred.';
             }
           }
           else if (event instanceof HttpErrorResponse)
           {
-            this.toastrService.error(event.error);
+            this.updateStatus = 'error';
+            this.updateMessage = event.error?.message || event.error || event.message || 'Unknown error occurred';
           }
         },
         error: (err) => {
-          this.toastrService.error(err.error);
+          this.updateStatus = 'error';
+          this.updateMessage = err.error?.message || err.error || err.message || 'Unknown error occurred';
         },
         complete: () => {
-          this.firmwareUpdateProgress = null;
+          this.firmwareUpdateProgress = 0;
         }
       });
   }
@@ -95,35 +109,42 @@ export class UpdateComponent {
       return;
     }
 
+    this.updateTarget = 'AxeOS';
+    this.updateStatus = 'progress';
+    this.updateMessage = '';
+    if (this.progressModal) {
+      this.progressModal.isVisible = true;
+    }
+
     this.systemService.performWWWOTAUpdate(file)
-      .pipe(
-        this.loadingService.lockUIUntilComplete(),
-      ).subscribe({
-        next: (event) => {
+      .subscribe({
+        next: (event: any) => {
           if (event.type === HttpEventType.UploadProgress) {
             this.websiteUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
           } else if (event.type === HttpEventType.Response) {
             if (event.ok) {
-              this.toastrService.success('AxeOS updated. The page will reload in a few seconds.');
+              this.updateStatus = 'success';
+              this.updateMessage = 'AxeOS updated. The page will reload in a few seconds.';
               setTimeout(() => {
                 window.location.reload();
               }, 2000);
             } else {
-              this.toastrService.error(event.statusText);
+              this.updateStatus = 'error';
+              this.updateMessage = event.statusText || 'An unknown error occurred.';
             }
           }
           else if (event instanceof HttpErrorResponse)
           {
-            const errorMessage = event.error?.message || event.message || 'Unknown error occurred';
-            this.toastrService.error(errorMessage);
+            this.updateStatus = 'error';
+            this.updateMessage = event.error?.message || event.error || event.message || 'Unknown error occurred';
           }
         },
         error: (err) => {
-          const errorMessage = err.error?.message || err.message || 'Unknown error occurred';
-          this.toastrService.error(errorMessage);
+          this.updateStatus = 'error';
+          this.updateMessage = err.error?.message || err.error || err.message || 'Unknown error occurred';
         },
         complete: () => {
-          this.websiteUpdateProgress = null;
+          this.websiteUpdateProgress = 0;
         }
       });
   }
@@ -148,13 +169,17 @@ export class UpdateComponent {
     if (this.localStorageService.getBool(IGNORE_RELEASE_CHECK_WARNING)) {
       this.checkLatestRelease = true;
     } else {
-      this.modalComponent.isVisible = true;
+      if (this.privacyModal) {
+        this.privacyModal.isVisible = true;
+      }
     }
   }
 
   public continueReleaseCheck(skipWarning: boolean): void {
     this.checkLatestRelease = true;
-    this.modalComponent.isVisible = false;
+    if (this.privacyModal) {
+      this.privacyModal.isVisible = false;
+    }
 
     if (!skipWarning) {
       return;

@@ -1,7 +1,10 @@
 #ifndef STATISTICS_TASK_H_
 #define STATISTICS_TASK_H_
 
+#include <stdbool.h>
 #include <stdint.h>
+
+#define MAX_STATISTICS_COUNT 720
 
 typedef struct StatisticsData * StatisticsDataPtr;
 
@@ -14,6 +17,7 @@ struct StatisticsData
     float hashrate_1h;
     float errorPercentage;
     float chipTemperature;
+    float chipTemperature2;
     float vrTemperature;
     float power;
     float voltage;

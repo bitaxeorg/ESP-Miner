@@ -59,7 +59,9 @@ Available API endpoints:
 * `/api/system/asic` Get ASIC settings information
 * `/api/system/statistics` Get system statistics (data logging should be activated)
 * `/api/system/statistics/dashboard` Get system statistics for dashboard
+* `/api/system/scoreboard` Get top 20 highest difficulty shares
 * `/api/system/wifi/scan` Scan for available Wi-Fi networks
+* `/api/system/logs` Download system logs
 
 **POST**
 
@@ -71,6 +73,11 @@ Available API endpoints:
 **PATCH**
 
 * `/api/system` Update system settings
+
+**WEBSOCKETS**
+
+* `/api/ws` Text stream log
+* `/api/ws/live` JSONp stream of partial system info updates
 
 ### API examples in `curl`:
 
@@ -89,6 +96,9 @@ curl http://YOUR-BITAXE-IP/api/system/statistics/dashboard
 
 # Get available Wi-Fi networks
 curl http://YOUR-BITAXE-IP/api/system/wifi/scan
+
+# Download system logs
+curl http://YOUR-BITAXE-IP/api/system/logs
 
 
 # Restart the system
@@ -120,6 +130,12 @@ curl -X POST \
 curl -X PATCH http://YOUR-BITAXE-IP/api/system \
      -H "Content-Type: application/json" \
      -d '{"fanspeed": "desired_speed_value"}'
+
+# Stream logs
+websocat ws://YOUR-BITAXE-IP/api/ws
+
+# Stream Info API
+websocat ws://YOUR-BITAXE-IP/api/ws/live
 ```
 
 ## Administration
@@ -147,9 +163,10 @@ This configuration allows you to edit locally and compile the source code using 
 These instructions will assume an installation to your home directory.
 ```
 cd ~
-git clone https://github.com/bitaxeorg/ESP-MINER.git
+git clone --recursive https://github.com/bitaxeorg/ESP-MINER.git
 cd ESP-MINER
 git checkout <the branch you want>
+git submodule update --init --recursive
 # The next step builds the docker container that will compile the source code
 # This will take several minutes to finish
 docker build -t espminer-build .devcontainer
@@ -172,6 +189,18 @@ Once the build is done exit out of the docker session and flash the new firmware
 - Install the ESP-IDF toolchain from https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/
 - Install nodejs/npm from https://nodejs.org/en/download
 - (Optional) Install the ESP-IDF extension for VSCode from https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension
+
+### Cloning
+
+This project uses git submodules (e.g. libsecp256k1). Clone with `--recursive`:
+```
+git clone --recursive https://github.com/bitaxeorg/ESP-Miner.git
+```
+
+If you already have a checkout, initialize the submodules with:
+```
+git submodule update --init --recursive
+```
 
 ### Building
 

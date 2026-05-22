@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { WebsocketService } from 'src/app/services/web-socket.service';
+import { SystemApiService } from 'src/app/services/system.service';
 
 @Component({
   selector: 'app-logs',
@@ -10,6 +11,7 @@ import { WebsocketService } from 'src/app/services/web-socket.service';
   styleUrl: './logs.component.scss'
 })
 export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
+  public loadingLogs: boolean = false;
 
   public form!: FormGroup;
 
@@ -19,22 +21,15 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   public stopScroll: boolean = false;
 
-  public isExpanded: boolean = false;
-
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
-  @HostListener('document:keydown.esc', ['$event'])
-  onEscKey() {
-    if (this.isExpanded) {
-      this.isExpanded = false;
-    }
-  }
 
   @Input() uri = '';
 
   constructor(
     private fb: FormBuilder,
     private websocketService: WebsocketService,
+    private systemApiService: SystemApiService,
     private toastr: ToastrService,
   ) {}
 
@@ -51,34 +46,44 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.clearLogs();
   }
 
+  private logBuffer: string = '';
+
   private subscribeLogs() {
     this.websocketSubscription = this.websocketService.ws$.subscribe({
         next: (val) => {
-          const matches = val.matchAll(/\[(\d+;\d+)m(.*?)(?=\[|\n|$)/g);
-          let className = 'ansi-white'; // default color
+          this.logBuffer += val;
 
-          for (const match of matches) {
-            const colorCode = match[1].split(';')[1];
-            switch (colorCode) {
-              case '31': className = 'ansi-red'; break;
-              case '32': className = 'ansi-green'; break;
-              case '33': className = 'ansi-yellow'; break;
-              case '34': className = 'ansi-blue'; break;
-              case '35': className = 'ansi-magenta'; break;
-              case '36': className = 'ansi-cyan'; break;
-              case '37': className = 'ansi-white'; break;
+          // Only process when we have a complete line (ending with newline)
+          if (this.logBuffer.endsWith('\n')) {
+            const completeLine = this.logBuffer;
+            this.logBuffer = '';
+
+            const matches = completeLine.matchAll(/\[(\d+;\d+)m(.*?)(?=\[|\n|$)/g);
+            let className = 'ansi-white'; // default color
+
+            for (const match of matches) {
+              const colorCode = match[1].split(';')[1];
+              switch (colorCode) {
+                case '31': className = 'ansi-red'; break;
+                case '32': className = 'ansi-green'; break;
+                case '33': className = 'ansi-yellow'; break;
+                case '34': className = 'ansi-blue'; break;
+                case '35': className = 'ansi-magenta'; break;
+                case '36': className = 'ansi-cyan'; break;
+                case '37': className = 'ansi-white'; break;
+              }
             }
-          }
 
-          // Get current filter value from form
-          const currentFilter = this.form?.get('filter')?.value;
+            // Get current filter value from form
+            const currentFilter = this.form?.get('filter')?.value;
 
-          if (!currentFilter || val.includes(currentFilter)) {
-            this.logs.push({ className: `max-w-full text-monospace ${className}`, text: val });
-          }
+            if (!currentFilter || completeLine.includes(currentFilter)) {
+              this.logs.push({ className: `max-w-full text-monospace ${className}`, text: completeLine });
+            }
 
-          if (this.logs.length > 256) {
-            this.logs.shift();
+            if (this.logs.length > 256) {
+              this.logs.shift();
+            }
           }
         },
         error: (error) => {
@@ -89,6 +94,29 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   public clearLogs() {
     this.logs.length = 0;
+  }
+
+  public downloadLogs() {
+    this.loadingLogs = true;
+    this.systemApiService.downloadLogs(this.uri).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = 'bitaxe-logs.txt';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        this.toastr.success("Logs downloaded successfully");
+        this.loadingLogs = false;
+      },
+      error: (error) => {
+        console.error('There was a problem with the log download:', error);
+        this.toastr.error("Failed to download logs");
+        this.loadingLogs = false;
+      }
+    });
   }
 
   ngAfterViewChecked(): void {

@@ -65,6 +65,7 @@ static lv_obj_t *asic_status_label;
 
 static lv_obj_t *mining_block_height_label;
 static lv_obj_t *mining_network_difficulty_label;
+static lv_obj_t *mining_scriptsig_title_label;
 static lv_obj_t *mining_scriptsig_label;
 
 static lv_obj_t *firmware_update_scr_filename_label;
@@ -405,8 +406,8 @@ static lv_obj_t * create_scr_mining() {
     mining_network_difficulty_label = lv_label_create(scr);
     lv_label_set_text(mining_network_difficulty_label, "Difficulty: --");
 
-    lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, "Scriptsig:");
+    mining_scriptsig_title_label = lv_label_create(scr);
+    lv_label_set_text(mining_scriptsig_title_label, "Scriptsig:");
 
     mining_scriptsig_label = lv_label_create(scr);
     lv_label_set_text(mining_scriptsig_label, "--");
@@ -449,6 +450,10 @@ static void scr_create_overlay()
 
 static bool screen_show(screen_t screen)
 {
+    if (!lvgl_port_lock(0)) {
+        return false;
+    }
+
     if (SCR_CAROUSEL_START > screen) {
         lv_display_trigger_activity(NULL);
     }
@@ -459,15 +464,17 @@ static bool screen_show(screen_t screen)
         lv_obj_t * scr = screens[screen];
 
         is_valid = lv_obj_is_valid(scr);
-        if (is_valid && lvgl_port_lock(0)) {
+        if (is_valid) {
             bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
             lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
-            lvgl_port_unlock();
         }
 
         current_screen_time_ms = 0;
         current_screen_delay_ms = delays_ms[screen];
     }
+
+    lvgl_port_unlock();
+
     return is_valid;
 }
 
@@ -633,17 +640,27 @@ static void screen_update_cb(lv_timer_t * timer)
         current_chip_temp = power_management->chip_temp_avg;
     }
 
-    if (current_block_height != GLOBAL_STATE->block_height) {
-        lv_label_set_text_fmt(mining_block_height_label, "Block: %d", GLOBAL_STATE->block_height);
-        current_block_height = GLOBAL_STATE->block_height;
-    }
-    
-    if (strcmp(&lv_label_get_text(mining_network_difficulty_label)[9], GLOBAL_STATE->network_diff_string) != 0) {
-        lv_label_set_text_fmt(mining_network_difficulty_label, "Difficulty: %s", GLOBAL_STATE->network_diff_string);
+    if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+        // SV2 standard channel: no coinbase data, so no block height or scriptsig
+        lv_label_set_text(mining_block_height_label, "Protocol: SV2");
+        lv_obj_add_flag(mining_scriptsig_title_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(mining_scriptsig_label, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_clear_flag(mining_scriptsig_title_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(mining_scriptsig_label, LV_OBJ_FLAG_HIDDEN);
+
+        if (current_block_height != GLOBAL_STATE->block_height) {
+            lv_label_set_text_fmt(mining_block_height_label, "Block: %d", GLOBAL_STATE->block_height);
+            current_block_height = GLOBAL_STATE->block_height;
+        }
+
+        if (strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
+            lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->scriptsig);
+        }
     }
 
-    if (strcmp(lv_label_get_text(mining_scriptsig_label), GLOBAL_STATE->scriptsig) != 0) {
-        lv_label_set_text(mining_scriptsig_label, GLOBAL_STATE->scriptsig);
+    if (strcmp(&lv_label_get_text(mining_network_difficulty_label)[9], GLOBAL_STATE->network_diff_string) != 0) {
+        lv_label_set_text_fmt(mining_network_difficulty_label, "Difficulty: %s", GLOBAL_STATE->network_diff_string);
     }
 
     // Update WiFi RSSI periodically
@@ -734,13 +751,13 @@ static void uptime_update_cb(lv_timer_t * timer)
         uptime_seconds %= 60;
 
         if (days > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldd %ldh %ldm %lds", days, hours, minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lud %luh %lum %lus", days, hours, minutes, uptime_seconds);
         } else if (hours > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldh %ldm %lds", hours, minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %luh %lum %lus", hours, minutes, uptime_seconds);
         } else if (minutes > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %ldm %lds", minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lum %lus", minutes, uptime_seconds);
         } else {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lds", uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %lus", uptime_seconds);
         }
 
         if (strcmp(lv_label_get_text(wifi_uptime_label), uptime) != 0) {

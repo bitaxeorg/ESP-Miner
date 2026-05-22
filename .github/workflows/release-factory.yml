@@ -4,6 +4,9 @@ on:
   release:
     types: [released]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   checks: write
   pull-requests: write

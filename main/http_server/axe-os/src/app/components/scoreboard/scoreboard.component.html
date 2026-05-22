@@ -1,0 +1,48 @@
+<div class="card">
+    <h2>Scoreboard</h2>
+
+    <ng-container *ngIf="scoreboard$ | async as scoreboard">
+        <div class="card mt-2 overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th *ngFor="let field of [
+                            { label: 'Rank', name: 'rank' },
+                            { label: 'Difficulty', name: 'difficulty' },
+                            { label: 'Job ID', name: 'job_id' },
+                            { label: 'ExtraNonce2', name: 'extranonce2' },
+                            { label: 'Time', name: 'ntime' },
+                            { label: 'Nonce', name: 'nonce' },
+                            { label: 'Version Bits', name: 'version_bits' }
+                        ]" class="text-500 font-medium">
+                            <div class="flex align-items-center cursor-pointer select-none relative" (click)="sortBy(field.name)">
+                                <span class="pr-3">{{field.label}}</span>
+                                <i class="pi text-xs ml-2 absolute right-0" [ngClass]="{
+                                    'pi-sort-up-fill': sortField === field.name && sortDirection === 'asc',
+                                    'pi-sort-down-fill': sortField === field.name && sortDirection === 'desc'
+                                }"></i>
+                            </div>
+                        </th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let entry of scoreboard">
+                        <td>
+                            <i class="pi pi-trophy" *ngIf="entry.rank < 3" [ngStyle]="{
+                                'color': entry.rank === 0 ? 'gold' : entry.rank === 1 ? 'silver' : 'peru'
+                            }"></i>
+                            <span *ngIf="entry.rank >= 3" class="text-500 text-xs">{{ entry.rank + 1 }}</span>
+                        </td>
+                        <td pTooltip="{{ entry.difficulty }}" tooltipPosition="top" class="text-900">{{ entry.difficulty | diffSuffix }}</td>
+                        <td class="font-monospace">{{ entry.job_id }}</td>
+                        <td class="font-monospace">{{ entry.extranonce2 }}</td>
+                        <td pTooltip="{{ entry.since | dateAgo: {intervals: 2} }} ago" tooltipPosition="top">{{ entry.ntime * 1000 | date:'yyyy-MM-dd HH:mm:ss' }}</td>
+                        <td class="font-monospace">{{ entry.nonce }}</td>
+                        <td class="font-monospace">{{ entry.version_bits }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </ng-container>
+</div>

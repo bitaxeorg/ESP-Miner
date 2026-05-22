@@ -81,6 +81,8 @@ export class LayoutService {
         menuHoverActive: false,
     };
 
+    isWideView = signal<boolean>(this.localStorageService.getBool('DASHBOARD_WIDE_VIEW'));
+
     private overlayOpen = new Subject<any>();
     overlayOpen$ = this.overlayOpen.asObservable();
 
@@ -234,6 +236,11 @@ export class LayoutService {
 
         this.state.staticMenuDesktopInactive = this.localStorageService.getBool(STATIC_MENU_DESKTOP_INACTIVE);
         this.staticMenuDesktopInactive$.next(this.state.staticMenuDesktopInactive);
+    }
+
+    toggleWideView() {
+        this.isWideView.set(!this.isWideView());
+        this.localStorageService.setBool('DASHBOARD_WIDE_VIEW', this.isWideView());
     }
 
     getStaticMenuDesktopInactive$() {
