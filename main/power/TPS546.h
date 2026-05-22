@@ -30,10 +30,11 @@
 typedef struct {
   uint16_t status_word;
   uint8_t  st_vout, st_input, st_iout, st_temp, st_cml, st_mfr, st_other;
-  uint8_t  operation, on_off_config;
+  uint8_t  operation, on_off_config, phase, sync_config;
+  uint16_t stack_config, interleave;
   float    read_vout, read_vin, read_iout;
   int      read_temp1;
-  float    vout_command;
+  float    vout_command, vout_min, vout_max, vout_scale_loop;
 } TPS546_StatusSnapshot;
 
 typedef struct
@@ -77,13 +78,13 @@ typedef struct
   /* vout voltage */
 //#define TPS546_INIT_SCALE_LOOP 0.25  /* Voltage Scale factor */
 //#define TPS546_INIT_VOUT_MAX 3 /* V */
-#define TPS546_INIT_VOUT_OV_FAULT_LIMIT 1.25 /* %/100 above VOUT_COMMAND */
-#define TPS546_INIT_VOUT_OV_WARN_LIMIT  1.16 /* %/100 above VOUT_COMMAND */
-#define TPS546_INIT_VOUT_MARGIN_HIGH 1.1 /* %/100 above VOUT */
+#define TPS546_INIT_VOUT_OV_FAULT_LIMIT 1.25 /* multiplier of VOUT_COMMAND */
+#define TPS546_INIT_VOUT_OV_WARN_LIMIT  1.16 /* multiplier of VOUT_COMMAND */
+#define TPS546_INIT_VOUT_MARGIN_HIGH 1.1 /* multiplier of VOUT_COMMAND */
 //#define TPS546_INIT_VOUT_COMMAND 1.2  /* V absolute value */
-#define TPS546_INIT_VOUT_MARGIN_LOW 0.90 /* %/100 below VOUT */
-#define TPS546_INIT_VOUT_UV_WARN_LIMIT 0.90  /* %/100 below VOUT_COMMAND */
-#define TPS546_INIT_VOUT_UV_FAULT_LIMIT 0.75 /* %/100 below VOUT_COMMAND */
+#define TPS546_INIT_VOUT_MARGIN_LOW 0.90 /* multiplier of VOUT_COMMAND */
+#define TPS546_INIT_VOUT_UV_WARN_LIMIT 0.90  /* multiplier of VOUT_COMMAND */
+#define TPS546_INIT_VOUT_UV_FAULT_LIMIT 0.75 /* multiplier of VOUT_COMMAND */
 //#define TPS546_INIT_VOUT_MIN 1 /* v */
 
   /* iout current */

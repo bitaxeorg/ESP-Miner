@@ -6,9 +6,6 @@
 #include "i2c_bitaxe.h"
 #include "driver/i2c_master.h"
 
-#define GPIO_I2C_SDA CONFIG_GPIO_I2C_SDA
-#define GPIO_I2C_SCL CONFIG_GPIO_I2C_SCL
-
 #define I2C_MASTER_FREQ_HZ 100000   /*!< I2C master clock frequency */
 
 #define I2C_MASTER_NUM 0            /*!< I2C master i2c port number, the number of i2c peripheral interfaces available will depend on the chip */
@@ -50,16 +47,18 @@ static esp_err_t log_on_error(esp_err_t err, i2c_master_dev_handle_t handle) {
 /**
  * @brief i2c master initialization
  */
-esp_err_t i2c_bitaxe_init(void)
+esp_err_t i2c_bitaxe_init(int sda_gpio, int scl_gpio)
 {
     i2c_master_bus_config_t i2c_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .i2c_port = I2C_MASTER_NUM,
-        .scl_io_num = GPIO_I2C_SCL,
-        .sda_io_num = GPIO_I2C_SDA,
+        .scl_io_num = scl_gpio,
+        .sda_io_num = sda_gpio,
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
     };
+
+    ESP_LOGI(TAG, "Initializing I2C bus on SDA=%d SCL=%d", sda_gpio, scl_gpio);
 
     return i2c_new_master_bus(&i2c_bus_config, &i2c_bus_handle);
 }
@@ -97,6 +96,24 @@ esp_err_t i2c_bitaxe_get_master_bus_handle(i2c_master_bus_handle_t * dev_handle)
 {
     *dev_handle = i2c_bus_handle;
     return ESP_OK;
+}
+
+size_t i2c_bitaxe_scan_bus(uint8_t start_address, uint8_t end_address, const char *requester_tag)
+{
+    size_t found_devices = 0;
+
+    for (uint8_t address = start_address; address <= end_address; address++) {
+        if (i2c_master_probe(i2c_bus_handle, address, 20) == ESP_OK) {
+            ESP_LOGI(requester_tag, "I2C device responded at 0x%02X", address);
+            found_devices++;
+        }
+    }
+
+    if (found_devices == 0) {
+        ESP_LOGW(requester_tag, "No I2C devices responded on 0x%02X-0x%02X", start_address, end_address);
+    }
+
+    return found_devices;
 }
 
 /**

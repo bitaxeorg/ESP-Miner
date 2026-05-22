@@ -31,10 +31,18 @@ typedef enum {
 #define BUTTON_WAKE_MS 5000
 
 #define SCR_CAROUSEL_START SCR_URLS
+#define BITAXE_LOGO_INVERTED_SIZE (77 * 30 * 2)
+#define OSMU_LOGO_INVERTED_SIZE (125 * 27 * 2)
 
 extern const lv_img_dsc_t bitaxe_logo;
 extern const lv_img_dsc_t osmu_logo;
 extern const lv_img_dsc_t identify_text;
+
+static lv_img_dsc_t bitaxe_logo_inverted;
+static lv_img_dsc_t osmu_logo_inverted;
+static uint8_t bitaxe_logo_inverted_map[BITAXE_LOGO_INVERTED_SIZE];
+static uint8_t osmu_logo_inverted_map[OSMU_LOGO_INVERTED_SIZE];
+static bool inverted_logos_ready;
 
 static lv_obj_t * screens[MAX_SCREENS];
 static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000, 10000, 10000, 10000};
@@ -113,8 +121,69 @@ static screen_t get_current_screen() {
     return -1;
 }
 
+static bool is_large_display(void) {
+    return lv_display_get_vertical_resolution(NULL) > 128;
+}
+
+static void apply_screen_padding(lv_obj_t * obj) {
+    if (is_large_display()) {
+        lv_obj_set_style_pad_all(obj, 8, LV_PART_MAIN);
+    }
+}
+
+static void make_inverted_logo(const lv_img_dsc_t * src, lv_img_dsc_t * dst, uint8_t * dst_map, size_t dst_map_size) {
+    size_t data_size = src->data_size;
+    if (data_size > dst_map_size) {
+        data_size = dst_map_size;
+    }
+
+    *dst = *src;
+    dst->data = dst_map;
+    dst->data_size = data_size;
+
+    for (size_t i = 0; i + 1 < data_size; i += 2) {
+        uint16_t pixel = src->data[i] | (src->data[i + 1] << 8);
+        uint16_t inverted_pixel = pixel == 0xffff ? 0x0000 : 0xffff;
+        dst_map[i] = inverted_pixel & 0xff;
+        dst_map[i + 1] = inverted_pixel >> 8;
+    }
+}
+
+static void init_inverted_logos(void) {
+    if (inverted_logos_ready) {
+        return;
+    }
+
+    make_inverted_logo(&bitaxe_logo, &bitaxe_logo_inverted, bitaxe_logo_inverted_map, sizeof(bitaxe_logo_inverted_map));
+    make_inverted_logo(&osmu_logo, &osmu_logo_inverted, osmu_logo_inverted_map, sizeof(osmu_logo_inverted_map));
+    lv_image_cache_drop(&bitaxe_logo);
+    lv_image_cache_drop(&osmu_logo);
+    lv_image_cache_drop(&bitaxe_logo_inverted);
+    lv_image_cache_drop(&osmu_logo_inverted);
+    inverted_logos_ready = true;
+}
+
+static const lv_img_dsc_t * get_bitaxe_logo_src(void) {
+    if (is_large_display()) {
+        init_inverted_logos();
+        return &bitaxe_logo_inverted;
+    }
+
+    return &bitaxe_logo;
+}
+
+static const lv_img_dsc_t * get_osmu_logo_src(void) {
+    if (is_large_display()) {
+        init_inverted_logos();
+        return &osmu_logo_inverted;
+    }
+
+    return &osmu_logo;
+}
+
 static lv_obj_t * create_flex_screen(int expected_lines) {
     lv_obj_t * scr = lv_obj_create(NULL);
+    apply_screen_padding(scr);
 
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -170,11 +239,14 @@ static lv_obj_t * create_scr_asic_status() {
 
 static lv_obj_t * create_screen_with_qr(const char * ap_ssid, int expected_lines, lv_obj_t ** out_text_cont) {
     lv_obj_t * scr = lv_obj_create(NULL);
+    apply_screen_padding(scr);
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(scr, 2, LV_PART_MAIN);
+    lv_obj_set_style_pad_column(scr, is_large_display() ? 8 : 2, LV_PART_MAIN);
 
     lv_obj_t * text_cont = lv_obj_create(scr);
+    lv_obj_set_style_bg_opa(text_cont, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(text_cont, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_flex_flow(text_cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(text_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
     lv_obj_set_flex_grow(text_cont, 1);
@@ -184,7 +256,7 @@ static lv_obj_t * create_screen_with_qr(const char * ap_ssid, int expected_lines
     if (screen_lines > expected_lines) lv_obj_set_style_pad_row(text_cont, 1, LV_PART_MAIN);
 
     lv_obj_t * qr = lv_qrcode_create(scr);
-    lv_qrcode_set_size(qr, 32);
+    lv_qrcode_set_size(qr, is_large_display() ? 72 : 32);
     lv_qrcode_set_dark_color(qr, lv_color_black());
     lv_qrcode_set_light_color(qr, lv_color_white());
 
@@ -256,27 +328,33 @@ static lv_obj_t * create_scr_connection(const char * ssid, const char * ap_ssid)
 
 static lv_obj_t * create_scr_bitaxe_logo(const char * name, const char * board_version) {
     lv_obj_t * scr = lv_obj_create(NULL);
+    apply_screen_padding(scr);
 
     lv_obj_t *img = lv_img_create(scr);
-    lv_img_set_src(img, &bitaxe_logo);
-    lv_obj_align(img, LV_ALIGN_CENTER, 0, 1);
+    lv_img_set_src(img, get_bitaxe_logo_src());
+    if (is_large_display()) {
+        lv_obj_align(img, LV_ALIGN_CENTER, -42, -10);
+    } else {
+        lv_obj_align(img, LV_ALIGN_CENTER, 0, 1);
+    }
 
     lv_obj_t *label1 = lv_label_create(scr);
     lv_label_set_text(label1, name);
-    lv_obj_align(label1, LV_ALIGN_RIGHT_MID, -6, -12);
+    lv_obj_align(label1, LV_ALIGN_RIGHT_MID, -8, is_large_display() ? -18 : -12);
 
     lv_obj_t *label2 = lv_label_create(scr);
     lv_label_set_text(label2, board_version);
-    lv_obj_align(label2, LV_ALIGN_RIGHT_MID, -6, -4);
+    lv_obj_align(label2, LV_ALIGN_RIGHT_MID, -8, is_large_display() ? 2 : -4);
 
     return scr;
 }
 
 static lv_obj_t * create_scr_osmu_logo() {
     lv_obj_t * scr = lv_obj_create(NULL);
+    apply_screen_padding(scr);
 
     lv_obj_t *img = lv_img_create(scr);
-    lv_img_set_src(img, &osmu_logo);
+    lv_img_set_src(img, get_osmu_logo_src());
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
     return scr;
@@ -365,6 +443,7 @@ static void scr_create_overlay()
 
     notification_label = lv_label_create(lv_layer_top());
     lv_label_set_text(notification_label, "");
+    lv_obj_set_style_text_color(notification_label, lv_color_white(), LV_PART_MAIN);
     lv_obj_align(notification_label, LV_ALIGN_TOP_RIGHT, 0, 0);
 }
 
@@ -673,8 +752,7 @@ static void uptime_update_cb(lv_timer_t * timer)
 esp_err_t screen_start(void * pvParameters)
 {
     if (lvgl_port_lock(0)) {
-        // screen_chars = lv_display_get_horizontal_resolution(NULL) / 6;
-        screen_lines = lv_display_get_vertical_resolution(NULL) / 8;
+        screen_lines = lv_display_get_vertical_resolution(NULL) / (is_large_display() ? 16 : 8);
 
         GLOBAL_STATE = (GlobalState *) pvParameters;
         SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;

@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include <string.h>
 #include "bap.h"
 
 static const char *TAG = "BAP";
@@ -26,6 +27,11 @@ esp_err_t BAP_init(GlobalState *state) {
     if (!state) {
         ESP_LOGE(TAG, "Invalid global state pointer");
         return ESP_ERR_INVALID_ARG;
+    }
+
+    if (strcmp(state->DEVICE_CONFIG.board_version, "900") == 0) {
+        ESP_LOGW(TAG, "BAP UART disabled on board 900 because LCD uses the configured BAP pins");
+        return ESP_OK;
     }
     
     bap_global_state = state;

@@ -11,6 +11,7 @@
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 #define GPIO_PLUG_SENSE CONFIG_GPIO_PLUG_SENSE
+#define TPS546_GAMMA_HEX_STACK_CONFIG_4_PHASE 0x0003
 
 static const char *TAG = "vcore";
 
@@ -20,6 +21,31 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
 
     // Set family-specific parameters
     switch (family->id) {
+    case GAMMA_HEX:
+        if (family->voltage_domains != GAMMA_HEX_VOLTAGE_DOMAINS) {
+            ESP_LOGE(TAG, "GammaHex must be configured for %u voltage domains", GAMMA_HEX_VOLTAGE_DOMAINS);
+            return config;
+        }
+        config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_MULTI;
+        config.TPS546_INIT_VIN_ON = 11.0;
+        config.TPS546_INIT_VIN_OFF = 10.5;
+        config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        config.TPS546_INIT_SCALE_LOOP = 0.25;
+        config.TPS546_INIT_VOUT_MIN = 2;
+        config.TPS546_INIT_VOUT_MAX = 3;
+        config.TPS546_INIT_VOUT_COMMAND = 2.4;
+        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = 150.00;
+        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = 160.00;
+        config.TPS546_INIT_STACK_CONFIG = TPS546_GAMMA_HEX_STACK_CONFIG_4_PHASE; // 4 modules (3 slaves, 4-phase)
+        config.TPS546_INIT_SYNC_CONFIG = 0xD0;    // Enable Auto Detect SYNC
+        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x02;
+        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x64;
+        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0x82;
+        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x11;
+        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x06;
+        break;
+
     case GAMMA_TURBO:
         config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_MULTI;
         config.TPS546_INIT_VIN_ON = 11.0;
@@ -81,9 +107,42 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
     return config;
 }
 
+static void configure_asic_power_enable(GlobalState * GLOBAL_STATE)
+{
+    if (!(GLOBAL_STATE->DEVICE_CONFIG.plug_sense || GLOBAL_STATE->DEVICE_CONFIG.asic_enable)) {
+        return;
+    }
+
+    bool enable_power = GLOBAL_STATE->DEVICE_CONFIG.asic_enable;
+
+    if (GLOBAL_STATE->DEVICE_CONFIG.plug_sense) {
+        gpio_config_t barrel_jack_conf = {
+            .pin_bit_mask = (1ULL << GPIO_PLUG_SENSE),
+            .mode = GPIO_MODE_INPUT,
+        };
+        gpio_config(&barrel_jack_conf);
+        enable_power = gpio_get_level(GPIO_PLUG_SENSE) == 1 || enable_power;
+    }
+
+    gpio_config_t asic_enable_conf = {
+        .pin_bit_mask = (1ULL << GPIO_ASIC_ENABLE),
+        .mode = GPIO_MODE_OUTPUT,
+    };
+    gpio_config(&asic_enable_conf);
+
+    bool active_high = GLOBAL_STATE->DEVICE_CONFIG.asic_enable_active_high;
+    gpio_set_level(GPIO_ASIC_ENABLE, enable_power ? active_high : !active_high);
+
+    if (enable_power) {
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+
 esp_err_t VCORE_init(GlobalState * GLOBAL_STATE)
 {
     ESP_RETURN_ON_FALSE(GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains != 0, ESP_FAIL, TAG, "voltage_domains not defined");
+
+    configure_asic_power_enable(GLOBAL_STATE);
 
     if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {
         ESP_RETURN_ON_ERROR(DS4432U_init(), TAG, "DS4432 init failed!");
@@ -96,23 +155,6 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE)
         ESP_RETURN_ON_ERROR(TPS546_init(tps_config), TAG, "TPS546 init failed!");
     }
 
-    if (GLOBAL_STATE->DEVICE_CONFIG.plug_sense) {
-        gpio_config_t barrel_jack_conf = {
-            .pin_bit_mask = (1ULL << GPIO_PLUG_SENSE),
-            .mode = GPIO_MODE_INPUT,
-        };
-        gpio_config(&barrel_jack_conf);
-        int barrel_jack_plugged_in = gpio_get_level(GPIO_PLUG_SENSE);
-
-        gpio_set_direction(GPIO_ASIC_ENABLE, GPIO_MODE_OUTPUT);
-        if (barrel_jack_plugged_in == 1 || GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
-            gpio_set_level(GPIO_ASIC_ENABLE, 0);
-        } else {
-            // turn ASIC off
-            gpio_set_level(GPIO_ASIC_ENABLE, 1);
-        }
-    }
-
     return ESP_OK;
 }
 
@@ -122,7 +164,13 @@ esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
 
     // Enable/disable the ASIC power enable GPIO before touching the regulator
     if (GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
-        gpio_set_level(GPIO_ASIC_ENABLE, core_voltage == 0.0f ? 1 : 0);
+        bool active_high = GLOBAL_STATE->DEVICE_CONFIG.asic_enable_active_high;
+        bool enable_power = core_voltage != 0.0f;
+        gpio_set_level(GPIO_ASIC_ENABLE, enable_power ? active_high : !active_high);
+
+        if (enable_power) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+        }
     }
 
     if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {

@@ -65,6 +65,7 @@ PRIV_REQUIRES
     "esp_app_format"
     "esp_event"
     "esp_http_server"
+    "esp_lcd"
     "esp_netif"
     "esp_psram"
     "esp_timer"
