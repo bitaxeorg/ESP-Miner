@@ -978,8 +978,9 @@ paths:
       description: |
         Returns system telemetry in Prometheus text exposition format.
         Mining state is exported as `espminer_mining_paused` (1=paused).
-        Secondary sensor metrics such as `espminer_fan2_rpm` and `espminer_chip_temp2_celsius`
-        are emitted only when the active hardware configuration supports them.
+        Fan and chip temperature metrics are exported as labeled series:
+        `espminer_fan_rpm{fan="1|2"}` and `espminer_chip_temp_celsius{chip="1|2"}`.
+        Secondary series are emitted only when the active hardware configuration supports them.
       operationId: getSystemMetrics
       tags:
         - system

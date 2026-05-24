@@ -1730,15 +1730,19 @@ static esp_err_t GET_system_metrics(httpd_req_t *req) {
     }
 
     // --- POWER/FAN/HARDWARE ---
-    prometheus_write_metric(req, "espminer_fan_rpm", "Fan RPM", "gauge", NULL, (double)pm->fan_rpm, 0);
+    prometheus_format_label(label_buf, sizeof(label_buf), "fan", "1");
+    prometheus_write_metric(req, "espminer_fan_rpm", "Fan RPM", "gauge", label_buf, (double)pm->fan_rpm, 0);
     if (cfg->EMC2302) {
-        prometheus_write_metric(req, "espminer_fan2_rpm", "Fan2 RPM", "gauge", NULL, (double)pm->fan2_rpm, 0);
+        prometheus_format_label(label_buf, sizeof(label_buf), "fan", "2");
+        prometheus_write_metric(req, "espminer_fan_rpm", "Fan RPM", "gauge", label_buf, (double)pm->fan2_rpm, 0);
     }
     prometheus_write_metric(req, "espminer_fan_speed_percent", "Fan speed percent", "gauge", NULL, (double)pm->fan_perc, 0);
     prometheus_write_metric(req, "espminer_manual_fan_speed_percent", "Manual fan speed percent", "gauge", NULL, (double)nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED), 0);
-    prometheus_write_metric(req, "espminer_chip_temp_celsius", "Average chip temperature (C)", "gauge", NULL, (double)pm->chip_temp_avg, 0);
+    prometheus_format_label(label_buf, sizeof(label_buf), "chip", "1");
+    prometheus_write_metric(req, "espminer_chip_temp_celsius", "Chip temperature (C)", "gauge", label_buf, (double)pm->chip_temp_avg, 0);
     if (cfg->TMP1075) {
-        prometheus_write_metric(req, "espminer_chip_temp2_celsius", "Second chip temperature (C)", "gauge", NULL, (double)pm->chip_temp2_avg, 0);
+        prometheus_format_label(label_buf, sizeof(label_buf), "chip", "2");
+        prometheus_write_metric(req, "espminer_chip_temp_celsius", "Chip temperature (C)", "gauge", label_buf, (double)pm->chip_temp2_avg, 0);
     }
     prometheus_write_metric(req, "espminer_vr_temp_celsius", "VRM temperature (C)", "gauge", NULL, (double)pm->vr_temp, 0);
     prometheus_write_metric(req, "espminer_voltage_volts", "Voltage (V)", "gauge", NULL, (double)pm->voltage, 0);

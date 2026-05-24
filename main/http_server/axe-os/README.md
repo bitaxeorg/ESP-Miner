@@ -32,8 +32,8 @@ espminer_hashrate_hashes_per_second 123.4
 - `espminer_best_share`: Best share difficulty
 - `espminer_pool_connected`: Pool connection state
 - `espminer_mining_paused`: Mining paused state (1=paused)
-- `espminer_fan_rpm` (+ `espminer_fan2_rpm` on dual-fan hardware): Fan speeds
-- `espminer_chip_temp_celsius`, `espminer_vr_temp_celsius` (+ `espminer_chip_temp2_celsius` on dual-temp hardware): Temperatures
+- `espminer_fan_rpm{fan="1|2"}`: Fan speeds (one series per detected fan)
+- `espminer_chip_temp_celsius{chip="1|2"}`, `espminer_vr_temp_celsius`: Temperatures (one chip series per detected sensor)
 - `espminer_voltage_volts`, `espminer_frequency_hz`, `espminer_power_watts`, `espminer_current_amps`: Power/frequency
 
 See the endpoint for the full list and current values.
