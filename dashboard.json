@@ -924,7 +924,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "espminer_fan_rpm{instance=~\"${hostname}\"}",
+          "expr": "espminer_fan_rpm{instance=~\"${hostname}\",fan=\"1\"}",
           "legendFormat": "{{instance}} fan rpm",
           "range": true,
           "refId": "A"
@@ -934,7 +934,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "espminer_fan2_rpm{instance=~\"${hostname}\"}",
+          "expr": "espminer_fan_rpm{instance=~\"${hostname}\",fan=\"2\"}",
           "hide": false,
           "legendFormat": "{{instance}} fan2 rpm",
           "range": true,
@@ -2266,7 +2266,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "espminer_chip_temp_celsius{instance=~\"${hostname}\"}",
+          "expr": "espminer_chip_temp_celsius{instance=~\"${hostname}\",chip=\"1\"}",
           "legendFormat": "{{instance}} - chip temp",
           "range": true,
           "refId": "A"
@@ -2276,7 +2276,7 @@
             "type": "prometheus"
           },
           "editorMode": "code",
-          "expr": "espminer_chip_temp2_celsius{instance=~\"${hostname}\"}",
+          "expr": "espminer_chip_temp_celsius{instance=~\"${hostname}\",chip=\"2\"}",
           "hide": false,
           "legendFormat": "{{instance}} - chip temp2",
           "range": true,
