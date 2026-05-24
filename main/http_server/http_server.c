@@ -142,6 +142,25 @@ static void prometheus_escape_label_value(const char *src, char *dst, size_t dst
     dst[j] = '\0';
 }
 
+static void prometheus_copy_sanitized_ascii(char *dst, size_t dst_size, const char *src)
+{
+    if (!dst || dst_size == 0) {
+        return;
+    }
+
+    if (!src) {
+        dst[0] = '\0';
+        return;
+    }
+
+    size_t j = 0;
+    for (size_t i = 0; src[i] && j + 1 < dst_size; ++i) {
+        unsigned char c = (unsigned char)src[i];
+        dst[j++] = (c < 32 || c > 126) ? '_' : (char)c;
+    }
+    dst[j] = '\0';
+}
+
 // Helper: format a single label key-value pair, escaping value
 static void prometheus_format_label(char *buf, size_t bufsize, const char *key, const char *value) {
     char esc[128];
@@ -1613,38 +1632,16 @@ static esp_err_t GET_system_metrics(httpd_req_t *req) {
     char safe_idf[32] = {0};
     char safe_device_model[32] = {0};
     char safe_asic_model[32] = {0};
-    char safe_board[32];
-    memset(safe_board, 0, sizeof(safe_board));
+    char safe_board[32] = {0};
 
     char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
-    strncpy(safe_hostname, hostname ? hostname : "", sizeof(safe_hostname) - 1);
-    strncpy(safe_version, sys->version ? sys->version : "", sizeof(safe_version) - 1);
-    strncpy(safe_axeos, sys->axeOSVersion ? sys->axeOSVersion : "", sizeof(safe_axeos) - 1);
-    strncpy(safe_idf, esp_get_idf_version(), sizeof(safe_idf) - 1);
-    strncpy(safe_device_model, cfg->family.name ? cfg->family.name : "", sizeof(safe_device_model) - 1);
-    strncpy(safe_asic_model, cfg->family.asic.name ? cfg->family.asic.name : "", sizeof(safe_asic_model) - 1);
-
-    // Defensive: ensure board_version is always a valid null-terminated string
-    if (cfg->board_version) {
-        size_t j = 0;
-        for (size_t i = 0; i < sizeof(safe_board) - 1 && cfg->board_version[i]; ++i) {
-            char c = cfg->board_version[i];
-            if (c < 32 || c > 126) break; // Truncate at first non-printable
-            safe_board[j++] = c;
-        }
-        safe_board[j] = '\0';
-    } else {
-        safe_board[0] = '\0';
-    }
-
-    // Sanitize: replace non-printable or non-ASCII with '_'
-    for (size_t i = 0; i < sizeof(safe_hostname); ++i) if (safe_hostname[i] && (safe_hostname[i] < 32 || safe_hostname[i] > 126)) safe_hostname[i] = '_';
-    for (size_t i = 0; i < sizeof(safe_version); ++i) if (safe_version[i] && (safe_version[i] < 32 || safe_version[i] > 126)) safe_version[i] = '_';
-    for (size_t i = 0; i < sizeof(safe_axeos); ++i) if (safe_axeos[i] && (safe_axeos[i] < 32 || safe_axeos[i] > 126)) safe_axeos[i] = '_';
-    for (size_t i = 0; i < sizeof(safe_idf); ++i) if (safe_idf[i] && (safe_idf[i] < 32 || safe_idf[i] > 126)) safe_idf[i] = '_';
-    for (size_t i = 0; i < sizeof(safe_device_model); ++i) if (safe_device_model[i] && (safe_device_model[i] < 32 || safe_device_model[i] > 126)) safe_device_model[i] = '_';
-    for (size_t i = 0; i < sizeof(safe_asic_model); ++i) if (safe_asic_model[i] && (safe_asic_model[i] < 32 || safe_asic_model[i] > 126)) safe_asic_model[i] = '_';
-    for (size_t i = 0; i < sizeof(safe_board); ++i) if (safe_board[i] && (safe_board[i] < 32 || safe_board[i] > 126)) safe_board[i] = '_';
+    prometheus_copy_sanitized_ascii(safe_hostname, sizeof(safe_hostname), hostname ? hostname : "");
+    prometheus_copy_sanitized_ascii(safe_version, sizeof(safe_version), sys->version ? sys->version : "");
+    prometheus_copy_sanitized_ascii(safe_axeos, sizeof(safe_axeos), sys->axeOSVersion ? sys->axeOSVersion : "");
+    prometheus_copy_sanitized_ascii(safe_idf, sizeof(safe_idf), esp_get_idf_version());
+    prometheus_copy_sanitized_ascii(safe_device_model, sizeof(safe_device_model), cfg->family.name ? cfg->family.name : "");
+    prometheus_copy_sanitized_ascii(safe_asic_model, sizeof(safe_asic_model), cfg->family.asic.name ? cfg->family.asic.name : "");
+    prometheus_copy_sanitized_ascii(safe_board, sizeof(safe_board), cfg->board_version ? cfg->board_version : "");
 
     // Format label list with escaping
     const char *keys[] = {"hostname","firmware","axeos","idf","device_model","asic_model","board"};
@@ -1680,12 +1677,21 @@ static esp_err_t GET_system_metrics(httpd_req_t *req) {
 
     // WiFi info labels (escaped)
     const char *wifi_keys[] = {"ssid","status","mac","ipv4","ipv6"};
+    char safe_ssid[33] = {0};
+    char safe_wifi_status[64] = {0};
+    char safe_ipv4[40] = {0};
+    char safe_ipv6[48] = {0};
+    prometheus_copy_sanitized_ascii(safe_ssid, sizeof(safe_ssid), sys->ssid ? sys->ssid : "");
+    prometheus_copy_sanitized_ascii(safe_wifi_status, sizeof(safe_wifi_status), sys->wifi_status);
+    prometheus_copy_sanitized_ascii(safe_ipv4, sizeof(safe_ipv4), sys->ip_addr_str);
+    prometheus_copy_sanitized_ascii(safe_ipv6, sizeof(safe_ipv6), sys->ipv6_addr_str);
+
     const char *wifi_values[] = {
-        sys->ssid ? sys->ssid : "",
-        sys->wifi_status,
+        safe_ssid,
+        safe_wifi_status,
         formattedMac,
-        sys->ip_addr_str,
-        sys->ipv6_addr_str
+        safe_ipv4,
+        safe_ipv6
     };
     prometheus_format_labels(label_buf, sizeof(label_buf), wifi_keys, wifi_values, 5);
     prometheus_write_metric(req, "espminer_wifi_info", "WiFi info labels", "gauge", label_buf, 1, 1);
@@ -1706,26 +1712,34 @@ static esp_err_t GET_system_metrics(httpd_req_t *req) {
     prometheus_write_metric(req, "espminer_network_difficulty", "Network difficulty", "gauge", NULL, (double)GLOBAL_STATE->network_nonce_diff, 0);
     prometheus_write_metric(req, "espminer_pool_difficulty", "Pool difficulty", "gauge", NULL, (double)GLOBAL_STATE->pool_difficulty, 0);
     prometheus_write_metric(req, "espminer_pool_connected", "Pool connected state (1=connected)", "gauge", NULL, sys->is_connected ? 1 : 0, 0);
-    prometheus_write_metric(req, "espminer_mining_enabled", "Mining enabled state (1=enabled)", "gauge", NULL, sys->mining_paused ? 0 : 1, 0);
 
     // Mining paused state
     prometheus_write_metric(req, "espminer_mining_paused", "Mining paused (1=paused)", "gauge", NULL, sys->mining_paused ? 1 : 0, 0);
 
     // Shares rejected by reason
     for (int i = 0; i < sys->rejected_reason_stats_count; i++) {
+        char safe_rejected_reason[128] = {0};
+        prometheus_copy_sanitized_ascii(
+            safe_rejected_reason,
+            sizeof(safe_rejected_reason),
+            sys->rejected_reason_stats[i].message);
         const char *rej_keys[] = {"reason"};
-        const char *rej_values[] = {sys->rejected_reason_stats[i].message};
+        const char *rej_values[] = {safe_rejected_reason};
         prometheus_format_labels(label_buf, sizeof(label_buf), rej_keys, rej_values, 1);
         prometheus_write_metric(req, "espminer_shares_rejected_reasons", "Rejected shares by reason", "counter", label_buf, (double)sys->rejected_reason_stats[i].count, 0);
     }
 
     // --- POWER/FAN/HARDWARE ---
     prometheus_write_metric(req, "espminer_fan_rpm", "Fan RPM", "gauge", NULL, (double)pm->fan_rpm, 0);
-    prometheus_write_metric(req, "espminer_fan2_rpm", "Fan2 RPM", "gauge", NULL, (double)pm->fan2_rpm, 0);
+    if (cfg->EMC2302) {
+        prometheus_write_metric(req, "espminer_fan2_rpm", "Fan2 RPM", "gauge", NULL, (double)pm->fan2_rpm, 0);
+    }
     prometheus_write_metric(req, "espminer_fan_speed_percent", "Fan speed percent", "gauge", NULL, (double)pm->fan_perc, 0);
     prometheus_write_metric(req, "espminer_manual_fan_speed_percent", "Manual fan speed percent", "gauge", NULL, (double)nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED), 0);
     prometheus_write_metric(req, "espminer_chip_temp_celsius", "Average chip temperature (C)", "gauge", NULL, (double)pm->chip_temp_avg, 0);
-    prometheus_write_metric(req, "espminer_chip_temp2_celsius", "Second chip temperature (C)", "gauge", NULL, (double)pm->chip_temp2_avg, 0);
+    if (cfg->TMP1075) {
+        prometheus_write_metric(req, "espminer_chip_temp2_celsius", "Second chip temperature (C)", "gauge", NULL, (double)pm->chip_temp2_avg, 0);
+    }
     prometheus_write_metric(req, "espminer_vr_temp_celsius", "VRM temperature (C)", "gauge", NULL, (double)pm->vr_temp, 0);
     prometheus_write_metric(req, "espminer_voltage_volts", "Voltage (V)", "gauge", NULL, (double)pm->voltage, 0);
     prometheus_write_metric(req, "espminer_core_voltage_mv", "ASIC core voltage (configured, mV)", "gauge", NULL, (double)nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE), 0);

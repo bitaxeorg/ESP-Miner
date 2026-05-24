@@ -23,8 +23,7 @@
   "panels": [
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -113,8 +112,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_coinbase_value_user_satoshis{instance=~\"${hostname}\"}",
@@ -129,8 +127,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -220,8 +217,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_coinbase_value_user_satoshis{instance=~\"${hostname}\"}",
@@ -232,8 +228,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "(espminer_coinbase_value_user_satoshis{instance=~\"${hostname}\"} / espminer_coinbase_value_total_satoshis{instance=~\"${hostname}\"}) * 100",
@@ -261,8 +256,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -352,8 +346,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_core_voltage_mv{instance=~\"${hostname}\"}",
@@ -364,8 +357,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_frequency_hz{instance=~\"${hostname}\"}",
@@ -376,8 +368,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_power_watts{instance=~\"${hostname}\"}",
@@ -388,8 +379,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_current_amps{instance=~\"${hostname}\"}",
@@ -414,8 +404,7 @@
       "panels": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
@@ -504,8 +493,7 @@
             },
             {
               "datasource": {
-                "type": "prometheus",
-                "uid": "dfa7ax4wlhvr4a"
+                "type": "prometheus"
               },
               "editorMode": "code",
               "expr": "espminer_wifi_connected{instance=~\"${hostname}\"}",
@@ -537,8 +525,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -627,8 +614,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_heap_min_free_bytes{instance=~\"${hostname}\"}",
@@ -640,8 +626,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_heap_free_spiram_bytes{instance=~\"${hostname}\"}",
@@ -657,8 +642,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -751,8 +735,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -859,8 +842,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -949,8 +931,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_fan2_rpm{instance=~\"${hostname}\"}",
@@ -965,8 +946,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1072,8 +1052,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1155,8 +1134,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_hashrate_hashes_per_second{instance=~\"${hostname}\"}",
@@ -1167,8 +1145,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_hashrate_1m{instance=~\"${hostname}\"}",
@@ -1179,8 +1156,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_hashrate_10m{instance=~\"${hostname}\"}",
@@ -1191,8 +1167,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_hashrate_1h{instance=~\"${hostname}\"}",
@@ -1203,8 +1178,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_expected_hashrate{instance=~\"${hostname}\"}",
@@ -1215,8 +1189,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "builder",
           "expr": "sum by(instance) (espminer_asic_hashrate{instance=~\"${hostname}\"})",
@@ -1231,8 +1204,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1325,8 +1297,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "builder",
           "exemplar": false,
@@ -1340,8 +1311,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -1355,8 +1325,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -1370,8 +1339,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -1389,8 +1357,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1498,8 +1465,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(espminer_shares_accepted_total{instance=~\"${hostname}\"}[5m]) * 60",
@@ -1511,8 +1477,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(espminer_shares_rejected_total{instance=~\"${hostname}\"}[5m]) * 60",
@@ -1528,8 +1493,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1613,8 +1577,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_error_percentage{instance=~\"${hostname}\"}",
@@ -1626,8 +1589,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "\navg by(instance) (\n  avg_over_time(\n    espminer_error_percentage{instance=~\"${hostname}\"}[20m]\n  )\n)",
@@ -1643,8 +1605,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1726,8 +1687,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_best_share{instance=~\"${hostname}\"}",
@@ -1739,8 +1699,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_best_session_share{instance=~\"${hostname}\"}",
@@ -1756,8 +1715,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1839,8 +1797,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "rate(espminer_jobs_received_total{instance=~\"${hostname}\"}[5m])",
@@ -1869,8 +1826,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1963,8 +1919,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -2057,8 +2012,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -2147,8 +2101,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "avg by(instance) (\n  avg_over_time(\n    espminer_pool_difficulty{instance=~\"${hostname}\"}[5m]\n  )\n)",
@@ -2159,8 +2112,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "avg by(instance) (\n  avg_over_time(\n    espminer_pool_difficulty{instance=~\"${hostname}\"}[10m]\n  )\n)",
@@ -2171,8 +2123,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "avg by(instance) (\n  avg_over_time(\n    espminer_pool_difficulty{instance=~\"${hostname}\"}[30m]\n  )\n)",
@@ -2183,8 +2134,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "avg by(instance) (\n  avg_over_time(\n    espminer_pool_difficulty{instance=~\"${hostname}\"}[6h]\n  )\n)",
@@ -2195,8 +2145,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "avg by(instance) (\n  avg_over_time(\n    espminer_pool_difficulty{instance=~\"${hostname}\"}[12h]\n  )\n)",
@@ -2207,8 +2156,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "avg by(instance) (\n  avg_over_time(\n    espminer_pool_difficulty{instance=~\"${hostname}\"}[10h]\n  )\n)",
@@ -2236,8 +2184,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "dfa7ax4wlhvr4a"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -2326,8 +2273,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_chip_temp2_celsius{instance=~\"${hostname}\"}",
@@ -2338,8 +2284,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "dfa7ax4wlhvr4a"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "expr": "espminer_vr_temp_celsius{instance=~\"${hostname}\"}",

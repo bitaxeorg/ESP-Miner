@@ -975,7 +975,11 @@ paths:
   /api/system/metrics:
     get:
       summary: Get Prometheus metrics
-      description: Returns system telemetry in Prometheus text exposition format
+      description: |
+        Returns system telemetry in Prometheus text exposition format.
+        Mining state is exported as `espminer_mining_paused` (1=paused).
+        Secondary sensor metrics such as `espminer_fan2_rpm` and `espminer_chip_temp2_celsius`
+        are emitted only when the active hardware configuration supports them.
       operationId: getSystemMetrics
       tags:
         - system
