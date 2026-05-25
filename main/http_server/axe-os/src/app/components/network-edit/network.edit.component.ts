@@ -71,9 +71,11 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.warning('You must restart this device after saving for changes to take effect.');
+          if (this.isRestartRequired) {
+            this.toastr.warning('You must restart this device after saving for changes to take effect.');
+          }
           this.toastr.success('Saved network settings');
-          this.savedChanges = true;
+          this.savedChanges = this.isRestartRequired;
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error(`Could not save. ${err.message}`);
@@ -145,5 +147,10 @@ export class NetworkEditComponent implements OnInit {
           this.toastr.error(`Could not restart. ${err.message}`);
         }
       });
+  }
+
+  get isRestartRequired(): boolean {
+    return !!Object.entries(this.form.controls)
+      .filter(([field, control]) => control.dirty && field !== 'hostname').length;
   }
 }
