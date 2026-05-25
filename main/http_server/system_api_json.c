@@ -12,6 +12,7 @@
 #include "cjson_utils.h"
 #include "statistics_task.h"
 #include "stratum_v2_task.h"
+#include "predictive_efficiency.h"
 
 static const char * stratum_protocol_to_string(uint16_t v)
 {
@@ -109,6 +110,28 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     if (g->SYSTEM_MODULE.hardware_fault) {
         cJSON_AddStringToObject(root, "hardware_fault", g->SYSTEM_MODULE.hardware_fault_msg);
     }
+}
+
+static void system_api_add_predictive_efficiency(cJSON *root, GlobalState *g) {
+    if (!root || !g) return;
+
+    PredictiveEfficiencyModule *predictive = &g->PREDICTIVE_EFFICIENCY_MODULE;
+    cJSON *obj = cJSON_CreateObject();
+    if (!obj) return;
+
+    cJSON_AddItemToObject(root, "predictiveEfficiency", obj);
+    cJSON_AddBoolToObject(obj, "enabled", predictive->enabled);
+    cJSON_AddBoolToObject(obj, "gammaProfile", predictive->gamma_profile);
+    cJSON_AddFloatToObject(obj, "score", predictive->score);
+    cJSON_AddFloatToObject(obj, "hashPerWatt", predictive->hash_per_watt);
+    cJSON_AddFloatToObject(obj, "usefulShareRatio", predictive->useful_share_ratio);
+    cJSON_AddFloatToObject(obj, "thermalMarginC", predictive->thermal_margin_c);
+    cJSON_AddFloatToObject(obj, "hashrateRatio", predictive->hashrate_ratio);
+    cJSON_AddFloatToObject(obj, "errorPenalty", predictive->error_penalty);
+    cJSON_AddFloatToObject(obj, "latencyPenalty", predictive->latency_penalty);
+    cJSON_AddStringToObject(obj, "recommendedAction", predictive_efficiency_action_name(predictive->action));
+    cJSON_AddStringToObject(obj, "reason", predictive->reason);
+    cJSON_AddNumberToObject(obj, "lastUpdateMs", predictive->last_update_ms);
 }
 
 static void system_api_add_config(cJSON *root, GlobalState *g) {
@@ -303,6 +326,7 @@ cJSON* system_api_get_full_json(GlobalState *g) {
     if (root == NULL) return NULL;
 
     system_api_add_telemetry(root, g);
+    system_api_add_predictive_efficiency(root, g);
     system_api_add_config(root, g);
     system_api_add_hashrate_monitor(root, g);
 

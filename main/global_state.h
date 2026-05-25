@@ -18,6 +18,7 @@
 #include "display.h"
 #include "scoreboard.h"
 #include "esp_transport.h"
+#include "predictive_efficiency.h"
 
 // Protocol selection (V1 = JSON-RPC, V2 = binary SV2)
 typedef enum {
@@ -144,6 +145,7 @@ typedef struct
     DisplayConfig DISPLAY_CONFIG;
     AsicTaskModule ASIC_TASK_MODULE;
     PowerManagementModule POWER_MANAGEMENT_MODULE;
+    PredictiveEfficiencyModule PREDICTIVE_EFFICIENCY_MODULE;
     SelfTestModule SELF_TEST_MODULE;
     HashrateMonitorModule HASHRATE_MONITOR_MODULE;
 

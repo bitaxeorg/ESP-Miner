@@ -11,6 +11,7 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "connect.h"
+#include "predictive_efficiency.h"
 
 #define DEFAULT_POLL_RATE 1000
 
@@ -189,9 +190,11 @@ void statistics_task(void * pvParameters)
                 statsData.freeHeap = esp_get_free_heap_size();
                 statsData.responseTime = sys_module->response_time;
 
+                predictive_efficiency_update(GLOBAL_STATE, currentTime);
                 addStatisticData(&statsData, configStatsFrequency);
             }
         } else {
+            predictive_efficiency_update(GLOBAL_STATE, currentTime);
             removeStatisticsBuffer();
         }
 
