@@ -59,6 +59,22 @@ void hashrate_monitor_reset_measurements(void *pvParameters)
     pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 }
 
+void hashrate_monitor_reset_error_measurements(void *pvParameters)
+{
+    GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
+    HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
+
+    if (!HASHRATE_MONITOR_MODULE->is_initialized) {
+        return;
+    }
+
+    int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+
+    pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
+    memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
+    pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
+}
+
 void update_hashrate(measurement_t * measurement, uint32_t value)
 {
     uint8_t flag_long = (value & 0x80000000) >> 31;

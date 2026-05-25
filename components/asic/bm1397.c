@@ -148,6 +148,12 @@ void BM1397_set_version_mask(uint32_t version_mask)
     // placeholder
 }
 
+void BM1397_reset_error_count(void)
+{
+    uint8_t reset_error_count[] = {0x00, 0x4C, 0x00, 0x00, 0x00, 0x00};
+    _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), reset_error_count, 6, BM1397_SERIALTX_DEBUG);
+}
+
 float BM1397_send_hash_frequency(float target_freq)
 {
     uint8_t fb_divider, refdiv, postdiv1, postdiv2;

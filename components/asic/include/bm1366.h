@@ -24,6 +24,7 @@ typedef struct __attribute__((__packed__))
 uint8_t BM1366_init(void * GLOBAL_STATE);
 void BM1366_send_work(void * GLOBAL_STATE, bm_job * next_bm_job);
 void BM1366_set_version_mask(uint32_t version_mask);
+void BM1366_reset_error_count(void);
 int BM1366_set_max_baud(void);
 int BM1366_set_default_baud(void);
 float BM1366_send_hash_frequency(float frequency);

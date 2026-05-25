@@ -109,18 +109,45 @@ void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
             do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
-            return;
+            break;
         case BM1366:
             do_frequency_transition(GLOBAL_STATE, BM1366_send_hash_frequency);
-            return;
+            break;
         case BM1368:
             do_frequency_transition(GLOBAL_STATE, BM1368_send_hash_frequency);
-            return;
+            break;
         case BM1370:
             do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
             return;
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+
+    ASIC_reset_error_count(GLOBAL_STATE);
+}
+
+void ASIC_reset_error_count(GlobalState * GLOBAL_STATE)
+{
+    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BM1397:
+            BM1397_reset_error_count();
+            break;
+        case BM1366:
+            BM1366_reset_error_count();
+            break;
+        case BM1368:
+            BM1368_reset_error_count();
+            break;
+        case BM1370:
+            BM1370_reset_error_count();
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown ASIC id %d — cannot reset error count", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+            return;
+    }
+
+    hashrate_monitor_reset_error_measurements(GLOBAL_STATE);
 }
 
 void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)

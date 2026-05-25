@@ -24,6 +24,7 @@ typedef struct __attribute__((__packed__))
 uint8_t BM1370_init(void * GLOBAL_STATE);
 void BM1370_send_work(void * GLOBAL_STATE, bm_job * next_bm_job);
 void BM1370_set_version_mask(uint32_t version_mask);
+void BM1370_reset_error_count(void);
 int BM1370_set_max_baud(void);
 int BM1370_set_default_baud(void);
 float BM1370_send_hash_frequency(float frequency);
