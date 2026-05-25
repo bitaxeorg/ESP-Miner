@@ -174,6 +174,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             nvs_config_set_bool(NVS_CONFIG_AUTO_FAN_SPEED, false);
             nvs_config_set_u16(NVS_CONFIG_MANUAL_FAN_SPEED, 100);
             nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, true);
+            sys_module->overheat_mode = true;
             ESP_LOGW(TAG, "Entering safe mode due to overheat condition. System operation halted.");
             mining_stop(GLOBAL_STATE);
             
@@ -223,6 +224,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             if (chip_count > 0) {
                 // Frequency reduction will now be applied by normal power management loop
                 nvs_config_set_bool(NVS_CONFIG_OVERHEAT_MODE, false);
+                sys_module->overheat_mode = false;
                 ESP_LOGI(TAG, "Resuming normal operation. Reduced frequency (%.0f MHz) will be applied automatically.", reduced_asic_frequency);
             }
         }
