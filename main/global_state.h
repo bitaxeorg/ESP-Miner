@@ -104,6 +104,7 @@ typedef struct
     uint32_t lastClockSync;
     bool is_screen_active;
     bool is_firmware_update;
+    int64_t ota_authorized_until;
     char firmware_update_filename[20];
     char firmware_update_status[20];
     bool hardware_fault;

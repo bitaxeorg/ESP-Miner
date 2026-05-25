@@ -204,6 +204,8 @@ components:
         - hashrateMonitor
         - miningPaused
         - statsLimit
+        - otaAuthRequired
+        - otaAuthorized
       properties:
         ASICModel:
           type: string
@@ -533,6 +535,12 @@ components:
         statsLimit:
           type: integer
           description: Maximum number of statistics data points
+        otaAuthRequired:
+          type: boolean
+          description: Whether OTA updates require recent physical button authorization
+        otaAuthorized:
+          type: boolean
+          description: Whether OTA updates are currently authorized by a recent physical button press
 
     SystemASIC:
       type: object
@@ -834,6 +842,9 @@ components:
           minimum: 0
           examples:
             - 120
+        otaAuthRequired:
+          type: boolean
+          description: Require a recent physical BOOT button press before OTA updates. Disabling this also requires recent authorization.
       additionalProperties: true
 
   responses:

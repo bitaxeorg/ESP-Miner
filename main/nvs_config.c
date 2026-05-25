@@ -94,6 +94,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_THEME_SCHEME]                          = {.nvs_key_name = "themescheme",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_THEME}},
     [NVS_CONFIG_THEME_COLORS]                          = {.nvs_key_name = "themecolors",     .type = TYPE_STR,   .default_value = {.str = DEFAULT_COLORS}},
     [NVS_CONFIG_SCOREBOARD]                            = {.nvs_key_name = "scoreboard",      .type = TYPE_STR,   .array_size = MAX_SCOREBOARD},
+    [NVS_CONFIG_OTA_AUTH_REQUIRED]                     = {.nvs_key_name = "otaauthreq",      .type = TYPE_BOOL,  .default_value = {.b = true},                                           .rest_name = "otaAuthRequired",                   .min = 0,  .max = 1},
     
     [NVS_CONFIG_BOARD_VERSION]                         = {.nvs_key_name = "boardversion",    .type = TYPE_STR,   .default_value = {.str = "000"}},
     [NVS_CONFIG_DEVICE_MODEL]                          = {.nvs_key_name = "devicemodel",     .type = TYPE_STR,   .default_value = {.str = "unknown"}},

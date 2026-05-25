@@ -61,11 +61,42 @@ static const char * STATS_LABEL_FAN2_RPM = "fan2Rpm";
 static const char * STATS_LABEL_WIFI_RSSI = "wifiRssi";
 static const char * STATS_LABEL_FREE_HEAP = "freeHeap";
 static const char * STATS_LABEL_RESPONSE_TIME = "responseTime";
+#define OTA_AUTH_WINDOW_US (5LL * 60LL * 1000000LL)
 
 static int system_info_prebuffer_len = 256;
 static int system_statistics_prebuffer_len = 256;
 static int system_wifi_scan_prebuffer_len = 256;
 static int api_common_prebuffer_len = 256;
+static GlobalState * GLOBAL_STATE;
+
+void HTTP_authorize_ota_update(void)
+{
+    if (!GLOBAL_STATE) {
+        return;
+    }
+
+    GLOBAL_STATE->SYSTEM_MODULE.ota_authorized_until = esp_timer_get_time() + OTA_AUTH_WINDOW_US;
+    ESP_LOGW(TAG, "OTA updates authorized for 5 minutes by physical button press");
+}
+
+bool HTTP_is_ota_update_authorized(void)
+{
+    if (!GLOBAL_STATE || !nvs_config_get_bool(NVS_CONFIG_OTA_AUTH_REQUIRED)) {
+        return true;
+    }
+
+    return esp_timer_get_time() <= GLOBAL_STATE->SYSTEM_MODULE.ota_authorized_until;
+}
+
+static esp_err_t check_ota_update_authorized(httpd_req_t *req)
+{
+    if (HTTP_is_ota_update_authorized()) {
+        return ESP_OK;
+    }
+
+    httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "Press the BOOT button to authorize OTA updates for 5 minutes");
+    return ESP_FAIL;
+}
 
 typedef enum
 {
@@ -145,7 +176,6 @@ static esp_err_t GET_system_logs(httpd_req_t *req)
     return res;
 }
 
-static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
 
 static int stratum_protocol_from_string(const char *s, uint16_t *out)
@@ -621,6 +651,13 @@ bool check_settings_and_update(const cJSON * const root)
             ESP_LOGW(TAG, "Invalid display rotation: '%d'", item->valueint);
             result = false;
         }
+        if (key == NVS_CONFIG_OTA_AUTH_REQUIRED) {
+            bool requested_auth_required = item->valueint != 0 || cJSON_IsTrue(item);
+            if (!requested_auth_required && !HTTP_is_ota_update_authorized()) {
+                ESP_LOGW(TAG, "Refusing to disable OTA button authorization without a recent physical button press");
+                result = false;
+            }
+        }
     }
 
     if (result) {
@@ -1083,6 +1120,9 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
+    if (check_ota_update_authorized(req) != ESP_OK) {
+        return ESP_OK;
+    }
 
     wifi_mode_t mode;
     esp_wifi_get_mode(&mode);
@@ -1166,6 +1206,9 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    if (check_ota_update_authorized(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     wifi_mode_t mode;

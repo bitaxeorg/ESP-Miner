@@ -227,6 +227,8 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddFloatToObject(root, "frequency", nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY));
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY));
     cJSON_AddNumberToObject(root, "statsLimit", MAX_STATISTICS_COUNT);
+    cJSON_AddBoolToObject(root, "otaAuthRequired", nvs_config_get_bool(NVS_CONFIG_OTA_AUTH_REQUIRED));
+    cJSON_AddBoolToObject(root, "otaAuthorized", g->SYSTEM_MODULE.ota_authorized_until >= esp_timer_get_time());
 }
 
 static void system_api_add_hashrate_monitor(cJSON *root, GlobalState *g) {

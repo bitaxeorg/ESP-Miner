@@ -5,6 +5,12 @@
         <div class="col-12 xl:col-4">
             <div class="card h-full">
                 <h5>Current Version: {{(info$ | async)?.version}}</h5>
+                <p-message
+                    *ngIf="(info$ | async)?.otaAuthRequired && !(info$ | async)?.otaAuthorized"
+                    severity="warn"
+                    text="Press BOOT once before uploading firmware or AxeOS."
+                    styleClass="w-full mb-3">
+                </p-message>
 
                 <ng-container *ngIf="checkLatestRelease == false; else afterCheck">
                     <h3>Latest Release: <p-button (onClick)="handleReleaseCheck()">Check</p-button></h3>

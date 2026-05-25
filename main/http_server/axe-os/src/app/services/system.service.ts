@@ -142,6 +142,8 @@ export class SystemApiService {
         boardtemp2: 40,
         overheat_mode: 0,
         statsLimit: 720,
+        otaAuthRequired: true,
+        otaAuthorized: false,
 
         blockHeight: 811111,
         scriptsig: "..%..h..,H...ckpool.eu/solo.ckpool.org/",

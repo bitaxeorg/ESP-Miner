@@ -10,6 +10,7 @@
 #include "display.h"
 #include "connect.h"
 #include "esp_timer.h"
+#include "http_server.h"
 
 typedef enum {
     SCR_SELF_TEST,
@@ -651,6 +652,8 @@ static void screen_update_cb(lv_timer_t * timer)
 
 void screen_button_press() 
 {
+    HTTP_authorize_ota_update();
+
     if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
     } else {

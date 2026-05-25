@@ -173,7 +173,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
             Validators.required,
             Validators.min(0),
             Validators.max(this.statsFrequencyMaxValue)
-          ]]
+          ]],
+          otaAuthRequired: [info.otaAuthRequired, [Validators.required]]
         });
 
         this.formSubject.next(this.form);
@@ -342,7 +343,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       'manualFanSpeed',
       'temptarget',
       'overheat_mode',
-      'statsFrequency'
+      'statsFrequency',
+      'otaAuthRequired'
     ];
   }
 

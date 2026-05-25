@@ -168,6 +168,20 @@
         </div>
     </div>
 
+    <h3 class="mt-5">Update Security</h3>
+
+    <div class="card">
+        <div class="field-checkbox grid my-2">
+            <div class="col-1 md:col-10 md:flex-order-2">
+                <p-checkbox name="otaAuthRequired" formControlName="otaAuthRequired" inputId="otaAuthRequired" [binary]="true"></p-checkbox>
+            </div>
+            <label for="otaAuthRequired" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Require BOOT Button for OTA</label>
+        </div>
+        <small class="block text-500">
+            Press BOOT once before changing this setting or uploading firmware.
+        </small>
+    </div>
+
     <div class="flex mt-5 gap-3">
         <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
             class="btn btn-primary">Save</button>
