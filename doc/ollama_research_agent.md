@@ -1,4 +1,4 @@
-# Ollama Research Agent
+# Cypher Gamma Max Ollama Research Agent
 
 This fork includes an external autonomous companion agent:
 

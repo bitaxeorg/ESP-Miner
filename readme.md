@@ -5,7 +5,13 @@
 ![GitHub contributors](https://img.shields.io/github/contributors/bitaxeorg/esp-miner)
 ![Alt](https://repobeats.axiom.co/api/embed/70889479b1e002c18a184b05bc5cbf2ed3718579.svg "Repobeats analytics image")
 
-# ESP-Miner
+# ESP-Miner Cypher Gamma Max
+
+Cypher Gamma Max is the `0xjc65eth` fork of ESP-Miner for Bitaxe BM1368/BM1370
+devices. It adds predictive-efficiency telemetry, autonomous frequency autotuning,
+and an optional Ollama research companion agent while preserving the upstream
+ESP-Miner firmware base.
+
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/bitaxeorg/bitaxe)
 
 If you are looking for premade images to load on your Bitaxe, check out the [latest release](https://github.com/bitaxeorg/ESP-Miner/releases/latest) page. Maybe you want [instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md) for loading factory images.

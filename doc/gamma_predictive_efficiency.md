@@ -1,4 +1,11 @@
-# BM1368/BM1370 Predictive Efficiency Fork
+# Cypher Gamma Max Predictive Efficiency Fork
+
+Fork identity:
+
+- `forkName`: Cypher Gamma Max
+- `forkCodename`: CYPHER-GAMMA-MAX
+- `creator`: 0xjc65eth
+- `creatorTag`: CYPHER-0xJC65ETH
 
 This fork targets Bitaxe devices that use the `BM1368` or `BM1370` ASIC, including
 Supra, SupraHex, Gamma, GammaDuo, and GammaTurbo profiles.
@@ -22,6 +29,10 @@ Tracked signals:
 - `bm1368Profile`: true when the active ASIC profile is BM1368.
 - `bm1370Profile`: true when the active ASIC profile is BM1370.
 - `profileName`: active tuning profile name.
+- `forkName`: fork branding exposed by this firmware.
+- `forkCodename`: short codename for identifying this firmware line.
+- `creator`: creator identity for this fork.
+- `creatorTag`: Cypher creator tag for API-level attribution.
 - `gammaProfile`: compatibility alias for `bm1370Profile`.
 - `thermalMarginC`: margin below the active profile's thermal ceiling used by this model.
 - `hashrateRatio`: one-minute hashrate divided by expected hashrate.

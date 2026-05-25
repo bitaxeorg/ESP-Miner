@@ -126,6 +126,10 @@ static void system_api_add_predictive_efficiency(cJSON *root, GlobalState *g) {
     cJSON_AddBoolToObject(obj, "bm1370Profile", predictive->bm1370_profile);
     cJSON_AddBoolToObject(obj, "gammaProfile", predictive->gamma_profile);
     cJSON_AddStringToObject(obj, "profileName", predictive->profile_name);
+    cJSON_AddStringToObject(obj, "forkName", "Cypher Gamma Max");
+    cJSON_AddStringToObject(obj, "forkCodename", "CYPHER-GAMMA-MAX");
+    cJSON_AddStringToObject(obj, "creator", "0xjc65eth");
+    cJSON_AddStringToObject(obj, "creatorTag", "CYPHER-0xJC65ETH");
     cJSON_AddFloatToObject(obj, "score", predictive->score);
     cJSON_AddFloatToObject(obj, "hashPerWatt", predictive->hash_per_watt);
     cJSON_AddFloatToObject(obj, "usefulShareRatio", predictive->useful_share_ratio);
