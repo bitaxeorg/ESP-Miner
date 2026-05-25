@@ -3,9 +3,9 @@
 #include "global_state.h"
 #include "predictive_efficiency.h"
 
-#define GAMMA_TARGET_TEMP_C 70.0f
-#define GAMMA_MAX_TEMP_C 80.0f
-#define GAMMA_MIN_EXPLORE_MARGIN_C 12.0f
+#define BM1370_TARGET_TEMP_C 70.0f
+#define BM1370_MAX_TEMP_C 80.0f
+#define BM1370_MIN_EXPLORE_MARGIN_C 12.0f
 #define MIN_VALID_POWER_W 1.0f
 #define MAX_SCORE 100.0f
 
@@ -25,12 +25,10 @@ static float hottest_chip_temp(const PowerManagementModule *power)
     return temp;
 }
 
-static bool is_gamma_profile(const GlobalState *global_state)
+static bool is_bm1370_profile(const GlobalState *global_state)
 {
     const DeviceConfig *device = &global_state->DEVICE_CONFIG;
-    return device->family.id == GAMMA
-        && device->family.asic.id == BM1370
-        && device->family.asic_count == 1;
+    return device->family.asic.id == BM1370;
 }
 
 const char *predictive_efficiency_action_name(PredictiveEfficiencyAction action)
@@ -59,7 +57,8 @@ void predictive_efficiency_update(void *pvParameters, uint64_t now_ms)
     const SystemModule *system = &global_state->SYSTEM_MODULE;
 
     module->enabled = true;
-    module->gamma_profile = is_gamma_profile(global_state);
+    module->bm1370_profile = is_bm1370_profile(global_state);
+    module->gamma_profile = module->bm1370_profile;
     module->last_update_ms = now_ms;
 
     float accepted = (float)system->shares_accepted;
@@ -76,11 +75,11 @@ void predictive_efficiency_update(void *pvParameters, uint64_t now_ms)
         : 0.0f;
 
     float temp = hottest_chip_temp(power);
-    module->thermal_margin_c = GAMMA_MAX_TEMP_C - temp;
+    module->thermal_margin_c = BM1370_MAX_TEMP_C - temp;
     module->error_penalty = clampf(system->error_percentage / 5.0f, 0.0f, 1.0f);
     module->latency_penalty = clampf(system->response_time / 2500.0f, 0.0f, 1.0f);
 
-    float thermal_score = clampf(module->thermal_margin_c / (GAMMA_MAX_TEMP_C - GAMMA_TARGET_TEMP_C), 0.0f, 1.0f);
+    float thermal_score = clampf(module->thermal_margin_c / (BM1370_MAX_TEMP_C - BM1370_TARGET_TEMP_C), 0.0f, 1.0f);
     float hashrate_score = clampf(module->hashrate_ratio, 0.0f, 1.15f) / 1.15f;
     float share_score = clampf(module->useful_share_ratio, 0.0f, 1.0f);
     float stability_score = 1.0f - clampf((module->error_penalty * 0.7f) + (module->latency_penalty * 0.3f), 0.0f, 1.0f);
@@ -92,10 +91,10 @@ void predictive_efficiency_update(void *pvParameters, uint64_t now_ms)
         + stability_score * 0.20f
     );
 
-    if (!module->gamma_profile) {
+    if (!module->bm1370_profile) {
         module->action = PREDICTIVE_EFFICIENCY_HOLD;
-        snprintf(module->reason, sizeof(module->reason), "profile is passive outside single-chip BM1370 Gamma");
-    } else if (temp >= GAMMA_MAX_TEMP_C || power->vr_temp >= 105.0f) {
+        snprintf(module->reason, sizeof(module->reason), "profile is passive outside BM1370 ASIC devices");
+    } else if (temp >= BM1370_MAX_TEMP_C || power->vr_temp >= 105.0f) {
         module->action = PREDICTIVE_EFFICIENCY_COOL_DOWN;
         snprintf(module->reason, sizeof(module->reason), "thermal headroom is exhausted");
     } else if (system->error_percentage > 5.0f || module->hashrate_ratio < 0.82f) {
@@ -104,11 +103,11 @@ void predictive_efficiency_update(void *pvParameters, uint64_t now_ms)
     } else if (total_shares >= 8.0f && module->useful_share_ratio < 0.90f) {
         module->action = PREDICTIVE_EFFICIENCY_CHECK_POOL;
         snprintf(module->reason, sizeof(module->reason), "share rejection ratio is above target");
-    } else if (module->thermal_margin_c > GAMMA_MIN_EXPLORE_MARGIN_C && system->error_percentage < 1.0f && module->hashrate_ratio > 0.94f) {
+    } else if (module->thermal_margin_c > BM1370_MIN_EXPLORE_MARGIN_C && system->error_percentage < 1.0f && module->hashrate_ratio > 0.94f) {
         module->action = PREDICTIVE_EFFICIENCY_EXPLORE_UP;
-        snprintf(module->reason, sizeof(module->reason), "Gamma has thermal and error margin for a small upward trial");
+        snprintf(module->reason, sizeof(module->reason), "BM1370 has thermal and error margin for a small upward trial");
     } else {
         module->action = PREDICTIVE_EFFICIENCY_HOLD;
-        snprintf(module->reason, sizeof(module->reason), "Gamma efficiency is inside the current stability band");
+        snprintf(module->reason, sizeof(module->reason), "BM1370 efficiency is inside the current stability band");
     }
 }

@@ -14,6 +14,7 @@ typedef enum {
 
 typedef struct {
     bool enabled;
+    bool bm1370_profile;
     bool gamma_profile;
     float hash_per_watt;
     float useful_share_ratio;

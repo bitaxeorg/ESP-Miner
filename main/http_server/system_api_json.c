@@ -121,6 +121,7 @@ static void system_api_add_predictive_efficiency(cJSON *root, GlobalState *g) {
 
     cJSON_AddItemToObject(root, "predictiveEfficiency", obj);
     cJSON_AddBoolToObject(obj, "enabled", predictive->enabled);
+    cJSON_AddBoolToObject(obj, "bm1370Profile", predictive->bm1370_profile);
     cJSON_AddBoolToObject(obj, "gammaProfile", predictive->gamma_profile);
     cJSON_AddFloatToObject(obj, "score", predictive->score);
     cJSON_AddFloatToObject(obj, "hashPerWatt", predictive->hash_per_watt);
