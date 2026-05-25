@@ -12,6 +12,7 @@
 #include "esp_timer.h"
 #include "esp_transport.h"
 #include "esp_transport_tcp.h"
+#include "asic.h"
 #include <sys/time.h>
 #include <stdbool.h>
 #include <string.h>
@@ -485,7 +486,8 @@ void stratum_v1_task(void *pvParameters)
 
         ///// Start Stratum Action
         // mining.configure - ID: 1
-        STRATUM_V1_configure_version_rolling(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), &GLOBAL_STATE->version_mask);
+        uint32_t supported_version_mask = ASIC_get_supported_version_mask(GLOBAL_STATE);
+        STRATUM_V1_configure_version_rolling(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), &supported_version_mask);
 
         // mining.subscribe - ID: 2
         STRATUM_V1_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
@@ -548,8 +550,10 @@ void stratum_v1_task(void *pvParameters)
                 GLOBAL_STATE->new_set_mining_difficulty_msg = true;
             } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK ||
                     stratum_api_v1_message.method == STRATUM_RESULT_VERSION_MASK) {
-                ESP_LOGI(TAG, "Set version mask: %08lx", stratum_api_v1_message.version_mask);
-                GLOBAL_STATE->version_mask = stratum_api_v1_message.version_mask;
+                uint32_t supported_version_mask = stratum_api_v1_message.version_mask & ASIC_get_supported_version_mask(GLOBAL_STATE);
+                ESP_LOGI(TAG, "Set version mask: %08lx (pool: %08lx)",
+                         supported_version_mask, stratum_api_v1_message.version_mask);
+                GLOBAL_STATE->version_mask = supported_version_mask;
                 GLOBAL_STATE->new_stratum_version_rolling_msg = true;
             } else if (stratum_api_v1_message.method == MINING_SET_EXTRANONCE ||
                     stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {

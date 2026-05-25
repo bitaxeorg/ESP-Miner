@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <inttypes.h>
 
 #define TRANSPORT_TIMEOUT_MS 5000
 #define BUFFER_SIZE 1024
@@ -586,9 +587,12 @@ int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, cons
 int STRATUM_V1_configure_version_rolling(esp_transport_handle_t transport, int send_uid, uint32_t * version_mask)
 {
     char configure_msg[BUFFER_SIZE];
+    uint32_t requested_mask = version_mask != NULL ? *version_mask : STRATUM_DEFAULT_VERSION_MASK;
+    requested_mask &= STRATUM_DEFAULT_VERSION_MASK;
+
     snprintf(configure_msg, sizeof(configure_msg),
-        "{\"id\":%d,\"method\":\"mining.configure\",\"params\":[[\"version-rolling\"],{\"version-rolling.mask\":\"ffffffff\"}]}\n",
-        send_uid);
+        "{\"id\":%d,\"method\":\"mining.configure\",\"params\":[[\"version-rolling\"],{\"version-rolling.mask\":\"%08" PRIx32 "\"}]}\n",
+        send_uid, requested_mask);
     debug_stratum_tx(configure_msg);
 
     return esp_transport_write(transport, configure_msg, strlen(configure_msg), TRANSPORT_TIMEOUT_MS);
