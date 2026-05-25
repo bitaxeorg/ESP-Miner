@@ -604,6 +604,11 @@ void stratum_v1_task(void *pvParameters)
                     }
                 } else {
                     ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);
+                    if (stratum_api_v1_message.message_id == authorize_message_id) {
+                        snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                                 sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info),
+                                 "Pool auth failed: %.45s", stratum_api_v1_message.error_str);
+                    }
                 }
             }
             STRATUM_V1_reset_message(&stratum_api_v1_message);
