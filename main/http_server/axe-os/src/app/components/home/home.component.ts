@@ -783,7 +783,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         this.maxPower = Math.max(info.maxPower || 0, info.power || 0);
         this.nominalVoltage = info.nominalVoltage || 5;
-        this.maxTemp = Math.max(75, info.temp || 0);
+        this.maxTemp = Math.max(75, info.temp || 0, info.temp2 || 0);
         this.maxRpm = Math.max(7000, info.fanrpm || 0, info.fan2rpm || 0);
         this.maxFrequency = Math.max(800, info.actualFrequency || info.frequency || 0);
         this.statsLimit = info.statsLimit || 720;
@@ -1242,7 +1242,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.hashrate_10m:       return info.hashRate_10m;
       case eChartLabel.hashrate_1h:        return info.hashRate_1h;
       case eChartLabel.errorPercentage:    return info.errorPercentage;
-      case eChartLabel.asicTemp:           return info.temp;
+      case eChartLabel.asicTemp:           return Math.max(info.temp || 0, info.temp2 || 0);
       case eChartLabel.asicTemp2:          return info.temp2;
       case eChartLabel.vrTemp:             return info.vrTemp;
       case eChartLabel.asicVoltage:        return info.coreVoltageActual;
