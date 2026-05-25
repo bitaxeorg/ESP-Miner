@@ -30,19 +30,27 @@ Tracked signals:
 
 ## Safety boundary
 
-This milestone is intentionally passive. It does not change voltage, frequency, fan
-speed, pool settings, or job scheduling. The next milestone should consume
-`recommendedAction` behind an explicit NVS setting, with conservative BM1370-only
-frequency steps and rollback on higher error rate, higher reject rate, or lower
-hash-per-watt.
+Autotune is enabled by default in this fork through the `predictiveAutotune` NVS/API
+setting. It only changes ASIC frequency, and only on BM1370 profiles. It does not
+change voltage, fan speed, pool settings, or job scheduling.
+
+The agent waits for a warm-up window, then makes small 25 MHz trials. It rolls back
+when the score drops, ASIC errors rise, rejected shares rise, or thermal margin is
+exhausted. It also steps down on thermal pressure before the firmware's stronger
+overheat protection is needed.
+
+Additional exposed fields:
+
+- `autotuneEnabled`: true when the autonomous BM1370 tuner is allowed to act.
+- `agentState`: one of `disabled`, `warmup`, `monitor`, `trial`, `rollback`, or `throttle`.
+- `agentReason`: short explanation for the agent state.
+- `tunedFrequency`: current requested ASIC frequency in MHz.
+- `bestFrequency`: last accepted stable frequency in MHz.
+- `trialFrequency`: active or most recent trial frequency in MHz.
+- `baselineScore`: score used to evaluate the current trial.
+- `lastTuneMs`: monotonic timestamp of the last agent frequency action.
 
 ## Suggested next milestone
 
-Add a BM1370-only autotune mode:
-
-1. Require an opt-in config flag.
-2. Run only after a warm-up period.
-3. Try one small frequency step at a time.
-4. Compare hash-per-watt and reject/error trends over a fixed window.
-5. Persist the best stable setting only after repeated confirmation.
-6. Roll back immediately on over-temperature, error spikes, or rejected-share spikes.
+Add AxeOS controls for `predictiveAutotune` and a dedicated Predictive Efficiency
+panel so the agent can be paused, resumed, and inspected from the web UI.

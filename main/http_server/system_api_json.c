@@ -121,6 +121,7 @@ static void system_api_add_predictive_efficiency(cJSON *root, GlobalState *g) {
 
     cJSON_AddItemToObject(root, "predictiveEfficiency", obj);
     cJSON_AddBoolToObject(obj, "enabled", predictive->enabled);
+    cJSON_AddBoolToObject(obj, "autotuneEnabled", predictive->autotune_enabled);
     cJSON_AddBoolToObject(obj, "bm1370Profile", predictive->bm1370_profile);
     cJSON_AddBoolToObject(obj, "gammaProfile", predictive->gamma_profile);
     cJSON_AddFloatToObject(obj, "score", predictive->score);
@@ -130,9 +131,16 @@ static void system_api_add_predictive_efficiency(cJSON *root, GlobalState *g) {
     cJSON_AddFloatToObject(obj, "hashrateRatio", predictive->hashrate_ratio);
     cJSON_AddFloatToObject(obj, "errorPenalty", predictive->error_penalty);
     cJSON_AddFloatToObject(obj, "latencyPenalty", predictive->latency_penalty);
+    cJSON_AddFloatToObject(obj, "tunedFrequency", predictive->tuned_frequency);
+    cJSON_AddFloatToObject(obj, "bestFrequency", predictive->best_frequency);
+    cJSON_AddFloatToObject(obj, "trialFrequency", predictive->trial_frequency);
+    cJSON_AddFloatToObject(obj, "baselineScore", predictive->baseline_score);
     cJSON_AddStringToObject(obj, "recommendedAction", predictive_efficiency_action_name(predictive->action));
+    cJSON_AddStringToObject(obj, "agentState", predictive_autotune_state_name(predictive->agent_state));
     cJSON_AddStringToObject(obj, "reason", predictive->reason);
+    cJSON_AddStringToObject(obj, "agentReason", predictive->agent_reason);
     cJSON_AddNumberToObject(obj, "lastUpdateMs", predictive->last_update_ms);
+    cJSON_AddNumberToObject(obj, "lastTuneMs", predictive->last_tune_ms);
 }
 
 static void system_api_add_config(cJSON *root, GlobalState *g) {
@@ -237,6 +245,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
 
     // User Preferences
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) ? 1 : 0);
+    cJSON_AddNumberToObject(root, "predictiveAutotune", nvs_config_get_bool(NVS_CONFIG_PREDICTIVE_AUTOTUNE) ? 1 : 0);
     char *disp_name = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     cJSON_AddStringToObject(root, "display", disp_name ? disp_name : "");
     free(disp_name);
