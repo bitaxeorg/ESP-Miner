@@ -56,6 +56,11 @@ static int stratum_get_next_uid(GlobalState * GLOBAL_STATE)
     return uid;
 }
 
+static bool stratum_v1_is_optional_setup_response(int message_id, int suggest_difficulty_message_id, int extranonce_subscribe_message_id)
+{
+    return message_id == suggest_difficulty_message_id || message_id == extranonce_subscribe_message_id;
+}
+
 struct timeval tcp_snd_timeout = {
     .tv_sec = 5,
     .tv_usec = 0
@@ -494,6 +499,8 @@ void stratum_v1_task(void *pvParameters)
         char *password = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_pass : GLOBAL_STATE->SYSTEM_MODULE.pool_pass;
 
         int authorize_message_id = stratum_get_next_uid(GLOBAL_STATE);
+        int suggest_difficulty_message_id = -1;
+        int extranonce_subscribe_message_id = -1;
 
         //mining.authorize - ID: 3
         STRATUM_V1_authorize(GLOBAL_STATE->transport, authorize_message_id, username, password);
@@ -572,18 +579,26 @@ void stratum_v1_task(void *pvParameters)
                 stratum_v1_close_connection(GLOBAL_STATE);
                 break;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
-                float response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id, receive_time_us);
-                if (stratum_api_v1_message.response_success) {
-                    ESP_LOGI(TAG, "message result accepted");
-                    if (response_time_ms >= 0) {
-                        ESP_LOGI(TAG, "Stratum response time: %.1f ms", response_time_ms);
-                        GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
-                        SYSTEM_notify_accepted_share(GLOBAL_STATE);
+                if (stratum_v1_is_optional_setup_response(stratum_api_v1_message.message_id, suggest_difficulty_message_id, extranonce_subscribe_message_id)) {
+                    if (stratum_api_v1_message.response_success) {
+                        ESP_LOGI(TAG, "optional setup message accepted");
+                    } else {
+                        ESP_LOGW(TAG, "optional setup message rejected: %s", stratum_api_v1_message.error_str);
                     }
                 } else {
-                    ESP_LOGW(TAG, "message result rejected: %s", stratum_api_v1_message.error_str);
-                    if (response_time_ms >= 0) {
-                        SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
+                    float response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id, receive_time_us);
+                    if (stratum_api_v1_message.response_success) {
+                        ESP_LOGI(TAG, "message result accepted");
+                        if (response_time_ms >= 0) {
+                            ESP_LOGI(TAG, "Stratum response time: %.1f ms", response_time_ms);
+                            GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
+                            SYSTEM_notify_accepted_share(GLOBAL_STATE);
+                        }
+                    } else {
+                        ESP_LOGW(TAG, "message result rejected: %s", stratum_api_v1_message.error_str);
+                        if (response_time_ms >= 0) {
+                            SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
+                        }
                     }
                 }
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {
@@ -596,11 +611,13 @@ void stratum_v1_task(void *pvParameters)
                     ESP_LOGI(TAG, "setup message accepted");
                     uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
                     if (stratum_api_v1_message.message_id == authorize_message_id && difficulty > 0) {
-                        STRATUM_V1_suggest_difficulty(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), difficulty);
+                        suggest_difficulty_message_id = stratum_get_next_uid(GLOBAL_STATE);
+                        STRATUM_V1_suggest_difficulty(GLOBAL_STATE->transport, suggest_difficulty_message_id, difficulty);
                     }
                     bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
                     if (extranonce_subscribe) {
-                        STRATUM_V1_extranonce_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE));
+                        extranonce_subscribe_message_id = stratum_get_next_uid(GLOBAL_STATE);
+                        STRATUM_V1_extranonce_subscribe(GLOBAL_STATE->transport, extranonce_subscribe_message_id);
                     }
                 } else {
                     ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);
