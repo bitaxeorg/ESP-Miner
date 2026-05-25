@@ -20,8 +20,8 @@ const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 })
 export class UpdateComponent {
 
-  public firmwareUpdateProgress: number = 0;
-  public websiteUpdateProgress: number = 0;
+  public firmwareUpdateProgress: number | null = 0;
+  public websiteUpdateProgress: number | null = 0;
 
   public checkLatestRelease: boolean = false;
   public latestRelease$: Observable<any>;
@@ -65,6 +65,7 @@ export class UpdateComponent {
     this.updateTarget = 'Firmware';
     this.updateStatus = 'progress';
     this.updateMessage = '';
+    this.firmwareUpdateProgress = 0;
     if (this.progressModal) {
       this.progressModal.isVisible = true;
     }
@@ -75,24 +76,22 @@ export class UpdateComponent {
           if (event.type === HttpEventType.UploadProgress) {
             this.firmwareUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
           } else if (event.type === HttpEventType.Response) {
+            this.firmwareUpdateProgress = null;
             if (event.ok) {
               this.toastrService.success('Device restarted');
               this.updateStatus = 'success';
               this.updateMessage = 'Firmware updated. Device has been successfully restarted.';
             } else {
-              this.updateStatus = 'error';
-              this.updateMessage = event.statusText || 'An unknown error occurred.';
+              this.setUpdateError('Firmware', event.statusText || 'An unknown error occurred.');
             }
           }
           else if (event instanceof HttpErrorResponse)
           {
-            this.updateStatus = 'error';
-            this.updateMessage = event.error?.message || event.error || event.message || 'Unknown error occurred';
+            this.setUpdateError('Firmware', this.getUpdateErrorMessage(event));
           }
         },
         error: (err) => {
-          this.updateStatus = 'error';
-          this.updateMessage = err.error?.message || err.error || err.message || 'Unknown error occurred';
+          this.setUpdateError('Firmware', this.getUpdateErrorMessage(err));
         },
         complete: () => {
           this.firmwareUpdateProgress = 0;
@@ -112,6 +111,7 @@ export class UpdateComponent {
     this.updateTarget = 'AxeOS';
     this.updateStatus = 'progress';
     this.updateMessage = '';
+    this.websiteUpdateProgress = 0;
     if (this.progressModal) {
       this.progressModal.isVisible = true;
     }
@@ -122,6 +122,7 @@ export class UpdateComponent {
           if (event.type === HttpEventType.UploadProgress) {
             this.websiteUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
           } else if (event.type === HttpEventType.Response) {
+            this.websiteUpdateProgress = null;
             if (event.ok) {
               this.updateStatus = 'success';
               this.updateMessage = 'AxeOS updated. The page will reload in a few seconds.';
@@ -129,19 +130,16 @@ export class UpdateComponent {
                 window.location.reload();
               }, 2000);
             } else {
-              this.updateStatus = 'error';
-              this.updateMessage = event.statusText || 'An unknown error occurred.';
+              this.setUpdateError('AxeOS', event.statusText || 'An unknown error occurred.');
             }
           }
           else if (event instanceof HttpErrorResponse)
           {
-            this.updateStatus = 'error';
-            this.updateMessage = event.error?.message || event.error || event.message || 'Unknown error occurred';
+            this.setUpdateError('AxeOS', this.getUpdateErrorMessage(event));
           }
         },
         error: (err) => {
-          this.updateStatus = 'error';
-          this.updateMessage = err.error?.message || err.error || err.message || 'Unknown error occurred';
+          this.setUpdateError('AxeOS', this.getUpdateErrorMessage(err));
         },
         complete: () => {
           this.websiteUpdateProgress = 0;
@@ -186,5 +184,33 @@ export class UpdateComponent {
     }
 
     this.localStorageService.setBool(IGNORE_RELEASE_CHECK_WARNING, true);
+  }
+
+  public dismissProgressModal(): void {
+    this.updateTarget = '';
+    this.updateStatus = 'progress';
+    this.updateMessage = '';
+    this.firmwareUpdateProgress = 0;
+    this.websiteUpdateProgress = 0;
+
+    if (this.progressModal) {
+      this.progressModal.isVisible = false;
+    }
+  }
+
+  private setUpdateError(target: 'Firmware' | 'AxeOS', message: string): void {
+    this.updateTarget = target;
+    this.updateStatus = 'error';
+    this.updateMessage = message;
+
+    if (target === 'Firmware') {
+      this.firmwareUpdateProgress = 0;
+    } else {
+      this.websiteUpdateProgress = 0;
+    }
+  }
+
+  private getUpdateErrorMessage(err: any): string {
+    return err.error?.message || err.error || err.message || 'Unknown error occurred';
   }
 }

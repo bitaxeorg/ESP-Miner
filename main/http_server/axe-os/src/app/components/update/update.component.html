@@ -102,7 +102,7 @@
             <i class="pi pi-check-circle text-green-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
             <div class="text-lg text-center">{{ updateMessage }}</div>
             <div class="mt-4" *ngIf="updateTarget !== 'AxeOS'">
-                <p-button (onClick)="progressModal.isVisible = false">Close</p-button>
+                <p-button (onClick)="dismissProgressModal()">Close</p-button>
             </div>
         </ng-container>
 
@@ -110,7 +110,7 @@
             <i class="pi pi-times-circle text-red-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
             <div class="text-lg text-center text-red-500">{{ updateMessage }}</div>
              <div class="mt-4">
-                <p-button (onClick)="progressModal.isVisible = false">Close</p-button>
+                <p-button (onClick)="dismissProgressModal()">Close</p-button>
             </div>
         </ng-container>
     </div>
