@@ -12,6 +12,11 @@ void protocol_coordinator_task(void *pvParameters);
 // Called by protocol tasks to signal connection failure
 void protocol_coordinator_notify_failure(void);
 
+// Called by protocol tasks once they've completed a successful setup
+// (V1: STRATUM_RESULT_SETUP accepted, V2: handshake + channel opened).
+// Resets the "all pools unreachable" failure counter and clears pools_unavailable.
+void protocol_coordinator_notify_success(void);
+
 // V1 task checks this to know when to shut down gracefully
 bool protocol_coordinator_v1_should_shutdown(void);
 

@@ -56,11 +56,6 @@ static int stratum_get_next_uid(GlobalState * GLOBAL_STATE)
     return uid;
 }
 
-static const char * primary_stratum_url;
-static uint16_t primary_stratum_port;
-static uint16_t primary_stratum_tls;
-static char * primary_stratum_cert;
-
 struct timeval tcp_snd_timeout = {
     .tv_sec = 5,
     .tv_usec = 0
@@ -283,7 +278,7 @@ void stratum_v1_close_connection(GlobalState *GLOBAL_STATE)
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
-static void decode_mining_notification(GlobalState *GLOBAL_STATE, const mining_notify *mining_notification)
+static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_notify *mining_notification)
 {
     mining_notification_result_t *result = heap_caps_malloc(sizeof(mining_notification_result_t), MALLOC_CAP_SPIRAM);
     if (!result) {
@@ -376,11 +371,6 @@ void stratum_v1_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
-    primary_stratum_url = GLOBAL_STATE->SYSTEM_MODULE.pool_url;
-    primary_stratum_port = GLOBAL_STATE->SYSTEM_MODULE.pool_port;
-    primary_stratum_tls = GLOBAL_STATE->SYSTEM_MODULE.pool_tls;
-    primary_stratum_cert = GLOBAL_STATE->SYSTEM_MODULE.pool_cert;
-
     bool use_fallback = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
     char *stratum_url = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
     uint16_t port = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
@@ -412,9 +402,11 @@ void stratum_v1_task(void *pvParameters)
             continue;
         }
 
-        if (retry_attempts >= MAX_RETRY_ATTEMPTS) {
-            // Reset share stats at failover
-            // Notify coordinator and exit — let it handle fallback decisions
+        if (retry_attempts >= MAX_RETRY_ATTEMPTS)
+        {
+            // Notify the coordinator and exit. The coordinator owns the
+            // "all pools unreachable" decision, pool swapping, and power-pause
+            // recovery — see protocol_coordinator.c.
             ESP_LOGW(TAG, "Max V1 retry attempts reached (%d), notifying coordinator", retry_attempts);
             stratum_v1_close_connection(GLOBAL_STATE);
             protocol_coordinator_notify_failure();
@@ -597,6 +589,9 @@ void stratum_v1_task(void *pvParameters)
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {
                 // Reset retry attempts after successfully receiving data.
                 retry_attempts = 0;
+                // Tell the coordinator setup succeeded so it clears its
+                // failure counter and pools_unavailable.
+                protocol_coordinator_notify_success();
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "setup message accepted");
                     uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;

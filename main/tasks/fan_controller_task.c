@@ -72,6 +72,8 @@ void FAN_CONTROLLER_task(void * pvParameters)
             update_fan_speed(GLOBAL_STATE, 100.0f, "Overheat");
         } else if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
             update_fan_speed(GLOBAL_STATE, 30.0f, "Paused");
+        } else if (GLOBAL_STATE->SYSTEM_MODULE.pools_unavailable) {
+            update_fan_speed(GLOBAL_STATE, 30.0f, "No pool");
         } else {
             //enable the PID auto control for the FAN if set
             if (nvs_config_get_bool(NVS_CONFIG_AUTO_FAN_SPEED)) {

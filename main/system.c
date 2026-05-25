@@ -110,6 +110,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "Initial overheat_mode value: %d", module->overheat_mode);
 
     module->mining_paused = false;
+    module->pools_unavailable = false;
 
     //Initialize power_fault fault mode
     module->power_fault = 0;
