@@ -257,6 +257,13 @@ void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     module->shares_accepted++;
+
+    if (module->pending_block_candidates > 0) {
+        module->pending_block_candidates--;
+        module->block_found++;
+        module->show_new_block = true;
+        ESP_LOGI(TAG, "FOUND BLOCK accepted by pool (count: %d)", module->block_found);
+    }
 }
 
 static int compare_rejected_reason_stats(const void *a, const void *b) {
@@ -270,6 +277,10 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     module->shares_rejected++;
+    if (module->pending_block_candidates > 0) {
+        module->pending_block_candidates--;
+        ESP_LOGW(TAG, "Block candidate rejected by pool: %s", error_msg);
+    }
 
     for (int i = 0; i < module->rejected_reason_stats_count; i++) {
         if (strncmp(module->rejected_reason_stats[i].message, error_msg, sizeof(module->rejected_reason_stats[i].message) - 1) == 0) {
@@ -309,20 +320,13 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
     settimeofday(&tv, NULL);
 }
 
-void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id)
+void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     if ((uint64_t) diff > module->best_session_nonce_diff) {
         module->best_session_nonce_diff = (uint64_t) diff;
         suffixString((uint64_t) diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
-    }
-
-    double network_diff = networkDifficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
-    if (diff >= network_diff) {
-        module->block_found++;
-        module->show_new_block = true;
-        ESP_LOGI(TAG, "FOUND BLOCK!!!!!!!!!!!!!!!!!!!!!! %f >= %f (count: %d)", diff, network_diff, module->block_found);
     }
 
     if ((uint64_t) diff <= module->best_nonce_diff) {
@@ -336,6 +340,16 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t 
     suffixString((uint64_t) diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
 
     ESP_LOGI(TAG, "New best difficulty: %s", module->best_diff_string);
+}
+
+void SYSTEM_notify_submitted_block_candidate(GlobalState * GLOBAL_STATE, double diff)
+{
+    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    if (module->pending_block_candidates < UINT8_MAX) {
+        module->pending_block_candidates++;
+    }
+    ESP_LOGI(TAG, "Submitted block candidate, waiting for pool acceptance: %f", diff);
 }
 
 static esp_err_t ensure_overheat_mode_config() {
