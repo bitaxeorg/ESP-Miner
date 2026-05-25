@@ -250,8 +250,11 @@ static void system_api_add_hashrate_monitor(cJSON *root, GlobalState *g) {
         
         cJSON *domains = cJSON_CreateArray();
         cJSON_AddItemToObject(asic, "domains", domains);
+        cJSON *stalled_domains = cJSON_CreateArray();
+        cJSON_AddItemToObject(asic, "stalledDomains", stalled_domains);
         for (int j = 0; j < hash_domains; j++) {
             cJSON_AddItemToArray(domains, cJSON_CreateNumber(g->HASHRATE_MONITOR_MODULE.domain_measurements[i][j].hashrate));
+            cJSON_AddItemToArray(stalled_domains, cJSON_CreateBool(g->HASHRATE_MONITOR_MODULE.domain_stalled[i][j]));
         }
     }
 }

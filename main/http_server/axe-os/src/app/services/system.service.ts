@@ -151,6 +151,7 @@ export class SystemApiService {
           asics: [{
             total: 441.2579,
             domains: [114.9901, 98.6658, 103.8136, 122.7133],
+            stalledDomains: [false, false, false, false],
             errorCount: 4,
           }],
           hashrate: 441.2579,

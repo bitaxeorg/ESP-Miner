@@ -36,6 +36,7 @@ type MessageType =
   | 'VERSION_MISMATCH'
   | 'NOT_SOLO_MINING'
   | 'NO_MINING_REWARD'
+  | 'HASH_DOMAIN_STALLED'
   | 'HARDWARE_FAULT';
 
 interface ISystemMessage {
@@ -1005,6 +1006,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(!!info.overheat_mode, 'DEVICE_OVERHEAT', 'error', 'Device has overheated - See settings');
     updateMessage(!!info.power_fault, 'POWER_FAULT', 'error', `${info.power_fault} Check your Power Supply.`);
     updateMessage(!!info.hardware_fault, 'HARDWARE_FAULT', 'error', `${info.hardware_fault}`);
+    updateMessage(this.hasStalledHashDomains(info), 'HASH_DOMAIN_STALLED', 'warn', 'One or more ASIC hash domains stopped incrementing. Check power supply, voltage and frequency settings.');
     updateMessage(!info.frequency || info.frequency < 400, 'FREQUENCY_LOW', 'warn', 'Device frequency is set low - See settings');
     updateMessage(!!info.isUsingFallbackStratum, 'FALLBACK_STRATUM', 'warn', 'Using fallback pool - Share stats reset. Check Pool Settings and / or reboot Device.');
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
@@ -1070,6 +1072,14 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public getAsicDomainsAmount(info: ISystemInfo): number {
     return info.hashrateMonitor?.asics?.[0]?.domains?.length ?? 0;
+  }
+
+  public hasStalledHashDomains(info: ISystemInfo): boolean {
+    return info.hashrateMonitor?.asics?.some(asic => asic.stalledDomains?.some(Boolean)) ?? false;
+  }
+
+  public isHashDomainStalled(asic: { stalledDomains?: boolean[] }, domainIndex: number): boolean {
+    return asic.stalledDomains?.[domainIndex] ?? false;
   }
 
   public getHeatmapColor(info: ISystemInfo, domainHashrate: number): string {

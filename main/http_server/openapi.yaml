@@ -95,6 +95,7 @@ components:
       required:
         - total
         - domains
+        - stalledDomains
         - errorCount
       properties:
         total:
@@ -105,6 +106,11 @@ components:
           description: Hashrate per domain
           items:
             type: number
+        stalledDomains:
+          type: array
+          description: Whether each hash domain counter has stopped changing
+          items:
+            type: boolean
         errorCount:
           description: Number of errors
           type: number

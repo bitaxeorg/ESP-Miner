@@ -583,9 +583,11 @@
                                     <td *ngIf="asicAmount > 1" class="text-500 text-left">
                                         {{ i + 1 }}
                                     </td>
-                                <td *ngFor="let domain of asic?.domains; trackBy: trackByIndex"
-                                    [style.backgroundColor]="getHeatmapColor(info, domain)"
+                                <td *ngFor="let domain of asic?.domains; let domainIndex = index; trackBy: trackByIndex"
+                                    [style.backgroundColor]="isHashDomainStalled(asic, domainIndex) ? 'var(--red-700)' : getHeatmapColor(info, domain)"
                                         [style.height]="(asicAmount <= 2 ? '2rem' : null)"
+                                        [pTooltip]="isHashDomainStalled(asic, domainIndex) ? 'Hash domain counter stopped incrementing' : undefined"
+                                        tooltipPosition="bottom"
                                         class="text-center">
                                         <span class="text-xs">{{ domain | hashSuffix }}</span>
                                     </td>

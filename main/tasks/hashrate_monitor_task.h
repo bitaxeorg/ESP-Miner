@@ -3,6 +3,7 @@
 
 #include "asic_common.h"
 #include <pthread.h>
+#include <stdbool.h>
 
 typedef struct {
     uint32_t value;
@@ -13,6 +14,8 @@ typedef struct {
 typedef struct {
     measurement_t* total_measurement;
     measurement_t** domain_measurements;
+    uint8_t** domain_stall_counts;
+    bool** domain_stalled;
     measurement_t* error_measurement;
 
     pthread_mutex_t lock;
