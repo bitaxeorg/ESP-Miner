@@ -24,8 +24,10 @@ typedef enum {
 typedef struct {
     bool enabled;
     bool autotune_enabled;
+    bool bm1368_profile;
     bool bm1370_profile;
     bool gamma_profile;
+    char profile_name[16];
     float hash_per_watt;
     float useful_share_ratio;
     float thermal_margin_c;

@@ -1,12 +1,12 @@
-# BM1370 Predictive Efficiency Fork
+# BM1368/BM1370 Predictive Efficiency Fork
 
-This fork targets Bitaxe devices that use the `BM1370` ASIC, including Gamma,
-GammaDuo, and GammaTurbo profiles.
+This fork targets Bitaxe devices that use the `BM1368` or `BM1370` ASIC, including
+Supra, SupraHex, Gamma, GammaDuo, and GammaTurbo profiles.
 
 The goal is not to predict winning Bitcoin nonces. SHA-256 mining has no exploitable
 nonce prediction path without breaking Bitcoin's proof-of-work assumptions. Instead,
 this fork measures operational nonce-search efficiency and recommends safer tuning
-actions for BM1370-based devices.
+actions for supported BM13xx-based devices.
 
 ## First milestone
 
@@ -19,9 +19,11 @@ Tracked signals:
 - `score`: composite efficiency/stability score from 0 to 100.
 - `hashPerWatt`: one-minute hashrate divided by measured power.
 - `usefulShareRatio`: accepted shares divided by total submitted shares.
+- `bm1368Profile`: true when the active ASIC profile is BM1368.
 - `bm1370Profile`: true when the active ASIC profile is BM1370.
+- `profileName`: active tuning profile name.
 - `gammaProfile`: compatibility alias for `bm1370Profile`.
-- `thermalMarginC`: margin below the BM1370 thermal ceiling used by this model.
+- `thermalMarginC`: margin below the active profile's thermal ceiling used by this model.
 - `hashrateRatio`: one-minute hashrate divided by expected hashrate.
 - `errorPenalty`: normalized ASIC error pressure.
 - `latencyPenalty`: normalized pool response latency pressure.
@@ -31,7 +33,7 @@ Tracked signals:
 ## Safety boundary
 
 Autotune is enabled by default in this fork through the `predictiveAutotune` NVS/API
-setting. It only changes ASIC frequency, and only on BM1370 profiles. It does not
+setting. It only changes ASIC frequency, and only on BM1368/BM1370 profiles. It does not
 change voltage, fan speed, pool settings, or job scheduling.
 
 The agent waits for a warm-up window, then makes small 25 MHz trials. It rolls back
@@ -41,7 +43,7 @@ overheat protection is needed.
 
 Additional exposed fields:
 
-- `autotuneEnabled`: true when the autonomous BM1370 tuner is allowed to act.
+- `autotuneEnabled`: true when the autonomous tuner is allowed to act.
 - `agentState`: one of `disabled`, `warmup`, `monitor`, `trial`, `rollback`, or `throttle`.
 - `agentReason`: short explanation for the agent state.
 - `tunedFrequency`: current requested ASIC frequency in MHz.

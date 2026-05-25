@@ -10,6 +10,11 @@
 #define BM1370_MIN_EXPLORE_MARGIN_C 12.0f
 #define BM1370_AUTOTUNE_THROTTLE_TEMP_C 77.0f
 #define BM1370_AUTOTUNE_VR_THROTTLE_TEMP_C 102.0f
+#define BM1368_TARGET_TEMP_C 70.0f
+#define BM1368_MAX_TEMP_C 80.0f
+#define BM1368_MIN_EXPLORE_MARGIN_C 12.0f
+#define BM1368_AUTOTUNE_THROTTLE_TEMP_C 77.0f
+#define BM1368_AUTOTUNE_VR_THROTTLE_TEMP_C 102.0f
 #define AUTOTUNE_WARMUP_MS 180000ULL
 #define AUTOTUNE_INTERVAL_MS 180000ULL
 #define AUTOTUNE_RECOVERY_MS 300000ULL
@@ -42,6 +47,49 @@ static bool is_bm1370_profile(const GlobalState *global_state)
 {
     const DeviceConfig *device = &global_state->DEVICE_CONFIG;
     return device->family.asic.id == BM1370;
+}
+
+static bool is_bm1368_profile(const GlobalState *global_state)
+{
+    const DeviceConfig *device = &global_state->DEVICE_CONFIG;
+    return device->family.asic.id == BM1368;
+}
+
+static const char *active_profile_name(const PredictiveEfficiencyModule *module)
+{
+    if (module->bm1368_profile) return "BM1368";
+    if (module->bm1370_profile) return "BM1370";
+    return "unsupported";
+}
+
+static bool is_supported_profile(const PredictiveEfficiencyModule *module)
+{
+    return module->bm1368_profile || module->bm1370_profile;
+}
+
+static float profile_target_temp_c(const PredictiveEfficiencyModule *module)
+{
+    return module->bm1368_profile ? BM1368_TARGET_TEMP_C : BM1370_TARGET_TEMP_C;
+}
+
+static float profile_max_temp_c(const PredictiveEfficiencyModule *module)
+{
+    return module->bm1368_profile ? BM1368_MAX_TEMP_C : BM1370_MAX_TEMP_C;
+}
+
+static float profile_min_explore_margin_c(const PredictiveEfficiencyModule *module)
+{
+    return module->bm1368_profile ? BM1368_MIN_EXPLORE_MARGIN_C : BM1370_MIN_EXPLORE_MARGIN_C;
+}
+
+static float profile_throttle_temp_c(const PredictiveEfficiencyModule *module)
+{
+    return module->bm1368_profile ? BM1368_AUTOTUNE_THROTTLE_TEMP_C : BM1370_AUTOTUNE_THROTTLE_TEMP_C;
+}
+
+static float profile_vr_throttle_temp_c(const PredictiveEfficiencyModule *module)
+{
+    return module->bm1368_profile ? BM1368_AUTOTUNE_VR_THROTTLE_TEMP_C : BM1370_AUTOTUNE_VR_THROTTLE_TEMP_C;
 }
 
 const char *predictive_efficiency_action_name(PredictiveEfficiencyAction action)
@@ -82,7 +130,7 @@ const char *predictive_autotune_state_name(PredictiveAutotuneState state)
     }
 }
 
-static void bm1370_frequency_limits(const GlobalState *global_state, float *min_frequency, float *max_frequency)
+static void asic_frequency_limits(const GlobalState *global_state, float *min_frequency, float *max_frequency)
 {
     const uint16_t *options = global_state->DEVICE_CONFIG.family.asic.frequency_options;
 
@@ -104,7 +152,7 @@ static float bounded_frequency(const GlobalState *global_state, float requested)
 {
     float min_frequency;
     float max_frequency;
-    bm1370_frequency_limits(global_state, &min_frequency, &max_frequency);
+    asic_frequency_limits(global_state, &min_frequency, &max_frequency);
     return clampf(requested, min_frequency, max_frequency);
 }
 
@@ -128,8 +176,8 @@ static void predictive_autotune_update(GlobalState *global_state, uint64_t now_m
         return;
     }
 
-    if (!module->bm1370_profile) {
-        set_agent_state(module, PREDICTIVE_AUTOTUNE_DISABLED, "autotune only runs on BM1370 ASIC profiles");
+    if (!is_supported_profile(module)) {
+        set_agent_state(module, PREDICTIVE_AUTOTUNE_DISABLED, "autotune only runs on BM1368/BM1370 ASIC profiles");
         return;
     }
 
@@ -138,7 +186,8 @@ static void predictive_autotune_update(GlobalState *global_state, uint64_t now_m
         module->best_frequency = module->tuned_frequency;
         module->baseline_score = module->score;
         module->last_tune_ms = now_ms;
-        set_agent_state(module, PREDICTIVE_AUTOTUNE_WARMUP, "waiting for stable BM1370 telemetry before tuning");
+        snprintf(module->agent_reason, sizeof(module->agent_reason), "waiting for stable %s telemetry before tuning", active_profile_name(module));
+        module->agent_state = PREDICTIVE_AUTOTUNE_WARMUP;
         return;
     }
 
@@ -147,13 +196,13 @@ static void predictive_autotune_update(GlobalState *global_state, uint64_t now_m
         module->baseline_score = module->score;
     }
 
-    if (hottest_temp >= BM1370_AUTOTUNE_THROTTLE_TEMP_C || power->vr_temp >= BM1370_AUTOTUNE_VR_THROTTLE_TEMP_C) {
+    if (hottest_temp >= profile_throttle_temp_c(module) || power->vr_temp >= profile_vr_throttle_temp_c(module)) {
         float target = bounded_frequency(global_state, module->tuned_frequency - AUTOTUNE_FREQ_STEP_MHZ);
         if (target < module->tuned_frequency) {
             nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, target);
             module->trial_frequency = target;
             module->last_tune_ms = now_ms;
-            ESP_LOGW(TAG, "BM1370 autotune thermal throttle: %.0f -> %.0f MHz", module->tuned_frequency, target);
+            ESP_LOGW(TAG, "%s autotune thermal throttle: %.0f -> %.0f MHz", active_profile_name(module), module->tuned_frequency, target);
         }
         module->best_frequency = target;
         module->baseline_score = module->score;
@@ -171,14 +220,15 @@ static void predictive_autotune_update(GlobalState *global_state, uint64_t now_m
             module->last_tune_ms = now_ms;
             module->baseline_score = module->score;
             set_agent_state(module, PREDICTIVE_AUTOTUNE_ROLLBACK, "trial worsened efficiency or stability, rolling back");
-            ESP_LOGW(TAG, "BM1370 autotune rollback to %.0f MHz", target);
+            ESP_LOGW(TAG, "%s autotune rollback to %.0f MHz", active_profile_name(module), target);
             return;
         }
 
         if (module->score >= module->baseline_score) {
             module->best_frequency = module->tuned_frequency;
             module->baseline_score = module->score;
-            set_agent_state(module, PREDICTIVE_AUTOTUNE_MONITOR, "trial accepted as current best BM1370 frequency");
+            snprintf(module->agent_reason, sizeof(module->agent_reason), "trial accepted as current best %s frequency", active_profile_name(module));
+            module->agent_state = PREDICTIVE_AUTOTUNE_MONITOR;
         }
     }
 
@@ -186,7 +236,8 @@ static void predictive_autotune_update(GlobalState *global_state, uint64_t now_m
         ? AUTOTUNE_RECOVERY_MS
         : AUTOTUNE_INTERVAL_MS;
     if (now_ms - module->last_tune_ms < interval) {
-        set_agent_state(module, PREDICTIVE_AUTOTUNE_MONITOR, "monitoring BM1370 efficiency window");
+        snprintf(module->agent_reason, sizeof(module->agent_reason), "monitoring %s efficiency window", active_profile_name(module));
+        module->agent_state = PREDICTIVE_AUTOTUNE_MONITOR;
         return;
     }
 
@@ -198,8 +249,9 @@ static void predictive_autotune_update(GlobalState *global_state, uint64_t now_m
             module->best_frequency = target;
             module->baseline_score = module->score;
             module->last_tune_ms = now_ms;
-            set_agent_state(module, PREDICTIVE_AUTOTUNE_THROTTLE, "instability detected, stepping BM1370 frequency down");
-            ESP_LOGW(TAG, "BM1370 autotune reduce clock: %.0f -> %.0f MHz", module->tuned_frequency, target);
+            snprintf(module->agent_reason, sizeof(module->agent_reason), "instability detected, stepping %s frequency down", active_profile_name(module));
+            module->agent_state = PREDICTIVE_AUTOTUNE_THROTTLE;
+            ESP_LOGW(TAG, "%s autotune reduce clock: %.0f -> %.0f MHz", active_profile_name(module), module->tuned_frequency, target);
             return;
         }
     }
@@ -212,13 +264,15 @@ static void predictive_autotune_update(GlobalState *global_state, uint64_t now_m
             module->trial_frequency = target;
             module->last_tune_ms = now_ms;
             nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, target);
-            set_agent_state(module, PREDICTIVE_AUTOTUNE_TRIAL, "testing a small BM1370 frequency increase");
-            ESP_LOGI(TAG, "BM1370 autotune trial: %.0f -> %.0f MHz", module->tuned_frequency, target);
+            snprintf(module->agent_reason, sizeof(module->agent_reason), "testing a small %s frequency increase", active_profile_name(module));
+            module->agent_state = PREDICTIVE_AUTOTUNE_TRIAL;
+            ESP_LOGI(TAG, "%s autotune trial: %.0f -> %.0f MHz", active_profile_name(module), module->tuned_frequency, target);
             return;
         }
     }
 
-    set_agent_state(module, PREDICTIVE_AUTOTUNE_MONITOR, "BM1370 agent is holding current frequency");
+    snprintf(module->agent_reason, sizeof(module->agent_reason), "%s agent is holding current frequency", active_profile_name(module));
+    module->agent_state = PREDICTIVE_AUTOTUNE_MONITOR;
 }
 
 void predictive_efficiency_update(void *pvParameters, uint64_t now_ms)
@@ -229,8 +283,10 @@ void predictive_efficiency_update(void *pvParameters, uint64_t now_ms)
     const SystemModule *system = &global_state->SYSTEM_MODULE;
 
     module->enabled = true;
+    module->bm1368_profile = is_bm1368_profile(global_state);
     module->bm1370_profile = is_bm1370_profile(global_state);
     module->gamma_profile = module->bm1370_profile;
+    snprintf(module->profile_name, sizeof(module->profile_name), "%s", active_profile_name(module));
     module->last_update_ms = now_ms;
 
     float accepted = (float)system->shares_accepted;
@@ -247,11 +303,11 @@ void predictive_efficiency_update(void *pvParameters, uint64_t now_ms)
         : 0.0f;
 
     float temp = hottest_chip_temp(power);
-    module->thermal_margin_c = BM1370_MAX_TEMP_C - temp;
+    module->thermal_margin_c = profile_max_temp_c(module) - temp;
     module->error_penalty = clampf(system->error_percentage / 5.0f, 0.0f, 1.0f);
     module->latency_penalty = clampf(system->response_time / 2500.0f, 0.0f, 1.0f);
 
-    float thermal_score = clampf(module->thermal_margin_c / (BM1370_MAX_TEMP_C - BM1370_TARGET_TEMP_C), 0.0f, 1.0f);
+    float thermal_score = clampf(module->thermal_margin_c / (profile_max_temp_c(module) - profile_target_temp_c(module)), 0.0f, 1.0f);
     float hashrate_score = clampf(module->hashrate_ratio, 0.0f, 1.15f) / 1.15f;
     float share_score = clampf(module->useful_share_ratio, 0.0f, 1.0f);
     float stability_score = 1.0f - clampf((module->error_penalty * 0.7f) + (module->latency_penalty * 0.3f), 0.0f, 1.0f);
@@ -263,10 +319,10 @@ void predictive_efficiency_update(void *pvParameters, uint64_t now_ms)
         + stability_score * 0.20f
     );
 
-    if (!module->bm1370_profile) {
+    if (!is_supported_profile(module)) {
         module->action = PREDICTIVE_EFFICIENCY_HOLD;
-        snprintf(module->reason, sizeof(module->reason), "profile is passive outside BM1370 ASIC devices");
-    } else if (temp >= BM1370_MAX_TEMP_C || power->vr_temp >= 105.0f) {
+        snprintf(module->reason, sizeof(module->reason), "profile is passive outside BM1368/BM1370 ASIC devices");
+    } else if (temp >= profile_max_temp_c(module) || power->vr_temp >= 105.0f) {
         module->action = PREDICTIVE_EFFICIENCY_COOL_DOWN;
         snprintf(module->reason, sizeof(module->reason), "thermal headroom is exhausted");
     } else if (system->error_percentage > 5.0f || module->hashrate_ratio < 0.82f) {
@@ -275,12 +331,12 @@ void predictive_efficiency_update(void *pvParameters, uint64_t now_ms)
     } else if (total_shares >= 8.0f && module->useful_share_ratio < 0.90f) {
         module->action = PREDICTIVE_EFFICIENCY_CHECK_POOL;
         snprintf(module->reason, sizeof(module->reason), "share rejection ratio is above target");
-    } else if (module->thermal_margin_c > BM1370_MIN_EXPLORE_MARGIN_C && system->error_percentage < 1.0f && module->hashrate_ratio > 0.94f) {
+    } else if (module->thermal_margin_c > profile_min_explore_margin_c(module) && system->error_percentage < 1.0f && module->hashrate_ratio > 0.94f) {
         module->action = PREDICTIVE_EFFICIENCY_EXPLORE_UP;
-        snprintf(module->reason, sizeof(module->reason), "BM1370 has thermal and error margin for a small upward trial");
+        snprintf(module->reason, sizeof(module->reason), "%s has thermal and error margin for a small upward trial", active_profile_name(module));
     } else {
         module->action = PREDICTIVE_EFFICIENCY_HOLD;
-        snprintf(module->reason, sizeof(module->reason), "BM1370 efficiency is inside the current stability band");
+        snprintf(module->reason, sizeof(module->reason), "%s efficiency is inside the current stability band", active_profile_name(module));
     }
 
     predictive_autotune_update(global_state, now_ms, temp);
