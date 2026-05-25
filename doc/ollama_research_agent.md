@@ -8,6 +8,7 @@ python3 tools/bitaxe_ollama_research_agent.py \
   --ollama-url http://127.0.0.1:11434 \
   --model llama3.1 \
   --research-url https://github.com/bitaxeorg/ESP-Miner \
+  --auto-research \
   --apply
 ```
 
@@ -22,6 +23,23 @@ content to configure voltage, pools, or runtime behavior. The external agent giv
 you stronger compute, local model control, logs, and easier shutdown while the
 firmware still enforces hard thermal/electrical safety behavior.
 
+## Cortex Mode
+
+The agent now keeps a local SQLite memory database with telemetry, decisions, and
+research snippets. It can generate telemetry-driven searches, feed the results to
+Ollama, and treat each tuning move as a measured experiment.
+
+```bash
+python3 tools/bitaxe_ollama_research_agent.py \
+  --bitaxe-url http://YOUR-BITAXE-IP \
+  --model llama3.1 \
+  --db bitaxe-cortex.sqlite3 \
+  --auto-research \
+  --research-every 2 \
+  --authority experimental \
+  --apply
+```
+
 ## Authority Modes
 
 Default mode allows:
@@ -34,9 +52,11 @@ Default mode allows:
 - `temptarget`
 - `predictiveAutotune`
 
-`--full-authority` additionally allows pool-related settings. Even then, hard
-clamps remain in the script for frequency, voltage, fan speed, and temperature
-target.
+`--authority full` additionally allows pool-related settings.
+
+`--authority experimental` also permits restart actions. Even then, hard clamps
+remain in the script for frequency, voltage, fan speed, and temperature target.
+This mode is intended for supervised test rigs.
 
 ## Dry Run
 
@@ -51,8 +71,20 @@ python3 tools/bitaxe_ollama_research_agent.py \
 ## Continuous Research
 
 Pass one or more `--research-url` values. The agent fetches compact text snippets
-from those URLs on each cycle and provides them to Ollama as references.
+from those URLs and provides them to Ollama as references.
 
-The first implementation intentionally uses explicit URLs instead of open-ended
-web search. This prevents the agent from following low-quality or hostile content
-without operator intent.
+Use `--auto-research` for generated web searches based on live telemetry:
+
+```bash
+python3 tools/bitaxe_ollama_research_agent.py \
+  --bitaxe-url http://YOUR-BITAXE-IP \
+  --model llama3.1 \
+  --auto-research \
+  --research-query "Bitaxe BM1368 undervolt efficiency tuning" \
+  --apply
+```
+
+The agent stores recent research and sends a compact memory summary to Ollama,
+including score, hash-per-watt, frequency, temperature, ASIC error rate, and share
+counts. This gives the model continuity between cycles instead of making isolated
+decisions.
