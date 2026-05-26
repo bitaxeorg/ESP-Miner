@@ -33,6 +33,7 @@
 #include "axe-os/api/system/asic_settings.h"
 #include "display.h"
 #include "http_server.h"
+#include "prometheus_format.h"
 #include "websocket.h"
 #include "websocket_log.h"
 #include "websocket_api.h"
@@ -121,73 +122,8 @@ DataSource strToDataSource(const char * sourceStr)
     return SRC_NONE;
 }
 
-static void prometheus_escape_label_value(const char *src, char *dst, size_t dst_size) {
-    size_t j = 0;
-    for (size_t i = 0; src[i] && j + 1 < dst_size; ++i) {
-        char c = src[i];
-        if (c == '\\' || c == '"') {
-            if (j + 2 >= dst_size) break;
-            dst[j++] = '\\';
-            dst[j++] = c;
-        } else if (c == '\n' || c == '\r') {
-            if (j + 2 >= dst_size) break;
-            dst[j++] = '\\';
-            dst[j++] = 'n';
-        } else if ((unsigned char)c < 32 || (unsigned char)c > 126) {
-            dst[j++] = '_';
-        } else {
-            dst[j++] = c;
-        }
-    }
-    dst[j] = '\0';
-}
-
-static void prometheus_copy_sanitized_ascii(char *dst, size_t dst_size, const char *src)
-{
-    if (!dst || dst_size == 0) {
-        return;
-    }
-
-    if (!src) {
-        dst[0] = '\0';
-        return;
-    }
-
-    size_t j = 0;
-    for (size_t i = 0; src[i] && j + 1 < dst_size; ++i) {
-        unsigned char c = (unsigned char)src[i];
-        dst[j++] = (c < 32 || c > 126) ? '_' : (char)c;
-    }
-    dst[j] = '\0';
-}
-
-// Helper: format a single label key-value pair, escaping value
-static void prometheus_format_label(char *buf, size_t bufsize, const char *key, const char *value) {
-    char esc[128];
-    prometheus_escape_label_value(value, esc, sizeof(esc));
-    snprintf(buf, bufsize, "%s=\"%s\"", key, esc);
-}
-
-// Helper: format a label list from arrays of keys/values
-static void prometheus_format_labels(char *buf, size_t bufsize, const char **keys, const char **values, int count) {
-    size_t pos = 0;
-    if (count <= 0) {
-        buf[0] = '\0';
-        return;
-    }
-    if (pos < bufsize) buf[pos++] = '{';
-    for (int i = 0; i < count; ++i) {
-        char pair[192];
-        prometheus_format_label(pair, sizeof(pair), keys[i], values[i]);
-        size_t pairlen = strlen(pair);
-        if (pos + pairlen + 2 >= bufsize) break;
-        memcpy(buf + pos, pair, pairlen);
-        pos += pairlen;
-        if (i != count - 1) buf[pos++] = ',';
-    }
-    if (pos < bufsize) buf[pos++] = '}';
-    buf[pos < bufsize ? pos : bufsize-1] = '\0';
-}
+// prometheus_escape_label_value, prometheus_copy_sanitized_ascii,
+// prometheus_format_label, prometheus_format_labels are in components/prometheus_format/
 
 static const char *prometheus_reset_reason_string(esp_reset_reason_t reason)
 {
@@ -1730,19 +1666,29 @@ static esp_err_t GET_system_metrics(httpd_req_t *req) {
     }
 
     // --- POWER/FAN/HARDWARE ---
-    prometheus_format_label(label_buf, sizeof(label_buf), "fan", "1");
-    prometheus_write_metric(req, "espminer_fan_rpm", "Fan RPM", "gauge", label_buf, (double)pm->fan_rpm, 0);
-    if (cfg->EMC2302) {
-        prometheus_format_label(label_buf, sizeof(label_buf), "fan", "2");
-        prometheus_write_metric(req, "espminer_fan_rpm", "Fan RPM", "gauge", label_buf, (double)pm->fan2_rpm, 0);
+    {
+        const char *fan_keys[]   = {"fan"};
+        const char *fan1_vals[]  = {"1"};
+        prometheus_format_labels(label_buf, sizeof(label_buf), fan_keys, fan1_vals, 1);
+        prometheus_write_metric(req, "espminer_fan_rpm", "Fan RPM", "gauge", label_buf, (double)pm->fan_rpm, 0);
+        if (cfg->EMC2302) {
+            const char *fan2_vals[] = {"2"};
+            prometheus_format_labels(label_buf, sizeof(label_buf), fan_keys, fan2_vals, 1);
+            prometheus_write_metric(req, "espminer_fan_rpm", "Fan RPM", "gauge", label_buf, (double)pm->fan2_rpm, 0);
+        }
     }
     prometheus_write_metric(req, "espminer_fan_speed_percent", "Fan speed percent", "gauge", NULL, (double)pm->fan_perc, 0);
     prometheus_write_metric(req, "espminer_manual_fan_speed_percent", "Manual fan speed percent", "gauge", NULL, (double)nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED), 0);
-    prometheus_format_label(label_buf, sizeof(label_buf), "chip", "1");
-    prometheus_write_metric(req, "espminer_chip_temp_celsius", "Chip temperature (C)", "gauge", label_buf, (double)pm->chip_temp_avg, 0);
-    if (cfg->TMP1075) {
-        prometheus_format_label(label_buf, sizeof(label_buf), "chip", "2");
-        prometheus_write_metric(req, "espminer_chip_temp_celsius", "Chip temperature (C)", "gauge", label_buf, (double)pm->chip_temp2_avg, 0);
+    {
+        const char *chip_keys[]  = {"chip"};
+        const char *chip1_vals[] = {"1"};
+        prometheus_format_labels(label_buf, sizeof(label_buf), chip_keys, chip1_vals, 1);
+        prometheus_write_metric(req, "espminer_chip_temp_celsius", "Chip temperature (C)", "gauge", label_buf, (double)pm->chip_temp_avg, 0);
+        if (cfg->TMP1075) {
+            const char *chip2_vals[] = {"2"};
+            prometheus_format_labels(label_buf, sizeof(label_buf), chip_keys, chip2_vals, 1);
+            prometheus_write_metric(req, "espminer_chip_temp_celsius", "Chip temperature (C)", "gauge", label_buf, (double)pm->chip_temp2_avg, 0);
+        }
     }
     prometheus_write_metric(req, "espminer_vr_temp_celsius", "VRM temperature (C)", "gauge", NULL, (double)pm->vr_temp, 0);
     prometheus_write_metric(req, "espminer_voltage_volts", "Voltage (V)", "gauge", NULL, (double)pm->voltage, 0);
