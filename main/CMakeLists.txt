@@ -100,10 +100,23 @@ if("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
 
     spiffs_create_partition_image(www ${WEB_SRC_DIR}/dist/axe-os FLASH_IN_PROJECT)
 else()
-    find_program(NPM_EXECUTABLE npm)
-    if(NOT NPM_EXECUTABLE AND NOT EXISTS ${WEB_SRC_DIR}/dist)
-        message(FATAL_ERROR "npm is not found! Please install it to proceed.")
+    file(GLOB NVM_NPM_CANDIDATES "$ENV{HOME}/.nvm/versions/node/v*/bin/npm")
+    if(NVM_NPM_CANDIDATES)
+        list(SORT NVM_NPM_CANDIDATES)
+        list(REVERSE NVM_NPM_CANDIDATES)
+        foreach(NVM_NPM_CANDIDATE ${NVM_NPM_CANDIDATES})
+            get_filename_component(NVM_NPM_DIR ${NVM_NPM_CANDIDATE} DIRECTORY)
+            list(APPEND NVM_NPM_DIRS ${NVM_NPM_DIR})
+        endforeach()
     endif()
+
+    find_program(NPM_EXECUTABLE npm HINTS ${NVM_NPM_DIRS})
+    if(NOT NPM_EXECUTABLE)
+        message(FATAL_ERROR "npm is not found! Install Node.js 22+ or make npm available on PATH.")
+    endif()
+    get_filename_component(NPM_EXECUTABLE_DIR ${NPM_EXECUTABLE} DIRECTORY)
+    set(NPM_COMMAND ${CMAKE_COMMAND} -E env "PATH=${NPM_EXECUTABLE_DIR}:$ENV{PATH}" ${NPM_EXECUTABLE})
+    message(STATUS "Using npm: ${NPM_EXECUTABLE}")
 
     # OpenAPI generation - only when openapi.yaml changes
     set(OPENAPI_SPEC "${CMAKE_CURRENT_SOURCE_DIR}/http_server/openapi.yaml")
@@ -111,8 +124,8 @@ else()
 
     add_custom_command(
         OUTPUT ${OPENAPI_STAMP}
-        COMMAND ${NPM_EXECUTABLE} i
-        COMMAND ${NPM_EXECUTABLE} run generate:api
+        COMMAND ${NPM_COMMAND} i
+        COMMAND ${NPM_COMMAND} run generate:api
         COMMAND ${CMAKE_COMMAND} -E touch ${OPENAPI_STAMP}
         WORKING_DIRECTORY ${WEB_SRC_DIR}
         DEPENDS ${OPENAPI_SPEC}
@@ -143,8 +156,8 @@ else()
     # Custom command that only runs when source files change
     add_custom_command(
         OUTPUT ${WEB_UI_STAMP} ${WEB_UI_OUTPUT}
-        COMMAND ${NPM_EXECUTABLE} i
-        COMMAND ${NPM_EXECUTABLE} run build:no-api-gen
+        COMMAND ${NPM_COMMAND} i
+        COMMAND ${NPM_COMMAND} run build:no-api-gen
         COMMAND ${CMAKE_COMMAND} -E touch ${WEB_UI_STAMP}
         WORKING_DIRECTORY ${WEB_SRC_DIR}
         DEPENDS ${WEB_UI_SOURCES} ${OPENAPI_STAMP}

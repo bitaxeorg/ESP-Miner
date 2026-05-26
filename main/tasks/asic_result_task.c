@@ -55,7 +55,22 @@ void ASIC_result_task(void *pvParameters)
         // check the nonce difficulty
         double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
 
-        if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) continue;
+        if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
+            SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
+            double ticket_diff = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
+
+            pthread_mutex_lock(&self_test->lock);
+            if (self_test->nonce_measurement_active) {
+                if (nonce_diff >= ticket_diff) {
+                    self_test->nonce_count++;
+                    self_test->nonce_hashes += ticket_diff * NONCE_SPACE;
+                } else {
+                    self_test->nonce_rejected_count++;
+                }
+            }
+            pthread_mutex_unlock(&self_test->lock);
+            continue;
+        }
 
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)
