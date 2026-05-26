@@ -1563,25 +1563,21 @@ static esp_err_t GET_system_metrics(httpd_req_t *req) {
 
     // Build info metric with labels
     char safe_hostname[64] = {0};
-    char safe_version[32] = {0};
-    char safe_axeos[32] = {0};
-    char safe_idf[32] = {0};
-    char safe_device_model[32] = {0};
-    char safe_asic_model[32] = {0};
-    char safe_board[32] = {0};
 
     char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
     prometheus_copy_sanitized_ascii(safe_hostname, sizeof(safe_hostname), hostname ? hostname : "");
-    prometheus_copy_sanitized_ascii(safe_version, sizeof(safe_version), sys->version ? sys->version : "");
-    prometheus_copy_sanitized_ascii(safe_axeos, sizeof(safe_axeos), sys->axeOSVersion ? sys->axeOSVersion : "");
-    prometheus_copy_sanitized_ascii(safe_idf, sizeof(safe_idf), esp_get_idf_version());
-    prometheus_copy_sanitized_ascii(safe_device_model, sizeof(safe_device_model), cfg->family.name ? cfg->family.name : "");
-    prometheus_copy_sanitized_ascii(safe_asic_model, sizeof(safe_asic_model), cfg->family.asic.name ? cfg->family.asic.name : "");
-    prometheus_copy_sanitized_ascii(safe_board, sizeof(safe_board), cfg->board_version ? cfg->board_version : "");
 
     // Format label list with escaping
     const char *keys[] = {"hostname","firmware","axeos","idf","device_model","asic_model","board"};
-    const char *values[] = {safe_hostname, safe_version, safe_axeos, safe_idf, safe_device_model, safe_asic_model, safe_board};
+    const char *values[] = {
+        safe_hostname,
+        sys->version ? sys->version : "",
+        sys->axeOSVersion ? sys->axeOSVersion : "",
+        esp_get_idf_version(),
+        cfg->family.name ? cfg->family.name : "",
+        cfg->family.asic.name ? cfg->family.asic.name : "",
+        cfg->board_version ? cfg->board_version : ""
+    };
     prometheus_format_labels(label_buf, sizeof(label_buf), keys, values, 7);
     prometheus_write_metric(req, "espminer_build_info", "Build and device info", "gauge", label_buf, 1, 1);
     if (hostname) free(hostname);
