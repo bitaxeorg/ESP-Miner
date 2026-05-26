@@ -85,6 +85,7 @@ typedef struct
     bool pool_decode_coinbase_tx;
     bool fallback_pool_decode_coinbase_tx;
     float response_time;
+    uint16_t response_share_batch; // shares acked in the batch that produced response_time (SV2: 1 = single, >1 = batched)
     float process_time;
     float cpu_usage;
     bool use_fallback_stratum;

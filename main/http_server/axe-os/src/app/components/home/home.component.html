@@ -440,7 +440,7 @@
                                 />
                             </div>
                             <ng-container *ngIf="info.responseTime > 0; else noValue">
-                                {{ info.responseTime | number:'1.1-1' }} ms
+                                {{ info.responseTime | number:'1.1-1' }} ms<span *ngIf="(info.responseShareBatch ?? 0) > 1" class="text-500" pTooltip="The pool acknowledged {{ info.responseShareBatch }} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window" tooltipPosition="top">&nbsp;(batched ×{{ info.responseShareBatch }})</span>
                             </ng-container>
                         </div>
                         <div class="flex flex-nowrap" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">

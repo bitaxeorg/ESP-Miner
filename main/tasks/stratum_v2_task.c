@@ -150,8 +150,18 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
-// Track last share submit time for response time measurement
-static int64_t stratum_v2_last_submit_time_us = 0;
+// Track per-share submit timestamps for response time measurement.
+// SubmitShares.Success can batch-acknowledge multiple shares via its
+// last_sequence_number field, so we key the submit time by sequence number
+// (ring buffer) and measure against the specific share being acknowledged
+// rather than just the most recent submit.
+#define SV2_SUBMIT_TIMING_SLOTS 32
+static int64_t stratum_v2_submit_time_us[SV2_SUBMIT_TIMING_SLOTS] = {0};
+
+static inline void stratum_v2_record_submit_time(uint32_t sequence_number)
+{
+    stratum_v2_submit_time_us[sequence_number % SV2_SUBMIT_TIMING_SLOTS] = esp_timer_get_time();
+}
 
 int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, uint32_t job_id, uint32_t nonce,
                             uint32_t ntime, uint32_t version)
@@ -163,13 +173,14 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, uint32_t job_id, uint32_t
     sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
     uint8_t buf[SV2_FRAME_HEADER_SIZE + 24];
 
+    uint32_t sequence_number = conn->sequence_number++;
     int len = sv2_build_submit_shares_standard(buf, sizeof(buf),
                                                 conn->channel_id,
-                                                conn->sequence_number++,
+                                                sequence_number,
                                                 job_id, nonce, ntime, version);
     if (len < 0) return -1;
 
-    stratum_v2_last_submit_time_us = esp_timer_get_time();
+    stratum_v2_record_submit_time(sequence_number);
     return sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
 }
 
@@ -184,14 +195,15 @@ int stratum_v2_submit_share_extended(GlobalState *GLOBAL_STATE, uint32_t job_id,
     sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
     uint8_t buf[SV2_FRAME_HEADER_SIZE + 24 + 1 + 32];
 
+    uint32_t sequence_number = conn->sequence_number++;
     int len = sv2_build_submit_shares_extended(buf, sizeof(buf),
                                                 conn->channel_id,
-                                                conn->sequence_number++,
+                                                sequence_number,
                                                 job_id, nonce, ntime, version,
                                                 extranonce, extranonce_len);
     if (len < 0) return -1;
 
-    stratum_v2_last_submit_time_us = esp_timer_get_time();
+    stratum_v2_record_submit_time(sequence_number);
     return sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
 }
 
@@ -951,12 +963,20 @@ void stratum_v2_task(void *pvParameters)
                     break;
 
                 case SV2_MSG_SUBMIT_SHARES_SUCCESS: {
-                    uint32_t channel_id, accepted_count;
-                    if (sv2_parse_submit_shares_success(recv_buf, hdr.msg_length, &channel_id, &accepted_count) == 0) {
-                        if (stratum_v2_last_submit_time_us > 0) {
-                            float response_time_ms = (float)(esp_timer_get_time() - stratum_v2_last_submit_time_us) / 1000.0f;
+                    uint32_t channel_id, last_sequence_number, accepted_count;
+                    if (sv2_parse_submit_shares_success(recv_buf, hdr.msg_length, &channel_id, &last_sequence_number, &accepted_count) == 0) {
+                        // Measure against the share acknowledged by last_sequence_number — the
+                        // most recent share in the ack, giving the cleanest available round trip.
+                        // accepted_count is surfaced separately so the UI can flag batch acks,
+                        // where the elapsed time also includes the pool's batching window.
+                        int slot = last_sequence_number % SV2_SUBMIT_TIMING_SLOTS;
+                        int64_t submit_time_us = stratum_v2_submit_time_us[slot];
+                        if (submit_time_us > 0) {
+                            float response_time_ms = (float)(esp_timer_get_time() - submit_time_us) / 1000.0f;
                             ESP_LOGI(TAG, "Shares accepted: %lu (%.1f ms)", accepted_count, response_time_ms);
                             GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
+                            GLOBAL_STATE->SYSTEM_MODULE.response_share_batch = (uint16_t)accepted_count;
+                            stratum_v2_submit_time_us[slot] = 0;
                         } else {
                             ESP_LOGI(TAG, "Shares accepted: %lu", accepted_count);
                         }
