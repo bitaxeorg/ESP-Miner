@@ -117,6 +117,11 @@ typedef struct
 {
     bool is_active;
     bool is_finished;
+    bool nonce_measurement_active;
+    uint64_t nonce_count;
+    uint64_t nonce_rejected_count;
+    double nonce_hashes;
+    pthread_mutex_t lock;
     char *message;
     char *result;
     char *finished;
