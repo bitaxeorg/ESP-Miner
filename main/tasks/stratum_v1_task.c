@@ -210,6 +210,14 @@ static void set_socket_options(esp_transport_handle_t transport)
             ESP_LOGE(TAG, "Failed to set SO_RCVTIMEO");
         }
 
+        // Disable Nagle's algorithm so share submits are sent immediately instead
+        // of being held back to coalesce with later data, which interacts badly
+        // with the pool's delayed-ACK and adds latency per submit.
+        int nodelay = 1;
+        if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay)) < 0) {
+            ESP_LOGE(TAG, "Failed to set TCP_NODELAY");
+        }
+
         // Enable keepalive
         int keepalive = 1;
         if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive)) < 0) {

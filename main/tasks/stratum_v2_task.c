@@ -48,6 +48,13 @@ static void stratum_v2_set_socket_options(esp_transport_handle_t transport)
     setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &snd_timeout, sizeof(snd_timeout));
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
 
+    // Disable Nagle's algorithm. SV2 frames are written as two segments (encrypted
+    // header then payload); with Nagle on, the second segment is held until the
+    // first is ACKed, which collides with the pool's delayed-ACK and adds ~40 ms
+    // of latency per share submit.
+    int nodelay = 1;
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
+
     int keepalive = 1;
     setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive));
 
