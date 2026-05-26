@@ -16,6 +16,7 @@
 #include "stratum_api.h"
 #include "stratum_v2_task.h"
 #include "utils.h"
+#include "nvs_config.h"
 
 static const char *TAG = "create_jobs_task";
 
@@ -63,6 +64,11 @@ void create_jobs_task(void *pvParameters)
     ESP_LOGI(TAG, "ASIC Ready!");
 
     while (1) {
+        if (nvs_config_get_bool(NVS_CONFIG_LOCAL_WORK_ENABLED)) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
         // Read protocol dynamically each iteration (coordinator may have switched it)
         stratum_protocol_t active_protocol = GLOBAL_STATE->stratum_protocol;
 
@@ -203,7 +209,7 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
     uint8_t merkle_root[32];
     calculate_merkle_root_hash(coinbase_tx_hash, (uint8_t(*)[32])notification->merkle_branches, notification->n_merkle_branches, merkle_root);
 
-    bm_job *next_job = malloc(sizeof(bm_job));
+    bm_job *next_job = calloc(1, sizeof(bm_job));
 
     if (next_job == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for new job");
@@ -235,7 +241,7 @@ static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification
 // version bits using version_mask, giving different midstates per nonce search space.
 static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *sv2_job, double difficulty)
 {
-    bm_job *next_job = malloc(sizeof(bm_job));
+    bm_job *next_job = calloc(1, sizeof(bm_job));
     if (next_job == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for new SV2 job");
         return;
@@ -312,7 +318,7 @@ static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_
     sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
     if (!conn) return;
 
-    bm_job *next_job = malloc(sizeof(bm_job));
+    bm_job *next_job = calloc(1, sizeof(bm_job));
     if (!next_job) {
         ESP_LOGE(TAG, "Failed to allocate memory for SV2 ext job");
         return;

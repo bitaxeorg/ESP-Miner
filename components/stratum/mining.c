@@ -8,6 +8,12 @@
 
 void free_bm_job(bm_job *job)
 {
+    if (!job) {
+        return;
+    }
+    if (job->source_data && job->source_data_free) {
+        job->source_data_free(job->source_data);
+    }
     free(job->jobid);
     free(job->extranonce2);
     free(job);
@@ -68,6 +74,9 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
 // take a mining_notify struct with ascii hex strings and convert it to a bm_job struct
 void construct_bm_job(mining_notify *params, const uint8_t merkle_root[32], const uint32_t version_mask, const double difficulty, bm_job *new_job)
 {
+    new_job->source = BM_JOB_SOURCE_STRATUM;
+    new_job->source_data = NULL;
+    new_job->source_data_free = NULL;
     new_job->version = params->version;
     new_job->target = params->target;
     new_job->ntime = params->ntime;

@@ -48,6 +48,7 @@ static coordinator_state_t s_state = COORD_STATE_IDLE;
 static QueueHandle_t s_event_queue = NULL;
 static volatile bool s_v1_should_shutdown = false;
 static volatile bool s_v2_should_shutdown = false;
+static bool s_local_work_mode = false;
 
 // Protocol tracking
 static stratum_protocol_t s_primary_protocol;
@@ -73,6 +74,7 @@ void protocol_coordinator_init(GlobalState *gs)
     s_v1_should_shutdown = false;
     s_v2_should_shutdown = false;
     s_heartbeat_enabled = false;
+    s_local_work_mode = false;
     s_consecutive_pool_failures = 0;
 }
 
@@ -226,6 +228,78 @@ static void stop_running_task(GlobalState *gs)
     } else {
         stop_v1_task(gs);
     }
+}
+
+static void set_local_work_connection_info(GlobalState *gs)
+{
+    snprintf(gs->SYSTEM_MODULE.pool_connection_info,
+             sizeof(gs->SYSTEM_MODULE.pool_connection_info),
+             "Local Work");
+}
+
+static void start_configured_protocol_task(GlobalState *gs)
+{
+    gs->SYSTEM_MODULE.pools_unavailable = false;
+    s_consecutive_pool_failures = 0;
+
+    if (gs->SYSTEM_MODULE.is_using_fallback) {
+        gs->stratum_protocol = s_fallback_protocol;
+        s_running_protocol = s_fallback_protocol;
+        s_state = COORD_STATE_RUNNING_FALLBACK;
+        start_protocol_task(gs, s_fallback_protocol);
+        s_heartbeat_enabled = false;
+    } else {
+        gs->stratum_protocol = s_primary_protocol;
+        s_running_protocol = s_primary_protocol;
+        s_state = COORD_STATE_RUNNING_PRIMARY;
+        start_protocol_task(gs, s_primary_protocol);
+    }
+}
+
+static void enter_local_work_mode(GlobalState *gs)
+{
+    if (s_local_work_mode) {
+        set_local_work_connection_info(gs);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Local work mode enabled; stopping Stratum protocol task");
+    if (s_state == COORD_STATE_RUNNING_PRIMARY || s_state == COORD_STATE_RUNNING_FALLBACK) {
+        stop_running_task(gs);
+    }
+
+    queue_clear(&gs->stratum_queue);
+    s_state = COORD_STATE_IDLE;
+    s_heartbeat_enabled = false;
+    s_consecutive_pool_failures = 0;
+    gs->SYSTEM_MODULE.pools_unavailable = false;
+    s_local_work_mode = true;
+    set_local_work_connection_info(gs);
+}
+
+static void leave_local_work_mode(GlobalState *gs)
+{
+    if (!s_local_work_mode) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "Local work mode unavailable; restoring Stratum protocol task");
+    s_local_work_mode = false;
+    start_configured_protocol_task(gs);
+}
+
+static bool should_run_local_work_mode(GlobalState *gs)
+{
+    if (!nvs_config_get_bool(NVS_CONFIG_LOCAL_WORK_ENABLED)) {
+        return false;
+    }
+    if (!nvs_config_get_bool(NVS_CONFIG_LOCAL_WORK_FALLBACK_TO_STRATUM)) {
+        return true;
+    }
+
+    SystemModule *module = &gs->SYSTEM_MODULE;
+    return module->local_work_template_reachable ||
+           (module->local_work_template_runs == 0 && module->local_work_template_failures == 0);
 }
 
 // TCP connect probe (used for SV2 — full noise handshake is too expensive)
@@ -438,6 +512,11 @@ static void try_resume_from_paused(GlobalState *gs)
 // Handle an event from the event queue
 static void handle_event(GlobalState *gs, coordinator_event_t evt)
 {
+    if (s_local_work_mode) {
+        ESP_LOGI(TAG, "Ignoring Stratum coordinator event while local work mode is active (evt=%d)", evt);
+        return;
+    }
+
     switch (evt) {
         case COORD_EVENT_PROTOCOL_FAILED: {
             if (s_state == COORD_STATE_PAUSED) {
@@ -499,19 +578,10 @@ void protocol_coordinator_task(void *pvParameters)
     s_primary_protocol = gs->stratum_protocol;
     s_fallback_protocol = gs->SYSTEM_MODULE.fallback_pool_protocol;
 
-    // Start initial protocol task
-    if (gs->SYSTEM_MODULE.is_using_fallback) {
-        // User explicitly selected fallback — use fallback protocol
-        gs->stratum_protocol = s_fallback_protocol;
-        s_running_protocol = s_fallback_protocol;
-        s_state = COORD_STATE_RUNNING_FALLBACK;
-        start_protocol_task(gs, s_fallback_protocol);
-        // User chose fallback, no heartbeat
-        s_heartbeat_enabled = false;
+    if (should_run_local_work_mode(gs)) {
+        enter_local_work_mode(gs);
     } else {
-        s_running_protocol = s_primary_protocol;
-        s_state = COORD_STATE_RUNNING_PRIMARY;
-        start_protocol_task(gs, s_primary_protocol);
+        start_configured_protocol_task(gs);
     }
 
     ESP_LOGI(TAG, "Protocol coordinator started (primary: %s, fallback: %s, state: %d)",
@@ -528,7 +598,9 @@ void protocol_coordinator_task(void *pvParameters)
     while (1) {
         coordinator_event_t evt;
         TickType_t wait;
-        if (s_state == COORD_STATE_PAUSED) {
+        if (nvs_config_get_bool(NVS_CONFIG_LOCAL_WORK_ENABLED)) {
+            wait = pdMS_TO_TICKS(1000);
+        } else if (s_state == COORD_STATE_PAUSED) {
             wait = pdMS_TO_TICKS(RECOVERY_PROBE_INTERVAL_MS);
         } else if (s_heartbeat_enabled) {
             wait = pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS);
@@ -546,7 +618,16 @@ void protocol_coordinator_task(void *pvParameters)
                 heartbeat_initial_delay = true;
                 heartbeat_delay_start = esp_timer_get_time();
             }
-        } else if (s_state == COORD_STATE_PAUSED) {
+        }
+
+        if (should_run_local_work_mode(gs)) {
+            enter_local_work_mode(gs);
+            continue;
+        }
+
+        leave_local_work_mode(gs);
+
+        if (s_state == COORD_STATE_PAUSED) {
             // Recovery probe — try to bring a pool back online.
             try_resume_from_paused(gs);
         } else if (s_heartbeat_enabled) {

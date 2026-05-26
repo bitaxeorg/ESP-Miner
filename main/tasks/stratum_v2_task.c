@@ -22,6 +22,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+int esp_transport_get_socket(esp_transport_handle_t t);
+
 #define MAX_RETRY_ATTEMPTS 3
 #define TRANSPORT_TIMEOUT_MS 5000
 #define SV2_MAX_FRAME_SIZE 2048
@@ -345,7 +347,7 @@ static void stratum_v2_decode_coinbase(GlobalState *GLOBAL_STATE, sv2_conn_t *co
     }
 
     if (result->block_height != 0 && (uint32_t)GLOBAL_STATE->block_height != result->block_height) {
-        ESP_LOGI(TAG, "Block height %d", result->block_height);
+        ESP_LOGI(TAG, "Block height %lu", (unsigned long)result->block_height);
         GLOBAL_STATE->block_height = result->block_height;
     }
 

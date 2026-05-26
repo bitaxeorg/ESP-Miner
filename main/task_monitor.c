@@ -46,7 +46,8 @@ void task_monitor_task(void *pvParameters) {
 
         // Warn if task count changed (possible create/destroy)
         if (num_tasks2 != num_tasks1) {
-            ESP_LOGW(TAG, "Task count changed (%u -> %u); stats may be incomplete for destroyed tasks", num_tasks1, num_tasks2);
+            ESP_LOGW(TAG, "Task count changed (%lu -> %lu); stats may be incomplete for destroyed tasks",
+                     (unsigned long)num_tasks1, (unsigned long)num_tasks2);
         }
 
         // Print header

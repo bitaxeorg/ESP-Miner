@@ -32,6 +32,18 @@
 #define FALLBACK_KEY_ASICFREQUENCY "asicfrequency" // Since v2.10.0 (https://github.com/bitaxeorg/ESP-Miner/pull/1051)
 #define FALLBACK_KEY_FANSPEED "fanspeed"           // Since v2.11.0 (https://github.com/bitaxeorg/ESP-Miner/pull/1331)
 
+#ifdef CONFIG_LOCAL_WORK_ENABLED
+    #define LOCAL_WORK_ENABLED 1
+#else
+    #define LOCAL_WORK_ENABLED 0
+#endif
+
+#ifdef CONFIG_LOCAL_WORK_FALLBACK_TO_STRATUM
+    #define LOCAL_WORK_FALLBACK_TO_STRATUM 1
+#else
+    #define LOCAL_WORK_FALLBACK_TO_STRATUM 0
+#endif
+
 typedef struct {
     NvsConfigKey key;
     ConfigType type;
@@ -121,6 +133,14 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY]        = {.nvs_key_name = "fbsv2authpubk",   .type = TYPE_STR,   .default_value = {.str = ""},                            .rest_name = "fallbackStratumV2AuthorityPubkey",          .min = 0,  .max = 52},
     [NVS_CONFIG_SV2_CHANNEL_TYPE]                     = {.nvs_key_name = "sv2chantype",     .type = TYPE_U16,   .default_value = {.u16 = 0},                             .min = 0,  .max = 1},
     [NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE]            = {.nvs_key_name = "fbSv2ChanType",   .type = TYPE_U16,   .default_value = {.u16 = 0},                             .min = 0,  .max = 1},
+
+    [NVS_CONFIG_LOCAL_WORK_ENABLED]                      = {.nvs_key_name = "localworken",    .type = TYPE_BOOL,  .default_value = {.b   = (bool)LOCAL_WORK_ENABLED},                    .rest_name = "localWorkEnabled",              .min = 0,  .max = 1},
+    [NVS_CONFIG_LOCAL_WORK_BITCOIN_RPC_URL]              = {.nvs_key_name = "lwrpcurl",       .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_LOCAL_WORK_BITCOIN_RPC_URL},     .rest_name = "localWorkBitcoinRpcUrl",        .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_LOCAL_WORK_BITCOIN_RPC_AUTH_MODE]        = {.nvs_key_name = "lwrpcauth",      .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_LOCAL_WORK_BITCOIN_RPC_AUTH_MODE}, .rest_name = "localWorkBitcoinRpcAuthMode",    .min = 0,  .max = 16},
+    [NVS_CONFIG_LOCAL_WORK_BITCOIN_RPC_USERNAME]         = {.nvs_key_name = "lwrpcuser",      .type = TYPE_STR,   .default_value = {.str = ""},                                           .rest_name = "localWorkBitcoinRpcUsername",    .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_LOCAL_WORK_BITCOIN_RPC_PASSWORD]         = {.nvs_key_name = "lwrpcpass",      .type = TYPE_STR,   .default_value = {.str = ""},                                           .rest_name = "localWorkBitcoinRpcPassword",    .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_LOCAL_WORK_PAYOUT_ADDRESS]               = {.nvs_key_name = "lwpayoutaddr",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_LOCAL_WORK_PAYOUT_ADDRESS},       .rest_name = "localWorkPayoutAddress",         .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_LOCAL_WORK_FALLBACK_TO_STRATUM]          = {.nvs_key_name = "lwfallback",     .type = TYPE_BOOL,  .default_value = {.b   = (bool)LOCAL_WORK_FALLBACK_TO_STRATUM},          .rest_name = "localWorkFallbackToStratum",     .min = 0,  .max = 1},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
@@ -280,10 +300,10 @@ esp_err_t nvs_config_init(void)
     nvs_stats_t stats;
     err = nvs_get_stats(NULL, &stats);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "Used entries: %lu", stats.used_entries);
-        ESP_LOGI(TAG, "Free entries: %lu", stats.free_entries);
-        ESP_LOGI(TAG, "Available entries: %lu", stats.available_entries);
-        ESP_LOGI(TAG, "Total entries: %lu", stats.total_entries);
+        ESP_LOGI(TAG, "Used entries: %u", (unsigned)stats.used_entries);
+        ESP_LOGI(TAG, "Free entries: %u", (unsigned)stats.free_entries);
+        ESP_LOGI(TAG, "Available entries: %u", (unsigned)stats.available_entries);
+        ESP_LOGI(TAG, "Total entries: %u", (unsigned)stats.total_entries);
     } else {
         ESP_LOGE(TAG, "Error getting NVS stats: %s\n", esp_err_to_name(err));
     }

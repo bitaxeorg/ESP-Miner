@@ -92,8 +92,9 @@ esp_err_t scoreboard_add(Scoreboard *scoreboard, double difficulty, const char *
         return ESP_FAIL;
     }
     
-    ESP_LOGI(TAG, "New #%d: Difficulty: %.1f, Job ID: %s, extranonce2: %s, ntime: %d, nonce: %08X, version_bits: %08X",
-        i+1, new_entry.difficulty, new_entry.job_id, new_entry.extranonce2, new_entry.ntime, (unsigned int)new_entry.nonce, (unsigned int)new_entry.version_bits);
+    ESP_LOGI(TAG, "New #%d: Difficulty: %.1f, Job ID: %s, extranonce2: %s, ntime: %lu, nonce: %08lX, version_bits: %08lX",
+        i+1, new_entry.difficulty, new_entry.job_id, new_entry.extranonce2,
+        (unsigned long)new_entry.ntime, (unsigned long)new_entry.nonce, (unsigned long)new_entry.version_bits);
 
     return ESP_OK;
 }

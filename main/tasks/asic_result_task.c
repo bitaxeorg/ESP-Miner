@@ -11,6 +11,7 @@
 #include "sv2_protocol.h"
 #include "hashrate_monitor_task.h"
 #include "asic.h"
+#include "local_work_client.h"
 #include "freertos/task.h"
 #include "scoreboard.h"
 
@@ -60,7 +61,26 @@ void ASIC_result_task(void *pvParameters)
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)
         {
-            if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+            bool local_work_enabled = local_work_is_enabled();
+            if (active_job->source == BM_JOB_SOURCE_LOCAL_WORK) {
+                if (local_work_enabled) {
+                    double network_diff = networkDifficulty(active_job->target);
+                    if (nonce_diff >= network_diff) {
+                        ESP_LOGI(TAG, "Local Work direct job found a Bitcoin block candidate; submitting to local RPC node");
+                        esp_err_t block_ret = local_work_submit_block(GLOBAL_STATE,
+                                                                           active_job,
+                                                                           asic_result->nonce,
+                                                                           asic_result->rolled_version);
+                        if (block_ret != ESP_OK) {
+                            ESP_LOGE(TAG, "Failed to submit Bitcoin block candidate: %s", esp_err_to_name(block_ret));
+                        }
+                    }
+                } else {
+                    ESP_LOGW(TAG, "Dropping stale local-work nonce while local work mode is disabled");
+                }
+            } else if (local_work_enabled && GLOBAL_STATE->SYSTEM_MODULE.local_work_template_reachable) {
+                ESP_LOGW(TAG, "Dropping stale Stratum share while local work mode is enabled");
+            } else if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
                 // SV2: submit with binary protocol
                 int ret;
                 uint32_t sv2_job_id = (uint32_t)strtoul(active_job->jobid, NULL, 10);
