@@ -3,22 +3,20 @@
 #include "system.h"
 #include "global_state.h"
 #include <lwip/tcpip.h>
-#include <lwip/netdb.h>
 #include "stratum_v1_task.h"
+#include "stratum_socket.h"
 #include "protocol_coordinator.h"
+#include "connect.h"
 #include "work_queue.h"
-#include "esp_wifi.h"
 #include <esp_sntp.h>
 #include "esp_timer.h"
 #include "esp_transport.h"
 #include "esp_transport_tcp.h"
-#include <sys/time.h>
 #include <stdbool.h>
 #include <string.h>
 #include "utils.h"
 #include "coinbase_decoder.h"
 #include <esp_heap_caps.h>
-#include "hashrate_monitor_task.h"
 #include "esp_transport_ssl.h"
 #include "freertos/task.h"
 
@@ -56,212 +54,6 @@ static int stratum_get_next_uid(GlobalState * GLOBAL_STATE)
     return uid;
 }
 
-struct timeval tcp_snd_timeout = {
-    .tv_sec = 5,
-    .tv_usec = 0
-};
-
-struct timeval tcp_rcv_timeout = {
-    .tv_sec = 60 * 3,
-    .tv_usec = 0
-};
-
-
-typedef struct {
-    struct sockaddr_storage dest_addr;  // Stores IPv4 or IPv6 address with scope_id for IPv6
-    socklen_t addrlen;
-    int addr_family;
-    int ip_protocol;
-    char host_ip[INET6_ADDRSTRLEN + 16];  // IPv6 address + zone identifier (e.g., "fe80::1%wlan0")
-} stratum_connection_info_t;
-
-static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, stratum_connection_info_t *conn_info)
-{
-    // Input validation
-    if (hostname == NULL || conn_info == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    if (port == 0) {
-        ESP_LOGE(TAG, "Invalid port: 0");
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    char port_str[6];
-    snprintf(port_str, sizeof(port_str), "%u", port);
-
-    ESP_LOGD(TAG, "Resolving address for %s:%u", hostname, port);
-
-    struct addrinfo hints = {
-        .ai_family   = AF_UNSPEC,
-        .ai_socktype = SOCK_STREAM,
-        .ai_protocol = IPPROTO_TCP,
-        .ai_flags    = AI_NUMERICSERV
-    };
-
-    struct addrinfo *res = NULL;
-    int gai_err = esp_getaddrinfo(hostname, port_str, &hints, &res);
-    if (gai_err != 0 || res == NULL) {
-        ESP_LOGE(TAG, "DNS resolution failed for %s:%u (error: %d)", hostname, port, gai_err);
-        return ESP_ERR_NOT_FOUND;
-    }
-
-    // Initialize connection info
-    memset(conn_info, 0, sizeof(*conn_info));
-    conn_info->addr_family = AF_UNSPEC;
-
-    // Preferred order: IPv4 first, then IPv6
-    const int preferred_families[] = { AF_INET, AF_INET6 };
-    const size_t num_families = sizeof(preferred_families) / sizeof(preferred_families[0]);
-
-    const struct addrinfo *selected = NULL;
-
-    for (size_t i = 0; i < num_families && selected == NULL; i++) {
-        int family = preferred_families[i];
-
-        for (const struct addrinfo *p = res; p != NULL; p = p->ai_next) {
-            if (p->ai_family == family) {
-                selected = p;
-                break;
-            }
-        }
-    }
-
-    if (selected == NULL) {
-        ESP_LOGE(TAG, "No supported address family (IPv4 or IPv6) found for %s", hostname);
-        freeaddrinfo(res);
-        return ESP_ERR_NOT_SUPPORTED;
-    }
-
-    // Copy selected address
-    memcpy(&conn_info->dest_addr, selected->ai_addr, selected->ai_addrlen);
-    conn_info->addrlen     = selected->ai_addrlen;
-    conn_info->addr_family = selected->ai_family;
-    conn_info->ip_protocol = (selected->ai_family == AF_INET) ? IPPROTO_IP : IPPROTO_IPV6;
-
-    // Handle IPv6 link-local scope ID if needed
-    if (selected->ai_family == AF_INET6) {
-        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
-
-        if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr)) {
-            if (addr6->sin6_scope_id == 0) {
-                ESP_LOGW(TAG, "Link-local IPv6 address without scope ID - attempting to set from WiFi STA interface");
-
-                esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-                if (netif) {
-                    int index = esp_netif_get_netif_impl_index(netif);
-                    if (index >= 0) {
-                        addr6->sin6_scope_id = (uint32_t)index;
-                        ESP_LOGI(TAG, "Set IPv6 scope_id to interface index: %lu", (unsigned long)addr6->sin6_scope_id);
-                    } else {
-                        ESP_LOGW(TAG, "Failed to get valid interface index for WIFI_STA_DEF");
-                    }
-                } else {
-                    ESP_LOGW(TAG, "Could not get netif handle for WIFI_STA_DEF");
-                }
-            } else {
-                ESP_LOGI(TAG, "Link-local IPv6 address with existing scope_id: %lu", (unsigned long)addr6->sin6_scope_id);
-            }
-        }
-    }
-
-    const void *src_addr;
-    int af = conn_info->addr_family;
-
-    if (af == AF_INET) {
-        struct sockaddr_in *addr4 = (struct sockaddr_in *)&conn_info->dest_addr;
-        src_addr = &addr4->sin_addr;
-    } else {
-        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
-        src_addr = &addr6->sin6_addr;
-    }
-
-    // Convert resolved address to string for logging and storage
-    if (inet_ntop(af, src_addr, conn_info->host_ip, sizeof(conn_info->host_ip)) == NULL) {
-        ESP_LOGW(TAG, "inet_ntop failed (errno: %d)", errno);
-        snprintf(conn_info->host_ip, sizeof(conn_info->host_ip), "[invalid %s addr]",
-                 (af == AF_INET) ? "IPv4" : "IPv6");
-    } else if (af == AF_INET6) {
-        struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&conn_info->dest_addr;
-        if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr) && addr6->sin6_scope_id != 0) {
-            char zone[16];
-            snprintf(zone, sizeof(zone), "%%%" PRIu32, addr6->sin6_scope_id);
-            strncat(conn_info->host_ip, zone,
-                    sizeof(conn_info->host_ip) - strlen(conn_info->host_ip) - 1);
-            // Ensure null termination
-            conn_info->host_ip[sizeof(conn_info->host_ip) - 1] = '\0';
-        }
-    }
-
-    ESP_LOGI(TAG, "Resolved %s:%u → %s", hostname, port, conn_info->host_ip);
-
-    freeaddrinfo(res);
-    return ESP_OK;
-}
-
-static void set_socket_options(esp_transport_handle_t transport)
-{
-    int sock = esp_transport_get_socket(transport);
-    if (sock >= 0) {
-        // Set send and receive timeouts
-        if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tcp_snd_timeout, sizeof(tcp_snd_timeout)) < 0) {
-            ESP_LOGE(TAG, "Failed to set SO_SNDTIMEO");
-        }
-        if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tcp_rcv_timeout, sizeof(tcp_rcv_timeout)) < 0) {
-            ESP_LOGE(TAG, "Failed to set SO_RCVTIMEO");
-        }
-
-        // Disable Nagle's algorithm so share submits are sent immediately instead
-        // of being held back to coalesce with later data, which interacts badly
-        // with the pool's delayed-ACK and adds latency per submit.
-        int nodelay = 1;
-        if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay)) < 0) {
-            ESP_LOGE(TAG, "Failed to set TCP_NODELAY");
-        }
-
-        // Enable keepalive
-        int keepalive = 1;
-        if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive)) < 0) {
-            ESP_LOGE(TAG, "Failed to set SO_KEEPALIVE");
-        }
-
-        // Set keepalive parameters (adjust values as needed)
-        int keepidle = 60;  // TCP_KEEPIDLE: seconds before sending keepalive
-        int keepintvl = 10; // TCP_KEEPINTVL: seconds between keepalive probes
-        int keepcnt = 3;    // TCP_KEEPCNT: number of keepalive probes
-        if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, sizeof(keepidle)) < 0) {
-            ESP_LOGE(TAG, "Failed to set TCP_KEEPIDLE");
-        }
-        if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl, sizeof(keepintvl)) < 0) {
-            ESP_LOGE(TAG, "Failed to set TCP_KEEPINTVL");
-        }
-        if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt, sizeof(keepcnt)) < 0) {
-            ESP_LOGE(TAG, "Failed to set TCP_KEEPCNT");
-        }
-    } else {
-        ESP_LOGE(TAG, "Failed to get socket from transport");
-    }
-}
-
-static bool is_wifi_connected(void)
-{
-    wifi_ap_record_t ap_info;
-    return (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK);
-}
-
-static void cleanQueue(GlobalState *GLOBAL_STATE)
-{
-    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
-    queue_clear(&GLOBAL_STATE->stratum_queue);
-
-    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
-    for (int i = 0; i < 128; i = i + 4) {
-        GLOBAL_STATE->valid_jobs[i] = 0;
-    }
-    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
-    
-    // Reset hashrate measurements to prevent spike on reconnection
-    hashrate_monitor_reset_measurements(GLOBAL_STATE);
-}
 
 static void stratum_v1_reset_uid(GlobalState *GLOBAL_STATE)
 {
@@ -282,7 +74,7 @@ void stratum_v1_close_connection(GlobalState *GLOBAL_STATE)
     if (transport != NULL) {
         esp_transport_close(transport);
     }
-    cleanQueue(GLOBAL_STATE);
+    SYSTEM_clean_jobs_queue(GLOBAL_STATE);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
@@ -404,7 +196,7 @@ void stratum_v1_task(void *pvParameters)
             continue;
         }
 
-        if (!is_wifi_connected()) {
+        if (!wifi_is_connected()) {
             ESP_LOGI(TAG, "WiFi disconnected, attempting to reconnect...");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
             continue;
@@ -426,7 +218,7 @@ void stratum_v1_task(void *pvParameters)
         port = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
 
         stratum_connection_info_t conn_info;
-        if (resolve_stratum_address(stratum_url, port, &conn_info) != ESP_OK) {
+        if (stratum_socket_resolve(stratum_url, port, &conn_info) != ESP_OK) {
             ESP_LOGE(TAG, "Address resolution failed for %s", stratum_url);
             retry_attempts++;
             vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -472,7 +264,7 @@ void stratum_v1_task(void *pvParameters)
             continue;
         }
 
-        set_socket_options(GLOBAL_STATE->transport);
+        stratum_socket_set_options(GLOBAL_STATE->transport);
 
         const char *protocol = (conn_info.addr_family == AF_INET6) ? "IPv6" : "IPv4";
         const char *tls_status;
@@ -489,7 +281,7 @@ void stratum_v1_task(void *pvParameters)
                  "%s%s", protocol, tls_status);
 
         stratum_v1_reset_uid(GLOBAL_STATE);
-        cleanQueue(GLOBAL_STATE);
+        SYSTEM_clean_jobs_queue(GLOBAL_STATE);
 
         ///// Start Stratum Action
         // mining.configure - ID: 1
@@ -541,7 +333,7 @@ void stratum_v1_task(void *pvParameters)
                 SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
                 if (stratum_api_v1_message.mining_notification->clean_jobs &&
                     (GLOBAL_STATE->stratum_queue.count > 0)) {
-                    cleanQueue(GLOBAL_STATE);
+                    SYSTEM_clean_jobs_queue(GLOBAL_STATE);
                 }
                 if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
                     mining_notify *next_notify_json_str = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);

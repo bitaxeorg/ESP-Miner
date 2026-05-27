@@ -595,3 +595,9 @@ static const char *get_wifi_reason_string(int reason) {
     }
     return "Unknown error";
 }
+
+bool wifi_is_connected(void)
+{
+    wifi_ap_record_t ap_info;
+    return (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK);
+}

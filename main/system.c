@@ -32,6 +32,8 @@
 #include "utils.h"
 #include "self_test.h"
 #include "filesystem.h"
+#include "work_queue.h"
+#include "hashrate_monitor_task.h"
 
 static const char * TAG = "system";
 
@@ -250,6 +252,21 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     }
 
     return ESP_OK;
+}
+
+void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
+{
+    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
+    queue_clear(&GLOBAL_STATE->stratum_queue);
+
+    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
+    for (int i = 0; i < 128; i = i + 4) {
+        GLOBAL_STATE->valid_jobs[i] = 0;
+    }
+    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+
+    // Reset hashrate measurements to prevent a spike on reconnection
+    hashrate_monitor_reset_measurements(GLOBAL_STATE);
 }
 
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)

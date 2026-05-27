@@ -3,11 +3,12 @@
 #include "esp_transport_tcp.h"
 #include <lwip/sockets.h>
 #include "esp_timer.h"
-#include "esp_wifi.h"
 #include "system.h"
 #include "global_state.h"
 #include "stratum_v2_task.h"
+#include "stratum_socket.h"
 #include "protocol_coordinator.h"
+#include "connect.h"
 #include "sv2_protocol.h"
 #include "sv2_noise.h"
 #include "nvs_config.h"
@@ -18,7 +19,6 @@
 #include "coinbase_decoder.h"
 #include "esp_heap_caps.h"
 
-#include <lwip/netdb.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -27,44 +27,6 @@
 #define SV2_MAX_FRAME_SIZE 2048
 
 static const char *TAG = "stratum_v2_task";
-
-static bool is_wifi_connected(void)
-{
-    wifi_ap_record_t ap_info;
-    return (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK);
-}
-
-static void stratum_v2_set_socket_options(esp_transport_handle_t transport)
-{
-    int sock = esp_transport_get_socket(transport);
-    if (sock < 0) {
-        ESP_LOGE(TAG, "Failed to get socket from transport");
-        return;
-    }
-
-    struct timeval snd_timeout = { .tv_sec = 5, .tv_usec = 0 };
-    struct timeval rcv_timeout = { .tv_sec = 60 * 3, .tv_usec = 0 };
-
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &snd_timeout, sizeof(snd_timeout));
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
-
-    // Disable Nagle's algorithm. SV2 frames are written as two segments (encrypted
-    // header then payload); with Nagle on, the second segment is held until the
-    // first is ACKed, which collides with the pool's delayed-ACK and adds ~40 ms
-    // of latency per share submit.
-    int nodelay = 1;
-    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
-
-    int keepalive = 1;
-    setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive));
-
-    int keepidle = 60;
-    int keepintvl = 10;
-    int keepcnt = 3;
-    setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, sizeof(keepidle));
-    setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl, sizeof(keepintvl));
-    setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt, sizeof(keepcnt));
-}
 
 // Load authority pubkey from NVS (base58-encoded) into 32-byte buffer.
 // SV2 format: base58check(0x0001_LE + 32_byte_xonly_pubkey)
@@ -111,18 +73,6 @@ static bool stratum_v2_load_authority_pubkey(uint8_t out[32], bool use_fallback)
     return true;
 }
 
-static void stratum_v2_clean_queue(GlobalState *GLOBAL_STATE)
-{
-    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
-    queue_clear(&GLOBAL_STATE->stratum_queue);
-
-    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
-    for (int i = 0; i < 128; i = i + 4) {
-        GLOBAL_STATE->valid_jobs[i] = 0;
-    }
-    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
-}
-
 static sv2_channel_type_t sv2_select_channel_type(GlobalState *GLOBAL_STATE, bool use_fallback)
 {
     NvsConfigKey key = use_fallback ? NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE
@@ -146,7 +96,7 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
         esp_transport_destroy(GLOBAL_STATE->transport);
         GLOBAL_STATE->transport = NULL;
     }
-    stratum_v2_clean_queue(GLOBAL_STATE);
+    SYSTEM_clean_jobs_queue(GLOBAL_STATE);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
@@ -238,7 +188,7 @@ static void stratum_v2_enqueue_job(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
     SYSTEM_notify_new_ntime(GLOBAL_STATE, ntime);
 
     if (clean_jobs && (GLOBAL_STATE->stratum_queue.count > 0)) {
-        stratum_v2_clean_queue(GLOBAL_STATE);
+        SYSTEM_clean_jobs_queue(GLOBAL_STATE);
     }
 
     if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
@@ -258,7 +208,7 @@ static void stratum_v2_enqueue_ext_job(GlobalState *GLOBAL_STATE, sv2_conn_t *co
     SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
 
     if (job->clean_jobs && (GLOBAL_STATE->stratum_queue.count > 0)) {
-        stratum_v2_clean_queue(GLOBAL_STATE);
+        SYSTEM_clean_jobs_queue(GLOBAL_STATE);
     }
 
     if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
@@ -646,7 +596,7 @@ void stratum_v2_task(void *pvParameters)
             return;
         }
 
-        if (!is_wifi_connected()) {
+        if (!wifi_is_connected()) {
             ESP_LOGI(TAG, "WiFi disconnected, waiting...");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
             continue;
@@ -678,11 +628,11 @@ void stratum_v2_task(void *pvParameters)
             continue;
         }
 
-        int64_t connect_start_us = esp_timer_get_time();
-
-        esp_err_t ret = esp_transport_connect(transport, stratum_url, port, TRANSPORT_TIMEOUT_MS);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "TCP connect failed to %s:%d (err %d)", stratum_url, port, ret);
+        // Resolve up front and connect by IP so DNS stays non-blocking (a long
+        // DNS timeout otherwise stalls the lwIP stack and starves the HTTP server).
+        stratum_connection_info_t conn_info;
+        if (stratum_socket_resolve(stratum_url, port, &conn_info) != ESP_OK) {
+            ESP_LOGE(TAG, "Address resolution failed for %s", stratum_url);
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                      sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool unreachable");
             esp_transport_close(transport);
@@ -692,10 +642,24 @@ void stratum_v2_task(void *pvParameters)
             continue;
         }
 
-        ESP_LOGI(TAG, "TCP connected to %s:%d", stratum_url, port);
+        int64_t connect_start_us = esp_timer_get_time();
+
+        esp_err_t ret = esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "TCP connect failed to %s:%d (%s) (err %d)", stratum_url, port, conn_info.host_ip, ret);
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool unreachable");
+            esp_transport_close(transport);
+            esp_transport_destroy(transport);
+            retry_attempts++;
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        ESP_LOGI(TAG, "TCP connected to %s:%d (%s)", stratum_url, port, conn_info.host_ip);
 
         GLOBAL_STATE->transport = transport;
-        stratum_v2_set_socket_options(transport);
+        stratum_socket_set_options(transport);
 
         // Reset connection state
         memset(conn, 0, sizeof(*conn));
