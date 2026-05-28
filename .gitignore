@@ -36,3 +36,4 @@ Thumbs.db
 debug.log
 .vscode
 .cache
+tools/devices.txt
