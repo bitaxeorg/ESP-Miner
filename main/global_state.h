@@ -169,6 +169,7 @@ typedef struct
     bool new_set_mining_difficulty_msg;
     uint32_t version_mask;
     bool new_stratum_version_rolling_msg;
+    bool reset_extranonce2;
 
     esp_transport_handle_t transport;
     portMUX_TYPE stratum_mux;

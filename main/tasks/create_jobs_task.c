@@ -63,6 +63,12 @@ void create_jobs_task(void *pvParameters)
     ESP_LOGI(TAG, "ASIC Ready!");
 
     while (1) {
+        if (GLOBAL_STATE->reset_extranonce2) {
+            ESP_LOGI(TAG, "Resetting extranonce2 to 0 due to set_extranonce request");
+            extranonce_2 = 0;
+            GLOBAL_STATE->reset_extranonce2 = false;
+        }
+
         // Read protocol dynamically each iteration (coordinator may have switched it)
         stratum_protocol_t active_protocol = GLOBAL_STATE->stratum_protocol;
 
