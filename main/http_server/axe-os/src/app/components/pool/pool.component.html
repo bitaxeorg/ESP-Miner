@@ -39,7 +39,7 @@
                         [ngClass]="{'pi-eye': !showPassword[pool], 'pi-eye-slash': showPassword[pool]}"
                         (click)="showPassword[pool] = !showPassword[pool]"></i>
                         <input pInputText [id]="pool + 'Password'" [formControlName]="pool + 'Password'"
-                            [type]="showPassword[pool] ? 'text' : 'password'" />
+                            [type]="showPassword[pool] ? 'text' : 'password'" autocomplete="off" />
                     </div>
                 </div>
 
