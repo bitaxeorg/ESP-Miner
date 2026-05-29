@@ -1,6 +1,7 @@
 #include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 #include "esp_wifi.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
@@ -58,6 +59,43 @@ static int clients_connected_to_ap = 0;
 static const char *get_wifi_reason_string(int reason);
 static void wifi_softap_on(void);
 static void wifi_softap_off(void);
+
+esp_err_t wifi_apply_hostname(const char *hostname)
+{
+    if (hostname == NULL || hostname[0] == '\0') {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_netif_t *esp_netif_sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (esp_netif_sta == NULL) {
+        ESP_LOGW(TAG, "STA netif not ready; hostname will apply on next Wi-Fi start");
+        return ESP_ERR_ESP_NETIF_IF_NOT_READY;
+    }
+
+    esp_err_t err = esp_netif_set_hostname(esp_netif_sta, hostname);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "esp_netif_set_hostname failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "Set Wi-Fi hostname to: %s", hostname);
+
+    // Bounce the DHCP client so the new hostname is sent in option 12 on the
+    // next DISCOVER/REQUEST. This keeps the Wi-Fi link up — no AP flap.
+    err = esp_netif_dhcpc_stop(esp_netif_sta);
+    if (err != ESP_OK && err != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED) {
+        ESP_LOGW(TAG, "esp_netif_dhcpc_stop failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = esp_netif_dhcpc_start(esp_netif_sta);
+    if (err != ESP_OK && err != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED) {
+        ESP_LOGW(TAG, "esp_netif_dhcpc_start failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    return ESP_OK;
+}
 
 esp_err_t get_wifi_current_rssi(int8_t *rssi)
 {
