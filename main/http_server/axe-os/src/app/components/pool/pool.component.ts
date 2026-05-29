@@ -24,6 +24,16 @@ interface IChannelOption {
   label: string;
 }
 
+interface ILocalWorkAuthOption {
+  value: 'none' | 'basic';
+  label: string;
+}
+
+interface ILocalWorkFallbackOption {
+  value: number;
+  label: string;
+}
+
 @Component({
   selector: 'app-pool',
   templateUrl: './pool.component.html',
@@ -37,6 +47,7 @@ export class PoolComponent implements OnInit {
 
   public pools: PoolType[] = ['stratum', 'fallbackStratum'];
   public showPassword = { 'stratum': false, 'fallbackStratum': false };
+  public showLocalWorkRpcPassword = false;
   public showAdvancedOptions = { 'stratum': false, 'fallbackStratum': false };
 
   public tlsOptions: ITlsOption[] = [
@@ -53,6 +64,16 @@ export class PoolComponent implements OnInit {
   public sv2ChannelOptions: IChannelOption[] = [
     { value: 'extended', label: 'Extended Channels' },
     { value: 'standard', label: 'Standard Channels' }
+  ];
+
+  public localWorkAuthOptions: ILocalWorkAuthOption[] = [
+    { value: 'basic', label: 'Username / Password' },
+    { value: 'none', label: 'No Authentication' }
+  ];
+
+  public localWorkFallbackOptions: ILocalWorkFallbackOption[] = [
+    { value: 1, label: 'Fallback to Stratum pools' },
+    { value: 0, label: 'Keep trying local work' }
   ];
 
   public asicModel: string = '';
@@ -111,8 +132,27 @@ export class PoolComponent implements OnInit {
           fallbackStratumProtocol: [info.fallbackStratumProtocol || 'SV1'],
           fallbackStratumV2AuthorityPubkey: [info.fallbackStratumV2AuthorityPubkey || '', [this.base58Validator()]],
           stratumV2ChannelType: [info.stratumV2ChannelType || 'standard'],
-          fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType || 'standard']
+          fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType || 'standard'],
+          localWorkEnabled: [info.localWorkEnabled === 1],
+          localWorkBitcoinRpcUrl: [info.localWorkBitcoinRpcUrl || '', [this.optionalHttpUrlValidator()]],
+          localWorkBitcoinRpcAuthMode: [info.localWorkBitcoinRpcAuthMode || 'basic'],
+          localWorkBitcoinRpcUsername: [info.localWorkBitcoinRpcUsername || ''],
+          localWorkBitcoinRpcPassword: ['*****'],
+          localWorkPayoutAddress: [info.localWorkPayoutAddress || ''],
+          localWorkFallbackToStratum: [info.localWorkFallbackToStratum !== 0 ? 1 : 0]
         });
+
+        const applyLocalWorkRpcValidation = () => {
+          const enabled = this.form.get('localWorkEnabled')?.value === true;
+          const rpcUrlControl = this.form.get('localWorkBitcoinRpcUrl');
+
+          if (enabled) {
+            rpcUrlControl?.setValidators([Validators.required, this.httpUrlValidator()]);
+          } else {
+            rpcUrlControl?.setValidators([this.optionalHttpUrlValidator()]);
+          }
+          rpcUrlControl?.updateValueAndValidity();
+        };
 
         const setupTlsValidation = (tlsControlName: string, certControlName: string) => {
           this.form.get(tlsControlName)?.valueChanges.subscribe(value => {
@@ -132,10 +172,12 @@ export class PoolComponent implements OnInit {
         // Setup tls validation
         setupTlsValidation('stratumTLS', 'stratumCert');
         setupTlsValidation('fallbackStratumTLS', 'fallbackStratumCert');
+        this.form.get('localWorkEnabled')?.valueChanges.subscribe(() => applyLocalWorkRpcValidation());
 
         // Trigger initial validation
         this.form.get('stratumTLS')?.updateValueAndValidity();
         this.form.get('fallbackStratumTLS')?.updateValueAndValidity();
+        applyLocalWorkRpcValidation();
       });
   }
 
@@ -148,6 +190,12 @@ export class PoolComponent implements OnInit {
     if (form.fallbackStratumPassword === '*****') {
       delete form.fallbackStratumPassword;
     }
+    if (form.localWorkBitcoinRpcPassword === '*****') {
+      delete form.localWorkBitcoinRpcPassword;
+    }
+
+    form.localWorkEnabled = form.localWorkEnabled ? 1 : 0;
+    form.localWorkFallbackToStratum = Number(form.localWorkFallbackToStratum) ? 1 : 0;
 
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
@@ -188,6 +236,18 @@ export class PoolComponent implements OnInit {
       return { cleanUrl: url.slice(0, match.index), port };
     }
     return { cleanUrl: url };
+  }
+
+  private httpUrlValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = (control.value || '').trim();
+      if (!value) return null;
+      return /^https?:\/\/.+/i.test(value) ? null : { invalidUrl: true };
+    };
+  }
+
+  private optionalHttpUrlValidator(): ValidatorFn {
+    return this.httpUrlValidator();
   }
 
   public onUrlChange(poolType: PoolType) {

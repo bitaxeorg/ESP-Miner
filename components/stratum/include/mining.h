@@ -3,6 +3,12 @@
 
 #include "stratum_api.h"
 
+typedef enum
+{
+    BM_JOB_SOURCE_STRATUM = 0,
+    BM_JOB_SOURCE_LOCAL_WORK = 1,
+} bm_job_source_t;
+
 typedef struct
 {
     uint32_t version;
@@ -21,6 +27,9 @@ typedef struct
     double pool_diff;
     char *jobid;
     char *extranonce2;
+    bm_job_source_t source;
+    void *source_data;
+    void (*source_data_free)(void *source_data);
 } bm_job;
 
 void free_bm_job(bm_job *job);

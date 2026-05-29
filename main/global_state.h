@@ -36,6 +36,11 @@ struct sv2_noise_ctx;
 #define DIFF_STRING_SIZE 10
 #define MAX_BLOCK_SIGNALS 8
 #define MAX_BLOCK_SIGNAL_LEN 16
+#define LOCAL_WORK_HASH_LEN 80
+#define LOCAL_WORK_TEMPLATE_STATUS_LEN 96
+#define LOCAL_WORK_TEMPLATE_ERROR_LEN 160
+#define LOCAL_WORK_BLOCK_STATUS_LEN 96
+#define LOCAL_WORK_BLOCK_ERROR_LEN 160
 
 typedef struct {
     char message[64];
@@ -113,6 +118,40 @@ typedef struct
     char * version;
     char * axeOSVersion;
     Scoreboard scoreboard;
+    bool local_work_template_reachable;
+    int local_work_template_http_status;
+    int64_t local_work_template_last_success_time;
+    int64_t local_work_template_last_attempt_time;
+    uint32_t local_work_template_runs;
+    uint32_t local_work_template_failures;
+    uint32_t local_work_template_height;
+    uint32_t local_work_template_tx_count;
+    uint32_t local_work_template_merkle_path_count;
+    uint32_t local_work_template_coinbase_bytes;
+    uint32_t local_work_template_bytes;
+    uint32_t local_work_template_total_ms;
+    uint32_t local_work_template_rpc_ms;
+    uint32_t local_work_template_parse_ms;
+    uint32_t local_work_template_build_ms;
+    uint32_t local_work_template_heap_before;
+    uint32_t local_work_template_heap_after;
+    uint32_t local_work_template_internal_heap_before;
+    uint32_t local_work_template_internal_heap_after;
+    uint32_t local_work_template_spiram_heap_before;
+    uint32_t local_work_template_spiram_heap_after;
+    uint64_t local_work_template_slot0_value_sats;
+    uint32_t local_work_direct_jobs_sent;
+    char local_work_template_status[LOCAL_WORK_TEMPLATE_STATUS_LEN];
+    char local_work_template_last_error[LOCAL_WORK_TEMPLATE_ERROR_LEN];
+    char local_work_template_prev_hash[LOCAL_WORK_HASH_LEN];
+    uint32_t local_work_block_submits;
+    uint32_t local_work_block_accepted;
+    uint32_t local_work_block_rejected;
+    int local_work_block_http_status;
+    int64_t local_work_block_last_submit_time;
+    uint32_t local_work_block_submit_ms;
+    char local_work_block_status[LOCAL_WORK_BLOCK_STATUS_LEN];
+    char local_work_block_last_error[LOCAL_WORK_BLOCK_ERROR_LEN];
 } SystemModule;
 
 typedef struct

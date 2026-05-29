@@ -105,6 +105,42 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     // Initialize pool connection info
     strcpy(module->pool_connection_info, "Not Connected");
 
+    // Initialize local work generation status. The polling task refreshes these when enabled.
+    module->local_work_template_reachable = false;
+    module->local_work_template_http_status = 0;
+    module->local_work_template_last_success_time = 0;
+    module->local_work_template_last_attempt_time = 0;
+    module->local_work_template_runs = 0;
+    module->local_work_template_failures = 0;
+    module->local_work_template_height = 0;
+    module->local_work_template_tx_count = 0;
+    module->local_work_template_merkle_path_count = 0;
+    module->local_work_template_coinbase_bytes = 0;
+    module->local_work_template_bytes = 0;
+    module->local_work_template_total_ms = 0;
+    module->local_work_template_rpc_ms = 0;
+    module->local_work_template_parse_ms = 0;
+    module->local_work_template_build_ms = 0;
+    module->local_work_template_heap_before = 0;
+    module->local_work_template_heap_after = 0;
+    module->local_work_template_internal_heap_before = 0;
+    module->local_work_template_internal_heap_after = 0;
+    module->local_work_template_spiram_heap_before = 0;
+    module->local_work_template_spiram_heap_after = 0;
+    module->local_work_template_slot0_value_sats = 0;
+    module->local_work_direct_jobs_sent = 0;
+    module->local_work_block_submits = 0;
+    module->local_work_block_accepted = 0;
+    module->local_work_block_rejected = 0;
+    module->local_work_block_http_status = 0;
+    module->local_work_block_last_submit_time = 0;
+    module->local_work_block_submit_ms = 0;
+    strcpy(module->local_work_template_status, "");
+    strcpy(module->local_work_template_last_error, "");
+    strcpy(module->local_work_template_prev_hash, "");
+    strcpy(module->local_work_block_status, "");
+    strcpy(module->local_work_block_last_error, "");
+
     // Initialize overheat_mode
     module->overheat_mode = nvs_config_get_bool(NVS_CONFIG_OVERHEAT_MODE);
     ESP_LOGI(TAG, "Initial overheat_mode value: %d", module->overheat_mode);

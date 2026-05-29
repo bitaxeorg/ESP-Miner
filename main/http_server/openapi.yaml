@@ -420,6 +420,85 @@ components:
         activeProtocolLabel:
           type: string
           description: Human-readable label for the active protocol (e.g. "SV1", "SV2 Extended Channel")
+        localWorkEnabled:
+          type: integer
+          enum: [0, 1]
+          description: Enable local work generation from a Bitcoin JSON-RPC node
+        localWorkBitcoinRpcUrl:
+          type: string
+          description: Bitcoin JSON-RPC URL used for local work generation
+        localWorkBitcoinRpcAuthMode:
+          type: string
+          enum: [none, basic]
+          description: Bitcoin JSON-RPC authentication mode
+        localWorkBitcoinRpcUsername:
+          type: string
+          description: Bitcoin JSON-RPC username
+        localWorkPayoutAddress:
+          type: string
+          description: Payout address used in locally generated coinbase transactions
+        localWorkFallbackToStratum:
+          type: integer
+          enum: [0, 1]
+          description: Fall back to configured Stratum pools when local work generation is unavailable
+        localWorkTemplateReachable:
+          type: integer
+          enum: [0, 1]
+          description: Whether the configured Bitcoin RPC node is currently providing templates
+        localWorkTemplateStatus:
+          type: string
+          description: Current local work template status
+        localWorkTemplateLastError:
+          type: string
+          description: Last local work template error
+        localWorkTemplateRuns:
+          type: integer
+          description: Number of successful local template refreshes
+        localWorkTemplateFailures:
+          type: integer
+          description: Number of failed local template refreshes
+        localWorkTemplateHeight:
+          type: integer
+          description: Height of the cached local block template
+        localWorkTemplateTxCount:
+          type: integer
+          description: Transaction count in the cached local block template
+        localWorkTemplateBytes:
+          type: integer
+          description: Size of the last getblocktemplate response in bytes
+        localWorkTemplateRpcMs:
+          type: integer
+          description: Time spent fetching the latest template over Bitcoin RPC
+        localWorkTemplateParseMs:
+          type: integer
+          description: Time spent parsing the latest local template
+        localWorkTemplateBuildMs:
+          type: integer
+          description: Time spent building the latest local work item
+        localWorkTemplateTotalMs:
+          type: integer
+          description: Total template refresh time
+        localWorkTemplateHeapAfter:
+          type: integer
+          description: Free heap after the latest local template refresh
+        localWorkDirectJobsSent:
+          type: integer
+          description: Number of locally generated jobs sent to the ASIC
+        localWorkBlockSubmits:
+          type: integer
+          description: Number of block candidates submitted to the Bitcoin RPC node
+        localWorkBlockAccepted:
+          type: integer
+          description: Number of block candidates accepted by the Bitcoin RPC node
+        localWorkBlockRejected:
+          type: integer
+          description: Number of block candidates rejected by the Bitcoin RPC node
+        localWorkBlockStatus:
+          type: string
+          description: Last local block submit status
+        localWorkBlockLastError:
+          type: string
+          description: Last local block submit error
         stratumV2AuthorityPubkey:
           type: string
           description: SV2 authority public key for certificate verification (base58-encoded)
@@ -747,6 +826,45 @@ components:
           maxLength: 52
           examples:
             - ""
+        localWorkEnabled:
+          type: integer
+          description: Enable local work generation from a Bitcoin JSON-RPC node (0=disabled, 1=enabled)
+          enum: [0, 1]
+          examples:
+            - 0
+        localWorkBitcoinRpcUrl:
+          type: string
+          description: Bitcoin JSON-RPC URL used for local work generation
+          examples:
+            - "http://192.168.1.10:8332"
+        localWorkBitcoinRpcAuthMode:
+          type: string
+          description: Bitcoin JSON-RPC authentication mode
+          enum: [none, basic]
+          examples:
+            - "basic"
+        localWorkBitcoinRpcUsername:
+          type: string
+          description: Bitcoin JSON-RPC username
+          examples:
+            - "bitcoinrpc"
+        localWorkBitcoinRpcPassword:
+          type: string
+          description: Bitcoin JSON-RPC password
+          writeOnly: true
+          examples:
+            - "password"
+        localWorkPayoutAddress:
+          type: string
+          description: Payout address used in locally generated coinbase transactions
+          examples:
+            - "bc1q..."
+        localWorkFallbackToStratum:
+          type: integer
+          description: Fall back to configured Stratum pools when local work generation is unavailable (0=disabled, 1=enabled)
+          enum: [0, 1]
+          examples:
+            - 1
         ssid:
           type: string
           description: WiFi network SSID

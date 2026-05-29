@@ -65,6 +65,41 @@ menu "Bitaxe Configuration"
             The BM1397 hash frequency
 endmenu
 
+menu "Local Work Generation Configuration"
+
+    config LOCAL_WORK_ENABLED
+        bool "Enable local work generation"
+        default n
+        help
+            Fetches block templates directly from Bitcoin Core or Knots RPC, builds work on
+            the ESP32, and submits found blocks back to that Bitcoin node.
+
+    config LOCAL_WORK_BITCOIN_RPC_URL
+        string "Bitcoin RPC URL"
+        default ""
+        help
+            Local Bitcoin Core or Knots JSON-RPC URL for direct template building.
+
+    config LOCAL_WORK_BITCOIN_RPC_AUTH_MODE
+        string "Bitcoin RPC authentication mode"
+        default "basic"
+        help
+            Authentication mode for the Bitcoin RPC client.
+
+    config LOCAL_WORK_PAYOUT_ADDRESS
+        string "Local work payout address"
+        default ""
+        help
+            Payout address for locally generated coinbase transactions.
+
+    config LOCAL_WORK_FALLBACK_TO_STRATUM
+        bool "Fallback to Stratum when local work generation fails"
+        default y
+        help
+            Local work mode should fall back to configured Stratum mining when possible.
+
+endmenu
+
 menu "Stratum Configuration"
 
     config STRATUM_URL

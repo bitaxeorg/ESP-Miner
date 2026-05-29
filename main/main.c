@@ -25,6 +25,7 @@
 #include "filesystem.h"
 #include "input.h"
 #include "log_buffer.h"
+#include "local_work_client.h"
 
 static GlobalState GLOBAL_STATE;
 
@@ -134,6 +135,10 @@ void app_main(void)
 
     while (!GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+
+    if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+        ESP_ERROR_CHECK(local_work_client_start(&GLOBAL_STATE));
     }
 
     queue_init(&GLOBAL_STATE.stratum_queue);

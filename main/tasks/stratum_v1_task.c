@@ -22,6 +22,8 @@
 #include "esp_transport_ssl.h"
 #include "freertos/task.h"
 
+int esp_transport_get_socket(esp_transport_handle_t t);
+
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
 #define MAX_EXTRANONCE_2_LEN 32
@@ -99,7 +101,7 @@ static esp_err_t resolve_stratum_address(const char *hostname, uint16_t port, st
     };
 
     struct addrinfo *res = NULL;
-    int gai_err = esp_getaddrinfo(hostname, port_str, &hints, &res);
+    int gai_err = getaddrinfo(hostname, port_str, &hints, &res);
     if (gai_err != 0 || res == NULL) {
         ESP_LOGE(TAG, "DNS resolution failed for %s:%u (error: %d)", hostname, port, gai_err);
         return ESP_ERR_NOT_FOUND;
@@ -315,7 +317,7 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
 
     // Update block height
     if (result->block_height != GLOBAL_STATE->block_height) {
-        ESP_LOGI(TAG, "Block height %d", result->block_height);
+        ESP_LOGI(TAG, "Block height %lu", (unsigned long)result->block_height);
         GLOBAL_STATE->block_height = result->block_height;
     }
 

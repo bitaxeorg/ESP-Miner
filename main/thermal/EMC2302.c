@@ -90,7 +90,7 @@ static uint16_t get_fan_speed(uint8_t reg_addr, uint8_t multiplier)
     uint32_t rpm = 3932160UL * multiplier / tach_counter;
 
     if (rpm > UINT16_MAX) {
-        ESP_LOGW(TAG, "RPM %u exceeds uint16_t range, clamping", rpm);
+        ESP_LOGW(TAG, "RPM %lu exceeds uint16_t range, clamping", (unsigned long)rpm);
         rpm = UINT16_MAX;
     }
 

@@ -189,7 +189,9 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
                             stratum_protocol_to_string(nvs_config_get_u16(NVS_CONFIG_STRATUM_PROTOCOL)));
 
     const char *protocol_label = "SV1";
-    if (g->stratum_protocol == STRATUM_V2) {
+    if (nvs_config_get_bool(NVS_CONFIG_LOCAL_WORK_ENABLED) && g->SYSTEM_MODULE.local_work_template_reachable) {
+        protocol_label = "Local Work";
+    } else if (g->stratum_protocol == STRATUM_V2) {
         protocol_label = stratum_v2_is_extended_channel(g)
             ? "SV2 Extended Channel" : "SV2 Standard Channel";
     }
@@ -211,6 +213,40 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
 
     cJSON_AddStringToObject(root, "fallbackStratumProtocol",
                             stratum_protocol_to_string(nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL)));
+
+    cJSON_AddNumberToObject(root, "localWorkEnabled", nvs_config_get_bool(NVS_CONFIG_LOCAL_WORK_ENABLED) ? 1 : 0);
+    char *localWorkRpcUrl = nvs_config_get_string(NVS_CONFIG_LOCAL_WORK_BITCOIN_RPC_URL);
+    cJSON_AddStringToObject(root, "localWorkBitcoinRpcUrl", localWorkRpcUrl ? localWorkRpcUrl : "");
+    free(localWorkRpcUrl);
+    char *localWorkRpcAuthMode = nvs_config_get_string(NVS_CONFIG_LOCAL_WORK_BITCOIN_RPC_AUTH_MODE);
+    cJSON_AddStringToObject(root, "localWorkBitcoinRpcAuthMode", localWorkRpcAuthMode ? localWorkRpcAuthMode : "basic");
+    free(localWorkRpcAuthMode);
+    char *localWorkRpcUsername = nvs_config_get_string(NVS_CONFIG_LOCAL_WORK_BITCOIN_RPC_USERNAME);
+    cJSON_AddStringToObject(root, "localWorkBitcoinRpcUsername", localWorkRpcUsername ? localWorkRpcUsername : "");
+    free(localWorkRpcUsername);
+    char *localWorkPayoutAddress = nvs_config_get_string(NVS_CONFIG_LOCAL_WORK_PAYOUT_ADDRESS);
+    cJSON_AddStringToObject(root, "localWorkPayoutAddress", localWorkPayoutAddress ? localWorkPayoutAddress : "");
+    free(localWorkPayoutAddress);
+    cJSON_AddNumberToObject(root, "localWorkFallbackToStratum", nvs_config_get_bool(NVS_CONFIG_LOCAL_WORK_FALLBACK_TO_STRATUM) ? 1 : 0);
+    cJSON_AddNumberToObject(root, "localWorkTemplateReachable", g->SYSTEM_MODULE.local_work_template_reachable ? 1 : 0);
+    cJSON_AddStringToObject(root, "localWorkTemplateStatus", g->SYSTEM_MODULE.local_work_template_status);
+    cJSON_AddStringToObject(root, "localWorkTemplateLastError", g->SYSTEM_MODULE.local_work_template_last_error);
+    cJSON_AddNumberToObject(root, "localWorkTemplateRuns", g->SYSTEM_MODULE.local_work_template_runs);
+    cJSON_AddNumberToObject(root, "localWorkTemplateFailures", g->SYSTEM_MODULE.local_work_template_failures);
+    cJSON_AddNumberToObject(root, "localWorkTemplateHeight", g->SYSTEM_MODULE.local_work_template_height);
+    cJSON_AddNumberToObject(root, "localWorkTemplateTxCount", g->SYSTEM_MODULE.local_work_template_tx_count);
+    cJSON_AddNumberToObject(root, "localWorkTemplateBytes", g->SYSTEM_MODULE.local_work_template_bytes);
+    cJSON_AddNumberToObject(root, "localWorkTemplateRpcMs", g->SYSTEM_MODULE.local_work_template_rpc_ms);
+    cJSON_AddNumberToObject(root, "localWorkTemplateParseMs", g->SYSTEM_MODULE.local_work_template_parse_ms);
+    cJSON_AddNumberToObject(root, "localWorkTemplateBuildMs", g->SYSTEM_MODULE.local_work_template_build_ms);
+    cJSON_AddNumberToObject(root, "localWorkTemplateTotalMs", g->SYSTEM_MODULE.local_work_template_total_ms);
+    cJSON_AddNumberToObject(root, "localWorkTemplateHeapAfter", g->SYSTEM_MODULE.local_work_template_heap_after);
+    cJSON_AddNumberToObject(root, "localWorkDirectJobsSent", g->SYSTEM_MODULE.local_work_direct_jobs_sent);
+    cJSON_AddNumberToObject(root, "localWorkBlockSubmits", g->SYSTEM_MODULE.local_work_block_submits);
+    cJSON_AddNumberToObject(root, "localWorkBlockAccepted", g->SYSTEM_MODULE.local_work_block_accepted);
+    cJSON_AddNumberToObject(root, "localWorkBlockRejected", g->SYSTEM_MODULE.local_work_block_rejected);
+    cJSON_AddStringToObject(root, "localWorkBlockStatus", g->SYSTEM_MODULE.local_work_block_status);
+    cJSON_AddStringToObject(root, "localWorkBlockLastError", g->SYSTEM_MODULE.local_work_block_last_error);
 
     // User Preferences
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) ? 1 : 0);
