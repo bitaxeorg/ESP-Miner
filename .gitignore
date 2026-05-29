@@ -36,4 +36,6 @@ Thumbs.db
 debug.log
 .vscode
 .cache
-tools/devices.txt
+
+# Device list file for tools/upload2device.py
+devices.txt
