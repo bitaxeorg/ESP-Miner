@@ -1011,12 +1011,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     // Add mDNS-specific fields on top of the base system info
     char * hostname_base = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
     char * mdns_hostname = GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname;
-    char full_hostname[64];
+    char full_hostname[72]; // 64 (mdns_hostname max) + 6 (".local") + 2 (margin)
     
     if (mdns_hostname != NULL && strlen(mdns_hostname) > 0) {
         snprintf(full_hostname, sizeof(full_hostname), "%s.local", mdns_hostname);
     } else {
-        snprintf(full_hostname, sizeof(full_hostname), "%s.local", hostname_base);
+        snprintf(full_hostname, sizeof(full_hostname), "%s.local", hostname_base ? hostname_base : "unknown");
     }
 
     cJSON_AddStringToObject(root, "fullHostname", full_hostname);
