@@ -488,74 +488,60 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
+  private isSensorSupported(labelKey: string, info?: ISystemInfo): boolean {
+    switch(labelKey) {
+      case 'vrTemp': return info ? (this.lastHasVrTemp || !!info.vrTemp) : this.lastHasVrTemp;
+      case 'asicTemp2' : return info ? (this.lastHasAsicTemp2 || !!(info.temp2 && info.temp2 !== -1)) : this.lastHasAsicTemp2;
+      case 'fanRpm': return info ? (this.lastHasFanRpm || !!info.fanrpm) : this.lastHasFanRpm;
+      case 'fan2Rpm': return info ? (this.lastHasFan2Rpm || !!info.fan2rpm) : this.lastHasFan2Rpm;
+      default: return true;
+    }
+  }
+
+  private createChartDatasets(
+    formControlName: 'chartY1Unit' | 'chartY2Unit',
+    baseColor: string,
+    mixColor: string,
+    fill: boolean,
+    yAxisID: 'y' | 'y2'
+  ): any[] {
+    const unit = this.form?.get(formControlName)?.value;
+    const labels = ChartUnitGroups.find(g => g.value === unit)?.labels || [];
+
+    return labels.filter(label => this.isSensorSupported(label, this.latestInfo)).map((labelKey, index) => {
+      const label = chartLabelValue(labelKey) || labelKey;
+      const borderColor = index === 0 
+        ? baseColor 
+        : `color-mix(in srgb, ${baseColor} ${100 - index * 15}%, ${mixColor} ${index * 15}%)`;
+      const backgroundColor = `color-mix(in srgb, ${borderColor}, transparent 81%)`;
+
+      return {
+        type: 'line',
+        label,
+        data: this.chartDatasets[labelKey] || (this.chartDatasets[labelKey] = []),
+        fill,
+        backgroundColor,
+        borderColor,
+        tension: 0,
+        pointRadius: 2,
+        pointHoverRadius: 5,
+        borderWidth: 1,
+        yAxisID,
+        hidden: this.chartHiddenSensors[label] ?? (labelKey === 'none')
+      };
+    });
+  }
+
   private rebuildChartDatasets() {
     const documentStyle = getComputedStyle(document.documentElement);
     const primaryColor = documentStyle.getPropertyValue('--primary-color').trim() || '#6366f1';
     const textColor = documentStyle.getPropertyValue('--text-color').trim() || '#ffffff';
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary').trim() || '#808080';
 
-    const y1Unit = this.form?.get('chartY1Unit')?.value;
-    const y2Unit = this.form?.get('chartY2Unit')?.value;
-    const y1Labels = ChartUnitGroups.find(g => g.value === y1Unit)?.labels || [];
-    const y2Labels = ChartUnitGroups.find(g => g.value === y2Unit)?.labels || [];
-
-    const datasets: any[] = [];
-
-    const isLabelSupported = (labelKey: string): boolean => {
-      if (labelKey === 'vrTemp') return this.lastHasVrTemp || !!this.latestInfo?.vrTemp;
-      if (labelKey === 'asicTemp2') return this.lastHasAsicTemp2 || !!(this.latestInfo?.temp2 && this.latestInfo.temp2 !== -1);
-      if (labelKey === 'fanRpm') return this.lastHasFanRpm || !!this.latestInfo?.fanrpm;
-      if (labelKey === 'fan2Rpm') return this.lastHasFan2Rpm || !!this.latestInfo?.fan2rpm;
-      return true;
-    };
-
-    y1Labels.filter(isLabelSupported).forEach((labelKey, index) => {
-      const label = chartLabelValue(labelKey) || labelKey;
-      
-      const borderColor = index === 0 
-        ? primaryColor 
-        : `color-mix(in srgb, ${primaryColor} ${100 - index * 15}%, ${textColor} ${index * 15}%)`;
-      const backgroundColor = `color-mix(in srgb, ${borderColor}, transparent 81%)`;
-
-      datasets.push({
-        type: 'line',
-        label: label,
-        data: this.chartDatasets[labelKey] || (this.chartDatasets[labelKey] = []),
-        fill: true,
-        backgroundColor,
-        borderColor,
-        tension: 0,
-        pointRadius: 2,
-        pointHoverRadius: 5,
-        borderWidth: 1,
-        yAxisID: 'y',
-        hidden: this.chartHiddenSensors[label] ?? (labelKey === 'none')
-      });
-    });
-
-    y2Labels.filter(isLabelSupported).forEach((labelKey, index) => {
-      const label = chartLabelValue(labelKey) || labelKey;
-
-      const borderColor = index === 0 
-        ? textColorSecondary 
-        : `color-mix(in srgb, ${textColorSecondary} ${100 - index * 15}%, black ${index * 15}%)`;
-      const backgroundColor = `color-mix(in srgb, ${borderColor}, transparent 81%)`;
-
-      datasets.push({
-        type: 'line',
-        label: label,
-        data: this.chartDatasets[labelKey] || (this.chartDatasets[labelKey] = []),
-        fill: false,
-        backgroundColor,
-        borderColor,
-        tension: 0,
-        pointRadius: 2,
-        pointHoverRadius: 5,
-        borderWidth: 1,
-        yAxisID: 'y2',
-        hidden: this.chartHiddenSensors[label] ?? (labelKey === 'none')
-      });
-    });
+    const datasets = [
+      ...this.createChartDatasets('chartY1Unit', primaryColor, textColor, true, 'y'),
+      ...this.createChartDatasets('chartY2Unit', textColorSecondary, 'black', false, 'y2')
+    ];
 
     if (this.chartData) {
       this.chartData = {
@@ -1205,22 +1191,16 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.chartUnitGroups = ChartUnitGroups.map(group => {
       return {
         ...group,
-        labels: group.labels.filter(label => {
-          if (label === 'vrTemp') return this.lastHasVrTemp;
-          if (label === 'asicTemp2') return this.lastHasAsicTemp2;
-          if (label === 'fanRpm') return this.lastHasFanRpm;
-          if (label === 'fan2Rpm') return this.lastHasFan2Rpm;
-          return true;
-        })
+        labels: group.labels.filter(label => this.isSensorSupported(label))
       };
     }).filter(group => group.labels.length > 0 || group.value === 'none');
   }
 
   private updateChartDataSources(info: ISystemInfo) {
-    const hasVrTemp = this.lastHasVrTemp || !!info.vrTemp;
-    const hasAsicTemp2 = this.lastHasAsicTemp2 || !!(info.temp2 && info.temp2 !== -1);
-    const hasFanRpm = this.lastHasFanRpm || !!info.fanrpm;
-    const hasFan2Rpm = this.lastHasFan2Rpm || !!info.fan2rpm;
+    const hasVrTemp = this.isSensorSupported('vrTemp', info);
+    const hasAsicTemp2 = this.isSensorSupported('asicTemp2', info);
+    const hasFanRpm = this.isSensorSupported('fanRpm', info);
+    const hasFan2Rpm = this.isSensorSupported('fan2Rpm', info);
 
     if (
       this.lastHasVrTemp !== hasVrTemp ||
@@ -1235,10 +1215,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.lastHasFan2Rpm = hasFan2Rpm;
 
       this.chartDataSources = Object.entries(eChartLabel)
-        .filter(([key, ]) => key !== 'vrTemp' || hasVrTemp)
-        .filter(([key, ]) => key !== 'asicTemp2' || hasAsicTemp2)
-        .filter(([key, ]) => key !== 'fanRpm' || hasFanRpm)
-        .filter(([key, ]) => key !== 'fan2Rpm' || hasFan2Rpm)
+        .filter(([key, ]) => this.isSensorSupported(key))
         .map(([key, value]) => ({ name: value, value: key }));
 
       this.updateChartUnitGroups();
