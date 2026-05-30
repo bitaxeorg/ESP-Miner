@@ -97,6 +97,7 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
         GLOBAL_STATE->transport = NULL;
     }
     SYSTEM_clean_jobs_queue(GLOBAL_STATE);
+    GLOBAL_STATE->SYSTEM_MODULE.shares_pending = 0;
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
@@ -111,6 +112,20 @@ static int64_t stratum_v2_submit_time_us[SV2_SUBMIT_TIMING_SLOTS] = {0};
 static inline void stratum_v2_record_submit_time(uint32_t sequence_number)
 {
     stratum_v2_submit_time_us[sequence_number % SV2_SUBMIT_TIMING_SLOTS] = esp_timer_get_time();
+}
+
+// Shares submitted but not yet resolved by the pool (rises while it batches acks).
+static void stratum_v2_update_pending_shares(GlobalState *GLOBAL_STATE)
+{
+    sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
+    if (!conn) {
+        GLOBAL_STATE->SYSTEM_MODULE.shares_pending = 0;
+        return;
+    }
+    uint32_t pending = (conn->sequence_number > conn->resolved_shares)
+                           ? (conn->sequence_number - conn->resolved_shares)
+                           : 0;
+    GLOBAL_STATE->SYSTEM_MODULE.shares_pending = (uint16_t)(pending > UINT16_MAX ? UINT16_MAX : pending);
 }
 
 int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, uint32_t job_id, uint32_t nonce,
@@ -131,6 +146,7 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, uint32_t job_id, uint32_t
     if (len < 0) return -1;
 
     stratum_v2_record_submit_time(sequence_number);
+    stratum_v2_update_pending_shares(GLOBAL_STATE);
     return sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
 }
 
@@ -154,6 +170,7 @@ int stratum_v2_submit_share_extended(GlobalState *GLOBAL_STATE, uint32_t job_id,
     if (len < 0) return -1;
 
     stratum_v2_record_submit_time(sequence_number);
+    stratum_v2_update_pending_shares(GLOBAL_STATE);
     return sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
 }
 
@@ -664,6 +681,7 @@ void stratum_v2_task(void *pvParameters)
         // Reset connection state
         memset(conn, 0, sizeof(*conn));
         GLOBAL_STATE->sv2_conn = conn;
+        GLOBAL_STATE->SYSTEM_MODULE.shares_pending = 0;
 
         // --- Noise Handshake ---
         ESP_LOGI(TAG, "Starting Noise handshake (Noise_NX_Secp256k1+EllSwift_ChaChaPoly_SHA256)");
@@ -947,6 +965,11 @@ void stratum_v2_task(void *pvParameters)
                         for (uint32_t i = 0; i < accepted_count; i++) {
                             SYSTEM_notify_accepted_share(GLOBAL_STATE);
                         }
+                        uint32_t resolved = last_sequence_number + 1;  // 0-based seq -> count
+                        if (resolved > conn->resolved_shares) {
+                            conn->resolved_shares = resolved;
+                        }
+                        stratum_v2_update_pending_shares(GLOBAL_STATE);
                     }
                     break;
                 }
@@ -959,6 +982,11 @@ void stratum_v2_task(void *pvParameters)
                                                       error_code, sizeof(error_code)) == 0) {
                         ESP_LOGW(TAG, "Share rejected: %s", error_code);
                         SYSTEM_notify_rejected_share(GLOBAL_STATE, error_code);
+                        uint32_t resolved = seq_num + 1;
+                        if (resolved > conn->resolved_shares) {
+                            conn->resolved_shares = resolved;
+                        }
+                        stratum_v2_update_pending_shares(GLOBAL_STATE);
                     }
                     break;
                 }

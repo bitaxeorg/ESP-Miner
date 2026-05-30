@@ -87,7 +87,8 @@ typedef struct {
 // SV2 connection state
 typedef struct sv2_conn {
     uint32_t channel_id;
-    uint32_t sequence_number;
+    uint32_t sequence_number;       // also the count of shares submitted
+    uint32_t resolved_shares;       // shares the pool has accepted or rejected
     uint8_t target[32]; // U256 LE target
     bool channel_opened;
 
