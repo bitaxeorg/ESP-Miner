@@ -166,7 +166,6 @@ export class HomeComponent implements OnInit, OnDestroy {
   private lastBucket: number = -1;
 
   // Performance optimization cache properties
-  private primaryColorRgb: { r: number, g: number, b: number } = { r: 0, g: 0, b: 0 };
   private isHardwareConfigInitialized = false;
   public asicsAmount: number = 0;
   public asicDomainsAmount: number = 0;
@@ -491,8 +490,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private rebuildChartDatasets() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
-    const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
+    const primaryColor = documentStyle.getPropertyValue('--primary-color').trim() || '#6366f1';
+    const textColor = documentStyle.getPropertyValue('--text-color').trim() || '#ffffff';
+    const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary').trim() || '#808080';
 
     const y1Unit = this.form?.get('chartY1Unit')?.value;
     const y2Unit = this.form?.get('chartY2Unit')?.value;
@@ -511,13 +511,21 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     y1Labels.filter(isLabelSupported).forEach((labelKey, index) => {
       const label = chartLabelValue(labelKey) || labelKey;
+      
+      const borderColor = index === 0 
+        ? primaryColor 
+        : `color-mix(in srgb, ${primaryColor} ${100 - index * 15}%, ${textColor} ${index * 15}%)`;
+      const backgroundColor = index === 0 
+        ? `color-mix(in srgb, ${primaryColor}, transparent 81%)` 
+        : `color-mix(in srgb, color-mix(in srgb, ${primaryColor} ${100 - index * 15}%, ${textColor} ${index * 15}%), transparent 81%)`;
+
       datasets.push({
         type: 'line',
         label: label,
         data: this.chartDatasets[labelKey] || (this.chartDatasets[labelKey] = []),
         fill: true,
-        backgroundColor: primaryColor + '30',
-        borderColor: primaryColor,
+        backgroundColor,
+        borderColor,
         tension: 0,
         pointRadius: 2,
         pointHoverRadius: 5,
@@ -527,15 +535,23 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
     });
 
-    y2Labels.filter(isLabelSupported).forEach((labelKey) => {
+    y2Labels.filter(isLabelSupported).forEach((labelKey, index) => {
       const label = chartLabelValue(labelKey) || labelKey;
+
+      const borderColor = index === 0 
+        ? textColorSecondary 
+        : `color-mix(in srgb, ${textColorSecondary} ${100 - index * 15}%, black ${index * 15}%)`;
+      const backgroundColor = index === 0 
+        ? `color-mix(in srgb, ${textColorSecondary}, transparent 81%)` 
+        : `color-mix(in srgb, color-mix(in srgb, ${textColorSecondary} ${100 - index * 15}%, black ${index * 15}%), transparent 81%)`;
+
       datasets.push({
         type: 'line',
         label: label,
         data: this.chartDatasets[labelKey] || (this.chartDatasets[labelKey] = []),
         fill: false,
-        backgroundColor: textColorSecondary,
-        borderColor: textColorSecondary,
+        backgroundColor,
+        borderColor,
         tension: 0,
         pointRadius: 2,
         pointHoverRadius: 5,
@@ -559,7 +575,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
     const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
-    this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.rebuildChartDatasets();
 
@@ -599,7 +614,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     const textColorSecondary = getComputedStyle(document.documentElement).getPropertyValue('--text-color-secondary');
     const surfaceBorder = getComputedStyle(document.documentElement).getPropertyValue('--surface-border');
     const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
-    this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.chartData = {
       labels: this.dataLabel,
@@ -1099,18 +1113,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.titleService.setTitle(parts.filter(Boolean).join(' • '));
   }
 
-  private hexToRgb(hex: string): { r: number, g: number, b: number } {
-    if (hex[0] === '#') hex = hex.slice(1);
-    if (hex.length === 3) {
-      hex = hex.split('').map((h: string) => h + h).join('');
-    }
 
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-
-    return { r, g, b };
-  }
 
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
@@ -1193,16 +1196,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     const expected = expectedHashrate || 1;
     const ratio = Math.max(0, Math.min(2, (domainHashrate / expected) * this.asicsAmount) * this.asicDomainsAmount);
     const deviation = isNaN(ratio) ? 1 : Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
-    const t = 1 - Math.pow(1 - deviation, 1.5); // Exponent controls graduality (lower = more gradual, 7 was very steep)
-    const target = ratio > 1 ? 255 : 0; // gradient from 0: black, 1: primary-color, 2: white
+    const t = 1 - Math.pow(1 - deviation, 1.5); // Exponent controls graduality
 
-    const { r, g, b } = this.primaryColorRgb;
+    const direction = ratio > 1 ? 1 : -1;
+    const amount = direction * t * 0.4;
+    const lightness = 0.5 + amount;
 
-    const finalR = (r * (1 - t) + target * t) | 0;
-    const finalG = (g * (1 - t) + target * t) | 0;
-    const finalB = (b * (1 - t) + target * t) | 0;
-
-    return `rgb(${finalR}, ${finalG}, ${finalB})`;
+    return lightness.toFixed(3);
   }
 
   private updateChartUnitGroups() {
@@ -1474,5 +1474,4 @@ export class HomeComponent implements OnInit, OnDestroy {
     const dotIndex = user.lastIndexOf('.');
     return dotIndex !== -1 ? '.' + user.substring(dotIndex + 1) : '';
   }
-
 }
