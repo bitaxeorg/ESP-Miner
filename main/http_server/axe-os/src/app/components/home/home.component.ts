@@ -781,13 +781,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: stats => {
-          this.lastHasVrTemp = stats.labels.includes(chartLabelKey(eChartLabel.vrTemp)) || this.lastHasVrTemp;
-          this.lastHasAsicTemp2 = stats.labels.includes(chartLabelKey(eChartLabel.asicTemp2)) || this.lastHasAsicTemp2;
-          this.lastHasFanRpm = stats.labels.includes(chartLabelKey(eChartLabel.fanRpm)) || this.lastHasFanRpm;
-          this.lastHasFan2Rpm = stats.labels.includes(chartLabelKey(eChartLabel.fan2Rpm)) || this.lastHasFan2Rpm;
-
-          this.updateChartUnitGroups();
-
           const idxHashrate = stats.labels.indexOf(chartLabelKey(eChartLabel.hashrate));
           const idxPower = stats.labels.indexOf(chartLabelKey(eChartLabel.power));
           const idxTimestamp = stats.labels.indexOf('timestamp');
@@ -927,8 +920,9 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.isHardwareConfigInitialized = true;
           this.asicsAmount = info.hashrateMonitor.asics.length;
           this.asicDomainsAmount = info.hashrateMonitor.asics[0]?.domains?.length ?? 0;
-          this.updateChartDataSources(info);
         }
+
+        this.updateChartDataSources(info);
 
         this.efficiency = this.calculateEfficiency(info, 'hashRate');
         this.efficiencyAverage = this.calculateEfficiency(info, 'hashRate_1m');
