@@ -786,6 +786,8 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.lastHasFanRpm = stats.labels.includes(chartLabelKey(eChartLabel.fanRpm)) || this.lastHasFanRpm;
           this.lastHasFan2Rpm = stats.labels.includes(chartLabelKey(eChartLabel.fan2Rpm)) || this.lastHasFan2Rpm;
 
+          this.updateChartUnitGroups();
+
           const idxHashrate = stats.labels.indexOf(chartLabelKey(eChartLabel.hashrate));
           const idxPower = stats.labels.indexOf(chartLabelKey(eChartLabel.power));
           const idxTimestamp = stats.labels.indexOf('timestamp');
@@ -1209,11 +1211,26 @@ export class HomeComponent implements OnInit, OnDestroy {
     return `rgb(${finalR}, ${finalG}, ${finalB})`;
   }
 
+  private updateChartUnitGroups() {
+    this.chartUnitGroups = ChartUnitGroups.map(group => {
+      return {
+        ...group,
+        labels: group.labels.filter(label => {
+          if (label === 'vrTemp') return this.lastHasVrTemp;
+          if (label === 'asicTemp2') return this.lastHasAsicTemp2;
+          if (label === 'fanRpm') return this.lastHasFanRpm;
+          if (label === 'fan2Rpm') return this.lastHasFan2Rpm;
+          return true;
+        })
+      };
+    }).filter(group => group.labels.length > 0 || group.value === 'none');
+  }
+
   private updateChartDataSources(info: ISystemInfo) {
-    const hasVrTemp = !!info.vrTemp;
-    const hasAsicTemp2 = !!(info.temp2 && info.temp2 !== -1);
-    const hasFanRpm = !!info.fanrpm;
-    const hasFan2Rpm = !!info.fan2rpm;
+    const hasVrTemp = this.lastHasVrTemp || !!info.vrTemp;
+    const hasAsicTemp2 = this.lastHasAsicTemp2 || !!(info.temp2 && info.temp2 !== -1);
+    const hasFanRpm = this.lastHasFanRpm || !!info.fanrpm;
+    const hasFan2Rpm = this.lastHasFan2Rpm || !!info.fan2rpm;
 
     if (
       this.lastHasVrTemp !== hasVrTemp ||
@@ -1234,6 +1251,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         .filter(([key, ]) => key !== 'fan2Rpm' || hasFan2Rpm)
         .map(([key, value]) => ({ name: value, value: key }));
 
+      this.updateChartUnitGroups();
       this.rebuildChartDatasets();
     }
   }
