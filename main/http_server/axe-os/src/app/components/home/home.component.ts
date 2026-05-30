@@ -515,9 +515,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       const borderColor = index === 0 
         ? primaryColor 
         : `color-mix(in srgb, ${primaryColor} ${100 - index * 15}%, ${textColor} ${index * 15}%)`;
-      const backgroundColor = index === 0 
-        ? `color-mix(in srgb, ${primaryColor}, transparent 81%)` 
-        : `color-mix(in srgb, color-mix(in srgb, ${primaryColor} ${100 - index * 15}%, ${textColor} ${index * 15}%), transparent 81%)`;
+      const backgroundColor = `color-mix(in srgb, ${borderColor}, transparent 81%)`;
 
       datasets.push({
         type: 'line',
@@ -541,9 +539,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       const borderColor = index === 0 
         ? textColorSecondary 
         : `color-mix(in srgb, ${textColorSecondary} ${100 - index * 15}%, black ${index * 15}%)`;
-      const backgroundColor = index === 0 
-        ? `color-mix(in srgb, ${textColorSecondary}, transparent 81%)` 
-        : `color-mix(in srgb, color-mix(in srgb, ${textColorSecondary} ${100 - index * 15}%, black ${index * 15}%), transparent 81%)`;
+      const backgroundColor = `color-mix(in srgb, ${borderColor}, transparent 81%)`;
 
       datasets.push({
         type: 'line',
@@ -1192,7 +1188,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     return percentage < 10 ? percentage.toPrecision(2) : percentage.toFixed(1);
   }
 
-  public getHeatmapColor(domainHashrate: number, expectedHashrate: number): string {
+  public getHeatmapLightness(domainHashrate: number, expectedHashrate: number): string {
     const expected = expectedHashrate || 1;
     const ratio = Math.max(0, Math.min(2, (domainHashrate / expected) * this.asicsAmount) * this.asicDomainsAmount);
     const deviation = isNaN(ratio) ? 1 : Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
