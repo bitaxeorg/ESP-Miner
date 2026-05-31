@@ -141,6 +141,7 @@ export class SystemApiService {
 
         boardtemp1: 30,
         boardtemp2: 40,
+        overheatMode: 0,
         overheat_mode: 0,
         statsLimit: 720,
 

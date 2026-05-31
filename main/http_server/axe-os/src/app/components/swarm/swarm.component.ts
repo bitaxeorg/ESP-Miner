@@ -369,6 +369,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       IP,
       ...existing,
       power_fault: null,
+      overheatMode: null,
       overheat_mode: null,
       isUsingFallbackStratum: null,
       blockFound: null,
@@ -469,7 +470,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
     switch (true) {
       case !!axe.miningPaused:
         return { color: 'yellow', msg: 'Paused' };
-      case axe.overheat_mode === 1:
+      case (axe.overheatMode ?? axe.overheat_mode) === 1:
         return { color: 'red', msg: 'Overheated' };
       case !!axe.power_fault:
         return { color: 'red', msg: 'Power Fault' };

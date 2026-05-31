@@ -157,6 +157,7 @@ components:
         - maxPower
         - minFanSpeed
         - nominalVoltage
+        - overheatMode
         - overheat_mode
         - overclockEnabled
         - poolConnectionInfo
@@ -357,6 +358,9 @@ components:
         nominalVoltage:
           type: integer
           description: Nominal board voltage
+        overheatMode:
+          type: number
+          description: CamelCase compatibility alias for overheat_mode
         overheat_mode:
           type: number
           description: Overheat protection mode
