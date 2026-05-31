@@ -1,5 +1,7 @@
 #include "unity.h"
 #include "stratum_api.h"
+#include "utils.h"
+#include <string.h>
 
 TEST_CASE("Parse stratum method", "[stratum]")
 {
@@ -115,6 +117,17 @@ TEST_CASE("Parse stratum mining.set_version_mask params", "[stratum]")
     TEST_ASSERT_EQUAL(1, stratum_api_v1_message.message_id);
     TEST_ASSERT_EQUAL(MINING_SET_VERSION_MASK, stratum_api_v1_message.method);
     TEST_ASSERT_EQUAL_HEX32(0x1fffe000, stratum_api_v1_message.version_mask);
+}
+
+TEST_CASE("Build version rolling configure with supported mask", "[stratum]")
+{
+    char configure_msg[256];
+
+    STRATUM_V1_build_configure_version_rolling_message(
+        configure_msg, sizeof(configure_msg), 1, STRATUM_DEFAULT_VERSION_MASK);
+
+    TEST_ASSERT_NOT_NULL(strstr(configure_msg, "\"version-rolling.mask\":\"1fffe000\""));
+    TEST_ASSERT_NULL(strstr(configure_msg, "\"version-rolling.mask\":\"ffffffff\""));
 }
 
 TEST_CASE("Parse stratum result success", "[stratum]")

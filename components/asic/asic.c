@@ -10,6 +10,7 @@
 #include "asic.h"
 #include "device_config.h"
 #include "frequency_transition_bmXX.h"
+#include "utils.h"
 
 static const char *TAG = "asic";
 
@@ -102,6 +103,26 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
             ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set version mask", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
             break;
     }
+}
+
+uint32_t ASIC_get_supported_version_mask(GlobalState * GLOBAL_STATE)
+{
+    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+        case BM1366:
+        case BM1368:
+        case BM1370:
+            return STRATUM_DEFAULT_VERSION_MASK;
+        case BM1397:
+            return UINT32_MAX;
+        default:
+            ESP_LOGE(TAG, "Unknown ASIC id %d, cannot get supported version mask", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+            return 0;
+    }
+}
+
+uint32_t ASIC_clamp_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
+{
+    return mask & ASIC_get_supported_version_mask(GLOBAL_STATE);
 }
 
 void ASIC_set_frequency(GlobalState * GLOBAL_STATE)

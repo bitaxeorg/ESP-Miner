@@ -1,9 +1,51 @@
 #include "unity.h"
 
+#include "asic.h"
 #include "serial.h"
 #include "bm1397.h"
+#include "utils.h"
 
 #include <string.h>
+
+static void set_test_asic(GlobalState *state, Asic asic_id)
+{
+    memset(state, 0, sizeof(*state));
+    state->DEVICE_CONFIG.family.asic.id = asic_id;
+}
+
+TEST_CASE("ASIC supported version mask for BM1366/BM1368/BM1370", "[asic]")
+{
+    GlobalState state;
+
+    set_test_asic(&state, BM1366);
+    TEST_ASSERT_EQUAL_HEX32(STRATUM_DEFAULT_VERSION_MASK, ASIC_get_supported_version_mask(&state));
+
+    set_test_asic(&state, BM1368);
+    TEST_ASSERT_EQUAL_HEX32(STRATUM_DEFAULT_VERSION_MASK, ASIC_get_supported_version_mask(&state));
+
+    set_test_asic(&state, BM1370);
+    TEST_ASSERT_EQUAL_HEX32(STRATUM_DEFAULT_VERSION_MASK, ASIC_get_supported_version_mask(&state));
+}
+
+TEST_CASE("ASIC clamps version rolling masks to supported bits", "[asic]")
+{
+    GlobalState state;
+
+    set_test_asic(&state, BM1370);
+
+    TEST_ASSERT_EQUAL_HEX32(0x1fffe000, ASIC_clamp_version_mask(&state, 0xffffffff));
+    TEST_ASSERT_EQUAL_HEX32(0x00000000, ASIC_clamp_version_mask(&state, 0x00001fff));
+    TEST_ASSERT_EQUAL_HEX32(0x00000000, ASIC_clamp_version_mask(&state, 0xe0000000));
+}
+
+TEST_CASE("ASIC keeps BM1397 version mask compatibility", "[asic]")
+{
+    GlobalState state;
+
+    set_test_asic(&state, BM1397);
+
+    TEST_ASSERT_EQUAL_HEX32(0xffffffff, ASIC_clamp_version_mask(&state, 0xffffffff));
+}
 
 /*
 static uint8_t uart_initialized = 0;
