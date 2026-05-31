@@ -5,6 +5,7 @@
 #include "serial.h"
 #include <string.h>
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "nvs_config.h"
 #include "utils.h"
 #include "stratum_v2_task.h"
@@ -63,6 +64,10 @@ void ASIC_result_task(void *pvParameters)
         {
             bool local_work_enabled = local_work_is_enabled();
             if (active_job->source == BM_JOB_SOURCE_LOCAL_WORK) {
+                float process_time = (esp_timer_get_time() - asic_result->timestamp_us) / 1000.0f;
+                GLOBAL_STATE->SYSTEM_MODULE.process_time = process_time;
+                ESP_LOGI(TAG, "Local Work processing time: %0.1f ms", process_time);
+
                 if (local_work_enabled) {
                     double network_diff = networkDifficulty(active_job->target);
                     if (nonce_diff >= network_diff) {

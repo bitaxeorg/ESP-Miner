@@ -138,6 +138,7 @@ export class SystemApiService {
         localWorkBlockLastError: "",
         poolDifficulty: 1000,
         responseTime: 10,
+        processTime: 1.2,
         isUsingFallbackStratum: 0,
         poolConnectionInfo: "IPv4 (TLS)",
         frequency: 485,

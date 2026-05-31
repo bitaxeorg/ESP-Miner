@@ -25,7 +25,7 @@ import { LocalStorageService } from 'src/app/local-storage.service';
 import { GridStack, GridItemHTMLElement } from 'gridstack';
 import { DashboardEditService, WidgetDef } from 'src/app/services/dashboard-edit.service';
 
-type PoolLabel = 'Primary' | 'Fallback';
+type PoolLabel = 'Primary' | 'Fallback' | 'Local Work';
 type MessageType =
   | 'SYSTEM_INFO_ERROR'
   | 'MINING_PAUSED'
@@ -98,7 +98,10 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolURL!: string;
   public activePoolPort!: number;
   public activePoolUser!: string;
+  public activePoolDisplayURL!: string;
   public activePoolLabel!: PoolLabel;
+  public activePoolTime!: number;
+  public activePoolTimeTooltip!: string;
   public responseTime!: number;
 
   public flashShare: boolean = false;
@@ -804,11 +807,25 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.updateChart(info);
         }
 
+        const isLocalWorkMode = this.isLocalWorkMode(info);
         const isFallbackPool = !!info.isUsingFallbackStratum;
-        this.activePoolURL = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
-        this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
-        this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
-        this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
+        if (isLocalWorkMode) {
+          this.activePoolURL = info.localWorkBitcoinRpcUrl || '';
+          this.activePoolUser = info.localWorkPayoutAddress || '';
+          this.activePoolPort = 0;
+          this.activePoolDisplayURL = this.activePoolURL || 'Bitcoin RPC';
+          this.activePoolLabel = 'Local Work';
+          this.activePoolTime = info.processTime ?? 0;
+          this.activePoolTimeTooltip = 'Time from ASIC nonce result to ESP32 local share validation';
+        } else {
+          this.activePoolURL = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
+          this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
+          this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
+          this.activePoolDisplayURL = `${this.activePoolURL}:${this.activePoolPort}`;
+          this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
+          this.activePoolTime = info.responseTime ?? 0;
+          this.activePoolTimeTooltip = 'Time it takes for the pool to respond to a share';
+        }
         this.responseTime = info.responseTime;
 
         const currentShares = info.sharesAccepted + info.sharesRejected;
@@ -855,6 +872,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.quickLink$ = this.info$.pipe(
       map(info => {
+        if (this.isLocalWorkMode(info)) {
+          return undefined;
+        }
         const isFallbackPool = !!info.isUsingFallbackStratum;
         const url = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
         const user = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
@@ -959,6 +979,11 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   getProtocolLabel(info: ISystemInfo): string {
     return info.activeProtocolLabel ?? 'SV1';
+  }
+
+  isLocalWorkMode(info: ISystemInfo): boolean {
+    return info.activeProtocolLabel === 'Local Work' ||
+      (!!info.localWorkEnabled && !!info.localWorkTemplateReachable && !info.isUsingFallbackStratum);
   }
 
   hasCoinbaseVisibility(info: ISystemInfo): boolean {

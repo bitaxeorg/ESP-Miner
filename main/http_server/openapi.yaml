@@ -285,6 +285,9 @@ components:
         responseTime:
           type: number
           description: Pool response time in ms
+        processTime:
+          type: number
+          description: Local share processing time in ms
         rotation:
           type: number
           description: Screen rotation setting (0, 90, 180, 270)
