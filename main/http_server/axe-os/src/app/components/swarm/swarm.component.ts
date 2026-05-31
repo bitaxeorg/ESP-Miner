@@ -36,7 +36,21 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalTime = 30;
   public refreshTimeSet = 30;
 
-  public totals: { hashRate: number; power: number; bestDiff: number } = { hashRate: 0, power: 0, bestDiff: 0 };
+  public totals: {
+    hashRate: number;
+    power: number;
+    bestDiff: number;
+    hashingDevices: number;
+    pausedDevices: number;
+    nonAccessibleDevices: number;
+  } = {
+    hashRate: 0,
+    power: 0,
+    bestDiff: 0,
+    hashingDevices: 0,
+    pausedDevices: 0,
+    nonAccessibleDevices: 0
+  };
 
   public isRefreshing = false;
 
@@ -261,6 +275,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       version: 0,
       uptimeSeconds: 0,
       poolDifficulty: 0,
+      nonAccessible: true,
     });
   };
 
@@ -325,13 +340,17 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public isNotHashing(axe: any): boolean {
-    return !!axe.miningPaused || !axe.hashRate;
+    return !!axe.miningPaused || !axe.hashRate || !!axe.nonAccessible;
   }
 
   private calculateTotals() {
     this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (this.isNotHashing(axe) ? 0 : (axe.hashRate || 0)), 0);
     this.totals.power = this.swarm.reduce((sum, axe) => sum + (this.isNotHashing(axe) ? 0 : (axe.power || 0)), 0);
     this.totals.bestDiff = this.swarm.reduce((max, axe) => Math.max(max, axe.bestDiff || 0), 0);
+
+    this.totals.hashingDevices = this.swarm.filter(axe => !this.isNotHashing(axe) && !axe.nonAccessible).length;
+    this.totals.pausedDevices = this.swarm.filter(axe => !axe.nonAccessible && !!axe.miningPaused).length;
+    this.totals.nonAccessibleDevices = this.swarm.filter(axe => !!axe.nonAccessible).length;
   }
 
   get deviceFamilies(): SwarmDevice[] {
@@ -376,6 +395,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       overheat_mode: null,
       isUsingFallbackStratum: null,
       blockFound: null,
+      nonAccessible: null,
       ...info,
       ...asic,
     };
