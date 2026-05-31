@@ -26,6 +26,7 @@
 #define NACK_VALUE     0x1
 #define MAX_BLOCK_LEN  32
 #define TPS546_POWER_GOOD_GRACE_MS 250
+#define TPS546_I2C_TIMEOUT_MS 500
 
 static const char *TAG = "TPS546";
 
@@ -38,6 +39,7 @@ static i2c_master_dev_handle_t tps546_i2c_handle;
 
 static TPS546_CONFIG tps546_config;
 static TickType_t tps546_power_good_grace_until = 0;
+static i2c_master_dev_handle_t tps546_alert_i2c_handle;
 
 // Cached values to handle I2C failures robustly
 static float last_vin = 0.0f;
@@ -47,6 +49,14 @@ static int last_temp = 0;
 
 
 static esp_err_t TPS546_parse_status(uint16_t);
+
+static esp_err_t TPS546_read_alert_response(uint8_t *alert_response)
+{
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_add_device(TPS546_I2CADDR_ALERT, &tps546_alert_i2c_handle, "TPS546_ALERT"),
+                        TAG, "Failed to add TPS546 SMBus alert address");
+
+    return i2c_master_receive(tps546_alert_i2c_handle, alert_response, 1, TPS546_I2C_TIMEOUT_MS);
+}
 
 /**
  * @brief SMBus read byte
@@ -387,6 +397,21 @@ esp_err_t TPS546_init(TPS546_CONFIG config)
     tps546_config = config;
 
     ESP_LOGI(TAG, "Initializing the core voltage regulator");
+    ESP_LOGI(TAG, "Scanning I2C bus before TPS546 probe; expected 7-bit address is 0x%02X", TPS546_I2CADDR);
+    size_t found_devices = i2c_bitaxe_scan_bus(0x03, 0x77, TAG);
+    ESP_LOGI(TAG, "I2C pre-probe scan found %u device(s)", (unsigned)found_devices);
+
+    uint8_t alert_response = 0;
+    esp_err_t alert_err = TPS546_read_alert_response(&alert_response);
+    if (alert_err == ESP_OK) {
+        ESP_LOGW(TAG, "SMBus alert response raw=0x%02X decoded 7-bit address=0x%02X", alert_response,
+                 alert_response >> 1);
+        found_devices = i2c_bitaxe_scan_bus(0x03, 0x77, TAG);
+        ESP_LOGI(TAG, "I2C post-alert-response scan found %u device(s)", (unsigned)found_devices);
+    } else {
+        ESP_LOGI(TAG, "No SMBus alert response read: %s", esp_err_to_name(alert_err));
+    }
+
     ESP_RETURN_ON_ERROR(i2c_bitaxe_add_device(TPS546_I2CADDR, &tps546_i2c_handle, TAG), TAG, "Failed to add TPS546 I2C");
 
     // 1) Power-up guard (PMBus ready after AVIN UVLO + ~8 ms)
@@ -414,7 +439,9 @@ esp_err_t TPS546_init(TPS546_CONFIG config)
     ESP_LOGI(TAG, "Device ID: %02x %02x %02x %02x %02x %02x", id[0], id[1], id[2], id[3], id[4], id[5]);
 
     if (!id_matched) {
-        i2c_bitaxe_scan_bus(0x03, 0x77, TAG);
+        ESP_LOGW(TAG, "TPS546 ID mismatch; rescanning I2C bus");
+        found_devices = i2c_bitaxe_scan_bus(0x03, 0x77, TAG);
+        ESP_LOGI(TAG, "I2C post-failure scan found %u device(s)", (unsigned)found_devices);
         ESP_LOGE(TAG, "Cannot find TPS546 regulator - Device ID mismatch");
         return ESP_FAIL;
     }

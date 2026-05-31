@@ -29,8 +29,8 @@ esp_err_t BAP_init(GlobalState *state) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (strcmp(state->DEVICE_CONFIG.board_version, "900") == 0) {
-        ESP_LOGW(TAG, "BAP UART disabled on board 900 because LCD uses the configured BAP pins");
+    if (state->DEVICE_CONFIG.family.id == GAMMA_HEX) {
+        ESP_LOGW(TAG, "BAP UART disabled on %s because LCD uses the configured BAP pins", state->DEVICE_CONFIG.family.name);
         return ESP_OK;
     }
     

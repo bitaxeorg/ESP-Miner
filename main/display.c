@@ -10,6 +10,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_check.h"
+#include "esp_heap_caps.h"
 #include "driver/gpio.h"
 #include "lvgl.h"
 #include "lvgl__lvgl/src/themes/lv_theme_private.h"
@@ -55,6 +56,7 @@
 #define LCD_BK_LIGHT_OFF_LEVEL  0
 #define LCD_PWR_ON_LEVEL        1
 #define LCD_PWR_OFF_LEVEL       0
+#define LCD_BOOT_PROBE_MS       750
 
 static const char * TAG = "display";
 static const char * LVGL_TAG = "lvgl";
@@ -72,6 +74,7 @@ LV_FONT_DECLARE(lv_font_unscii_16);
 
 esp_err_t display_on(bool display_on);
 static void my_log_cb(lv_log_level_t level, const char * buf);
+static esp_err_t st7789_boot_probe(void);
 
 static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
     if (lv_obj_get_parent(obj) == NULL) {
@@ -81,7 +84,7 @@ static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
 
 static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
 {
-    if (strcmp(GLOBAL_STATE->DEVICE_CONFIG.board_version, "900") == 0) {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_HEX) {
         const DisplayConfig * display_config = get_display_config("ST7789 (320x170)");
         GLOBAL_STATE->DISPLAY_CONFIG = *display_config;
         ESP_LOGI(TAG, "%s", GLOBAL_STATE->DISPLAY_CONFIG.name);
@@ -167,6 +170,11 @@ static esp_err_t init_i80_st7789_display(GlobalState * GLOBAL_STATE, const lvgl_
     ESP_RETURN_ON_ERROR(esp_lcd_panel_swap_xy(panel_handle, true), TAG, "Panel swap XY failed");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_mirror(panel_handle, true, false), TAG, "Panel mirror failed");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_set_gap(panel_handle, LCD_I80_GAP_X, LCD_I80_GAP_Y), TAG, "Panel gap failed");
+    display_has_backlight = true;
+
+#if LCD_BOOT_PROBE_MS > 0
+    ESP_RETURN_ON_ERROR(st7789_boot_probe(), TAG, "ST7789 boot probe failed");
+#endif
 
     ESP_LOGI(TAG, "Initialize LVGL");
     ESP_RETURN_ON_ERROR(lvgl_port_init(lvgl_cfg), TAG, "LVGL init failed");
@@ -224,11 +232,49 @@ static esp_err_t init_i80_st7789_display(GlobalState * GLOBAL_STATE, const lvgl_
         lvgl_port_unlock();
     }
 
-    display_has_backlight = true;
     ESP_RETURN_ON_ERROR(display_on(true), TAG, "Display on failed");
     GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = true;
 
     ESP_LOGI(TAG, "ST7789 display init success!");
+    return ESP_OK;
+}
+
+static esp_err_t st7789_fill_color(uint16_t color)
+{
+    const size_t pixels = LCD_I80_H_RES * LCD_I80_BUF_LINES;
+    uint16_t *buf = heap_caps_malloc(pixels * sizeof(uint16_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+    ESP_RETURN_ON_FALSE(buf, ESP_ERR_NO_MEM, TAG, "Failed to allocate ST7789 boot probe buffer");
+
+    for (size_t i = 0; i < pixels; i++) {
+        buf[i] = color;
+    }
+
+    esp_err_t ret = ESP_OK;
+    for (int y = 0; y < LCD_I80_V_RES; y += LCD_I80_BUF_LINES) {
+        int y_end = y + LCD_I80_BUF_LINES;
+        if (y_end > LCD_I80_V_RES) {
+            y_end = LCD_I80_V_RES;
+        }
+        ret = esp_lcd_panel_draw_bitmap(panel_handle, 0, y, LCD_I80_H_RES, y_end, buf);
+        if (ret != ESP_OK) {
+            break;
+        }
+    }
+
+    free(buf);
+    return ret;
+}
+
+static esp_err_t st7789_boot_probe(void)
+{
+    ESP_LOGI(TAG, "Draw ST7789 boot probe");
+    ESP_RETURN_ON_ERROR(display_on(true), TAG, "Display on failed");
+    ESP_RETURN_ON_ERROR(st7789_fill_color(0xF800), TAG, "Red fill failed");
+    vTaskDelay(pdMS_TO_TICKS(LCD_BOOT_PROBE_MS / 3));
+    ESP_RETURN_ON_ERROR(st7789_fill_color(0x07E0), TAG, "Green fill failed");
+    vTaskDelay(pdMS_TO_TICKS(LCD_BOOT_PROBE_MS / 3));
+    ESP_RETURN_ON_ERROR(st7789_fill_color(0x001F), TAG, "Blue fill failed");
+    vTaskDelay(pdMS_TO_TICKS(LCD_BOOT_PROBE_MS / 3));
     return ESP_OK;
 }
 

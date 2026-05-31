@@ -31,7 +31,7 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         config.TPS546_INIT_VIN_OFF = 10.5;
         config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
         config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
-        config.TPS546_INIT_SCALE_LOOP = 0.25;
+        config.TPS546_INIT_SCALE_LOOP = 0.125;
         config.TPS546_INIT_VOUT_MIN = 2;
         config.TPS546_INIT_VOUT_MAX = 3;
         config.TPS546_INIT_VOUT_COMMAND = 2.4;
