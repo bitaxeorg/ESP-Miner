@@ -106,15 +106,50 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
 // (ring buffer) and measure against the specific share being acknowledged
 // rather than just the most recent submit.
 #define SV2_SUBMIT_TIMING_SLOTS 32
+#define SV2_MAX_ACCEPTED_SHARE_NOTIFICATIONS 0xffffu
 static int64_t stratum_v2_submit_time_us[SV2_SUBMIT_TIMING_SLOTS] = {0};
+static uint32_t stratum_v2_submit_sequence_number[SV2_SUBMIT_TIMING_SLOTS] = {0};
+static bool stratum_v2_submit_valid[SV2_SUBMIT_TIMING_SLOTS] = {0};
+static bool stratum_v2_share_block_candidate[SV2_SUBMIT_TIMING_SLOTS] = {0};
+static double stratum_v2_share_diff[SV2_SUBMIT_TIMING_SLOTS] = {0};
 
-static inline void stratum_v2_record_submit_time(uint32_t sequence_number)
+static inline void stratum_v2_record_submit(uint32_t sequence_number, bool is_block_candidate, double diff)
 {
-    stratum_v2_submit_time_us[sequence_number % SV2_SUBMIT_TIMING_SLOTS] = esp_timer_get_time();
+    int slot = sequence_number % SV2_SUBMIT_TIMING_SLOTS;
+    stratum_v2_submit_time_us[slot] = esp_timer_get_time();
+    stratum_v2_submit_sequence_number[slot] = sequence_number;
+    stratum_v2_submit_valid[slot] = true;
+    stratum_v2_share_block_candidate[slot] = is_block_candidate;
+    stratum_v2_share_diff[slot] = diff;
+}
+
+static inline bool stratum_v2_submit_slot_matches(uint32_t sequence_number, int *slot)
+{
+    int submit_slot = sequence_number % SV2_SUBMIT_TIMING_SLOTS;
+    if (slot) {
+        *slot = submit_slot;
+    }
+    return stratum_v2_submit_valid[submit_slot] &&
+           stratum_v2_submit_sequence_number[submit_slot] == sequence_number;
+}
+
+static inline void stratum_v2_clear_submit_slot(uint32_t sequence_number)
+{
+    int slot;
+    if (!stratum_v2_submit_slot_matches(sequence_number, &slot)) {
+        return;
+    }
+
+    stratum_v2_submit_time_us[slot] = 0;
+    stratum_v2_submit_sequence_number[slot] = 0;
+    stratum_v2_submit_valid[slot] = false;
+    stratum_v2_share_block_candidate[slot] = false;
+    stratum_v2_share_diff[slot] = 0;
 }
 
 int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, uint32_t job_id, uint32_t nonce,
-                            uint32_t ntime, uint32_t version)
+                            uint32_t ntime, uint32_t version,
+                            bool is_block_candidate, double diff)
 {
     if (!GLOBAL_STATE->transport || !GLOBAL_STATE->sv2_conn || !GLOBAL_STATE->sv2_noise_ctx) {
         return -1;
@@ -130,13 +165,18 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, uint32_t job_id, uint32_t
                                                 job_id, nonce, ntime, version);
     if (len < 0) return -1;
 
-    stratum_v2_record_submit_time(sequence_number);
-    return sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
+    stratum_v2_record_submit(sequence_number, is_block_candidate, diff);
+    int ret = sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
+    if (ret < 0) {
+        stratum_v2_clear_submit_slot(sequence_number);
+    }
+    return ret;
 }
 
 int stratum_v2_submit_share_extended(GlobalState *GLOBAL_STATE, uint32_t job_id,
                                      uint32_t nonce, uint32_t ntime, uint32_t version,
-                                     const uint8_t *extranonce, uint8_t extranonce_len)
+                                     const uint8_t *extranonce, uint8_t extranonce_len,
+                                     bool is_block_candidate, double diff)
 {
     if (!GLOBAL_STATE->transport || !GLOBAL_STATE->sv2_conn || !GLOBAL_STATE->sv2_noise_ctx) {
         return -1;
@@ -153,8 +193,12 @@ int stratum_v2_submit_share_extended(GlobalState *GLOBAL_STATE, uint32_t job_id,
                                                 extranonce, extranonce_len);
     if (len < 0) return -1;
 
-    stratum_v2_record_submit_time(sequence_number);
-    return sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
+    stratum_v2_record_submit(sequence_number, is_block_candidate, diff);
+    int ret = sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
+    if (ret < 0) {
+        stratum_v2_clear_submit_slot(sequence_number);
+    }
+    return ret;
 }
 
 bool stratum_v2_is_extended_channel(GlobalState *GLOBAL_STATE)
@@ -929,23 +973,56 @@ void stratum_v2_task(void *pvParameters)
                 case SV2_MSG_SUBMIT_SHARES_SUCCESS: {
                     uint32_t channel_id, last_sequence_number, accepted_count;
                     if (sv2_parse_submit_shares_success(recv_buf, hdr.msg_length, &channel_id, &last_sequence_number, &accepted_count) == 0) {
-                        // Measure against the share acknowledged by last_sequence_number — the
+                        uint32_t share_notify_count = accepted_count;
+                        if (share_notify_count > SV2_MAX_ACCEPTED_SHARE_NOTIFICATIONS) {
+                            ESP_LOGW(TAG, "SubmitShares.Success accepted_count %lu exceeds safe notification limit",
+                                     accepted_count);
+                            share_notify_count = SV2_MAX_ACCEPTED_SHARE_NOTIFICATIONS;
+                        }
+
+                        uint32_t track_count = accepted_count;
+                        if (track_count > SV2_SUBMIT_TIMING_SLOTS) {
+                            track_count = SV2_SUBMIT_TIMING_SLOTS;
+                        }
+                        if (track_count > 0 && last_sequence_number < track_count - 1) {
+                            ESP_LOGW(TAG, "SubmitShares.Success accepted_count %lu exceeds last sequence %lu",
+                                     accepted_count, last_sequence_number);
+                            track_count = last_sequence_number + 1;
+                        }
+
+                        // Measure against the share acknowledged by last_sequence_number, the
                         // most recent share in the ack, giving the cleanest available round trip.
                         // accepted_count is surfaced separately so the UI can flag batch acks,
                         // where the elapsed time also includes the pool's batching window.
-                        int slot = last_sequence_number % SV2_SUBMIT_TIMING_SLOTS;
-                        int64_t submit_time_us = stratum_v2_submit_time_us[slot];
-                        if (submit_time_us > 0) {
+                        int slot;
+                        if (accepted_count > 0 &&
+                            stratum_v2_submit_slot_matches(last_sequence_number, &slot) &&
+                            stratum_v2_submit_time_us[slot] > 0) {
+                            int64_t submit_time_us = stratum_v2_submit_time_us[slot];
                             float response_time_ms = (float)(esp_timer_get_time() - submit_time_us) / 1000.0f;
                             ESP_LOGI(TAG, "Shares accepted: %lu (%.1f ms)", accepted_count, response_time_ms);
                             GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
-                            GLOBAL_STATE->SYSTEM_MODULE.response_share_batch = (uint16_t)accepted_count;
-                            stratum_v2_submit_time_us[slot] = 0;
+                            GLOBAL_STATE->SYSTEM_MODULE.response_share_batch =
+                                (uint16_t)(accepted_count > 0xffffu ? 0xffffu : accepted_count);
                         } else {
                             ESP_LOGI(TAG, "Shares accepted: %lu", accepted_count);
                         }
-                        for (uint32_t i = 0; i < accepted_count; i++) {
+
+                        for (uint32_t i = 0; i < share_notify_count; i++) {
                             SYSTEM_notify_accepted_share(GLOBAL_STATE);
+                        }
+
+                        for (uint32_t i = 0; i < track_count; i++) {
+                            uint32_t sequence_number = last_sequence_number - i;
+                            int accepted_slot;
+                            if (!stratum_v2_submit_slot_matches(sequence_number, &accepted_slot)) {
+                                continue;
+                            }
+
+                            if (stratum_v2_share_block_candidate[accepted_slot]) {
+                                SYSTEM_notify_accepted_block(GLOBAL_STATE, stratum_v2_share_diff[accepted_slot]);
+                            }
+                            stratum_v2_clear_submit_slot(sequence_number);
                         }
                     }
                     break;
@@ -957,8 +1034,14 @@ void stratum_v2_task(void *pvParameters)
                     if (sv2_parse_submit_shares_error(recv_buf, hdr.msg_length,
                                                       &channel_id, &seq_num,
                                                       error_code, sizeof(error_code)) == 0) {
+                        int slot;
                         ESP_LOGW(TAG, "Share rejected: %s", error_code);
                         SYSTEM_notify_rejected_share(GLOBAL_STATE, error_code);
+                        if (stratum_v2_submit_slot_matches(seq_num, &slot)) {
+                            stratum_v2_clear_submit_slot(seq_num);
+                        } else {
+                            ESP_LOGW(TAG, "Share rejected for untracked sequence: %lu", seq_num);
+                        }
                     }
                     break;
                 }

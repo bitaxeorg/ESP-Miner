@@ -45,6 +45,30 @@
 static const char *TAG = "stratum_v1_task";
 
 static StratumApiV1Message stratum_api_v1_message = {};
+static int stratum_v1_share_request_id[MAX_REQUEST_IDS] = {0};
+static bool stratum_v1_share_block_candidate[MAX_REQUEST_IDS] = {0};
+static double stratum_v1_share_diff[MAX_REQUEST_IDS] = {0};
+
+void stratum_v1_record_share_block_candidate(int request_id, bool is_block_candidate, double diff)
+{
+    if (request_id < 0) {
+        return;
+    }
+
+    int slot = request_id % MAX_REQUEST_IDS;
+    stratum_v1_share_request_id[slot] = request_id;
+    stratum_v1_share_block_candidate[slot] = is_block_candidate;
+    stratum_v1_share_diff[slot] = diff;
+}
+
+static void stratum_v1_clear_share_block_candidates(void)
+{
+    for (int i = 0; i < MAX_REQUEST_IDS; i++) {
+        stratum_v1_share_request_id[i] = -1;
+    }
+    memset(stratum_v1_share_block_candidate, 0, sizeof(stratum_v1_share_block_candidate));
+    memset(stratum_v1_share_diff, 0, sizeof(stratum_v1_share_diff));
+}
 
 static int stratum_get_next_uid(GlobalState * GLOBAL_STATE)
 {
@@ -61,6 +85,7 @@ static void stratum_v1_reset_uid(GlobalState *GLOBAL_STATE)
     taskENTER_CRITICAL(&GLOBAL_STATE->stratum_mux);
     GLOBAL_STATE->send_uid = 1;
     taskEXIT_CRITICAL(&GLOBAL_STATE->stratum_mux);
+    stratum_v1_clear_share_block_candidates();
 }
 
 void stratum_v1_close_connection(GlobalState *GLOBAL_STATE)
@@ -170,6 +195,8 @@ static void decode_mining_notification(GlobalState * GLOBAL_STATE, const mining_
 void stratum_v1_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+
+    stratum_v1_clear_share_block_candidates();
 
     bool use_fallback = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
     char *stratum_url = use_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
@@ -372,7 +399,16 @@ void stratum_v1_task(void *pvParameters)
                 stratum_v1_close_connection(GLOBAL_STATE);
                 break;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
-                float response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id, receive_time_us);
+                int response_message_id = stratum_api_v1_message.message_id;
+                if (response_message_id < 0) {
+                    ESP_LOGW(TAG, "Ignoring stratum result with invalid message id: %d", response_message_id);
+                    STRATUM_V1_reset_message(&stratum_api_v1_message);
+                    continue;
+                }
+
+                int slot = response_message_id % MAX_REQUEST_IDS;
+                bool matching_share = stratum_v1_share_request_id[slot] == response_message_id;
+                float response_time_ms = STRATUM_V1_get_response_time_ms(response_message_id, receive_time_us);
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "message result accepted");
                     if (response_time_ms >= 0) {
@@ -380,10 +416,23 @@ void stratum_v1_task(void *pvParameters)
                         GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
                         SYSTEM_notify_accepted_share(GLOBAL_STATE);
                     }
+                    if (matching_share) {
+                        if (stratum_v1_share_block_candidate[slot]) {
+                            SYSTEM_notify_accepted_block(GLOBAL_STATE, stratum_v1_share_diff[slot]);
+                        }
+                        stratum_v1_share_request_id[slot] = -1;
+                        stratum_v1_share_block_candidate[slot] = false;
+                        stratum_v1_share_diff[slot] = 0;
+                    }
                 } else {
                     ESP_LOGW(TAG, "message result rejected: %s", stratum_api_v1_message.error_str);
                     if (response_time_ms >= 0) {
                         SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
+                    }
+                    if (matching_share) {
+                        stratum_v1_share_request_id[slot] = -1;
+                        stratum_v1_share_block_candidate[slot] = false;
+                        stratum_v1_share_diff[slot] = 0;
                     }
                 }
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {

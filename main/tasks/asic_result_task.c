@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "nvs_config.h"
 #include "utils.h"
+#include "stratum_v1_task.h"
 #include "stratum_v2_task.h"
 #include "sv2_protocol.h"
 #include "hashrate_monitor_task.h"
@@ -58,6 +59,9 @@ void ASIC_result_task(void *pvParameters)
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) continue;
 
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
+        bool is_block_candidate = SYSTEM_is_block_candidate(GLOBAL_STATE, nonce_diff, job_id);
+        SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, job_id);
+
         if (nonce_diff >= active_job->pool_diff)
         {
             if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
@@ -76,12 +80,16 @@ void ASIC_result_task(void *pvParameters)
                                                            asic_result->nonce,
                                                            active_job->ntime,
                                                            asic_result->rolled_version,
-                                                           extranonce_2, en2_len);
+                                                           extranonce_2, en2_len,
+                                                           is_block_candidate,
+                                                           nonce_diff);
                 } else {
                     ret = stratum_v2_submit_share(GLOBAL_STATE, sv2_job_id,
                                                    asic_result->nonce,
                                                    active_job->ntime,
-                                                   asic_result->rolled_version);
+                                                   asic_result->rolled_version,
+                                                   is_block_candidate,
+                                                   nonce_diff);
                 }
 
                 if (ret < 0) {
@@ -115,6 +123,8 @@ void ASIC_result_task(void *pvParameters)
                     if (ret < 0) {
                         ESP_LOGW(TAG, "Unable to write share to socket (ret: %d, errno %d: %s)", ret, errno, strerror(errno));
                         // stratum_task recv loop will detect a broken connection on its next read and handle reconnection
+                    } else {
+                        stratum_v1_record_share_block_candidate(uid, is_block_candidate, nonce_diff);
                     }
 
                     float process_time = (sent_time_us - asic_result->timestamp_us) / 1000.0f;
@@ -126,8 +136,6 @@ void ASIC_result_task(void *pvParameters)
 
         //log the ASIC response
         ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, Core: %d/%d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %g.", active_job->jobid, asic_result->asic_nr, asic_result->core_id, asic_result->small_core_id, asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
-
-        SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, job_id);
 
         scoreboard_add(&GLOBAL_STATE->SYSTEM_MODULE.scoreboard, nonce_diff, active_job->jobid, active_job->extranonce2, active_job->ntime, asic_result->nonce, version_bits);
     }
