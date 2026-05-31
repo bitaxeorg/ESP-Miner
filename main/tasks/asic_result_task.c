@@ -13,6 +13,7 @@
 #include "asic.h"
 #include "freertos/task.h"
 #include "scoreboard.h"
+#include "self_test.h"
 
 static const char *TAG = "asic_result";
 
@@ -55,7 +56,10 @@ void ASIC_result_task(void *pvParameters)
         // check the nonce difficulty
         double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
 
-        if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) continue;
+        if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
+            self_test_record_nonce(GLOBAL_STATE, nonce_diff);
+            continue;
+        }
 
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)

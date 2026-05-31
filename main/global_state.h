@@ -118,7 +118,17 @@ typedef struct
 typedef struct
 {
     bool is_active;
+    uint64_t accepted_count;
+    uint64_t rejected_count;
+    double hashes;
+    pthread_mutex_t lock;
+} SelfTestNonceMeasurement;
+
+typedef struct
+{
+    bool is_active;
     bool is_finished;
+    SelfTestNonceMeasurement nonce_measurement;
     char *message;
     char *result;
     char *finished;
