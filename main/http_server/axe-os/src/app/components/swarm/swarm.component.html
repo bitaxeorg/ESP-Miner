@@ -87,7 +87,7 @@
         <ng-container *ngIf="filteredSwarm.length; else noFilterResults">
             <div class="grid" *ngIf="gridView">
                 <div class="col-12 sm:col-6 xl:col-{{staticMenuDesktopInactive ? 3 : 4}}" *ngFor="let axe of filteredSwarm">
-                    <div class="card flex justify-content-between mb-0 h-full">
+                    <div class="card flex justify-content-between mb-0 h-full" [class.not-hashing]="isNotHashing(axe)">
                         <div class="flex flex-column justify-content-between">
                             <div class="flex flex-column">
                                 <div class="flex flex-column">
@@ -241,7 +241,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr *ngFor="let axe of filteredSwarm">
+                        <tr *ngFor="let axe of filteredSwarm" [class.not-hashing]="isNotHashing(axe)">
                             <td>
                                 <a [href]="'http://' + axe.IP" target="_blank">
                                     <span class="text-900">{{axe.hostname}}</span>

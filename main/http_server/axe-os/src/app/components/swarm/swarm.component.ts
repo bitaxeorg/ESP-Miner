@@ -324,10 +324,14 @@ export class SwarmComponent implements OnInit, OnDestroy {
     });
   }
 
+  public isNotHashing(axe: any): boolean {
+    return !!axe.miningPaused || !axe.hashRate;
+  }
+
   private calculateTotals() {
-    this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
-    this.totals.power = this.swarm.reduce((sum, axe) => sum + (axe.power || 0), 0);
-    this.totals.bestDiff = this.swarm.reduce((max, axe) => Math.max(max, axe.bestDiff || 0), 0);
+    this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (this.isNotHashing(axe) ? 0 : (axe.hashRate || 0)), 0);
+    this.totals.power = this.swarm.reduce((sum, axe) => sum + (this.isNotHashing(axe) ? 0 : (axe.power || 0)), 0);
+    this.totals.bestDiff = this.swarm.reduce((max, axe) => this.isNotHashing(axe) ? max : Math.max(max, axe.bestDiff || 0), 0);
   }
 
   get deviceFamilies(): SwarmDevice[] {
