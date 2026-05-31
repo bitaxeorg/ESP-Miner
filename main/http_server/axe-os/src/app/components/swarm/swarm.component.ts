@@ -42,14 +42,14 @@ export class SwarmComponent implements OnInit, OnDestroy {
     bestDiff: number;
     hashingDevices: number;
     pausedDevices: number;
-    nonAccessibleDevices: number;
+    notAccessibleDevices: number;
   } = {
     hashRate: 0,
     power: 0,
     bestDiff: 0,
     hashingDevices: 0,
     pausedDevices: 0,
-    nonAccessibleDevices: 0
+    notAccessibleDevices: 0
   };
 
   public isRefreshing = false;
@@ -275,7 +275,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       version: 0,
       uptimeSeconds: 0,
       poolDifficulty: 0,
-      nonAccessible: true,
+      notAccessible: true,
     });
   };
 
@@ -340,7 +340,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   }
 
   public isNotHashing(axe: any): boolean {
-    return !!axe.miningPaused || !axe.hashRate || !!axe.nonAccessible;
+    return !!axe.miningPaused || !axe.hashRate || !!axe.notAccessible;
   }
 
   private calculateTotals() {
@@ -348,9 +348,9 @@ export class SwarmComponent implements OnInit, OnDestroy {
     this.totals.power = this.swarm.reduce((sum, axe) => sum + (this.isNotHashing(axe) ? 0 : (axe.power || 0)), 0);
     this.totals.bestDiff = this.swarm.reduce((max, axe) => Math.max(max, axe.bestDiff || 0), 0);
 
-    this.totals.hashingDevices = this.swarm.filter(axe => !this.isNotHashing(axe) && !axe.nonAccessible).length;
-    this.totals.pausedDevices = this.swarm.filter(axe => !axe.nonAccessible && !!axe.miningPaused).length;
-    this.totals.nonAccessibleDevices = this.swarm.filter(axe => !!axe.nonAccessible).length;
+    this.totals.hashingDevices = this.swarm.filter(axe => !this.isNotHashing(axe) && !axe.notAccessible).length;
+    this.totals.pausedDevices = this.swarm.filter(axe => !axe.notAccessible && !!axe.miningPaused).length;
+    this.totals.notAccessibleDevices = this.swarm.filter(axe => !!axe.notAccessible).length;
   }
 
   get deviceFamilies(): SwarmDevice[] {
@@ -395,7 +395,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
       overheat_mode: null,
       isUsingFallbackStratum: null,
       blockFound: null,
-      nonAccessible: null,
+      notAccessible: null,
       ...info,
       ...asic,
     };

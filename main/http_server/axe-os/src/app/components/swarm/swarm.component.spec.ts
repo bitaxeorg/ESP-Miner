@@ -46,7 +46,7 @@ describe('SwarmComponent', () => {
     const device2 = { IP: '192.168.1.101', hashRate: 1600, power: 130, bestDiff: 2500, miningPaused: true }; // paused
     const device3 = { IP: '192.168.1.102', hashRate: 0, power: 10, bestDiff: 0, miningPaused: false }; // not hashing (0 hashrate)
     const device4 = { IP: '192.168.1.103', hashRate: 1800, power: 140, bestDiff: 3000, miningPaused: false }; // hashing
-    const device5 = { IP: '192.168.1.104', hashRate: 0, power: 0, bestDiff: 0, miningPaused: false, nonAccessible: true }; // non-accessible
+    const device5 = { IP: '192.168.1.104', hashRate: 0, power: 0, bestDiff: 0, miningPaused: false, notAccessible: true }; // non-accessible
 
     component.swarm = [device1, device2, device3, device4, device5];
 
@@ -73,7 +73,7 @@ describe('SwarmComponent', () => {
     // Paused: device2 (1 device)
     expect(component.totals.pausedDevices).toBe(1);
     // Non-accessible: device5 (1 device)
-    expect(component.totals.nonAccessibleDevices).toBe(1);
+    expect(component.totals.notAccessibleDevices).toBe(1);
   });
 });
 
