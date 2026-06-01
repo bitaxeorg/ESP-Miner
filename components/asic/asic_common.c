@@ -12,6 +12,7 @@
 #define PREAMBLE 0xAA55
 
 static const char * TAG = "common";
+static char asic_chain_error[96];
 
 static void format_asic_indices(char *buffer, size_t buffer_size, int first_index, int end_index)
 {
@@ -26,6 +27,16 @@ static void format_asic_indices(char *buffer, size_t buffer_size, int first_inde
 
         offset += written;
     }
+}
+
+void clear_asic_chain_error(void)
+{
+    asic_chain_error[0] = '\0';
+}
+
+const char *get_asic_chain_error(void)
+{
+    return asic_chain_error[0] == '\0' ? NULL : asic_chain_error;
 }
 
 unsigned char _reverse_bits(unsigned char num)
@@ -71,6 +82,8 @@ int _next_power_of_two(int num)
 int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response_length)
 {
     uint8_t buffer[11] = {0};
+
+    clear_asic_chain_error();
 
     int chip_counter = 0;
     while (true) {
@@ -119,11 +132,12 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
         char asic_indices[64];
         if (chip_counter < asic_count) {
             format_asic_indices(asic_indices, sizeof(asic_indices), chip_counter, asic_count);
-            ESP_LOGE(TAG, "ASIC %s not found", asic_indices);
+            snprintf(asic_chain_error, sizeof(asic_chain_error), "ASIC %s not found", asic_indices);
         } else {
             format_asic_indices(asic_indices, sizeof(asic_indices), asic_count, chip_counter);
-            ESP_LOGE(TAG, "Unexpected ASIC %s detected", asic_indices);
+            snprintf(asic_chain_error, sizeof(asic_chain_error), "Unexpected ASIC %s detected", asic_indices);
         }
+        ESP_LOGE(TAG, "%s", asic_chain_error);
 
         return 0;
     }

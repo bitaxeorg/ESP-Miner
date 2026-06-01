@@ -144,7 +144,7 @@ void app_main(void)
                 return;
             }
 
-            self_test_show_message(&GLOBAL_STATE, "ASIC COUNT:FAIL");
+            self_test_show_message(&GLOBAL_STATE, GLOBAL_STATE.SYSTEM_MODULE.asic_status);
             system_init_ret = ESP_FAIL;
         } else {
             if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {

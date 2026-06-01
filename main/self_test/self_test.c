@@ -341,7 +341,7 @@ void self_test_reset()
     }
 }
 
-void self_test_show_message(void * pvParameters, char * msg)
+void self_test_show_message(void * pvParameters, const char * msg)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     

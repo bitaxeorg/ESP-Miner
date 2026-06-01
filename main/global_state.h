@@ -109,7 +109,7 @@ typedef struct
     char firmware_update_status[20];
     bool hardware_fault;
     char hardware_fault_msg[64];
-    char * asic_status;
+    const char * asic_status;
     char * version;
     char * axeOSVersion;
     Scoreboard scoreboard;
@@ -129,7 +129,7 @@ typedef struct
     bool is_active;
     bool is_finished;
     SelfTestNonceMeasurement nonce_measurement;
-    char *message;
+    const char *message;
     char *result;
     char *finished;
     esp_err_t system_init_ret;
