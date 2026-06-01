@@ -113,6 +113,7 @@ export class SystemApiService {
         fallbackStratumDecodeCoinbase: true,
         poolDifficulty: 1000,
         responseTime: 10,
+        responseShareBatch: 1,
         isUsingFallbackStratum: 0,
         poolConnectionInfo: "IPv4 (TLS)",
         frequency: 485,

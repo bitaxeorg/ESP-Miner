@@ -672,13 +672,13 @@ static void uptime_update_cb(lv_timer_t * timer)
         uptime_seconds %= 60;
 
         if (days > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lud %luh %lum %lus", days, hours, minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "d %" PRIu32 "h %" PRIu32 "m %" PRIu32 "s", days, hours, minutes, uptime_seconds);
         } else if (hours > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %luh %lum %lus", hours, minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "h %" PRIu32 "m %" PRIu32 "s", hours, minutes, uptime_seconds);
         } else if (minutes > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lum %lus", minutes, uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "m %" PRIu32 "s", minutes, uptime_seconds);
         } else {
-            snprintf(uptime, sizeof(uptime), "Uptime: %lus", uptime_seconds);
+            snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "s", uptime_seconds);
         }
 
         if (strcmp(lv_label_get_text(wifi_uptime_label), uptime) != 0) {

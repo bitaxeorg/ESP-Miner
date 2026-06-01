@@ -2,13 +2,13 @@
 #include "esp_timer.h"
 #include "esp_transport.h"
 #include "esp_transport_tcp.h"
-#include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
 #include "protocol_coordinator.h"
 #include "stratum_v1_task.h"
 #include "stratum_v2_task.h"
+#include "connect.h"
 #include "system.h"
 #include "nvs_config.h"
 
@@ -116,12 +116,6 @@ void protocol_coordinator_v2_exited(void)
     if (s_event_queue) {
         xQueueSend(s_event_queue, &evt, 0);
     }
-}
-
-static bool is_wifi_connected(void)
-{
-    wifi_ap_record_t ap_info;
-    return (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK);
 }
 
 static void reset_share_stats(GlobalState *gs)
@@ -343,7 +337,7 @@ static void do_heartbeat_probe(GlobalState *gs)
         return;
     }
 
-    if (!is_wifi_connected()) {
+    if (!wifi_is_connected()) {
         return;
     }
 
@@ -406,7 +400,7 @@ static void resume_on_pool(GlobalState *gs, bool use_fallback)
 // Resumes mining as soon as one is reachable.
 static void try_resume_from_paused(GlobalState *gs)
 {
-    if (!is_wifi_connected()) {
+    if (!wifi_is_connected()) {
         return;
     }
 

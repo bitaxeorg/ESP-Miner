@@ -75,6 +75,7 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "bestSessionDiff", g->SYSTEM_MODULE.best_session_nonce_diff);
     cJSON_AddNumberToObject(root, "poolDifficulty", g->pool_difficulty);
     cJSON_AddFloatToObject(root, "responseTime", g->SYSTEM_MODULE.response_time);
+    cJSON_AddNumberToObject(root, "responseShareBatch", g->SYSTEM_MODULE.response_share_batch);
     cJSON_AddFloatToObject(root, "processTime", g->SYSTEM_MODULE.process_time);
 
     // Dynamic Block Info

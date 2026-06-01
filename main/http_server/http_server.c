@@ -11,6 +11,7 @@
 #include "freertos/task.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
@@ -719,10 +720,23 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         return ESP_OK;
     }
 
+    cJSON *hostname_item = cJSON_GetObjectItem(root, "hostname");
+    char *current_hostname = cJSON_IsString(hostname_item) ? nvs_config_get_string(NVS_CONFIG_HOSTNAME) : NULL;
+    bool hostname_changed = cJSON_IsString(hostname_item) &&
+                            (current_hostname == NULL || strcmp(current_hostname, hostname_item->valuestring) != 0);
+    free(current_hostname);
+
     if (!check_settings_and_update(root)) {
         cJSON_Delete(root);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Wrong API input");
         return ESP_OK;
+    }
+
+    if (hostname_changed) {
+        esp_err_t err = wifi_apply_hostname(hostname_item->valuestring);
+        if (err != ESP_OK && err != ESP_ERR_ESP_NETIF_IF_NOT_READY) {
+            ESP_LOGW(TAG, "Failed to apply hostname live: %s", esp_err_to_name(err));
+        }
     }
 
     cJSON_Delete(root);

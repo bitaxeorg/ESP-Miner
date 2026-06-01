@@ -165,6 +165,25 @@ export class HomeComponent implements OnInit, OnDestroy {
   private lastChartUpdate: number = 0;
   private lastBucket: number = -1;
 
+  // Performance optimization cache properties
+  private primaryColorRgb: { r: number, g: number, b: number } = { r: 0, g: 0, b: 0 };
+  private isHardwareConfigInitialized = false;
+  public asicsAmount: number = 0;
+  public asicDomainsAmount: number = 0;
+  public efficiency: number = 0;
+  public efficiencyAverage: number = 0;
+  public expectedEfficiency: number = 0;
+  public activePoolUserAddressPart: string = '';
+  public activePoolUserSuffixPart: string = '';
+  public sortedRejectionReasons: Array<{ message: string; count: number; percentage: number }> = [];
+  public networkDifficultyPercentage: string = '0';
+  public payoutPercentage: number = -1;
+  public chartDataSources: { name: string; value: string }[] = [];
+  private lastHasVrTemp = false;
+  private lastHasAsicTemp2 = false;
+  private lastHasFanRpm = false;
+  private lastHasFan2Rpm = false;
+
   private destroy$ = new Subject<void>();
   private infoSubscription?: Subscription;
   private statsSubscription?: Subscription;
@@ -274,12 +293,25 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
 
     if (document.visibilityState === 'visible') {
+      // Immediately refresh the chart to display the accumulated data points and avoid a stale visual state
+      this.updateChart(undefined, true);
+
+      // Reset lastMessageTime to prevent stale data warning immediately after wake up
+      if (this.lastMessageTime > 0) {
+        this.lastMessageTime = Date.now();
+      }
+      // Also clear any existing stale connection error
+      const systemInfoError = this.systemInfoError$.value;
+      if (!!systemInfoError.duration) {
+        this.systemInfoError$.next({ duration: 0, startTime: null });
+      }
+
       const lastPoint = this.dataLabel[this.dataLabel.length - 1];
       const threshold = Math.max(15000, this.lastStatsFrequency * 1000 * 1.5);
       const awayTime = this.lastHiddenTime ? (Date.now() - this.lastHiddenTime) : 0;
 
       if (awayTime > threshold || !lastPoint || (Date.now() - lastPoint > threshold)) {
-        this.loadPreviousData();
+        this.loadPreviousData(false);
       }
       this.lastHiddenTime = 0;
     }
@@ -430,6 +462,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private checkStaleData() {
+    if (document.visibilityState === 'hidden') {
+      return;
+    }
     if (this.lastMessageTime > 0) {
       const now = new Date().getTime();
       const elapsedMs = now - this.lastMessageTime;
@@ -448,7 +483,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     const documentStyle = getComputedStyle(document.documentElement);
     const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
     const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
-    const primaryColor = documentStyle.getPropertyValue('--primary-color');
+    const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
+    this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     // Update chart colors
     if (this.chartData && this.chartData.datasets) {
@@ -491,9 +527,10 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
-    const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
-    const primaryColor = documentStyle.getPropertyValue('--primary-color');
+    const textColorSecondary = getComputedStyle(document.documentElement).getPropertyValue('--text-color-secondary');
+    const surfaceBorder = getComputedStyle(document.documentElement).getPropertyValue('--surface-border');
+    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
+    this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.chartData = {
       labels: this.dataLabel,
@@ -665,7 +702,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.chartData.datasets[1].data = this.chartY2Data;
   }
 
-  private loadPreviousData() {
+  private loadPreviousData(clear: boolean = true) {
     this.isStatsLoaded = false;
     const chartY1DataLabel = this.form.get('chartY1Data')?.value;
     const chartY2DataLabel = this.form.get('chartY2Data')?.value;
@@ -679,7 +716,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: stats => {
-          this.clearDataPoints();
           let idxHashrate = -1;
           let idxPower = -1;
           let idxChartY1Data = -1;
@@ -714,20 +750,6 @@ export class HomeComponent implements OnInit, OnDestroy {
               default:
                 break;
             }
-
-            this.dataLabel.push(new Date().getTime() - stats.currentTimestamp + element[idxTimestamp]);
-            this.hashrateData.push(element[idxHashrate]);
-            this.powerData.push(element[idxPower]);
-            if (-1 != idxChartY1Data) {
-              this.chartY1Data.push(element[idxChartY1Data]);
-            } else {
-              this.chartY1Data.push(0.0);
-            }
-            if (-1 != idxChartY2Data) {
-              this.chartY2Data.push(element[idxChartY2Data]);
-            } else {
-              this.chartY2Data.push(0.0);
-            }
           });
 
           this.lastStatsFrequency = 0;
@@ -736,7 +758,51 @@ export class HomeComponent implements OnInit, OnDestroy {
             this.lastStatsFrequency = Math.floor(totalDurationMs / (stats.statistics.length - 1) / 1000);
           }
 
-          this.limitDataPoints(this.lastStatsFrequency);
+          // 1. Gather existing points only if we are not clearing
+          const existingPoints = clear ? [] : this.dataLabel.map((timestamp, i) => ({
+            timestamp,
+            hashrate: this.hashrateData[i],
+            power: this.powerData[i],
+            y1: this.chartY1Data[i],
+            y2: this.chartY2Data[i]
+          })).sort((a, b) => a.timestamp - b.timestamp);
+
+          // 2. Always map and sort backend statistics
+          const backendPoints = stats.statistics.map((element: number[]) => ({
+            timestamp: Date.now() - stats.currentTimestamp + element[idxTimestamp],
+            hashrate: element[idxHashrate] || 0,
+            power: element[idxPower] || 0,
+            y1: idxChartY1Data !== -1 ? element[idxChartY1Data] : 0.0,
+            y2: idxChartY2Data !== -1 ? element[idxChartY2Data] : 0.0
+          })).sort((a, b) => a.timestamp - b.timestamp);
+
+          // 3. Determine points to insert (all of them if clearing/empty, otherwise fill gaps)
+          const pointsToInsert = existingPoints.length === 0
+            ? backendPoints
+            : existingPoints.map((p, i) => ({
+                start: p.timestamp,
+                end: i < existingPoints.length - 1 ? existingPoints[i + 1].timestamp : Date.now()
+              })).flatMap(interval => {
+                const points = backendPoints.filter(bp => bp.timestamp > interval.start && bp.timestamp < interval.end);
+                return points.length >= 3 ? points : [];
+              });
+
+          // 4. Update the chart data arrays
+          if (clear || pointsToInsert.length > 0) {
+            const mergedPoints = clear ? backendPoints : [...existingPoints, ...pointsToInsert]
+              .sort((a, b) => a.timestamp - b.timestamp);
+
+            this.clearDataPoints();
+            mergedPoints.forEach(p => {
+              this.dataLabel.push(p.timestamp);
+              this.hashrateData.push(p.hashrate);
+              this.powerData.push(p.power);
+              this.chartY1Data.push(p.y1);
+              this.chartY2Data.push(p.y2);
+            });
+          }
+
+          this.limitDataPoints(this.latestInfo?.statsFrequency || 0);
           this.updateChart(undefined, true);
           this.isStatsLoaded = true;
 
@@ -788,6 +854,38 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.maxFrequency = Math.max(800, info.actualFrequency || info.frequency || 0);
         this.statsLimit = info.statsLimit || 720;
 
+        // Pre-compute values for template performance
+        if (!this.isHardwareConfigInitialized && info.hashrateMonitor?.asics?.length) {
+          this.isHardwareConfigInitialized = true;
+          this.asicsAmount = info.hashrateMonitor.asics.length;
+          this.asicDomainsAmount = info.hashrateMonitor.asics[0]?.domains?.length ?? 0;
+          this.updateChartDataSources(info);
+        }
+
+        this.efficiency = this.calculateEfficiency(info, 'hashRate');
+        this.efficiencyAverage = this.calculateEfficiency(info, 'hashRate_1m');
+        this.expectedEfficiency = this.calculateEfficiency(info, 'expectedHashrate');
+        this.networkDifficultyPercentage = this.getNetworkDifficultyPercentage(info);
+        this.payoutPercentage = this.getPayoutPercentage(info);
+
+        const isFallbackPool = !!info.isUsingFallbackStratum;
+        this.activePoolURL = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
+        this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
+        this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
+        this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
+        this.responseTime = info.responseTime;
+
+        this.activePoolUserAddressPart = this.getAddressPart(this.activePoolUser);
+        this.activePoolUserSuffixPart = this.getSuffixPart(this.activePoolUser);
+
+        const totalShares = info.sharesAccepted + info.sharesRejected;
+        this.sortedRejectionReasons = [...(info.sharesRejectedReasons ?? [])]
+          .sort((a, b) => b.count - a.count)
+          .map(reason => ({
+            ...reason,
+            percentage: totalShares > 0 ? (reason.count / totalShares) * 100 : 0
+          }));
+
         // Only collect and update chart data if there's no power fault
         // and at most once every second, AND after stats are loaded to maintain order
         const now = new Date().getTime();
@@ -801,15 +899,11 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.chartY2Data.push(HomeComponent.getDataForLabel(chartLabelValue(this.form.get('chartY2Data')?.value), info));
 
           this.limitDataPoints(info.statsFrequency);
-          this.updateChart(info);
-        }
 
-        const isFallbackPool = !!info.isUsingFallbackStratum;
-        this.activePoolURL = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
-        this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
-        this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
-        this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
-        this.responseTime = info.responseTime;
+          if (document.visibilityState !== 'hidden') {
+            this.updateChart(info);
+          }
+        }
 
         const currentShares = info.sharesAccepted + info.sharesRejected;
         if (this.lastSharesCount !== -1 && currentShares > this.lastSharesCount) {
@@ -949,16 +1043,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     return this.shareRejectReasonsService.getExplanation(reason);
   }
 
-  getSortedRejectionReasons(info: ISystemInfo): ISystemInfo['sharesRejectedReasons'] {
-    return [...(info.sharesRejectedReasons ?? [])].sort((a, b) => b.count - a.count);
-  }
-
   trackByReason(_index: number, item: { message: string, count: number }) {
     return item.message; //Track only by message
-  }
-
-  getProtocolLabel(info: ISystemInfo): string {
-    return info.activeProtocolLabel ?? 'SV1';
   }
 
   hasCoinbaseVisibility(info: ISystemInfo): boolean {
@@ -1023,18 +1109,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     return info.power / (hashrate / 1_000);
   }
 
-  public getEfficiency(info: ISystemInfo): number {
-    return this.calculateEfficiency(info, 'hashRate');
-  }
-
-  public getEfficiencyAverage(info: ISystemInfo): number {
-    return this.calculateEfficiency(info, 'hashRate_1m');
-  }
-
-  public getExpectedEfficiency(info: ISystemInfo): number {
-    return this.calculateEfficiency(info, 'expectedHashrate');
-  }
-
   public getNetworkDifficultyPercentage(info: ISystemInfo): string {
     if (!info.networkDifficulty || info.networkDifficulty === 0) return '0';
     const percentage = (info.bestDiff / info.networkDifficulty) * 100;
@@ -1042,51 +1116,47 @@ export class HomeComponent implements OnInit, OnDestroy {
     return percentage < 10 ? percentage.toPrecision(2) : percentage.toFixed(1);
   }
 
-  public getShareRejectionPercentage(sharesRejectedReason: { count: number }, info: ISystemInfo): number {
-    const totalShares = info.sharesAccepted + info.sharesRejected;
-    if (totalShares <= 0) {
-      return 0;
-    }
-    return (sharesRejectedReason.count / totalShares) * 100;
-  }
-
-  public getDomainErrorPercentage(info: ISystemInfo, asic: { errorCount: number }): number {
-    return asic.errorCount ? (asic.errorCount * 100 / info.expectedHashrate) : 0;
-  }
-
-  public getDomainErrorColor(info: ISystemInfo, asic: { errorCount: number }): string {
-    const percentage = this.getDomainErrorPercentage(info, asic);
-
-    switch (true) {
-      case (percentage < 1): return 'green';
-      case (percentage >= 1 && percentage < 10): return 'orange';
-      default: return 'red';
-    }
-  }
-
-  public getAsicsAmount(info: ISystemInfo): number {
-    return info.hashrateMonitor?.asics?.length ?? 0;
-  }
-
-  public getAsicDomainsAmount(info: ISystemInfo): number {
-    return info.hashrateMonitor?.asics?.[0]?.domains?.length ?? 0;
-  }
-
-  public getHeatmapColor(info: ISystemInfo, domainHashrate: number): string {
-    const expectedHashrate = info.expectedHashrate || 1;
-    const ratio = Math.max(0, Math.min(2, (domainHashrate / expectedHashrate) * this.getAsicsAmount(info)) * this.getAsicDomainsAmount(info));
+  public getHeatmapColor(domainHashrate: number, expectedHashrate: number): string {
+    const expected = expectedHashrate || 1;
+    const ratio = Math.max(0, Math.min(2, (domainHashrate / expected) * this.asicsAmount) * this.asicDomainsAmount);
     const deviation = isNaN(ratio) ? 1 : Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
     const t = 1 - Math.pow(1 - deviation, 1.5); // Exponent controls graduality (lower = more gradual, 7 was very steep)
     const target = ratio > 1 ? 255 : 0; // gradient from 0: black, 1: primary-color, 2: white
 
-    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
-    const { r, g, b } = this.hexToRgb(primaryColor);
+    const { r, g, b } = this.primaryColorRgb;
 
     const finalR = (r * (1 - t) + target * t) | 0;
     const finalG = (g * (1 - t) + target * t) | 0;
     const finalB = (b * (1 - t) + target * t) | 0;
 
     return `rgb(${finalR}, ${finalG}, ${finalB})`;
+  }
+
+  private updateChartDataSources(info: ISystemInfo) {
+    const hasVrTemp = !!info.vrTemp;
+    const hasAsicTemp2 = !!(info.temp2 && info.temp2 !== -1);
+    const hasFanRpm = !!info.fanrpm;
+    const hasFan2Rpm = !!info.fan2rpm;
+
+    if (
+      this.lastHasVrTemp !== hasVrTemp ||
+      this.lastHasAsicTemp2 !== hasAsicTemp2 ||
+      this.lastHasFanRpm !== hasFanRpm ||
+      this.lastHasFan2Rpm !== hasFan2Rpm ||
+      this.chartDataSources.length === 0
+    ) {
+      this.lastHasVrTemp = hasVrTemp;
+      this.lastHasAsicTemp2 = hasAsicTemp2;
+      this.lastHasFanRpm = hasFanRpm;
+      this.lastHasFan2Rpm = hasFan2Rpm;
+
+      this.chartDataSources = Object.entries(eChartLabel)
+        .filter(([key, ]) => key !== 'vrTemp' || hasVrTemp)
+        .filter(([key, ]) => key !== 'asicTemp2' || hasAsicTemp2)
+        .filter(([key, ]) => key !== 'fanRpm' || hasFanRpm)
+        .filter(([key, ]) => key !== 'fan2Rpm' || hasFan2Rpm)
+        .map(([key, value]) => ({ name: value, value: key }));
+    }
   }
 
   public clearDataPoints() {
@@ -1154,8 +1224,10 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.chartY2Data.shift();
       } else {
         // Option B: Chart is crowded. Binary search for the densest region.
-        let low = 0;
-        let high = this.dataLabel.length - 1;
+        // We initialize search range from index 1 to length - 2 to protect the oldest point (index 0) 
+        // and newest point (index length - 1) from being deleted, preserving chart boundaries.
+        let low = 1;
+        let high = this.dataLabel.length - 2;
         while (high - low > 1) {
           const midTime = (this.dataLabel[low] + this.dataLabel[high]) / 2;
           
@@ -1181,9 +1253,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
         }
         
-        // Remove point at index 'low'. 
-        // If low is 0, we at least kept the newest point. 
-        // If high was size-1, we at least kept the oldest point.
+        // Remove point at index 'low'.
         this.dataLabel.splice(low, 1);
         this.hashrateData.splice(low, 1);
         this.powerData.splice(low, 1);
@@ -1309,12 +1379,4 @@ export class HomeComponent implements OnInit, OnDestroy {
     return dotIndex !== -1 ? '.' + user.substring(dotIndex + 1) : '';
   }
 
-  dataSourceLabels(info: ISystemInfo) {
-    return Object.entries(eChartLabel)
-      .filter(([key, ]) => key !== 'vrTemp' || info.vrTemp)
-      .filter(([key, ]) => key !== 'asicTemp2' || (info.temp2 && info.temp2 !== -1))
-      .filter(([key, ]) => key !== 'fanRpm' || info.fanrpm)
-      .filter(([key, ]) => key !== 'fan2Rpm' || info.fan2rpm)
-      .map(([key, value]) => ({name: value, value: key}));
-  }
 }

@@ -160,7 +160,8 @@ int sv2_parse_set_target(const uint8_t *payload, uint32_t len,
                          uint32_t *channel_id, uint8_t max_target[32]);
 
 int sv2_parse_submit_shares_success(const uint8_t *payload, uint32_t len,
-                                    uint32_t *channel_id, uint32_t *accepted_count);
+                                    uint32_t *channel_id, uint32_t *last_sequence_number,
+                                    uint32_t *accepted_count);
 
 int sv2_parse_submit_shares_error(const uint8_t *payload, uint32_t len,
                                   uint32_t *channel_id, uint32_t *seq_num,
