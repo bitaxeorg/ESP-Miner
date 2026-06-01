@@ -636,8 +636,8 @@ void self_test_task(void * pvParameters)
             const SelfTestDomainAverage * domain_average = self_test_domain_get_const(&domain_averages, asic_nr, domain_nr);
             float domain_hashrate = self_test_domain_average_hashrate(domain_average);
             uint32_t sample_count = domain_average->sample_count;
-            uint32_t rejected_count = domain_average->rejected_sample_count;
-            uint32_t total_domain_samples = sample_count + rejected_count;
+            uint32_t rejected_sample_count = domain_average->rejected_sample_count;
+            uint32_t total_domain_samples = sample_count + rejected_sample_count;
             SelfTestDomainStatus domain_status = SELF_TEST_DOMAIN_OK;
 
             ESP_LOGI(TAG,
@@ -646,32 +646,32 @@ void self_test_task(void * pvParameters)
                      domain_nr,
                      domain_hashrate,
                      (unsigned long)sample_count,
-                     (unsigned long)rejected_count);
-            if (rejected_count > 0) {
+                     (unsigned long)rejected_sample_count);
+            if (rejected_sample_count > 0) {
                 ESP_LOGW(TAG,
                          "ASIC %d Domain %d ignored %lu implausible register sample(s); using nonce hashrate for total validation",
                          asic_nr,
                          domain_nr,
-                         (unsigned long)rejected_count);
+                         (unsigned long)rejected_sample_count);
             }
             
             float min_domain_hashrate = expected_domain_hashrate * (1.0f - SELF_TEST_DOMAIN_HASHRATE_TOLERANCE);
             float max_domain_hashrate = expected_domain_hashrate * (1.0f + SELF_TEST_DOMAIN_HASHRATE_TOLERANCE);
-            if (sample_count == 0 && rejected_count > 0) {
+            if (sample_count == 0 && rejected_sample_count > 0) {
                 domain_status = SELF_TEST_DOMAIN_UNRELIABLE;
                 ESP_LOGW(TAG,
                          "ASIC %d Domain %d self-reported counter is unreliable; all %lu sample(s) were implausible high, external nonce hashrate remains authoritative",
                          asic_nr,
                          domain_nr,
-                         (unsigned long)rejected_count);
+                         (unsigned long)rejected_sample_count);
             } else if (total_domain_samples > 0 &&
-                       ((float)rejected_count / (float)total_domain_samples) >= SELF_TEST_DOMAIN_REJECTED_WARN_RATIO) {
+                       ((float)rejected_sample_count / (float)total_domain_samples) >= SELF_TEST_DOMAIN_REJECTED_WARN_RATIO) {
                 domain_status = SELF_TEST_DOMAIN_UNRELIABLE;
                 ESP_LOGW(TAG,
                          "ASIC %d Domain %d self-reported counter is unstable; %lu/%lu sample(s) were implausible, external nonce hashrate remains authoritative",
                          asic_nr,
                          domain_nr,
-                         (unsigned long)rejected_count,
+                         (unsigned long)rejected_sample_count,
                          (unsigned long)total_domain_samples);
             } else if (sample_count == 0 || domain_hashrate < min_domain_hashrate || domain_hashrate > max_domain_hashrate) {
                 domain_status = SELF_TEST_DOMAIN_FAIL;
