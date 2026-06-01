@@ -68,6 +68,7 @@ export class SystemApiService {
         errorPercentage: 0.2,
         bestDiff: 238214491,
         bestSessionDiff: 21212121,
+        difficulty: 0,
         cpuUsage: 12.5,
         freeHeap: 200504,
         freeHeapInternal: 200504,
@@ -193,6 +194,7 @@ export class SystemApiService {
     const wifiRssiData = [-35,-34,-33,-34,-34,-34,-33,-35,-33,-34];
     const freeHeapData = [214504,212504,213504,210504,207504,209504,203504,202504,201504,200504];
     const responseTimeData = [15.1,14.5,14.3,15.1,13.1,16.1,28.6,18.4,17.7,17.6,18.0,15.5];
+    const difficultyData = [0, 500, 1500, 4500, 12000, 35000, 100000, 400000, 1200000, 5000000];
     const timestampData = [13131,18126,23125,28125,33125,38125,43125,48125,53125,58125];
 
     columnList.push("timestamp");
@@ -218,6 +220,7 @@ export class SystemApiService {
           case eChartLabel.wifiRssi:     statisticsList[i][j] = wifiRssiData[i];     break;
           case eChartLabel.freeHeap:     statisticsList[i][j] = freeHeapData[i];     break;
           case eChartLabel.responseTime: statisticsList[i][j] = responseTimeData[i]; break;
+          case eChartLabel.difficulty:   statisticsList[i][j] = difficultyData[i];   break;
           default:
             if (columnList[j] === "timestamp") {
               statisticsList[i][j] = timestampData[i];

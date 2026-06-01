@@ -1,5 +1,4 @@
 #include <inttypes.h>
-#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -10,18 +9,12 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-#include "esp_check.h"
 
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
 #include "esp_timer.h"
-#include "esp_wifi.h"
-#include "lwip/inet.h"
 
 #include "system.h"
-#include "i2c_bitaxe.h"
-#include "INA260.h"
-#include "adc.h"
 #include "connect.h"
 #include "nvs_config.h"
 #include "display.h"
@@ -33,6 +26,8 @@
 #include "self_test.h"
 #include "filesystem.h"
 #include "work_queue.h"
+#include "cJSON.h"
+#include "websocket.h"
 #include "hashrate_monitor_task.h"
 
 static const char * TAG = "system";
@@ -48,6 +43,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->shares_accepted = 0;
     module->shares_rejected = 0;
     module->best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF);
+    module->best_sample_diff = 0.0;
     module->best_session_nonce_diff = 0;
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
@@ -329,6 +325,29 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
 void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+
+    if (diff >= GLOBAL_STATE->pool_difficulty) {
+        if (diff > module->best_sample_diff) {
+            module->best_sample_diff = diff;
+        }
+
+        cJSON *msg = cJSON_CreateObject();
+        if (msg) {
+            cJSON_AddStringToObject(msg, "event", "share_found");
+            cJSON_AddNumberToObject(msg, "difficulty", diff);
+            char *json_str = cJSON_PrintUnformatted(msg);
+            if (json_str) {
+                httpd_ws_frame_t ws_pkt;
+                memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+                ws_pkt.payload = (uint8_t *)json_str;
+                ws_pkt.len = strlen(json_str);
+                ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+                websocket_broadcast(WS_TYPE_API, &ws_pkt);
+                free(json_str);
+            }
+            cJSON_Delete(msg);
+        }
+    }
 
     if ((uint64_t) diff > module->best_session_nonce_diff) {
         module->best_session_nonce_diff = (uint64_t) diff;
