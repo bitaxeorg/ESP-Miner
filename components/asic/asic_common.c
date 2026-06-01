@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <math.h>
+#include <stdio.h>
 
 #include "asic_common.h"
 #include "serial.h"
@@ -11,6 +12,21 @@
 #define PREAMBLE 0xAA55
 
 static const char * TAG = "common";
+
+static void format_asic_indices(char *buffer, size_t buffer_size, int first_index, int end_index)
+{
+    size_t offset = 0;
+
+    for (int index = first_index; index < end_index; index++) {
+        int written = snprintf(buffer + offset, buffer_size - offset, "%s%d", index == first_index ? "" : ",", index);
+        if (written < 0 || (size_t) written >= buffer_size - offset) {
+            snprintf(buffer, buffer_size, "%d-%d", first_index, end_index - 1);
+            return;
+        }
+
+        offset += written;
+    }
+}
 
 unsigned char _reverse_bits(unsigned char num)
 {
@@ -99,6 +115,16 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
     
     if (chip_counter != asic_count) {
         ESP_LOGE(TAG, "%i chip(s) detected on the chain, expected %i", chip_counter, asic_count);
+
+        char asic_indices[64];
+        if (chip_counter < asic_count) {
+            format_asic_indices(asic_indices, sizeof(asic_indices), chip_counter, asic_count);
+            ESP_LOGE(TAG, "ASIC %s not found", asic_indices);
+        } else {
+            format_asic_indices(asic_indices, sizeof(asic_indices), asic_count, chip_counter);
+            ESP_LOGE(TAG, "Unexpected ASIC %s detected", asic_indices);
+        }
+
         return 0;
     }
 
