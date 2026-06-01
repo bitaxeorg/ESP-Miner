@@ -1,4 +1,6 @@
 #include "nvs_config.h"
+#include "sv2_protocol.h"
+#include "global_state.h"
 #include <esp_err.h>
 #include "esp_log.h"
 #include <nvs_flash.h>
@@ -50,6 +52,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_WIFI_PASS]                             = {.nvs_key_name = "wifipass",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_PASSWORD},            .rest_name = "wifiPass",                           .min = 0,  .max = 63},
     [NVS_CONFIG_HOSTNAME]                              = {.nvs_key_name = "hostname",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_LWIP_LOCAL_HOSTNAME},          .rest_name = "hostname",                           .min = 1,  .max = 32},
 
+    [NVS_CONFIG_STRATUM_PROTOCOL]                      = {.nvs_key_name = "stratumprot",     .type = TYPE_STR,   .default_value = {.str = STRATUM_V1},                                  .rest_name = "stratumProtocol",                    .min = 3,  .max = 3},
     [NVS_CONFIG_STRATUM_URL]                           = {.nvs_key_name = "stratumurl",      .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_URL},                  .rest_name = "stratumURL",                         .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_STRATUM_PORT]                          = {.nvs_key_name = "stratumport",     .type = TYPE_U16,   .default_value = {.u16 = CONFIG_STRATUM_PORT},                         .rest_name = "stratumPort",                        .min = 0,  .max = UINT16_MAX},
     [NVS_CONFIG_STRATUM_USER]                          = {.nvs_key_name = "stratumuser",     .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_USER},                 .rest_name = "stratumUser",                        .min = 0,  .max = NVS_STR_LIMIT},
@@ -58,7 +61,10 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE]          = {.nvs_key_name = "stratumxnsub",    .type = TYPE_BOOL,  .default_value = {.b   = (bool)STRATUM_EXTRANONCE_SUBSCRIBE},          .rest_name = "stratumExtranonceSubscribe",         .min = 0,  .max = 1},
     [NVS_CONFIG_STRATUM_TLS]                           = {.nvs_key_name = "stratumtls",      .type = TYPE_U16,   .default_value = {.u16 = (uint16_t)CONFIG_STRATUM_TLS},                .rest_name = "stratumTLS",                         .min = 0,  .max = 3},
     [NVS_CONFIG_STRATUM_CERT]                          = {.nvs_key_name = "stratumcert",     .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_CERT},                 .rest_name = "stratumCert",                        .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_SV2_CHANNEL_TYPE]                      = {.nvs_key_name = "sv2chantype",     .type = TYPE_STR,   .default_value = {.str = SV2_CHANNEL_TYPE_EXTENDED},                   .rest_name = "stratumV2ChannelType",               .min = 8,  .max = 8},
+    [NVS_CONFIG_SV2_AUTHORITY_PUBKEY]                  = {.nvs_key_name = "sv2authpubkey",   .type = TYPE_STR,   .default_value = {.str = ""},                                          .rest_name = "stratumV2AuthorityPubkey",           .min = 0,  .max = 52},   
     [NVS_CONFIG_STRATUM_DECODE_COINBASE_TX]            = {.nvs_key_name = "stratumdecode",   .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "stratumDecodeCoinbase",              .min = 0,  .max = 1},
+    [NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL]             = {.nvs_key_name = "fbstratumprot",   .type = TYPE_STR,   .default_value = {.str = STRATUM_V1},                                  .rest_name = "fallbackStratumProtocol",            .min = 3,  .max = 3},
     [NVS_CONFIG_FALLBACK_STRATUM_URL]                  = {.nvs_key_name = "fbstratumurl",    .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_URL},         .rest_name = "fallbackStratumURL",                 .min = 0,  .max = NVS_STR_LIMIT},
     [NVS_CONFIG_FALLBACK_STRATUM_PORT]                 = {.nvs_key_name = "fbstratumport",   .type = TYPE_U16,   .default_value = {.u16 = CONFIG_FALLBACK_STRATUM_PORT},                .rest_name = "fallbackStratumPort",                .min = 0,  .max = UINT16_MAX},
     [NVS_CONFIG_FALLBACK_STRATUM_USER]                 = {.nvs_key_name = "fbstratumuser",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_USER},        .rest_name = "fallbackStratumUser",                .min = 0,  .max = NVS_STR_LIMIT},
@@ -67,6 +73,8 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE] = {.nvs_key_name = "stratumfbxnsub",  .type = TYPE_BOOL,  .default_value = {.b   = (bool)FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE}, .rest_name = "fallbackStratumExtranonceSubscribe", .min = 0,  .max = 1},
     [NVS_CONFIG_FALLBACK_STRATUM_TLS]                  = {.nvs_key_name = "fbstratumtls",    .type = TYPE_U16,   .default_value = {.u16 = (uint16_t)CONFIG_FALLBACK_STRATUM_TLS},       .rest_name = "fallbackStratumTLS",                 .min = 0,  .max = 3},
     [NVS_CONFIG_FALLBACK_STRATUM_CERT]                 = {.nvs_key_name = "fbstratumcert",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_CERT},        .rest_name = "fallbackStratumCert",                .min = 0,  .max = NVS_STR_LIMIT},
+    [NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE]             = {.nvs_key_name = "fbsv2chantype",   .type = TYPE_STR,   .default_value = {.str = SV2_CHANNEL_TYPE_EXTENDED},                   .rest_name = "fallbackStratumV2ChannelType",       .min = 8,  .max = 8},
+    [NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY]         = {.nvs_key_name = "fbsv2authpubk",   .type = TYPE_STR,   .default_value = {.str = ""},                                          .rest_name = "fallbackStratumV2AuthorityPubkey",   .min = 0,  .max = 52},
     [NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX]   = {.nvs_key_name = "fbstratumdecode", .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "fallbackStratumDecodeCoinbase",      .min = 0,  .max = 1},
     [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstartum",    .type = TYPE_BOOL,                                                                         .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
 
@@ -112,15 +120,6 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_TPS546]                                = {.nvs_key_name = "TPS546",          .type = TYPE_BOOL},
     [NVS_CONFIG_TMP1075]                               = {.nvs_key_name = "TMP1075",         .type = TYPE_BOOL},
     [NVS_CONFIG_POWER_CONSUMPTION_TARGET]              = {.nvs_key_name = "power_cons_tgt",  .type = TYPE_U16},
-    // Protocol and channel-type are TYPE_U16 internally but exposed as strings via the API
-    // (see http_server.c GET/PATCH special-case handling). rest_name is omitted so the generic
-    // PATCH loop does not handle them as numeric.
-    [NVS_CONFIG_STRATUM_PROTOCOL]                      = {.nvs_key_name = "stratumprot",     .type = TYPE_U16,   .default_value = {.u16 = 0},                           .min = 0,  .max = 1},
-    [NVS_CONFIG_SV2_AUTHORITY_PUBKEY]                  = {.nvs_key_name = "sv2authpubkey",   .type = TYPE_STR,   .default_value = {.str = ""},                           .rest_name = "stratumV2AuthorityPubkey",                 .min = 0,  .max = 52},
-    [NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL]            = {.nvs_key_name = "fbstratumprot",   .type = TYPE_U16,   .default_value = {.u16 = 0},                            .min = 0,  .max = 1},
-    [NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY]        = {.nvs_key_name = "fbsv2authpubk",   .type = TYPE_STR,   .default_value = {.str = ""},                            .rest_name = "fallbackStratumV2AuthorityPubkey",          .min = 0,  .max = 52},
-    [NVS_CONFIG_SV2_CHANNEL_TYPE]                     = {.nvs_key_name = "sv2chantype",     .type = TYPE_U16,   .default_value = {.u16 = 0},                             .min = 0,  .max = 1},
-    [NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE]            = {.nvs_key_name = "fbSv2ChanType",   .type = TYPE_U16,   .default_value = {.u16 = 0},                             .min = 0,  .max = 1},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)
@@ -170,6 +169,34 @@ static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
             if (ret == ESP_OK) {
                 ESP_LOGI(TAG, "Migrating NVS config %s to %s (%d)", FALLBACK_KEY_FANSPEED, setting->nvs_key_name, val);
                 nvs_set_u16(handle, setting->nvs_key_name, val);
+            }
+        }
+    }
+    if (key == NVS_CONFIG_STRATUM_PROTOCOL || key == NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL) {
+        uint16_t val;
+        if (nvs_get_u16(handle, setting->nvs_key_name, &val) == ESP_OK) {
+            const char *str_val = (val == 1) ? STRATUM_V2 : STRATUM_V1;
+            ESP_LOGI(TAG, "Migrating NVS config %s from u16 (%d) to string (%s)", setting->nvs_key_name, val, str_val);
+            nvs_erase_key(handle, setting->nvs_key_name);
+            nvs_set_str(handle, setting->nvs_key_name, str_val);
+        }
+    }
+    if (key == NVS_CONFIG_SV2_CHANNEL_TYPE || key == NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE) {
+        uint16_t val;
+        esp_err_t res = nvs_get_u16(handle, setting->nvs_key_name, &val);
+        if (res == ESP_OK) {
+            const char *str_val = (val == 1) ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED;
+            ESP_LOGI(TAG, "Migrating NVS config %s from u16 (%d) to string (%s)", setting->nvs_key_name, val, str_val);
+            nvs_erase_key(handle, setting->nvs_key_name);
+            nvs_set_str(handle, setting->nvs_key_name, str_val);
+        }
+        if (res == ESP_ERR_NVS_NOT_FOUND) {
+            res = nvs_get_u16(handle, "fbSv2ChanType", &val);
+            if (res == ESP_OK) {
+                const char *str_val = (val == 1) ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED;
+                ESP_LOGI(TAG, "Migrating NVS config %s from u16 (%d) to string (%s)", setting->nvs_key_name, val, str_val);
+                nvs_erase_key(handle, "fbSv2ChanType");
+                nvs_set_str(handle, setting->nvs_key_name, str_val);
             }
         }
     }

@@ -60,7 +60,7 @@ void ASIC_result_task(void *pvParameters)
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)
         {
-            if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+            if (GLOBAL_STATE->stratum_protocol == STRATUM_PROTOCOL_V2) {
                 // SV2: submit with binary protocol
                 int ret;
                 uint32_t sv2_job_id = (uint32_t)strtoul(active_job->jobid, NULL, 10);

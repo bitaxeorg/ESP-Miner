@@ -3,14 +3,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "asic_common.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/portmacro.h"
 #include "power_management_task.h"
 #include "hashrate_monitor_task.h"
-#include "serial.h"
-#include "stratum_api.h"
 #include "mining.h"
 #include "coinbase_decoder.h"
 #include "work_queue.h"
@@ -19,11 +16,14 @@
 #include "scoreboard.h"
 #include "esp_transport.h"
 
-// Protocol selection (V1 = JSON-RPC, V2 = binary SV2)
 typedef enum {
-    STRATUM_V1 = 0,
-    STRATUM_V2 = 1,
+    STRATUM_PROTOCOL_UNKNOWN = 0,
+    STRATUM_PROTOCOL_V1 = 1,
+    STRATUM_PROTOCOL_V2 = 2,
 } stratum_protocol_t;
+
+#define STRATUM_V1 "SV1"
+#define STRATUM_V2 "SV2"
 
 // Forward declarations
 struct sv2_conn;

@@ -26,6 +26,7 @@ import { GridStack, GridItemHTMLElement } from 'gridstack';
 import { DashboardEditService, WidgetDef } from 'src/app/services/dashboard-edit.service';
 
 type PoolLabel = 'Primary' | 'Fallback';
+type ProtocolLabel = 'SV2 Standard Channel' | 'SV2 Extended Channel';
 type MessageType =
   | 'SYSTEM_INFO_ERROR'
   | 'MINING_PAUSED'
@@ -99,6 +100,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolPort!: number;
   public activePoolUser!: string;
   public activePoolLabel!: PoolLabel;
+  public activePoolProtocol!: string;
   public responseTime!: number;
 
   public flashShare: boolean = false;
@@ -869,10 +871,17 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.payoutPercentage = this.getPayoutPercentage(info);
 
         const isFallbackPool = !!info.isUsingFallbackStratum;
+        this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
         this.activePoolURL = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
         this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
         this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
-        this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
+        const activeProtocol = isFallbackPool ? info.fallbackStratumProtocol : info.stratumProtocol;
+        if (activeProtocol === 'SV2') {
+          const channelType = isFallbackPool ? info.fallbackStratumV2ChannelType : info.stratumV2ChannelType;
+          this.activePoolProtocol = channelType === 'standard' ? 'SV2 Standard Channel' : 'SV2 Extended Channel';
+        } else {
+          this.activePoolProtocol = 'SV1';
+        }
         this.responseTime = info.responseTime;
 
         this.activePoolUserAddressPart = this.getAddressPart(this.activePoolUser);

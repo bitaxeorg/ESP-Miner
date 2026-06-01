@@ -26,6 +26,7 @@
 #include "cJSON.h"
 #include "global_state.h"
 #include "nvs_config.h"
+#include "system.h"
 #include "connect.h"
 #include "statistics_task.h"
 #include "theme_api.h"
@@ -148,24 +149,6 @@ static esp_err_t GET_system_logs(httpd_req_t *req)
 
 static GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
-
-static int stratum_protocol_from_string(const char *s, uint16_t *out)
-{
-    if (!s) return -1;
-    if (strcmp(s, "SV1") == 0) { *out = 0; return 0; }
-    if (strcmp(s, "SV2") == 0) { *out = 1; return 0; }
-    return -1;
-}
-
-// NVS storage uses the same numeric values as the SV2_CHANNEL_* enum in sv2_protocol.h:
-// 0 = SV2_CHANNEL_EXTENDED, 1 = SV2_CHANNEL_STANDARD. The string mapping must follow.
-static int sv2_channel_type_from_string(const char *s, uint16_t *out)
-{
-    if (!s) return -1;
-    if (strcmp(s, "extended") == 0) { *out = 0; return 0; }
-    if (strcmp(s, "standard") == 0) { *out = 1; return 0; }
-    return -1;
-}
 
 esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_len)
 {
@@ -530,26 +513,6 @@ bool check_settings_and_update(const cJSON * const root)
 {
     bool result = true;
 
-    // Validate the string-enum fields (handled outside the rest_name table).
-    struct {
-        const char *json_key;
-        int (*parse)(const char *, uint16_t *);
-    } string_enum_fields[] = {
-        { "stratumProtocol",              stratum_protocol_from_string },
-        { "fallbackStratumProtocol",      stratum_protocol_from_string },
-        { "stratumV2ChannelType",         sv2_channel_type_from_string },
-        { "fallbackStratumV2ChannelType", sv2_channel_type_from_string },
-    };
-    for (size_t i = 0; i < sizeof(string_enum_fields) / sizeof(string_enum_fields[0]); i++) {
-        cJSON *item = cJSON_GetObjectItem(root, string_enum_fields[i].json_key);
-        if (!item) continue;
-        uint16_t v;
-        if (!cJSON_IsString(item) || string_enum_fields[i].parse(item->valuestring, &v) != 0) {
-            ESP_LOGW(TAG, "Invalid value for '%s'", string_enum_fields[i].json_key);
-            result = false;
-        }
-    }
-
     for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
         Settings *setting = nvs_config_get_settings(key);
         if (!setting->rest_name) continue;
@@ -622,6 +585,18 @@ bool check_settings_and_update(const cJSON * const root)
             ESP_LOGW(TAG, "Invalid display rotation: '%d'", item->valueint);
             result = false;
         }
+        if (key == NVS_CONFIG_STRATUM_PROTOCOL || key == NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL) {
+            if (stratum_protocol_from_string(item->valuestring) == STRATUM_PROTOCOL_UNKNOWN) {
+                ESP_LOGW(TAG, "Invalid stratum protocol: '%s'", item->valuestring);
+                result = false;
+            }
+        }
+        if (key == NVS_CONFIG_SV2_CHANNEL_TYPE || key == NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE) {
+            if (sv2_channel_type_from_string(item->valuestring) == SV2_CHANNEL_UNKNOWN) {
+                ESP_LOGW(TAG, "Invalid SV2 channel type: '%s'", item->valuestring);
+                result = false;
+            }
+        }
     }
 
     if (result) {
@@ -652,29 +627,6 @@ bool check_settings_and_update(const cJSON * const root)
                 case TYPE_FLOAT:
                     nvs_config_set_float(key, (float)item->valuedouble);
                     break;
-            }
-        }
-
-        // Special-case: protocol and channel-type are exposed as strings via the API
-        // (no rest_name in nvs_config table), parse to u16 here.
-        struct {
-            const char *json_key;
-            NvsConfigKey nvs_key;
-            int (*parse)(const char *, uint16_t *);
-        } string_enum_fields[] = {
-            { "stratumProtocol",              NVS_CONFIG_STRATUM_PROTOCOL,          stratum_protocol_from_string },
-            { "fallbackStratumProtocol",      NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL, stratum_protocol_from_string },
-            { "stratumV2ChannelType",         NVS_CONFIG_SV2_CHANNEL_TYPE,          sv2_channel_type_from_string },
-            { "fallbackStratumV2ChannelType", NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE, sv2_channel_type_from_string },
-        };
-        for (size_t i = 0; i < sizeof(string_enum_fields) / sizeof(string_enum_fields[0]); i++) {
-            cJSON *item = cJSON_GetObjectItem(root, string_enum_fields[i].json_key);
-            if (!item || !cJSON_IsString(item)) continue;
-            uint16_t v;
-            if (string_enum_fields[i].parse(item->valuestring, &v) == 0) {
-                nvs_config_set_u16(string_enum_fields[i].nvs_key, v);
-            } else {
-                ESP_LOGW(TAG, "Invalid value for %s: %s", string_enum_fields[i].json_key, item->valuestring);
             }
         }
     }

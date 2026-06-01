@@ -417,9 +417,6 @@ components:
           type: string
           enum: [SV1, SV2]
           description: Configured stratum protocol
-        activeProtocolLabel:
-          type: string
-          description: Human-readable label for the active protocol (e.g. "SV1", "SV2 Extended Channel")
         stratumV2AuthorityPubkey:
           type: string
           description: SV2 authority public key for certificate verification (base58-encoded)
