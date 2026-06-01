@@ -98,7 +98,8 @@ int count_asic_chips(uint16_t asic_count, uint16_t chip_id, int chip_id_response
     }    
     
     if (chip_counter != asic_count) {
-        ESP_LOGW(TAG, "%i chip(s) detected on the chain, expected %i", chip_counter, asic_count);
+        ESP_LOGE(TAG, "%i chip(s) detected on the chain, expected %i", chip_counter, asic_count);
+        return 0;
     }
 
     return chip_counter;

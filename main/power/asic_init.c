@@ -46,8 +46,8 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
     uint8_t chip_count = ASIC_init(GLOBAL_STATE);
     
     if (chip_count == 0) {
-        ESP_LOGE(TAG, "ASIC initialization failed - chip count 0");
-        GLOBAL_STATE->SYSTEM_MODULE.asic_status = "Chip count 0";
+        ESP_LOGE(TAG, "ASIC initialization failed - chip chain detection failed");
+        GLOBAL_STATE->SYSTEM_MODULE.asic_status = "ASIC chain detection failed";
         return 0;
     }
 
