@@ -28,6 +28,7 @@
 #include "work_queue.h"
 #include "cJSON.h"
 #include "websocket.h"
+#include "websocket_api.h"
 #include "hashrate_monitor_task.h"
 
 static const char * TAG = "system";
@@ -331,22 +332,7 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t 
             module->best_sample_diff = diff;
         }
 
-        cJSON *msg = cJSON_CreateObject();
-        if (msg) {
-            cJSON_AddStringToObject(msg, "event", "share_found");
-            cJSON_AddNumberToObject(msg, "difficulty", diff);
-            char *json_str = cJSON_PrintUnformatted(msg);
-            if (json_str) {
-                httpd_ws_frame_t ws_pkt;
-                memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-                ws_pkt.payload = (uint8_t *)json_str;
-                ws_pkt.len = strlen(json_str);
-                ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-                websocket_broadcast(WS_TYPE_API, &ws_pkt);
-                free(json_str);
-            }
-            cJSON_Delete(msg);
-        }
+        websocket_api_send_share_found(diff);
     }
 
     if ((uint64_t) diff > module->best_session_nonce_diff) {
