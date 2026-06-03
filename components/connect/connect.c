@@ -197,6 +197,15 @@ static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
             ESP_LOGI(TAG, "mDNS HTTP service registered: _http._tcp port 80");
             ESP_LOGI(TAG, "Discover with: avahi-browse _http._tcp");
             ESP_LOGI(TAG, "mDNS instance: %s", instance_name);
+
+            /* Add AxeOS subtype for DNS-SD discovery */
+            err = mdns_service_subtype_add_for_host(instance_name, "_http", "_tcp", NULL, "_axeos");
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "mDNS AxeOS subtype registration failed: %s", esp_err_to_name(err));
+            } else {
+                ESP_LOGI(TAG, "mDNS AxeOS subtype registered: _axeos._sub._http._tcp");
+                ESP_LOGI(TAG, "Discover AxeOS devices with: avahi-browse _axeos._sub._http._tcp");
+            }
         }
 
         ESP_LOGI(TAG, "mDNS/Avahi setup complete - device ready for network discovery");
