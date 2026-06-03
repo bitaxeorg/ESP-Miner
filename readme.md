@@ -147,6 +147,8 @@ ESP-Miner now includes comprehensive mDNS (multicast DNS) support for seamless n
 - **Automatic mDNS Initialization**: Device automatically registers with mDNS/Bonjour/Avahi services on network connection
 - **Dynamic Hostname Registration**: Device hostname is registered as `<hostname>.local` (e.g., `bitaxe.local`)
 - **Service Advertisement**: HTTP service is advertised as `_http._tcp` on port 80
+- **AxeOS Subtype**: Advertises `_axeos._sub._http._tcp` for targeted DNS-SD discovery of AxeOS devices
+- **Device TXT Records**: Includes board version, family, ASIC model, ASIC count, and firmware version as DNS-SD TXT records
 - **Dynamic Hostname Updates**: mDNS hostname updates automatically when device hostname is changed via web interface
 - **Hostname Normalization**: Automatically strips `.local` suffix when setting hostnames to prevent duplicate registrations
 - **CORS Support**: Enhanced CORS handling to allow requests from mDNS hostnames
@@ -161,8 +163,14 @@ Once connected to your local network, the device becomes discoverable through:
 # Using avahi-browse (Linux)
 avahi-browse _http._tcp
 
+# Discover AxeOS devices specifically
+avahi-browse _axeos._sub._http._tcp
+
 # Using dns-sd (macOS)
 dns-sd -B _http._tcp
+
+# Discover AxeOS devices with TXT records
+dns-sd -B _axeos._sub._http._tcp
 
 # Direct access
 http://<hostname>.local
@@ -172,8 +180,10 @@ http://<hostname>.local
 
 - **Default Hostname**: `bitaxe` (configurable via web interface)
 - **Service Type**: `_http._tcp`
+- **Subtype**: `_axeos._sub._http._tcp`
 - **Port**: `80`
-- **Instance Name**: `ESP-Miner Web Server`
+- **Instance Name**: `Bitaxe <family> <board> (<mac_suffix>)` (e.g., `Bitaxe Gamma 601 (A1B2)`)
+- **TXT Records**: `board`, `family`, `asic`, `asic_count`, `fw_version`
 
 ### Hostname Conflict Resolution
 
