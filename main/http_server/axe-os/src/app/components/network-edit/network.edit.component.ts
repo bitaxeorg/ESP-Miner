@@ -129,7 +129,7 @@ export class NetworkEditComponent implements OnInit {
             .subscribe((selectedSsid: string) => {
               if (selectedSsid) {
                 this.form.patchValue({ ssid: selectedSsid });
-                this.form.markAsDirty();
+                this.form.get('ssid')?.markAsDirty();
               }
             });
         },
