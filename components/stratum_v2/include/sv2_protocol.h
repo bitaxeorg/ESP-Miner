@@ -35,9 +35,13 @@
 
 // Channel type selection
 typedef enum {
-    SV2_CHANNEL_EXTENDED = 0,
-    SV2_CHANNEL_STANDARD = 1
+    SV2_CHANNEL_UNKNOWN = 0,
+    SV2_CHANNEL_STANDARD = 1,
+    SV2_CHANNEL_EXTENDED = 2,
 } sv2_channel_type_t;
+
+#define SV2_CHANNEL_TYPE_STANDARD "standard"
+#define SV2_CHANNEL_TYPE_EXTENDED "extended"
 
 // Frame header (parsed)
 typedef struct {

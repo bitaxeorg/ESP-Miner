@@ -3,14 +3,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "asic_common.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/portmacro.h"
 #include "power_management_task.h"
 #include "hashrate_monitor_task.h"
-#include "serial.h"
-#include "stratum_api.h"
 #include "mining.h"
 #include "coinbase_decoder.h"
 #include "work_queue.h"
@@ -19,11 +16,14 @@
 #include "scoreboard.h"
 #include "esp_transport.h"
 
-// Protocol selection (V1 = JSON-RPC, V2 = binary SV2)
 typedef enum {
-    STRATUM_V1 = 0,
-    STRATUM_V2 = 1,
+    STRATUM_PROTOCOL_UNKNOWN = 0,
+    STRATUM_PROTOCOL_V1 = 1,
+    STRATUM_PROTOCOL_V2 = 2,
 } stratum_protocol_t;
+
+#define STRATUM_V1 "SV1"
+#define STRATUM_V2 "SV2"
 
 // Forward declarations
 struct sv2_conn;
@@ -110,7 +110,7 @@ typedef struct
     char firmware_update_status[20];
     bool hardware_fault;
     char hardware_fault_msg[64];
-    char * asic_status;
+    const char * asic_status;
     char * version;
     char * axeOSVersion;
     Scoreboard scoreboard;
@@ -119,8 +119,18 @@ typedef struct
 typedef struct
 {
     bool is_active;
+    uint64_t accepted_count;
+    uint64_t rejected_count;
+    double hashes;
+    pthread_mutex_t lock;
+} SelfTestNonceMeasurement;
+
+typedef struct
+{
+    bool is_active;
     bool is_finished;
-    char *message;
+    SelfTestNonceMeasurement nonce_measurement;
+    const char *message;
     char *result;
     char *finished;
     esp_err_t system_init_ret;

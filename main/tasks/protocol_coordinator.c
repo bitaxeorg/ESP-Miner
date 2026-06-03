@@ -157,7 +157,7 @@ static void start_v2_task(GlobalState *gs)
 // Start a task for the given protocol
 static void start_protocol_task(GlobalState *gs, stratum_protocol_t protocol)
 {
-    if (protocol == STRATUM_V2) {
+    if (protocol == STRATUM_PROTOCOL_V2) {
         start_v2_task(gs);
     } else {
         start_v1_task(gs);
@@ -215,7 +215,7 @@ static void stop_v2_task(GlobalState *gs)
 // Stop the currently running protocol task
 static void stop_running_task(GlobalState *gs)
 {
-    if (s_running_protocol == STRATUM_V2) {
+    if (s_running_protocol == STRATUM_PROTOCOL_V2) {
         stop_v2_task(gs);
     } else {
         stop_v1_task(gs);
@@ -275,7 +275,7 @@ static bool probe_pool(GlobalState *gs, bool use_fallback)
     const char *url   = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_url   : gs->SYSTEM_MODULE.pool_url;
     uint16_t    port  = use_fallback ? gs->SYSTEM_MODULE.fallback_pool_port  : gs->SYSTEM_MODULE.pool_port;
 
-    if (protocol == STRATUM_V2) {
+    if (protocol == STRATUM_PROTOCOL_V2) {
         return probe_pool_sv2(url, port);
     }
 
@@ -299,7 +299,7 @@ static void switch_to_fallback(GlobalState *gs)
     s_state = COORD_STATE_RUNNING_FALLBACK;
 
     ESP_LOGI(TAG, "Switching to fallback pool (%s)",
-             s_fallback_protocol == STRATUM_V2 ? "SV2" : "V1");
+             s_fallback_protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
 
     start_protocol_task(gs, s_fallback_protocol);
 
@@ -387,7 +387,7 @@ static void resume_on_pool(GlobalState *gs, bool use_fallback)
 
     ESP_LOGI(TAG, "Pool recovery: %s pool reachable, resuming mining (%s)",
              use_fallback ? "fallback" : "primary",
-             proto == STRATUM_V2 ? "SV2" : "V1");
+             proto == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
 
     start_protocol_task(gs, proto);
 
@@ -509,8 +509,8 @@ void protocol_coordinator_task(void *pvParameters)
     }
 
     ESP_LOGI(TAG, "Protocol coordinator started (primary: %s, fallback: %s, state: %d)",
-             s_primary_protocol == STRATUM_V2 ? "SV2" : "V1",
-             s_fallback_protocol == STRATUM_V2 ? "SV2" : "V1",
+             s_primary_protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1,
+             s_fallback_protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1,
              s_state);
 
     // Heartbeat initial delay state — give fallback connection time to establish
