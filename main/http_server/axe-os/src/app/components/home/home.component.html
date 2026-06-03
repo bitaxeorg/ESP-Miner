@@ -142,7 +142,7 @@
                             </span>
                             <div class="text-900 font-medium text-2xl">
                                 {{info.sharesAccepted | number: '1.0-0'}}
-                                <span *ngIf="(info.sharesPending ?? 0) > 0" class="text-base font-medium text-yellow-500 ml-2" pTooltip="Shares submitted to the pool but not yet acknowledged. The pool may batch acks, so this clears once it catches up." tooltipPosition="top">+{{ info.sharesPending }} pending</span>
+                                <span *ngIf="(info.sharesPending ?? 0) > 0" class="text-base font-medium text-yellow-500 ml-2" pTooltip="Shares submitted to the pool but not yet acknowledged. The pool may batch acks, so this clears once it catches up." tooltipPosition="top">{{ info.sharesPending }} pending</span>
                             </div>
                         </div>
                     </div>
