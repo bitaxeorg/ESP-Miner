@@ -20,6 +20,7 @@
 #include "connect.h"
 #include "global_state.h"
 #include "nvs_config.h"
+#include "esp_app_desc.h"
 
 // Maximum number of access points to scan
 #define MAX_AP_COUNT 20
@@ -206,6 +207,27 @@ static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
                 ESP_LOGI(TAG, "mDNS AxeOS subtype registered: _axeos._sub._http._tcp");
                 ESP_LOGI(TAG, "Discover AxeOS devices with: avahi-browse _axeos._sub._http._tcp");
             }
+
+            /* Add TXT records for device identification */
+            err = mdns_service_txt_item_set_for_host(instance_name, "_http", "_tcp", NULL, "board", GLOBAL_STATE->DEVICE_CONFIG.board_version);
+            if (err != ESP_OK) ESP_LOGW(TAG, "mDNS TXT 'board' failed: %s", esp_err_to_name(err));
+            err = mdns_service_txt_item_set_for_host(instance_name, "_http", "_tcp", NULL, "family", GLOBAL_STATE->DEVICE_CONFIG.family.name);
+            if (err != ESP_OK) ESP_LOGW(TAG, "mDNS TXT 'family' failed: %s", esp_err_to_name(err));
+            err = mdns_service_txt_item_set_for_host(instance_name, "_http", "_tcp", NULL, "asic", GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
+            if (err != ESP_OK) ESP_LOGW(TAG, "mDNS TXT 'asic' failed: %s", esp_err_to_name(err));
+            char asic_count_str[4];
+            snprintf(asic_count_str, sizeof(asic_count_str), "%u", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count);
+            err = mdns_service_txt_item_set_for_host(instance_name, "_http", "_tcp", NULL, "asic_count", asic_count_str);
+            if (err != ESP_OK) ESP_LOGW(TAG, "mDNS TXT 'asic_count' failed: %s", esp_err_to_name(err));
+            const esp_app_desc_t *app_desc = esp_app_get_description();
+            err = mdns_service_txt_item_set_for_host(instance_name, "_http", "_tcp", NULL, "fw_version", app_desc->version);
+            if (err != ESP_OK) ESP_LOGW(TAG, "mDNS TXT 'fw_version' failed: %s", esp_err_to_name(err));
+            ESP_LOGI(TAG, "mDNS TXT records added: board=%s, family=%s, asic=%s, asic_count=%s, fw_version=%s",
+                     GLOBAL_STATE->DEVICE_CONFIG.board_version,
+                     GLOBAL_STATE->DEVICE_CONFIG.family.name,
+                     GLOBAL_STATE->DEVICE_CONFIG.family.asic.name,
+                     asic_count_str,
+                     app_desc->version);
         }
 
         ESP_LOGI(TAG, "mDNS/Avahi setup complete - device ready for network discovery");
