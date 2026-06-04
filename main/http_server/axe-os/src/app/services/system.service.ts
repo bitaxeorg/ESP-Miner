@@ -340,6 +340,20 @@ export class SystemApiService {
     return of(undefined);
   }
 
+  public testSv2Connection(uri: string = '', url: string, port: number): Observable<{ supported: boolean; message: string }> {
+    const body = { url, port };
+
+    if (environment.production && this.api && !uri) {
+      return from(this.api.invoke(functions.testSv2Connection, { body }) as Promise<{ supported: boolean; message: string }>).pipe(timeout(API_TIMEOUT));
+    }
+
+    if (environment.production && uri) {
+      return this.httpClient.post<{ supported: boolean; message: string }>(`${uri}/api/system/test/sv2`, body).pipe(timeout(API_TIMEOUT));
+    }
+
+    return of({ supported: true, message: 'Stratum V2 supported (mock)' });
+  }
+
   private otaUpdate(file: File | Blob, url: string): Observable<HttpEvent<string>> {
     return new Observable<HttpEvent<string>>((subscriber) => {
       const reader = new FileReader();

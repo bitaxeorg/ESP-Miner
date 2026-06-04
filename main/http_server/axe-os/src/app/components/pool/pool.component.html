@@ -141,6 +141,21 @@
                                     </small>
                                 </div>
                             </div>
+
+                            <div class="field grid p-fluid">
+                                <div class="col-12 md:col-10 md:col-offset-2">
+                                    <button pButton
+                                        type="button"
+                                        class="p-button-secondary"
+                                        label="Test SV2 connection"
+                                        [loading]="testingSv2[pool]"
+                                        [disabled]="testingSv2[pool] || !form.get(pool + 'URL')?.value"
+                                        (click)="testSv2(pool)"></button>
+                                    <small class="block text-400 mt-2">
+                                        Checks whether the pool supports Stratum V2 before you save, so you don't end up on the fallback pool.
+                                    </small>
+                                </div>
+                            </div>
                         </ng-container>
 
                         <!-- SV1-only options -->

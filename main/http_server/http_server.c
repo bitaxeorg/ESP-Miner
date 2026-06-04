@@ -37,6 +37,7 @@
 #include "websocket_log.h"
 #include "websocket_api.h"
 #include "system_api_json.h"
+#include "sv2_connection_test.h"
 #include "log_buffer.h"
 #include "cjson_utils.h"
 #include "utils.h"
@@ -694,6 +695,69 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
+}
+
+/* Probe whether the given pool speaks Stratum V2, so users can verify SV2
+ * support before committing to it. Tests the url/port from the request body
+ * (the values currently in the form, not yet saved). */
+static esp_err_t POST_test_sv2(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    int total_len = req->content_len;
+    int cur_len = 0;
+    char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
+    int received = 0;
+    if (total_len >= SCRATCH_BUFSIZE) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_OK;
+    }
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len);
+        if (received <= 0) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read request");
+            return ESP_OK;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    cJSON * root = cJSON_Parse(buf);
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
+    cJSON * url_item = cJSON_GetObjectItem(root, "url");
+    cJSON * port_item = cJSON_GetObjectItem(root, "port");
+    if (!cJSON_IsString(url_item) || !cJSON_IsNumber(port_item)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing url or port");
+        return ESP_OK;
+    }
+
+    sv2_test_result_t result;
+    sv2_test_connection(url_item->valuestring, (uint16_t) port_item->valueint, &result);
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    cJSON * resp = cJSON_CreateObject();
+    if (resp == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_OK;
+    }
+    cJSON_AddBoolToObject(resp, "supported", result.supported);
+    cJSON_AddStringToObject(resp, "message", result.message);
+    esp_err_t res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
+    cJSON_Delete(resp);
+    return res;
 }
 
 static esp_err_t POST_identify(httpd_req_t * req)
@@ -1364,6 +1428,14 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &update_system_settings_uri);
+
+    httpd_uri_t system_test_sv2_uri = {
+        .uri = "/api/system/test/sv2",
+        .method = HTTP_POST,
+        .handler = POST_test_sv2,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_test_sv2_uri);
 
     httpd_uri_t update_post_ota_firmware = {
         .uri = "/api/system/OTA", 
