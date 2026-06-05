@@ -1,7 +1,6 @@
 #ifndef STRATUM_API_H
 #define STRATUM_API_H
 
-#include "cJSON.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/time.h>
@@ -17,15 +16,13 @@
 
 typedef enum
 {
-    STRATUM_UNKNOWN,
+    METHOD_UNKNOWN,
     MINING_NOTIFY,
     MINING_SET_DIFFICULTY,
     MINING_SET_VERSION_MASK,
     MINING_SET_EXTRANONCE,
     MINING_PING,
     STRATUM_RESULT,
-    STRATUM_RESULT_SETUP,
-    STRATUM_RESULT_VERSION_MASK,
     STRATUM_RESULT_SUBSCRIBE,
     STRATUM_RESULT_CONFIGURE,
     CLIENT_RECONNECT,
@@ -89,7 +86,7 @@ char *STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport);
 
 int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const char * model);
 
-void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
+bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
 
 void STRATUM_V1_reset_message(StratumApiV1Message *message);
 

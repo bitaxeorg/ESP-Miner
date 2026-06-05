@@ -326,11 +326,17 @@ void stratum_v1_task(void *pvParameters)
             int64_t receive_time_us = esp_timer_get_time();
 
             bool reconnect_requested = false;
-            STRATUM_V1_parse(&stratum_api_v1_message, line);
+            if (!STRATUM_V1_parse(&stratum_api_v1_message, line)) {
+                ESP_LOGE(TAG, "Failed to parse Stratum message, ignoring");
+                STRATUM_V1_reset_message(&stratum_api_v1_message);
+                free(line);
+                continue;
+            }
             free(line);
 
             switch (stratum_api_v1_message.method) {
-                case STRATUM_UNKNOWN:
+                case METHOD_UNKNOWN:
+                    // Should never happen
                     break;
 
                 case MINING_NOTIFY:
@@ -356,7 +362,6 @@ void stratum_v1_task(void *pvParameters)
                     break;
 
                 case MINING_SET_VERSION_MASK:
-                case STRATUM_RESULT_VERSION_MASK:
                     ESP_LOGI(TAG, "Set version mask: %08lx", stratum_api_v1_message.version_mask);
                     GLOBAL_STATE->version_mask = stratum_api_v1_message.version_mask;
                     GLOBAL_STATE->new_stratum_version_rolling_msg = true;
@@ -406,46 +411,38 @@ void stratum_v1_task(void *pvParameters)
 
                 case CLIENT_GET_VERSION:
                     STRATUM_V1_send_version(GLOBAL_STATE->transport, stratum_api_v1_message.message_id);
-                    break;
-
-                case STRATUM_RESULT:
+                    break;                case STRATUM_RESULT:
                     {
                         float response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id, receive_time_us);
-                        if (stratum_api_v1_message.response_success) {
-                            ESP_LOGI(TAG, "message result accepted");
-                            if (response_time_ms >= 0) {
+                        if (response_time_ms >= 0) {
+                            if (stratum_api_v1_message.response_success) {
+                                ESP_LOGI(TAG, "message result accepted");
                                 ESP_LOGI(TAG, "Stratum response time: %.1f ms", response_time_ms);
                                 GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
                                 SYSTEM_notify_accepted_share(GLOBAL_STATE);
-                            }
-                        } else {
-                            ESP_LOGW(TAG, "message result rejected: %s", stratum_api_v1_message.error_str);
-                            if (response_time_ms >= 0) {
+                            } else {
+                                ESP_LOGW(TAG, "message result rejected: %s", stratum_api_v1_message.error_str);
                                 SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
                             }
-                        }
-                    }
-                    break;
-
-                case STRATUM_RESULT_SETUP:
-                    {
-                        // Reset retry attempts after successfully receiving data.
-                        retry_attempts = 0;
-                        // Tell the coordinator setup succeeded so it clears its
-                        // failure counter and pools_unavailable.
-                        protocol_coordinator_notify_success();
-                        if (stratum_api_v1_message.response_success) {
-                            ESP_LOGI(TAG, "setup message accepted");
-                            uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
-                            if (stratum_api_v1_message.message_id == authorize_message_id && difficulty > 0) {
-                                STRATUM_V1_suggest_difficulty(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), difficulty);
-                            }
-                            bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
-                            if (extranonce_subscribe) {
-                                STRATUM_V1_extranonce_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE));
-                            }
                         } else {
-                            ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);
+                            // Reset retry attempts after successfully receiving data.
+                            retry_attempts = 0;
+                            // Tell the coordinator setup succeeded so it clears its
+                            // failure counter and pools_unavailable.
+                            protocol_coordinator_notify_success();
+                            if (stratum_api_v1_message.response_success) {
+                                ESP_LOGI(TAG, "setup message accepted");
+                                uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
+                                if (stratum_api_v1_message.message_id == authorize_message_id && difficulty > 0) {
+                                    STRATUM_V1_suggest_difficulty(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), difficulty);
+                                }
+                                bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
+                                if (extranonce_subscribe) {
+                                    STRATUM_V1_extranonce_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE));
+                                }
+                            } else {
+                                ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);
+                            }
                         }
                     }
                     break;

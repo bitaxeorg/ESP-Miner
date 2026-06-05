@@ -224,7 +224,7 @@ void STRATUM_V1_reset_message(StratumApiV1Message *message)
         STRATUM_V1_free_mining_notify(message->mining_notification);
         message->mining_notification = NULL;
     }
-    message->method = STRATUM_UNKNOWN;
+    message->method = METHOD_UNKNOWN;
     message->message_id = -1;
     message->response_success = false;
     message->new_difficulty = 0.0;
@@ -234,7 +234,7 @@ void STRATUM_V1_reset_message(StratumApiV1Message *message)
 static stratum_method parse_method(const cJSON *method_json)
 {
     if (!method_json || !cJSON_IsString(method_json)) {
-        return STRATUM_UNKNOWN;
+        return STRATUM_RESULT;
     }
 
     const char *method = method_json->valuestring;
@@ -248,7 +248,7 @@ static stratum_method parse_method(const cJSON *method_json)
     if (strcmp(method, "client.get_version") == 0) return CLIENT_GET_VERSION;
 
     ESP_LOGI(TAG, "Unhandled method: %s", method);
-    return STRATUM_UNKNOWN;
+    return METHOD_UNKNOWN;
 }
 
 static bool parse_mining_notify(cJSON *json, StratumApiV1Message *message)
@@ -420,11 +420,6 @@ static bool parse_get_version(cJSON *json, StratumApiV1Message *message)
 static bool parse_subscribe_result(cJSON *json, StratumApiV1Message *message)
 {
     cJSON *result = cJSON_GetObjectItem(json, "result");
-    if (!result || !cJSON_IsArray(result) || cJSON_GetArraySize(result) < 3) {
-        ESP_LOGE(TAG, "Invalid result for subscribe");
-        return false;
-    }
-
     cJSON *extranonce = cJSON_GetArrayItem(result, 1);
     cJSON *extranonce2_len = cJSON_GetArrayItem(result, 2);
     if (!extranonce || !extranonce2_len || !cJSON_IsString(extranonce) || !cJSON_IsNumber(extranonce2_len)) {
@@ -451,10 +446,6 @@ static bool parse_subscribe_result(cJSON *json, StratumApiV1Message *message)
 static bool parse_configure_result(cJSON *json, StratumApiV1Message *message)
 {
     cJSON *result = cJSON_GetObjectItem(json, "result");
-    if (!result || !cJSON_IsObject(result)) {
-        ESP_LOGE(TAG, "Invalid result type for configure");
-        return false;
-    }
     cJSON *version_rolling = cJSON_GetObjectItem(result, "version-rolling");
     cJSON *mask = cJSON_GetObjectItem(result, "version-rolling.mask");
     if (!version_rolling || !cJSON_IsTrue(version_rolling) || !mask || !cJSON_IsString(mask)) {
@@ -472,6 +463,8 @@ static bool parse_result(cJSON *json, StratumApiV1Message *message)
     cJSON *result = cJSON_GetObjectItem(json, "result");
     cJSON *error = cJSON_GetObjectItem(json, "error");
     cJSON *reject_reason = cJSON_GetObjectItem(json, "reject-reason");
+
+    message->method = STRATUM_RESULT;
 
     // Handle error array format: [code, message, extra]
     if (error && cJSON_IsArray(error) && cJSON_GetArraySize(error) >= 2) {
@@ -514,11 +507,6 @@ static bool parse_result(cJSON *json, StratumApiV1Message *message)
     // Handle boolean result
     if (cJSON_IsBool(result)) {
         message->response_success = cJSON_IsTrue(result);
-        if (message->message_id < 5) {
-            message->method = STRATUM_RESULT_SETUP;
-        } else {
-            message->method = STRATUM_RESULT;
-        }
         if (!message->response_success) {
             if (message->error_str) free(message->error_str);
             message->error_str = reject_reason && cJSON_IsString(reject_reason)
@@ -547,7 +535,7 @@ static bool parse_result(cJSON *json, StratumApiV1Message *message)
     return false;
 }
 
-void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json)
+bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json)
 {
     STRATUM_V1_reset_message(message);
 
@@ -556,8 +544,8 @@ void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json)
     cJSON *json = cJSON_Parse(stratum_json);
     if (!json) {
         ESP_LOGE(TAG, "JSON parse failed: %s", stratum_json);
-        message->method = STRATUM_UNKNOWN;
-        return;
+        message->method = METHOD_UNKNOWN;
+        return false;
     }
 
     // Parse message ID
@@ -570,42 +558,47 @@ void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json)
     cJSON *method_json = cJSON_GetObjectItem(json, "method");
     message->method = parse_method(method_json);
 
-    // Handle requests
-    if (message->method != STRATUM_UNKNOWN) {
-        switch (message->method) {
-            case MINING_NOTIFY:
-                parse_mining_notify(json, message);
-                break;
-            case MINING_SET_DIFFICULTY:
-                parse_set_difficulty(json, message);
-                break;
-            case MINING_SET_VERSION_MASK:
-                parse_set_version_mask(json, message);
-                break;
-            case MINING_SET_EXTRANONCE:
-                parse_set_extranonce(json, message);
-                break;
-            case CLIENT_RECONNECT:
-                ESP_LOGI(TAG, "Received client.reconnect");
-                break;
-            case MINING_PING:
-                ESP_LOGI(TAG, "Received mining.ping");
-                break;
-            case CLIENT_SHOW_MESSAGE:
-                parse_show_message(json, message);
-                break;
-            case CLIENT_GET_VERSION:
-                parse_get_version(json, message);
-                break;
-            default:
-                ESP_LOGI(TAG, "No handler for method: %d", message->method);
-        }
-    } else {
-        // Handle results
-        parse_result(json, message);
+    bool result = false;
+    // Handle requests or results
+    switch (message->method) {
+        case STRATUM_RESULT:
+            result = parse_result(json, message);
+            break;
+        case MINING_NOTIFY:
+            result = parse_mining_notify(json, message);
+            break;
+        case MINING_SET_DIFFICULTY:
+            result = parse_set_difficulty(json, message);
+            break;
+        case MINING_SET_VERSION_MASK:
+            result = parse_set_version_mask(json, message);
+            break;
+        case MINING_SET_EXTRANONCE:
+            result = parse_set_extranonce(json, message);
+            break;
+        case CLIENT_RECONNECT:
+            ESP_LOGI(TAG, "Received client.reconnect");
+            result = true;
+            break;
+        case MINING_PING:
+            ESP_LOGI(TAG, "Received mining.ping");
+            result = true;
+            break;
+        case CLIENT_SHOW_MESSAGE:
+            result = parse_show_message(json, message);
+            break;
+        case CLIENT_GET_VERSION:
+            result = parse_get_version(json, message);
+            break;
+        case METHOD_UNKNOWN:
+            break;
+        default:
+            ESP_LOGI(TAG, "No handler for method: %d", message->method);
+            break;
     }
 
     cJSON_Delete(json);
+    return result;
 }
 
 void STRATUM_V1_free_mining_notify(mining_notify * params)
