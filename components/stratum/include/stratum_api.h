@@ -27,8 +27,10 @@ typedef enum
     STRATUM_RESULT_SETUP,
     STRATUM_RESULT_VERSION_MASK,
     STRATUM_RESULT_SUBSCRIBE,
+    STRATUM_RESULT_CONFIGURE,
     CLIENT_RECONNECT,
-    CLIENT_SHOW_MESSAGE
+    CLIENT_SHOW_MESSAGE,
+    CLIENT_GET_VERSION,
 } stratum_method;
 
 typedef enum
@@ -37,9 +39,6 @@ typedef enum
     BUNDLED_CRT = 1,
     CUSTOM_CRT = 2,
 } tls_mode;
-
-static const int  STRATUM_ID_CONFIGURE    = 1;
-static const int  STRATUM_ID_SUBSCRIBE    = 2;
 
 typedef struct
 {
@@ -57,7 +56,7 @@ typedef struct
 
 typedef struct
 {
-    char * extranonce_str;
+    char *extranonce_str;
     int extranonce_2_len;
 
     int message_id;
@@ -72,7 +71,9 @@ typedef struct
     uint32_t version_mask;
     // result
     bool response_success;
-    char * error_str;
+    char *error_str;
+    char *show_message;
+    char *version_string;
 } StratumApiV1Message;
 
 typedef struct {
@@ -99,6 +100,8 @@ int STRATUM_V1_authorize(esp_transport_handle_t transport, int send_uid, const c
 int STRATUM_V1_configure_version_rolling(esp_transport_handle_t transport, int send_uid, uint32_t * version_mask);
 
 int STRATUM_V1_pong(esp_transport_handle_t transport, int message_id);
+
+int STRATUM_V1_send_version(esp_transport_handle_t transport, int message_id);
 
 int STRATUM_V1_suggest_difficulty(esp_transport_handle_t transport, int send_uid, uint32_t difficulty);
 
