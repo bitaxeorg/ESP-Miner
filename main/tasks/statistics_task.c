@@ -80,17 +80,17 @@ bool addStatisticData(StatisticsDataPtr data, uint16_t statsFrequency)
             if (currentSpan >= targetDuration) {
                 indexToRemove = 0;
             } else {
-                uint16_t low = 0;
-                uint16_t high = maxDataCount; // Virtual index for the new point
+                uint16_t low = 1;
+                uint16_t high = maxDataCount - 1;
 
                 while (high - low > 1) {
                     uint64_t lowTime = statisticsBuffer[low].timestamp;
-                    uint64_t highTime = (high == maxDataCount) ? data->timestamp : statisticsBuffer[high].timestamp;
+                    uint64_t highTime = statisticsBuffer[high].timestamp;
                     uint64_t midTime = (lowTime + highTime) / 2;
 
                     uint16_t split = low;
                     for (uint16_t i = low; i <= high; i++) {
-                        uint64_t t = (i == maxDataCount) ? data->timestamp : statisticsBuffer[i].timestamp;
+                        uint64_t t = statisticsBuffer[i].timestamp;
                         if (t >= midTime) {
                             split = i;
                             break;
@@ -105,13 +105,12 @@ bool addStatisticData(StatisticsDataPtr data, uint16_t statsFrequency)
                     uint16_t rightCount = high - split + 1;
 
                     if (leftCount > rightCount) {
-                        high = (split == 0) ? 0 : split - 1;
+                        high = split - 1;
                     } else {
                         low = split;
                     }
                 }
                 indexToRemove = low;
-                if (indexToRemove >= maxDataCount) indexToRemove = maxDataCount - 1;
             }
 
             // Shift and append (Standard linear array shift)

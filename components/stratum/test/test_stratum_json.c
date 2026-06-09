@@ -209,10 +209,21 @@ TEST_CASE("Parse stratum result with null result and error string", "[stratum]")
 TEST_CASE("Parse stratum error array format", "[stratum]")
 {
     StratumApiV1Message stratum_api_v1_message = {};
-    const char *json_string = "{\"id\":4,\"result\":null,\"error\":[21,\"Job not found\",\"\"]}";
+    const char *json_string = "{\"id\":50,\"result\":null,\"error\":[21,\"Job not found\",\"\"]}";
     STRATUM_V1_parse(&stratum_api_v1_message, json_string);
-    TEST_ASSERT_EQUAL(4, stratum_api_v1_message.message_id);
-    TEST_ASSERT_EQUAL(STRATUM_RESULT_SETUP, stratum_api_v1_message.method);
+    TEST_ASSERT_EQUAL(50, stratum_api_v1_message.message_id);
+    TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
     TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
     TEST_ASSERT_EQUAL_STRING("Job not found", stratum_api_v1_message.error_str);
+}
+
+TEST_CASE("Parse stratum error jsonrpc object with code", "[stratum]")
+{
+    StratumApiV1Message stratum_api_v1_message = {};
+    const char *json_string = "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":22,\"message\":\"duplicate share\",\"data\":null},\"id\":42}";
+    STRATUM_V1_parse(&stratum_api_v1_message, json_string);
+    TEST_ASSERT_EQUAL(42, stratum_api_v1_message.message_id);
+    TEST_ASSERT_EQUAL(STRATUM_RESULT, stratum_api_v1_message.method);
+    TEST_ASSERT_FALSE(stratum_api_v1_message.response_success);
+    TEST_ASSERT_EQUAL_STRING("duplicate share", stratum_api_v1_message.error_str);
 }

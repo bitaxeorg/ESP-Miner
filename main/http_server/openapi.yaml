@@ -285,6 +285,9 @@ components:
         responseTime:
           type: number
           description: Pool response time in ms
+        responseShareBatch:
+          type: number
+          description: Number of shares acknowledged in the batch that produced responseTime (SV2; 1 = single share, >1 = batched ack)
         rotation:
           type: number
           description: Screen rotation setting (0, 90, 180, 270)
@@ -414,9 +417,6 @@ components:
           type: string
           enum: [SV1, SV2]
           description: Configured stratum protocol
-        activeProtocolLabel:
-          type: string
-          description: Human-readable label for the active protocol (e.g. "SV1", "SV2 Extended Channel")
         stratumV2AuthorityPubkey:
           type: string
           description: SV2 authority public key for certificate verification (base58-encoded)

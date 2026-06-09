@@ -83,4 +83,42 @@ describe('HomeComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  describe('stale data and visibility state', () => {
+    it('should set stale data error when visible and last message is old', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+
+      component['lastMessageTime'] = Date.now() - 10000;
+      component.systemInfoError$.next({ duration: 0, startTime: null });
+
+      component['checkStaleData']();
+
+      expect(component.systemInfoError$.value.duration).toBe(10);
+    });
+
+    it('should NOT set stale data error when hidden and last message is old', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('hidden');
+
+      component['lastMessageTime'] = Date.now() - 10000;
+      component.systemInfoError$.next({ duration: 0, startTime: null });
+
+      component['checkStaleData']();
+
+      expect(component.systemInfoError$.value.duration).toBe(0);
+    });
+
+    it('should reset lastMessageTime and clear stale error when transitioning to visible', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+
+      const initialTime = Date.now() - 10000;
+      component['lastMessageTime'] = initialTime;
+      component.systemInfoError$.next({ duration: 10, startTime: initialTime });
+
+      component.onVisibilityChange();
+
+      expect(component.systemInfoError$.value.duration).toBe(0);
+      expect(component.systemInfoError$.value.startTime).toBeNull();
+      expect(component['lastMessageTime']).toBeGreaterThan(initialTime);
+    });
+  });
 });

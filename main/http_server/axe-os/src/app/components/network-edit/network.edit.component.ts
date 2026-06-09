@@ -54,6 +54,8 @@ export class NetworkEditComponent implements OnInit {
 
   public updateSystem() {
 
+    const restartAlreadyPending = this.savedChanges;
+    const restartRequired = this.isRestartRequired;
     const form = this.form.getRawValue();
 
     // Allow an empty Wi-Fi password
@@ -72,13 +74,16 @@ export class NetworkEditComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          this.toastr.warning('You must restart this device after saving for changes to take effect.');
+          if (restartRequired) {
+            this.toastr.warning('You must restart this device after saving for changes to take effect.');
+          }
           this.toastr.success('Saved network settings');
-          this.savedChanges = true;
+          this.savedChanges = restartAlreadyPending || restartRequired;
+          this.form.markAsPristine();
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error(`Could not save. ${err.message}`);
-          this.savedChanges = false;
+          this.savedChanges = restartAlreadyPending;
         }
       });
   }
@@ -125,7 +130,7 @@ export class NetworkEditComponent implements OnInit {
             .subscribe((selectedSsid: string) => {
               if (selectedSsid) {
                 this.form.patchValue({ ssid: selectedSsid });
-                this.form.markAsDirty();
+                this.form.get('ssid')?.markAsDirty();
               }
             });
         },
@@ -141,10 +146,22 @@ export class NetworkEditComponent implements OnInit {
       .subscribe({
         next: () => {
           this.toastr.success('Device restarted');
+          this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error(`Could not restart. ${err.message}`);
         }
       });
+  }
+
+  get noRestartFields(): string[] {
+    return [
+      'hostname'
+    ];
+  }
+
+  get isRestartRequired(): boolean {
+    return Object.entries(this.form.controls)
+      .some(([field, control]) => control.dirty && !this.noRestartFields.includes(field));
   }
 }
