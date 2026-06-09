@@ -432,13 +432,15 @@ void stratum_v1_task(void *pvParameters)
                             protocol_coordinator_notify_success();
                             if (stratum_api_v1_message.response_success) {
                                 ESP_LOGI(TAG, "setup message accepted");
-                                uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
-                                if (stratum_api_v1_message.message_id == authorize_message_id && difficulty > 0) {
-                                    STRATUM_V1_suggest_difficulty(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), difficulty);
-                                }
-                                bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
-                                if (extranonce_subscribe) {
-                                    STRATUM_V1_extranonce_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE));
+                                if (stratum_api_v1_message.message_id == authorize_message_id) {
+                                    uint16_t difficulty = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_difficulty : GLOBAL_STATE->SYSTEM_MODULE.pool_difficulty;
+                                    if (difficulty > 0) {
+                                        STRATUM_V1_suggest_difficulty(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), difficulty);
+                                    }
+                                    bool extranonce_subscribe = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_extranonce_subscribe : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
+                                    if (extranonce_subscribe) {
+                                        STRATUM_V1_extranonce_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE));
+                                    }
                                 }
                             } else {
                                 ESP_LOGE(TAG, "setup message rejected: %s", stratum_api_v1_message.error_str);
