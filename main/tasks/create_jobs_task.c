@@ -30,7 +30,7 @@ static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *job,
 static void free_work_item(GlobalState *GLOBAL_STATE, void *work, stratum_protocol_t protocol)
 {
     if (!work) return;
-    if (protocol == STRATUM_V2) {
+    if (protocol == STRATUM_PROTOCOL_V2) {
         if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
             sv2_ext_job_free((sv2_ext_job_t *)work);
         } else {
@@ -72,8 +72,8 @@ void create_jobs_task(void *pvParameters)
         if (active_protocol != current_work_protocol) {
             if (current_work != NULL) {
                 ESP_LOGI(TAG, "Protocol switched from %s to %s, discarding current work",
-                         current_work_protocol == STRATUM_V2 ? "SV2" : "V1",
-                         active_protocol == STRATUM_V2 ? "SV2" : "V1");
+                         current_work_protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1,
+                         active_protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
                 free_work_item(GLOBAL_STATE, current_work, current_work_protocol);
                 current_work = NULL;
             }
@@ -105,7 +105,7 @@ void create_jobs_task(void *pvParameters)
             }
 
             // Protocol unchanged — item matches current_work_protocol. Safe to cast.
-            if (current_work_protocol == STRATUM_V2) {
+            if (current_work_protocol == STRATUM_PROTOCOL_V2) {
                 if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
                     ESP_LOGI(TAG, "New Work Dequeued SV2 ext job %lu", ((sv2_ext_job_t *)new_work)->job_id);
                 } else {
@@ -133,7 +133,7 @@ void create_jobs_task(void *pvParameters)
 
             // Check clean_jobs flag
             bool clean;
-            if (current_work_protocol == STRATUM_V2) {
+            if (current_work_protocol == STRATUM_PROTOCOL_V2) {
                 if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
                     clean = ((sv2_ext_job_t *)current_work)->clean_jobs;
                 } else {
@@ -155,7 +155,7 @@ void create_jobs_task(void *pvParameters)
             // Re-sending the same job restarts the nonce search from 0 and
             // produces duplicate shares. Only send work on new jobs.
             // (V1 and SV2 extended are fine — extranonce_2 gives unique work each time.)
-            if (active_protocol == STRATUM_V2 && !stratum_v2_is_extended_channel(GLOBAL_STATE)) {
+            if (active_protocol == STRATUM_PROTOCOL_V2 && !stratum_v2_is_extended_channel(GLOBAL_STATE)) {
                 timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
                 continue;
             }
@@ -173,7 +173,7 @@ void create_jobs_task(void *pvParameters)
         }
 
         // Generate and send job
-        if (active_protocol == STRATUM_V2) {
+        if (active_protocol == STRATUM_PROTOCOL_V2) {
             if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
                 generate_work_sv2_ext(GLOBAL_STATE, (sv2_ext_job_t *)current_work, difficulty, extranonce_2);
                 extranonce_2++;

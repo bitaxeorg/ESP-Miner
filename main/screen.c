@@ -561,7 +561,7 @@ static void screen_update_cb(lv_timer_t * timer)
         current_chip_temp = power_management->chip_temp_avg;
     }
 
-    if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+    if (GLOBAL_STATE->stratum_protocol == STRATUM_PROTOCOL_V2) {
         // SV2 standard channel: no coinbase data, so no block height or scriptsig
         lv_label_set_text(mining_block_height_label, "Protocol: SV2");
         lv_obj_add_flag(mining_scriptsig_title_label, LV_OBJ_FLAG_HIDDEN);

@@ -77,11 +77,20 @@ static sv2_channel_type_t sv2_select_channel_type(GlobalState *GLOBAL_STATE, boo
 {
     NvsConfigKey key = use_fallback ? NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE
                                     : NVS_CONFIG_SV2_CHANNEL_TYPE;
-    uint16_t cfg = nvs_config_get_u16(key);
-    if (cfg == 1 && GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397) {
-        return SV2_CHANNEL_STANDARD;
+    char *cfg_str = nvs_config_get_string(key);
+    sv2_channel_type_t type = SV2_CHANNEL_EXTENDED;  // default, and forced for BM1397
+    if (cfg_str) {
+        sv2_channel_type_t parsed = sv2_channel_type_from_string(cfg_str);
+        if (parsed == SV2_CHANNEL_STANDARD) {
+            if (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397) {
+                type = SV2_CHANNEL_STANDARD;
+            }
+        } else if (parsed == SV2_CHANNEL_UNKNOWN && cfg_str[0] != '\0') {
+            ESP_LOGW(TAG, "Invalid SV2 channel type in NVS: '%s', defaulting to extended", cfg_str);
+        }
+        free(cfg_str);
     }
-    return SV2_CHANNEL_EXTENDED;  // default, and forced for BM1397
+    return type;
 }
 
 void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
@@ -730,7 +739,7 @@ void stratum_v2_task(void *pvParameters)
             const char *device_model = GLOBAL_STATE->DEVICE_CONFIG.family.asic.name;
             ESP_LOGI(TAG, "Sending SetupConnection (vendor=bitaxe, hw=%s, channel=%s)",
                      device_model ? device_model : "",
-                     channel_type == SV2_CHANNEL_EXTENDED ? "extended" : "standard");
+                     channel_type == SV2_CHANNEL_EXTENDED ? SV2_CHANNEL_TYPE_EXTENDED : SV2_CHANNEL_TYPE_STANDARD);
             int frame_len = sv2_build_setup_connection(frame_buf, sizeof(frame_buf),
                                                        stratum_url, port,
                                                        "bitaxe", device_model ? device_model : "",
@@ -882,7 +891,7 @@ void stratum_v2_task(void *pvParameters)
 
             ESP_LOGI(TAG, "Mining channel opened: channel_id=%lu, group=%lu, type=%s",
                      channel_id, group_channel_id,
-                     channel_type == SV2_CHANNEL_EXTENDED ? "extended" : "standard");
+                     channel_type == SV2_CHANNEL_EXTENDED ? SV2_CHANNEL_TYPE_EXTENDED : SV2_CHANNEL_TYPE_STANDARD);
             ESP_LOGI(TAG, "Set pool difficulty: %lu", pdiff);
         }
 

@@ -140,21 +140,26 @@ void app_main(void)
 
     if (system_init_ret == ESP_OK) {
         if (asic_initialize(&GLOBAL_STATE, ASIC_INIT_COLD_BOOT, 0) == 0) {
-            return;
-        }
+            if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
+                return;
+            }
 
-        if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
-            ESP_LOGE(TAG, "Error creating stratum miner task");
-        }
-        if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
-            ESP_LOGE(TAG, "Error creating asic result task");
-        }
+            self_test_show_message(&GLOBAL_STATE, GLOBAL_STATE.SYSTEM_MODULE.asic_status);
+            system_init_ret = ESP_FAIL;
+        } else {
+            if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating stratum miner task");
+            }
+            if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating asic result task");
+            }
 
-        if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
-            ESP_LOGE(TAG, "Error creating hashrate monitor task");
-        }
-        if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
-            ESP_LOGE(TAG, "Error creating statistics task");
+            if (xTaskCreateWithCaps(hashrate_monitor_task, "hashrate monitor", 8192, (void *) &GLOBAL_STATE, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating hashrate monitor task");
+            }
+            if (xTaskCreateWithCaps(statistics_task, "statistics", 8192, (void *) &GLOBAL_STATE, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating statistics task");
+            }
         }
     }
 
