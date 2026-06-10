@@ -130,16 +130,17 @@
 
         --focus-ring: var(--p-focus-ring-shadow);
 
+        --surface-border: var(--p-content-border-color);
+
         /* PrimeFlex color variable aliases */
-        --green-500: var(--p-green-500);
-        --red-500: var(--p-red-500);
-        --yellow-500: var(--p-yellow-500);
-        --blue-500: var(--p-blue-500);
-        --orange-500: var(--p-orange-500);
-        --cyan-500: var(--p-cyan-500);
-        --pink-500: var(--p-pink-500);
-        --indigo-500: var(--p-indigo-500);
-        --teal-500: var(--p-teal-500);
+        $shades: 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950;
+        $colors: 'green', 'red', 'yellow', 'blue', 'orange', 'cyan', 'pink', 'indigo', 'teal', 'surface';
+
+        @each $color in $colors {
+            @each $shade in $shades {
+                --#{$color}-#{$shade}: var(--p-#{$color}-#{$shade});
+            }
+        }
     }
 
     * {
