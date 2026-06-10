@@ -7,7 +7,6 @@
 #include "stratum_api.h"
 #include "cJSON.h"
 #include "esp_log.h"
-#include "esp_ota_ops.h"
 #include "esp_app_desc.h"
 #include "esp_transport.h"
 #include "esp_transport_ssl.h"
@@ -15,6 +14,7 @@
 #include "esp_crt_bundle.h"
 #include "utils.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -28,7 +28,7 @@ static const char * TAG = "stratum_api";
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
 
-static RequestTiming request_timings[MAX_REQUEST_IDS];
+static RequestTiming *request_timings = NULL;
 
 static RequestTiming* get_request_timing(int request_id) {
     if (request_id < 0) return NULL;
@@ -103,6 +103,14 @@ void STRATUM_V1_initialize_buffer()
     }
     memset(json_rpc_buffer, 0, BUFFER_SIZE);
 
+    if (request_timings == NULL) {
+        request_timings = heap_caps_malloc(sizeof(RequestTiming) * MAX_REQUEST_IDS, MALLOC_CAP_SPIRAM);
+        if (request_timings == NULL) {
+            printf("Error: Failed to allocate memory for request_timings\n");
+            exit(1);
+        }
+    }
+
     for (int i = 0; i < MAX_REQUEST_IDS; i++) {
         request_timings[i].timestamp_us = 0;
         request_timings[i].tracking = false;
@@ -112,6 +120,11 @@ void STRATUM_V1_initialize_buffer()
 void cleanup_stratum_buffer()
 {
     free(json_rpc_buffer);
+    json_rpc_buffer = NULL;
+    if (request_timings) {
+        free(request_timings);
+        request_timings = NULL;
+    }
 }
 
 static void realloc_json_buffer(size_t len)

@@ -4,6 +4,7 @@
 #include "esp_transport_tcp.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "esp_heap_caps.h"
 
 #include "protocol_coordinator.h"
 #include "stratum_v1_task.h"
@@ -140,7 +141,7 @@ static bool has_fallback_pool(GlobalState *gs)
 static void start_v1_task(GlobalState *gs)
 {
     s_v1_should_shutdown = false;
-    if (xTaskCreate(stratum_v1_task, "stratum v1", 8192, (void *)gs, 5, NULL) != pdPASS) {
+    if (xTaskCreateWithCaps(stratum_v1_task, "stratum v1", 8192, (void *)gs, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create V1 stratum task");
     }
 }
@@ -149,7 +150,7 @@ static void start_v1_task(GlobalState *gs)
 static void start_v2_task(GlobalState *gs)
 {
     s_v2_should_shutdown = false;
-    if (xTaskCreate(stratum_v2_task, "stratum v2", 12288, (void *)gs, 5, NULL) != pdPASS) {
+    if (xTaskCreateWithCaps(stratum_v2_task, "stratum v2", 12288, (void *)gs, 5, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create V2 stratum task");
     }
 }
