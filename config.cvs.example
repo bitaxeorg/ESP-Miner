@@ -28,4 +28,7 @@ rotation,data,u16,0
 autofanspeed,data,u16,1
 fanspeed,data,u16,100
 selftest,data,u16,1
+selftest_temp,data,u16,65
+selftest_warm,data,u16,55
+selftest_max,data,u16,70
 overheat_mode,data,u16,0
