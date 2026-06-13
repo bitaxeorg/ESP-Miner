@@ -213,4 +213,19 @@ export class UpdateComponent {
       });
     }
   }
+
+  public toggleCustomWWW(checked: boolean): void {
+    const value = checked ? 1 : 0;
+    this.systemService.updateSystem('', { useCustomWWW: value }).subscribe({
+      next: () => {
+        this.toastrService.success(`Web UI source changed to ${checked ? 'Custom (SPIFFS)' : 'Default (Embedded)'}. Reloading...`);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      },
+      error: (err) => {
+        this.toastrService.error(err.error?.message || err.message || 'Failed to change Web UI source');
+      }
+    });
+  }
 }

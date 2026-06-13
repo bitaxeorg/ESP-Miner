@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_partition.h"
+#include "esp_image_format.h"
 #include "esp_wifi.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
@@ -206,6 +207,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     free(fallback_proto);
 
     // User Preferences
+    cJSON_AddNumberToObject(root, "useCustomWWW", nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) ? 1 : 0);
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) ? 1 : 0);
     char *disp_name = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     cJSON_AddStringToObject(root, "display", disp_name ? disp_name : "");
@@ -312,8 +314,20 @@ static void system_api_add_partitions(cJSON *root) {
             esp_app_desc_t app_desc;
             if (esp_ota_get_partition_description(p, &app_desc) == ESP_OK) {
                 cJSON_AddStringToObject(p_obj, "version", app_desc.version);
+                
+                esp_partition_pos_t part_pos = {
+                    .offset = p->address,
+                    .size = p->size,
+                };
+                esp_image_metadata_t metadata;
+                if (esp_image_get_metadata(&part_pos, &metadata) == ESP_OK) {
+                    cJSON_AddNumberToObject(p_obj, "usagePercent", (metadata.image_len * 100) / p->size);
+                } else {
+                    cJSON_AddNullToObject(p_obj, "usagePercent");
+                }
             } else {
                 cJSON_AddNullToObject(p_obj, "version");
+                cJSON_AddNullToObject(p_obj, "usagePercent");
             }
             cJSON_AddItemToArray(partitions_array, p_obj);
         }

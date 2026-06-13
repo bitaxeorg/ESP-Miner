@@ -135,6 +135,7 @@ export class SystemApiService {
         autofanspeed: 1,
         isPSRAMAvailable: 1,
         overclockEnabled: 1,
+        useCustomWWW: 0 as const,
         runningPartition: "factory",
         minFanSpeed: 25,
         fanspeed: 50,
@@ -150,9 +151,9 @@ export class SystemApiService {
         statsLimit: 720,
 
         partitions: [
-          { label: 'factory', version: 'v2.11.0', isCurrent: false, isFactory: true },
-          { label: 'ota_0', version: 'v2.12.0', isCurrent: true, isFactory: false },
-          { label: 'ota_1', version: 'v2.10.0', isCurrent: false, isFactory: false }
+          { label: 'factory', version: 'v2.11.0', isCurrent: false, isFactory: true, usagePercent: 58 },
+          { label: 'ota_0', version: 'v2.12.0', isCurrent: true, isFactory: false, usagePercent: 58 },
+          { label: 'ota_1', version: 'v2.10.0', isCurrent: false, isFactory: false, usagePercent: 58 }
         ],
 
         blockHeight: 811111,

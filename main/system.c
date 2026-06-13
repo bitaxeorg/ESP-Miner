@@ -32,6 +32,7 @@
 #include "utils.h"
 #include "self_test.h"
 #include "filesystem.h"
+#include "embedded_web_ui.h"
 #include "work_queue.h"
 #include "hashrate_monitor_task.h"
 
@@ -156,29 +157,44 @@ void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {
         GLOBAL_STATE->SYSTEM_MODULE.version = strdup("Unknown");
     }
     
-    // Read AxeOS version from SPIFFS
-    FILE *f = fopen("/version.txt", "r");
-    if (f == NULL) {
-        ESP_LOGW(TAG, "Failed to open /version.txt");
-        GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
-    } else {
-        char version[64];
-        if (fgets(version, sizeof(version), f) == NULL) {
-            ESP_LOGW(TAG, "Failed to read version from /version.txt");
-            GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
+    bool use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) && GLOBAL_STATE->filesystem_is_available;
+    char version[64] = "Unknown";
+
+    if (use_custom) {
+        // Read AxeOS version from SPIFFS
+        FILE *f = fopen("/version.txt", "r");
+        if (f != NULL) {
+            if (fgets(version, sizeof(version), f) != NULL) {
+                // Remove trailing newline if present
+                size_t len = strlen(version);
+                if (len > 0 && version[len - 1] == '\n') {
+                    version[len - 1] = '\0';
+                }
+            }
+            fclose(f);
         } else {
+            ESP_LOGW(TAG, "Failed to open /version.txt from SPIFFS");
+        }
+    } else {
+        // Read AxeOS version from embedded files
+        const EmbeddedFile *vf = get_embedded_file("/version.txt");
+        if (vf != NULL) {
+            size_t copy_len = vf->size < (sizeof(version) - 1) ? vf->size : (sizeof(version) - 1);
+            memcpy(version, vf->data, copy_len);
+            version[copy_len] = '\0';
             // Remove trailing newline if present
             size_t len = strlen(version);
             if (len > 0 && version[len - 1] == '\n') {
                 version[len - 1] = '\0';
             }
-            GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup(version);
-            if (GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion == NULL) {
-                ESP_LOGE(TAG, "Failed to allocate memory for axeOSVersion");
-                GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
-            }
+        } else {
+            ESP_LOGW(TAG, "Failed to find embedded version.txt");
         }
-        fclose(f);
+    }
+
+    GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup(version);
+    if (GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion == NULL) {
+        GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
     }
     
     ESP_LOGI(TAG, "Firmware Version: %s", GLOBAL_STATE->SYSTEM_MODULE.version);

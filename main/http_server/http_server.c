@@ -33,6 +33,7 @@
 #include "axe-os/api/system/asic_settings.h"
 #include "display.h"
 #include "http_server.h"
+#include "embedded_web_ui.h"
 #include "websocket.h"
 #include "websocket_log.h"
 #include "websocket_api.h"
@@ -428,70 +429,81 @@ static bool file_exists(const char *path) {
 /* Send HTTP response with the contents of the requested file */
 static esp_err_t rest_common_get_handler(httpd_req_t * req)
 {
-    char filepath[FILE_PATH_MAX];
-    char gz_file[FILE_PATH_MAX];
-    uint8_t filePathLength = sizeof(filepath);
-
-    rest_server_context_t * rest_context = (rest_server_context_t *) req->user_ctx;
-    strlcpy(filepath, rest_context->base_path, filePathLength);
+    char rel_path[FILE_PATH_MAX];
     if (req->uri[strlen(req->uri) - 1] == '/') {
-        strlcat(filepath, "/index.html", filePathLength);
+        strlcpy(rel_path, "/index.html", sizeof(rel_path));
     } else {
-        strlcat(filepath, req->uri, filePathLength);
-    }
-    set_content_type_from_file(req, filepath);
-
-    strlcpy(gz_file, filepath, filePathLength);
-    strlcat(gz_file, ".gz", filePathLength);
-
-    bool serve_gz = file_exists(gz_file);
-    const char *file_to_open = serve_gz ? gz_file : filepath;
-
-    int fd = open(file_to_open, O_RDONLY, 0);
-    if (fd == -1) {
-        // Set status
-        httpd_resp_set_status(req, "302 Temporary Redirect");
-        // Redirect to the "/" root directory
-        httpd_resp_set_hdr(req, "Location", "/");
-        // iOS requires content in the response to detect a captive portal, simply redirecting is not sufficient.
-        httpd_resp_send(req, "Redirect to the captive portal", HTTPD_RESP_USE_STRLEN);
-
-        ESP_LOGI(TAG, "Redirecting to root");
-        return ESP_OK;
-    }
-    if (req->uri[strlen(req->uri) - 1] != '/') {
-        httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
+        strlcpy(rel_path, req->uri, sizeof(rel_path));
     }
 
-    if (serve_gz) {
-        httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-    }
+    bool use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) && GLOBAL_STATE->filesystem_is_available;
 
-    char * chunk = rest_context->scratch;
-    ssize_t read_bytes;
-    do {
-        /* Read file in chunks into the scratch buffer */
-        read_bytes = read(fd, chunk, SCRATCH_BUFSIZE);
-        if (read_bytes == -1) {
-            ESP_LOGE(TAG, "Failed to read file : %s", file_to_open);
-        } else if (read_bytes > 0) {
-            /* Send the buffer contents as HTTP response chunk */
-            if (httpd_resp_send_chunk(req, chunk, read_bytes) != ESP_OK) {
-                close(fd);
-                ESP_LOGE(TAG, "File sending failed!");
-                /* Abort sending file */
-                httpd_resp_sendstr_chunk(req, NULL);
-                /* Respond with 500 Internal Server Error */
-                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to send file");
-                return ESP_OK;
+    if (use_custom) {
+        char filepath[FILE_PATH_MAX];
+        char gz_file[FILE_PATH_MAX];
+        uint8_t filePathLength = sizeof(filepath);
+        rest_server_context_t * rest_context = (rest_server_context_t *) req->user_ctx;
+        
+        strlcpy(filepath, rest_context->base_path, filePathLength);
+        strlcat(filepath, rel_path, filePathLength);
+
+        set_content_type_from_file(req, filepath);
+
+        strlcpy(gz_file, filepath, filePathLength);
+        strlcat(gz_file, ".gz", filePathLength);
+
+        bool serve_gz = file_exists(gz_file);
+        const char *file_to_open = serve_gz ? gz_file : filepath;
+
+        int fd = open(file_to_open, O_RDONLY, 0);
+        if (fd != -1) {
+            if (req->uri[strlen(req->uri) - 1] != '/') {
+                httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
             }
+            if (serve_gz) {
+                httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+            }
+
+            char * chunk = rest_context->scratch;
+            ssize_t read_bytes;
+            do {
+                /* Read file in chunks into the scratch buffer */
+                read_bytes = read(fd, chunk, SCRATCH_BUFSIZE);
+                if (read_bytes == -1) {
+                    ESP_LOGE(TAG, "Failed to read file : %s", file_to_open);
+                } else if (read_bytes > 0) {
+                    /* Send the buffer contents as HTTP response chunk */
+                    if (httpd_resp_send_chunk(req, chunk, read_bytes) != ESP_OK) {
+                        close(fd);
+                        return ESP_OK;
+                    }
+                }
+            } while (read_bytes > 0);
+            close(fd);
+            httpd_resp_send_chunk(req, NULL, 0);
+            return ESP_OK;
         }
-    } while (read_bytes > 0);
-    /* Close file after sending complete */
-    close(fd);
-    ESP_LOGI(TAG, "File sending complete");
-    /* Respond with an empty chunk to signal HTTP response completion */
-    httpd_resp_send_chunk(req, NULL, 0);
+    }
+
+    // Serve from Embedded Web UI
+    const EmbeddedFile *ef = get_embedded_file(rel_path);
+    if (ef != NULL) {
+        set_content_type_from_file(req, rel_path);
+        if (req->uri[strlen(req->uri) - 1] != '/') {
+            httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
+        }
+        if (ef->is_gzipped) {
+            httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+        }
+        return httpd_resp_send(req, (const char *)ef->data, ef->size);
+    }
+
+    // Redirect to the "/" root directory if not found in embedded
+    httpd_resp_set_status(req, "302 Temporary Redirect");
+    httpd_resp_set_hdr(req, "Location", "/");
+    httpd_resp_send(req, "Redirect to the captive portal", HTTPD_RESP_USE_STRLEN);
+
+    ESP_LOGI(TAG, "Redirecting to root");
     return ESP_OK;
 }
 
@@ -1188,6 +1200,7 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     }
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "WWW update complete\n");
+    nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, true);
 
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Finished...");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -1479,31 +1492,21 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &ws_live);
 
-    if (!GLOBAL_STATE->filesystem_is_available) {
-        /* Make default route serve Recovery */
-        httpd_uri_t recovery_implicit_get_uri = {
-            .uri = "/*", .method = HTTP_GET, 
-            .handler = rest_recovery_handler, 
-            .user_ctx = rest_context
-        };
-        httpd_register_uri_handler(server, &recovery_implicit_get_uri);
-    } else {
-        httpd_uri_t api_common_uri = {
-            .uri = "/api/*",
-            .method = HTTP_ANY,
-            .handler = rest_api_common_handler,
-            .user_ctx = rest_context
-        };
-        httpd_register_uri_handler(server, &api_common_uri);
-        /* URI handler for getting web server files */
-        httpd_uri_t common_get_uri = {
-            .uri = "/*", 
-            .method = HTTP_GET, 
-            .handler = rest_common_get_handler, 
-            .user_ctx = rest_context
-        };
-        httpd_register_uri_handler(server, &common_get_uri);
-    }
+    httpd_uri_t api_common_uri = {
+        .uri = "/api/*",
+        .method = HTTP_ANY,
+        .handler = rest_api_common_handler,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &api_common_uri);
+    /* URI handler for getting web server files */
+    httpd_uri_t common_get_uri = {
+        .uri = "/*", 
+        .method = HTTP_GET, 
+        .handler = rest_common_get_handler, 
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &common_get_uri);
 
     httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
 

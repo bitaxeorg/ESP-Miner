@@ -119,7 +119,7 @@ curl -X POST \
      --data-binary "@esp-miner.bin" \
      http://YOUR-BITAXE-IP/api/system/OTA
 
-# Update AxeOS
+# Update with a custom AxeOS Web UI partition (www.bin)
 curl -X POST \
      -H "Content-Type: application/octet-stream" \
      --data-binary "@www.bin" \
@@ -144,7 +144,7 @@ The firmware hosts a small web server on port 80 for administrative purposes. On
 
 ### Recovery
 
-In the event that the admin web front end is inaccessible, for example because of an unsuccessful firmware update (`www.bin`), a recovery page can be accessed at `http://<IP>/recovery`.
+In the event that the admin web front end is inaccessible, for example because of an unsuccessful custom Web UI update, a recovery page can be accessed at `http://<IP>/recovery`.
 
 ### Unlock Settings
 

@@ -129,6 +129,10 @@ components:
         isFactory:
           type: boolean
           description: Whether this is a factory partition
+        usagePercent:
+          type: integer
+          nullable: true
+          description: Partition space usage percentage (0-100)
 
     SystemInfo:
       type: object
@@ -228,6 +232,7 @@ components:
         - miningPaused
         - statsLimit
         - partitions
+        - useCustomWWW
       properties:
         ASICModel:
           type: string
@@ -393,6 +398,10 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
+        useCustomWWW:
+          type: integer
+          description: Whether to serve files from the SPIFFS www partition instead of the embedded Web UI (0=embedded, 1=custom/SPIFFS)
+          enum: [0, 1]
         poolConnectionInfo:
           type: string
           description: Current pool address family
@@ -828,6 +837,12 @@ components:
           type: integer
           description: Set custom voltage/frequency in AxeOS (0=disabled, 1=enabled)
           enum: [0,1]
+          examples:
+            - 0
+        useCustomWWW:
+          type: integer
+          description: Whether to serve files from the SPIFFS www partition instead of the embedded Web UI (0=embedded, 1=custom/SPIFFS)
+          enum: [0, 1]
           examples:
             - 0
         invertscreen:
