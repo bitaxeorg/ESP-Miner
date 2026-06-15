@@ -71,7 +71,7 @@
             <div class="card h-full">
                 <h3>Custom Frontend</h3>
 
-                <div class="flex align-items-center gap-2 mb-4">
+                <div class="flex align-items-center gap-2 mb-2">
                     <p-checkbox 
                         inputId="customWWWToggle"
                         [binary]="true"
@@ -80,6 +80,7 @@
                     </p-checkbox>
                     <label for="customWWWToggle" class="font-medium cursor-pointer">Use Custom Web UI</label>
                 </div>
+                <small class="text-orange-500 block mb-4">* A device restart is required to apply this change.</small>
 
                 <div *ngIf="(info$ | async)?.useCustomWWW === 1" class="border-round p-3" style="background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
                     <h5 class="mt-0 mb-3">Upload Custom UI</h5>

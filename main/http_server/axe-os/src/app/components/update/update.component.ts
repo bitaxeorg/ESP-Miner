@@ -218,10 +218,11 @@ export class UpdateComponent {
     const value = checked ? 1 : 0;
     this.systemService.updateSystem('', { useCustomWWW: value }).subscribe({
       next: () => {
-        this.toastrService.success(`Web UI source changed to ${checked ? 'Custom' : 'Embedded'}. Reloading...`);
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
+        this.toastrService.success(
+          `Web UI source changed to ${checked ? 'Custom' : 'Embedded'}. A device restart is required to apply the change.`,
+          'Setting Saved',
+          { timeOut: 8000 }
+        );
       },
       error: (err) => {
         this.toastrService.error(err.error?.message || err.message || 'Failed to change Web UI source');

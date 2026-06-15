@@ -444,6 +444,7 @@ static esp_err_t rest_common_get_handler_spiffs(httpd_req_t * req)
 
     strlcpy(gz_file, filepath, filePathLength);
     strlcat(gz_file, ".gz", filePathLength);
+
     bool serve_gz = file_exists(gz_file);
     const char *file_to_open = serve_gz ? gz_file : filepath;
 
@@ -712,16 +713,11 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
                             (current_hostname == NULL || strcmp(current_hostname, hostname_item->valuestring) != 0);
     free(current_hostname);
 
-    bool old_use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW);
-
     if (!check_settings_and_update(root)) {
         cJSON_Delete(root);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Wrong API input");
         return ESP_OK;
     }
-
-    bool new_use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW);
-    bool custom_www_changed = (old_use_custom != new_use_custom);
 
     if (hostname_changed) {
         esp_err_t err = wifi_apply_hostname(hostname_item->valuestring);
@@ -732,12 +728,6 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
-
-    if (custom_www_changed) {
-        ESP_LOGI(TAG, "Restarting System because useCustomWWW changed");
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        esp_restart();
-    }
 
     return ESP_OK;
 }
