@@ -218,7 +218,7 @@ export class UpdateComponent {
     const value = checked ? 1 : 0;
     this.systemService.updateSystem('', { useCustomWWW: value }).subscribe({
       next: () => {
-        this.toastrService.success(`Web UI source changed to ${checked ? 'Custom (SPIFFS)' : 'Default (Embedded)'}. Reloading...`);
+        this.toastrService.success(`Web UI source changed to ${checked ? 'Custom' : 'Embedded'}. Reloading...`);
         setTimeout(() => {
           window.location.reload();
         }, 1500);

@@ -184,7 +184,7 @@ else()
                 "${WEB_SRC_DIR}/dist/axe-os"
                 "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.c"
                 "${CMAKE_CURRENT_BINARY_DIR}/embedded_web_ui.h"
-        DEPENDS web_ui_dist "${CMAKE_SOURCE_DIR}/tools/embed_web_ui.py"
+        DEPENDS ${WEB_UI_STAMP} "${CMAKE_SOURCE_DIR}/tools/embed_web_ui.py"
         COMMENT "Generating embedded Web UI source files"
         VERBATIM
     )

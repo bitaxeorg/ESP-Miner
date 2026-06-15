@@ -81,7 +81,7 @@ export class SystemComponent implements OnInit, OnDestroy {
   }
 
   getSystemRows(data: CombinedData): TableRow[] {
-    return [
+    const rows: TableRow[] = [
       { label: 'Device Model', value: data.asic.deviceModel || 'Other', valueClass: 'text-' + data.asic.swarmColor + '-500' },
       { label: 'Board Version', value: data.info.boardVersion },
       { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
@@ -100,9 +100,15 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: '• Min Free (All Time)', value: ByteSuffixPipe.transform(data.info.minFreeHeap)},
       { label: '• Max Alloc Block', value: ByteSuffixPipe.transform(data.info.maxAllocHeap), class: 'pb-3' },
       { label: 'Firmware Version', value: data.info.version },
-      { label: 'AxeOS Version', value: data.info.axeOSVersion },
-      { label: 'ESP-IDF Version', value: data.info.idfVersion },
     ];
+
+    if (data.info.useCustomWWW === 1) {
+      rows.push({ label: 'AxeOS Version', value: data.info.axeOSVersion });
+    }
+
+    rows.push({ label: 'ESP-IDF Version', value: data.info.idfVersion });
+
+    return rows;
   }
 
   identifyDevice(): void {

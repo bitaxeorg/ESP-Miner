@@ -427,7 +427,7 @@ static bool file_exists(const char *path) {
 }
 
 /* Send HTTP response with the contents of the requested file */
-static esp_err_t rest_common_get_handler(httpd_req_t * req)
+static esp_err_t rest_common_get_handler_spiffs(httpd_req_t * req)
 {
     char rel_path[FILE_PATH_MAX];
     if (req->uri[strlen(req->uri) - 1] == '/') {
@@ -436,56 +436,82 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
         strlcpy(rel_path, req->uri, sizeof(rel_path));
     }
 
-    bool use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) && GLOBAL_STATE->filesystem_is_available;
+    char filepath[FILE_PATH_MAX];
+    char gz_file[FILE_PATH_MAX];
+    uint8_t filePathLength = sizeof(filepath);
+    rest_server_context_t * rest_context = (rest_server_context_t *) req->user_ctx;
+    
+    strlcpy(filepath, rest_context->base_path, filePathLength);
+    strlcat(filepath, rel_path, filePathLength);
 
-    if (use_custom) {
-        char filepath[FILE_PATH_MAX];
-        char gz_file[FILE_PATH_MAX];
-        uint8_t filePathLength = sizeof(filepath);
-        rest_server_context_t * rest_context = (rest_server_context_t *) req->user_ctx;
-        
-        strlcpy(filepath, rest_context->base_path, filePathLength);
-        strlcat(filepath, rel_path, filePathLength);
+    set_content_type_from_file(req, filepath);
 
-        set_content_type_from_file(req, filepath);
+    strlcpy(gz_file, filepath, filePathLength);
+    strlcat(gz_file, ".gz", filePathLength);
 
-        strlcpy(gz_file, filepath, filePathLength);
-        strlcat(gz_file, ".gz", filePathLength);
+    bool serve_gz = file_exists(gz_file);
+    const char *file_to_open = serve_gz ? gz_file : filepath;
 
-        bool serve_gz = file_exists(gz_file);
-        const char *file_to_open = serve_gz ? gz_file : filepath;
-
-        int fd = open(file_to_open, O_RDONLY, 0);
-        if (fd != -1) {
-            if (req->uri[strlen(req->uri) - 1] != '/') {
-                httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
-            }
-            if (serve_gz) {
-                httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-            }
-
-            char * chunk = rest_context->scratch;
-            ssize_t read_bytes;
-            do {
-                /* Read file in chunks into the scratch buffer */
-                read_bytes = read(fd, chunk, SCRATCH_BUFSIZE);
-                if (read_bytes == -1) {
-                    ESP_LOGE(TAG, "Failed to read file : %s", file_to_open);
-                } else if (read_bytes > 0) {
-                    /* Send the buffer contents as HTTP response chunk */
-                    if (httpd_resp_send_chunk(req, chunk, read_bytes) != ESP_OK) {
-                        close(fd);
-                        return ESP_OK;
-                    }
-                }
-            } while (read_bytes > 0);
-            close(fd);
-            httpd_resp_send_chunk(req, NULL, 0);
-            return ESP_OK;
+    int fd = open(file_to_open, O_RDONLY, 0);
+    if (fd != -1) {
+        if (req->uri[strlen(req->uri) - 1] != '/') {
+            httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
         }
+        if (serve_gz) {
+            httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+        }
+
+        char * chunk = rest_context->scratch;
+        ssize_t read_bytes;
+        do {
+            /* Read file in chunks into the scratch buffer */
+            read_bytes = read(fd, chunk, SCRATCH_BUFSIZE);
+            if (read_bytes == -1) {
+                ESP_LOGE(TAG, "Failed to read file : %s", file_to_open);
+            } else if (read_bytes > 0) {
+                /* Send the buffer contents as HTTP response chunk */
+                if (httpd_resp_send_chunk(req, chunk, read_bytes) != ESP_OK) {
+                    close(fd);
+                    return ESP_OK;
+                }
+            }
+        } while (read_bytes > 0);
+        close(fd);
+        httpd_resp_send_chunk(req, NULL, 0);
+        return ESP_OK;
     }
 
-    // Serve from Embedded Web UI
+    // Fallback to Embedded Web UI just in case some file is missing in custom SPIFFS partition
+    const EmbeddedFile *ef = get_embedded_file(rel_path);
+    if (ef != NULL) {
+        set_content_type_from_file(req, rel_path);
+        if (req->uri[strlen(req->uri) - 1] != '/') {
+            httpd_resp_set_hdr(req, "Cache-Control", "max-age=2592000");
+        }
+        if (ef->is_gzipped) {
+            httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+        }
+        return httpd_resp_send(req, (const char *)ef->data, ef->size);
+    }
+
+    // Redirect to the "/" root directory if not found in embedded
+    httpd_resp_set_status(req, "302 Temporary Redirect");
+    httpd_resp_set_hdr(req, "Location", "/");
+    httpd_resp_send(req, "Redirect to the captive portal", HTTPD_RESP_USE_STRLEN);
+
+    ESP_LOGI(TAG, "Redirecting to root");
+    return ESP_OK;
+}
+
+static esp_err_t rest_common_get_handler_embedded(httpd_req_t * req)
+{
+    char rel_path[FILE_PATH_MAX];
+    if (req->uri[strlen(req->uri) - 1] == '/') {
+        strlcpy(rel_path, "/index.html", sizeof(rel_path));
+    } else {
+        strlcpy(rel_path, req->uri, sizeof(rel_path));
+    }
+
     const EmbeddedFile *ef = get_embedded_file(rel_path);
     if (ef != NULL) {
         set_content_type_from_file(req, rel_path);
@@ -694,11 +720,16 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
                             (current_hostname == NULL || strcmp(current_hostname, hostname_item->valuestring) != 0);
     free(current_hostname);
 
+    bool old_use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW);
+
     if (!check_settings_and_update(root)) {
         cJSON_Delete(root);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Wrong API input");
         return ESP_OK;
     }
+
+    bool new_use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW);
+    bool custom_www_changed = (old_use_custom != new_use_custom);
 
     if (hostname_changed) {
         esp_err_t err = wifi_apply_hostname(hostname_item->valuestring);
@@ -709,6 +740,13 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
+
+    if (custom_www_changed) {
+        ESP_LOGI(TAG, "Restarting System because useCustomWWW changed");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        esp_restart();
+    }
+
     return ESP_OK;
 }
 
@@ -1199,12 +1237,13 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         }
     }
     httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr(req, "WWW update complete\n");
+    httpd_resp_sendstr(req, "WWW update complete, rebooting now!\n");
     nvs_config_set_bool(NVS_CONFIG_USE_CUSTOM_WWW, true);
 
-    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Finished...");
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Rebooting...");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+    esp_restart();
 
     return ESP_OK;
 }
@@ -1500,10 +1539,11 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &api_common_uri);
     /* URI handler for getting web server files */
+    bool use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) && GLOBAL_STATE->filesystem_is_available;
     httpd_uri_t common_get_uri = {
         .uri = "/*", 
         .method = HTTP_GET, 
-        .handler = rest_common_get_handler, 
+        .handler = use_custom ? rest_common_get_handler_spiffs : rest_common_get_handler_embedded, 
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &common_get_uri);

@@ -60,23 +60,34 @@
         </div>
         <div class="col-12 lg:col-6 xl:col-4">
             <div class="card h-full">
-                <h3>Update AxeOS</h3>
-
-                <p-fileUpload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
-                    [auto]="true" chooseLabel="Browse"></p-fileUpload>
-
-                <small>(www.bin)</small>
-            </div>
-        </div>
-        <div class="col-12 lg:col-6 xl:col-4">
-            <div class="card h-full">
                 <h3>Update Firmware</h3>
                 <p-fileUpload #firmwareUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaUpdate($event)"
                     [auto]="true" chooseLabel="Browse"></p-fileUpload>
 
                 <small>(esp-miner.bin)</small>
             </div>
+        </div>
+        <div class="col-12 lg:col-6 xl:col-4">
+            <div class="card h-full">
+                <h3>Custom Frontend</h3>
 
+                <div class="flex align-items-center gap-2 mb-4">
+                    <p-checkbox 
+                        inputId="customWWWToggle"
+                        [binary]="true"
+                        [ngModel]="(info$ | async)?.useCustomWWW === 1"
+                        (onChange)="toggleCustomWWW($event.checked)">
+                    </p-checkbox>
+                    <label for="customWWWToggle" class="font-medium cursor-pointer">Use Custom Web UI</label>
+                </div>
+
+                <div *ngIf="(info$ | async)?.useCustomWWW === 1" class="border-round p-3" style="background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                    <h5 class="mt-0 mb-3">Upload Custom UI</h5>
+                    <p-fileUpload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
+                        [auto]="true" chooseLabel="Browse"></p-fileUpload>
+                    <small class="block mt-1 text-500">(www.bin)</small>
+                </div>
+            </div>
         </div>
     </div>
 </div>
