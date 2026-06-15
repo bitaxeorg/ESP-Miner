@@ -1,5 +1,5 @@
 import { Component, ViewChild } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { Observable, map, tap } from 'rxjs';
 import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
 import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
@@ -38,6 +38,8 @@ export class UpdateComponent {
   public updateStatus: 'progress' | 'success' | 'error' = 'progress';
   public updateMessage: string = '';
 
+  private currentVersion: string | undefined = undefined;
+
   constructor(
     private systemService: SystemApiService,
     private liveDataService: LiveDataService,
@@ -50,7 +52,15 @@ export class UpdateComponent {
       return (releases as any)[0];
     }));
 
-    this.info$ = this.liveDataService.info$;
+    this.info$ = this.liveDataService.info$.pipe(
+      tap(info => {
+        if (this.currentVersion === undefined) {
+          this.currentVersion = info.version;
+        } else if (info.version !== this.currentVersion) {
+          window.location.reload();
+        }
+      })
+    );
   }
 
   otaUpdate(event: FileUploadHandlerEvent) {
@@ -76,9 +86,8 @@ export class UpdateComponent {
             this.firmwareUpdateProgress = Math.round((event.loaded / (event.total as number)) * 100);
           } else if (event.type === HttpEventType.Response) {
             if (event.ok) {
-              this.toastrService.success('Device restarted');
               this.updateStatus = 'success';
-              this.updateMessage = 'Firmware updated. Device has been successfully restarted.';
+              this.updateMessage = 'Firmware updated. The page will reload when the device comes back online.';
             } else {
               this.updateStatus = 'error';
               this.updateMessage = event.statusText || 'An unknown error occurred.';
@@ -124,10 +133,7 @@ export class UpdateComponent {
           } else if (event.type === HttpEventType.Response) {
             if (event.ok) {
               this.updateStatus = 'success';
-              this.updateMessage = 'AxeOS updated. The page will reload in a few seconds.';
-              setTimeout(() => {
-                window.location.reload();
-              }, 2000);
+              this.updateMessage = 'AxeOS updated. The page will reload when the device comes back online.';
             } else {
               this.updateStatus = 'error';
               this.updateMessage = event.statusText || 'An unknown error occurred.';

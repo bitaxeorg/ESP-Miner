@@ -113,9 +113,6 @@
         <ng-container *ngIf="updateStatus === 'success'">
             <i class="pi pi-check-circle text-green-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
             <div class="text-lg text-center">{{ updateMessage }}</div>
-            <div class="mt-4" *ngIf="updateTarget !== 'AxeOS'">
-                <p-button (onClick)="progressModal.isVisible = false">Close</p-button>
-            </div>
         </ng-container>
 
         <ng-container *ngIf="updateStatus === 'error'">
