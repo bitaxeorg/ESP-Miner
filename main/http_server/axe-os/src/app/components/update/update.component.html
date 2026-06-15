@@ -78,7 +78,7 @@
                         [ngModel]="(info$ | async)?.useCustomWWW === 1"
                         (onChange)="toggleCustomWWW($event.checked)">
                     </p-checkbox>
-                    <label for="customWWWToggle" class="font-medium cursor-pointer">Use Custom Web UI</label>
+                    <label for="customWWWToggle" class="font-medium cursor-pointer">Enable custom web UI</label>
                 </div>
                 <small class="text-orange-500 block mb-4">* A device restart is required to apply this change.</small>
 
@@ -138,7 +138,6 @@
                     <th class="text-500 font-medium pb-2">Partition</th>
                     <th class="text-500 font-medium pb-2">Version</th>
                     <th class="text-500 font-medium pb-2">Space</th>
-                    <th class="text-500 font-medium pb-2">Status</th>
                     <th class="text-500 font-medium pb-2 text-right">Actions</th>
                 </tr>
             </thead>
@@ -147,10 +146,10 @@
                     <td>
                         <i class="pi pi-box mr-2"></i>
                         {{ partition.label }}
-                        <p-badge *ngIf="partition.isFactory" value="Factory" severity="info" class="ml-2"></p-badge>
+                        <p-badge *ngIf="partition.isCurrent" value="Active" severity="info" class="ml-2"></p-badge>
                     </td>
                     <td class="font-monospace">
-                        {{ partition.version || 'Empty / Invalid' }}
+                        {{ partition.version || 'N/A' }}
                     </td>
                     <td>
                         <div *ngIf="partition.usagePercent !== undefined && partition.usagePercent !== null" class="flex align-items-center gap-2" style="max-width: 9rem;">
@@ -160,24 +159,18 @@
                             </div>
                         </div>
                         <span *ngIf="partition.usagePercent === undefined || partition.usagePercent === null" class="text-500 italic text-sm">
-                            Empty
+                            -
                         </span>
-                    </td>
-                    <td>
-                        <p-tag *ngIf="partition.isCurrent" value="Running" severity="success"></p-tag>
-                        <span *ngIf="!partition.isCurrent" class="text-500">Standby</span>
                     </td>
                     <td class="text-right">
                         <div class="flex gap-2 justify-content-end align-items-center">
                             <p-button 
                                 *ngIf="!partition.isCurrent && partition.version" 
-                                label="Boot" 
-                                icon="pi pi-caret-right"
+                                label="Activate"
                                 (onClick)="switchPartition(partition.label)"
+                                severity="secondary"
                                 styleClass="p-button-sm">
                             </p-button>
-                            <span *ngIf="partition.isCurrent" class="text-500 italic">Active</span>
-                            <span *ngIf="!partition.isCurrent && !partition.version" class="text-500 italic">No valid firmware</span>
                         </div>
                     </td>
                 </tr>
