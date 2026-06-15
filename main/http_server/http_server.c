@@ -728,7 +728,6 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
-
     return ESP_OK;
 }
 

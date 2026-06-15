@@ -154,8 +154,8 @@ else()
 
     # Use a stamp file to track when the build was last done
     set(WEB_UI_STAMP "${CMAKE_BINARY_DIR}/web_ui_build.stamp")
-    # Track version.txt which is generated last and doesn't get deleted
-    set(WEB_UI_OUTPUT "${WEB_SRC_DIR}/dist/axe-os/version.txt")
+    # Track index.html.gz which is generated as part of the build
+    set(WEB_UI_OUTPUT "${WEB_SRC_DIR}/dist/axe-os/index.html.gz")
 
     # Custom command that only runs when source files change
     add_custom_command(

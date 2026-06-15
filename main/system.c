@@ -154,7 +154,7 @@ void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {
     }
     
     bool use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) && GLOBAL_STATE->filesystem_is_available;
-    char version[64] = "Unknown";
+    char version[64] = "Unified";
 
     if (use_custom) {
         // Read AxeOS version from SPIFFS
@@ -169,22 +169,8 @@ void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {
             }
             fclose(f);
         } else {
+            strlcpy(version, "Unknown", sizeof(version));
             ESP_LOGW(TAG, "Failed to open /version.txt from SPIFFS");
-        }
-    } else {
-        // Read AxeOS version from embedded files
-        const EmbeddedFile *vf = get_embedded_file("/version.txt");
-        if (vf != NULL) {
-            size_t copy_len = vf->size < (sizeof(version) - 1) ? vf->size : (sizeof(version) - 1);
-            memcpy(version, vf->data, copy_len);
-            version[copy_len] = '\0';
-            // Remove trailing newline if present
-            size_t len = strlen(version);
-            if (len > 0 && version[len - 1] == '\n') {
-                version[len - 1] = '\0';
-            }
-        } else {
-            ESP_LOGW(TAG, "Failed to find embedded version.txt");
         }
     }
 
