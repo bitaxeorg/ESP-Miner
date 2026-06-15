@@ -85,6 +85,8 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
     cJSON_AddNumberToObject(root, "freeHeapInternal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(root, "minFreeHeap", esp_get_minimum_free_heap_size());
+    cJSON_AddNumberToObject(root, "maxAllocHeap", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(root, "uptimeSeconds", (uint32_t)((esp_timer_get_time() - g->SYSTEM_MODULE.start_time) / 1000000));
     cJSON_AddFloatToObject(root, "cpuUsage", g->SYSTEM_MODULE.cpu_usage);
     cJSON_AddBoolToObject(root, "miningPaused", g->SYSTEM_MODULE.mining_paused);
