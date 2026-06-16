@@ -15,6 +15,7 @@
 #include "display.h"
 #include "theme_api.h"
 #include "scoreboard.h"
+#include "utils.h"
 
 #define NVS_CONFIG_NAMESPACE "main"
 #define NVS_STR_LIMIT (4000 - 1) // See nvs_set_str
@@ -431,7 +432,7 @@ char *nvs_config_get_string(NvsConfigKey key)
         return NULL;
     }
     xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
-    char *result = strdup(setting->value[0].str);
+    char *result = strdup_psram(setting->value[0].str);
     xSemaphoreGive(nvs_cache_mutex);
     return result;
 }
@@ -452,7 +453,7 @@ char *nvs_config_get_string_indexed(NvsConfigKey key, int index)
         return NULL;
     }
     xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
-    char *result = strdup(setting->value[index].str);
+    char *result = strdup_psram(setting->value[index].str);
     xSemaphoreGive(nvs_cache_mutex);
     return result;
 }
