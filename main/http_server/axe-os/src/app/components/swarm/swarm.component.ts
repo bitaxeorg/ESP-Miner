@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, ViewChild, HostListener } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, Validators, FormControl, ValidationErrors } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, catchError, from, map, mergeMap, of, take, timeout, toArray, Observable, Subscription } from 'rxjs';
 import { LocalStorageService } from 'src/app/local-storage.service';
@@ -14,6 +14,23 @@ const SWARM_VERSION = 'SWARM_VERSION';
 const SWARM_REFRESH_TIME = 'SWARM_REFRESH_TIME';
 const SWARM_SORTING = 'SWARM_SORTING';
 const SWARM_GRID_VIEW = 'SWARM_GRID_VIEW';
+
+function addressValidator(control: AbstractControl): ValidationErrors | null {
+  const value = control.value;
+  if (!value) return null;
+  const parts = value.split('.');
+  switch (parts.length) {
+    case 1: // Bare hostname (e.g. "bitaxe")
+      return /^[a-zA-Z0-9-]+$/.test(parts[0]) ? null : { invalidAddress: true };
+    case 2: // mDNS hostname (e.g. "bitaxe.local")
+      if (parts[1].toLowerCase() === 'local' && /^[a-zA-Z0-9-]+$/.test(parts[0])) return null;
+      break;
+    case 4: // IP Address (e.g. "192.168.1.1")
+      if (parts.every((part: string) => /^\d+$/.test(part) && Number(part) >= 0 && Number(part) <= 255)) return null;
+      break;
+  }
+  return { invalidAddress: true };
+}
 
 type SwarmDevice = { 
   address: string; 
@@ -81,7 +98,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
   ) {
 
     this.form = this.fb.group({
-      manualAddAddress: [null, [Validators.required, Validators.pattern('^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|[a-zA-Z0-9-]+(?:\\.local)?$')]]
+      manualAddAddress: [null, [Validators.required, addressValidator]]
     });
 
     this.gridView = this.localStorageService.getBool(SWARM_GRID_VIEW);
