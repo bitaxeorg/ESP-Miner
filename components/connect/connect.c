@@ -253,7 +253,11 @@ esp_err_t update_mdns_hostname(const char *new_hostname, GlobalState *GLOBAL_STA
         ip_info.ip.addr = 0;
     }
     char current_ip[16];
-    snprintf(current_ip, sizeof(current_ip), IPSTR, IP2STR(&ip_info.ip));
+    if (ip_info.ip.addr == 0) {
+        strlcpy(current_ip, "0.0.0.0", sizeof(current_ip));
+    } else {
+        snprintf(current_ip, sizeof(current_ip), IPSTR, IP2STR(&ip_info.ip));
+    }
 
     /* Check for hostname conflicts and resolve if needed */
     char *resolved_hostname = check_and_resolve_hostname_conflict(new_hostname, current_ip);
