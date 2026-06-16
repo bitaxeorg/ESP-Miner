@@ -123,7 +123,7 @@ export class SwarmComponent implements OnInit, OnDestroy {
 
     this.httpClient.get(`http://${window.location.hostname}/api/system/info`).subscribe({
       next: (response: any) => {
-        this.currentDeviceIp = response.ip;
+        this.currentDeviceIp = response.ipv4;
         this.currentDeviceVersion = response.version;
         this.initSwarm(response.version);
       },
@@ -213,7 +213,7 @@ private isIpAddress(value: string): boolean {
       this.httpClient.get(`http://${window.location.hostname}/api/system/info`)
         .subscribe({
           next: (response: any) => {
-            const serverIp = response.ip;
+            const serverIp = response.ipv4;
             const { start, end } = this.calculateIpRange(serverIp, '255.255.255.0');
             const ips = Array.from({ length: end - start + 1 }, (_, i) => this.intToIp(start + i));
             this.performNetworkScan(ips);
@@ -234,7 +234,7 @@ private isIpAddress(value: string): boolean {
         // Merge new results with existing swarm entries
         const existingAddresses = new Set([...this.swarm.map(item => item.address), ...this.swarm.map(item => item.connectionAddress)]);
         const newItems = validResults.filter(item => {
-          const isDuplicate = existingAddresses.has(item['hostname']) || existingAddresses.has(item['ip']);
+          const isDuplicate = existingAddresses.has(item['hostname']) || existingAddresses.has(item['ipv4']);
           return !isDuplicate;
         });
         this.swarm = [...this.swarm, ...newItems];
@@ -301,7 +301,7 @@ private isIpAddress(value: string): boolean {
         return;
       }
 
-      if (this.swarm.some(item => item.connectionAddress === info['ip'])) {
+      if (this.swarm.some(item => item.connectionAddress === info['ipv4'])) {
         this.toastr.warning('Device already added to the swarm.', `Device at ${address}`);
         return;
       }
@@ -309,7 +309,7 @@ private isIpAddress(value: string): boolean {
       const device = {
         address: info['fullHostname'] || info['hostname'] || address,
         displayName: info['hostname'] ? info['hostname'].replace(/\.local$/i, '') : address,
-        connectionAddress: info['ip'] || address,
+        connectionAddress: info['ipv4'] || address,
         ...asic,
         ...info,
         ...this.numerizeDeviceBestDiffs(info)
@@ -643,7 +643,7 @@ return this.swarm.filter(axe =>
       return true;
     }
     
-    if (this.currentDeviceIp !== null && device['ip'] === this.currentDeviceIp) {
+    if (this.currentDeviceIp !== null && device['ipv4'] === this.currentDeviceIp) {
       return true;
     }
     

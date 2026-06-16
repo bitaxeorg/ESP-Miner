@@ -244,7 +244,14 @@ esp_err_t update_mdns_hostname(const char *new_hostname, GlobalState *GLOBAL_STA
 
     /* Get current IP for conflict checking */
     esp_netif_ip_info_t ip_info;
-    esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif == NULL) {
+        netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    }
+    if (netif == NULL || esp_netif_get_ip_info(netif, &ip_info) != ESP_OK) {
+        ESP_LOGW(TAG, "No active network interface for mDNS hostname update");
+        ip_info.ip.addr = 0;
+    }
     char current_ip[16];
     snprintf(current_ip, sizeof(current_ip), IPSTR, IP2STR(&ip_info.ip));
 

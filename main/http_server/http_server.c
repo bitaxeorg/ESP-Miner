@@ -352,29 +352,30 @@ esp_err_t is_network_allowed(httpd_req_t * req)
         ESP_LOGD(CORS_TAG, "Origin contains hostname, proceeding to hostname validation");
     }
 
-    // Check if Origin header matches the avahi hostname    
+    // Check if Origin header matches the avahi hostname
     if (httpd_req_get_hdr_value_len(req, "Origin") > 0) {
         httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin));
         ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
         char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
         ESP_LOGD(CORS_TAG, "Configured hostname: %s", hostname);
-        char expected[256];
-        snprintf(expected, sizeof(expected), "http://%s.local", hostname);
-        ESP_LOGD(CORS_TAG, "Expected origin with .local: %s", expected);
-        if (strcmp(origin, expected) == 0) {
-            free(hostname);
-            ESP_LOGD(CORS_TAG, "Request from avahi hostname - allowing access");
-            return ESP_OK;
+        // Match origin as http://<hostname>.local[:port] or http://<hostname>[:port]
+        const char *patterns[] = { "http://%s.local", "http://%s" };
+        bool matched = false;
+        for (int i = 0; i < 2 && !matched; i++) {
+            char expected[256];
+            snprintf(expected, sizeof(expected), patterns[i], hostname);
+            size_t len = strlen(expected);
+            // Origin must start with expected, followed by end-of-string or ':port'
+            if (strncmp(origin, expected, len) == 0 &&
+                (origin[len] == '\0' || origin[len] == ':')) {
+                matched = true;
+            }
         }
-        // Also check without .local suffix
-        snprintf(expected, sizeof(expected), "http://%s", hostname);
-        ESP_LOGD(CORS_TAG, "Expected origin without .local: %s", expected);
-        if (strcmp(origin, expected) == 0) {
-            free(hostname);
+        free(hostname);
+        if (matched) {
             ESP_LOGD(CORS_TAG, "Request from hostname - allowing access");
             return ESP_OK;
         }
-        free(hostname);
     } else {
         ESP_LOGD(CORS_TAG, "No Origin header found");
     }
@@ -1023,7 +1024,6 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     if (strlen(mdns_hostname) > 0) {
         cJSON_AddStringToObject(root, "mdnsHostname", mdns_hostname);
     }
-    cJSON_AddStringToObject(root, "ipv6", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
 
     free(hostname_base);
 

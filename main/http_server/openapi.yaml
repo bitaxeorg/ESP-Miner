@@ -24,6 +24,21 @@ components:
       properties:
         message:
           type: string
+    UpdateSettingsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        redirect:
+          type: object
+          properties:
+            url:
+              type: string
+            delay:
+              type: number
+            message:
+              type: string
     SharesRejectedReason:
       type: object
       required:
@@ -1103,6 +1118,10 @@ paths:
       responses:
         '200':
           description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateSettingsResponse'
         '400':
           description: Invalid settings provided
         '401':

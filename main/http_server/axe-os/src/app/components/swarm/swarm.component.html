@@ -102,7 +102,7 @@
                                                 <i class="pi pi-star-fill text-xs"></i>
                                             </span>
                                          </div>
-                                         <span class="text-500 text-sm">{{axe.ip}}</span>
+                                         <span class="text-500 text-sm">{{axe.ipv4}}</span>
                                     </div>
                                 <span class="text-500 cursor-pointer" pTooltip="Version" tooltipPosition="top">
                                     {{axe.version}}
@@ -246,7 +246,7 @@
                                             <i class="pi pi-star-fill text-xs"></i>
                                         </span>
                                     </a>
-                                    <span class="text-500 text-sm">{{axe.ip}}</span>
+                                    <span class="text-500 text-sm">{{axe.ipv4}}</span>
                                 </div>
                                 <div *ngIf="getDeviceNotification(axe) as notification" class="flex align-items-center gap-1" [ngClass]="'text-' + notification.color + '-500'">
                                     <i class="pi pi-exclamation-triangle"></i>
