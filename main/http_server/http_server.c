@@ -352,10 +352,53 @@ esp_err_t is_network_allowed(httpd_req_t * req)
         ESP_LOGD(CORS_TAG, "Origin contains hostname, proceeding to hostname validation");
     }
 
-    // Check if Origin header matches the avahi hostname
+    // Check if Origin header matches the avahi hostname or is a local-network hostname
     if (httpd_req_get_hdr_value_len(req, "Origin") > 0) {
         httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin));
         ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
+
+        // Extract the host portion from the origin for local-hostname validation
+        char host_str[128] = {0};
+        const char *prefix = "http://";
+        char *host_start = strstr(origin, prefix);
+        bool is_local_hostname = false;
+        if (host_start) {
+            host_start += strlen(prefix);
+            // Strip port if present
+            char *colon = strchr(host_start, ':');
+            char *slash = strchr(host_start, '/');
+            size_t host_len = 0;
+            if (colon) {
+                host_len = colon - host_start;
+            } else if (slash) {
+                host_len = slash - host_start;
+            } else {
+                host_len = strlen(host_start);
+            }
+            if (host_len > 0 && host_len < sizeof(host_str)) {
+                strncpy(host_str, host_start, host_len);
+                host_str[host_len] = '\0';
+
+                // Allow any .local hostname (mDNS, inherently local network)
+                size_t hlen = strlen(host_str);
+                if (hlen > 6 && strcasecmp(host_str + hlen - 6, ".local") == 0) {
+                    is_local_hostname = true;
+                    ESP_LOGD(CORS_TAG, "Origin host '%s' is a .local mDNS hostname - allowing", host_str);
+                }
+                // Allow any bare hostname (no dots, only resolvable on local network)
+                else if (strchr(host_str, '.') == NULL) {
+                    is_local_hostname = true;
+                    ESP_LOGD(CORS_TAG, "Origin host '%s' is a bare local hostname - allowing", host_str);
+                }
+            }
+        }
+
+        if (is_local_hostname) {
+            ESP_LOGD(CORS_TAG, "Request from local hostname - allowing access");
+            return ESP_OK;
+        }
+
+        // Fall back to exact match against this device's configured hostname
         char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
         ESP_LOGD(CORS_TAG, "Configured hostname: %s", hostname);
         // Match origin as http://<hostname>.local[:port] or http://<hostname>[:port]
