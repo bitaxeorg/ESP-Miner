@@ -151,9 +151,17 @@ static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
 
         /* Get current IP */
         esp_netif_ip_info_t ip_info;
-        esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip_info);
+        esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+        if (netif == NULL) {
+            netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+        }
         char current_ip[16];
-        snprintf(current_ip, sizeof(current_ip), IPSTR, IP2STR(&ip_info.ip));
+        if (netif == NULL || esp_netif_get_ip_info(netif, &ip_info) != ESP_OK || ip_info.ip.addr == 0) {
+            ESP_LOGW(TAG, "No active network interface for mDNS init, using 0.0.0.0");
+            strlcpy(current_ip, "0.0.0.0", sizeof(current_ip));
+        } else {
+            snprintf(current_ip, sizeof(current_ip), IPSTR, IP2STR(&ip_info.ip));
+        }
 
         /* Check for hostname conflicts */
         char *final_hostname = check_and_resolve_hostname_conflict(hostname, current_ip);
@@ -161,6 +169,12 @@ static void initialize_mdns_if_needed(GlobalState *GLOBAL_STATE) {
             ESP_LOGE(TAG, "Failed to resolve hostname conflicts, skipping mDNS hostname setup");
             free(hostname);
             return;
+        }
+
+        /* If conflict resolution changed the hostname, persist to NVS */
+        if (strcmp(final_hostname, hostname) != 0) {
+            nvs_config_set_string(NVS_CONFIG_HOSTNAME, final_hostname);
+            ESP_LOGI(TAG, "Hostname conflict resolved, updated NVS to: %s", final_hostname);
         }
 
         /* Set mDNS hostname */
@@ -617,7 +631,6 @@ static char* check_and_resolve_hostname_conflict(const char *hostname, const cha
             return strdup(hostname);
         }
         ESP_LOGI(TAG, "mDNS conflict detected for '%s' at %s, renaming to '%s'", hostname, ip_str, new_hostname);
-        nvs_config_set_string(NVS_CONFIG_HOSTNAME, new_hostname);
         mdns_query_results_free(results);
         return new_hostname;
     }
