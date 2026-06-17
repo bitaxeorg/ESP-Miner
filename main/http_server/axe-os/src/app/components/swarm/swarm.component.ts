@@ -203,7 +203,7 @@ private isIpAddress(value: string): boolean {
   // Follows the current device's access method (IP, hostname.local, or bare hostname)
   public getDeviceLink(device: SwarmDevice): string {
     const currentHost = window.location.hostname;
-    const isIP = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(currentHost);
+    const isIP = this.isIpAddress(currentHost);
     if (isIP) {
       // Accessing via IP — link to device IP
       return device['ipv4'] || device.connectionAddress || device.address || '';
