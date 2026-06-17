@@ -1,5 +1,6 @@
 #include <stdlib.h>
 
+#include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "esp_heap_caps.h"
@@ -12,17 +13,21 @@
 #include "statistics_task.h"
 #include "system.h"
 #include "http_server.h"
+#include "serial.h"
 #include "protocol_coordinator.h"
 #include "i2c_bitaxe.h"
 #include "adc.h"
 #include "nvs_config.h"
 #include "self_test.h"
+#include "asic.h"
 #include "bap/bap.h"
 #include "device_config.h"
 #include "connect.h"
 #include "asic_reset.h"
 #include "asic_init.h"
 #include "task_monitor.h"
+#include "filesystem.h"
+#include "input.h"
 #include "log_buffer.h"
 #include "esp_ota_ops.h"
 
