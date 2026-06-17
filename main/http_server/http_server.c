@@ -166,8 +166,12 @@ esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     httpd_resp_set_type(req, "application/json");
-    
+
     // Give some time for the connected flag to take effect
     vTaskDelay(100 / portTICK_PERIOD_MS);
     
@@ -577,7 +581,7 @@ bool check_settings_and_update(const cJSON * const root)
             }
         }
 
-        if (key == NVS_CONFIG_DISPLAY && get_display_config(item->valuestring) == NULL) {
+        if (key == NVS_CONFIG_DISPLAY && cJSON_IsString(item) && get_display_config(item->valuestring) == NULL) {
             ESP_LOGW(TAG, "Invalid display config: '%s'", item->valuestring);
             result = false;
         }
@@ -585,13 +589,13 @@ bool check_settings_and_update(const cJSON * const root)
             ESP_LOGW(TAG, "Invalid display rotation: '%d'", item->valueint);
             result = false;
         }
-        if (key == NVS_CONFIG_STRATUM_PROTOCOL || key == NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL) {
+        if ((key == NVS_CONFIG_STRATUM_PROTOCOL || key == NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL) && cJSON_IsString(item)) {
             if (stratum_protocol_from_string(item->valuestring) == STRATUM_PROTOCOL_UNKNOWN) {
                 ESP_LOGW(TAG, "Invalid stratum protocol: '%s'", item->valuestring);
                 result = false;
             }
         }
-        if (key == NVS_CONFIG_SV2_CHANNEL_TYPE || key == NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE) {
+        if ((key == NVS_CONFIG_SV2_CHANNEL_TYPE || key == NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE) && cJSON_IsString(item)) {
             if (sv2_channel_type_from_string(item->valuestring) == SV2_CHANNEL_UNKNOWN) {
                 ESP_LOGW(TAG, "Invalid SV2 channel type: '%s'", item->valuestring);
                 result = false;
@@ -1035,13 +1039,11 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
         return ESP_OK;
     }
 
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
 
-    free((void *)response);
     cJSON_Delete(root);
 
-    return ESP_OK;
+    return res;
 }
 
 esp_err_t POST_WWW_update(httpd_req_t * req)

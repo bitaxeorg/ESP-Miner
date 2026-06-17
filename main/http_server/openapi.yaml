@@ -139,6 +139,8 @@ components:
         - freeHeap
         - freeHeapInternal
         - freeHeapSpiram
+        - minFreeHeap
+        - maxAllocHeap
         - frequency
         - actualFrequency
         - hashRate
@@ -303,6 +305,12 @@ components:
         freeHeapSpiram:
           type: number
           description: Available Spiram heap memory in bytes
+        minFreeHeap:
+          type: number
+          description: All-time low watermark for free heap memory in bytes
+        maxAllocHeap:
+          type: number
+          description: Largest contiguous free block of internal heap memory in bytes
         frequency:
           type: number
           description: ASIC frequency in MHz

@@ -18,7 +18,7 @@
   },
   {
     "Invalid version mask": "The version mask provided was invalid for this job.",    
-    "Subscription validation error": "The miner’s subscription request was invalid or malformed.",
+    "Subscription validation error": "The miner's subscription request was invalid or malformed.",
     "Configuration validation error": "Invalid mining configuration or settings sent by the miner.",
     "Authorization validation error": "The credentials provided by the miner were incorrect or not authorized.",
     "Suggest difficulty validation error": "An invalid difficulty value was suggested by the miner.",
