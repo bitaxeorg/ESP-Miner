@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
@@ -32,6 +34,14 @@ static GlobalState GLOBAL_STATE;
 
 static const char * TAG = "bitaxe";
 
+static void heap_alloc_failed_hook(size_t requested_size, uint32_t caps, const char *function_name)
+{
+    if (caps & MALLOC_CAP_SPIRAM) {
+        ESP_EARLY_LOGE(TAG, "%s failed to allocate %zu bytes from PSRAM", function_name, requested_size);
+        abort();
+    }
+}
+
 static void *cjson_malloc_psram(size_t size)
 {
     if (esp_psram_is_initialized()) {
@@ -47,6 +57,8 @@ static void cjson_free_psram(void *ptr)
 
 void app_main(void)
 {
+    ESP_ERROR_CHECK(heap_caps_register_failed_alloc_callback(heap_alloc_failed_hook));
+
     cJSON_Hooks hooks = {
         .malloc_fn = cjson_malloc_psram,
         .free_fn = cjson_free_psram
