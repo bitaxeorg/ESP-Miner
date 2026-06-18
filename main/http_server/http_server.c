@@ -979,10 +979,16 @@ static esp_err_t POST_system_boot(httpd_req_t *req)
     }
 
     cJSON *resp = cJSON_CreateObject();
-    cJSON_AddStringToObject(resp, "message", "Next boot partition set successfully. Please restart to apply.");
+    cJSON_AddStringToObject(resp, "message", "Next boot partition set successfully. Rebooting...");
     httpd_resp_set_type(req, "application/json");
-    esp_err_t send_res = HTTP_send_json(req, resp, NULL);
+    esp_err_t send_res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
     cJSON_Delete(resp);
+
+    // Delay to ensure the response is sent
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // Restart the system
+    esp_restart();
 
     return send_res;
 }

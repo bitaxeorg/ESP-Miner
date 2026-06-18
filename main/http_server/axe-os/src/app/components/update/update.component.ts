@@ -195,7 +195,7 @@ export class UpdateComponent {
   }
 
   public switchPartition(label: string): void {
-    if (confirm(`Set ${label} as the next boot partition? You will need to restart the device to apply this change.`)) {
+    if (confirm(`Set ${label} as the next boot partition? The device will restart to apply this change.`)) {
       this.systemService.switchBootPartition(label).subscribe({
         next: (resp) => {
           this.toastrService.success(resp.message);
