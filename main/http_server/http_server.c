@@ -1203,13 +1203,13 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         } else if (recv_len <= 0) {
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
-            return ESP_OK;
+            return ESP_FAIL;
         }
 
         if (esp_partition_write(www_partition, www_partition->size - remaining, (const void *) buf, recv_len) != ESP_OK) {
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
-            return ESP_OK;
+            return ESP_FAIL;
         }
 
 
@@ -1275,7 +1275,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
         } else if (recv_len <= 0) {
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Protocol Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
-            return ESP_OK;
+            return ESP_FAIL;
         }
 
         // Successful Upload: Flash firmware chunk
@@ -1283,7 +1283,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
             esp_ota_abort(ota_handle);
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
-            return ESP_OK;
+            return ESP_FAIL;
         }
 
         uint8_t percentage = 100 - ((remaining * 100 / req->content_len));
