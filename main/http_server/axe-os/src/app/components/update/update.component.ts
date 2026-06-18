@@ -4,7 +4,6 @@ import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
 import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
-import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { LocalStorageService } from 'src/app/local-storage.service';
@@ -44,7 +43,6 @@ export class UpdateComponent {
     private systemService: SystemApiService,
     private liveDataService: LiveDataService,
     private toastrService: ToastrService,
-    private loadingService: LoadingService,
     private githubUpdateService: GithubUpdateService,
     private localStorageService: LocalStorageService,
   ) {
@@ -52,15 +50,23 @@ export class UpdateComponent {
       return (releases as any)[0];
     }));
 
-    this.info$ = this.liveDataService.info$.pipe(
-      tap(info => {
-        if (this.currentVersion === undefined) {
-          this.currentVersion = info.version;
-        } else if (info.version !== this.currentVersion) {
-          window.location.reload();
-        }
-      })
-    );
+    this.info$ = this.liveDataService.info$;
+
+    // Reload page if firmware version changes
+    this.liveDataService.info$.subscribe(info => {
+      if (this.currentVersion === undefined) {
+        this.currentVersion = info.version;
+      } else if (info.version !== this.currentVersion) {
+        window.location.reload();
+      }
+    });
+
+    // Reload page when device comes back online after a successful update
+    this.liveDataService.connected$.subscribe(connected => {
+      if (connected && this.updateStatus === 'success') {
+        window.location.reload();
+      }
+    });
   }
 
   otaUpdate(event: FileUploadHandlerEvent) {
