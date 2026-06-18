@@ -88,6 +88,8 @@ typedef struct {
 
 #define SV2_PENDING_JOBS_SIZE 8
 
+#define SV2_MAX_ACTIVE_JOB_IDS 16
+
 // SV2 connection state
 typedef struct sv2_conn {
     uint32_t channel_id;
@@ -110,6 +112,10 @@ typedef struct sv2_conn {
     uint8_t  extranonce_prefix_len;
     uint8_t  extranonce_size;              // total extranonce bytes assigned by pool
     sv2_ext_job_t *ext_pending_jobs[SV2_PENDING_JOBS_SIZE];
+
+    // Active job IDs tracking for duplicate detection
+    uint32_t active_job_ids[SV2_MAX_ACTIVE_JOB_IDS];
+    int active_job_ids_count;
 } sv2_conn_t;
 
 // --- Frame encode/decode ---
