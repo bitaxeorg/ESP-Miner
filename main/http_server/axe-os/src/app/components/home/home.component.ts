@@ -103,11 +103,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolProtocol!: string;
   public responseTime!: number;
 
-  public flashShare: boolean = false;
+  public flashShareAccepted: boolean = false;
+  public flashShareRejected: boolean = false;
   public flashJob: boolean = false;
-  private shareTimeout: any;
+  private shareAcceptedTimeout: any;
+  private shareRejectedTimeout: any;
   private jobTimeout: any;
-  private lastSharesCount: number = -1;
+  private lastSharesAcceptedCount: number = -1;
+  private lastSharesRejectedCount: number = -1;
   private lastWorkReceived: number = -1;
 
   public systemInfoError$ = new BehaviorSubject<ISystemInfoError>({
@@ -914,13 +917,21 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
         }
 
-        const currentShares = info.sharesAccepted + info.sharesRejected;
-        if (this.lastSharesCount !== -1 && currentShares > this.lastSharesCount) {
-          this.flashShare = true;
-          clearTimeout(this.shareTimeout);
-          this.shareTimeout = setTimeout(() => this.flashShare = false, 500);
+        const currentSharesAccepted = info.sharesAccepted;
+        if (this.lastSharesAcceptedCount !== -1 && currentSharesAccepted > this.lastSharesAcceptedCount) {
+          this.flashShareAccepted = true;
+          clearTimeout(this.shareAcceptedTimeout);
+          this.shareAcceptedTimeout = setTimeout(() => this.flashShareAccepted = false, 500);
         }
-        this.lastSharesCount = currentShares;
+        this.lastSharesAcceptedCount = currentSharesAccepted;
+
+        const currentSharesRejected = info.sharesRejected;
+        if (this.lastSharesRejectedCount !== -1 && currentSharesRejected > this.lastSharesRejectedCount) {
+          this.flashShareRejected = true;
+          clearTimeout(this.shareRejectedTimeout);
+          this.shareRejectedTimeout = setTimeout(() => this.flashShareRejected = false, 500);
+        }
+        this.lastSharesRejectedCount = currentSharesRejected;
 
         const currentWorkReceived = info.workReceived ?? 0;
         if (this.lastWorkReceived !== -1 && currentWorkReceived > this.lastWorkReceived) {
