@@ -108,7 +108,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   private shareTimeout: any;
   private jobTimeout: any;
   private lastSharesCount: number = -1;
-  private lastScriptsig: string = '';
+  private lastWorkReceived: number = -1;
 
   public systemInfoError$ = new BehaviorSubject<ISystemInfoError>({
     duration: 0,
@@ -922,12 +922,13 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
         this.lastSharesCount = currentShares;
 
-        if (this.lastScriptsig !== '' && info.scriptsig !== this.lastScriptsig) {
+        const currentWorkReceived = info.workReceived ?? 0;
+        if (this.lastWorkReceived !== -1 && currentWorkReceived > this.lastWorkReceived) {
           this.flashJob = true;
           clearTimeout(this.jobTimeout);
           this.jobTimeout = setTimeout(() => this.flashJob = false, 500);
         }
-        this.lastScriptsig = info.scriptsig || '';
+        this.lastWorkReceived = currentWorkReceived;
       }),
       map(info => {
         const formatted = { ...info };
