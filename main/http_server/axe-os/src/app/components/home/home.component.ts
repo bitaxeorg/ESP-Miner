@@ -105,10 +105,10 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public flashShareAccepted: boolean = false;
   public flashShareRejected: boolean = false;
-  public flashJob: boolean = false;
+  public flashWorkReceived: boolean = false;
   private shareAcceptedTimeout: any;
   private shareRejectedTimeout: any;
-  private jobTimeout: any;
+  private workReceivedTimeout: any;
   private lastSharesAcceptedCount: number = -1;
   private lastSharesRejectedCount: number = -1;
   private lastWorkReceived: number = -1;
@@ -935,9 +935,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         const currentWorkReceived = info.workReceived ?? 0;
         if (this.lastWorkReceived !== -1 && currentWorkReceived > this.lastWorkReceived) {
-          this.flashJob = true;
-          clearTimeout(this.jobTimeout);
-          this.jobTimeout = setTimeout(() => this.flashJob = false, 500);
+          this.flashWorkReceived = true;
+          clearTimeout(this.workReceivedTimeout);
+          this.workReceivedTimeout = setTimeout(() => this.flashWorkReceived = false, 500);
         }
         this.lastWorkReceived = currentWorkReceived;
       }),

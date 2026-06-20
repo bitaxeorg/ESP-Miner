@@ -490,7 +490,7 @@
                 <div class="card">
                     <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis">
                         Block Header
-                        <i class="pi pi-arrow-down transition-opacity transition-duration-500 ml-2 text-sm vertical-align-middle" [ngClass]="{'opacity-100 text-primary': flashJob, 'opacity-0': !flashJob}" pTooltip="New Job Received" tooltipPosition="top"></i>
+                        <i class="pi pi-arrow-down transition-opacity transition-duration-500 ml-2 text-sm vertical-align-middle" [ngClass]="{'opacity-100 text-primary': flashWorkReceived, 'opacity-0': !flashWorkReceived}" pTooltip="New Work Received" tooltipPosition="top"></i>
                         <span *ngIf="info.blockSignals && info.blockSignals.length > 0" class="vertical-align-bottom ml-2">
                             <span *ngFor="let signal of info.blockSignals" class="p-badge p-badge-success ml-1">{{ signal }}</span>
                         </span>
