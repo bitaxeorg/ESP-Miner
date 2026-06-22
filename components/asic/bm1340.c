@@ -233,17 +233,15 @@ uint8_t BM1340_init(void * pvParameters)
     // unsigned char init7[7] = {0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03};
     // _send_simple(init7, 7);
 
-    // split the chip address space evenly
-    address_interval = 256 / chip_counter;
+    // S23/BM1373 capture assigns addresses by 0x10, then uses 0x04-spaced
+    // addressed writes for per-chip setup and nonce/result mapping.
+    const uint8_t set_address_interval = 0x10;
+    address_interval = 0x04;
     for (uint8_t i = 0; i < chip_counter; i++) {
-        _set_chip_address(i * address_interval);
+        _set_chip_address(i * set_address_interval);
         // unsigned char init8[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
         // _send_simple(init8, 7);
     }
-
-    //Core Register Control
-    //unsigned char init9[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0x3C, 0x80, 0x00, 0x8B, 0x00, 0x12};
-    _send_BM1340((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x3C, 0x80, 0x00, 0x8B, 0x00}, 6, BM1340_SERIALTX_DEBUG);
 
     //Core Register Control
     //TX: 55 AA 51 09 [00 3C 80 00 80 0C] 11  //command all chips, write chip address 00, register 3C, data 80 00 80 0C - Core Register Control
@@ -264,18 +262,19 @@ uint8_t BM1340_init(void * pvParameters)
     //TX: 55 AA 51 09 [00 58 00 01 11 11] 0D  //command all chips, write chip address 00, register 58, data 01 11 11 11 - Set the IO Driver Strength on chip 00
     _send_BM1340((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x58, 0x00, 0x01, 0x11, 0x11}, 6, BM1340_SERIALTX_DEBUG); //from S21Pro dump
     //_send_BM1340((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x58, 0x02, 0x11, 0x11, 0x11}, 6, BM1340_SERIALTX_DEBUG); //from S21Pro dump
+
+    //PLL3 Parameter
+    //TX: 55 AA 51 09 [00 68 5A A5 5A A5] 1C    //command all chips, write chip address 00, register 68, data 5A A5 5A A5 - PLL3 Parameter
+    _send_BM1340((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x68, 0x5A, 0xA5, 0x5A, 0xA5}, 6, BM1340_SERIALTX_DEBUG); //from S23/BM1373 dump
     
 
     for (uint8_t i = 0; i < chip_counter; i++) {
         //TX: 55 AA 41 09 00 [A8 00 07 01 F0] 15    // Reg_A8
         unsigned char set_a8_register[6] = {i * address_interval, 0xA8, 0x00, 0x07, 0x01, 0xF0};
         _send_BM1340((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_a8_register, 6, BM1340_SERIALTX_DEBUG);
-        //TX: 55 AA 41 09 00 [18 F0 00 C1 00] 0C    // Misc Control
-        unsigned char set_18_register[6] = {i * address_interval, 0x18, 0xF0, 0x00, 0xC1, 0x00};
+        //TX: 55 AA 41 09 00 [18 FF 00 C1 00] 0C    // Misc Control
+        unsigned char set_18_register[6] = {i * address_interval, 0x18, 0xFF, 0x00, 0xC1, 0x00};
         _send_BM1340((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_18_register, 6, BM1340_SERIALTX_DEBUG);
-        //TX: 55 AA 41 09 00 [3C 80 00 8B 00] 1A    // Core Register Control
-        unsigned char set_3c_register_first[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x8B, 0x00};
-        _send_BM1340((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_first, 6, BM1340_SERIALTX_DEBUG);
         //TX: 55 AA 41 09 00 [3C 80 00 80 0C] 19    // Core Register Control
         unsigned char set_3c_register_second[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x80, 0x0C};
         _send_BM1340((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_second, 6, BM1340_SERIALTX_DEBUG);
