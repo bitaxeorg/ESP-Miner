@@ -37,7 +37,6 @@
 static const register_type_t REGISTER_MAP[] = {
     [0x4C] = REGISTER_ERROR_COUNT,
     [0x88] = REGISTER_DOMAIN_0_COUNT,
-    [0x89] = REGISTER_DOMAIN_1_COUNT,
     [0x8A] = REGISTER_DOMAIN_2_COUNT,
     [0x8B] = REGISTER_DOMAIN_3_COUNT,
     [0x8C] = REGISTER_TOTAL_COUNT
@@ -75,7 +74,8 @@ static const char * TAG = "bm1340";
 
 static task_result result;
 
-static int address_interval;
+static int chip_cmd_response_address_interval;
+static int chip_nonce_address_interval;
 
 /// @brief
 /// @param ftdi
@@ -154,6 +154,15 @@ void BM1340_set_version_mask(uint32_t version_mask)
     _send_BM1340(TYPE_CMD | GROUP_ALL | CMD_WRITE, version_cmd, 6, BM1340_SERIALTX_DEBUG);
 }
 
+static void _set_init_version_mask(uint32_t version_mask)
+{
+    int versions_to_roll = version_mask >> 13;
+    uint8_t version_byte0 = (versions_to_roll >> 8);
+    uint8_t version_byte1 = (versions_to_roll & 0xFF);
+    uint8_t version_cmd[] = {0x00, 0xA4, 0x80, 0x00, version_byte0, version_byte1};
+    _send_BM1340(TYPE_CMD | GROUP_ALL | CMD_WRITE, version_cmd, 6, BM1340_SERIALTX_DEBUG);
+}
+
 void BM1340_set_hash_counting_number(uint32_t hcn)
 {
     uint8_t set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x00, 0x00};
@@ -200,9 +209,9 @@ uint8_t BM1340_init(void * pvParameters)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
 
-    // set version mask
-    for (int i = 0; i < 3; i++) {
-        BM1340_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
+    // set init version mask
+    for (int i = 0; i < 4; i++) {
+        _set_init_version_mask(STRATUM_DEFAULT_VERSION_MASK);
     }
 
     //read register 00 on all chips (should respond AA 55 13 68 00 00 00 00 00 00 0F)
@@ -216,8 +225,8 @@ uint8_t BM1340_init(void * pvParameters)
         return 0;
     }
 
-    // set version mask
-    BM1340_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
+    // set init version mask
+    _set_init_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
     //Reg_A8
     //unsigned char init5[11] = {0x55, 0xAA, 0x51, 0x09, 0x00, 0xA8, 0x00, 0x07, 0x00, 0x00, 0x03};
@@ -233,12 +242,14 @@ uint8_t BM1340_init(void * pvParameters)
     // unsigned char init7[7] = {0x55, 0xAA, 0x53, 0x05, 0x00, 0x00, 0x03};
     // _send_simple(init7, 7);
 
-    // S23/BM1373 capture assigns addresses by 0x10, then uses 0x04-spaced
-    // addressed writes for per-chip setup and nonce/result mapping.
-    const uint8_t set_address_interval = 0x10;
-    address_interval = 0x04;
+    // S23/BM1373 capture assigns chain addresses by 0x10, while later
+    // single-chip command address bytes use the assigned address >> 2.
+    const uint8_t set_address_stride = 0x10;
+    const uint8_t set_address_to_cmd_shift = 2;
+    chip_cmd_response_address_interval = set_address_stride;
+    chip_nonce_address_interval = 256 / chip_counter;
     for (uint8_t i = 0; i < chip_counter; i++) {
-        _set_chip_address(i * set_address_interval);
+        _set_chip_address(i * set_address_stride);
         // unsigned char init8[7] = {0x55, 0xAA, 0x40, 0x05, 0x00, 0x00, 0x1C};
         // _send_simple(init8, 7);
     }
@@ -269,37 +280,27 @@ uint8_t BM1340_init(void * pvParameters)
     
 
     for (uint8_t i = 0; i < chip_counter; i++) {
+        uint8_t chip_cmd_address = (i * set_address_stride) >> set_address_to_cmd_shift;
+
         //TX: 55 AA 41 09 00 [A8 00 07 01 F0] 15    // Reg_A8
-        unsigned char set_a8_register[6] = {i * address_interval, 0xA8, 0x00, 0x07, 0x01, 0xF0};
+        unsigned char set_a8_register[6] = {chip_cmd_address, 0xA8, 0x00, 0x07, 0x01, 0xF0};
         _send_BM1340((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_a8_register, 6, BM1340_SERIALTX_DEBUG);
         //TX: 55 AA 41 09 00 [18 FF 00 C1 00] 0C    // Misc Control
-        unsigned char set_18_register[6] = {i * address_interval, 0x18, 0xFF, 0x00, 0xC1, 0x00};
+        unsigned char set_18_register[6] = {chip_cmd_address, 0x18, 0xFF, 0x00, 0xC1, 0x00};
         _send_BM1340((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_18_register, 6, BM1340_SERIALTX_DEBUG);
         //TX: 55 AA 41 09 00 [3C 80 00 80 0C] 19    // Core Register Control
-        unsigned char set_3c_register_second[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x80, 0x0C};
+        unsigned char set_3c_register_second[6] = {chip_cmd_address, 0x3C, 0x80, 0x00, 0x80, 0x0C};
         _send_BM1340((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_second, 6, BM1340_SERIALTX_DEBUG);
         //TX: 55 AA 41 09 00 [3C 80 00 82 AA] 05    // Core Register Control
-        unsigned char set_3c_register_third[6] = {i * address_interval, 0x3C, 0x80, 0x00, 0x82, 0xAA};
+        unsigned char set_3c_register_third[6] = {chip_cmd_address, 0x3C, 0x80, 0x00, 0x82, 0xAA};
         _send_BM1340((TYPE_CMD | GROUP_SINGLE | CMD_WRITE), set_3c_register_third, 6, BM1340_SERIALTX_DEBUG);
     }
 
-    //Some misc settings?
-    // TX: 55 AA 51 09 [00 B9 00 00 44 80] 0D    //command all chips, write chip address 00, register B9, data 00 00 44 80
-    _send_BM1340((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0xB9, 0x00, 0x00, 0x44, 0x80}, 6, BM1340_SERIALTX_DEBUG);
     // TX: 55 AA 51 09 [00 54 00 00 00 02] 18    //command all chips, write chip address 00, register 54, data 00 00 00 02 - Analog Mux Control - rumored to control the temp diode
     _send_BM1340((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x54, 0x00, 0x00, 0x00, 0x02}, 6, BM1340_SERIALTX_DEBUG);
-    // TX: 55 AA 51 09 [00 B9 00 00 44 80] 0D    //command all chips, write chip address 00, register B9, data 00 00 44 80 -- duplicate of first command in series
-    _send_BM1340((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0xB9, 0x00, 0x00, 0x44, 0x80}, 6, BM1340_SERIALTX_DEBUG);
-    // TX: 55 AA 51 09 [00 3C 80 00 8D EE] 1B    //command all chips, write chip address 00, register 3C, data 80 00 8D EE
-    _send_BM1340((TYPE_CMD | GROUP_ALL | CMD_WRITE), (uint8_t[]){0x00, 0x3C, 0x80, 0x00, 0x8D, 0xEE}, 6, BM1340_SERIALTX_DEBUG);
 
     //ramp up the hash frequency
     do_frequency_transition(GLOBAL_STATE, BM1340_send_hash_frequency);
-
-    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
-    int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
-
-    BM1340_set_nonce_space(1.0, frequency, asic_count, cores);
 
     //register 10 is still a bit of a mystery. discussion: https://github.com/bitaxeorg/ESP-Miner/pull/167
 
@@ -310,6 +311,8 @@ uint8_t BM1340_init(void * pvParameters)
     unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x00, 0x1E, 0xB5}; //S21 Pro-Stock Default
     // unsigned char set_10_hash_counting[6] = {0x00, 0x10, 0x00, 0x0F, 0x00, 0x00}; //supposedly the "full" 32bit nonce range
     _send_BM1340((TYPE_CMD | GROUP_ALL | CMD_WRITE), set_10_hash_counting, 6, BM1340_SERIALTX_DEBUG);
+
+    BM1340_set_version_mask(STRATUM_DEFAULT_VERSION_MASK);
 
     return chip_counter;
 }
@@ -393,7 +396,7 @@ task_result * BM1340_process_work(void * pvParameters)
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
-        result.asic_nr = asic_result.cmd.asic_address / address_interval;
+        result.asic_nr = asic_result.cmd.asic_address / chip_cmd_response_address_interval;
         result.value = ntohl(asic_result.cmd.value);
 
         return &result;
@@ -408,7 +411,7 @@ task_result * BM1340_process_work(void * pvParameters)
 
     uint8_t job_id = (asic_result.job.id & 0xf0) >> 1;
     uint32_t nonce_h = ntohl(asic_result.job.nonce);
-    uint8_t asic_nr = (uint8_t)((nonce_h >> 17) & 0xff) / address_interval;
+    uint8_t asic_nr = (uint8_t)((nonce_h >> 17) & 0xff) / chip_nonce_address_interval;
     uint8_t core_id = (uint8_t)((nonce_h >> 25) & 0x7f);
     uint8_t small_core_id = asic_result.job.id & 0x0f;
     uint32_t version_bits = (ntohs(asic_result.job.version) << 13);
