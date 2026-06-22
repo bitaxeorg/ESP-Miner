@@ -42,6 +42,26 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x04;
         break;
 
+    case GAMMA_12V:
+        // Same single-phase / VOUT profile as the stock 5V Gamma (one TPS546, BM1370 @1.2V),
+        // but with VIN thresholds for a 12V-input redesign (values reused from the
+        // already-validated GAMMA_TURBO/HEX 12V profiles below).
+        config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_SINGLE;
+        config.TPS546_INIT_VIN_ON = 11.0;
+        config.TPS546_INIT_VIN_OFF = 10.5;
+        config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        config.TPS546_INIT_SCALE_LOOP = 0.25;
+        config.TPS546_INIT_VOUT_MIN = 1;
+        config.TPS546_INIT_VOUT_MAX = 2;
+        config.TPS546_INIT_VOUT_COMMAND = 1.2;
+        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00;
+        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00;
+        // Single-phase configuration (one physical TPS546 module)
+        config.TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
+        config.TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
+        break;
+
     case HEX:
     case SUPRA_HEX:
         config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_SINGLE;
