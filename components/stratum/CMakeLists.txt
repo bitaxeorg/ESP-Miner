@@ -18,4 +18,5 @@ REQUIRES
     "esp_timer"
     "tcp_transport"
     "esp_netif"
+    "esp_psram"
 )
