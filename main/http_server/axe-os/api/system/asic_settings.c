@@ -20,7 +20,7 @@ void asic_api_init(GlobalState *global_state) {
 esp_err_t GET_system_asic(httpd_req_t *req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {

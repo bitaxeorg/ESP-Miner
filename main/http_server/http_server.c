@@ -128,7 +128,7 @@ DataSource strToDataSource(const char * sourceStr)
 static esp_err_t GET_system_logs(httpd_req_t *req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -179,12 +179,13 @@ esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
+
     httpd_resp_set_type(req, "application/json");
 
     // Give some time for the connected flag to take effect
@@ -277,7 +278,7 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
 static esp_err_t rest_recovery_handler(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -296,7 +297,7 @@ static esp_err_t rest_recovery_handler(httpd_req_t * req)
 static esp_err_t rest_api_common_handler(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -395,14 +396,12 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
 static esp_err_t handle_options_request(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
-
-
 
     // Send a blank response for OPTIONS request
     httpd_resp_send(req, NULL, 0);
@@ -584,14 +583,12 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
-
-
 
     int total_len = req->content_len;
     int cur_len = 0;
@@ -668,7 +665,7 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 static esp_err_t POST_identify(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -703,14 +700,12 @@ static esp_err_t POST_identify(httpd_req_t * req)
 static esp_err_t POST_restart(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
-
-
 
     ESP_LOGI(TAG, "Restarting System because of API Request");
 
@@ -742,14 +737,12 @@ static esp_err_t POST_restart(httpd_req_t * req)
 static esp_err_t POST_dismiss_block_found(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
-
-
 
     ESP_LOGI(TAG, "Dismissing block found notification");
 
@@ -777,7 +770,7 @@ static esp_err_t POST_dismiss_block_found(httpd_req_t * req)
 static esp_err_t POST_mining_pause(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -802,7 +795,7 @@ static esp_err_t POST_mining_pause(httpd_req_t * req)
 static esp_err_t POST_mining_resume(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -828,7 +821,7 @@ static esp_err_t POST_mining_resume(httpd_req_t * req)
 static esp_err_t GET_system_info(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -836,8 +829,6 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     }
 
     httpd_resp_set_type(req, "application/json");
-
-
 
     cJSON * root = system_api_get_full_json(GLOBAL_STATE);
 
@@ -869,7 +860,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -877,8 +868,6 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
     }
 
     httpd_resp_set_type(req, "application/json");
-
-
 
     size_t bufLen = httpd_req_get_url_query_len(req) + 1;
     bool dataSelection[SRC_NONE] = {false};
@@ -978,7 +967,7 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
 static esp_err_t GET_scoreboard(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -986,8 +975,6 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
     }
 
     httpd_resp_set_type(req, "application/json");
-
-
 
     Scoreboard *scoreboard = &GLOBAL_STATE->SYSTEM_MODULE.scoreboard;
     cJSON * root = cJSON_CreateArray();
@@ -1028,7 +1015,7 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
 esp_err_t POST_WWW_update(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -1116,7 +1103,7 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
 esp_err_t POST_OTA_update(httpd_req_t * req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {

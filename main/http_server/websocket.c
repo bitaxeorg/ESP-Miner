@@ -144,14 +144,12 @@ esp_err_t websocket_handler(httpd_req_t *req)
         strcasecmp(upgrade_hdr, "websocket") == 0) {
 
         if (http_cors_check(req) != ESP_OK) {
-            return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+            return ESP_FAIL;
         }
 
-        esp_err_t auth_err = http_auth_websocket_validate(req);
-        if (auth_err != ESP_OK) {
-            return auth_err;
+        if (http_auth_websocket_validate(req) != ESP_OK) {
+            return ESP_FAIL;
         }
-
 
         int active_clients = 0;
         for (int i = 0; i < WS_TYPE_MAX; i++) active_clients += type_counts[i];

@@ -15,7 +15,7 @@ static int theme_prebuffer_len = 256;
 static esp_err_t theme_get_handler(httpd_req_t *req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {
@@ -52,7 +52,7 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
 static esp_err_t theme_post_handler(httpd_req_t *req)
 {
     if (http_cors_check(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
     }
 
     if (http_auth_validate(req) != ESP_OK) {

@@ -230,5 +230,7 @@ esp_err_t http_cors_check(httpd_req_t * req)
     }
 
     ESP_LOGI(TAG, "Client is NOT in the private ip ranges or same range as server.");
+    httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     return ESP_FAIL;
 }
+
