@@ -195,11 +195,4 @@ sv2_ext_job_t *sv2_parse_new_extended_mining_job(const uint8_t *payload, uint32_
 
 void sv2_ext_job_free(sv2_ext_job_t *job);
 
-// --- Helpers ---
-
-// Convert U256 LE target to pool difficulty (pdiff). Returns a double to
-// preserve fractional difficulty (e.g. 931.1) so the submit threshold matches
-// the pool's exact target.
-double sv2_target_to_pdiff(const uint8_t target[32]);
-
 #endif /* SV2_PROTOCOL_H */
