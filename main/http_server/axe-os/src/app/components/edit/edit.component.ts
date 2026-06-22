@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, FormControl, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
@@ -107,7 +108,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           console.log(`Overclock setting saved: ${enabled === 1 ? 'enabled' : 'disabled'}`);
         },
         error: (err) => {
-          console.error(`Failed to save overclock setting: ${err.message}`);
+          console.error(`Failed to save overclock setting: ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
@@ -242,7 +243,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Could not save settings for ${this.uri}. ${err.message}` : `Could not save settings. ${err.message}`;
+          const errorMessage = `Could not save settings. ${getHttpErrorMessage(err, this.uri)}`;
           this.toastr.error(errorMessage);
           this.savedChanges = false;
         }
@@ -277,7 +278,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           this.toastr.success(successMessage);
         },
         error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
+          const errorMessage = `Failed to restart device. ${getHttpErrorMessage(err, this.uri)}`;
           this.toastr.error(errorMessage);
         }
       });

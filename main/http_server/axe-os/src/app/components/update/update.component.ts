@@ -1,6 +1,7 @@
 import { Component, ViewChild } from '@angular/core';
 import { Observable, map, tap } from 'rxjs';
 import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
+import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { ToastrService } from 'ngx-toastr';
 import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
@@ -102,12 +103,12 @@ export class UpdateComponent {
           else if (event instanceof HttpErrorResponse)
           {
             this.updateStatus = 'error';
-            this.updateMessage = event.error?.message || event.error || event.message || 'Unknown error occurred';
+            this.updateMessage = getHttpErrorMessage(event);
           }
         },
         error: (err) => {
           this.updateStatus = 'error';
-          this.updateMessage = err.error?.message || err.error || err.message || 'Unknown error occurred';
+          this.updateMessage = getHttpErrorMessage(err);
         },
         complete: () => {
           this.firmwareUpdateProgress = 0;
@@ -148,12 +149,12 @@ export class UpdateComponent {
           else if (event instanceof HttpErrorResponse)
           {
             this.updateStatus = 'error';
-            this.updateMessage = event.error?.message || event.error || event.message || 'Unknown error occurred';
+            this.updateMessage = getHttpErrorMessage(event);
           }
         },
         error: (err) => {
           this.updateStatus = 'error';
-          this.updateMessage = err.error?.message || err.error || err.message || 'Unknown error occurred';
+          this.updateMessage = getHttpErrorMessage(err);
         },
         complete: () => {
           this.websiteUpdateProgress = 0;
@@ -237,7 +238,7 @@ export class UpdateComponent {
         );
       },
       error: (err) => {
-        this.toastrService.error(err.error?.message || err.message || 'Failed to change Web UI source');
+        this.toastrService.error(`Failed to change Web UI source. ${getHttpErrorMessage(err)}`);
       }
     });
   }

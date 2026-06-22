@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewChild, Input, OnDestroy, ElementRef, HostListener, effect } from '@angular/core';
 import { map, Observable, shareReplay, Subscription, switchMap, tap, first, Subject, takeUntil, BehaviorSubject, filter, combineLatest } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
+import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
@@ -521,7 +522,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.loadPreviousData();
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error('Error.', `Could not save chart source. ${err.message}`);
+          this.toastr.error('Error.', `Could not save chart source. ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
@@ -994,7 +995,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.toastr.success('Pool changed and device restarted');
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Error during pool change or device restart: ${err.message}`);
+          this.toastr.error(`Error during pool change or device restart: ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }
@@ -1009,7 +1010,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.toastr.success('Block found notification dismissed');
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Error dismissing notification: ${err.message}`);
+          this.toastr.error(`Error dismissing notification: ${getHttpErrorMessage(err, this.uri)}`);
         }
       });
   }

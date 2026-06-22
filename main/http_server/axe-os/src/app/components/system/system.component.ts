@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Observable, Subject, combineLatest, shareReplay, first, takeUntil, map } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
+import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { ToastrService } from 'ngx-toastr';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
@@ -119,7 +120,7 @@ export class SystemComponent implements OnInit, OnDestroy {
           this.toastr.success((result as GenericResponse).message);
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not identify device. ${err.message}`);
+          this.toastr.error(`Could not identify device. ${getHttpErrorMessage(err)}`);
         }
       });
   }
