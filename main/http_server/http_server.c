@@ -3,6 +3,8 @@
 #include <string.h>
 #include <limits.h>
 #include <sys/param.h>
+#include "mbedtls/sha256.h"
+#include "mbedtls/base64.h"
 #include <sys/stat.h>
 #include <esp_heap_caps.h>
 
@@ -127,6 +129,10 @@ static esp_err_t GET_system_logs(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"bitaxe-logs.txt\"");
 
@@ -174,6 +180,9 @@ static esp_err_t GET_wifi_scan(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
+    }
     httpd_resp_set_type(req, "application/json");
 
     // Give some time for the connected flag to take effect
@@ -427,6 +436,110 @@ esp_err_t is_network_allowed(httpd_req_t * req)
     return ESP_FAIL;
 }
 
+bool is_auth_required(httpd_req_t *req)
+{
+    // 1. If no password is set, auth is disabled globally
+    char *password = nvs_config_get_string(NVS_CONFIG_AXEOS_PASSWORD);
+    if (!password || strlen(password) == 0) {
+        if (password) free(password);
+        return false;
+    }
+    free(password);
+
+    // 2. AP Mode physically proves ownership and bypasses all auth (grandma-proof)
+    if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled) {
+        return false;
+    }
+
+    // 3. For OPTIONS requests (CORS preflight), bypass auth
+    if (req->method == HTTP_OPTIONS) {
+        return false;
+    }
+
+    // 4. For GET requests, check if read-only auth is optionally enabled
+    if (req->method == HTTP_GET) {
+        return nvs_config_get_bool(NVS_CONFIG_AUTH_READ_REQUIRED);
+    }
+
+    // 5. All other methods (POST, PATCH, PUT) require auth
+    return true;
+}
+
+esp_err_t check_auth_value(const char *encoded_creds)
+{
+    if (!encoded_creds || strlen(encoded_creds) == 0) {
+        return ESP_FAIL;
+    }
+
+    unsigned char decoded[128] = {0};
+    size_t decoded_len = 0;
+    int b64_ret = mbedtls_base64_decode(decoded, sizeof(decoded) - 1, &decoded_len, (const unsigned char *)encoded_creds, strlen(encoded_creds));
+    if (b64_ret != 0) {
+        return ESP_FAIL;
+    }
+    decoded[decoded_len] = '\0';
+
+    char *colon = strchr((char *)decoded, ':');
+    if (!colon) {
+        return ESP_FAIL;
+    }
+    char *password = colon + 1;
+
+    unsigned char hash[32];
+    mbedtls_sha256((const unsigned char *)password, strlen(password), hash, 0);
+    char hashed_hex[65];
+    bin2hex(hash, 32, hashed_hex, sizeof(hashed_hex));
+
+    char *stored_hash = nvs_config_get_string(NVS_CONFIG_AXEOS_PASSWORD);
+    esp_err_t auth_result = ESP_FAIL;
+    if (stored_hash) {
+        if (strcmp(hashed_hex, stored_hash) == 0) {
+            auth_result = ESP_OK;
+        }
+        free(stored_hash);
+    }
+    return auth_result;
+}
+
+esp_err_t check_auth(httpd_req_t *req)
+{
+    char auth_header[128] = {0};
+    if (httpd_req_get_hdr_value_str(req, "Authorization", auth_header, sizeof(auth_header)) != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    if (strncmp(auth_header, "Basic ", 6) != 0) {
+        return ESP_FAIL;
+    }
+    return check_auth_value(auth_header + 6);
+}
+
+esp_err_t validate_authentication(httpd_req_t *req)
+{
+    if (!is_auth_required(req)) {
+        return ESP_OK;
+    }
+
+    if (check_auth(req) == ESP_OK) {
+        return ESP_OK;
+    }
+
+    // Set WWW-Authenticate header
+    httpd_resp_set_hdr(req, "WWW-Authenticate", "Basic realm=\"Bitaxe\"");
+    
+    // Set response header to return json indicating auth is required
+    httpd_resp_set_type(req, "application/json");
+    
+    // Allow CORS for 401 response so browser client can read response headers
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    
+    const char *resp = "{\"authRequired\":1}";
+    httpd_resp_set_status(req, "401 Unauthorized");
+    httpd_resp_send(req, resp, strlen(resp));
+    
+    return ESP_FAIL;
+}
+
 /* Function for stopping the webserver */
 void stop_webserver(httpd_handle_t server)
 {
@@ -489,6 +602,10 @@ static esp_err_t rest_recovery_handler(httpd_req_t * req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     extern const unsigned char recovery_page_start[] asm("_binary_recovery_page_html_start");
     extern const unsigned char recovery_page_end[] asm("_binary_recovery_page_html_end");
     const size_t recovery_page_size = (recovery_page_end - recovery_page_start);
@@ -502,6 +619,10 @@ static esp_err_t rest_api_common_handler(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     httpd_resp_set_status(req, "404 Not Found");
@@ -603,6 +724,10 @@ static esp_err_t handle_options_request(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     // Set CORS headers for OPTIONS request
@@ -794,6 +919,10 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     // Set CORS headers
     if (set_cors_headers(req) != ESP_OK) {
         httpd_resp_send_500(req);
@@ -878,6 +1007,10 @@ static esp_err_t POST_identify(httpd_req_t * req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     // Set CORS headers
     if (set_cors_headers(req) != ESP_OK) {
         httpd_resp_send_500(req);
@@ -913,6 +1046,10 @@ static esp_err_t POST_restart(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     // Set CORS headers
@@ -954,6 +1091,10 @@ static esp_err_t POST_dismiss_block_found(httpd_req_t * req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     // Set CORS headers
     if (set_cors_headers(req) != ESP_OK) {
         httpd_resp_send_500(req);
@@ -989,6 +1130,10 @@ static esp_err_t POST_mining_pause(httpd_req_t * req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     if (set_cors_headers(req) != ESP_OK) {
         httpd_resp_send_500(req);
         return ESP_OK;
@@ -1013,6 +1158,10 @@ static esp_err_t POST_mining_resume(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     if (set_cors_headers(req) != ESP_OK) {
@@ -1040,6 +1189,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     httpd_resp_set_type(req, "application/json");
@@ -1081,6 +1234,10 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     httpd_resp_set_type(req, "application/json");
@@ -1192,6 +1349,10 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     httpd_resp_set_type(req, "application/json");
 
     // Set CORS headers
@@ -1240,6 +1401,10 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_FAIL;
     }
 
     wifi_mode_t mode;
@@ -1324,6 +1489,10 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_FAIL;
     }
 
     wifi_mode_t mode;

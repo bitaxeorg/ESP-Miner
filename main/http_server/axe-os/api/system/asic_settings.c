@@ -27,6 +27,10 @@ esp_err_t GET_system_asic(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
+    if (validate_authentication(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
     httpd_resp_set_type(req, "application/json");
 
     // Set CORS headers

@@ -198,6 +198,37 @@ If multiple devices attempt to use the same hostname, ESP-Miner automatically re
 - **Zero-Configuration Swarm Management**: Automatic device discovery and management without IP configuration
 - **Enhanced Cross-Platform Compatibility**: Improved support across different network environments and discovery protocols
 
+### API Authentication
+
+If an administration password is set on the device (`axeosPassword` in settings), authentication is required for all state-changing endpoints (POST, PATCH, PUT). If read-only authentication is also enabled (`authReadRequired` set to true), GET endpoints and WebSockets will also require authentication.
+
+Authentication uses standard HTTP Basic Authentication. The username is ignored (so you can pass any username or leave it empty, and use the configured password).
+
+#### API examples with authentication:
+
+Using `curl`:
+```bash
+# Get system info (if read-only auth is required)
+curl -u :your-password http://YOUR-BITAXE-IP/api/system/info
+
+# Restart the system (requires auth since it is a POST request)
+curl -u :your-password -X POST http://YOUR-BITAXE-IP/api/system/restart
+
+# Update settings
+curl -u :your-password -X PATCH http://YOUR-BITAXE-IP/api/system \
+     -H "Content-Type: application/json" \
+     -d '{"fanspeed": 100}'
+```
+
+#### WebSockets with authentication:
+
+For WebSocket endpoints, pass the credentials as a base64-encoded `username:password` string in the `auth` query parameter.
+
+```bash
+# Connect using websocat (where base64 encoded credentials are: echo -n ":your-password" | base64)
+websocat "ws://YOUR-BITAXE-IP/api/ws?auth=eW91ci1wYXNzd29yZA=="
+```
+
 ## Administration
 
 The firmware hosts a small web server on port 80 for administrative purposes. Once the Bitaxe device is connected to the local network, the admin web front end may be accessed via a web browser connected to the same network at `http://<IP>`, replacing `IP` with the LAN IP address of the Bitaxe device, or `http://bitaxe`, provided your network supports mDNS configuration.
@@ -289,6 +320,20 @@ A custom board version is also possible with `config-custom.cvs`. A custom board
   - If you are developing within a dev container, you will need to run the bitaxetool command from outside the container. Otherwise, you will get an error about the device not being found.
   - Some Bitaxe versions can't directly connect to a USB-C port. If yours is affected use a USB-A adapter as a workaround. More about it [here](https://github.com/bitaxeorg/bitaxeGamma/issues/37).
   - Only ESP32-S3-WROOM-1 module type N16R8 (16MB Flash, 8MB Octal SPI PSRAM) is supported. This model number should be visible on the ESP32 module. Other module types without PSRAM or with Quad SPI PSRAM will not work with the normal firmware. More about it [here](https://github.com/bitaxeorg/ESP-Miner/issues/826).
+
+### Over-the-Air (OTA) Updates
+
+You can update the firmware (`esp-miner.bin`) and web interface (`www.bin`) remotely over the network using the HTTP APIs or by using the helper script in the repository:
+
+```bash
+# Upload web UI (www.bin) and firmware (esp-miner.bin) from the build/ directory
+python3 tools/upload2device.py YOUR-BITAXE-IP
+
+# If password authentication is enabled:
+python3 tools/upload2device.py --password your-password YOUR-BITAXE-IP
+# Or use the environment variable:
+AXEOS_PASSWORD="your-password" python3 tools/upload2device.py YOUR-BITAXE-IP
+```
 
 ### Wi-Fi routers
 

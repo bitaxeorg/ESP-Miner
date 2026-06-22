@@ -221,7 +221,15 @@ components:
         - hashrateMonitor
         - miningPaused
         - statsLimit
+        - authEnabled
+        - authReadRequired
       properties:
+        authEnabled:
+          type: number
+          description: Whether authentication is enabled on the device (0=no, 1=yes)
+        authReadRequired:
+          type: number
+          description: Whether read-only endpoints require authentication (0=no, 1=yes)
         ASICModel:
           type: string
           description: ASIC model identifier
@@ -863,6 +871,17 @@ components:
           minimum: 0
           examples:
             - 120
+        axeosPassword:
+          type: string
+          description: Set AxeOS administration password (empty to disable authentication)
+          maxLength: 64
+          examples:
+            - "my-secure-password"
+        authReadRequired:
+          type: boolean
+          description: Require authentication for read-only endpoints (GET requests and WebSockets)
+          examples:
+            - false
       additionalProperties: true
 
   responses:
