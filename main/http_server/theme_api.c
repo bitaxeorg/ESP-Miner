@@ -4,6 +4,8 @@
 #include "nvs_config.h"
 #include "cJSON.h"
 #include "http_server.h"
+#include "http_auth.h"
+#include "http_cors.h"
 
 static const char *TAG = "theme_api";
 
@@ -12,16 +14,15 @@ static int theme_prebuffer_len = 256;
 // GET /api/theme handler
 static esp_err_t theme_get_handler(httpd_req_t *req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (http_cors_check(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
-    if (validate_authentication(req) != ESP_OK) {
+    if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
 
     httpd_resp_set_type(req, "application/json");
-    set_cors_headers(req);
 
     char *scheme = nvs_config_get_string(NVS_CONFIG_THEME_SCHEME);
     char *colors = nvs_config_get_string(NVS_CONFIG_THEME_COLORS);
@@ -50,15 +51,13 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
 // POST /api/theme handler
 static esp_err_t theme_post_handler(httpd_req_t *req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
+    if (http_cors_check(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
-    if (validate_authentication(req) != ESP_OK) {
+    if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
-
-    set_cors_headers(req);
 
     // Read POST data
     char content[1024];

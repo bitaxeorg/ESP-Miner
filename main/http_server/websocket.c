@@ -9,6 +9,8 @@
 #include "websocket_log.h"
 #include "websocket_api.h"
 #include "http_server.h"
+#include "http_auth.h"
+#include "http_cors.h"
 #include "log_buffer.h"
 
 #define WS_LOG_SCRATCH_SIZE 2048
@@ -141,31 +143,15 @@ esp_err_t websocket_handler(httpd_req_t *req)
     if (httpd_req_get_hdr_value_str(req, "Upgrade", upgrade_hdr, sizeof(upgrade_hdr)) == ESP_OK &&
         strcasecmp(upgrade_hdr, "websocket") == 0) {
 
-        if (is_network_allowed(req) != ESP_OK) {
+        if (http_cors_check(req) != ESP_OK) {
             return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
         }
 
-        if (is_auth_required(req)) {
-            size_t query_len = httpd_req_get_url_query_len(req) + 1;
-            char *query_buf = NULL;
-            bool auth_ok = false;
-            if (query_len > 1) {
-                query_buf = malloc(query_len);
-                if (query_buf && httpd_req_get_url_query_str(req, query_buf, query_len) == ESP_OK) {
-                    char auth_val[128] = {0};
-                    if (httpd_query_key_value(query_buf, "auth", auth_val, sizeof(auth_val)) == ESP_OK) {
-                        if (check_auth_value(auth_val) == ESP_OK) {
-                            auth_ok = true;
-                        }
-                    }
-                }
-                if (query_buf) free(query_buf);
-            }
-            if (!auth_ok) {
-                ESP_LOGW(TAG, "WebSocket connection rejected: unauthorized");
-                return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-            }
+        esp_err_t auth_err = http_auth_websocket_validate(req);
+        if (auth_err != ESP_OK) {
+            return auth_err;
         }
+
 
         int active_clients = 0;
         for (int i = 0; i < WS_TYPE_MAX; i++) active_clients += type_counts[i];

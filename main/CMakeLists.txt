@@ -21,6 +21,8 @@ SRCS
     "device_config.c"
     "task_monitor.c"
     "./http_server/http_server.c"
+    "./http_server/http_auth.c"
+    "./http_server/http_cors.c"
     "./http_server/websocket.c"
     "./http_server/websocket_log.c"
     "./http_server/websocket_api.c"
