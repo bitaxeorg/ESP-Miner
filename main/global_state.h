@@ -123,6 +123,8 @@ typedef struct
     Scoreboard scoreboard;
     cached_partition_t cached_partitions[3];
     int cached_partitions_count;
+    char mdns_hostname[64];
+    char full_hostname[70];
 } SystemModule;
 
 typedef struct

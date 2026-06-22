@@ -221,6 +221,14 @@ void STRATUM_V1_reset_message(StratumApiV1Message *message)
         free(message->extranonce_str);
         message->extranonce_str = NULL;
     }
+    if (message->show_message) {
+        free(message->show_message);
+        message->show_message = NULL;
+    }
+    if (message->version_string) {
+        free(message->version_string);
+        message->version_string = NULL;
+    }
     if (message->mining_notification) {
         // mining_notification is usually handled by ownership transfer in stratum_task.c
         // but if it wasn't enqueued, we must free it here to avoid leaks.
@@ -229,255 +237,381 @@ void STRATUM_V1_reset_message(StratumApiV1Message *message)
         STRATUM_V1_free_mining_notify(message->mining_notification);
         message->mining_notification = NULL;
     }
-    message->method = STRATUM_UNKNOWN;
+    message->method = METHOD_UNKNOWN;
     message->message_id = -1;
     message->response_success = false;
-    message->new_difficulty = 0;
+    message->new_difficulty = 0.0;
     message->version_mask = 0;
 }
 
-void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
+static stratum_method parse_method(const cJSON *method_json)
+{
+    if (!method_json || !cJSON_IsString(method_json)) {
+        return STRATUM_RESULT;
+    }
+
+    const char *method = method_json->valuestring;
+    if (strcmp(method, "mining.notify") == 0) return MINING_NOTIFY;
+    if (strcmp(method, "mining.set_difficulty") == 0) return MINING_SET_DIFFICULTY;
+    if (strcmp(method, "mining.set_extranonce") == 0) return MINING_SET_EXTRANONCE;
+    if (strcmp(method, "mining.set_version_mask") == 0) return MINING_SET_VERSION_MASK;
+    if (strcmp(method, "client.reconnect") == 0) return CLIENT_RECONNECT;
+    if (strcmp(method, "mining.ping") == 0) return MINING_PING;
+    if (strcmp(method, "client.show_message") == 0) return CLIENT_SHOW_MESSAGE;
+    if (strcmp(method, "client.get_version") == 0) return CLIENT_GET_VERSION;
+
+    ESP_LOGI(TAG, "Unhandled method: %s", method);
+    return METHOD_UNKNOWN;
+}
+
+static bool parse_mining_notify(cJSON *json, StratumApiV1Message *message)
+{
+    cJSON *params = cJSON_GetObjectItem(json, "params");
+    if (!params || !cJSON_IsArray(params)) {
+        ESP_LOGE(TAG, "Invalid params in mining.notify");
+        return false;
+    }
+    int params_count = cJSON_GetArraySize(params);
+    if (params_count < 8) {
+        ESP_LOGE(TAG, "Not enough params in mining.notify: %d", params_count);
+        return false;
+    }
+
+    mining_notify *new_work = calloc(1, sizeof(mining_notify));
+    if (!new_work) {
+        ESP_LOGE(TAG, "Memory allocation failed for mining_notify");
+        return false;
+    }
+
+    cJSON *job_id_item = cJSON_GetArrayItem(params, 0);
+    if (!job_id_item || !cJSON_IsString(job_id_item)) {
+        ESP_LOGE(TAG, "Invalid job_id in mining.notify");
+        free(new_work);
+        return false;
+    }
+
+    new_work->job_id = strdup(job_id_item->valuestring);
+    new_work->prev_block_hash = strdup(cJSON_GetArrayItem(params, 1)->valuestring);
+    new_work->coinbase_1 = strdup(cJSON_GetArrayItem(params, 2)->valuestring);
+    new_work->coinbase_2 = strdup(cJSON_GetArrayItem(params, 3)->valuestring);
+
+    cJSON *merkle_branch = cJSON_GetArrayItem(params, 4);
+    if (!merkle_branch || !cJSON_IsArray(merkle_branch)) {
+        ESP_LOGE(TAG, "Invalid merkle_branch in mining.notify");
+        free(new_work->job_id);
+        free(new_work->prev_block_hash);
+        free(new_work->coinbase_1);
+        free(new_work->coinbase_2);
+        free(new_work);
+        return false;
+    }
+    new_work->n_merkle_branches = cJSON_GetArraySize(merkle_branch);
+    if (new_work->n_merkle_branches > MAX_MERKLE_BRANCHES) {
+        ESP_LOGE(TAG, "Too many Merkle branches: %zu", new_work->n_merkle_branches);
+        free(new_work->job_id);
+        free(new_work->prev_block_hash);
+        free(new_work->coinbase_1);
+        free(new_work->coinbase_2);
+        free(new_work);
+        return false;
+    }
+    new_work->merkle_branches = malloc(HASH_SIZE * new_work->n_merkle_branches);
+    for (size_t i = 0; i < new_work->n_merkle_branches; i++) {
+        hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE);
+    }
+
+    new_work->version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
+    new_work->target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
+    new_work->ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
+
+    // params can be variable length
+    int paramsLength = cJSON_GetArraySize(params);
+    int value = cJSON_IsTrue(cJSON_GetArrayItem(params, paramsLength - 1));
+    new_work->clean_jobs = value;
+
+    message->mining_notification = new_work;
+    ESP_LOGD(TAG, "Parsed mining.notify: job_id=%s, clean_jobs=%d", new_work->job_id, new_work->clean_jobs);
+    return true;
+}
+
+static bool parse_set_difficulty(cJSON *json, StratumApiV1Message *message)
+{
+    cJSON *params = cJSON_GetObjectItem(json, "params");
+    if (!params || !cJSON_IsArray(params) || cJSON_GetArraySize(params) == 0) {
+        ESP_LOGE(TAG, "Invalid params for set_difficulty");
+        return false;
+    }
+    cJSON *difficulty = cJSON_GetArrayItem(params, 0);
+    if (!difficulty || !cJSON_IsNumber(difficulty)) {
+        ESP_LOGE(TAG, "Invalid difficulty value in set_difficulty");
+        return false;
+    }
+    message->new_difficulty = difficulty->valuedouble;
+    ESP_LOGI(TAG, "Set pool difficulty: %.2f", message->new_difficulty);
+    return true;
+}
+
+static bool parse_set_version_mask(cJSON *json, StratumApiV1Message *message)
+{
+    cJSON *params = cJSON_GetObjectItem(json, "params");
+    if (!params || !cJSON_IsArray(params) || cJSON_GetArraySize(params) == 0) {
+        ESP_LOGE(TAG, "Invalid params for set_version_mask");
+        return false;
+    }
+    cJSON *mask = cJSON_GetArrayItem(params, 0);
+    if (!mask || !cJSON_IsString(mask)) {
+        ESP_LOGE(TAG, "Invalid version mask in set_version_mask");
+        return false;
+    }
+    message->version_mask = strtoul(mask->valuestring, NULL, 16);
+    ESP_LOGI(TAG, "Set version mask: %08lx", message->version_mask);
+    return true;
+}
+
+static bool parse_set_extranonce(cJSON *json, StratumApiV1Message *message)
+{
+    cJSON *params = cJSON_GetObjectItem(json, "params");
+    if (!params || !cJSON_IsArray(params) || cJSON_GetArraySize(params) < 2) {
+        ESP_LOGE(TAG, "Invalid params for set_extranonce");
+        return false;
+    }
+    cJSON *extranonce1 = cJSON_GetArrayItem(params, 0);
+    cJSON *extranonce2_size = cJSON_GetArrayItem(params, 1);
+    if (!extranonce1 || !extranonce2_size || !cJSON_IsString(extranonce1) || !cJSON_IsNumber(extranonce2_size)) {
+        ESP_LOGE(TAG, "Invalid extranonce data in set_extranonce");
+        return false;
+    }
+    if (message->extranonce_str) free(message->extranonce_str);
+    message->extranonce_str = strdup(extranonce1->valuestring);
+    
+    int extranonce_2_len = extranonce2_size->valueint;
+    if (extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
+        ESP_LOGW(TAG, "Extranonce_2_len %d exceeds maximum %d, clamping to maximum",
+                 extranonce_2_len, MAX_EXTRANONCE_2_LEN);
+        extranonce_2_len = MAX_EXTRANONCE_2_LEN;
+    }
+    message->extranonce_2_len = extranonce_2_len;
+    ESP_LOGI(TAG, "Set extranonce: %s, size: %d", message->extranonce_str, message->extranonce_2_len);
+    return true;
+}
+
+static bool parse_show_message(cJSON *json, StratumApiV1Message *message)
+{
+    cJSON *params = cJSON_GetObjectItem(json, "params");
+    if (!params || !cJSON_IsArray(params) || cJSON_GetArraySize(params) == 0) {
+        ESP_LOGE(TAG, "Invalid params for show_message");
+        return false;
+    }
+    cJSON *msg = cJSON_GetArrayItem(params, 0);
+    if (!msg || !cJSON_IsString(msg)) {
+        ESP_LOGE(TAG, "Invalid message in show_message");
+        return false;
+    }
+    if (message->show_message) free(message->show_message);
+    message->show_message = strdup(msg->valuestring);
+    
+    size_t msg_len = strlen(message->show_message);
+    if (msg_len > MAX_POOL_MESSAGE_LEN) {
+        char capped_msg[MAX_POOL_MESSAGE_LEN + 1];
+        strncpy(capped_msg, message->show_message, MAX_POOL_MESSAGE_LEN);
+        capped_msg[MAX_POOL_MESSAGE_LEN] = '\0';
+        ESP_LOGI(TAG, "Pool message: %s...", capped_msg);
+    } else {
+        ESP_LOGI(TAG, "Pool message: %s", message->show_message);
+    }
+    return true;
+}
+
+static bool parse_get_version(cJSON *json, StratumApiV1Message *message)
+{
+    if (message->version_string) free(message->version_string);
+    message->version_string = strdup("unknown");
+    ESP_LOGI(TAG, "Get version requested");
+    return true;
+}
+
+static bool parse_subscribe_result(cJSON *json, StratumApiV1Message *message)
+{
+    cJSON *result = cJSON_GetObjectItem(json, "result");
+    cJSON *extranonce = cJSON_GetArrayItem(result, 1);
+    cJSON *extranonce2_len = cJSON_GetArrayItem(result, 2);
+    if (!extranonce || !extranonce2_len || !cJSON_IsString(extranonce) || !cJSON_IsNumber(extranonce2_len)) {
+        ESP_LOGE(TAG, "Invalid extranonce data in subscribe result");
+        return false;
+    }
+
+    if (message->extranonce_str) free(message->extranonce_str);
+    message->extranonce_str = strdup(extranonce->valuestring);
+    
+    int extranonce_2_len = extranonce2_len->valueint;
+    if (extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
+        ESP_LOGW(TAG, "Extranonce_2_len %d exceeds maximum %d, clamping to maximum", 
+                 extranonce_2_len, MAX_EXTRANONCE_2_LEN);
+        extranonce_2_len = MAX_EXTRANONCE_2_LEN;
+    }
+    message->extranonce_2_len = extranonce_2_len;
+    message->response_success = true;
+    ESP_LOGI(TAG, "Subscribe result: extranonce=%s, extranonce2_len=%d",
+             message->extranonce_str, message->extranonce_2_len);
+    return true;
+}
+
+static bool parse_configure_result(cJSON *json, StratumApiV1Message *message)
+{
+    cJSON *result = cJSON_GetObjectItem(json, "result");
+    cJSON *version_rolling = cJSON_GetObjectItem(result, "version-rolling");
+    cJSON *mask = cJSON_GetObjectItem(result, "version-rolling.mask");
+    if (!version_rolling || !cJSON_IsTrue(version_rolling) || !mask || !cJSON_IsString(mask)) {
+        ESP_LOGE(TAG, "Invalid configure result fields");
+        return false;
+    }
+    message->version_mask = strtoul(mask->valuestring, NULL, 16);
+    message->response_success = true;
+    ESP_LOGI(TAG, "Configure result: version_mask=%08lx", message->version_mask);
+    return true;
+}
+
+static bool parse_result(cJSON *json, StratumApiV1Message *message)
+{
+    cJSON *result = cJSON_GetObjectItem(json, "result");
+    cJSON *error = cJSON_GetObjectItem(json, "error");
+    cJSON *reject_reason = cJSON_GetObjectItem(json, "reject-reason");
+
+    message->method = STRATUM_RESULT;
+
+    // Handle error array format: [code, message, extra]
+    if (error && cJSON_IsArray(error) && cJSON_GetArraySize(error) >= 2) {
+        cJSON *error_msg = cJSON_GetArrayItem(error, 1);
+        if (cJSON_IsString(error_msg)) {
+            message->response_success = false;
+            if (message->error_str) free(message->error_str);
+            message->error_str = strdup(error_msg->valuestring);
+            ESP_LOGI(TAG, "Result failed: %s", message->error_str);
+            return true;
+        }
+    } else if (error && cJSON_IsString(error)) {
+        message->response_success = false;
+        if (message->error_str) free(message->error_str);
+        message->error_str = strdup(error->valuestring);
+        ESP_LOGI(TAG, "Result failed: %s", message->error_str);
+        return true;
+    } else if (error && cJSON_IsObject(error)) {
+        cJSON *error_msg = cJSON_GetObjectItem(error, "message");
+        if (error_msg && cJSON_IsString(error_msg)) {
+            message->response_success = false;
+            if (message->error_str) free(message->error_str);
+            message->error_str = strdup(error_msg->valuestring);
+            ESP_LOGI(TAG, "Result failed: %s", message->error_str);
+            return true;
+        }
+    }
+
+    // Handle null result or non-null error
+    if ((!result || cJSON_IsNull(result)) && (error && !cJSON_IsNull(error))) {
+        message->response_success = false;
+        if (message->error_str) free(message->error_str);
+        message->error_str = reject_reason && cJSON_IsString(reject_reason)
+            ? strdup(reject_reason->valuestring)
+            : strdup("unknown");
+        ESP_LOGI(TAG, "Result failed: %s", message->error_str);
+        return true;
+    }
+
+    // Handle boolean result
+    if (cJSON_IsBool(result)) {
+        message->response_success = cJSON_IsTrue(result);
+        if (!message->response_success) {
+            if (message->error_str) free(message->error_str);
+            message->error_str = reject_reason && cJSON_IsString(reject_reason)
+                ? strdup(reject_reason->valuestring)
+                : strdup("unknown");
+            ESP_LOGI(TAG, "Result failed: %s", message->error_str);
+        } else {
+            ESP_LOGI(TAG, "Result success");
+        }
+        return true;
+    }
+
+    // Handle subscribe result
+    if (cJSON_IsArray(result) && cJSON_GetArraySize(result) >= 3) {
+        message->method = STRATUM_RESULT_SUBSCRIBE;
+        return parse_subscribe_result(json, message);
+    }
+
+    // Handle configure result
+    if (cJSON_IsObject(result) && cJSON_GetObjectItem(result, "version-rolling")) {
+        message->method = STRATUM_RESULT_CONFIGURE;
+        return parse_configure_result(json, message);
+    }
+
+    ESP_LOGI(TAG, "Unhandled result format");
+    return false;
+}
+
+bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json)
 {
     STRATUM_V1_reset_message(message);
 
     ESP_LOGI(TAG, "rx: %s", stratum_json); // debug incoming stratum messages
 
-    cJSON * json = cJSON_Parse(stratum_json);
-
-    cJSON * id_json = cJSON_GetObjectItem(json, "id");
-    int parsed_id = -1;
-    if (id_json != NULL && cJSON_IsNumber(id_json)) {
-        parsed_id = id_json->valueint;
-    }
-    message->message_id = parsed_id;
-
-    cJSON * method_json = cJSON_GetObjectItem(json, "method");
-    stratum_method result = STRATUM_UNKNOWN;
-
-    //if there is a method, then use that to decide what to do
-    if (method_json != NULL && cJSON_IsString(method_json)) {
-        if (strcmp("mining.notify", method_json->valuestring) == 0) {
-            result = MINING_NOTIFY;
-        } else if (strcmp("mining.set_difficulty", method_json->valuestring) == 0) {
-            result = MINING_SET_DIFFICULTY;
-        } else if (strcmp("mining.set_version_mask", method_json->valuestring) == 0) {
-            result = MINING_SET_VERSION_MASK;
-        } else if (strcmp("mining.set_extranonce", method_json->valuestring) == 0) {
-            result = MINING_SET_EXTRANONCE;
-        } else if (strcmp("client.reconnect", method_json->valuestring) == 0) {
-            result = CLIENT_RECONNECT;
-        } else if (strcmp("mining.ping", method_json->valuestring) == 0) {
-            result = MINING_PING;
-        } else if (strcmp("client.show_message", method_json->valuestring) == 0) {
-            result = CLIENT_SHOW_MESSAGE;
-        } else {
-            ESP_LOGI(TAG, "unhandled method in stratum message: %s", stratum_json);
-        }
-
-    //if there is no method, then it is a result
-    } else {
-        // parse results
-        cJSON * result_json = cJSON_GetObjectItem(json, "result");
-        cJSON * error_json = cJSON_GetObjectItem(json, "error");
-        cJSON * reject_reason_json = cJSON_GetObjectItem(json, "reject-reason");
-
-        // if the result is null and there is no error, then it's an unknown fail
-        if ((result_json == NULL || cJSON_IsNull(result_json)) && (error_json == NULL || cJSON_IsNull(error_json))) {
-            message->response_success = false;
-            message->error_str = strdup("unknown");
-            
-        // if it's an error, then it's a fail
-        } else if (error_json != NULL && !cJSON_IsNull(error_json)) {
-            message->response_success = false;
-            if (parsed_id < 5) {
-                result = STRATUM_RESULT_SETUP;
-            } else {
-                result = STRATUM_RESULT;
-            }
-            if (cJSON_IsArray(error_json)) {
-                int len = cJSON_GetArraySize(error_json);
-                if (len >= 2) {
-                    cJSON * error_msg = cJSON_GetArrayItem(error_json, 1);
-                    if (cJSON_IsString(error_msg)) {
-                        message->error_str = strdup(cJSON_GetStringValue(error_msg));
-                    }
-                }
-            } else if (cJSON_IsString(error_json)) {
-                message->error_str = strdup(cJSON_GetStringValue(error_json));
-            } else if (cJSON_IsObject(error_json)) {
-                cJSON * error_msg = cJSON_GetObjectItem(error_json, "message");
-                if (cJSON_IsString(error_msg)) {
-                    message->error_str = strdup(cJSON_GetStringValue(error_msg));
-                }
-            }
-            if (message->error_str == NULL) {
-                message->error_str = strdup("unknown");
-            }
-
-        // if the result is a boolean, then parse it
-        } else if (cJSON_IsBool(result_json)) {
-            if (parsed_id < 5) {
-                result = STRATUM_RESULT_SETUP;
-            } else {
-                result = STRATUM_RESULT;
-            }
-            if (cJSON_IsTrue(result_json)) {
-                message->response_success = true;
-            } else {
-                message->response_success = false;
-                if (cJSON_IsString(reject_reason_json)) {
-                    message->error_str = strdup(cJSON_GetStringValue(reject_reason_json));
-                } else if (cJSON_IsString(error_json)) {
-                    message->error_str = strdup(cJSON_GetStringValue(error_json));
-                } else {
-                    message->error_str = strdup("unknown");
-                }                
-            }
-        
-        //if the id is STRATUM_ID_SUBSCRIBE parse it
-        } else if (parsed_id == STRATUM_ID_SUBSCRIBE) {
-            result = STRATUM_RESULT_SUBSCRIBE;
-
-            cJSON * extranonce2_len_json = cJSON_GetArrayItem(result_json, 2);
-            if (extranonce2_len_json == NULL) {
-                ESP_LOGE(TAG, "Unable to parse extranonce2_len: %s", result_json->valuestring);
-                message->response_success = false;
-                goto done;
-            }
-            int extranonce_2_len = extranonce2_len_json->valueint;
-            if (extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
-                ESP_LOGW(TAG, "Extranonce_2_len %d exceeds maximum %d, clamping to maximum", 
-                         extranonce_2_len, MAX_EXTRANONCE_2_LEN);
-                extranonce_2_len = MAX_EXTRANONCE_2_LEN;
-            }
-            message->extranonce_2_len = extranonce_2_len;
-
-            cJSON * extranonce_json = cJSON_GetArrayItem(result_json, 1);
-            if (extranonce_json == NULL) {
-                ESP_LOGE(TAG, "Unable parse extranonce: %s", result_json->valuestring);
-                message->response_success = false;
-                goto done;
-            }
-            message->extranonce_str = strdup(extranonce_json->valuestring);
-            message->response_success = true;
-        //if the id is STRATUM_ID_CONFIGURE parse it
-        } else if (parsed_id == STRATUM_ID_CONFIGURE) {
-            cJSON * mask = cJSON_GetObjectItem(result_json, "version-rolling.mask");
-            if (mask != NULL) {
-                result = STRATUM_RESULT_VERSION_MASK;
-                message->version_mask = strtoul(mask->valuestring, NULL, 16);
-            } else {
-                ESP_LOGI(TAG, "error setting version mask: %s", stratum_json);
-            }
-
-        } else {
-            ESP_LOGI(TAG, "unhandled result in stratum message: %s", stratum_json);
-        }
+    cJSON *json = cJSON_Parse(stratum_json);
+    if (!json) {
+        ESP_LOGE(TAG, "JSON parse failed: %s", stratum_json);
+        message->method = METHOD_UNKNOWN;
+        return false;
     }
 
-    message->method = result;
-
-    if (message->method == MINING_NOTIFY) {
-
-        mining_notify * new_work = malloc(sizeof(mining_notify));
-        // new_work->difficulty = difficulty;
-        cJSON * params = cJSON_GetObjectItem(json, "params");
-        if (!params || !cJSON_IsArray(params)) {
-            ESP_LOGE(TAG, "Invalid params in mining.notify");
-            free(new_work);
-            goto done;
-        }
-        int params_count = cJSON_GetArraySize(params);
-        if (params_count < 8) {
-            ESP_LOGE(TAG, "Not enough params in mining.notify: %d", params_count);
-            free(new_work);
-            goto done;
-        }
-        cJSON *job_id_item = cJSON_GetArrayItem(params, 0);
-        if (!job_id_item || !cJSON_IsString(job_id_item)) {
-            ESP_LOGE(TAG, "Invalid job_id in mining.notify");
-            free(new_work);
-            goto done;
-        }
-        new_work->job_id = strdup(job_id_item->valuestring);
-        new_work->prev_block_hash = strdup(cJSON_GetArrayItem(params, 1)->valuestring);
-        new_work->coinbase_1 = strdup(cJSON_GetArrayItem(params, 2)->valuestring);
-        new_work->coinbase_2 = strdup(cJSON_GetArrayItem(params, 3)->valuestring);
-
-        cJSON * merkle_branch = cJSON_GetArrayItem(params, 4);
-        if (!merkle_branch || !cJSON_IsArray(merkle_branch)) {
-            ESP_LOGE(TAG, "Invalid merkle_branch in mining.notify");
-            free(new_work->job_id);
-            free(new_work->prev_block_hash);
-            free(new_work->coinbase_1);
-            free(new_work->coinbase_2);
-            free(new_work);
-            goto done;
-        }
-        new_work->n_merkle_branches = cJSON_GetArraySize(merkle_branch);
-        if (new_work->n_merkle_branches > MAX_MERKLE_BRANCHES) {
-            ESP_LOGE(TAG, "Too many Merkle branches: %d", new_work->n_merkle_branches);
-            free(new_work->job_id);
-            free(new_work->prev_block_hash);
-            free(new_work->coinbase_1);
-            free(new_work->coinbase_2);
-            free(new_work);
-            goto done;
-        }
-        new_work->merkle_branches = malloc(HASH_SIZE * new_work->n_merkle_branches);
-        for (size_t i = 0; i < new_work->n_merkle_branches; i++) {
-            hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE);
-        }
-
-        new_work->version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
-        new_work->target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
-        new_work->ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
-
-        // params can be varible length
-        int paramsLength = cJSON_GetArraySize(params);
-        int value = cJSON_IsTrue(cJSON_GetArrayItem(params, paramsLength - 1));
-        new_work->clean_jobs = value;
-
-        message->mining_notification = new_work;
-    } else if (message->method == MINING_SET_DIFFICULTY) {
-        cJSON * params = cJSON_GetObjectItem(json, "params");
-        double difficulty = cJSON_GetArrayItem(params, 0)->valuedouble;
-        message->new_difficulty = difficulty;
-    } else if (message->method == MINING_SET_VERSION_MASK) {
-        cJSON * params = cJSON_GetObjectItem(json, "params");
-        uint32_t version_mask = strtoul(cJSON_GetArrayItem(params, 0)->valuestring, NULL, 16);
-        message->version_mask = version_mask;
-    } else if (message->method == MINING_SET_EXTRANONCE) {
-        cJSON * params = cJSON_GetObjectItem(json, "params");
-        char * extranonce_str = cJSON_GetArrayItem(params, 0)->valuestring;
-        uint32_t extranonce_2_len = cJSON_GetArrayItem(params, 1)->valueint;
-        if (extranonce_2_len > MAX_EXTRANONCE_2_LEN) {
-            ESP_LOGW(TAG, "Extranonce_2_len %u exceeds maximum %d, clamping to maximum", 
-                     extranonce_2_len, MAX_EXTRANONCE_2_LEN);
-            extranonce_2_len = MAX_EXTRANONCE_2_LEN;
-        }
-        message->extranonce_str = strdup(extranonce_str);
-        message->extranonce_2_len = extranonce_2_len;
-    } else if (message->method == CLIENT_SHOW_MESSAGE) {
-        cJSON * params = cJSON_GetObjectItem(json, "params");
-        if (params && cJSON_IsArray(params) && cJSON_GetArraySize(params) > 0) {
-            cJSON * msg_item = cJSON_GetArrayItem(params, 0);
-            if (msg_item && cJSON_IsString(msg_item)) {
-                // Cap the pool message length to MAX_POOL_MESSAGE_LEN (256)
-                size_t msg_len = strlen(msg_item->valuestring);
-                if (msg_len > MAX_POOL_MESSAGE_LEN) {
-                    char capped_msg[MAX_POOL_MESSAGE_LEN + 1];
-                    strncpy(capped_msg, msg_item->valuestring, MAX_POOL_MESSAGE_LEN);
-                    capped_msg[MAX_POOL_MESSAGE_LEN] = '\0';
-                    ESP_LOGI(TAG, "Pool message: %s...", capped_msg);
-                } else {
-                    ESP_LOGI(TAG, "Pool message: %s", msg_item->valuestring);
-                }
-            }
-        }
+    // Parse message ID
+    cJSON *id_json = cJSON_GetObjectItem(json, "id");
+    if (id_json && cJSON_IsNumber(id_json)) {
+        message->message_id = id_json->valueint;
     }
-    done:
+
+    // Parse method or result
+    cJSON *method_json = cJSON_GetObjectItem(json, "method");
+    message->method = parse_method(method_json);
+
+    bool result = false;
+    // Handle requests or results
+    switch (message->method) {
+        case STRATUM_RESULT:
+            result = parse_result(json, message);
+            break;
+        case MINING_NOTIFY:
+            result = parse_mining_notify(json, message);
+            break;
+        case MINING_SET_DIFFICULTY:
+            result = parse_set_difficulty(json, message);
+            break;
+        case MINING_SET_VERSION_MASK:
+            result = parse_set_version_mask(json, message);
+            break;
+        case MINING_SET_EXTRANONCE:
+            result = parse_set_extranonce(json, message);
+            break;
+        case CLIENT_RECONNECT:
+            ESP_LOGI(TAG, "Received client.reconnect");
+            result = true;
+            break;
+        case MINING_PING:
+            ESP_LOGI(TAG, "Received mining.ping");
+            result = true;
+            break;
+        case CLIENT_SHOW_MESSAGE:
+            result = parse_show_message(json, message);
+            break;
+        case CLIENT_GET_VERSION:
+            result = parse_get_version(json, message);
+            break;
+        case METHOD_UNKNOWN:
+            break;
+        default:
+            ESP_LOGI(TAG, "No handler for method: %d", message->method);
+            break;
+    }
+
     cJSON_Delete(json);
+    return result;
 }
 
 void STRATUM_V1_free_mining_notify(mining_notify * params)
@@ -567,6 +701,19 @@ int STRATUM_V1_pong(esp_transport_handle_t transport, int message_id)
     debug_stratum_tx(pong_msg);
     
     return esp_transport_write(transport, pong_msg, strlen(pong_msg), TRANSPORT_TIMEOUT_MS);
+}
+
+int STRATUM_V1_send_version(esp_transport_handle_t transport, int message_id)
+{
+    char version_msg[BUFFER_SIZE];
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    const char *version = app_desc->version;
+    snprintf(version_msg, sizeof(version_msg),
+        "{\"id\":%d,\"result\":\"%s\",\"error\":null}\n",
+        message_id, version);
+    debug_stratum_tx(version_msg);
+    
+    return esp_transport_write(transport, version_msg, strlen(version_msg), TRANSPORT_TIMEOUT_MS);
 }
 
 /// @param transport Transport to write to

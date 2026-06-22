@@ -126,10 +126,13 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   private loadDeviceSettings(): void {
     const deviceUri = this.uri || '';
 
+    const info$ = deviceUri
+      ? this.systemService.getInfo(deviceUri)
+      : this.liveDataService.info$.pipe(first());
 
-    // Fetch both system info (from live stream) and ASIC settings in parallel
+    // Fetch both system info and ASIC settings in parallel
     forkJoin({
-      info: this.liveDataService.info$.pipe(first()),
+      info: info$,
       asic: this.systemService.getAsicSettings(deviceUri)
     })
     .pipe(
