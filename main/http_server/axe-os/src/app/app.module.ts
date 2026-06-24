@@ -27,6 +27,7 @@ import { UpdateComponent } from './components/update/update.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
+import { SoloChanceComponent } from './components/solo-chance/solo-chance.component';
 import { ScoreboardComponent } from './components/scoreboard/scoreboard.component';
 import { ThemeConfigComponent } from './components/design/theme-config.component';
 import { DesignComponent } from './components/design/design.component';
@@ -69,6 +70,7 @@ const components = [
     ANSIPipe,
     DateAgoPipe,
     SwarmComponent,
+    SoloChanceComponent,
     ScoreboardComponent,
     SettingsComponent,
     HashSuffixPipe,

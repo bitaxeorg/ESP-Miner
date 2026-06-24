@@ -1,0 +1,90 @@
+<ng-container *ngIf="info$ | async as info">
+    <div class="grid">
+        <div class="col-12">
+            <div class="card">
+                <h2 class="mb-3">Solo Chance</h2>
+                <p class="text-500 mb-4">
+                    The change of finding shares at various difficulty levels based on your expected hashrate of <strong>{{ info.expectedHashrate | hashSuffix: { tickmark: true } }}</strong>. 
+                </p>
+
+                <div class="table-container">
+                    <table class="solo-chance-table">
+                        <thead class="font-600">
+                            <tr>
+                                <th>Difficulty</th> 
+                                <th>
+                                    <tooltip-text-icon
+                                        text="Type"
+                                        tooltip="Special difficulty types and their meanings"
+                                    />
+                                </th>
+                                <th>
+                                    <tooltip-text-icon
+                                        text="Time to Find"
+                                        tooltip="Expected time to find one share at current hashrate"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="10 min"
+                                        tooltip="Probability or expected count in 10 minutes (average Bitcoin block time)"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="1 Hour"
+                                        tooltip="Probability or expected count in 1 hour"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="1 Day"
+                                        tooltip="Probability or expected count in 24 hours"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="1 Week"
+                                        tooltip="Probability or expected count in 7 days"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="1 Month"
+                                        tooltip="Probability or expected count in 30 days"
+                                    />
+                                </th>
+                                <th class="text-center">
+                                    <tooltip-text-icon
+                                        text="1 Year"
+                                        tooltip="Probability or expected count in 365 days"
+                                    />
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let row of rows">
+                                <td>
+                                    <span class="font-medium">{{ row.difficulty | diffSuffix }}</span>
+                                </td>
+                                <td>
+                                    <div *ngIf="row.label" class="flex align-items-center gap-2">
+                                        <span class="badge">{{ row.label }}</span>
+                                        <tooltip-icon *ngIf="row.tooltip" [tooltip]="row.tooltip"/>
+                                    </div>
+                                </td>
+                                <td>{{ formatDuration(row.timeToFind) }}</td>
+                                <td class="text-center">{{ row.tenMin }}</td>
+                                <td class="text-center">{{ row.hour }}</td>
+                                <td class="text-center">{{ row.day }}</td>
+                                <td class="text-center">{{ row.week }}</td>
+                                <td class="text-center">{{ row.month }}</td>
+                                <td class="text-center">{{ row.year }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</ng-container>
