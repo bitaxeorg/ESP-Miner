@@ -3,14 +3,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "asic_common.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/portmacro.h"
 #include "power_management_task.h"
 #include "hashrate_monitor_task.h"
-#include "serial.h"
-#include "stratum_api.h"
 #include "mining.h"
 #include "coinbase_decoder.h"
 #include "work_queue.h"
@@ -19,11 +16,14 @@
 #include "scoreboard.h"
 #include "esp_transport.h"
 
-// Protocol selection (V1 = JSON-RPC, V2 = binary SV2)
 typedef enum {
-    STRATUM_V1 = 0,
-    STRATUM_V2 = 1,
+    STRATUM_PROTOCOL_UNKNOWN = 0,
+    STRATUM_PROTOCOL_V1 = 1,
+    STRATUM_PROTOCOL_V2 = 2,
 } stratum_protocol_t;
+
+#define STRATUM_V1 "SV1"
+#define STRATUM_V2 "SV2"
 
 // Forward declarations
 struct sv2_conn;
@@ -85,6 +85,7 @@ typedef struct
     bool pool_decode_coinbase_tx;
     bool fallback_pool_decode_coinbase_tx;
     float response_time;
+    uint16_t response_share_batch;
     float process_time;
     float cpu_usage;
     bool use_fallback_stratum;
@@ -99,6 +100,7 @@ typedef struct
     char pool_connection_info[64];
     bool overheat_mode;
     bool mining_paused;
+    bool pools_unavailable;
     uint16_t power_fault;
     uint32_t lastClockSync;
     bool is_screen_active;
@@ -107,17 +109,29 @@ typedef struct
     char firmware_update_status[20];
     bool hardware_fault;
     char hardware_fault_msg[64];
-    char * asic_status;
+    const char * asic_status;
     char * version;
     char * axeOSVersion;
     Scoreboard scoreboard;
+    char mdns_hostname[64];
+    char full_hostname[70];
 } SystemModule;
 
 typedef struct
 {
     bool is_active;
+    uint64_t accepted_count;
+    uint64_t rejected_count;
+    double hashes;
+    pthread_mutex_t lock;
+} SelfTestNonceMeasurement;
+
+typedef struct
+{
+    bool is_active;
     bool is_finished;
-    char *message;
+    SelfTestNonceMeasurement nonce_measurement;
+    const char *message;
     char *result;
     char *finished;
     esp_err_t system_init_ret;

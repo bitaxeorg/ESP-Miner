@@ -2,6 +2,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "global_state.h"
+#include <inttypes.h>
 
 #define MAX_TASKS 40
 #define INTERVAL_MS 60000
@@ -9,6 +10,7 @@
 static const char* TAG = "task_monitor";
 
 void task_monitor_task(void *pvParameters) {
+#ifdef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
     TaskStatus_t *task_array1 = malloc(MAX_TASKS * sizeof(TaskStatus_t));
     TaskStatus_t *task_array2 = malloc(MAX_TASKS * sizeof(TaskStatus_t));
     if (task_array1 == NULL || task_array2 == NULL) {
@@ -19,7 +21,7 @@ void task_monitor_task(void *pvParameters) {
     }
 
     while (1) {
-        uint64_t total_runtime1 = 0;
+        configRUN_TIME_COUNTER_TYPE total_runtime1 = 0;
         uint32_t num_tasks1 = uxTaskGetSystemState(task_array1, MAX_TASKS, &total_runtime1);
         if (num_tasks1 == 0) {
             ESP_LOGE(TAG, "Failed to get initial task state");
@@ -30,7 +32,7 @@ void task_monitor_task(void *pvParameters) {
         // Wait for the interval
         vTaskDelay(pdMS_TO_TICKS(INTERVAL_MS));
 
-        uint64_t total_runtime2 = 0;
+        configRUN_TIME_COUNTER_TYPE total_runtime2 = 0;
         uint32_t num_tasks2 = uxTaskGetSystemState(task_array2, MAX_TASKS, &total_runtime2);
         if (num_tasks2 == 0) {
             ESP_LOGE(TAG, "Failed to get second task state");
@@ -38,7 +40,7 @@ void task_monitor_task(void *pvParameters) {
         }
 
         // Compute total delta (elapsed wall time in timer units)
-        uint64_t total_delta = total_runtime2 - total_runtime1;
+        configRUN_TIME_COUNTER_TYPE total_delta = total_runtime2 - total_runtime1;
         if (total_delta == 0) {
             ESP_LOGI(TAG, "No runtime change in interval");
             continue;
@@ -55,7 +57,7 @@ void task_monitor_task(void *pvParameters) {
 
         // Process each task in array2 (current tasks)
         for (uint32_t j = 0; j < num_tasks2; j++) {
-            uint64_t task_delta = task_array2[j].ulRunTimeCounter;
+            configRUN_TIME_COUNTER_TYPE task_delta = task_array2[j].ulRunTimeCounter;
 
             // Look for match in array1
             for (uint32_t i = 0; i < num_tasks1; i++) {
@@ -67,9 +69,14 @@ void task_monitor_task(void *pvParameters) {
 
             // If not found, it's a new task: delta remains run2 (all during interval)
             double delta_percentage = (task_delta * 100.0) / total_delta;
-            uint64_t lifetime_runtime = task_array2[j].ulRunTimeCounter;
+            configRUN_TIME_COUNTER_TYPE lifetime_runtime = task_array2[j].ulRunTimeCounter;
             double lifetime_percentage = (lifetime_runtime * 100.0) / total_runtime2;
-            printf("%-20s\t%llu\t\t\t%.2f%%\t\t%llu\t\t\t%.2f%%\n", task_array2[j].pcTaskName, task_delta, delta_percentage, lifetime_runtime, lifetime_percentage);
+            printf("%-20s\t%" PRIu64 "\t\t\t%.2f%%\t\t%" PRIu64 "\t\t\t%.2f%%\n",
+                   task_array2[j].pcTaskName,
+                   (uint64_t)task_delta,
+                   delta_percentage,
+                   (uint64_t)lifetime_runtime,
+                   lifetime_percentage);
         }
         printf("\n");
 
@@ -82,17 +89,21 @@ void task_monitor_task(void *pvParameters) {
     // Cleanup (though loop is infinite)
     free(task_array1);
     free(task_array2);
+#else
+    ESP_LOGW(TAG, "Task runtime statistics are disabled");
+#endif
     vTaskDelete(NULL);
 }
 
 void cpu_monitor_task(void *pvParameters) {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+#ifdef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
     float avg_idle = -1.0f;
     const float alpha = 0.5f;
 
     while (1) {
-        uint64_t idleTimeCore0 = ulTaskGetIdleRunTimePercentForCore(0);
-        uint64_t idleTimeCore1 = ulTaskGetIdleRunTimePercentForCore(1);
+        configRUN_TIME_COUNTER_TYPE idleTimeCore0 = ulTaskGetIdleRunTimePercentForCore(0);
+        configRUN_TIME_COUNTER_TYPE idleTimeCore1 = ulTaskGetIdleRunTimePercentForCore(1);
 
         double current_idle = (idleTimeCore0 + idleTimeCore1) * 0.5f;
         if (avg_idle < 0) {
@@ -105,4 +116,8 @@ void cpu_monitor_task(void *pvParameters) {
         
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+#else
+    GLOBAL_STATE->SYSTEM_MODULE.cpu_usage = 0.0f;
+    vTaskDelete(NULL);
+#endif
 }

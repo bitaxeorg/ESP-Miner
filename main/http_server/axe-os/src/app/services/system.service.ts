@@ -14,6 +14,7 @@ import {
 } from '../generated/models';
 import { Api } from '../generated/api';
 import * as functions from '../generated/functions';
+import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
 
 import { environment } from '../../environments/environment';
 
@@ -72,6 +73,8 @@ export class SystemApiService {
         freeHeap: 200504,
         freeHeapInternal: 200504,
         freeHeapSpiram: 200504,
+        minFreeHeap: 180000,
+        maxAllocHeap: 90000,
         coreVoltage: 1200,
         coreVoltageActual: 1200,
         hostname: "Bitaxe",
@@ -92,17 +95,18 @@ export class SystemApiService {
         uptimeSeconds: 38,
         smallCoreCount: 672,
         ASICModel: "BM1370" as any,
+        stratumProtocol: "SV1" as const,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
-        stratumProtocol: "SV1" as const,
-        activeProtocolLabel: "SV1",
-        stratumV2AuthorityPubkey: "",
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         stratumSuggestedDifficulty: 1000,
         stratumExtranonceSubscribe: !!0,
         stratumTLS: !!0,
         stratumCert: "",
+        stratumV2AuthorityPubkey: "",
+        stratumV2ChannelType: "extended" as const,
         stratumDecodeCoinbase: true,
+        fallbackStratumProtocol: "SV1" as const,
         fallbackStratumURL: "test.public-pool.io",
         fallbackStratumPort: 21497,
         fallbackStratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
@@ -111,8 +115,11 @@ export class SystemApiService {
         fallbackStratumTLS: !!0,
         fallbackStratumCert: "",
         fallbackStratumDecodeCoinbase: true,
+        fallbackStratumV2AuthorityPubkey: "",
+        fallbackStratumV2ChannelType: "extended" as const,
         poolDifficulty: 1000,
         responseTime: 10,
+        responseShareBatch: 1,
         isUsingFallbackStratum: 0,
         poolConnectionInfo: "IPv4 (TLS)",
         frequency: 485,
@@ -324,15 +331,25 @@ export class SystemApiService {
     return of({ message: 'Device identified (mock)' });
   }
 
-  public updateSystem(uri: string = '', update: any): Observable<void> {
-    if (!environment.mock && this.api && !uri) {
-      return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }) as Promise<void>);
+  public updateSystem(uri: string = '', update: any): Observable<any | ISystemUpdateResponse> {
+    if (environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }));
     }
 
-    if (!environment.mock && uri) {
-      return this.httpClient.patch<void>(`${uri}/api/system`, update);
+    if (environment.mock && uri) {
+      return this.httpClient.patch(`${uri}/api/system`, update);
     }
 
+    if (update.hostname) {
+      return of({
+        status: 'success',
+        redirect: {
+          url: `http://${update.hostname}.local`,
+          delay: 2000,
+          message: 'Hostname updated. Redirecting to new address...'
+        }
+      } as ISystemUpdateResponse);
+    }
     return of(undefined);
   }
 

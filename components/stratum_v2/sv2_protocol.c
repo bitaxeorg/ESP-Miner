@@ -310,11 +310,13 @@ int sv2_parse_set_target(const uint8_t *payload, uint32_t len,
 }
 
 int sv2_parse_submit_shares_success(const uint8_t *payload, uint32_t len,
-                                    uint32_t *channel_id, uint32_t *accepted_count)
+                                    uint32_t *channel_id, uint32_t *last_sequence_number,
+                                    uint32_t *accepted_count)
 {
     // channel_id(4) + last_seq(4) + accepted_count(4) + shares_sum(8) = 20 bytes
     if (len < 20) return -1;
     *channel_id = read_u32_le(payload);
+    *last_sequence_number = read_u32_le(payload + 4);
     *accepted_count = read_u32_le(payload + 8);
     return 0;
 }
@@ -539,16 +541,4 @@ void sv2_ext_job_free(sv2_ext_job_t *job)
     free(job->coinbase_prefix);
     free(job->coinbase_suffix);
     free(job);
-}
-
-// --- Helpers ---
-
-uint32_t sv2_target_to_pdiff(const uint8_t target[32])
-{
-    double target_d = le256todouble(target);
-    if (target_d == 0.0) return UINT32_MAX;
-    double pdiff = truediffone / target_d;
-    if (pdiff > (double)UINT32_MAX) return UINT32_MAX;
-    if (pdiff < 1.0) return 1;
-    return (uint32_t)pdiff;
 }

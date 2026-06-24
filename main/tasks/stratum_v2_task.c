@@ -3,13 +3,15 @@
 #include "esp_transport_tcp.h"
 #include <lwip/sockets.h>
 #include "esp_timer.h"
-#include "esp_wifi.h"
 #include "system.h"
 #include "global_state.h"
 #include "stratum_v2_task.h"
+#include "stratum_socket.h"
 #include "protocol_coordinator.h"
+#include "connect.h"
 #include "sv2_protocol.h"
 #include "sv2_noise.h"
+#include "mining.h"
 #include "nvs_config.h"
 #include "work_queue.h"
 #include "utils.h"
@@ -17,47 +19,16 @@
 #include "device_config.h"
 #include "coinbase_decoder.h"
 #include "esp_heap_caps.h"
+#include "esp_psram.h"
 
-#include <lwip/netdb.h>
 #include <string.h>
 #include <stdlib.h>
 
 #define MAX_RETRY_ATTEMPTS 3
 #define TRANSPORT_TIMEOUT_MS 5000
-#define SV2_MAX_FRAME_SIZE 2048
+#define SV2_MAX_FRAME_SIZE 8192
 
 static const char *TAG = "stratum_v2_task";
-
-static bool is_wifi_connected(void)
-{
-    wifi_ap_record_t ap_info;
-    return (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK);
-}
-
-static void stratum_v2_set_socket_options(esp_transport_handle_t transport)
-{
-    int sock = esp_transport_get_socket(transport);
-    if (sock < 0) {
-        ESP_LOGE(TAG, "Failed to get socket from transport");
-        return;
-    }
-
-    struct timeval snd_timeout = { .tv_sec = 5, .tv_usec = 0 };
-    struct timeval rcv_timeout = { .tv_sec = 60 * 3, .tv_usec = 0 };
-
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &snd_timeout, sizeof(snd_timeout));
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
-
-    int keepalive = 1;
-    setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive));
-
-    int keepidle = 60;
-    int keepintvl = 10;
-    int keepcnt = 3;
-    setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, sizeof(keepidle));
-    setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl, sizeof(keepintvl));
-    setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt, sizeof(keepcnt));
-}
 
 // Load authority pubkey from NVS (base58-encoded) into 32-byte buffer.
 // SV2 format: base58check(0x0001_LE + 32_byte_xonly_pubkey)
@@ -104,27 +75,24 @@ static bool stratum_v2_load_authority_pubkey(uint8_t out[32], bool use_fallback)
     return true;
 }
 
-static void stratum_v2_clean_queue(GlobalState *GLOBAL_STATE)
-{
-    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
-    queue_clear(&GLOBAL_STATE->stratum_queue);
-
-    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
-    for (int i = 0; i < 128; i = i + 4) {
-        GLOBAL_STATE->valid_jobs[i] = 0;
-    }
-    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
-}
-
 static sv2_channel_type_t sv2_select_channel_type(GlobalState *GLOBAL_STATE, bool use_fallback)
 {
     NvsConfigKey key = use_fallback ? NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE
                                     : NVS_CONFIG_SV2_CHANNEL_TYPE;
-    uint16_t cfg = nvs_config_get_u16(key);
-    if (cfg == 1 && GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397) {
-        return SV2_CHANNEL_STANDARD;
+    char *cfg_str = nvs_config_get_string(key);
+    sv2_channel_type_t type = SV2_CHANNEL_EXTENDED;  // default, and forced for BM1397
+    if (cfg_str) {
+        sv2_channel_type_t parsed = sv2_channel_type_from_string(cfg_str);
+        if (parsed == SV2_CHANNEL_STANDARD) {
+            if (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397) {
+                type = SV2_CHANNEL_STANDARD;
+            }
+        } else if (parsed == SV2_CHANNEL_UNKNOWN && cfg_str[0] != '\0') {
+            ESP_LOGW(TAG, "Invalid SV2 channel type in NVS: '%s', defaulting to extended", cfg_str);
+        }
+        free(cfg_str);
     }
-    return SV2_CHANNEL_EXTENDED;  // default, and forced for BM1397
+    return type;
 }
 
 void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
@@ -139,12 +107,22 @@ void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
         esp_transport_destroy(GLOBAL_STATE->transport);
         GLOBAL_STATE->transport = NULL;
     }
-    stratum_v2_clean_queue(GLOBAL_STATE);
+    SYSTEM_clean_jobs_queue(GLOBAL_STATE);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
-// Track last share submit time for response time measurement
-static int64_t stratum_v2_last_submit_time_us = 0;
+// Track per-share submit timestamps for response time measurement.
+// SubmitShares.Success can batch-acknowledge multiple shares via its
+// last_sequence_number field, so we key the submit time by sequence number
+// (ring buffer) and measure against the specific share being acknowledged
+// rather than just the most recent submit.
+#define SV2_SUBMIT_TIMING_SLOTS 32
+static int64_t stratum_v2_submit_time_us[SV2_SUBMIT_TIMING_SLOTS] = {0};
+
+static inline void stratum_v2_record_submit_time(uint32_t sequence_number)
+{
+    stratum_v2_submit_time_us[sequence_number % SV2_SUBMIT_TIMING_SLOTS] = esp_timer_get_time();
+}
 
 int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, uint32_t job_id, uint32_t nonce,
                             uint32_t ntime, uint32_t version)
@@ -156,13 +134,14 @@ int stratum_v2_submit_share(GlobalState *GLOBAL_STATE, uint32_t job_id, uint32_t
     sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
     uint8_t buf[SV2_FRAME_HEADER_SIZE + 24];
 
+    uint32_t sequence_number = conn->sequence_number++;
     int len = sv2_build_submit_shares_standard(buf, sizeof(buf),
                                                 conn->channel_id,
-                                                conn->sequence_number++,
+                                                sequence_number,
                                                 job_id, nonce, ntime, version);
     if (len < 0) return -1;
 
-    stratum_v2_last_submit_time_us = esp_timer_get_time();
+    stratum_v2_record_submit_time(sequence_number);
     return sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
 }
 
@@ -177,14 +156,15 @@ int stratum_v2_submit_share_extended(GlobalState *GLOBAL_STATE, uint32_t job_id,
     sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
     uint8_t buf[SV2_FRAME_HEADER_SIZE + 24 + 1 + 32];
 
+    uint32_t sequence_number = conn->sequence_number++;
     int len = sv2_build_submit_shares_extended(buf, sizeof(buf),
                                                 conn->channel_id,
-                                                conn->sequence_number++,
+                                                sequence_number,
                                                 job_id, nonce, ntime, version,
                                                 extranonce, extranonce_len);
     if (len < 0) return -1;
 
-    stratum_v2_last_submit_time_us = esp_timer_get_time();
+    stratum_v2_record_submit_time(sequence_number);
     return sv2_noise_send(GLOBAL_STATE->sv2_noise_ctx, GLOBAL_STATE->transport, buf, len);
 }
 
@@ -219,7 +199,7 @@ static void stratum_v2_enqueue_job(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
     SYSTEM_notify_new_ntime(GLOBAL_STATE, ntime);
 
     if (clean_jobs && (GLOBAL_STATE->stratum_queue.count > 0)) {
-        stratum_v2_clean_queue(GLOBAL_STATE);
+        SYSTEM_clean_jobs_queue(GLOBAL_STATE);
     }
 
     if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
@@ -239,7 +219,7 @@ static void stratum_v2_enqueue_ext_job(GlobalState *GLOBAL_STATE, sv2_conn_t *co
     SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
 
     if (job->clean_jobs && (GLOBAL_STATE->stratum_queue.count > 0)) {
-        stratum_v2_clean_queue(GLOBAL_STATE);
+        SYSTEM_clean_jobs_queue(GLOBAL_STATE);
     }
 
     if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
@@ -568,8 +548,8 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *
     }
 
     memcpy(conn->target, max_target, 32);
-    uint32_t pdiff = sv2_target_to_pdiff(max_target);
-    ESP_LOGI(TAG, "Set pool difficulty: %lu", pdiff);
+    double pdiff = hash_to_pdiff(max_target);
+    ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
     GLOBAL_STATE->pool_difficulty = pdiff;
     GLOBAL_STATE->new_set_mining_difficulty_msg = true;
 }
@@ -603,6 +583,20 @@ void stratum_v2_task(void *pvParameters)
     }
     GLOBAL_STATE->sv2_conn = conn;
 
+    uint8_t *frame_buf = heap_caps_malloc(SV2_MAX_FRAME_SIZE, MALLOC_CAP_SPIRAM);
+    uint8_t *recv_buf = heap_caps_malloc(SV2_MAX_FRAME_SIZE, MALLOC_CAP_SPIRAM);
+
+    if (!frame_buf || !recv_buf) {
+        ESP_LOGE(TAG, "Failed to allocate frame buffers");
+        free(frame_buf);
+        free(recv_buf);
+        free(conn);
+        GLOBAL_STATE->sv2_conn = NULL;
+        protocol_coordinator_notify_failure();
+        vTaskDelete(NULL);
+        return;
+    }
+
     int retry_attempts = 0;
     bool use_fallback = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
 
@@ -620,6 +614,8 @@ void stratum_v2_task(void *pvParameters)
         if (protocol_coordinator_v2_should_shutdown()) {
             ESP_LOGI(TAG, "Shutdown requested by coordinator");
             stratum_v2_close_connection(GLOBAL_STATE);
+            free(frame_buf);
+            free(recv_buf);
             free(conn);
             GLOBAL_STATE->sv2_conn = NULL;
             protocol_coordinator_v2_exited();
@@ -627,7 +623,7 @@ void stratum_v2_task(void *pvParameters)
             return;
         }
 
-        if (!is_wifi_connected()) {
+        if (!wifi_is_connected()) {
             ESP_LOGI(TAG, "WiFi disconnected, waiting...");
             vTaskDelay(10000 / portTICK_PERIOD_MS);
             continue;
@@ -638,6 +634,8 @@ void stratum_v2_task(void *pvParameters)
             ESP_LOGW(TAG, "Max SV2 retry attempts reached (%d), notifying coordinator",
                      retry_attempts);
             stratum_v2_close_connection(GLOBAL_STATE);
+            free(frame_buf);
+            free(recv_buf);
             free(conn);
             GLOBAL_STATE->sv2_conn = NULL;
             // Send only failure event — coordinator knows the task exited because it failed
@@ -659,11 +657,11 @@ void stratum_v2_task(void *pvParameters)
             continue;
         }
 
-        int64_t connect_start_us = esp_timer_get_time();
-
-        esp_err_t ret = esp_transport_connect(transport, stratum_url, port, TRANSPORT_TIMEOUT_MS);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "TCP connect failed to %s:%d (err %d)", stratum_url, port, ret);
+        // Resolve up front and connect by IP so DNS stays non-blocking (a long
+        // DNS timeout otherwise stalls the lwIP stack and starves the HTTP server).
+        stratum_connection_info_t conn_info;
+        if (stratum_socket_resolve(stratum_url, port, &conn_info) != ESP_OK) {
+            ESP_LOGE(TAG, "Address resolution failed for %s", stratum_url);
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                      sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool unreachable");
             esp_transport_close(transport);
@@ -673,10 +671,24 @@ void stratum_v2_task(void *pvParameters)
             continue;
         }
 
-        ESP_LOGI(TAG, "TCP connected to %s:%d", stratum_url, port);
+        int64_t connect_start_us = esp_timer_get_time();
+
+        esp_err_t ret = esp_transport_connect(transport, conn_info.host_ip, port, TRANSPORT_TIMEOUT_MS);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "TCP connect failed to %s:%d (%s) (err %d)", stratum_url, port, conn_info.host_ip, ret);
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool unreachable");
+            esp_transport_close(transport);
+            esp_transport_destroy(transport);
+            retry_attempts++;
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        ESP_LOGI(TAG, "TCP connected to %s:%d (%s)", stratum_url, port, conn_info.host_ip);
 
         GLOBAL_STATE->transport = transport;
-        stratum_v2_set_socket_options(transport);
+        stratum_socket_set_options(transport);
 
         // Reset connection state
         memset(conn, 0, sizeof(*conn));
@@ -732,8 +744,6 @@ void stratum_v2_task(void *pvParameters)
 
         // --- SV2 Protocol Handshake (encrypted) ---
 
-        uint8_t frame_buf[SV2_MAX_FRAME_SIZE];
-        uint8_t recv_buf[SV2_MAX_FRAME_SIZE];
         uint8_t hdr_buf[6];
         sv2_frame_header_t hdr;
         int payload_len;
@@ -747,8 +757,8 @@ void stratum_v2_task(void *pvParameters)
             const char *device_model = GLOBAL_STATE->DEVICE_CONFIG.family.asic.name;
             ESP_LOGI(TAG, "Sending SetupConnection (vendor=bitaxe, hw=%s, channel=%s)",
                      device_model ? device_model : "",
-                     channel_type == SV2_CHANNEL_EXTENDED ? "extended" : "standard");
-            int frame_len = sv2_build_setup_connection(frame_buf, sizeof(frame_buf),
+                     channel_type == SV2_CHANNEL_EXTENDED ? SV2_CHANNEL_TYPE_EXTENDED : SV2_CHANNEL_TYPE_STANDARD);
+            int frame_len = sv2_build_setup_connection(frame_buf, SV2_MAX_FRAME_SIZE,
                                                        stratum_url, port,
                                                        "bitaxe", device_model ? device_model : "",
                                                        "", "", setup_flags);
@@ -765,7 +775,7 @@ void stratum_v2_task(void *pvParameters)
         // 2. Receive SetupConnectionSuccess
         {
             if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
-                               sizeof(recv_buf), &payload_len) != 0) {
+                               SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
                 ESP_LOGE(TAG, "Failed to receive SetupConnectionSuccess");
                 snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                          sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool not responding");
@@ -804,11 +814,11 @@ void stratum_v2_task(void *pvParameters)
 
             if (channel_type == SV2_CHANNEL_EXTENDED) {
                 ESP_LOGI(TAG, "Opening extended mining channel (user=%s)", user ? user : "(empty)");
-                frame_len = sv2_build_open_extended_mining_channel(frame_buf, sizeof(frame_buf),
+                frame_len = sv2_build_open_extended_mining_channel(frame_buf, SV2_MAX_FRAME_SIZE,
                                                                     1, user ? user : "", hash_rate, 6);
             } else {
                 ESP_LOGI(TAG, "Opening standard mining channel (user=%s)", user ? user : "(empty)");
-                frame_len = sv2_build_open_standard_mining_channel(frame_buf, sizeof(frame_buf),
+                frame_len = sv2_build_open_standard_mining_channel(frame_buf, SV2_MAX_FRAME_SIZE,
                                                                     1, user ? user : "", hash_rate);
             }
 
@@ -825,7 +835,7 @@ void stratum_v2_task(void *pvParameters)
         // 4. Receive OpenMiningChannelSuccess
         {
             if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
-                               sizeof(recv_buf), &payload_len) != 0) {
+                               SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
                 ESP_LOGE(TAG, "Failed to receive OpenChannelSuccess");
                 snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                          sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool not responding");
@@ -893,18 +903,20 @@ void stratum_v2_task(void *pvParameters)
             conn->channel_opened = true;
             memcpy(conn->target, target, 32);
 
-            uint32_t pdiff = sv2_target_to_pdiff(target);
+            double pdiff = hash_to_pdiff(target);
             GLOBAL_STATE->pool_difficulty = pdiff;
             GLOBAL_STATE->new_set_mining_difficulty_msg = true;
 
             ESP_LOGI(TAG, "Mining channel opened: channel_id=%lu, group=%lu, type=%s",
                      channel_id, group_channel_id,
-                     channel_type == SV2_CHANNEL_EXTENDED ? "extended" : "standard");
-            ESP_LOGI(TAG, "Set pool difficulty: %lu", pdiff);
+                     channel_type == SV2_CHANNEL_EXTENDED ? SV2_CHANNEL_TYPE_EXTENDED : SV2_CHANNEL_TYPE_STANDARD);
+            ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
         }
 
         // Connection successful, reset retry counter
         retry_attempts = 0;
+        // Tell the coordinator so it clears its failure counter and pools_unavailable.
+        protocol_coordinator_notify_success();
 
         {
             float elapsed_ms = (float)(esp_timer_get_time() - connect_start_us) / 1000.0f;
@@ -915,7 +927,7 @@ void stratum_v2_task(void *pvParameters)
         // --- Main receive loop ---
         while (1) {
             if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
-                               sizeof(recv_buf), &payload_len) != 0) {
+                               SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
                 ESP_LOGE(TAG, "Failed to receive frame, reconnecting...");
                 retry_attempts++;
                 stratum_v2_close_connection(GLOBAL_STATE);
@@ -942,12 +954,20 @@ void stratum_v2_task(void *pvParameters)
                     break;
 
                 case SV2_MSG_SUBMIT_SHARES_SUCCESS: {
-                    uint32_t channel_id, accepted_count;
-                    if (sv2_parse_submit_shares_success(recv_buf, hdr.msg_length, &channel_id, &accepted_count) == 0) {
-                        if (stratum_v2_last_submit_time_us > 0) {
-                            float response_time_ms = (float)(esp_timer_get_time() - stratum_v2_last_submit_time_us) / 1000.0f;
+                    uint32_t channel_id, last_sequence_number, accepted_count;
+                    if (sv2_parse_submit_shares_success(recv_buf, hdr.msg_length, &channel_id, &last_sequence_number, &accepted_count) == 0) {
+                        // Measure against the share acknowledged by last_sequence_number — the
+                        // most recent share in the ack, giving the cleanest available round trip.
+                        // accepted_count is surfaced separately so the UI can flag batch acks,
+                        // where the elapsed time also includes the pool's batching window.
+                        int slot = last_sequence_number % SV2_SUBMIT_TIMING_SLOTS;
+                        int64_t submit_time_us = stratum_v2_submit_time_us[slot];
+                        if (submit_time_us > 0) {
+                            float response_time_ms = (float)(esp_timer_get_time() - submit_time_us) / 1000.0f;
                             ESP_LOGI(TAG, "Shares accepted: %lu (%.1f ms)", accepted_count, response_time_ms);
                             GLOBAL_STATE->SYSTEM_MODULE.response_time = response_time_ms;
+                            GLOBAL_STATE->SYSTEM_MODULE.response_share_batch = (uint16_t)accepted_count;
+                            stratum_v2_submit_time_us[slot] = 0;
                         } else {
                             ESP_LOGI(TAG, "Shares accepted: %lu", accepted_count);
                         }
@@ -978,6 +998,8 @@ void stratum_v2_task(void *pvParameters)
     }
 
     // Should not reach here, but clean up just in case
+    free(frame_buf);
+    free(recv_buf);
     free(conn);
     GLOBAL_STATE->sv2_conn = NULL;
     vTaskDelete(NULL);

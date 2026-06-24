@@ -33,6 +33,8 @@ float hashCounterToGhs(uint64_t duration_us, uint32_t counter);
 
 void url_decode(char *dst, const char *src);
 
+char *strdup_psram(const char *str);
+
 #define STRATUM_DEFAULT_VERSION_MASK 0x1fffe000
 
 #endif // STRATUM_UTILS_H
