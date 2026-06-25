@@ -138,3 +138,11 @@
     h4 { font-size: 1.2rem; }
     .mb-3 { margin-bottom: 1.25rem; }
 }
+
+p-chart {
+    ::ng-deep > div {
+        position: relative;
+        min-height: 40vh;
+    }
+}
+

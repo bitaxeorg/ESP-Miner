@@ -38,14 +38,6 @@
     font-size: 0.9rem;
 }
 
-.field.grid > label {
-    @media (min-width: 768px) {
-        align-items: baseline;
-        flex-direction: column;
-        justify-content: center;
-    }
-}
-
 .sensitive-data-hidden {
     [sensitive-data] {
         color: transparent;
@@ -71,3 +63,14 @@
         }
     }
 }
+
+.line-break-anywhere {
+    line-break: anywhere;
+}
+
+.text-monospace {
+    line-break: anywhere;
+    font-family: monospace;
+    font-size: medium;
+}
+
