@@ -2,8 +2,7 @@ import { Pipe, PipeTransform } from '@angular/core';
 
 @Pipe({
     name: 'sats',
-    pure: true,
-    standalone: true
+    pure: true
 })
 export class SatsPipe implements PipeTransform {
   private static _this = new SatsPipe();

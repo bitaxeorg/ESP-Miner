@@ -2,8 +2,7 @@ import { Pipe, PipeTransform } from '@angular/core';
 
 @Pipe({
     name: 'ANSI',
-    pure: true,
-    standalone: true
+    pure: true
 })
 export class ANSIPipe implements PipeTransform {
 
