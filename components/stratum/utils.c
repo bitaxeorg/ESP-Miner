@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "esp_psram.h"
+#include "esp_heap_caps.h"
 
 #include "mbedtls/sha256.h"
 
@@ -251,4 +253,17 @@ void url_decode(char *dst, const char *src) {
         }
     }
     *dst = '\0';
+}
+
+char *strdup_psram(const char *str)
+{
+    if (!str) return NULL;
+    if (esp_psram_is_initialized()) {
+        char *p = heap_caps_malloc(strlen(str) + 1, MALLOC_CAP_SPIRAM);
+        if (p) {
+            strcpy(p, str);
+            return p;
+        }
+    }
+    return strdup(str);
 }

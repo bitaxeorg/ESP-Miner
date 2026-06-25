@@ -39,7 +39,7 @@
                             <p-inputicon *ngIf="form.get(pool + 'Password')?.dirty" styleClass="pi cursor-pointer {{!showPassword[pool] ? 'pi-eye' : 'pi-eye-slash'}}"
                             (click)="showPassword[pool] = !showPassword[pool]"></p-inputicon>
                             <input pInputText [id]="pool + 'Password'" [formControlName]="pool + 'Password'"
-                                [type]="showPassword[pool] ? 'text' : 'password'" />
+                                [type]="showPassword[pool] ? 'text' : 'password'" autocomplete="off" />
                         </p-iconfield>
                     </div>
                 </div>

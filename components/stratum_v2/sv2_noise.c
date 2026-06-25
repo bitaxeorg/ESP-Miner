@@ -501,36 +501,44 @@ int sv2_noise_send(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,
         return -1;
     }
 
-    // Encrypt header (6 bytes -> 22 bytes)
-    uint8_t enc_hdr[22];
-    if (noise_encrypt(ctx->send_key, ctx->send_nonce++, NULL, 0,
-                      frame, SV2_FRAME_HEADER_SIZE, enc_hdr) != 0) {
-        return -1;
-    }
-
-    if (noise_send_all(transport, enc_hdr, 22) != 0) {
-        return -1;
-    }
-
-    // Encrypt payload if present
     int payload_len = frame_len - SV2_FRAME_HEADER_SIZE;
-    if (payload_len > 0) {
-        uint8_t *enc_payload = malloc(payload_len + 16);
-        if (!enc_payload) return -1;
 
+    // Header-only frame: encrypt (6 -> 22 bytes) and send directly off the stack.
+    if (payload_len <= 0) {
+        uint8_t enc_hdr[22];
         if (noise_encrypt(ctx->send_key, ctx->send_nonce++, NULL, 0,
-                          frame + SV2_FRAME_HEADER_SIZE, payload_len,
-                          enc_payload) != 0) {
-            free(enc_payload);
+                          frame, SV2_FRAME_HEADER_SIZE, enc_hdr) != 0) {
             return -1;
         }
-
-        int ret = noise_send_all(transport, enc_payload, payload_len + 16);
-        free(enc_payload);
-        if (ret != 0) return -1;
+        return noise_send_all(transport, enc_hdr, 22);
     }
 
-    return 0;
+    // Build the encrypted header and payload contiguously and send them in a
+    // single write, so a frame leaves as one TCP segment instead of a header
+    // segment followed by a payload segment. The two parts use separate Noise
+    // nonces but are just consecutive bytes on the wire, so the receiver, which
+    // reads the 22-byte header first and then the payload, is unaffected.
+    int total_len = 22 + payload_len + 16;
+    uint8_t *out = malloc(total_len);
+    if (!out) return -1;
+
+    // Encrypt header (nonce N) into out[0..21]
+    if (noise_encrypt(ctx->send_key, ctx->send_nonce++, NULL, 0,
+                      frame, SV2_FRAME_HEADER_SIZE, out) != 0) {
+        free(out);
+        return -1;
+    }
+
+    // Encrypt payload (nonce N+1) into out[22..]
+    if (noise_encrypt(ctx->send_key, ctx->send_nonce++, NULL, 0,
+                      frame + SV2_FRAME_HEADER_SIZE, payload_len, out + 22) != 0) {
+        free(out);
+        return -1;
+    }
+
+    int ret = noise_send_all(transport, out, total_len);
+    free(out);
+    return ret;
 }
 
 int sv2_noise_recv(sv2_noise_ctx_t *ctx, esp_transport_handle_t transport,

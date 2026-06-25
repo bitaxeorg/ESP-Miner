@@ -13,6 +13,7 @@
 #include "freertos/semphr.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include "bap_subscription.h"
 #include "bap_protocol.h"
 #include "bap_uart.h"
@@ -444,13 +445,14 @@ esp_err_t BAP_start_subscription_task(GlobalState *state) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    xTaskCreate(
+    xTaskCreateWithCaps(
         subscription_update_task,
         "subscription_up",
         8192,
         state,
         5,
-        &subscription_task_handle
+        &subscription_task_handle,
+        MALLOC_CAP_SPIRAM
     );
 
     //ESP_LOGI(TAG, "Subscription update task started");

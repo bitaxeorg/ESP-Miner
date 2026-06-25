@@ -14,6 +14,7 @@ import {
 } from '../generated/models';
 import { Api } from '../generated/api';
 import * as functions from '../generated/functions';
+import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
 
 import { environment } from '../../environments/environment';
 
@@ -72,6 +73,8 @@ export class SystemApiService {
         freeHeap: 200504,
         freeHeapInternal: 200504,
         freeHeapSpiram: 200504,
+        minFreeHeap: 180000,
+        maxAllocHeap: 90000,
         coreVoltage: 1200,
         coreVoltageActual: 1200,
         hostname: "Bitaxe",
@@ -328,15 +331,25 @@ export class SystemApiService {
     return of({ message: 'Device identified (mock)' });
   }
 
-  public updateSystem(uri: string = '', update: any): Observable<void> {
+  public updateSystem(uri: string = '', update: any): Observable<any | ISystemUpdateResponse> {
     if (environment.production && this.api && !uri) {
-      return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }) as Promise<void>);
+      return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }));
     }
 
     if (environment.production && uri) {
-      return this.httpClient.patch<void>(`${uri}/api/system`, update);
+      return this.httpClient.patch(`${uri}/api/system`, update);
     }
 
+    if (update.hostname) {
+      return of({
+        status: 'success',
+        redirect: {
+          url: `http://${update.hostname}.local`,
+          delay: 2000,
+          message: 'Hostname updated. Redirecting to new address...'
+        }
+      } as ISystemUpdateResponse);
+    }
     return of(undefined);
   }
 
