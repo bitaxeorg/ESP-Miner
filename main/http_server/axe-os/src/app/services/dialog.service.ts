@@ -20,6 +20,8 @@ export class DialogService {
     const ref = this.primeDialogService.open(DialogListComponent, {
       header: title,
       width: '500px',
+      closable: true,
+      showHeader: true,
       data: {
         options: options,
         onSelect: (value: string) => {
