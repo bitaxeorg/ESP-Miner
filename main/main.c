@@ -59,6 +59,8 @@ void app_main(void)
 {
     ESP_ERROR_CHECK(heap_caps_register_failed_alloc_callback(heap_alloc_failed_hook));
 
+    log_buffer_init();
+
     cJSON_Hooks hooks = {
         .malloc_fn = cjson_malloc_psram,
         .free_fn = cjson_free_psram

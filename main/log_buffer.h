@@ -4,6 +4,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define LOG_BUFFER_SIZE  (512 * 1024)  /* 512 KB */
+#define RTC_LOG_BUFFER_SIZE (4 * 1024) /* 4 KB */
+#define RTC_LOG_BASE_ADDR   0x600FE000 /* Start of RTC Fast RAM on ESP32-S3 */
+
+typedef struct {
+    uint32_t magic;
+    uint32_t checksum;
+    uint32_t len;
+} rtc_log_header_t;
+
+void log_buffer_early_init(void);
 void log_buffer_init(void);
 uint64_t log_buffer_get_total_written(void);
 

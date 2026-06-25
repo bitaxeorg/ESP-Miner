@@ -58,20 +58,16 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
             const completeLine = this.logBuffer;
             this.logBuffer = '';
 
-            const matches = completeLine.matchAll(/\[(\d+;\d+)m(.*?)(?=\[|\n|$)/g);
-            let className = 'ansi-white'; // default color
-
-            for (const match of matches) {
-              const colorCode = match[1].split(';')[1];
-              switch (colorCode) {
-                case '31': className = 'ansi-red'; break;
-                case '32': className = 'ansi-green'; break;
-                case '33': className = 'ansi-yellow'; break;
-                case '34': className = 'ansi-blue'; break;
-                case '35': className = 'ansi-magenta'; break;
-                case '36': className = 'ansi-cyan'; break;
-                case '37': className = 'ansi-white'; break;
-              }
+            let className = '';
+            if (completeLine.length > 0) {
+                const prefix = completeLine[0];
+                switch(prefix) {
+                    case 'E':
+                    case 'W':
+                    case 'I':
+                        className = `log-${prefix}`;
+                        break;
+                }
             }
 
             // Get current filter value from form
@@ -127,5 +123,4 @@ export class LogsComponent implements OnInit, OnDestroy, AfterViewChecked {
       this.scrollContainer.nativeElement.scrollTo({ left: 0, top: this.scrollContainer.nativeElement.scrollHeight, behavior: 'smooth' });
     }
   }
-
 }
