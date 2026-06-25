@@ -10,10 +10,11 @@
     <ng-container *ngFor="let message of messages">
         <p-message
             [severity]="message.severity"
-            [text]="message.text"
             [icon]="message.severity === 'info' ? 'pi pi-info-circle' : message.severity === 'warn' ? 'pi pi-exclamation-triangle' : 'pi pi-times-circle'"
             [styleClass]="'w-full mb-3 border-round-lg'"
-        />
+        >
+            {{message.text}}
+        </p-message>
     </ng-container>
 
     <div *ngIf="info.showNewBlock" class="p-inline-message p-inline-message-success w-full mb-3 py-3 border-round-lg">
@@ -207,24 +208,24 @@
                     <div class="card">
                         <form [formGroup]="form">
                             <div class="flex flex-nowrap justify-content-between mb-3">
-                                <p-dropdown
+                                <p-select
                                     [options]="chartDataSources"
                                     optionLabel="name"
                                     optionValue="value"
                                     formControlName="chartY1Data"
                                     appendTo="body"
-                                    panelStyleClass="p-dropdown--small"
-                                    styleClass="w-10rem p-dropdown--small">
-                                </p-dropdown>
-                                <p-dropdown
+                                    panelStyleClass="p-select--small"
+                                    styleClass="w-10rem p-select--small">
+                                </p-select>
+                                <p-select
                                     [options]="chartDataSources"
                                     optionLabel="name"
                                     optionValue="value"
                                     formControlName="chartY2Data"
                                     appendTo="body"
-                                    panelStyleClass="p-dropdown--small"
-                                    styleClass="w-10rem p-dropdown--small">
-                                </p-dropdown>
+                                    panelStyleClass="p-select--small"
+                                    styleClass="w-10rem p-select--small">
+                                </p-select>
                             </div>
 
                             <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
@@ -404,15 +405,15 @@
                                     <i class="pi pi-external-link"></i>
                                 </a>
                             </h4>
-                            <p-dropdown
+                            <p-select
                                 [options]="(pools$ | async) ?? []"
                                 [(ngModel)]="activePoolLabel"
                                 optionLabel="label"
                                 optionValue="value"
                                 (onChange)="onPoolChange($event)"
                                 appendTo="body"
-                                panelStyleClass="p-dropdown--small"
-                                styleClass="p-dropdown--small absolute right-0"
+                                panelStyleClass="p-select--small"
+                                styleClass="p-select--small absolute right-0"
                             />
                         </div>
 

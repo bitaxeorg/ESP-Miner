@@ -42,7 +42,6 @@
     --p-primary-contrast-color: var(--primary-color-text);
     
     --p-select-hover-border-color: var(--primary-color);
-    --p-dropdown-hover-border-color: var(--primary-color);
 
     /* Dropdown/Select Option (List Items) */
     --p-select-option-focus-background: rgba(255, 255, 255, 0.05);
@@ -58,11 +57,21 @@
     --p-checkbox-hover-border-color: var(--checkbox-hover-bg);
     --p-checkbox-highlight-background: var(--checkbox-bg);
     --p-checkbox-highlight-border-color: var(--checkbox-border);
+    --p-checkbox-checked-background: var(--checkbox-bg);
+    --p-checkbox-checked-border-color: var(--checkbox-border);
     
     --p-radiobutton-background: transparent;
     --p-radiobutton-hover-border-color: var(--checkbox-hover-bg);
     --p-radiobutton-highlight-background: var(--checkbox-bg);
     --p-radiobutton-highlight-border-color: var(--checkbox-border);
+    --p-radiobutton-checked-background: var(--checkbox-bg);
+    --p-radiobutton-checked-border-color: var(--checkbox-border);
+
+    --p-togglebutton-checked-background: var(--togglebutton-bg);
+    --p-togglebutton-checked-border-color: var(--togglebutton-bg);
+    --p-togglebutton-checked-hover-background: var(--togglebutton-hover-bg);
+    --p-togglebutton-checked-hover-border-color: var(--togglebutton-hover-bg);
+    --p-togglebutton-checked-color: var(--togglebutton-text-color, #ffffff);
 
     --p-button-background: var(--button-bg);
     --p-button-border-color: var(--button-bg);
@@ -79,9 +88,16 @@
     --p-slider-handle-border-color: var(--slider-handle-bg);
     --p-slider-handle-hover-background: var(--slider-handle-bg);
     --p-slider-handle-hover-border-color: var(--slider-handle-bg);
+    --p-slider-track-background: var(--slider-bg);
 
     --p-progressbar-background: var(--progressbar-bg, #dee2e6);
     --p-progressbar-value-background: var(--progressbar-value-bg, var(--primary-color));
+
+    --p-inputtext-background: transparent;
+    --p-inputtext-hover-border-color: var(--checkbox-hover-bg);
+    --p-inputtext-focus-border-color: var(--primary-color);
+
+    --p-focus-ring-shadow: var(--focus-ring);
 
     --p-border-radius: 2px;
     --p-button-border-radius: var(--p-border-radius);
@@ -128,8 +144,6 @@
         --font-family: var(--p-font-family);
         --border-radius: var(--p-border-radius);
 
-        --focus-ring: var(--p-focus-ring-shadow);
-
         --surface-border: var(--p-content-border-color);
 
         /* PrimeFlex color variable aliases */
@@ -147,10 +161,6 @@
         font-family: 'Nippo-Regular';
     }
 
-    /* Compatibility aliases for PrimeNG 19 renames */
-    .p-select { @extend .p-dropdown !optional; }
-    .p-toggleswitch { @extend .p-inputswitch !optional; }
-
     .p-message-content {
         justify-content: center;
     }
@@ -162,6 +172,7 @@
 
     .p-inputtext {
         width: 100%;
+        background: transparent !important;
         transition: none;
         box-shadow: none;
         outline: none;
@@ -174,32 +185,38 @@
         }
     }
 
-    /* Dropdown & Select - Base Reset */
-    .p-dropdown, .p-select,
-    .p-select-panel, .p-dropdown-panel, .p-select-overlay {
+    /* Select - Base Reset */
+    .p-select {
+        background: transparent !important;
+    }
+    .p-select,
+    .p-select-panel, .p-select-overlay {
         transition: none;
         box-shadow: none;
         outline: none;
 
-        .p-dropdown-label, .p-select-label {
+        .p-select-label {
             overflow: visible !important;
         }
     }
 
     /* Small Variant Modifier */
-    .p-dropdown--small {
+    .p-select--small {
         font-size: small !important;
 
-        .p-dropdown-label, .p-select-label,
-        .p-dropdown-input, .p-select-input,
-        .p-dropdown-item, .p-select-option {
+        .p-select-label,
+        .p-select-input {
             font-size: small !important;
-            padding: 0.25rem 0.5rem !important;
+            padding: 0.3rem 0 0.3rem 0.7rem !important;
+        }
+
+        .p-select-option {
+            font-size: small !important;
         }
     }
 
     /* Panel & Overlay Logic */
-    .p-select-panel, .p-dropdown-panel, .p-select-overlay {
+    .p-select-panel, .p-select-overlay {
         background-color: var(--p-card-background) !important;
         border: 1px solid var(--card-border) !important;
         box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
@@ -207,12 +224,12 @@
         min-width: 100%;
         z-index: 20000 !important;
 
-        .p-select-list, .p-dropdown-items {
+        .p-select-list {
             padding: 0.25rem 0;
             background: var(--p-card-background);
         }
             
-        .p-select-option, .p-dropdown-item {
+        .p-select-option {
             padding: 0.5rem 1rem;
             color: var(--text-color);
             transition: background-color 0.1s;
@@ -226,19 +243,19 @@
                 color: #ffffff !important;
             }
 
-            &.p-highlight, &.p-select-option-selected {
+            &.p-select-option-selected {
                 background-color: var(--primary-color) !important;
                 color: #ffffff !important;
             }
 
-            &.p-highlight:hover {
+            &.p-select-option-selected:hover {
                 background-color: color-mix(in srgb, var(--primary-color), black 50%) !important;
             }
         }
     }
 
     .p-fluid {
-        .p-dropdown, .p-select {
+        .p-select {
             width: 100%;
         }
     }
@@ -294,14 +311,17 @@
     .field.grid label, .grid label {
         @media screen and (min-width: 768px) {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: flex-start;
             text-align: left;
         }
     }
 
     /* Global element borders */
-    fieldset, table.border-1 {
+    fieldset {
         border-color: var(--p-content-border-color) !important;
+    }
+    table.border-1 {
+        border-color: var(--card-border) !important;
     }
 }

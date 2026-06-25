@@ -26,7 +26,7 @@
                         <i class="pi pi-sort-{{option.value.sortDirection === 'asc' ? 'up' : 'down'}}-fill text-xs ml-2"></i>
                     </ng-template>
 
-                    <p-dropdown
+                    <p-select
                         [options]="sortOptions"
                         [(ngModel)]="selectedSort"
                         (onChange)="onSortChange($event)"
@@ -41,7 +41,7 @@
                         <ng-template let-option pTemplate="selectedItem">
                             <ng-container *ngTemplateOutlet="sortTemplate; context: { $implicit: option }"></ng-container>
                         </ng-template>
-                    </p-dropdown>
+                    </p-select>
                 </div>
 
                 <p-iconfield class="w-full relative">

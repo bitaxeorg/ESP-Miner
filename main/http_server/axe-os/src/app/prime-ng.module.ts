@@ -3,24 +3,22 @@ import { RadioButtonModule } from 'primeng/radiobutton';
 import { ButtonModule } from 'primeng/button';
 import { ChartModule } from 'primeng/chart';
 import { CheckboxModule } from 'primeng/checkbox';
-import { DropdownModule } from 'primeng/dropdown';
+import { SelectModule } from 'primeng/select';
 import { FileUploadModule } from 'primeng/fileupload';
 import { InputGroupModule } from 'primeng/inputgroup';
 import { InputGroupAddonModule } from 'primeng/inputgroupaddon';
 import { InputTextModule } from 'primeng/inputtext';
-import { SidebarModule } from 'primeng/sidebar';
 import { SliderModule } from 'primeng/slider';
 import { TextareaModule } from 'primeng/textarea';
-import { OverlayPanelModule } from 'primeng/overlaypanel';
+import { PopoverModule } from 'primeng/popover';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 
 const primeNgModules = [
-    SidebarModule,
     InputTextModule,
     CheckboxModule,
-    DropdownModule,
+    SelectModule,
     SliderModule,
     ButtonModule,
     FileUploadModule,
@@ -29,7 +27,7 @@ const primeNgModules = [
     InputGroupAddonModule,
     RadioButtonModule,
     TextareaModule,
-    OverlayPanelModule,
+    PopoverModule,
     ProgressBarModule,
     IconFieldModule,
     InputIconModule
