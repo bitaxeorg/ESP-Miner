@@ -376,7 +376,9 @@ private isIpAddress(value: string): boolean {
       })
     ).subscribe((res: any) => {
       if (res !== null) {
-        this.toastr.success(res, `Device at ${device.address}`);
+        let message = res;
+        try { message = JSON.parse(res)?.message ?? res; } catch {}
+        this.toastr.success(message, `Device at ${device.address}`);
         this.refreshList(false);
       }
     });
