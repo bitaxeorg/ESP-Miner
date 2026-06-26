@@ -1,0 +1,169 @@
+:root {
+    --primary-color: var(--p-primary-color);
+    --primary-color-text: var(--p-primary-contrast-color);
+    
+    --text-color: var(--p-text-color);
+    --text-color-secondary: var(--p-text-muted-color);
+    --font-family: var(--p-font-family);
+    --border-radius: var(--p-border-radius);
+
+    --surface-border: var(--p-content-border-color);
+
+    /* PrimeFlex color variable aliases */
+    $shades: 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950;
+    $colors: 'green', 'red', 'yellow', 'blue', 'orange', 'cyan', 'pink', 'indigo', 'teal', 'surface';
+
+    @each $color in $colors {
+        @each $shade in $shades {
+            --#{$color}-#{$shade}: var(--p-#{$color}-#{$shade});
+        }
+    }
+}
+
+* {
+    font-family: 'Nippo-Regular';
+}
+
+.p-message-content {
+    justify-content: center;
+}
+
+.p-inputtext {
+    width: 100%;
+    background: transparent !important;
+    transition: none;
+    box-shadow: none;
+    outline: none;
+}
+
+/* Progress Bar */
+.p-progressbar {
+    &--thin {
+        height: 6px;
+    }
+}
+
+/* Select - Base Reset */
+.p-select {
+    background: transparent !important;
+}
+.p-select,
+.p-select-panel, .p-select-overlay {
+    transition: none;
+    box-shadow: none;
+    outline: none;
+
+    .p-select-label {
+        overflow: visible !important;
+    }
+}
+
+/* Small Variant Modifier */
+.p-select--small {
+    font-size: small !important;
+
+    .p-select-label,
+    .p-select-input {
+        font-size: small !important;
+        padding: 0.3rem 0 0.3rem 0.7rem !important;
+    }
+
+    .p-select-option {
+        font-size: small !important;
+    }
+}
+
+/* Panel & Overlay Logic */
+.p-select-panel, .p-select-overlay {
+    background-color: var(--p-card-background) !important;
+    border: 1px solid var(--card-border) !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+    width: max-content !important;
+    min-width: 100%;
+    z-index: 20000 !important;
+
+    .p-select-list {
+        padding: 0.25rem 0;
+        background: var(--p-card-background);
+    }
+        
+    .p-select-option {
+        padding: 0.5rem 1rem;
+        color: var(--text-color);
+        transition: background-color 0.1s;
+        border: 0 none;
+        margin: 0;
+        border-radius: 0;
+        white-space: nowrap !important;
+
+        &:hover, &.p-focus, &.p-select-option-focused {
+            background-color: color-mix(in srgb, var(--primary-color), black 40%) !important;
+            color: #ffffff !important;
+        }
+
+        &.p-select-option-selected {
+            background-color: var(--primary-color) !important;
+            color: #ffffff !important;
+        }
+
+        &.p-select-option-selected:hover {
+            background-color: color-mix(in srgb, var(--primary-color), black 50%) !important;
+        }
+    }
+}
+
+.p-fluid {
+    .p-select {
+        width: 100%;
+    }
+}
+
+.p-button-icon {
+    font-size: 1.2rem;
+}
+
+.p-dialog {
+    @extend .card !optional;
+    padding: 2rem;
+    margin: 1rem;
+
+    &-header,
+    &-content {
+        padding: 0;
+        margin: 0;
+        background: none;
+    }
+
+    &-header {
+        margin: 0 0 2rem;
+    }
+
+    &-header-icon,
+    &-close-button {
+        @extend .p-button !optional;
+        width: 2.2rem;
+        height: 2.2rem;
+        color: #fff;
+        border-radius: 0;
+    }
+
+    &-title {
+        @extend h2 !optional;
+        margin: 0;
+    }
+}
+h1, h2, h3, h4, h5, h6, .p-dialog-title {
+    color: #ffffff !important;
+}
+
+.p-fileupload-basic {
+    justify-content: inherit;
+}
+
+/* Global element borders */
+fieldset {
+    border-color: var(--p-content-border-color) !important;
+}
+table.border-1 {
+    border-color: var(--card-border) !important;
+}

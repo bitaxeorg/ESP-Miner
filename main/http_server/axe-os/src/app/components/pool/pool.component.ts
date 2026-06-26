@@ -26,9 +26,10 @@ interface IChannelOption {
 }
 
 @Component({
-  selector: 'app-pool',
-  templateUrl: './pool.component.html',
-  styleUrls: ['./pool.component.scss']
+    selector: 'app-pool',
+    templateUrl: './pool.component.html',
+    styleUrls: ['./pool.component.scss'],
+    standalone: false
 })
 export class PoolComponent implements OnInit {
   public form!: FormGroup;

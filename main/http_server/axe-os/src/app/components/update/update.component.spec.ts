@@ -4,6 +4,8 @@ import { UpdateComponent } from './update.component';
 import { ModalComponent } from '../modal/modal.component';
 import { FileUploadModule } from 'primeng/fileupload';
 import { CheckboxModule } from 'primeng/checkbox';
+import { ProgressBarModule } from 'primeng/progressbar';
+import { ButtonModule } from 'primeng/button';
 import { FormsModule } from '@angular/forms';
 import { provideHttpClient, HttpErrorResponse } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
@@ -16,7 +18,7 @@ describe('UpdateComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       declarations: [UpdateComponent, ModalComponent],
-      imports: [FileUploadModule, CheckboxModule, FormsModule],
+      imports: [FileUploadModule, CheckboxModule, ButtonModule, ProgressBarModule, FormsModule],
       providers: [provideHttpClient(), provideToastr()]
     });
     fixture = TestBed.createComponent(UpdateComponent);

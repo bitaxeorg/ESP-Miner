@@ -14,9 +14,10 @@ import { first } from 'rxjs/operators';
 import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
 
 @Component({
-  selector: 'app-network-edit',
-  templateUrl: './network.edit.component.html',
-  styleUrls: ['./network.edit.component.scss']
+    selector: 'app-network-edit',
+    templateUrl: './network.edit.component.html',
+    styleUrls: ['./network.edit.component.scss'],
+    standalone: false
 })
 export class NetworkEditComponent implements OnInit {
   private formSubject = new BehaviorSubject<FormGroup | null>(null);

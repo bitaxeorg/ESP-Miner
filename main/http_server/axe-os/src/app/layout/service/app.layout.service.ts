@@ -27,39 +27,27 @@ interface LayoutState {
 })
 export class LayoutService {
     private darkTheme = {
-        '--surface-a': '#0B1219',  // Darker navy
-        '--surface-b': '#070D17',  // Very dark navy (from image)
-        '--surface-c': 'rgba(255,255,255,0.03)',
-        '--surface-d': '#1A2632',  // Slightly lighter navy
-        '--surface-e': '#0B1219',
-        '--surface-f': '#0B1219',
-        '--surface-ground': '#070D17',
-        '--surface-section': '#070D17',
-        '--surface-card': '#0B1219',
-        '--surface-overlay': '#0B1219',
-        '--surface-border': '#1A2632',
-        '--surface-hover': 'rgba(255,255,255,0.03)',
-        '--text-color': 'rgba(255, 255, 255, 0.87)',
-        '--text-color-secondary': 'rgba(255, 255, 255, 0.6)',
-        '--maskbg': 'rgba(0,0,0,0.4)'
+        '--p-content-background': '#070D17',  // Very dark navy
+        '--p-card-background': '#0B1219',     // Darker navy
+        '--p-content-border-color': '#454d59', // Unified separator border
+        '--card-border': '#1A2632',           // Darker card border
+        '--p-text-color': 'rgba(255, 255, 255, 0.87)',
+        '--p-text-muted-color': 'rgba(255, 255, 255, 0.6)',
+        '--p-mask-background': 'rgba(0, 0, 0, 0.4)',
+        '--p-overlay-select-background': '#0B1219',
+        '--p-overlay-select-border-color': '#1A2632'
     };
 
     private lightTheme = {
-        '--surface-a': '#1a2632',  // Lighter navy for main background
-        '--surface-b': '#243447',  // Medium navy for secondary background
-        '--surface-c': 'rgba(255,255,255,0.03)',
-        '--surface-d': '#2f4562',  // Light navy for borders
-        '--surface-e': '#1a2632',
-        '--surface-f': '#1a2632',
-        '--surface-ground': '#243447',
-        '--surface-section': '#1a2632',
-        '--surface-card': '#1a2632',
-        '--surface-overlay': '#1a2632',
-        '--surface-border': '#2f4562',
-        '--surface-hover': 'rgba(255,255,255,0.03)',
-        '--text-color': 'rgba(255, 255, 255, 0.9)',  // Slightly brighter text
-        '--text-color-secondary': 'rgba(255, 255, 255, 0.7)',  // Brighter secondary text
-        '--maskbg': 'rgba(0,0,0,0.2)'
+        '--p-content-background': '#243447',  // Medium navy
+        '--p-card-background': '#1a2632',     // Lighter navy
+        '--p-content-border-color': '#454d59',
+        '--card-border': '#2f4562',
+        '--p-text-color': 'rgba(255, 255, 255, 0.9)',
+        '--p-text-muted-color': 'rgba(255, 255, 255, 0.7)',
+        '--p-mask-background': 'rgba(0, 0, 0, 0.2)',
+        '--p-overlay-select-background': '#1a2632',
+        '--p-overlay-select-border-color': '#2f4562'
     };
 
     _config: AppConfig = {

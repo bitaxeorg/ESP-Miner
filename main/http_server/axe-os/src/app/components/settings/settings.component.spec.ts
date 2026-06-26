@@ -12,7 +12,7 @@ describe('SettingsComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [SettingsComponent, EditComponent],
+      imports: [SettingsComponent, EditComponent],
       providers: [provideHttpClient(), provideToastr(), provideRouter([])]
     });
     fixture = TestBed.createComponent(SettingsComponent);
