@@ -35,9 +35,13 @@
 
 // Channel type selection
 typedef enum {
-    SV2_CHANNEL_EXTENDED = 0,
-    SV2_CHANNEL_STANDARD = 1
+    SV2_CHANNEL_UNKNOWN = 0,
+    SV2_CHANNEL_STANDARD = 1,
+    SV2_CHANNEL_EXTENDED = 2,
 } sv2_channel_type_t;
+
+#define SV2_CHANNEL_TYPE_STANDARD "standard"
+#define SV2_CHANNEL_TYPE_EXTENDED "extended"
 
 // Frame header (parsed)
 typedef struct {
@@ -190,10 +194,5 @@ sv2_ext_job_t *sv2_parse_new_extended_mining_job(const uint8_t *payload, uint32_
                                                   uint32_t *channel_id_out);
 
 void sv2_ext_job_free(sv2_ext_job_t *job);
-
-// --- Helpers ---
-
-// Convert U256 LE target to pool difficulty (pdiff)
-uint32_t sv2_target_to_pdiff(const uint8_t target[32]);
 
 #endif /* SV2_PROTOCOL_H */

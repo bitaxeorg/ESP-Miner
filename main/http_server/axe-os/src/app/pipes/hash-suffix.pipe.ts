@@ -1,7 +1,7 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
 @Pipe({
-  name: 'hashSuffix'
+    name: 'hashSuffix'
 })
 export class HashSuffixPipe implements PipeTransform {
 

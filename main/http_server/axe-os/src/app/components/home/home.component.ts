@@ -26,6 +26,7 @@ import { GridStack, GridItemHTMLElement } from 'gridstack';
 import { DashboardEditService, WidgetDef } from 'src/app/services/dashboard-edit.service';
 
 type PoolLabel = 'Primary' | 'Fallback';
+type ProtocolLabel = 'SV2 Standard Channel' | 'SV2 Extended Channel';
 type MessageType =
   | 'SYSTEM_INFO_ERROR'
   | 'MINING_PAUSED'
@@ -68,9 +69,10 @@ const WIDGET_DEFAULTS: WidgetDef[] = [
 ];
 
 @Component({
-  selector: 'app-home',
-  templateUrl: './home.component.html',
-  styleUrls: ['./home.component.scss']
+    selector: 'app-home',
+    templateUrl: './home.component.html',
+    styleUrls: ['./home.component.scss'],
+    standalone: false
 })
 export class HomeComponent implements OnInit, OnDestroy {
   public messages: ISystemMessage[] = [];
@@ -99,6 +101,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activePoolPort!: number;
   public activePoolUser!: string;
   public activePoolLabel!: PoolLabel;
+  public activePoolProtocol!: string;
   public responseTime!: number;
 
   public flashShare: boolean = false;
@@ -481,8 +484,8 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
-    const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
+    const textColorSecondary = (documentStyle.getPropertyValue('--p-text-muted-color') || documentStyle.getPropertyValue('--text-color-secondary')).trim();
+    const surfaceBorder = (documentStyle.getPropertyValue('--p-content-border-color') || documentStyle.getPropertyValue('--surface-border')).trim();
     const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
     this.primaryColorRgb = this.hexToRgb(primaryColor);
 
@@ -505,7 +508,9 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
 
     // Force chart update
+    this.chartOptions = { ...this.chartOptions };
     this.chartData = { ...this.chartData };
+    this.chart?.chart?.update();
   }
 
   public updateSystem() {
@@ -527,9 +532,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = getComputedStyle(document.documentElement).getPropertyValue('--text-color-secondary');
-    const surfaceBorder = getComputedStyle(document.documentElement).getPropertyValue('--surface-border');
-    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
+    const textColorSecondary = (documentStyle.getPropertyValue('--p-text-muted-color') || documentStyle.getPropertyValue('--text-color-secondary')).trim();
+    const surfaceBorder = (documentStyle.getPropertyValue('--p-content-border-color') || documentStyle.getPropertyValue('--surface-border')).trim();
+    const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
     this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.chartData = {
@@ -869,10 +874,17 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.payoutPercentage = this.getPayoutPercentage(info);
 
         const isFallbackPool = !!info.isUsingFallbackStratum;
+        this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
         this.activePoolURL = isFallbackPool ? info.fallbackStratumURL : info.stratumURL;
         this.activePoolUser = isFallbackPool ? info.fallbackStratumUser : info.stratumUser;
         this.activePoolPort = isFallbackPool ? info.fallbackStratumPort : info.stratumPort;
-        this.activePoolLabel = isFallbackPool ? 'Fallback' : 'Primary';
+        const activeProtocol = isFallbackPool ? info.fallbackStratumProtocol : info.stratumProtocol;
+        if (activeProtocol === 'SV2') {
+          const channelType = isFallbackPool ? info.fallbackStratumV2ChannelType : info.stratumV2ChannelType;
+          this.activePoolProtocol = channelType === 'standard' ? 'SV2 Standard Channel' : 'SV2 Extended Channel';
+        } else {
+          this.activePoolProtocol = 'SV1';
+        }
         this.responseTime = info.responseTime;
 
         this.activePoolUserAddressPart = this.getAddressPart(this.activePoolUser);

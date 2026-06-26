@@ -13,8 +13,8 @@
         </div>
         <div class="field grid p-fluid">
             <label for="ssid" class="col-12 md:col-2 md:m-0">Wi-Fi SSID</label>
-            <div class="col-12 md:col-10 p-inputgroup">
-                <input pInputText id="ssid" type="text" formControlName="ssid" />
+            <div class="col-12 md:col-10 flex gap-2 align-items-center">
+                <input pInputText id="ssid" type="text" formControlName="ssid" class="flex-grow-1" />
                 <p-button
                     icon="pi pi-search"
                     pp-button
@@ -26,13 +26,14 @@
         </div>
         <div class="field grid p-fluid">
             <label for="wifiPass" class="col-12 md:col-2 md:m-0">Wi-Fi Password</label>
-            <div class="col-12 md:col-10 p-input-icon-right">
-                <i *ngIf="form.get('wifiPass')?.dirty" class="pi cursor-pointer"
-                    [ngClass]="{'pi-eye': !showWifiPassword, 'pi-eye-slash': showWifiPassword}"
-                    (click)="toggleWifiPasswordVisibility()"></i>
-                <input pInputText id="wifiPass" formControlName="wifiPass"
-                    [type]="showWifiPassword ? 'text' : 'password'"
-                    placeholder="Enter Wi-Fi password" />
+            <div class="col-12 md:col-10">
+                <p-iconfield iconPosition="right">
+                    <p-inputicon *ngIf="form.get('wifiPass')?.dirty" styleClass="pi cursor-pointer {{!showWifiPassword ? 'pi-eye' : 'pi-eye-slash'}}"
+                        (click)="toggleWifiPasswordVisibility()"></p-inputicon>
+                    <input pInputText id="wifiPass" formControlName="wifiPass"
+                        [type]="showWifiPassword ? 'text' : 'password'"
+                        placeholder="Enter Wi-Fi password" />
+                </p-iconfield>
             </div>
         </div>
 

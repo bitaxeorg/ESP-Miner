@@ -11,6 +11,7 @@
 #include "connect.h"
 #include "sv2_protocol.h"
 #include "sv2_noise.h"
+#include "mining.h"
 #include "nvs_config.h"
 #include "work_queue.h"
 #include "utils.h"
@@ -18,13 +19,14 @@
 #include "device_config.h"
 #include "coinbase_decoder.h"
 #include "esp_heap_caps.h"
+#include "esp_psram.h"
 
 #include <string.h>
 #include <stdlib.h>
 
 #define MAX_RETRY_ATTEMPTS 3
 #define TRANSPORT_TIMEOUT_MS 5000
-#define SV2_MAX_FRAME_SIZE 2048
+#define SV2_MAX_FRAME_SIZE 8192
 
 static const char *TAG = "stratum_v2_task";
 
@@ -77,11 +79,20 @@ static sv2_channel_type_t sv2_select_channel_type(GlobalState *GLOBAL_STATE, boo
 {
     NvsConfigKey key = use_fallback ? NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE
                                     : NVS_CONFIG_SV2_CHANNEL_TYPE;
-    uint16_t cfg = nvs_config_get_u16(key);
-    if (cfg == 1 && GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397) {
-        return SV2_CHANNEL_STANDARD;
+    char *cfg_str = nvs_config_get_string(key);
+    sv2_channel_type_t type = SV2_CHANNEL_EXTENDED;  // default, and forced for BM1397
+    if (cfg_str) {
+        sv2_channel_type_t parsed = sv2_channel_type_from_string(cfg_str);
+        if (parsed == SV2_CHANNEL_STANDARD) {
+            if (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BM1397) {
+                type = SV2_CHANNEL_STANDARD;
+            }
+        } else if (parsed == SV2_CHANNEL_UNKNOWN && cfg_str[0] != '\0') {
+            ESP_LOGW(TAG, "Invalid SV2 channel type in NVS: '%s', defaulting to extended", cfg_str);
+        }
+        free(cfg_str);
     }
-    return SV2_CHANNEL_EXTENDED;  // default, and forced for BM1397
+    return type;
 }
 
 void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
@@ -537,8 +548,8 @@ static void stratum_v2_handle_set_target(GlobalState *GLOBAL_STATE, sv2_conn_t *
     }
 
     memcpy(conn->target, max_target, 32);
-    uint32_t pdiff = sv2_target_to_pdiff(max_target);
-    ESP_LOGI(TAG, "Set pool difficulty: %lu", pdiff);
+    double pdiff = hash_to_pdiff(max_target);
+    ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
     GLOBAL_STATE->pool_difficulty = pdiff;
     GLOBAL_STATE->new_set_mining_difficulty_msg = true;
 }
@@ -572,6 +583,20 @@ void stratum_v2_task(void *pvParameters)
     }
     GLOBAL_STATE->sv2_conn = conn;
 
+    uint8_t *frame_buf = heap_caps_malloc(SV2_MAX_FRAME_SIZE, MALLOC_CAP_SPIRAM);
+    uint8_t *recv_buf = heap_caps_malloc(SV2_MAX_FRAME_SIZE, MALLOC_CAP_SPIRAM);
+
+    if (!frame_buf || !recv_buf) {
+        ESP_LOGE(TAG, "Failed to allocate frame buffers");
+        free(frame_buf);
+        free(recv_buf);
+        free(conn);
+        GLOBAL_STATE->sv2_conn = NULL;
+        protocol_coordinator_notify_failure();
+        vTaskDelete(NULL);
+        return;
+    }
+
     int retry_attempts = 0;
     bool use_fallback = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback;
 
@@ -589,6 +614,8 @@ void stratum_v2_task(void *pvParameters)
         if (protocol_coordinator_v2_should_shutdown()) {
             ESP_LOGI(TAG, "Shutdown requested by coordinator");
             stratum_v2_close_connection(GLOBAL_STATE);
+            free(frame_buf);
+            free(recv_buf);
             free(conn);
             GLOBAL_STATE->sv2_conn = NULL;
             protocol_coordinator_v2_exited();
@@ -607,6 +634,8 @@ void stratum_v2_task(void *pvParameters)
             ESP_LOGW(TAG, "Max SV2 retry attempts reached (%d), notifying coordinator",
                      retry_attempts);
             stratum_v2_close_connection(GLOBAL_STATE);
+            free(frame_buf);
+            free(recv_buf);
             free(conn);
             GLOBAL_STATE->sv2_conn = NULL;
             // Send only failure event — coordinator knows the task exited because it failed
@@ -715,8 +744,6 @@ void stratum_v2_task(void *pvParameters)
 
         // --- SV2 Protocol Handshake (encrypted) ---
 
-        uint8_t frame_buf[SV2_MAX_FRAME_SIZE];
-        uint8_t recv_buf[SV2_MAX_FRAME_SIZE];
         uint8_t hdr_buf[6];
         sv2_frame_header_t hdr;
         int payload_len;
@@ -730,8 +757,8 @@ void stratum_v2_task(void *pvParameters)
             const char *device_model = GLOBAL_STATE->DEVICE_CONFIG.family.asic.name;
             ESP_LOGI(TAG, "Sending SetupConnection (vendor=bitaxe, hw=%s, channel=%s)",
                      device_model ? device_model : "",
-                     channel_type == SV2_CHANNEL_EXTENDED ? "extended" : "standard");
-            int frame_len = sv2_build_setup_connection(frame_buf, sizeof(frame_buf),
+                     channel_type == SV2_CHANNEL_EXTENDED ? SV2_CHANNEL_TYPE_EXTENDED : SV2_CHANNEL_TYPE_STANDARD);
+            int frame_len = sv2_build_setup_connection(frame_buf, SV2_MAX_FRAME_SIZE,
                                                        stratum_url, port,
                                                        "bitaxe", device_model ? device_model : "",
                                                        "", "", setup_flags);
@@ -748,7 +775,7 @@ void stratum_v2_task(void *pvParameters)
         // 2. Receive SetupConnectionSuccess
         {
             if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
-                               sizeof(recv_buf), &payload_len) != 0) {
+                               SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
                 ESP_LOGE(TAG, "Failed to receive SetupConnectionSuccess");
                 snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                          sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool not responding");
@@ -787,11 +814,11 @@ void stratum_v2_task(void *pvParameters)
 
             if (channel_type == SV2_CHANNEL_EXTENDED) {
                 ESP_LOGI(TAG, "Opening extended mining channel (user=%s)", user ? user : "(empty)");
-                frame_len = sv2_build_open_extended_mining_channel(frame_buf, sizeof(frame_buf),
+                frame_len = sv2_build_open_extended_mining_channel(frame_buf, SV2_MAX_FRAME_SIZE,
                                                                     1, user ? user : "", hash_rate, 6);
             } else {
                 ESP_LOGI(TAG, "Opening standard mining channel (user=%s)", user ? user : "(empty)");
-                frame_len = sv2_build_open_standard_mining_channel(frame_buf, sizeof(frame_buf),
+                frame_len = sv2_build_open_standard_mining_channel(frame_buf, SV2_MAX_FRAME_SIZE,
                                                                     1, user ? user : "", hash_rate);
             }
 
@@ -808,7 +835,7 @@ void stratum_v2_task(void *pvParameters)
         // 4. Receive OpenMiningChannelSuccess
         {
             if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
-                               sizeof(recv_buf), &payload_len) != 0) {
+                               SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
                 ESP_LOGE(TAG, "Failed to receive OpenChannelSuccess");
                 snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
                          sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Pool not responding");
@@ -876,14 +903,14 @@ void stratum_v2_task(void *pvParameters)
             conn->channel_opened = true;
             memcpy(conn->target, target, 32);
 
-            uint32_t pdiff = sv2_target_to_pdiff(target);
+            double pdiff = hash_to_pdiff(target);
             GLOBAL_STATE->pool_difficulty = pdiff;
             GLOBAL_STATE->new_set_mining_difficulty_msg = true;
 
             ESP_LOGI(TAG, "Mining channel opened: channel_id=%lu, group=%lu, type=%s",
                      channel_id, group_channel_id,
-                     channel_type == SV2_CHANNEL_EXTENDED ? "extended" : "standard");
-            ESP_LOGI(TAG, "Set pool difficulty: %lu", pdiff);
+                     channel_type == SV2_CHANNEL_EXTENDED ? SV2_CHANNEL_TYPE_EXTENDED : SV2_CHANNEL_TYPE_STANDARD);
+            ESP_LOGI(TAG, "Set pool difficulty: %g", pdiff);
         }
 
         // Connection successful, reset retry counter
@@ -900,7 +927,7 @@ void stratum_v2_task(void *pvParameters)
         // --- Main receive loop ---
         while (1) {
             if (sv2_noise_recv(noise_ctx, transport, hdr_buf, recv_buf,
-                               sizeof(recv_buf), &payload_len) != 0) {
+                               SV2_MAX_FRAME_SIZE, &payload_len) != 0) {
                 ESP_LOGE(TAG, "Failed to receive frame, reconnecting...");
                 retry_attempts++;
                 stratum_v2_close_connection(GLOBAL_STATE);
@@ -971,6 +998,8 @@ void stratum_v2_task(void *pvParameters)
     }
 
     // Should not reach here, but clean up just in case
+    free(frame_buf);
+    free(recv_buf);
     free(conn);
     GLOBAL_STATE->sv2_conn = NULL;
     vTaskDelete(NULL);
