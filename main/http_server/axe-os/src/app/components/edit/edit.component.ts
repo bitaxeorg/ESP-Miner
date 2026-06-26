@@ -1,24 +1,46 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
-import { FormBuilder, FormGroup, FormControl, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable, first } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { ActivatedRoute } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { ButtonModule } from 'primeng/button';
+import { CheckboxModule } from 'primeng/checkbox';
+import { SelectModule } from 'primeng/select';
+import { MessageModule } from 'primeng/message';
+import { SliderModule } from 'primeng/slider';
+import { TooltipModule } from 'primeng/tooltip';
+import { InputTextModule } from 'primeng/inputtext';
+import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 
-type Dropdown = {
+type SelectOption = {
   name: string;
   value: number;
-}[]
+};
 
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
 const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
 
 @Component({
-  selector: 'app-edit',
-  templateUrl: './edit.component.html'
+    selector: 'app-edit',
+    templateUrl: './edit.component.html',
+    standalone: true,
+    imports: [
+        CommonModule,
+        ReactiveFormsModule,
+        ButtonModule,
+        CheckboxModule,
+        SelectModule,
+        InputTextModule,
+        MessageModule,
+        SliderModule,
+        TooltipModule,
+        DateAgoPipe,
+    ]
 })
 
 export class EditComponent implements OnInit, OnDestroy, OnChanges {
@@ -283,12 +305,12 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       });
   }
 
-  get dropdownFrequency(): Dropdown {
-    return this.buildDropdown('frequency', this.frequencyOptions, this.defaultFrequency);
+  get selectFrequency(): SelectOption[] {
+    return this.buildSelectOptions('frequency', this.frequencyOptions, this.defaultFrequency);
   }
 
-  get dropdownVoltage(): Dropdown {
-    return this.buildDropdown('coreVoltage', this.voltageOptions, this.defaultVoltage);
+  get selectVoltage(): SelectOption[] {
+    return this.buildSelectOptions('coreVoltage', this.voltageOptions, this.defaultVoltage);
   }
 
   get displayTimeoutMaxSteps(): number {
@@ -307,12 +329,12 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     return STATS_FREQUENCY_STEPS[this.statsFrequencyMaxSteps];
   }
 
-  buildDropdown(formField: string, apiOptions: number[], defaultValue: number): Dropdown {
+  buildSelectOptions(formField: string, apiOptions: number[], defaultValue: number): SelectOption[] {
     if (!apiOptions.length) {
       return [];
     }
 
-    // Convert options from API to dropdown format
+    // Convert options from API to select format
     const options = apiOptions.map(option => {
       return {
         name: defaultValue === option ? `${option} (Default)` : `${option}`,

@@ -1,7 +1,7 @@
 <form *ngIf="form" [formGroup]="form">
     <div class="card">
-        <p-message *ngIf="settingsUnlocked" severity="warn" styleClass="w-full mb-3 py-4 border-round-xl"
-            text="Custom settings can cause damage & system instability. Only modify these settings if you understand the risks of running outside designed parameters.">
+        <p-message *ngIf="settingsUnlocked" severity="warn" icon="pi pi-exclamation-triangle" styleClass="w-full mb-3 border-round-xl">
+            Custom settings can cause damage & system instability. Only modify these settings if you understand the risks of running outside designed parameters.
         </p-message>
 
         <div class="field grid p-fluid">
@@ -12,15 +12,15 @@
                 </div>
             </ng-container>
             <ng-container *ngIf="!settingsUnlocked">
-                <label (click)="frequencyDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Frequency</label>
+                <label (click)="frequencySelect.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Frequency</label>
                 <div class="col-12 md:col-10">
-                    <p-dropdown
-                        [options]="dropdownFrequency"
+                    <p-select
+                        [options]="selectFrequency"
                         optionLabel="name"
                         optionValue="value"
                         formControlName="frequency"
-                        #frequencyDropdown
-                    ></p-dropdown>
+                        #frequencySelect
+                    ></p-select>
                 </div>
             </ng-container>
         </div>
@@ -33,15 +33,15 @@
                 </div>
             </ng-container>
             <ng-container *ngIf="!settingsUnlocked">
-                <label (click)="voltageDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Core Voltage</label>
+                <label (click)="voltageSelect.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Core Voltage</label>
                 <div class="col-12 md:col-10">
-                    <p-dropdown
-                        [options]="dropdownVoltage"
+                    <p-select
+                        [options]="selectVoltage"
                         optionLabel="name"
                         optionValue="value"
                         formControlName="coreVoltage"
-                        #voltageDropdown
-                    ></p-dropdown>
+                        #voltageSelect
+                    ></p-select>
                 </div>
             </ng-container>
         </div>
@@ -104,16 +104,16 @@
 
     <div class="card">
         <div class="field grid p-fluid">
-            <label (click)="displayDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Type</label>
+            <label (click)="displaySelect.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Type</label>
             <div class="col-12 md:col-10">
-                <p-dropdown [options]="displays" formControlName="display" #displayDropdown></p-dropdown>
+                <p-select [options]="displays" formControlName="display" #displaySelect></p-select>
             </div>
         </div>
 
         <div class="field grid p-fluid">
-            <label (click)="rotationDropdown.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Rotation</label>
+            <label (click)="rotationSelect.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Rotation</label>
             <div class="col-12 md:col-10">
-                <p-dropdown [options]="rotations" formControlName="rotation" #rotationDropdown></p-dropdown>
+                <p-select [options]="rotations" formControlName="rotation" #rotationSelect></p-select>
             </div>
         </div>
 
