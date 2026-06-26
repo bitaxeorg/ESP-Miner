@@ -18,14 +18,14 @@ describe('SwarmComponent', () => {
     TestBed.configureTestingModule({
       declarations: [
         SwarmComponent,
-        ModalComponent,
-        HashSuffixPipe,
-        DiffSuffixPipe,
-        DateAgoPipe
+        ModalComponent
       ],
       imports: [
         PrimeNGModule,
-        ReactiveFormsModule
+        ReactiveFormsModule,
+        HashSuffixPipe,
+        DiffSuffixPipe,
+        DateAgoPipe
       ],
       providers: [
         provideHttpClient(),
