@@ -7,7 +7,7 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Title } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { MessageModule } from 'primeng/message';
-import { DropdownModule } from 'primeng/dropdown';
+import { SelectModule } from 'primeng/select';
 import { ChartModule } from 'primeng/chart';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TooltipModule } from 'primeng/tooltip';
@@ -42,23 +42,23 @@ describe('HomeComponent', () => {
         HomeComponent,
         TooltipTextIconComponent,
         ConfettiComponent,
-        SnowflakesComponent,
-        HashSuffixPipe,
-        DiffSuffixPipe,
-        DateAgoPipe,
-        AddressPipe,
-        SatsPipe,
-        ByteSuffixPipe
+        SnowflakesComponent
       ],
       imports: [
         ReactiveFormsModule,
         FormsModule,
         NoopAnimationsModule,
         MessageModule,
-        DropdownModule,
+        SelectModule,
         ChartModule,
         ProgressBarModule,
-        TooltipModule
+        TooltipModule,
+        HashSuffixPipe,
+        DiffSuffixPipe,
+        DateAgoPipe,
+        AddressPipe,
+        SatsPipe,
+        ByteSuffixPipe
       ],
       providers: [
         provideRouter([]),

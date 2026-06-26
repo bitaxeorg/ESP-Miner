@@ -69,9 +69,10 @@ const WIDGET_DEFAULTS: WidgetDef[] = [
 ];
 
 @Component({
-  selector: 'app-home',
-  templateUrl: './home.component.html',
-  styleUrls: ['./home.component.scss']
+    selector: 'app-home',
+    templateUrl: './home.component.html',
+    styleUrls: ['./home.component.scss'],
+    standalone: false
 })
 export class HomeComponent implements OnInit, OnDestroy {
   public messages: ISystemMessage[] = [];
@@ -483,8 +484,8 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary');
-    const surfaceBorder = documentStyle.getPropertyValue('--surface-border');
+    const textColorSecondary = (documentStyle.getPropertyValue('--p-text-muted-color') || documentStyle.getPropertyValue('--text-color-secondary')).trim();
+    const surfaceBorder = (documentStyle.getPropertyValue('--p-content-border-color') || documentStyle.getPropertyValue('--surface-border')).trim();
     const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
     this.primaryColorRgb = this.hexToRgb(primaryColor);
 
@@ -507,7 +508,9 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
 
     // Force chart update
+    this.chartOptions = { ...this.chartOptions };
     this.chartData = { ...this.chartData };
+    this.chart?.chart?.update();
   }
 
   public updateSystem() {
@@ -529,9 +532,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = getComputedStyle(document.documentElement).getPropertyValue('--text-color-secondary');
-    const surfaceBorder = getComputedStyle(document.documentElement).getPropertyValue('--surface-border');
-    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
+    const textColorSecondary = (documentStyle.getPropertyValue('--p-text-muted-color') || documentStyle.getPropertyValue('--text-color-secondary')).trim();
+    const surfaceBorder = (documentStyle.getPropertyValue('--p-content-border-color') || documentStyle.getPropertyValue('--surface-border')).trim();
+    const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
     this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.chartData = {
