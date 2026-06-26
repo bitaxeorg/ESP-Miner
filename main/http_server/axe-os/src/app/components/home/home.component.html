@@ -138,12 +138,10 @@
                 <div class="card mb-0">
                     <div class="flex justify-content-between mb-3">
                         <div>
-                            <span class="block text-lg font-medium mb-3">
+                             <span class="block text-lg font-medium mb-3">
                                 Shares
-                                <span class="inline-block relative ml-2" style="width: 32px; height: 1em; vertical-align: middle;">
-                                    <i class="pi pi-arrow-up transition-opacity transition-duration-500 absolute left-0 text-green-500" [ngClass]="{'opacity-100': flashShareAccepted, 'opacity-0': !flashShareAccepted}" pTooltip="Share Accepted" tooltipPosition="top"></i>
-                                    <i class="pi pi-times transition-opacity transition-duration-500 absolute text-red-500" [ngClass]="{'opacity-100': flashShareRejected, 'opacity-0': !flashShareRejected}" [style.left.px]="flashShareAccepted ? 16 : 0" pTooltip="Share Rejected" tooltipPosition="top"></i>
-                                </span>
+                                <i class="pi pi-arrow-up text-green-500 flash-icon ml-2 text-sm vertical-align-middle" [class.active]="flashShareAccepted" pTooltip="Share Accepted" tooltipPosition="top"></i>
+                                <i class="pi pi-times text-red-500 flash-icon ml-1 text-sm vertical-align-middle" [class.active]="flashShareRejected" pTooltip="Share Rejected" tooltipPosition="top"></i>
                             </span>
                             <div class="font-medium text-2xl">
                                 {{info.sharesAccepted | number: '1.0-0'}}
@@ -498,7 +496,7 @@
                 <div class="card">
                     <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis">
                         Block Header
-                        <i class="pi pi-arrow-down transition-opacity transition-duration-500 ml-2 text-sm vertical-align-middle" [ngClass]="{'opacity-100 text-primary': flashWorkReceived, 'opacity-0': !flashWorkReceived}" pTooltip="New Work Received" tooltipPosition="top"></i>
+                        <i class="pi pi-arrow-down text-primary flash-icon ml-2 text-sm vertical-align-middle" [class.active]="flashWorkReceived" pTooltip="Work Received" tooltipPosition="top"></i>
                         <span *ngIf="info.blockSignals && info.blockSignals.length > 0" class="vertical-align-bottom ml-2">
                             <span *ngFor="let signal of info.blockSignals" class="p-badge p-badge-success ml-1">{{ signal }}</span>
                         </span>
