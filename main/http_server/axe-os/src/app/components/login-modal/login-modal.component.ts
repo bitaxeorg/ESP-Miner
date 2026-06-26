@@ -3,7 +3,8 @@ import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
 
 @Component({
   selector: 'app-login-modal',
-  templateUrl: './login-modal.component.html'
+  templateUrl: './login-modal.component.html',
+  standalone: false
 })
 export class LoginModalComponent {
   public username = 'admin';
