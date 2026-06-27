@@ -51,7 +51,7 @@ export class LayoutService {
     };
 
     private whiteTheme = {
-        '--p-content-background': '#f4f4f5',  // Off-white / light gray (Aura default)
+        '--p-content-background': '#f1f5f9',  // Softer blue-gray off-white (slate-100)
         '--p-card-background': '#ffffff',     // Card background is white
         '--p-content-border-color': '#e2e8f0', // Light border
         '--card-border': '#e2e8f0',           // Light card border
