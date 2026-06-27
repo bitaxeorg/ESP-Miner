@@ -1,3 +1,5 @@
+// Prometheus label value escaping (for ", \, \n, and ")
+#include <stddef.h>
 #include <pthread.h>
 #include <fcntl.h>
 #include <string.h>
@@ -37,13 +39,18 @@
 #include "display.h"
 #include "mdns.h"
 #include "http_server.h"
+#include "prometheus_format.h"
 #include "websocket.h"
 #include "websocket_log.h"
 #include "websocket_api.h"
 #include "system_api_json.h"
 #include "log_buffer.h"
 #include "cjson_utils.h"
+#include <inttypes.h>
 #include "utils.h"
+
+// Forward declaration for Prometheus metrics endpoint handler
+static esp_err_t GET_system_metrics(httpd_req_t *req);
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -119,6 +126,32 @@ DataSource strToDataSource(const char * sourceStr)
         if (strcmp(sourceStr, STATS_LABEL_RESPONSE_TIME) == 0) return SRC_RESPONSE_TIME;
     }
     return SRC_NONE;
+}
+
+// prometheus_escape_label_value, prometheus_copy_sanitized_ascii,
+// prometheus_format_label, prometheus_format_labels are in components/prometheus_format/
+
+static const char *prometheus_reset_reason_string(esp_reset_reason_t reason)
+{
+    switch (reason) {
+        case ESP_RST_UNKNOWN:    return "unknown";
+        case ESP_RST_POWERON:    return "power_on";
+        case ESP_RST_EXT:        return "external";
+        case ESP_RST_SW:         return "software";
+        case ESP_RST_PANIC:      return "panic";
+        case ESP_RST_INT_WDT:    return "interrupt_watchdog";
+        case ESP_RST_TASK_WDT:   return "task_watchdog";
+        case ESP_RST_WDT:        return "watchdog";
+        case ESP_RST_DEEPSLEEP:  return "deep_sleep";
+        case ESP_RST_BROWNOUT:   return "brownout";
+        case ESP_RST_SDIO:       return "sdio";
+        case ESP_RST_USB:        return "usb";
+        case ESP_RST_JTAG:       return "jtag";
+        case ESP_RST_EFUSE:      return "efuse";
+        case ESP_RST_PWR_GLITCH: return "power_glitch";
+        case ESP_RST_CPU_LOCKUP: return "cpu_lockup";
+        default:                 return "other";
+    }
 }
 
 static esp_err_t GET_system_logs(httpd_req_t *req)
@@ -1591,6 +1624,14 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &ws_live);
 
+    httpd_uri_t system_metrics_get_uri = {
+        .uri = "/api/system/metrics",
+        .method = HTTP_GET,
+        .handler = GET_system_metrics,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_metrics_get_uri);
+
     if (!GLOBAL_STATE->filesystem_is_available) {
         /* Make default route serve Recovery */
         httpd_uri_t recovery_implicit_get_uri = {
@@ -1641,3 +1682,228 @@ err_start:
 err:
     return ESP_FAIL;
 }
+
+
+// --- BEGIN PROMETHEUS METRICS ENDPOINT ---
+
+static void prometheus_write_metric(httpd_req_t *req, const char *name, const char *help, const char *type, const char *labels, double value, int is_info) {
+    char buf[384];
+    int n;
+    // HELP line
+    n = snprintf(buf, sizeof(buf), "# HELP %s %s\n", name, help);
+    if (n > 0 && n < (int)sizeof(buf)) httpd_resp_send_chunk(req, buf, n);
+    // TYPE line
+    n = snprintf(buf, sizeof(buf), "# TYPE %s %s\n", name, type);
+    if (n > 0 && n < (int)sizeof(buf)) httpd_resp_send_chunk(req, buf, n);
+    // Metric line
+    if (labels && labels[0]) {
+        if (is_info) {
+            n = snprintf(buf, sizeof(buf), "%s%s 1\n", name, labels);
+        } else {
+            n = snprintf(buf, sizeof(buf), "%s%s %.*g\n", name, labels, 10, value);
+        }
+    } else {
+        n = snprintf(buf, sizeof(buf), "%s %.*g\n", name, 10, value);
+    }
+    if (n > 0 && n < (int)sizeof(buf)) httpd_resp_send_chunk(req, buf, n);
+}
+
+static esp_err_t GET_system_metrics(httpd_req_t *req) {
+    ESP_LOGI(TAG, "GET_system_metrics handler called");
+    char label_buf[512];
+    httpd_resp_set_type(req, "text/plain; version=0.0.4; charset=utf-8");
+
+    // --- SYSTEM INFO ---
+    const SystemModule *sys = &GLOBAL_STATE->SYSTEM_MODULE;
+    const PowerManagementModule *pm = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    const HashrateMonitorModule *hm = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
+    const DeviceConfig *cfg = &GLOBAL_STATE->DEVICE_CONFIG;
+
+    // Build info metric with labels
+    char safe_hostname[64] = {0};
+
+    char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+    prometheus_copy_sanitized_ascii(safe_hostname, sizeof(safe_hostname), hostname ? hostname : "");
+
+    // Format label list with escaping
+    const char *keys[] = {"hostname","firmware","axeos","idf","device_model","asic_model","board"};
+    const char *values[] = {
+        safe_hostname,
+        sys->version ? sys->version : "",
+        sys->axeOSVersion ? sys->axeOSVersion : "",
+        esp_get_idf_version(),
+        cfg->family.name ? cfg->family.name : "",
+        cfg->family.asic.name ? cfg->family.asic.name : "",
+        cfg->board_version ? cfg->board_version : ""
+    };
+    prometheus_format_labels(label_buf, sizeof(label_buf), keys, values, 7);
+    prometheus_write_metric(req, "espminer_build_info", "Build and device info", "gauge", label_buf, 1, 1);
+    if (hostname) free(hostname);
+
+    // --- UPTIME ---
+    double uptime = (esp_timer_get_time() / 1000000.0);
+    prometheus_write_metric(req, "espminer_uptime_seconds", "Device uptime in seconds", "gauge", NULL, uptime, 0);
+
+    // --- HEAP ---
+    prometheus_write_metric(req, "espminer_heap_free_bytes", "Free heap in bytes", "gauge", NULL, (double)esp_get_free_heap_size(), 0);
+    prometheus_write_metric(req, "espminer_heap_min_free_bytes", "Minimum free heap in bytes", "gauge", NULL, (double)esp_get_minimum_free_heap_size(), 0);
+    prometheus_write_metric(req, "espminer_heap_free_internal_bytes", "Free internal heap in bytes", "gauge", NULL, (double)heap_caps_get_free_size(MALLOC_CAP_INTERNAL), 0);
+    prometheus_write_metric(req, "espminer_heap_free_spiram_bytes", "Free SPIRAM heap in bytes", "gauge", NULL, (double)heap_caps_get_free_size(MALLOC_CAP_SPIRAM), 0);
+
+    // --- WIFI/NETWORK ---
+    int8_t wifi_rssi = -90;
+    get_wifi_current_rssi(&wifi_rssi);
+    prometheus_write_metric(req, "espminer_wifi_rssi_dbm", "WiFi RSSI in dBm", "gauge", NULL, (double)wifi_rssi, 0);
+    prometheus_write_metric(req, "espminer_wifi_connected", "WiFi connected state (1=connected)", "gauge", NULL, sys->is_connected ? 1 : 0, 0);
+    prometheus_write_metric(req, "espminer_is_using_fallback_stratum", "Using fallback stratum (1=yes)", "gauge", NULL, sys->is_using_fallback ? 1 : 0, 0);
+    prometheus_write_metric(req, "espminer_psram_available", "PSRAM available (1=yes)", "gauge", NULL, GLOBAL_STATE->psram_is_available ? 1 : 0, 0);
+
+    // Info/label metrics for network
+    // MAC address: format as in GET_system_info
+    uint8_t mac[6];
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    char formattedMac[18];
+    snprintf(formattedMac, sizeof(formattedMac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    // WiFi info labels (escaped)
+    const char *wifi_keys[] = {"ssid","status","mac","ipv4","ipv6"};
+    char safe_ssid[33] = {0};
+    char safe_wifi_status[64] = {0};
+    char safe_ipv4[40] = {0};
+    char safe_ipv6[48] = {0};
+    prometheus_copy_sanitized_ascii(safe_ssid, sizeof(safe_ssid), sys->ssid ? sys->ssid : "");
+    prometheus_copy_sanitized_ascii(safe_wifi_status, sizeof(safe_wifi_status), sys->wifi_status);
+    prometheus_copy_sanitized_ascii(safe_ipv4, sizeof(safe_ipv4), sys->ip_addr_str);
+    prometheus_copy_sanitized_ascii(safe_ipv6, sizeof(safe_ipv6), sys->ipv6_addr_str);
+
+    const char *wifi_values[] = {
+        safe_ssid,
+        safe_wifi_status,
+        formattedMac,
+        safe_ipv4,
+        safe_ipv6
+    };
+    prometheus_format_labels(label_buf, sizeof(label_buf), wifi_keys, wifi_values, 5);
+    prometheus_write_metric(req, "espminer_wifi_info", "WiFi info labels", "gauge", label_buf, 1, 1);
+
+    // --- MINING/POOL ---
+    prometheus_write_metric(req, "espminer_hashrate_hashes_per_second", "Current hashrate", "gauge", NULL, (double)sys->current_hashrate, 0);
+    prometheus_write_metric(req, "espminer_hashrate_1m", "Hashrate 1m avg", "gauge", NULL, (double)sys->hashrate_1m, 0);
+    prometheus_write_metric(req, "espminer_hashrate_10m", "Hashrate 10m avg", "gauge", NULL, (double)sys->hashrate_10m, 0);
+    prometheus_write_metric(req, "espminer_hashrate_1h", "Hashrate 1h avg", "gauge", NULL, (double)sys->hashrate_1h, 0);
+    prometheus_write_metric(req, "espminer_error_percentage", "Hash error percentage", "gauge", NULL, (double)sys->error_percentage, 0);
+    prometheus_write_metric(req, "espminer_shares_accepted_total", "Accepted shares", "counter", NULL, (double)sys->shares_accepted, 0);
+    prometheus_write_metric(req, "espminer_shares_rejected_total", "Rejected shares", "counter", NULL, (double)sys->shares_rejected, 0);
+    prometheus_write_metric(req, "espminer_jobs_received_total", "Jobs received", "counter", NULL, (double)sys->work_received, 0);
+    prometheus_write_metric(req, "espminer_best_share", "Best share difficulty", "gauge", NULL, (double)sys->best_nonce_diff, 0);
+    prometheus_write_metric(req, "espminer_best_session_share", "Best session share difficulty", "gauge", NULL, (double)sys->best_session_nonce_diff, 0);
+    prometheus_write_metric(req, "espminer_block_found_total", "Blocks found", "counter", NULL, (double)sys->block_found, 0);
+    prometheus_write_metric(req, "espminer_block_height", "Current block height", "gauge", NULL, (double)GLOBAL_STATE->block_height, 0);
+    prometheus_write_metric(req, "espminer_network_difficulty", "Network difficulty", "gauge", NULL, (double)GLOBAL_STATE->network_nonce_diff, 0);
+    prometheus_write_metric(req, "espminer_pool_difficulty", "Pool difficulty", "gauge", NULL, (double)GLOBAL_STATE->pool_difficulty, 0);
+    prometheus_write_metric(req, "espminer_pool_connected", "Pool connected state (1=connected)", "gauge", NULL, sys->is_connected ? 1 : 0, 0);
+
+    // Mining paused state
+    prometheus_write_metric(req, "espminer_mining_paused", "Mining paused (1=paused)", "gauge", NULL, sys->mining_paused ? 1 : 0, 0);
+
+    // Shares rejected by reason
+    for (int i = 0; i < sys->rejected_reason_stats_count; i++) {
+        char safe_rejected_reason[128] = {0};
+        prometheus_copy_sanitized_ascii(
+            safe_rejected_reason,
+            sizeof(safe_rejected_reason),
+            sys->rejected_reason_stats[i].message);
+        const char *rej_keys[] = {"reason"};
+        const char *rej_values[] = {safe_rejected_reason};
+        prometheus_format_labels(label_buf, sizeof(label_buf), rej_keys, rej_values, 1);
+        prometheus_write_metric(req, "espminer_shares_rejected_reasons", "Rejected shares by reason", "counter", label_buf, (double)sys->rejected_reason_stats[i].count, 0);
+    }
+
+    // --- POWER/FAN/HARDWARE ---
+    {
+        const char *fan_keys[]   = {"fan"};
+        const char *fan1_vals[]  = {"1"};
+        prometheus_format_labels(label_buf, sizeof(label_buf), fan_keys, fan1_vals, 1);
+        prometheus_write_metric(req, "espminer_fan_rpm", "Fan RPM", "gauge", label_buf, (double)pm->fan_rpm, 0);
+        if (cfg->EMC2302) {
+            const char *fan2_vals[] = {"2"};
+            prometheus_format_labels(label_buf, sizeof(label_buf), fan_keys, fan2_vals, 1);
+            prometheus_write_metric(req, "espminer_fan_rpm", "Fan RPM", "gauge", label_buf, (double)pm->fan2_rpm, 0);
+        }
+    }
+    prometheus_write_metric(req, "espminer_fan_speed_percent", "Fan speed percent", "gauge", NULL, (double)pm->fan_perc, 0);
+    prometheus_write_metric(req, "espminer_manual_fan_speed_percent", "Manual fan speed percent", "gauge", NULL, (double)nvs_config_get_u16(NVS_CONFIG_MANUAL_FAN_SPEED), 0);
+    {
+        const char *chip_keys[]  = {"chip"};
+        const char *chip1_vals[] = {"1"};
+        prometheus_format_labels(label_buf, sizeof(label_buf), chip_keys, chip1_vals, 1);
+        prometheus_write_metric(req, "espminer_chip_temp_celsius", "Chip temperature (C)", "gauge", label_buf, (double)pm->chip_temp_avg, 0);
+        if (cfg->TMP1075) {
+            const char *chip2_vals[] = {"2"};
+            prometheus_format_labels(label_buf, sizeof(label_buf), chip_keys, chip2_vals, 1);
+            prometheus_write_metric(req, "espminer_chip_temp_celsius", "Chip temperature (C)", "gauge", label_buf, (double)pm->chip_temp2_avg, 0);
+        }
+    }
+    prometheus_write_metric(req, "espminer_vr_temp_celsius", "VRM temperature (C)", "gauge", NULL, (double)pm->vr_temp, 0);
+    prometheus_write_metric(req, "espminer_voltage_volts", "Voltage (V)", "gauge", NULL, (double)pm->voltage, 0);
+    prometheus_write_metric(req, "espminer_core_voltage_mv", "ASIC core voltage (configured, mV)", "gauge", NULL, (double)nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE), 0);
+    prometheus_write_metric(req, "espminer_core_voltage_actual_mv", "ASIC core voltage (measured, mV)", "gauge", NULL, (double)pm->core_voltage, 0);
+    prometheus_write_metric(req, "espminer_frequency_hz", "Frequency (Hz)", "gauge", NULL, (double)pm->actual_frequency, 0);
+    prometheus_write_metric(req, "espminer_expected_hashrate", "Expected hashrate (MH/s)", "gauge", NULL, (double)pm->expected_hashrate, 0);
+    prometheus_write_metric(req, "espminer_power_watts", "Power (W)", "gauge", NULL, (double)pm->power, 0);
+    prometheus_write_metric(req, "espminer_current_amps", "Current (A)", "gauge", NULL, (double)pm->current, 0);
+
+    // --- SYSTEM/DEVICE ---
+    prometheus_write_metric(req, "espminer_cpu_usage_percent", "CPU usage percent", "gauge", NULL, (double)sys->cpu_usage, 0);
+    prometheus_write_metric(req, "espminer_display_timeout_seconds", "Display timeout (s)", "gauge", NULL, (double)nvs_config_get_i32(NVS_CONFIG_DISPLAY_TIMEOUT), 0);
+    prometheus_write_metric(req, "espminer_stats_frequency_seconds", "Stats frequency (s)", "gauge", NULL, (double)nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY), 0);
+
+    // Info/label metrics for reset reason, running partition
+    const char *reset_keys[] = {"reason"};
+    const char *reset_values[] = {prometheus_reset_reason_string(esp_reset_reason())};
+    prometheus_format_labels(label_buf, sizeof(label_buf), reset_keys, reset_values, 1);
+    prometheus_write_metric(req, "espminer_reset_reason_info", "Reset reason info", "gauge", label_buf, 1, 1);
+    const char *part_keys[] = {"partition"};
+    const char *part_values[] = {esp_ota_get_running_partition()->label};
+    prometheus_format_labels(label_buf, sizeof(label_buf), part_keys, part_values, 1);
+    prometheus_write_metric(req, "espminer_running_partition_info", "Running partition info", "gauge", label_buf, 1, 1);
+
+    // --- BLOCK/COINBASE ---
+    prometheus_write_metric(req, "espminer_coinbase_value_total_satoshis", "Coinbase value total (satoshis)", "gauge", NULL, (double)GLOBAL_STATE->coinbase_value_total_satoshis, 0);
+    prometheus_write_metric(req, "espminer_coinbase_value_user_satoshis", "Coinbase value user (satoshis)", "gauge", NULL, (double)GLOBAL_STATE->coinbase_value_user_satoshis, 0);
+    // Coinbase outputs as label metrics
+    for (int i = 0; i < GLOBAL_STATE->coinbase_output_count; i++) {
+        const char *cb_keys[] = {"address"};
+        const char *cb_values[] = {GLOBAL_STATE->coinbase_outputs[i].address};
+        prometheus_format_labels(label_buf, sizeof(label_buf), cb_keys, cb_values, 1);
+        prometheus_write_metric(req, "espminer_coinbase_outputs", "Coinbase output value (satoshis)", "gauge", label_buf, (double)GLOBAL_STATE->coinbase_outputs[i].value_satoshis, 0);
+    }
+
+    // --- PER-ASIC AND DOMAIN METRICS ---
+    if (hm && hm->is_initialized) {
+        int asic_count = cfg->family.asic_count;
+        int hash_domains = cfg->family.asic.hash_domains;
+        for (int asic_nr = 0; asic_nr < asic_count; asic_nr++) {
+            char asic_str[16];
+            snprintf(asic_str, sizeof(asic_str), "%d", asic_nr);
+            const char *asic_keys[] = {"asic"};
+            const char *asic_values[] = {asic_str};
+            prometheus_format_labels(label_buf, sizeof(label_buf), asic_keys, asic_values, 1);
+            prometheus_write_metric(req, "espminer_asic_hashrate", "ASIC hashrate (GH/s)", "gauge", label_buf, (double)hm->total_measurement[asic_nr].hashrate, 0);
+            prometheus_write_metric(req, "espminer_asic_error_count", "ASIC error count", "gauge", label_buf, (double)hm->error_measurement[asic_nr].value, 0);
+            // Per-domain hashrate
+            for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
+                char domain_str[16];
+                snprintf(domain_str, sizeof(domain_str), "%d", domain_nr);
+                const char *ad_keys[] = {"asic","domain"};
+                const char *ad_values[] = {asic_str, domain_str};
+                prometheus_format_labels(label_buf, sizeof(label_buf), ad_keys, ad_values, 2);
+                prometheus_write_metric(req, "espminer_asic_domain_hashrate", "ASIC domain hashrate (GH/s)", "gauge", label_buf, (double)hm->domain_measurements[asic_nr][domain_nr].hashrate, 0);
+            }
+        }
+    }
+
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+// --- END PROMETHEUS METRICS ENDPOINT ---

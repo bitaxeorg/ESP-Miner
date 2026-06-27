@@ -1,5 +1,45 @@
 # AxeOS
 
+## ESP-Miner Prometheus Metrics API
+
+A new endpoint `/api/system/metrics` is available for Prometheus-compatible monitoring. It returns metrics in Prometheus text exposition format, suitable for direct scraping.
+
+### Example usage
+
+```
+curl http://<device_ip>/api/system/metrics
+```
+
+### Example output
+
+```
+# HELP espminer_uptime_seconds Device uptime in seconds
+# TYPE espminer_uptime_seconds gauge
+espminer_uptime_seconds 12345.67
+# HELP espminer_hashrate_hashes_per_second Current hashrate
+# TYPE espminer_hashrate_hashes_per_second gauge
+espminer_hashrate_hashes_per_second 123.4
+...
+```
+
+### Metric families
+- `espminer_build_info{...}`: Build and device info (labels: firmware_version, device_model, asic_model, board, hostname)
+- `espminer_uptime_seconds`: Device uptime
+- `espminer_heap_free_bytes`, `espminer_heap_min_free_bytes`: Heap memory
+- `espminer_wifi_rssi_dbm`, `espminer_wifi_connected`: WiFi status
+- `espminer_hashrate_hashes_per_second`: Current hashrate
+- `espminer_shares_accepted_total`, `espminer_shares_rejected_total`, `espminer_jobs_received_total`: Mining counters
+- `espminer_best_share`: Best share difficulty
+- `espminer_pool_connected`: Pool connection state
+- `espminer_mining_paused`: Mining paused state (1=paused)
+- `espminer_fan_rpm{fan="1|2"}`: Fan speeds (one series per detected fan)
+- `espminer_chip_temp_celsius{chip="1|2"}`, `espminer_vr_temp_celsius`: Temperatures (one chip series per detected sensor)
+- `espminer_voltage_volts`, `espminer_frequency_hz`, `espminer_power_watts`, `espminer_current_amps`: Power/frequency
+
+See the endpoint for the full list and current values.
+
+---
+
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 16.1.3.
 
 ## Development server

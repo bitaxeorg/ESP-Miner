@@ -124,6 +124,18 @@ components:
           description: Number of errors
           type: number
 
+    PrometheusMetrics:
+      type: string
+      description: |
+        Prometheus metrics in text exposition format (see https://prometheus.io/docs/instrumenting/exposition_formats/)
+        Example:
+          # HELP espminer_uptime_seconds Device uptime in seconds
+          # TYPE espminer_uptime_seconds gauge
+          espminer_uptime_seconds 12345.67
+          # HELP espminer_hashrate_hashes_per_second Current hashrate
+          # TYPE espminer_hashrate_hashes_per_second gauge
+          espminer_hashrate_hashes_per_second 123.4
+
     SystemInfo:
       type: object
       required:
@@ -986,6 +998,28 @@ paths:
                 $ref: '#/components/schemas/SystemStatistics'
         '401':
           description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/metrics:
+    get:
+      summary: Get Prometheus metrics
+      description: |
+        Returns system telemetry in Prometheus text exposition format.
+        Mining state is exported as `espminer_mining_paused` (1=paused).
+        Fan and chip temperature metrics are exported as labeled series:
+        `espminer_fan_rpm{fan="1|2"}` and `espminer_chip_temp_celsius{chip="1|2"}`.
+        Secondary series are emitted only when the active hardware configuration supports them.
+      operationId: getSystemMetrics
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PrometheusMetrics'
         '500':
           description: Internal server error
 
