@@ -59,7 +59,25 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         config.TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
         config.TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
         break;
-
+    case GAMMA_V2:
+        /* vin voltage */
+        config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_SINGLE;
+        config.TPS546_INIT_VIN_ON = 11.0;
+        config.TPS546_INIT_VIN_OFF = 10.5;
+        config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        /* vout voltage */
+        config.TPS546_INIT_SCALE_LOOP = 0.25;
+        config.TPS546_INIT_VOUT_MIN = 1;
+        config.TPS546_INIT_VOUT_MAX = 2;
+        config.TPS546_INIT_VOUT_COMMAND = 1.2;
+        /* iout current */
+        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00; /* A */
+        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00; /* A */
+        // Single-phase configuration
+        config.TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
+        config.TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
+        break;
     default: // MAX, ULTRA, SUPRA, GAMMA
         config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_SINGLE;
         config.TPS546_INIT_VIN_ON = 4.8;
