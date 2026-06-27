@@ -29,10 +29,8 @@
     --p-select-hover-border-color: var(--primary-color);
 
     /* Dropdown/Select Option (List Items) */
-    --p-select-option-focus-background: rgba(255, 255, 255, 0.05);
     --p-select-option-selected-background: var(--primary-color);
     --p-select-option-selected-focus-background: var(--primary-color);
-    --p-select-option-focus-color: #ffffff;
     --p-select-option-selected-color: #ffffff;
     
     --p-select-list-background: var(--p-card-background);
@@ -118,3 +116,9 @@
     --p-message-content-padding: 1rem;
     --p-message-border-radius: 0.5rem;
 }
+
+.dark-mode {
+    --p-select-option-focus-background: rgba(255, 255, 255, 0.05);
+    --p-select-option-focus-color: #ffffff;
+}
+
