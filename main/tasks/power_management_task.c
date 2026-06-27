@@ -211,7 +211,16 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             
             uint16_t reduced_voltage = last_known_asic_voltage > ASIC_REDUCTION ? last_known_asic_voltage - ASIC_REDUCTION : 1000;
             float reduced_asic_frequency = last_known_asic_frequency > ASIC_REDUCTION ? last_known_asic_frequency - ASIC_REDUCTION : 400.0;
-            
+
+            // Never drop below the regulator's minimum core voltage. TPS546_set_vout()
+            // rejects anything lower (out of range), which leaves the VR stuck in a
+            // "power fault" — and the invalid value is persisted to NVS, so it survives
+            // reboots. Frequency reduction still provides the cooling headroom.
+            int16_t min_voltage = VCORE_get_voltage_min_mv(GLOBAL_STATE);
+            if (min_voltage > 0 && reduced_voltage < min_voltage) {
+                reduced_voltage = (uint16_t) min_voltage;
+            }
+
             nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, reduced_voltage);
             nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, reduced_asic_frequency);
             
