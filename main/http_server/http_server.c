@@ -1505,6 +1505,20 @@ static esp_err_t POST_display_screens(httpd_req_t *req)
         return ESP_OK;
     }
 
+    Settings *setting = nvs_config_get_settings(NVS_CONFIG_SCREENS);
+    int max_len = (setting && setting->max > 0) ? setting->max : 256;
+
+    for (int i = 0; i < array_size; i++) {
+        cJSON *item = cJSON_GetArrayItem(root, i);
+        if (cJSON_IsString(item)) {
+            if (strlen(item->valuestring) > max_len) {
+                cJSON_Delete(root);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Screen configuration is too long");
+                return ESP_OK;
+            }
+        }
+    }
+
     for (int i = 0; i < array_size; i++) {
         cJSON *item = cJSON_GetArrayItem(root, i);
         if (cJSON_IsString(item)) {
