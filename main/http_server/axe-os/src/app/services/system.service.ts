@@ -412,5 +412,59 @@ export class SystemApiService {
     }).pipe(delay(1000));
   }
 
+  public getDisplayScreens(uri: string = ''): Observable<string[]> {
+    if (environment.production && this.api && !uri) {
+      return from(this.api.invoke(functions.getDisplayScreens, {})).pipe(timeout(API_TIMEOUT));
+    }
+    if (environment.production && uri) {
+      return this.httpClient.get<string[]>(`${uri}/api/display/screens`).pipe(timeout(API_TIMEOUT));
+    }
+    return of([
+      "Stratum Host:\n{pool_url}\nIP Address:\n{ip}",
+      "Gh/s: {hashrate}\nJ/Th: {efficiency}\nBest: {session_diff}/{best_diff}\nTemp: {asic_temp}°C",
+      "Block: {block_height}\nDifficulty: {network_diff}\nScriptsig:\n{scriptsig}",
+      "Wi-Fi Signal\nRSSI: {rssi} dBm\nSignal: {signal}\nUptime: {uptime}",
+      "", "", "", ""
+    ]).pipe(delay(1000));
+  }
+
+  public updateDisplayScreens(screens: string[], uri: string = ''): Observable<GenericResponse> {
+    if (environment.production && this.api && !uri) {
+      return from(this.api.invoke(functions.updateDisplayScreens, { body: screens })).pipe(timeout(API_TIMEOUT));
+    }
+    if (environment.production && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/display/screens`, screens).pipe(timeout(API_TIMEOUT));
+    }
+    return of({ message: 'Screens saved successfully' }).pipe(delay(1000));
+  }
+
+  public resetDisplayScreens(uri: string = ''): Observable<GenericResponse> {
+    if (environment.production && this.api && !uri) {
+      return from(this.api.invoke(functions.resetDisplayScreens, {})).pipe(timeout(API_TIMEOUT));
+    }
+    if (environment.production && uri) {
+      return this.httpClient.post<GenericResponse>(`${uri}/api/display/screens/reset`, {}).pipe(timeout(API_TIMEOUT));
+    }
+    return of({ message: 'Screens reset successfully' }).pipe(delay(1000));
+  }
+
+  public getDisplayVariables(uri: string = ''): Observable<string[]> {
+    if (environment.production && this.api && !uri) {
+      return from(this.api.invoke(functions.getDisplayVariables, {})).pipe(timeout(API_TIMEOUT));
+    }
+    if (environment.production && uri) {
+      return this.httpClient.get<string[]>(`${uri}/api/display/variables`).pipe(timeout(API_TIMEOUT));
+    }
+    return of([
+      "hashrate", "hashrate_1m", "hashrate_10m", "hashrate_1h", "hashrate_expected",
+      "frequency", "power", "efficiency", "voltage", "core_voltage", "current", "power_fault",
+      "asic_temp", "asic2_temp", "vr_temp", "target_temp", "fan_perc", "fan_rpm", "fan2_rpm",
+      "pool_url", "pool_difficulty", "response_time", "pool_connection_info", "is_using_fallback_stratum",
+      "shares_a", "shares_r", "work_received", "error_percentage", "session_diff", "best_diff", "block_found",
+      "ssid", "wifi_status", "ip", "ipv6", "rssi", "signal", "uptime", "network_diff", "scriptsig", "block_height",
+      "hostname", "device_model", "asic_model", "board_version", "version", "axe_os_version", "free_heap"
+    ]).pipe(delay(1000));
+  }
 
 }
+

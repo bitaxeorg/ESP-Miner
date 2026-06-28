@@ -6,6 +6,7 @@ SRCS
     "log_buffer.c"
     "nvs_config.c"
     "display.c"
+    "display_config.c"
     "screen.c"
     "input.c"
     "filesystem.c"

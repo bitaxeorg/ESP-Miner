@@ -146,6 +146,35 @@
         </div>
     </div>
 
+    <h3 class="mt-5">Screen Customization</h3>
+
+    <div class="card">
+        <div *ngFor="let screen of displayScreens; let i = index; trackBy: trackByIndex" class="field grid p-fluid align-items-center mb-3">
+            <label class="col-12 md:col-2 font-semibold">Screen {{ i + 1 }}</label>
+            <div class="col-12 md:col-9">
+                <textarea pInputTextarea rows="3" [(ngModel)]="displayScreens[i]" [ngModelOptions]="{standalone: true}" placeholder="Enter screen content..."></textarea>
+            </div>
+            <div class="col-12 md:col-1 flex justify-content-end md:justify-content-center">
+                <button pButton type="button" icon="pi pi-trash" class="p-button-danger p-button-text" (click)="removeScreen(i)"></button>
+            </div>
+        </div>
+
+        <div class="flex gap-3 mt-4">
+            <button pButton type="button" label="Add Screen" icon="pi pi-plus" class="p-button-outlined" [disabled]="displayScreens.length >= 8" (click)="addScreen()"></button>
+            <button pButton type="button" label="Save Screens" class="p-button-success" (click)="saveDisplayScreens()"></button>
+            <button pButton type="button" label="Reset to Defaults" class="p-button-secondary p-button-outlined" (click)="resetDisplayScreens()"></button>
+        </div>
+
+        <div class="mt-4 p-3 border-round bg-primary-reverse text-primary-reverse-text surface-100">
+            <h4 class="m-0 mb-2 font-bold text-sm">Available Placeholders</h4>
+            <div class="flex flex-wrap gap-2">
+                <span *ngFor="let variable of displayVariables" class="px-2 py-1 text-xs border-round surface-200 text-600 font-monospace">
+                    {{ '{' + variable + '}' }}
+                </span>
+            </div>
+        </div>
+    </div>
+
     <h3 class="mt-5">Statistics</h3>
 
     <div class="card">
