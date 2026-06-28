@@ -22,6 +22,7 @@ typedef enum {
     SCR_CONNECTION,
     SCR_BITAXE_LOGO,
     SCR_OSMU_LOGO,
+    SCR_BLOCK_FOUND,
     SCR_CAROUSEL,
     MAX_SCREENS,
 } screen_t;
@@ -35,7 +36,7 @@ extern const lv_img_dsc_t identify_text;
 static lv_obj_t * screens[MAX_SCREENS];
 static screen_t current_screen;
 
-static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 10000};
+static int delays_ms[MAX_SCREENS] = {0, 0, 0, 0, 0, 1000, 3000, 3000, 0, 10000};
 
 static int current_screen_time_ms;
 static int current_screen_delay_ms;
@@ -249,6 +250,29 @@ static lv_obj_t * create_scr_osmu_logo() {
     lv_obj_t *img = lv_img_create(scr);
     lv_img_set_src(img, &osmu_logo);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
+
+    return scr;
+}
+
+static lv_obj_t * create_scr_block_found() {
+    lv_obj_t * scr = create_flex_screen(3);
+
+    lv_obj_t *label1 = lv_label_create(scr);
+    lv_obj_set_width(label1, LV_HOR_RES);
+    lv_label_set_text(label1, "BLOCK FOUND!");
+    lv_obj_set_style_text_align(label1, LV_TEXT_ALIGN_CENTER, 0);
+
+    lv_obj_t *label2 = lv_label_create(scr);
+    lv_obj_set_width(label2, LV_HOR_RES);
+    lv_label_set_long_mode(label2, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_label_set_text(label2, "Congratulations!");
+    lv_obj_set_style_text_align(label2, LV_TEXT_ALIGN_CENTER, 0);
+
+    lv_obj_t *label3 = lv_label_create(scr);
+    lv_obj_set_width(label3, LV_HOR_RES);
+    lv_label_set_long_mode(label3, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_label_set_text(label3, "Click button to dismiss");
+    lv_obj_set_style_text_align(label3, LV_TEXT_ALIGN_CENTER, 0);
 
     return scr;
 }
@@ -540,12 +564,8 @@ static void screen_update_cb(lv_timer_t * timer)
         lv_label_set_text(notification_label, "");
     }
 
-    if (module->block_found) {
-        if (current_screen != SCR_CAROUSEL || current_carousel_index != 1) {
-            current_carousel_index = 1;  // Stats screen
-            screen_show(SCR_CAROUSEL);
-        }
-
+    if (module->show_new_block) {
+        screen_show(SCR_BLOCK_FOUND);
         lv_display_trigger_activity(NULL);
         return;
     }
@@ -561,6 +581,9 @@ void screen_button_press()
 {
     if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
+    } else if (GLOBAL_STATE->SYSTEM_MODULE.show_new_block) {
+        GLOBAL_STATE->SYSTEM_MODULE.show_new_block = false;
+        screen_next();
     } else {
         screen_next();
     }
@@ -584,6 +607,7 @@ esp_err_t screen_start(void * pvParameters)
             screens[SCR_CONNECTION] = create_scr_connection(SYSTEM_MODULE->ssid, SYSTEM_MODULE->ap_ssid);
             screens[SCR_BITAXE_LOGO] = create_scr_bitaxe_logo(GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version);
             screens[SCR_OSMU_LOGO] = create_scr_osmu_logo();
+            screens[SCR_BLOCK_FOUND] = create_scr_block_found();
             screens[SCR_CAROUSEL] = NULL;  // Created dynamically
 
             scr_create_overlay();
