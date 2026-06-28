@@ -212,12 +212,12 @@ static void handle_uptime(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char
     uint64_t uptime_us = esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time;
     uint32_t total_seconds = uptime_us / 1000000;
 
-    uint32_t days    = total_seconds / 86400;
-    total_seconds   %= 86400;
-    uint32_t hours   = total_seconds / 3600;
-    total_seconds   %= 3600;
-    uint32_t minutes = total_seconds / 60;
-    uint32_t seconds = total_seconds % 60;
+    unsigned long days    = total_seconds / 86400;
+    total_seconds        %= 86400;
+    unsigned long hours   = total_seconds / 3600;
+    total_seconds        %= 3600;
+    unsigned long minutes = total_seconds / 60;
+    unsigned long seconds = total_seconds % 60;
 
     if (days > 0) {
         snprintf(temp, ts, "%lud %luh %lum %lus", days, hours, minutes, seconds);
