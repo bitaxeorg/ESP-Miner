@@ -51,14 +51,14 @@ export class LayoutService {
     };
 
     private whiteTheme = {
-        '--p-content-background': '#f1f5f9',  // Softer blue-gray off-white (slate-100)
-        '--p-card-background': '#ffffff',     // Card background is white
+        '--p-content-background': '#f8fafc',  // Softer blue-gray off-white (slate-100)
+        '--p-card-background': '#f1f5f9',     // Card background is slate-50 (off-white, not pure white)
         '--p-content-border-color': '#e2e8f0', // Light border
         '--card-border': '#e2e8f0',           // Light card border
         '--p-text-color': '#0f172a',          // Dark text (slate-900)
         '--p-text-muted-color': '#64748b',    // Muted dark text (slate-500)
         '--p-mask-background': 'rgba(0, 0, 0, 0.2)',
-        '--p-overlay-select-background': '#ffffff',
+        '--p-overlay-select-background': '#f1f5f9',
         '--p-overlay-select-border-color': '#e2e8f0'
     };
 
