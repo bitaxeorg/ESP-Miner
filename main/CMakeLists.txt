@@ -10,6 +10,7 @@ SRCS
     "system.c"
     "work_queue.c"
     "lv_font_portfolio-6x8.c"
+    "font_fmtowns_8x16_data.c"
     "logo.c"
     "./bap/bap.c"
     "./bap/bap_protocol.c"
