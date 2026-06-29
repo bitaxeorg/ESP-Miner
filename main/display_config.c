@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_app_desc.h"
@@ -33,136 +34,28 @@ static inline bool append_formatted(char **dst, size_t *remaining,
     return append_string(dst, remaining, temp_buffer);
 }
 
-static void handle_hashrate(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.2f", GLOBAL_STATE->SYSTEM_MODULE.current_hashrate);
-}
+typedef enum {
+    VAR_TYPE_STRING_PTR,
+    VAR_TYPE_STRING_ARRAY,
+    VAR_TYPE_FLOAT,
+    VAR_TYPE_INT32,
+    VAR_TYPE_UINT16,
+    VAR_TYPE_UINT32,
+    VAR_TYPE_UINT64,
+    VAR_TYPE_CUSTOM,
+} var_type_t;
 
-static void handle_hashrate_1m(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.2f", GLOBAL_STATE->SYSTEM_MODULE.hashrate_1m);
-}
+typedef void (*handler_func_t)(GlobalState *GLOBAL_STATE, char *temp, size_t temp_size, char **dst, size_t *remaining);
 
-static void handle_hashrate_10m(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.2f", GLOBAL_STATE->SYSTEM_MODULE.hashrate_10m);
-}
+typedef struct {
+    const char    *var_name;
+    var_type_t     type;
+    size_t         offset;
+    const char    *format;
+    handler_func_t custom_handler;
+} var_entry_t;
 
-static void handle_hashrate_1h(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.2f", GLOBAL_STATE->SYSTEM_MODULE.hashrate_1h);
-}
-
-static void handle_hashrate_expected(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.1f", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate);
-}
-
-static void handle_power(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.1f", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
-}
-
-static void handle_asic_temp(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.1f", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
-}
-
-static void handle_asic2_temp(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.1f", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp2_avg);
-}
-
-static void handle_best_diff(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->SYSTEM_MODULE.best_diff_string);
-}
-
-static void handle_session_diff(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->SYSTEM_MODULE.best_session_diff_string);
-}
-
-static void handle_ip(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->SYSTEM_MODULE.ip_addr_str);
-}
-
-static void handle_ipv6(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
-}
-
-static void handle_shares_a(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%llu", (unsigned long long)GLOBAL_STATE->SYSTEM_MODULE.shares_accepted);
-}
-
-static void handle_shares_r(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%llu", (unsigned long long)GLOBAL_STATE->SYSTEM_MODULE.shares_rejected);
-}
-
-static void handle_network_diff(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->network_diff_string);
-}
-
-static void handle_scriptsig(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->scriptsig);
-}
-
-static void handle_voltage(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.2f", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
-}
-
-static void handle_core_voltage(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.2f", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.core_voltage);
-}
-
-static void handle_current(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.2f", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.current);
-}
-
-static void handle_fan_perc(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.1f", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
-}
-
-static void handle_fan_rpm(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%u", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm);
-}
-
-static void handle_fan2_rpm(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%u", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan2_rpm);
-}
-
-static void handle_work_received(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%llu", (unsigned long long)GLOBAL_STATE->SYSTEM_MODULE.work_received);
-}
-
-static void handle_response_time(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.2f", GLOBAL_STATE->SYSTEM_MODULE.response_time);
-}
-
-static void handle_frequency(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.0f", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
-}
-
-static void handle_vr_temp(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.1f", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
-}
-
+// Custom handler functions
 static void handle_efficiency(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
 {
     float power = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power;
@@ -177,11 +70,6 @@ static void handle_pool_url(GlobalState *GLOBAL_STATE, char *temp, size_t ts, ch
         ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url
         : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
     append_string(dst, remaining, pool);
-}
-
-static void handle_pool_difficulty(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%u", GLOBAL_STATE->pool_difficulty);
 }
 
 static void handle_rssi(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
@@ -237,31 +125,6 @@ static void handle_target_temp(GlobalState *GLOBAL_STATE, char *temp, size_t ts,
     append_formatted(dst, remaining, temp, ts, "%u", target);
 }
 
-static void handle_error_percentage(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%.2f", GLOBAL_STATE->SYSTEM_MODULE.error_percentage);
-}
-
-static void handle_ssid(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->SYSTEM_MODULE.ssid);
-}
-
-static void handle_wifi_status(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->SYSTEM_MODULE.wifi_status);
-}
-
-static void handle_pool_connection_info(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info);
-}
-
-static void handle_power_fault(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%u", GLOBAL_STATE->SYSTEM_MODULE.power_fault);
-}
-
 static void handle_block_found(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
 {
     const char *found = GLOBAL_STATE->SYSTEM_MODULE.block_found ? "Yes" : "No";
@@ -275,34 +138,9 @@ static void handle_hostname(GlobalState *GLOBAL_STATE, char *temp, size_t ts, ch
     free(hostname);
 }
 
-static void handle_device_model(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->DEVICE_CONFIG.family.name);
-}
-
-static void handle_asic_model(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
-}
-
-static void handle_board_version(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->DEVICE_CONFIG.board_version);
-}
-
 static void handle_free_heap(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
 {
     append_formatted(dst, remaining, temp, ts, "%u", esp_get_free_heap_size());
-}
-
-static void handle_version(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->SYSTEM_MODULE.version);
-}
-
-static void handle_axe_os_version(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_string(dst, remaining, GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
 }
 
 static void handle_is_using_fallback_stratum(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
@@ -311,78 +149,120 @@ static void handle_is_using_fallback_stratum(GlobalState *GLOBAL_STATE, char *te
     append_string(dst, remaining, str);
 }
 
-static void handle_block_height(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
-{
-    append_formatted(dst, remaining, temp, ts, "%u", GLOBAL_STATE->block_height);
-}
-
-typedef void (*handler_func_t)(GlobalState *GLOBAL_STATE, char *temp, size_t temp_size, char **dst, size_t *remaining);
-
-typedef struct {
-    const char    *var_name;
-    handler_func_t handler;
-} var_entry_t;
-
+// Variables configuration using offsetof for simple fields
 static const var_entry_t variables[] = {
-    { "hashrate",          handle_hashrate },
-    { "hashrate_1m",       handle_hashrate_1m },
-    { "hashrate_10m",      handle_hashrate_10m },
-    { "hashrate_1h",       handle_hashrate_1h },
-    { "hashrate_expected", handle_hashrate_expected },
+    { "hashrate",          VAR_TYPE_FLOAT,        offsetof(GlobalState, SYSTEM_MODULE.current_hashrate),            "%.2f", NULL },
+    { "hashrate_1m",       VAR_TYPE_FLOAT,        offsetof(GlobalState, SYSTEM_MODULE.hashrate_1m),                 "%.2f", NULL },
+    { "hashrate_10m",      VAR_TYPE_FLOAT,        offsetof(GlobalState, SYSTEM_MODULE.hashrate_10m),                "%.2f", NULL },
+    { "hashrate_1h",       VAR_TYPE_FLOAT,        offsetof(GlobalState, SYSTEM_MODULE.hashrate_1h),                 "%.2f", NULL },
+    { "hashrate_expected", VAR_TYPE_FLOAT,        offsetof(GlobalState, POWER_MANAGEMENT_MODULE.expected_hashrate), "%.1f", NULL },
 
-    { "frequency",         handle_frequency },
-    { "power",             handle_power },
-    { "efficiency",        handle_efficiency },
-    { "voltage",           handle_voltage },
-    { "core_voltage",      handle_core_voltage },
-    { "current",           handle_current },
-    { "power_fault",       handle_power_fault },
+    { "frequency",         VAR_TYPE_FLOAT,        offsetof(GlobalState, POWER_MANAGEMENT_MODULE.frequency_value),   "%.0f", NULL },
+    { "power",             VAR_TYPE_FLOAT,        offsetof(GlobalState, POWER_MANAGEMENT_MODULE.power),             "%.1f", NULL },
+    { "efficiency",        VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_efficiency },
+    { "voltage",           VAR_TYPE_FLOAT,        offsetof(GlobalState, POWER_MANAGEMENT_MODULE.voltage),           "%.2f", NULL },
+    { "core_voltage",      VAR_TYPE_FLOAT,        offsetof(GlobalState, POWER_MANAGEMENT_MODULE.core_voltage),      "%.2f", NULL },
+    { "current",           VAR_TYPE_FLOAT,        offsetof(GlobalState, POWER_MANAGEMENT_MODULE.current),           "%.2f", NULL },
+    { "power_fault",       VAR_TYPE_UINT16,       offsetof(GlobalState, SYSTEM_MODULE.power_fault),                 "%u",   NULL },
 
-    { "asic_temp",         handle_asic_temp },
-    { "asic2_temp",        handle_asic2_temp },
-    { "vr_temp",           handle_vr_temp },
-    { "target_temp",       handle_target_temp },
+    { "asic1_temp",        VAR_TYPE_FLOAT,        offsetof(GlobalState, POWER_MANAGEMENT_MODULE.chip_temp_avg),     "%.1f", NULL },
+    { "asic2_temp",        VAR_TYPE_FLOAT,        offsetof(GlobalState, POWER_MANAGEMENT_MODULE.chip_temp2_avg),    "%.1f", NULL },
+    { "vr_temp",           VAR_TYPE_FLOAT,        offsetof(GlobalState, POWER_MANAGEMENT_MODULE.vr_temp),           "%.1f", NULL },
+    { "target_temp",       VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_target_temp },
 
-    { "fan_perc",          handle_fan_perc },
-    { "fan_rpm",           handle_fan_rpm },
-    { "fan2_rpm",          handle_fan2_rpm },
+    { "fan_perc",          VAR_TYPE_FLOAT,        offsetof(GlobalState, POWER_MANAGEMENT_MODULE.fan_perc),          "%.1f", NULL },
+    { "fan1_rpm",          VAR_TYPE_UINT16,       offsetof(GlobalState, POWER_MANAGEMENT_MODULE.fan_rpm),           "%u",   NULL },
+    { "fan2_rpm",          VAR_TYPE_UINT16,       offsetof(GlobalState, POWER_MANAGEMENT_MODULE.fan2_rpm),          "%u",   NULL },
 
-    { "pool_url",          handle_pool_url },
-    { "pool_difficulty",   handle_pool_difficulty },
-    { "response_time",     handle_response_time },
-    { "pool_connection_info", handle_pool_connection_info },
-    { "is_using_fallback_stratum", handle_is_using_fallback_stratum },
+    { "pool_url",          VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_pool_url },
+    { "pool_difficulty",   VAR_TYPE_UINT16,       offsetof(GlobalState, SYSTEM_MODULE.pool_difficulty),             "%u",   NULL },
+    { "response_time",     VAR_TYPE_FLOAT,        offsetof(GlobalState, SYSTEM_MODULE.response_time),               "%.2f", NULL },
+    { "pool_connection_info", VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, SYSTEM_MODULE.pool_connection_info),     NULL,   NULL },
+    { "is_using_fallback_stratum", VAR_TYPE_CUSTOM, 0,                                                              NULL,   handle_is_using_fallback_stratum },
 
-    { "shares_a",          handle_shares_a },
-    { "shares_r",          handle_shares_r },
-    { "work_received",     handle_work_received },
-    { "error_percentage",  handle_error_percentage },
-    { "session_diff",      handle_session_diff },
-    { "best_diff",         handle_best_diff },
-    { "block_found",       handle_block_found },
+    { "shares_accepted",   VAR_TYPE_UINT64,       offsetof(GlobalState, SYSTEM_MODULE.shares_accepted),             "%llu", NULL },
+    { "shares_rejected",   VAR_TYPE_UINT64,       offsetof(GlobalState, SYSTEM_MODULE.shares_rejected),             "%llu", NULL },
+    { "work_received",     VAR_TYPE_UINT64,       offsetof(GlobalState, SYSTEM_MODULE.work_received),               "%llu", NULL },
+    { "error_percentage",  VAR_TYPE_FLOAT,        offsetof(GlobalState, SYSTEM_MODULE.error_percentage),            "%.2f", NULL },
+    { "session_diff",      VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, SYSTEM_MODULE.best_session_diff_string),    NULL,   NULL },
+    { "best_diff",         VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, SYSTEM_MODULE.best_diff_string),            NULL,   NULL },
+    { "block_found",       VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_block_found },
 
-    { "ssid",              handle_ssid },
-    { "wifi_status",       handle_wifi_status },
-    { "ip",                handle_ip },
-    { "ipv6",              handle_ipv6 },
-    { "rssi",              handle_rssi },
-    { "signal",            handle_signal },
-    { "uptime",            handle_uptime },
+    { "ssid",              VAR_TYPE_STRING_PTR,   offsetof(GlobalState, SYSTEM_MODULE.ssid),                        NULL,   NULL },
+    { "wifi_status",       VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, SYSTEM_MODULE.wifi_status),                 NULL,   NULL },
+    { "ip",                VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, SYSTEM_MODULE.ip_addr_str),                 NULL,   NULL },
+    { "ipv6",              VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, SYSTEM_MODULE.ipv6_addr_str),               NULL,   NULL },
+    { "rssi",              VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_rssi },
+    { "signal",            VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_signal },
+    { "uptime",            VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_uptime },
 
-    { "network_diff",      handle_network_diff },
-    { "scriptsig",         handle_scriptsig },
-    { "block_height",      handle_block_height },
+    { "network_diff",      VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, network_diff_string),                       NULL,   NULL },
+    { "scriptsig",         VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, scriptsig),                                 NULL,   NULL },
+    { "block_height",      VAR_TYPE_INT32,        offsetof(GlobalState, block_height),                              "%d",   NULL },
 
-    { "hostname",          handle_hostname },
-    { "device_model",      handle_device_model },
-    { "asic_model",        handle_asic_model },
-    { "board_version",     handle_board_version },
+    { "hostname",          VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_hostname },
+    { "device_model",      VAR_TYPE_STRING_PTR,   offsetof(GlobalState, DEVICE_CONFIG.family.name),                 NULL,   NULL },
+    { "asic_model",        VAR_TYPE_STRING_PTR,   offsetof(GlobalState, DEVICE_CONFIG.family.asic.name),            NULL,   NULL },
+    { "board_version",     VAR_TYPE_STRING_PTR,   offsetof(GlobalState, DEVICE_CONFIG.board_version),               NULL,   NULL },
 
-    { "version",           handle_version },
-    { "axe_os_version",    handle_axe_os_version },
-    { "free_heap",         handle_free_heap },
-    { NULL,                NULL }
+    { "version",           VAR_TYPE_STRING_PTR,   offsetof(GlobalState, SYSTEM_MODULE.version),                     NULL,   NULL },
+    { "axe_os_version",    VAR_TYPE_STRING_PTR,   offsetof(GlobalState, SYSTEM_MODULE.axeOSVersion),                NULL,   NULL },
+    { "free_heap",         VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_free_heap },
+    { NULL,                0,                     0,                                                                NULL,   NULL }
 };
+
+static void resolve_variable(GlobalState *GLOBAL_STATE, const var_entry_t *e, char *temp_buffer, size_t temp_size, char **dst, size_t *remaining)
+{
+    if (e->type == VAR_TYPE_CUSTOM) {
+        if (e->custom_handler) {
+            e->custom_handler(GLOBAL_STATE, temp_buffer, temp_size, dst, remaining);
+        }
+        return;
+    }
+
+    const void *base = (const void *)GLOBAL_STATE;
+    const void *ptr = (const char *)base + e->offset;
+
+    switch (e->type) {
+        case VAR_TYPE_STRING_PTR: {
+            const char *str = *(const char **)ptr;
+            append_string(dst, remaining, str);
+            break;
+        }
+        case VAR_TYPE_STRING_ARRAY: {
+            const char *str = (const char *)ptr;
+            append_string(dst, remaining, str);
+            break;
+        }
+        case VAR_TYPE_FLOAT: {
+            float val = *(const float *)ptr;
+            append_formatted(dst, remaining, temp_buffer, temp_size, e->format ? e->format : "%f", val);
+            break;
+        }
+        case VAR_TYPE_INT32: {
+            int32_t val = *(const int32_t *)ptr;
+            append_formatted(dst, remaining, temp_buffer, temp_size, e->format ? e->format : "%d", val);
+            break;
+        }
+        case VAR_TYPE_UINT16: {
+            uint16_t val = *(const uint16_t *)ptr;
+            append_formatted(dst, remaining, temp_buffer, temp_size, e->format ? e->format : "%u", val);
+            break;
+        }
+        case VAR_TYPE_UINT32: {
+            uint32_t val = *(const uint32_t *)ptr;
+            append_formatted(dst, remaining, temp_buffer, temp_size, e->format ? e->format : "%u", val);
+            break;
+        }
+        case VAR_TYPE_UINT64: {
+            uint64_t val = *(const uint64_t *)ptr;
+            append_formatted(dst, remaining, temp_buffer, temp_size, e->format ? e->format : "%llu", (unsigned long long)val);
+            break;
+        }
+        default:
+            break;
+    }
+}
 
 esp_err_t display_config_format_string(GlobalState *GLOBAL_STATE,
                                 const char *input,
@@ -408,11 +288,67 @@ esp_err_t display_config_format_string(GlobalState *GLOBAL_STATE,
                     memcpy(var_buffer, src + 1, var_len);
                     var_buffer[var_len] = '\0';
 
+                    // Parse optional padding width: {variable:width} or {variable:-width}
+                    char *colon = strchr(var_buffer, ':');
+                    int pad_width = 0;
+                    bool pad_left = false; // default: pad left (right-aligned)
+                    if (colon) {
+                        *colon = '\0'; // Split variable name from formatting options
+                        char *width_str = colon + 1;
+                        if (width_str[0] == '-') {
+                            pad_left = true;
+                            width_str++;
+                        }
+                        pad_width = atoi(width_str);
+                    }
+
                     bool found = false;
                     for (const var_entry_t *e = variables; e->var_name; ++e) {
                         if (strcmp(var_buffer, e->var_name) == 0) {
-                            e->handler(GLOBAL_STATE, temp_buffer, sizeof(temp_buffer),
-                                       &dst, &remaining);
+                            char temp_var_val[64];
+                            size_t temp_remaining = sizeof(temp_var_val) - 1;
+                            char *temp_dst = temp_var_val;
+
+                            resolve_variable(GLOBAL_STATE, e, temp_buffer, sizeof(temp_buffer),
+                                             &temp_dst, &temp_remaining);
+                            *temp_dst = '\0';
+
+                            size_t val_len = strlen(temp_var_val);
+                            if (pad_width > 0 && val_len < pad_width) {
+                                size_t spaces_to_add = pad_width - val_len;
+                                if (spaces_to_add > remaining) {
+                                    spaces_to_add = remaining;
+                                }
+                                if (pad_left) {
+                                    // Left-aligned: append string first, then pad spaces
+                                    if (val_len <= remaining) {
+                                        memcpy(dst, temp_var_val, val_len);
+                                        dst += val_len;
+                                        remaining -= val_len;
+                                    }
+                                    memset(dst, ' ', spaces_to_add);
+                                    dst += spaces_to_add;
+                                    remaining -= spaces_to_add;
+                                } else {
+                                    // Right-aligned: pad spaces first, then append string
+                                    memset(dst, ' ', spaces_to_add);
+                                    dst += spaces_to_add;
+                                    remaining -= spaces_to_add;
+                                    if (val_len <= remaining) {
+                                        memcpy(dst, temp_var_val, val_len);
+                                        dst += val_len;
+                                        remaining -= val_len;
+                                    }
+                                }
+                            } else {
+                                // No padding or string is already longer than pad_width
+                                if (val_len <= remaining) {
+                                    memcpy(dst, temp_var_val, val_len);
+                                    dst += val_len;
+                                    remaining -= val_len;
+                                }
+                            }
+
                             src = brace_end + 1;
                             found = true;
                             break;

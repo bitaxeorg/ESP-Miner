@@ -1438,11 +1438,7 @@ static esp_err_t GET_display_screens(httpd_req_t *req)
             cJSON_AddItemToArray(root, cJSON_CreateString(screen));
             free(screen);
         } else {
-            if (i < DEFAULT_SCREENS_COUNT) {
-                cJSON_AddItemToArray(root, cJSON_CreateString(default_screens[i]));
-            } else {
-                cJSON_AddItemToArray(root, cJSON_CreateString(""));
-            }
+            cJSON_AddItemToArray(root, cJSON_CreateString(""));
         }
     }
 
@@ -1554,7 +1550,7 @@ static esp_err_t POST_display_reset(httpd_req_t *req)
     }
 
     for (int i = 0; i < MAX_CAROUSEL_SCREENS; i++) {
-        nvs_config_set_string_indexed(NVS_CONFIG_SCREENS, i, "");
+        nvs_config_set_string_indexed(NVS_CONFIG_SCREENS, i, i < DEFAULT_SCREENS_COUNT ? default_screens[i] : "");
     }
 
     cJSON *resp = cJSON_CreateObject();
@@ -1612,7 +1608,7 @@ esp_err_t start_rest_server(void * pvParameters)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 25;
+    config.max_uri_handlers = 35;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
 

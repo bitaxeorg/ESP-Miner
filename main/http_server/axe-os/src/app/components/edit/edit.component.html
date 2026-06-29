@@ -48,7 +48,7 @@
 
         <div *ngIf="form.get('overheat_mode')?.value === 1" class="mt-4">
             <button pButton type="button" label="Disable Overheat Mode"
-                    class="p-button-danger w-full"
+                    severity="danger" class="w-full"
                     (click)="disableOverheatMode()">
             </button>
             <small class="block mt-1 text-center text-primary">
@@ -144,33 +144,54 @@
             </div>
             <label for="invertscreen" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Invert Display Colors</label>
         </div>
-    </div>
 
-    <h3 class="mt-5">Screen Customization</h3>
-
-    <div class="card">
-        <div *ngFor="let screen of displayScreens; let i = index; trackBy: trackByIndex" class="field grid p-fluid align-items-center mb-3">
-            <label class="col-12 md:col-2 font-semibold">Screen {{ i + 1 }}</label>
-            <div class="col-12 md:col-9">
-                <textarea pInputTextarea rows="3" [(ngModel)]="displayScreens[i]" [ngModelOptions]="{standalone: true}" placeholder="Enter screen content..."></textarea>
-            </div>
-            <div class="col-12 md:col-1 flex justify-content-end md:justify-content-center">
-                <button pButton type="button" icon="pi pi-trash" class="p-button-danger p-button-text" (click)="removeScreen(i)"></button>
-            </div>
+        <div class="col-12 mt-3 select-none flex align-items-center">
+            <label class="cursor-pointer font-bold">
+                <input type="checkbox" hidden (click)="showScreenCustomization = !showScreenCustomization">
+                <i class="pi pi-angle-{{showScreenCustomization ? 'down' : 'right'}} text-sm -ml-1 mr-1"></i>
+                {{showScreenCustomization ? 'Hide' : 'Show'}} Screen Customization
+            </label>
         </div>
 
-        <div class="flex gap-3 mt-4">
-            <button pButton type="button" label="Add Screen" icon="pi pi-plus" class="p-button-outlined" [disabled]="displayScreens.length >= 8" (click)="addScreen()"></button>
-            <button pButton type="button" label="Save Screens" class="p-button-success" (click)="saveDisplayScreens()"></button>
-            <button pButton type="button" label="Reset to Defaults" class="p-button-secondary p-button-outlined" (click)="resetDisplayScreens()"></button>
-        </div>
+        <div class="grid mt-3" *ngIf="showScreenCustomization">
+            <div class="col-12 md:col-6">
+                <div class="card mb-0">
+                    <div *ngFor="let screen of displayScreens; let i = index; trackBy: trackByIndex" class="field grid p-fluid align-items-stretch mb-3">
+                        <label class="col-12 md:col-2 font-semibold align-self-start pt-2">Screen {{ i + 1 }}</label>
+                        <div class="col-12 md:col-9">
+                            <textarea #screenTextarea pInputTextarea rows="4" [autoResize]="true" class="screen-textarea" [(ngModel)]="displayScreens[i]" [ngModelOptions]="{standalone: true}" (focus)="onTextareaFocus(i)" placeholder="Enter screen content..."></textarea>
+                        </div>
+                        <div class="col-12 md:col-1 flex md:flex-column justify-content-end md:justify-content-between align-items-center gap-2 pt-1 pb-1 align-self-stretch">
+                            <button pButton type="button" icon="pi pi-trash" severity="danger" [text]="true" style="padding-block: 0 !important;" (click)="removeScreen(i)"></button>
+                            <button *ngIf="i === displayScreens.length - 1 && displayScreens.length < 8" pButton type="button" icon="pi pi-plus" severity="secondary" (click)="addScreen()" pTooltip="Add Screen" tooltipPosition="top" class="md:mt-auto"></button>
+                        </div>
+                    </div>
 
-        <div class="mt-4 p-3 border-round bg-primary-reverse text-primary-reverse-text surface-100">
-            <h4 class="m-0 mb-2 font-bold text-sm">Available Placeholders</h4>
-            <div class="flex flex-wrap gap-2">
-                <span *ngFor="let variable of displayVariables" class="px-2 py-1 text-xs border-round surface-200 text-600 font-monospace">
-                    {{ '{' + variable + '}' }}
-                </span>
+                    <div class="flex gap-3">
+                        <button pButton type="button" label="Save Screens" severity="success" (click)="saveDisplayScreens()"></button>
+                        <button pButton type="button" label="Reset to Defaults" severity="secondary" [outlined]="true" (click)="resetDisplayScreens()"></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 md:col-6">
+                <div class="card h-full mb-0">
+                    <h3 class="m-0 mb-3 font-bold text-s">Available Fields</h3>
+                    <div class="grid text-s font-monospace">
+                        <div *ngFor="let variable of displayVariables" class="col-4 py-1">
+                            <span class="placeholder-chip px-2 py-1 border-round" (click)="insertPlaceholder(variable)">
+                                {{ '{' + variable + '}' }}
+                            </span>
+                        </div>
+                    </div>
+                    <h3 class="m-0 mb-3 font-bold text-sm">Layout</h3>
+                    <p class="text-sm text-color-secondary mb-2 line-height-3">
+                        Prefix any line with <strong>#</strong> to use the double-height font (e.g. <code>#&#123;ip&#125;</code>).
+                    </p>
+                    <p class="text-sm text-color-secondary mb-0 line-height-3">
+                        Add <code>:width</code> inside braces to pad with spaces (e.g. <code>&#123;hashrate:10&#125;</code> for right-aligned, or <code>&#123;ip:-15&#125;</code> for left-aligned).
+                    </p>
+                </div>
             </div>
         </div>
     </div>
@@ -203,7 +224,17 @@
 
         <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
 
-        <button *ngIf="settingsUnlocked" pButton pButton="p-button-danger" (click)="toggleOverclockMode(false)"
-            class="p-button-danger" pTooltip="Return to safe preset values only">Disable Overclock Mode</button>
+        <button *ngIf="settingsUnlocked" pButton severity="danger" (click)="toggleOverclockMode(false)"
+            pTooltip="Return to safe preset values only">Disable Overclock Mode</button>
     </div>
 </form>
+
+<p-dialog [(visible)]="showResetConfirm" header="Confirm Reset" [modal]="true" [style]="{width: '450px', maxWidth: '90vw'}">
+    <div class="mb-4">
+        Are you sure you want to reset all screens to their default layouts? This action cannot be undone.
+    </div>
+    <div class="flex justify-content-end gap-2">
+        <button pButton label="Cancel" severity="secondary" [outlined]="true" (click)="showResetConfirm = false"></button>
+        <button pButton label="Reset to Defaults" severity="danger" (click)="confirmResetDisplayScreens()"></button>
+    </div>
+</p-dialog>

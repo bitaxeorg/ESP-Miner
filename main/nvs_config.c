@@ -359,7 +359,7 @@ esp_err_t nvs_config_init(void)
                     // For display screens, if default is empty, use default_screens
                     if (key == NVS_CONFIG_SCREENS && setting->value[idx].str[0] == '\0') {
                         free(setting->value[idx].str);
-                        setting->value[idx].str = strdup(default_screens[idx]);
+                        setting->value[idx].str = strdup(idx < DEFAULT_SCREENS_COUNT ? default_screens[idx] : "");
                     }
                     break;
                 }

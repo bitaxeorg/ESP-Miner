@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges, ViewChildren, QueryList, ElementRef } from '@angular/core';
 import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable, first } from 'rxjs';
@@ -17,6 +17,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
+import { Dialog } from 'primeng/dialog';
 
 type SelectOption = {
   name: string;
@@ -43,6 +44,7 @@ const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 
         SliderModule,
         TooltipModule,
         DateAgoPipe,
+        Dialog,
     ]
 })
 
@@ -72,6 +74,11 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public statsLimit: number = 720;
   public displayScreens: string[] = [];
   public displayVariables: string[] = [];
+
+  @ViewChildren('screenTextarea') screenTextareas!: QueryList<ElementRef<HTMLTextAreaElement>>;
+  public lastFocusedTextareaIndex: number | null = null;
+  public showScreenCustomization: boolean = false;
+  public showResetConfirm: boolean = false;
 
   constructor(
     private fb: FormBuilder,
@@ -169,8 +176,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       takeUntil(this.destroy$)
     )
     .subscribe(({ info, asic, screens, variables }) => {
-      this.displayScreens = screens;
-      this.displayVariables = variables;
+      this.setDisplayScreens(screens);
+      this.displayVariables = [...variables].sort();
       // Store the frequency and voltage options from the API
       this.defaultFrequency = asic.defaultFrequency;
       this.frequencyOptions = asic.frequencyOptions;
@@ -403,27 +410,32 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       });
   }
 
-  public resetDisplayScreens() {
-    const deviceUri = this.uri || '';
-    this.systemService.resetDisplayScreens(deviceUri)
-      .pipe(this.loadingService.lockUIUntilComplete())
-      .subscribe({
-        next: () => {
-          this.toastr.success('Reset display screens to defaults');
-          this.loadDisplayScreens();
-        },
-        error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not reset display screens. ${err.message}`);
-        }
-      });
-  }
+   public resetDisplayScreens() {
+     this.showResetConfirm = true;
+   }
+
+   public confirmResetDisplayScreens() {
+     this.showResetConfirm = false;
+     const deviceUri = this.uri || '';
+     this.systemService.resetDisplayScreens(deviceUri)
+       .pipe(this.loadingService.lockUIUntilComplete())
+       .subscribe({
+         next: () => {
+           this.toastr.success('Reset display screens to defaults');
+           this.loadDisplayScreens();
+         },
+         error: (err: HttpErrorResponse) => {
+           this.toastr.error(`Could not reset display screens. ${err.message}`);
+         }
+       });
+   }
 
   private loadDisplayScreens() {
     const deviceUri = this.uri || '';
     this.systemService.getDisplayScreens(deviceUri)
       .subscribe({
         next: (screens) => {
-          this.displayScreens = screens;
+          this.setDisplayScreens(screens);
         },
         error: (err) => {
           console.error(`Failed to load display screens: ${err.message}`);
@@ -441,5 +453,43 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     if (this.displayScreens.length > 0) {
       this.displayScreens.splice(index, 1);
     }
+  }
+
+  private setDisplayScreens(screens: string[]) {
+    let lastNonEmptyIndex = -1;
+    for (let i = screens.length - 1; i >= 0; i--) {
+      if (screens[i] && screens[i].trim() !== '') {
+        lastNonEmptyIndex = i;
+        break;
+      }
+    }
+    this.displayScreens = screens.slice(0, lastNonEmptyIndex + 1);
+  }
+
+  public onTextareaFocus(index: number) {
+    this.lastFocusedTextareaIndex = index;
+  }
+
+  public insertPlaceholder(placeholder: string) {
+    if (this.lastFocusedTextareaIndex === null) {
+      return;
+    }
+    const index = this.lastFocusedTextareaIndex;
+    const textareas = this.screenTextareas.toArray();
+    const textareaEl = textareas[index]?.nativeElement;
+    if (!textareaEl) {
+      return;
+    }
+
+    const value = this.displayScreens[index] || '';
+    const caretPos = textareaEl.selectionStart || 0;
+    const newValue = value.substring(0, caretPos) + `{${placeholder}}` + value.substring(textareaEl.selectionEnd || caretPos);
+    this.displayScreens[index] = newValue;
+
+    setTimeout(() => {
+      textareaEl.focus();
+      const newCaretPos = caretPos + placeholder.length + 2; // +2 for { and }
+      textareaEl.setSelectionRange(newCaretPos, newCaretPos);
+    });
   }
 }

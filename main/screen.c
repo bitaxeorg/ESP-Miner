@@ -10,8 +10,10 @@
 #include "display.h"
 #include "connect.h"
 #include "esp_timer.h"
-#include "default_screens.h"
 #include "display_config.h"
+
+extern const lv_font_t lv_font_portfolio_6x8;
+extern const lv_font_t lv_font_nix8810_m15;
 
 typedef enum {
     SCR_SELF_TEST,
@@ -87,6 +89,10 @@ static bool self_test_finished;
 
 static lv_obj_t * create_flex_screen(int expected_lines) {
     lv_obj_t * scr = lv_obj_create(NULL);
+
+    // Clear default padding and borders to maximize vertical space
+    lv_obj_set_style_pad_all(scr, 0, LV_PART_MAIN);
+    lv_obj_set_style_border_width(scr, 0, LV_PART_MAIN);
 
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -283,15 +289,9 @@ static void update_carousel_screen_content(int screen_index, lv_obj_t *labels[MA
     char *screen_content = nvs_config_get_string_indexed(NVS_CONFIG_SCREENS, screen_index);
     const char *content = screen_content;
 
-    // If empty or not found, use default
-    if (!content || content[0] == '\0') {
-        free(screen_content);
-        screen_content = NULL;
-        if (screen_index < DEFAULT_SCREENS_COUNT) {
-            content = default_screens[screen_index];
-        } else {
-            content = "";
-        }
+    // If empty or not found, use empty string
+    if (!content) {
+        content = "";
     }
 
     char *content_copy = strdup(content);
@@ -300,12 +300,30 @@ static void update_carousel_screen_content(int screen_index, lv_obj_t *labels[MA
         int line_count = 0;
 
         while (line && line_count < MAX_CAROUSEL_LABELS && labels[line_count]) {
+            bool is_header = false;
+            const char *line_text = line;
+            if (line_text[0] == '#') {
+                is_header = true;
+                line_text++;
+                // Skip leading spaces after #
+                while (*line_text == ' ') {
+                    line_text++;
+                }
+            }
+
             char formatted_line[128];
-            if (display_config_format_string(GLOBAL_STATE, line, formatted_line, sizeof(formatted_line)) == ESP_OK) {
+            if (display_config_format_string(GLOBAL_STATE, line_text, formatted_line, sizeof(formatted_line)) == ESP_OK) {
                 lv_label_set_text(labels[line_count], formatted_line);
             } else {
-                lv_label_set_text(labels[line_count], line);
+                lv_label_set_text(labels[line_count], line_text);
             }
+
+            if (is_header) {
+                lv_obj_set_style_text_font(labels[line_count], &lv_font_nix8810_m15, 0);
+            } else {
+                lv_obj_set_style_text_font(labels[line_count], &lv_font_portfolio_6x8, 0);
+            }
+
             line = strtok(NULL, "\n");
             line_count++;
         }
@@ -313,6 +331,7 @@ static void update_carousel_screen_content(int screen_index, lv_obj_t *labels[MA
         for (int i = line_count; i < MAX_CAROUSEL_LABELS; i++) {
             if (labels[i]) {
                 lv_label_set_text(labels[i], "");
+                lv_obj_set_style_text_font(labels[i], &lv_font_portfolio_6x8, 0);
             }
         }
 
@@ -327,33 +346,41 @@ static lv_obj_t * create_scr_carousel(int screen_index)
     char *screen_content = nvs_config_get_string_indexed(NVS_CONFIG_SCREENS, screen_index);
     const char *content = screen_content;
 
-    if (!content || content[0] == '\0') {
-        free(screen_content);
-        screen_content = NULL;
-        if (screen_index < DEFAULT_SCREENS_COUNT) {
-            content = default_screens[screen_index];
-        } else {
-            content = "";
-        }
+    if (!content) {
+        content = "";
     }
 
     // Truly empty → caller will skip this page
-    if (!content || content[0] == '\0') {
+    if (content[0] == '\0') {
         free(screen_content);
         return NULL;
     }
 
-    // Count lines including blank ones
-    int total_lines = 1;
-    for (const char *p = content; *p; p++) {
-        if (*p == '\n') total_lines++;
+    int total_lines = 0;
+    int expected_slots = 0;
+    const char *p = content;
+    while (*p) {
+        total_lines++;
+        bool is_header = (*p == '#');
+        expected_slots += is_header ? 2 : 1;
+
+        const char *next_nl = strchr(p, '\n');
+        if (next_nl) {
+            p = next_nl + 1;
+        } else {
+            break;
+        }
+    }
+    if (total_lines == 0) {
+        total_lines = 1;
+        expected_slots = 1;
     }
 
     int lines_to_show = total_lines;
     if (lines_to_show > screen_lines) lines_to_show = screen_lines;
     if (lines_to_show > MAX_CAROUSEL_LABELS) lines_to_show = MAX_CAROUSEL_LABELS;
 
-    lv_obj_t *scr = create_flex_screen(lines_to_show);
+    lv_obj_t *scr = create_flex_screen(expected_slots);
 
     memset(carousel_labels, 0, sizeof(carousel_labels));
 
@@ -419,6 +446,10 @@ void screen_next()
     if (current_screen < SCR_CAROUSEL) {
         screen_t next = current_screen + 1;
         while (next < SCR_CAROUSEL) {
+            if (next != SCR_BITAXE_LOGO && next != SCR_OSMU_LOGO) {
+                next++;
+                continue;
+            }
             if (screen_show(next)) return;
             next++;
         }
