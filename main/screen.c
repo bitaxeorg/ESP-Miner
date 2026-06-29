@@ -283,6 +283,34 @@ static lv_obj_t * create_scr_block_found() {
     return scr;
 }
 
+extern uint32_t (*const lv_text_encoded_next)(const char * txt, uint32_t * i_start);
+
+static void sanitize_text_for_font(const char *src, char *dst, size_t dst_len, const lv_font_t *font)
+{
+    uint32_t src_idx = 0;
+    size_t dst_idx = 0;
+    
+    while (src[src_idx] != '\0' && dst_idx < dst_len - 1) {
+        uint32_t prev_idx = src_idx;
+        uint32_t unicode_char = lv_text_encoded_next(src, &src_idx);
+        if (unicode_char == 0) break;
+        
+        lv_font_glyph_dsc_t dsc;
+        bool has_glyph = lv_font_get_glyph_dsc(font, &dsc, unicode_char, 0);
+        
+        if (has_glyph || unicode_char == '\n' || unicode_char == '\r' || unicode_char == '\t') {
+            uint32_t char_bytes = src_idx - prev_idx;
+            if (dst_idx + char_bytes < dst_len - 1) {
+                memcpy(&dst[dst_idx], &src[prev_idx], char_bytes);
+                dst_idx += char_bytes;
+            }
+        } else {
+            dst[dst_idx++] = ' ';
+        }
+    }
+    dst[dst_idx] = '\0';
+}
+
 static void update_carousel_screen_content(int screen_index, lv_obj_t *labels[MAX_CAROUSEL_LABELS])
 {
     // Get custom screen content from NVS
@@ -311,18 +339,19 @@ static void update_carousel_screen_content(int screen_index, lv_obj_t *labels[MA
                 }
             }
 
+            const lv_font_t *target_font = is_header ? &lv_font_nix8810_m15 : &lv_font_portfolio_6x8;
+
             char formatted_line[128];
+            const char *text_to_set = line_text;
             if (display_config_format_string(GLOBAL_STATE, line_text, formatted_line, sizeof(formatted_line)) == ESP_OK) {
-                lv_label_set_text(labels[line_count], formatted_line);
-            } else {
-                lv_label_set_text(labels[line_count], line_text);
+                text_to_set = formatted_line;
             }
 
-            if (is_header) {
-                lv_obj_set_style_text_font(labels[line_count], &lv_font_nix8810_m15, 0);
-            } else {
-                lv_obj_set_style_text_font(labels[line_count], &lv_font_portfolio_6x8, 0);
-            }
+            char sanitized_line[128];
+            sanitize_text_for_font(text_to_set, sanitized_line, sizeof(sanitized_line), target_font);
+
+            lv_label_set_text(labels[line_count], sanitized_line);
+            lv_obj_set_style_text_font(labels[line_count], target_font, 0);
 
             line = strtok(NULL, "\n");
             line_count++;
