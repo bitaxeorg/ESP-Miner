@@ -7,7 +7,7 @@
     top: calc(var(--topbar-height) + 2rem);
     left: 2rem;
     transition: transform $transitionDuration, left $transitionDuration;
-    background-color: var(--surface-overlay);
+    background-color: var(--p-card-background);
     border-radius: $borderRadius;
     padding: 1.5rem;
     box-shadow: 0px 3px 5px rgba(0, 0, 0, .02), 0px 0px 2px rgba(0, 0, 0, .05), 0px 1px 4px rgba(0, 0, 0, .08);
@@ -27,7 +27,7 @@
             font-size: .857rem;
             text-transform: uppercase;
             font-weight: 700;
-            color: var(--surface-900);
+            color: var(--p-text-muted-color);
             margin: .5rem 0;
             line-height: 1.3rem;
         }
@@ -87,7 +87,7 @@
             }
 
             &:hover {
-                background-color: var(--surface-hover);
+                background-color: var(--p-content-hover-background);
             }
 
             &:focus {

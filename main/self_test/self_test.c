@@ -24,9 +24,6 @@
 /////Test Constants/////
 // Test Fan Speed
 #define FAN_SPEED_TARGET_MIN 1000 // RPM
-#define SELF_TEST_WARMUP_TEMP_C 55.0f
-#define SELF_TEST_TARGET_TEMP_C 65.0f
-#define SELF_TEST_MAX_TEMP_C 70.0f
 #define SELF_TEST_MIN_FAN_PERCENT 10.0f
 #define SELF_TEST_MAX_FAN_PERCENT 100.0f
 #define SELF_TEST_PID_SAMPLE_TIME_MS 100
@@ -543,15 +540,19 @@ void self_test_task(void * pvParameters)
 
     self_test_set_fan_percent(GLOBAL_STATE, SELF_TEST_MAX_FAN_PERCENT);
 
+    float target_temp = (float)nvs_config_get_u16(NVS_CONFIG_SELF_TEST_TEMP_TARGET);
+    float warmup_temp = (float)nvs_config_get_u16(NVS_CONFIG_SELF_TEST_TEMP_WARMUP);
+    float max_temp    = (float)nvs_config_get_u16(NVS_CONFIG_SELF_TEST_TEMP_MAX);
+
     float asic_temp = self_test_get_valid_control_temp(GLOBAL_STATE);
     ESP_LOGI(TAG, "ASIC Temp %.1f°C", asic_temp);
 
     self_test_set_fan_percent(GLOBAL_STATE, SELF_TEST_MIN_FAN_PERCENT);
-    while (asic_temp < SELF_TEST_WARMUP_TEMP_C)
+    while (asic_temp < warmup_temp)
     {
         vTaskDelay(500 / portTICK_PERIOD_MS);
         asic_temp = self_test_get_valid_control_temp(GLOBAL_STATE);
-        ESP_LOGI(TAG, "Warming up to %.1f°C: %.1f°C", SELF_TEST_WARMUP_TEMP_C, asic_temp);
+        ESP_LOGI(TAG, "Warming up to %.1f°C: %.1f°C", warmup_temp, asic_temp);
         snprintf(logString, sizeof(logString), "ASIC Temp: %.1f°C", asic_temp);
         self_test_show_message(GLOBAL_STATE, logString);
     }
@@ -559,7 +560,7 @@ void self_test_task(void * pvParameters)
     PIDController pid = {0};
     float pid_input = asic_temp;
     float pid_output = SELF_TEST_MIN_FAN_PERCENT;
-    float pid_setpoint = SELF_TEST_TARGET_TEMP_C;
+    float pid_setpoint = target_temp;
     pid_init(&pid, &pid_input, &pid_output, &pid_setpoint,
              SELF_TEST_PID_P, SELF_TEST_PID_I, SELF_TEST_PID_D, PID_P_ON_E, PID_REVERSE);
     pid_set_sample_time(&pid, SELF_TEST_PID_SAMPLE_TIME_MS);
@@ -588,7 +589,7 @@ void self_test_task(void * pvParameters)
     self_test_domain_averages_prime(GLOBAL_STATE, &domain_averages);
 
     self_test_start_nonce_measurement(GLOBAL_STATE);
-    ESP_LOGI(TAG, "Starting 30s hashrate monitoring loop, target temp %.1f°C", SELF_TEST_TARGET_TEMP_C);
+    ESP_LOGI(TAG, "Starting 30s hashrate monitoring loop, target temp %.1f°C", target_temp);
     while ((esp_timer_get_time() - start_us) < hashtest_us) {
         uint64_t elapsed_us = esp_timer_get_time() - start_us;
         hashrate = self_test_get_nonce_hashrate(GLOBAL_STATE, elapsed_us);
@@ -598,7 +599,7 @@ void self_test_task(void * pvParameters)
             self_test_set_fan_percent(GLOBAL_STATE, pid_output);
         }
         
-        if (asic_temp > SELF_TEST_MAX_TEMP_C) {
+        if (asic_temp > max_temp) {
             ESP_LOGE(TAG, "Overheat: %.1f°C", asic_temp);
             snprintf(logString, sizeof(logString), "TEMP:FAIL: %.1f°C", asic_temp);
             self_test_show_message(GLOBAL_STATE, logString);

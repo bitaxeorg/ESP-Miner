@@ -311,7 +311,7 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
         }
     }
 
-    if (module->rejected_reason_stats_count < sizeof(module->rejected_reason_stats)) {
+    if (module->rejected_reason_stats_count < (int)(sizeof(module->rejected_reason_stats) / sizeof(module->rejected_reason_stats[0]))) {
         strncpy(module->rejected_reason_stats[module->rejected_reason_stats_count].message, 
                 error_msg, 
                 sizeof(module->rejected_reason_stats[module->rejected_reason_stats_count].message) - 1);
