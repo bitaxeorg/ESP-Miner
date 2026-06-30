@@ -172,14 +172,18 @@ export class SystemApiService {
     ).pipe(delay(1000));
   }
 
-  public getStatistics(y1: string, y2: string, uri: string = ''): Observable<ISystemStatistics> {
+  public getStatistics(y1: string[], y2: string[], uri: string = ''): Observable<ISystemStatistics> {
     let columnList = [chartLabelKey(eChartLabel.hashrate), chartLabelKey(eChartLabel.power)];
 
-    if ((y1 != chartLabelKey(eChartLabel.hashrate)) && (y1 != chartLabelKey(eChartLabel.power))) {
-      columnList.push(y1);
+    for (const y of y1) {
+      if ((y != chartLabelKey(eChartLabel.hashrate)) && (y != chartLabelKey(eChartLabel.power)) && !columnList.includes(y)) {
+        columnList.push(y);
+      }
     }
-    if ((y2 != chartLabelKey(eChartLabel.hashrate)) && (y2 != chartLabelKey(eChartLabel.power))) {
-      columnList.push(y2);
+    for (const y of y2) {
+      if ((y != chartLabelKey(eChartLabel.hashrate)) && (y != chartLabelKey(eChartLabel.power)) && !columnList.includes(y)) {
+        columnList.push(y);
+      }
     }
 
     if (environment.production && this.api) {
@@ -189,6 +193,7 @@ export class SystemApiService {
     const hashrateData = [0,413.4903744405481,410.7764830376959,440.100549473198,430.5816012914026,452.5464981767163,414.9564271189586,498.7294609150379,411.1671601439723,491.327834852684];
     const powerData = [14.45068359375,14.86083984375,15.03173828125,15.1171875,15.1171875,15.1513671875,15.185546875,15.27099609375,15.30517578125,15.33935546875];
     const asicTempData = [-1,58.5,59.625,60.125,60.75,61.5,61.875,62.125,62.5,63];
+    const asicTemp2Data = [-1,57.5,58.625,59.125,59.75,60.5,60.875,61.125,61.5,62];
     const vrTempData = [45,45,45,44,45,44,44,45,45,45];
     const asicVoltageData = [1221,1223,1219,1223,1217,1222,1221,1219,1221,1221];
     const voltageData = [5196.875,5204.6875,5196.875,5196.875,5196.875,5196.875,5196.875,5196.875,5196.875,5204.6875];
@@ -214,6 +219,7 @@ export class SystemApiService {
           case eChartLabel.hashrate_1h:  statisticsList[i][j] = hashrateData[i];     break;
           case eChartLabel.power:        statisticsList[i][j] = powerData[i];        break;
           case eChartLabel.asicTemp:     statisticsList[i][j] = asicTempData[i];     break;
+          case eChartLabel.asicTemp2:    statisticsList[i][j] = asicTemp2Data[i];    break;
           case eChartLabel.vrTemp:       statisticsList[i][j] = vrTempData[i];       break;
           case eChartLabel.asicVoltage:  statisticsList[i][j] = asicVoltageData[i];  break;
           case eChartLabel.voltage:      statisticsList[i][j] = voltageData[i];      break;

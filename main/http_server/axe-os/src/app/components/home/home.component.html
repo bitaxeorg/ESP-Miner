@@ -209,22 +209,22 @@
                         <form [formGroup]="form">
                             <div class="flex flex-nowrap justify-content-between mb-3">
                                 <p-select
-                                    [options]="chartDataSources"
+                                    [options]="chartUnitGroups"
                                     optionLabel="name"
                                     optionValue="value"
-                                    formControlName="chartY1Data"
+                                    formControlName="chartY1Unit"
                                     appendTo="body"
                                     panelStyleClass="p-select--small"
-                                    styleClass="w-10rem p-select--small">
+                                    styleClass="w-12rem p-select--small">
                                 </p-select>
                                 <p-select
-                                    [options]="chartDataSources"
+                                    [options]="chartUnitGroups"
                                     optionLabel="name"
                                     optionValue="value"
-                                    formControlName="chartY2Data"
+                                    formControlName="chartY2Unit"
                                     appendTo="body"
                                     panelStyleClass="p-select--small"
-                                    styleClass="w-10rem p-select--small">
+                                    styleClass="w-12rem p-select--small">
                                 </p-select>
                             </div>
 
@@ -591,9 +591,9 @@
                                         {{ i + 1 }}
                                     </td>
                                 <td *ngFor="let domain of asic?.domains; trackBy: trackByIndex"
-                                    [style.backgroundColor]="getHeatmapColor(domain, info.expectedHashrate)"
+                                    [style.--lightness]="getHeatmapLightness(domain, info.expectedHashrate)"
                                         [style.height]="(asicAmount <= 2 ? '2rem' : null)"
-                                        class="text-center">
+                                        class="heatmap-cell">
                                         <span class="text-xs">{{ domain | hashSuffix }}</span>
                                     </td>
                                 </tr>
