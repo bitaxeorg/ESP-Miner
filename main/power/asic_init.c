@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "asic.h"
+#include "asic_common.h"
 #include "serial.h"
 #include "asic_reset.h"
 
@@ -43,11 +44,13 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
     }
 
     ESP_LOGI(TAG, "Detecting ASIC chips...");
+    clear_asic_chain_error();
     uint8_t chip_count = ASIC_init(GLOBAL_STATE);
     
     if (chip_count == 0) {
-        ESP_LOGE(TAG, "ASIC initialization failed - chip count 0");
-        GLOBAL_STATE->SYSTEM_MODULE.asic_status = "Chip count 0";
+        const char *chain_error = get_asic_chain_error();
+        ESP_LOGE(TAG, "ASIC initialization failed - chip chain detection failed");
+        GLOBAL_STATE->SYSTEM_MODULE.asic_status = chain_error != NULL ? chain_error : "ASIC chain detection failed";
         return 0;
     }
 

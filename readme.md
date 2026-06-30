@@ -8,6 +8,9 @@
 # ESP-Miner
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/bitaxeorg/bitaxe)
 
+## Community
+The ESP-Miner firmware is maintained by OSMU which hosts it's own discussion forum at [Forum](https://osmu.xyz).
+
 If you are looking for premade images to load on your Bitaxe, check out the [latest release](https://github.com/bitaxeorg/ESP-Miner/releases/latest) page. Maybe you want [instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md) for loading factory images.
 
 # Bitaxetool
@@ -74,7 +77,12 @@ Available API endpoints:
 
 * `/api/system` Update system settings
 
-### API examples in `curl`:
+**WEBSOCKETS**
+
+* `/api/ws` Text stream log
+* `/api/ws/live` JSONp stream of partial system info updates
+
+### API examples in `curl` (works with IP addresses or .local hostnames):
 
 ```bash
 # Get system information
@@ -125,7 +133,73 @@ curl -X POST \
 curl -X PATCH http://YOUR-BITAXE-IP/api/system \
      -H "Content-Type: application/json" \
      -d '{"fanspeed": "desired_speed_value"}'
+
+# Stream logs
+websocat ws://YOUR-BITAXE-IP/api/ws
+
+# Stream Info API
+websocat ws://YOUR-BITAXE-IP/api/ws/live
 ```
+
+## mDNS Support
+
+ESP-Miner now includes comprehensive mDNS (multicast DNS) support for seamless network discovery and device accessibility. This feature enables automatic device discovery on local networks without requiring manual IP address configuration.
+
+### Features
+
+- **Automatic mDNS Initialization**: Device automatically registers with mDNS/Bonjour/Avahi services on network connection
+- **Dynamic Hostname Registration**: Device hostname is registered as `<hostname>.local` (e.g., `bitaxe.local`)
+- **Service Advertisement**: HTTP service is advertised as `_http._tcp` on port 80
+- **AxeOS Subtype**: Advertises `_axeos._sub._http._tcp` for targeted DNS-SD discovery of AxeOS devices
+- **Device TXT Records**: Includes board version, family, ASIC model, ASIC count, and firmware version as DNS-SD TXT records
+- **Dynamic Hostname Updates**: mDNS hostname updates automatically when device hostname is changed via web interface
+- **Hostname Normalization**: Automatically strips `.local` suffix when setting hostnames to prevent duplicate registrations
+- **CORS Support**: Enhanced CORS handling to allow requests from mDNS hostnames
+- **Hostname Conflict Resolution**: Automatically detects and resolves hostname conflicts by appending MAC address suffix when needed
+- **Enhanced Swarm Discovery**: Swarm mode supports both IP addresses and .local hostnames for seamless network management
+
+### Network Discovery
+
+Once connected to your local network, the device becomes discoverable through:
+
+```bash
+# Using avahi-browse (Linux)
+avahi-browse _http._tcp
+
+# Discover AxeOS devices specifically
+avahi-browse _axeos._sub._http._tcp
+
+# Using dns-sd (macOS)
+dns-sd -B _http._tcp
+
+# Discover AxeOS devices with TXT records
+dns-sd -B _axeos._sub._http._tcp
+
+# Direct access
+http://<hostname>.local
+```
+
+### Configuration
+
+- **Default Hostname**: `bitaxe` (configurable via web interface)
+- **Service Type**: `_http._tcp`
+- **Subtype**: `_axeos._sub._http._tcp`
+- **Port**: `80`
+- **Instance Name**: `Bitaxe <family> <board> (<mac_suffix>)` (e.g., `Bitaxe Gamma 601 (A1B2)`)
+- **TXT Records**: `board`, `family`, `asic`, `asic_count`, `fw_version`
+
+### Hostname Conflict Resolution
+
+If multiple devices attempt to use the same hostname, ESP-Miner automatically resolves conflicts by appending a MAC address-derived suffix (e.g., `bitaxe-12ab` if `bitaxe` is taken). This ensures unique network identification without manual intervention.
+
+### Benefits
+
+- **Zero-Configuration Discovery**: Devices automatically appear in network browsers
+- **Cross-Platform Compatibility**: Works with Windows, macOS, Linux, and mobile devices
+- **No IP Address Required**: Access devices using human-readable names
+- **Automatic Resolution**: DNS resolution happens transparently in the background
+- **Zero-Configuration Swarm Management**: Automatic device discovery and management without IP configuration
+- **Enhanced Cross-Platform Compatibility**: Improved support across different network environments and discovery protocols
 
 ## Administration
 
@@ -152,9 +226,10 @@ This configuration allows you to edit locally and compile the source code using 
 These instructions will assume an installation to your home directory.
 ```
 cd ~
-git clone https://github.com/bitaxeorg/ESP-MINER.git
+git clone --recursive https://github.com/bitaxeorg/ESP-MINER.git
 cd ESP-MINER
 git checkout <the branch you want>
+git submodule update --init --recursive
 # The next step builds the docker container that will compile the source code
 # This will take several minutes to finish
 docker build -t espminer-build .devcontainer
@@ -177,6 +252,18 @@ Once the build is done exit out of the docker session and flash the new firmware
 - Install the ESP-IDF toolchain from https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/
 - Install nodejs/npm from https://nodejs.org/en/download
 - (Optional) Install the ESP-IDF extension for VSCode from https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension
+
+### Cloning
+
+This project uses git submodules (e.g. libsecp256k1). Clone with `--recursive`:
+```
+git clone --recursive https://github.com/bitaxeorg/ESP-Miner.git
+```
+
+If you already have a checkout, initialize the submodules with:
+```
+git submodule update --init --recursive
+```
 
 ### Building
 

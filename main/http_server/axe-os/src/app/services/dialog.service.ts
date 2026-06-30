@@ -20,6 +20,8 @@ export class DialogService {
     const ref = this.primeDialogService.open(DialogListComponent, {
       header: title,
       width: '500px',
+      closable: true,
+      showHeader: true,
       data: {
         options: options,
         onSelect: (value: string) => {
@@ -38,7 +40,7 @@ export class DialogService {
 }
 
 @Component({
-  template: `
+    template: `
     <div class="flex flex-column gap-2">
       <p-button *ngFor="let option of config.data.options"
         [label]="option.label"
@@ -50,7 +52,8 @@ export class DialogService {
         <wifi-icon [rssi]="option.rssi" class="flex-order-2" />
       </p-button>
     </div>
-  `
+  `,
+    standalone: false
 })
 export class DialogListComponent {
   constructor(public config: DynamicDialogConfig) {}

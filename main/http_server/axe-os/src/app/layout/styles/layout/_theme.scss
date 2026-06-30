@@ -1,0 +1,120 @@
+:root {
+    /* Branding Source Variables (Reactive via JS) */
+    --primary-color: #F80421;
+    --primary-color-text: #ffffff;
+    --button-bg: #F80421;
+    --button-hover-bg: #e63c2e;
+    --checkbox-bg: #F80421;
+    --checkbox-border: #F80421;
+    --checkbox-hover-bg: #e63c2e;
+    --slider-range-bg: #F80421;
+    --slider-handle-bg: #F80421;
+    --togglebutton-bg: #F80421;
+    --togglebutton-hover-bg: #e63c2e;
+    
+
+    /* Layout & Sizing */
+    font-size: 14px;
+    --topbar-height: 5.5rem;
+    --sidebar-width: 12rem;
+    --transition-duration: 0.2s;
+    --card-shadow: 0 2px 1px -1px rgba(0, 0, 0, 0.2), 0 1px 1px 0 rgba(0, 0, 0, 0.14), 0 1px 3px 0 rgba(0, 0, 0, 0.12);
+    
+    /* Branding Mappings (Bridge custom JS variables to PrimeNG tokens) */
+    --p-primary-color: var(--primary-color);
+    --p-primary-500: var(--primary-color);
+    --p-primary-hover-color: var(--button-hover-bg);
+    --p-primary-contrast-color: var(--primary-color-text);
+    
+    --p-select-hover-border-color: var(--primary-color);
+
+    /* Dropdown/Select Option (List Items) */
+    --p-select-option-focus-background: rgba(255, 255, 255, 0.05);
+    --p-select-option-selected-background: var(--primary-color);
+    --p-select-option-selected-focus-background: var(--primary-color);
+    --p-select-option-focus-color: #ffffff;
+    --p-select-option-selected-color: #ffffff;
+    
+    --p-select-list-background: var(--p-card-background);
+    --p-select-list-border-color: var(--p-content-border-color);
+
+    --p-checkbox-background: transparent;
+    --p-checkbox-hover-border-color: var(--checkbox-hover-bg);
+    --p-checkbox-highlight-background: var(--checkbox-bg);
+    --p-checkbox-highlight-border-color: var(--checkbox-border);
+    --p-checkbox-checked-background: var(--checkbox-bg);
+    --p-checkbox-checked-border-color: var(--checkbox-border);
+    
+    --p-radiobutton-background: transparent;
+    --p-radiobutton-hover-border-color: var(--checkbox-hover-bg);
+    --p-radiobutton-highlight-background: var(--checkbox-bg);
+    --p-radiobutton-highlight-border-color: var(--checkbox-border);
+    --p-radiobutton-checked-background: var(--checkbox-bg);
+    --p-radiobutton-checked-border-color: var(--checkbox-border);
+
+    --p-togglebutton-checked-background: var(--togglebutton-bg);
+    --p-togglebutton-checked-border-color: var(--togglebutton-bg);
+    --p-togglebutton-checked-hover-background: var(--togglebutton-hover-bg);
+    --p-togglebutton-checked-hover-border-color: var(--togglebutton-hover-bg);
+    --p-togglebutton-checked-color: var(--togglebutton-text-color, #ffffff);
+
+    --p-button-background: var(--button-bg);
+    --p-button-border-color: var(--button-bg);
+    --p-button-hover-background: var(--button-hover-bg);
+    --p-button-hover-border-color: var(--button-hover-bg);
+    --p-button-primary-background: var(--button-bg);
+    --p-button-primary-border-color: var(--button-bg);
+    --p-button-primary-hover-background: var(--button-hover-bg);
+    --p-button-primary-hover-border-color: var(--button-hover-bg);
+
+    --p-slider-range-background: var(--slider-range-bg);
+    --p-slider-handle-background: var(--slider-handle-bg);
+    --p-slider-handle-content-background: var(--slider-handle-bg);
+    --p-slider-handle-border-color: var(--slider-handle-bg);
+    --p-slider-handle-hover-background: var(--slider-handle-bg);
+    --p-slider-handle-hover-border-color: var(--slider-handle-bg);
+    --p-slider-track-background: var(--slider-bg);
+
+    --p-progressbar-background: var(--progressbar-bg, #dee2e6);
+    --p-progressbar-value-background: var(--progressbar-value-bg, var(--primary-color));
+
+    --p-inputtext-background: transparent;
+    --p-inputtext-hover-border-color: var(--checkbox-hover-bg);
+    --p-inputtext-focus-border-color: var(--primary-color);
+
+    --p-focus-ring-shadow: var(--focus-ring);
+
+    --p-border-radius: 2px;
+    --p-button-border-radius: var(--p-border-radius);
+    --p-select-border-radius: var(--p-border-radius);
+    --p-inputtext-border-radius: var(--p-border-radius);
+
+    /* Component sizing */
+    --p-button-padding-y: 0.5rem;
+    --p-button-padding-x: 1rem;
+    --p-select-padding-y: 0.5rem;
+    --p-select-padding-x: 0.75rem;
+    --p-inputtext-padding-y: 0.5rem;
+    --p-inputtext-padding-x: 0.75rem;
+    --p-checkbox-width: 18px;
+    --p-checkbox-height: 18px;
+    --p-slider-track-size: 4px;
+    --p-slider-handle-width: 16px;
+    --p-slider-handle-height: 16px;
+
+    /* PrimeNG message component overrides (restore Vela-era colours) */
+    --p-message-warn-background: #ffecb3;
+    --p-message-warn-color: #614a00;
+    --p-message-warn-border-color: #ffe082;
+    --p-message-error-background: #ffcdd2;
+    --p-message-error-color: #73000c;
+    --p-message-error-border-color: #ef9a9a;
+    --p-message-info-background: #b3e5fc;
+    --p-message-info-color: #01579b;
+    --p-message-info-border-color: #81d4fa;
+    --p-message-success-background: #c8e6c9;
+    --p-message-success-color: #256029;
+    --p-message-success-border-color: #a5d6a7;
+    --p-message-content-padding: 1rem;
+    --p-message-border-radius: 0.5rem;
+}
