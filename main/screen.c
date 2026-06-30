@@ -333,10 +333,6 @@ static void update_carousel_screen_content(int screen_index, lv_obj_t *labels[MA
             if (line_text[0] == '#') {
                 is_header = true;
                 line_text++;
-                // Skip leading spaces after #
-                while (*line_text == ' ') {
-                    line_text++;
-                }
             }
 
             const lv_font_t *target_font = is_header ? &lv_font_nix8810_m15 : &lv_font_portfolio_6x8;

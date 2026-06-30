@@ -177,7 +177,7 @@
             <div class="col-12 md:col-6">
                 <div class="card h-full mb-0">
                     <h3 class="m-0 mb-3 font-bold text-s">Available Fields</h3>
-                    <div class="grid text-s font-monospace">
+                    <div class="grid text-s font-monospace mb-3">
                         <div *ngFor="let variable of displayVariables" class="col-4 py-1">
                             <span class="placeholder-chip px-2 py-1 border-round" (click)="insertPlaceholder(variable)">
                                 {{ '{' + variable + '}' }}
