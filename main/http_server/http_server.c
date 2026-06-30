@@ -1430,6 +1430,8 @@ static esp_err_t GET_display_screens(httpd_req_t *req)
         return ESP_OK;
     }
 
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
+
     cJSON *root = cJSON_CreateArray();
 
     for (int i = 0; i < MAX_CAROUSEL_SCREENS; i++) {
@@ -1573,6 +1575,8 @@ static esp_err_t GET_display_variables(httpd_req_t *req)
         httpd_resp_send_500(req);
         return ESP_OK;
     }
+
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
 
     const char **variables = NULL;
     size_t count = 0;
