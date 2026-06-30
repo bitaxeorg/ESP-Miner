@@ -261,11 +261,9 @@
                             </p-progressbar>
 
                             <!-- Conditional marker based on nominal voltage-->
-                            <div class="absolute bg-white h-full top-0"
-                                [style.left]="(info.nominalVoltage / (info.nominalVoltage + .5)) * 100 + '%'"
-                                style="width: 3px;">
-                                <small class="absolute text-white white-space-nowrap text-xs"
-                                    style="bottom: -1rem; transform: translateX(-50%)">
+                            <div class="progressbar-marker"
+                                [style.left]="'round(' + (info.nominalVoltage / (info.nominalVoltage + .5)) * 100 + '%, 1px)'">
+                                <small class="progressbar-marker-label">
                                     {{info.nominalVoltage}} V
                                 </small>
                             </div>
@@ -322,11 +320,9 @@
                             </p-progressbar>
 
                             <!-- Target temperature marker -->
-                            <div *ngIf="info.autofanspeed === 1" class="absolute bg-white h-full top-0"
-                                [style.left]="(info.temptarget / maxTemp) * 100 + '%'"
-                                style="width: 3px;">
-                                <small class="absolute text-white white-space-nowrap text-xs"
-                                    style="bottom: -1rem; transform: translateX(-50%)">
+                            <div *ngIf="info.autofanspeed === 1" class="progressbar-marker"
+                                [style.left]="'round(' + (info.temptarget / maxTemp) * 100 + '%, 1px)'">
+                                <small class="progressbar-marker-label">
                                     {{info.temptarget}} &deg;C
                                 </small>
                             </div>
@@ -350,11 +346,9 @@
                             </p-progressbar>
 
                             <!-- Target temperature marker -->
-                            <div *ngIf="info.autofanspeed === 1" class="absolute bg-white h-full top-0"
-                                [style.left]="(info.temptarget / maxTemp) * 100 + '%'"
-                                style="width: 3px;">
-                                <small class="absolute text-white white-space-nowrap text-xs"
-                                    style="bottom: -1rem; transform: translateX(-50%)">
+                            <div *ngIf="info.autofanspeed === 1" class="progressbar-marker"
+                                [style.left]="'round(' + (info.temptarget / maxTemp) * 100 + '%, 1px)'">
+                                <small class="progressbar-marker-label">
                                     {{info.temptarget}} &deg;C
                                 </small>
                             </div>
