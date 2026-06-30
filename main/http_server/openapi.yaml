@@ -24,6 +24,21 @@ components:
       properties:
         message:
           type: string
+    UpdateSettingsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        redirect:
+          type: object
+          properties:
+            url:
+              type: string
+            delay:
+              type: number
+            message:
+              type: string
     SharesRejectedReason:
       type: object
       required:
@@ -139,6 +154,8 @@ components:
         - freeHeap
         - freeHeapInternal
         - freeHeapSpiram
+        - minFreeHeap
+        - maxAllocHeap
         - frequency
         - actualFrequency
         - hashRate
@@ -174,6 +191,8 @@ components:
         - ipv6
         - stratumExtranonceSubscribe
         - stratumPort
+        - stratumProtocol
+        - stratumV2AuthorityPubkey
         - stratumSuggestedDifficulty
         - stratumURL
         - stratumUser
@@ -201,6 +220,7 @@ components:
         - coinbaseValueUserSatoshis
         - hashrateMonitor
         - miningPaused
+        - statsLimit
       properties:
         ASICModel:
           type: string
@@ -256,6 +276,17 @@ components:
         fallbackStratumDecodeCoinbase:
           type: boolean
           description: Enable fallback pool coinbase transaction decoding
+        fallbackStratumProtocol:
+          type: string
+          enum: [SV1, SV2]
+          description: Configured fallback stratum protocol
+        fallbackStratumV2AuthorityPubkey:
+          type: string
+          description: Fallback SV2 authority public key for certificate verification (base58-encoded)
+        fallbackStratumV2ChannelType:
+          type: string
+          enum: [standard, extended]
+          description: Configured fallback SV2 channel type
         fanrpm:
           type: number
           description: Current fan speed in RPM
@@ -271,6 +302,9 @@ components:
         responseTime:
           type: number
           description: Pool response time in ms
+        responseShareBatch:
+          type: number
+          description: Number of shares acknowledged in the batch that produced responseTime (SV2; 1 = single share, >1 = batched ack)
         rotation:
           type: number
           description: Screen rotation setting (0, 90, 180, 270)
@@ -286,6 +320,12 @@ components:
         freeHeapSpiram:
           type: number
           description: Available Spiram heap memory in bytes
+        minFreeHeap:
+          type: number
+          description: All-time low watermark for free heap memory in bytes
+        maxAllocHeap:
+          type: number
+          description: Largest contiguous free block of internal heap memory in bytes
         frequency:
           type: number
           description: ASIC frequency in MHz
@@ -313,6 +353,12 @@ components:
         hostname:
           type: string
           description: Device hostname
+        fullHostname:
+          type: string
+          description: Full hostname including .local domain for mDNS
+        mdnsHostname:
+          type: string
+          description: mDNS/Bonjour hostname for network discovery
         idfVersion:
           type: string
           description: ESP-IDF version
@@ -396,6 +442,17 @@ components:
         stratumPort:
           type: number
           description: Primary stratum server port
+        stratumProtocol:
+          type: string
+          enum: [SV1, SV2]
+          description: Configured stratum protocol
+        stratumV2AuthorityPubkey:
+          type: string
+          description: SV2 authority public key for certificate verification (base58-encoded)
+        stratumV2ChannelType:
+          type: string
+          enum: [standard, extended]
+          description: Configured SV2 channel type
         stratumSuggestedDifficulty:
           type: number
           description: Pool suggested difficulty
@@ -502,6 +559,9 @@ components:
         miningPaused:
           type: boolean
           description: Whether mining is currently paused
+        statsLimit:
+          type: integer
+          description: Maximum number of statistics data points
 
     SystemASIC:
       type: object
@@ -667,6 +727,26 @@ components:
           maximum: 65535
           examples:
             - 3333
+        stratumProtocol:
+          type: string
+          description: Stratum protocol
+          enum: [SV1, SV2]
+          examples:
+            - "SV1"
+        stratumV2ChannelType:
+          type: string
+          description: SV2 channel type
+          enum: [standard, extended]
+          examples:
+            - "standard"
+        stratumV2AuthorityPubkey:
+          type: string
+          description: Optional SV2 authority public key for certificate verification (base58-encoded)
+          pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+          maxLength: 52
+          examples:
+            - ""
+            - "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
         fallbackStratumPort:
           type: integer
           description: Port number for fallback stratum server
@@ -674,6 +754,25 @@ components:
           maximum: 65535
           examples:
             - 3333
+        fallbackStratumProtocol:
+          type: string
+          description: Fallback stratum protocol
+          enum: [SV1, SV2]
+          examples:
+            - "SV1"
+        fallbackStratumV2ChannelType:
+          type: string
+          description: Fallback SV2 channel type
+          enum: [standard, extended]
+          examples:
+            - "standard"
+        fallbackStratumV2AuthorityPubkey:
+          type: string
+          description: Optional fallback SV2 authority public key for certificate verification (base58-encoded)
+          pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+          maxLength: 52
+          examples:
+            - ""
         ssid:
           type: string
           description: WiFi network SSID
@@ -1027,6 +1126,10 @@ paths:
       responses:
         '200':
           description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateSettingsResponse'
         '400':
           description: Invalid settings provided
         '401':

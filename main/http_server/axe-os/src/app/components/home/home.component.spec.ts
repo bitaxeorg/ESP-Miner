@@ -7,7 +7,7 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Title } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { MessageModule } from 'primeng/message';
-import { DropdownModule } from 'primeng/dropdown';
+import { SelectModule } from 'primeng/select';
 import { ChartModule } from 'primeng/chart';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TooltipModule } from 'primeng/tooltip';
@@ -42,23 +42,23 @@ describe('HomeComponent', () => {
         HomeComponent,
         TooltipTextIconComponent,
         ConfettiComponent,
-        SnowflakesComponent,
-        HashSuffixPipe,
-        DiffSuffixPipe,
-        DateAgoPipe,
-        AddressPipe,
-        SatsPipe,
-        ByteSuffixPipe
+        SnowflakesComponent
       ],
       imports: [
         ReactiveFormsModule,
         FormsModule,
         NoopAnimationsModule,
         MessageModule,
-        DropdownModule,
+        SelectModule,
         ChartModule,
         ProgressBarModule,
-        TooltipModule
+        TooltipModule,
+        HashSuffixPipe,
+        DiffSuffixPipe,
+        DateAgoPipe,
+        AddressPipe,
+        SatsPipe,
+        ByteSuffixPipe
       ],
       providers: [
         provideRouter([]),
@@ -82,5 +82,43 @@ describe('HomeComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  describe('stale data and visibility state', () => {
+    it('should set stale data error when visible and last message is old', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+
+      component['lastMessageTime'] = Date.now() - 10000;
+      component.systemInfoError$.next({ duration: 0, startTime: null });
+
+      component['checkStaleData']();
+
+      expect(component.systemInfoError$.value.duration).toBe(10);
+    });
+
+    it('should NOT set stale data error when hidden and last message is old', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('hidden');
+
+      component['lastMessageTime'] = Date.now() - 10000;
+      component.systemInfoError$.next({ duration: 0, startTime: null });
+
+      component['checkStaleData']();
+
+      expect(component.systemInfoError$.value.duration).toBe(0);
+    });
+
+    it('should reset lastMessageTime and clear stale error when transitioning to visible', () => {
+      spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
+
+      const initialTime = Date.now() - 10000;
+      component['lastMessageTime'] = initialTime;
+      component.systemInfoError$.next({ duration: 10, startTime: initialTime });
+
+      component.onVisibilityChange();
+
+      expect(component.systemInfoError$.value.duration).toBe(0);
+      expect(component.systemInfoError$.value.startTime).toBeNull();
+      expect(component['lastMessageTime']).toBeGreaterThan(initialTime);
+    });
   });
 });

@@ -5,13 +5,12 @@ import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterModule } from '@angular/router';
 import { BadgeModule } from 'primeng/badge';
-import { InputSwitchModule } from 'primeng/inputswitch';
 import { InputTextModule } from 'primeng/inputtext';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { RippleModule } from 'primeng/ripple';
-import { SidebarModule } from 'primeng/sidebar';
 import { TooltipModule } from 'primeng/tooltip';
-import { PrimeNGModule } from '../prime-ng.module';
+import { CheckboxModule } from 'primeng/checkbox';
+import { PopoverModule } from 'primeng/popover';
 import { AppFooterComponent } from './app.footer.component';
 import { AppLayoutComponent } from './app.layout.component';
 import { AppMenuComponent } from './app.menu.component';
@@ -38,14 +37,13 @@ import { WifiIconComponent } from '../components/wifi-icon/wifi-icon.component';
         HttpClientModule,
         BrowserAnimationsModule,
         InputTextModule,
-        SidebarModule,
         BadgeModule,
         RadioButtonModule,
-        InputSwitchModule,
         RippleModule,
         RouterModule,
-        PrimeNGModule,
         TooltipModule,
+        CheckboxModule,
+        PopoverModule,
     ],
     exports: [AppLayoutComponent, WifiIconComponent]
 })

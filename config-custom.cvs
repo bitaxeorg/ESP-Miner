@@ -57,3 +57,9 @@ TPS546,data,u16,1
 TMP1075,data,u16,1
 # Self-test Power Consumption Target (> 0)
 power_cons_tgt,data,u16,12
+# Self-test Target Temperature
+selftest_temp,data,u16,65
+# Self-test Warmup Temperature
+selftest_warm,data,u16,55
+# Self-test Max Temperature
+selftest_max,data,u16,70

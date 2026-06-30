@@ -33,6 +33,26 @@ void calculate_coinbase_tx_hash(const char *coinbase_1, const char *coinbase_2, 
     double_sha256_bin(coinbase_tx_bin, coinbase_tx_bin_len, dest);
 }
 
+void calculate_coinbase_tx_hash_bin(const uint8_t *prefix, size_t prefix_len,
+                                    const uint8_t *extranonce_prefix, size_t ep_len,
+                                    const uint8_t *extranonce_2, size_t e2_len,
+                                    const uint8_t *suffix, size_t suffix_len,
+                                    uint8_t dest[32])
+{
+    size_t total_len = prefix_len + ep_len + e2_len + suffix_len;
+    uint8_t *buf = malloc(total_len);
+    if (!buf) return;
+
+    size_t offset = 0;
+    memcpy(buf + offset, prefix, prefix_len);   offset += prefix_len;
+    memcpy(buf + offset, extranonce_prefix, ep_len); offset += ep_len;
+    memcpy(buf + offset, extranonce_2, e2_len); offset += e2_len;
+    memcpy(buf + offset, suffix, suffix_len);
+
+    double_sha256_bin(buf, total_len, dest);
+    free(buf);
+}
+
 void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_t merkle_branches[][32], const int num_merkle_branches, uint8_t dest[32])
 {
     uint8_t both_merkles[64];
@@ -111,11 +131,14 @@ void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[sta
     bin2hex(extranonce_2_bytes, length, dest, length * 2 + 1);
 }
 
-///////cgminer nonce testing
-/* truediffone == 0x00000000FFFF0000000000000000000000000000000000000000000000000000
- */
-static const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
+double hash_to_pdiff(const uint8_t hash[32])
+{
+    double s64 = le256todouble(hash);
+    if (s64 == 0.0) return (double)UINT32_MAX;
+    return truediffone / s64;
+}
 
+///////cgminer nonce testing
 /* testing a nonce and return the diff - 0 means invalid */
 double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version)
 {
@@ -138,9 +161,7 @@ double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t 
     uint8_t hash_result[32];
     double_sha256_bin(header, 80, hash_result);
 
-    double d64 = truediffone;
-    double s64 = le256todouble(hash_result);
-    return d64 / s64;
+    return hash_to_pdiff(hash_result);
 }
 
 uint32_t increment_bitmask(const uint32_t value, const uint32_t mask)

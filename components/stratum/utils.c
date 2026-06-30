@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "esp_psram.h"
+#include "esp_heap_caps.h"
 
 #include "mbedtls/sha256.h"
 
@@ -123,7 +125,7 @@ void reverse_endianness_per_word(uint8_t data[32])
     d[7] = __builtin_bswap32(d[7]);
 }
 
-// static const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
+const double truediffone = 26959535291011309493156476344723991336010898738574164086137773096960.0;
 static const double bits192 = 6277101735386680763835789423207666416102355444464034512896.0;
 static const double bits128 = 340282366920938463463374607431768211456.0;
 static const double bits64 = 18446744073709551616.0;
@@ -251,4 +253,17 @@ void url_decode(char *dst, const char *src) {
         }
     }
     *dst = '\0';
+}
+
+char *strdup_psram(const char *str)
+{
+    if (!str) return NULL;
+    if (esp_psram_is_initialized()) {
+        char *p = heap_caps_malloc(strlen(str) + 1, MALLOC_CAP_SPIRAM);
+        if (p) {
+            strcpy(p, str);
+            return p;
+        }
+    }
+    return strdup(str);
 }

@@ -1,20 +1,12 @@
-#include <string.h>
-#include "INA260.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "global_state.h"
-#include "math.h"
-#include "mining.h"
 #include "nvs_config.h"
-#include "serial.h"
-#include "TPS546.h"
 #include "vcore.h"
 #include "thermal.h"
-#include "PID.h"
 #include "power.h"
 #include "asic.h"
-#include "bm1370.h"
 #include "utils.h"
 #include "asic_init.h"
 #include "asic_reset.h"
@@ -107,7 +99,7 @@ void POWER_MANAGEMENT_init_frequency(void * pvParameters)
     float frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = frequency;
-    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = 50.0;    
+    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = 50.0;
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = expected_hashrate(GLOBAL_STATE);
     
     char expected_hashrate_str[16] = {0};
@@ -150,11 +142,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
-        // User requested pause or hardware fault
-        if ((sys_module->mining_paused || sys_module->hardware_fault) && !is_paused) {
+        // User pause, hardware fault, or all pools unreachable
+        bool wants_stop = sys_module->mining_paused || sys_module->hardware_fault || sys_module->pools_unavailable;
+        if (wants_stop && !is_paused) {
             mining_stop(GLOBAL_STATE);
             is_paused = true;
-        } else if (!sys_module->mining_paused && !sys_module->hardware_fault && is_paused) {
+        } else if (!wants_stop && is_paused) {
             mining_start(GLOBAL_STATE);
             is_paused = false;
         }
@@ -234,7 +227,9 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             }
         }
 
-        uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+        uint16_t core_voltage = GLOBAL_STATE->SELF_TEST_MODULE.is_active
+                                 ? GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv
+                                 : nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
         float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
         if (core_voltage != last_core_voltage) {

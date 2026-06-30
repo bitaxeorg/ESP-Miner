@@ -13,6 +13,7 @@
 #include "freertos/semphr.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include "bap_subscription.h"
 #include "bap_protocol.h"
 #include "bap_uart.h"
@@ -285,7 +286,7 @@ void BAP_send_subscription_update(GlobalState *state) {
                     case BAP_PARAM_SHARES:
                         {
                             char shares_ar_str[64];
-                            snprintf(shares_ar_str, sizeof(shares_ar_str), "%llu/%llu", state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
+                            snprintf(shares_ar_str, sizeof(shares_ar_str), "%" PRIu64 "/%" PRIu64, state->SYSTEM_MODULE.shares_accepted, state->SYSTEM_MODULE.shares_rejected);
                             BAP_send_if_changed("shares", shares_ar_str, last_values.shares, sizeof(last_values.shares), &last_values_valid.shares);
                             
                         }
@@ -444,13 +445,14 @@ esp_err_t BAP_start_subscription_task(GlobalState *state) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    xTaskCreate(
+    xTaskCreateWithCaps(
         subscription_update_task,
         "subscription_up",
         8192,
         state,
         5,
-        &subscription_task_handle
+        &subscription_task_handle,
+        MALLOC_CAP_SPIRAM
     );
 
     //ESP_LOGI(TAG, "Subscription update task started");
