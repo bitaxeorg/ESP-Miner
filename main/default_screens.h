@@ -12,7 +12,7 @@ static const char *default_screens[] = {
     "Stratum Host:\n{pool_url}\nIP Address:\n{ip}",
 
     // Screen 2: Stats (from SCR_STATS)
-    "Gh/s: {hashrate}\nJ/Th: {efficiency}\nBest: {session_diff}/{best_diff}\nTemp: {asic_temp}°C",
+    "Gh/s: {hashrate}\nJ/Th: {efficiency}\nBest: {session_diff}/{best_diff}\nTemp: {asic1_temp}°C",
 
     // Screen 3: Mining (from SCR_MINING)
     "Block: {block_height}\nDifficulty: {network_diff}\nScriptsig:\n{scriptsig}",

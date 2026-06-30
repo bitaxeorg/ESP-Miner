@@ -423,7 +423,7 @@ export class SystemApiService {
     }
     return of([
       "Stratum Host:\n{pool_url}\nIP Address:\n{ip}",
-      "Gh/s: {hashrate}\nJ/Th: {efficiency}\nBest: {session_diff}/{best_diff}\nTemp: {asic_temp}°C",
+      "Gh/s: {hashrate}\nJ/Th: {efficiency}\nBest: {session_diff}/{best_diff}\nTemp: {asic1_temp}°C",
       "Block: {block_height}\nDifficulty: {network_diff}\nScriptsig:\n{scriptsig}",
       "Wi-Fi Signal\nRSSI: {rssi} dBm\nSignal: {signal}\nUptime: {uptime}",
       "", "", "", ""
