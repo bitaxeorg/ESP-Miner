@@ -322,7 +322,7 @@
                             <!-- Target temperature marker -->
                             <div *ngIf="info.autofanspeed === 1" class="progressbar-marker"
                                 [style.left]="'round(' + (info.temptarget / maxTemp) * 100 + '%, 1px)'">
-                                <small class="progressbar-marker-label">
+                                <small class="progressbar-marker-label" *ngIf="0 >= info.temp2">
                                     {{info.temptarget}} &deg;C
                                 </small>
                             </div>
