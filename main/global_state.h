@@ -32,10 +32,26 @@ struct sv2_noise_ctx;
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
 
+typedef struct {
+    char * url;
+    uint16_t port;
+    char * user;
+    char * pass;
+    stratum_protocol_t protocol;
+    uint16_t difficulty;
+    bool extranonce_subscribe;
+    uint16_t tls;
+    char * cert;
+    bool decode_coinbase_tx;
+    uint16_t sv2_channel_type;
+    char * sv2_authority_pubkey;
+} PoolConfig;
+
 #define HISTORY_LENGTH 100
 #define DIFF_STRING_SIZE 10
 #define MAX_BLOCK_SIGNALS 8
 #define MAX_BLOCK_SIGNAL_LEN 16
+#define MAX_POOLS 8
 
 typedef struct {
     char message[64];
@@ -70,33 +86,15 @@ typedef struct
     bool ap_enabled;
     bool is_connected;
     int identify_mode_time_ms;
-    char * pool_url;
-    char * fallback_pool_url;
-    uint16_t pool_port;
-    uint16_t fallback_pool_port;
-    char * pool_user;
-    char * fallback_pool_user;
-    char * pool_pass;
-    char * fallback_pool_pass;
-    uint16_t pool_difficulty;
-    uint16_t fallback_pool_difficulty;
-    bool pool_extranonce_subscribe;
-    bool fallback_pool_extranonce_subscribe;
-    bool pool_decode_coinbase_tx;
-    bool fallback_pool_decode_coinbase_tx;
+    PoolConfig pools[MAX_POOLS];
+    uint16_t primary_pool_index;
+    uint16_t secondary_pool_index;
+    bool use_fallback_stratum;
+    bool is_using_fallback;
     float response_time;
     uint16_t response_share_batch;
     float process_time;
     float cpu_usage;
-    bool use_fallback_stratum;
-    uint16_t pool_is_tls;
-    uint16_t fallback_pool_is_tls;
-    uint16_t pool_tls;
-    uint16_t fallback_pool_tls;
-    char * pool_cert;
-    char * fallback_pool_cert;
-    bool is_using_fallback;
-    uint16_t fallback_pool_protocol;
     char pool_connection_info[64];
     bool overheat_mode;
     bool mining_paused;

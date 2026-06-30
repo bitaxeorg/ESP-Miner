@@ -1,6 +1,7 @@
 #include "nvs_config.h"
 #include "sv2_protocol.h"
 #include "global_state.h"
+#include "cJSON.h"
 #include <esp_err.h>
 #include "esp_log.h"
 #include <nvs_flash.h>
@@ -53,31 +54,10 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_WIFI_PASS]                             = {.nvs_key_name = "wifipass",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_PASSWORD},            .rest_name = "wifiPass",                           .min = 0,  .max = 63},
     [NVS_CONFIG_HOSTNAME]                              = {.nvs_key_name = "hostname",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_LWIP_LOCAL_HOSTNAME},          .rest_name = "hostname",                           .min = 1,  .max = 32},
 
-    [NVS_CONFIG_STRATUM_PROTOCOL]                      = {.nvs_key_name = "stratumprot",     .type = TYPE_STR,   .default_value = {.str = STRATUM_V1},                                  .rest_name = "stratumProtocol",                    .min = 3,  .max = 3},
-    [NVS_CONFIG_STRATUM_URL]                           = {.nvs_key_name = "stratumurl",      .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_URL},                  .rest_name = "stratumURL",                         .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_STRATUM_PORT]                          = {.nvs_key_name = "stratumport",     .type = TYPE_U16,   .default_value = {.u16 = CONFIG_STRATUM_PORT},                         .rest_name = "stratumPort",                        .min = 0,  .max = UINT16_MAX},
-    [NVS_CONFIG_STRATUM_USER]                          = {.nvs_key_name = "stratumuser",     .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_USER},                 .rest_name = "stratumUser",                        .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_STRATUM_PASS]                          = {.nvs_key_name = "stratumpass",     .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_PW},                   .rest_name = "stratumPassword",                    .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_STRATUM_DIFFICULTY]                    = {.nvs_key_name = "stratumdiff",     .type = TYPE_U16,   .default_value = {.u16 = CONFIG_STRATUM_DIFFICULTY},                   .rest_name = "stratumSuggestedDifficulty",         .min = 0,  .max = UINT16_MAX},
-    [NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE]          = {.nvs_key_name = "stratumxnsub",    .type = TYPE_BOOL,  .default_value = {.b   = (bool)STRATUM_EXTRANONCE_SUBSCRIBE},          .rest_name = "stratumExtranonceSubscribe",         .min = 0,  .max = 1},
-    [NVS_CONFIG_STRATUM_TLS]                           = {.nvs_key_name = "stratumtls",      .type = TYPE_U16,   .default_value = {.u16 = (uint16_t)CONFIG_STRATUM_TLS},                .rest_name = "stratumTLS",                         .min = 0,  .max = 3},
-    [NVS_CONFIG_STRATUM_CERT]                          = {.nvs_key_name = "stratumcert",     .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_STRATUM_CERT},                 .rest_name = "stratumCert",                        .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_SV2_CHANNEL_TYPE]                      = {.nvs_key_name = "sv2chantype",     .type = TYPE_STR,   .default_value = {.str = SV2_CHANNEL_TYPE_EXTENDED},                   .rest_name = "stratumV2ChannelType",               .min = 8,  .max = 8},
-    [NVS_CONFIG_SV2_AUTHORITY_PUBKEY]                  = {.nvs_key_name = "sv2authpubkey",   .type = TYPE_STR,   .default_value = {.str = ""},                                          .rest_name = "stratumV2AuthorityPubkey",           .min = 0,  .max = 52},   
-    [NVS_CONFIG_STRATUM_DECODE_COINBASE_TX]            = {.nvs_key_name = "stratumdecode",   .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "stratumDecodeCoinbase",              .min = 0,  .max = 1},
-    [NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL]             = {.nvs_key_name = "fbstratumprot",   .type = TYPE_STR,   .default_value = {.str = STRATUM_V1},                                  .rest_name = "fallbackStratumProtocol",            .min = 3,  .max = 3},
-    [NVS_CONFIG_FALLBACK_STRATUM_URL]                  = {.nvs_key_name = "fbstratumurl",    .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_URL},         .rest_name = "fallbackStratumURL",                 .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_FALLBACK_STRATUM_PORT]                 = {.nvs_key_name = "fbstratumport",   .type = TYPE_U16,   .default_value = {.u16 = CONFIG_FALLBACK_STRATUM_PORT},                .rest_name = "fallbackStratumPort",                .min = 0,  .max = UINT16_MAX},
-    [NVS_CONFIG_FALLBACK_STRATUM_USER]                 = {.nvs_key_name = "fbstratumuser",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_USER},        .rest_name = "fallbackStratumUser",                .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_FALLBACK_STRATUM_PASS]                 = {.nvs_key_name = "fbstratumpass",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_PW},          .rest_name = "fallbackStratumPassword",            .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY]           = {.nvs_key_name = "fbstratumdiff",   .type = TYPE_U16,   .default_value = {.u16 = CONFIG_FALLBACK_STRATUM_DIFFICULTY},          .rest_name = "fallbackStratumSuggestedDifficulty", .min = 0,  .max = UINT16_MAX},
-    [NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE] = {.nvs_key_name = "stratumfbxnsub",  .type = TYPE_BOOL,  .default_value = {.b   = (bool)FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE}, .rest_name = "fallbackStratumExtranonceSubscribe", .min = 0,  .max = 1},
-    [NVS_CONFIG_FALLBACK_STRATUM_TLS]                  = {.nvs_key_name = "fbstratumtls",    .type = TYPE_U16,   .default_value = {.u16 = (uint16_t)CONFIG_FALLBACK_STRATUM_TLS},       .rest_name = "fallbackStratumTLS",                 .min = 0,  .max = 3},
-    [NVS_CONFIG_FALLBACK_STRATUM_CERT]                 = {.nvs_key_name = "fbstratumcert",   .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_FALLBACK_STRATUM_CERT},        .rest_name = "fallbackStratumCert",                .min = 0,  .max = NVS_STR_LIMIT},
-    [NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE]             = {.nvs_key_name = "fbsv2chantype",   .type = TYPE_STR,   .default_value = {.str = SV2_CHANNEL_TYPE_EXTENDED},                   .rest_name = "fallbackStratumV2ChannelType",       .min = 8,  .max = 8},
-    [NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY]         = {.nvs_key_name = "fbsv2authpubk",   .type = TYPE_STR,   .default_value = {.str = ""},                                          .rest_name = "fallbackStratumV2AuthorityPubkey",   .min = 0,  .max = 52},
-    [NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX]   = {.nvs_key_name = "fbstratumdecode", .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "fallbackStratumDecodeCoinbase",      .min = 0,  .max = 1},
-    [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstartum",    .type = TYPE_BOOL,                                                                         .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
+    [NVS_CONFIG_POOL]                                  = {.nvs_key_name = "pool",            .type = TYPE_STR,   .default_value = {.str = ""},                                          .rest_name = "pools",                              .min = 0,  .max = NVS_STR_LIMIT, .array_size = MAX_POOLS},
+    [NVS_CONFIG_PRIMARY_POOL_INDEX]                    = {.nvs_key_name = "prim_idx",        .type = TYPE_U16,   .default_value = {.u16 = 0},                                           .rest_name = "primaryPoolIndex",                   .min = 0,  .max = MAX_POOLS - 1},
+    [NVS_CONFIG_SECONDARY_POOL_INDEX]                  = {.nvs_key_name = "sec_idx",         .type = TYPE_U16,   .default_value = {.u16 = 1},                                           .rest_name = "secondaryPoolIndex",                 .min = 0,  .max = MAX_POOLS - 1},
+    [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstartum",    .type = TYPE_BOOL,  .default_value = {.b = true},                                          .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
 
     [NVS_CONFIG_ASIC_FREQUENCY]                        = {.nvs_key_name = "asicfrequency_f", .type = TYPE_FLOAT, .default_value = {.f   = CONFIG_ASIC_FREQUENCY},                       .rest_name = "frequency",                          .min = 1,  .max = UINT16_MAX},
     [NVS_CONFIG_ASIC_VOLTAGE]                          = {.nvs_key_name = "asicvoltage",     .type = TYPE_U16,   .default_value = {.u16 = CONFIG_ASIC_VOLTAGE},                         .rest_name = "coreVoltage",                        .min = 1,  .max = UINT16_MAX},
@@ -151,14 +131,134 @@ static void get_nvs_key_name(const Settings * setting, const int index, char des
     }
 }
 
+static char* read_legacy_str(nvs_handle_t h, const char *key, const char *def) {
+    size_t len = 0;
+    if (nvs_get_str(h, key, NULL, &len) == ESP_OK && len > 0) {
+        char *buf = malloc(len);
+        if (buf) {
+            if (nvs_get_str(h, key, buf, &len) == ESP_OK) {
+                return buf;
+            }
+            free(buf);
+        }
+    }
+    return strdup(def ? def : "");
+}
+
+static uint16_t read_legacy_u16(nvs_handle_t h, const char *key, uint16_t def) {
+    uint16_t val;
+    if (nvs_get_u16(h, key, &val) == ESP_OK) {
+        return val;
+    }
+    return def;
+}
+
+static bool read_legacy_bool(nvs_handle_t h, const char *key, bool def) {
+    uint16_t val;
+    if (nvs_get_u16(h, key, &val) == ESP_OK) {
+        return val != 0;
+    }
+    return def;
+}
+
+static void migrate_legacy_pools(void) {
+    size_t len = 0;
+    // Check if new configuration already exists
+    if (nvs_get_str(handle, "pool_1", NULL, &len) == ESP_OK) {
+        return; // Already migrated
+    }
+
+    ESP_LOGI(TAG, "Migrating legacy NVS pool configurations...");
+
+    // Migrate Primary Pool -> pool_1
+    char *p_proto = read_legacy_str(handle, "stratumprot", STRATUM_V1);
+    char *p_url = read_legacy_str(handle, "stratumurl", CONFIG_STRATUM_URL);
+    uint16_t p_port = read_legacy_u16(handle, "stratumport", CONFIG_STRATUM_PORT);
+    char *p_user = read_legacy_str(handle, "stratumuser", CONFIG_STRATUM_USER);
+    char *p_pass = read_legacy_str(handle, "stratumpass", CONFIG_STRATUM_PW);
+    uint16_t p_diff = read_legacy_u16(handle, "stratumdiff", CONFIG_STRATUM_DIFFICULTY);
+    bool p_xnsub = read_legacy_bool(handle, "stratumxnsub", STRATUM_EXTRANONCE_SUBSCRIBE);
+    uint16_t p_tls = read_legacy_u16(handle, "stratumtls", CONFIG_STRATUM_TLS);
+    char *p_cert = read_legacy_str(handle, "stratumcert", CONFIG_STRATUM_CERT);
+    char *p_sv2chan = read_legacy_str(handle, "sv2chantype", SV2_CHANNEL_TYPE_EXTENDED);
+    char *p_sv2pubkey = read_legacy_str(handle, "sv2authpubkey", "");
+    bool p_decode = read_legacy_bool(handle, "stratumdecode", true);
+
+    cJSON *p_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(p_json, "stratumProtocol", p_proto);
+    cJSON_AddStringToObject(p_json, "stratumURL", p_url);
+    cJSON_AddNumberToObject(p_json, "stratumPort", p_port);
+    cJSON_AddStringToObject(p_json, "stratumUser", p_user);
+    cJSON_AddStringToObject(p_json, "stratumPassword", p_pass);
+    cJSON_AddNumberToObject(p_json, "stratumSuggestedDifficulty", p_diff);
+    cJSON_AddBoolToObject(p_json, "stratumExtranonceSubscribe", p_xnsub);
+    cJSON_AddNumberToObject(p_json, "stratumTLS", p_tls);
+    cJSON_AddStringToObject(p_json, "stratumCert", p_cert);
+    cJSON_AddStringToObject(p_json, "stratumV2ChannelType", p_sv2chan);
+    cJSON_AddStringToObject(p_json, "stratumV2AuthorityPubkey", p_sv2pubkey);
+    cJSON_AddBoolToObject(p_json, "stratumDecodeCoinbase", p_decode);
+
+    char *p_str = cJSON_PrintUnformatted(p_json);
+    if (p_str) {
+        nvs_set_str(handle, "pool_1", p_str);
+        free(p_str);
+    }
+    cJSON_Delete(p_json);
+    free(p_proto); free(p_url); free(p_user); free(p_pass); free(p_cert); free(p_sv2chan); free(p_sv2pubkey);
+
+    // Migrate Fallback Pool -> pool_2
+    char *f_proto = read_legacy_str(handle, "fbstratumprot", STRATUM_V1);
+    char *f_url = read_legacy_str(handle, "fbstratumurl", CONFIG_FALLBACK_STRATUM_URL);
+    uint16_t f_port = read_legacy_u16(handle, "fbstratumport", CONFIG_FALLBACK_STRATUM_PORT);
+    char *f_user = read_legacy_str(handle, "fbstratumuser", CONFIG_FALLBACK_STRATUM_USER);
+    char *f_pass = read_legacy_str(handle, "fbstratumpass", CONFIG_FALLBACK_STRATUM_PW);
+    uint16_t f_diff = read_legacy_u16(handle, "fbstratumdiff", CONFIG_FALLBACK_STRATUM_DIFFICULTY);
+    bool f_xnsub = read_legacy_bool(handle, "stratumfbxnsub", FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
+    uint16_t f_tls = read_legacy_u16(handle, "fbstratumtls", CONFIG_FALLBACK_STRATUM_TLS);
+    char *f_cert = read_legacy_str(handle, "fbstratumcert", CONFIG_FALLBACK_STRATUM_CERT);
+    char *f_sv2chan = read_legacy_str(handle, "fbsv2chantype", SV2_CHANNEL_TYPE_EXTENDED);
+    char *f_sv2pubkey = read_legacy_str(handle, "fbsv2authpubk", "");
+    bool f_decode = read_legacy_bool(handle, "fbstratumdecode", true);
+
+    cJSON *f_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(f_json, "stratumProtocol", f_proto);
+    cJSON_AddStringToObject(f_json, "stratumURL", f_url);
+    cJSON_AddNumberToObject(f_json, "stratumPort", f_port);
+    cJSON_AddStringToObject(f_json, "stratumUser", f_user);
+    cJSON_AddStringToObject(f_json, "stratumPassword", f_pass);
+    cJSON_AddNumberToObject(f_json, "stratumSuggestedDifficulty", f_diff);
+    cJSON_AddBoolToObject(f_json, "stratumExtranonceSubscribe", f_xnsub);
+    cJSON_AddNumberToObject(f_json, "stratumTLS", f_tls);
+    cJSON_AddStringToObject(f_json, "stratumCert", f_cert);
+    cJSON_AddStringToObject(f_json, "stratumV2ChannelType", f_sv2chan);
+    cJSON_AddStringToObject(f_json, "stratumV2AuthorityPubkey", f_sv2pubkey);
+    cJSON_AddBoolToObject(f_json, "stratumDecodeCoinbase", f_decode);
+
+    char *f_str = cJSON_PrintUnformatted(f_json);
+    if (f_str) {
+        nvs_set_str(handle, "pool_2", f_str);
+        free(f_str);
+    }
+    cJSON_Delete(f_json);
+    free(f_proto); free(f_url); free(f_user); free(f_pass); free(f_cert); free(f_sv2chan); free(f_sv2pubkey);
+
+    // Set default selectors: primary = 0, fallback = 1
+    nvs_set_u16(handle, "prim_idx", 0);
+    nvs_set_u16(handle, "sec_idx", 1);
+    nvs_commit(handle);
+
+    ESP_LOGI(TAG, "Legacy pool migration completed successfully");
+}
+
 static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
 {
-    esp_err_t ret;
+    if (key == NVS_CONFIG_POOL) {
+        migrate_legacy_pools();
+    }
     if (key == NVS_CONFIG_ASIC_FREQUENCY) {
         if (nvs_find_key(handle, setting->nvs_key_name, NULL) == ESP_ERR_NVS_NOT_FOUND) {
-            uint16_t val;
-            ret = nvs_get_u16(handle, FALLBACK_KEY_ASICFREQUENCY, &val);
-            if (ret == ESP_OK) {
+            uint16_t val = read_legacy_u16(handle, FALLBACK_KEY_ASICFREQUENCY, 0);
+            if (val > 0) {
                 ESP_LOGI(TAG, "Migrating NVS config %s to %s (%d)", FALLBACK_KEY_ASICFREQUENCY, setting->nvs_key_name, val);
                 char buf[32];
                 snprintf(buf, sizeof(buf), "%d", val);
@@ -168,39 +268,10 @@ static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
     }
     if (key == NVS_CONFIG_MANUAL_FAN_SPEED) {
         if (nvs_find_key(handle, setting->nvs_key_name, NULL) == ESP_ERR_NVS_NOT_FOUND) {
-            uint16_t val;
-            ret = nvs_get_u16(handle, FALLBACK_KEY_FANSPEED, &val);
-            if (ret == ESP_OK) {
+            uint16_t val = read_legacy_u16(handle, FALLBACK_KEY_FANSPEED, 0);
+            if (val > 0) {
                 ESP_LOGI(TAG, "Migrating NVS config %s to %s (%d)", FALLBACK_KEY_FANSPEED, setting->nvs_key_name, val);
                 nvs_set_u16(handle, setting->nvs_key_name, val);
-            }
-        }
-    }
-    if (key == NVS_CONFIG_STRATUM_PROTOCOL || key == NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL) {
-        uint16_t val;
-        if (nvs_get_u16(handle, setting->nvs_key_name, &val) == ESP_OK) {
-            const char *str_val = (val == 1) ? STRATUM_V2 : STRATUM_V1;
-            ESP_LOGI(TAG, "Migrating NVS config %s from u16 (%d) to string (%s)", setting->nvs_key_name, val, str_val);
-            nvs_erase_key(handle, setting->nvs_key_name);
-            nvs_set_str(handle, setting->nvs_key_name, str_val);
-        }
-    }
-    if (key == NVS_CONFIG_SV2_CHANNEL_TYPE || key == NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE) {
-        uint16_t val;
-        esp_err_t res = nvs_get_u16(handle, setting->nvs_key_name, &val);
-        if (res == ESP_OK) {
-            const char *str_val = (val == 1) ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED;
-            ESP_LOGI(TAG, "Migrating NVS config %s from u16 (%d) to string (%s)", setting->nvs_key_name, val, str_val);
-            nvs_erase_key(handle, setting->nvs_key_name);
-            nvs_set_str(handle, setting->nvs_key_name, str_val);
-        }
-        if (res == ESP_ERR_NVS_NOT_FOUND) {
-            res = nvs_get_u16(handle, "fbSv2ChanType", &val);
-            if (res == ESP_OK) {
-                const char *str_val = (val == 1) ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED;
-                ESP_LOGI(TAG, "Migrating NVS config %s from u16 (%d) to string (%s)", setting->nvs_key_name, val, str_val);
-                nvs_erase_key(handle, "fbSv2ChanType");
-                nvs_set_str(handle, setting->nvs_key_name, str_val);
             }
         }
     }

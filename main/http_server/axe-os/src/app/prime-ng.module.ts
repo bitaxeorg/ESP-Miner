@@ -14,6 +14,7 @@ import { PopoverModule } from 'primeng/popover';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
+import { BadgeModule } from 'primeng/badge';
 
 const primeNgModules = [
     InputTextModule,
@@ -30,7 +31,8 @@ const primeNgModules = [
     PopoverModule,
     ProgressBarModule,
     IconFieldModule,
-    InputIconModule
+    InputIconModule,
+    BadgeModule
 ];
 
 @NgModule({
