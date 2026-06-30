@@ -29,6 +29,7 @@
 #include "filesystem.h"
 #include "input.h"
 #include "log_buffer.h"
+#include "setup_ble.h"
 
 static GlobalState GLOBAL_STATE;
 
@@ -162,9 +163,22 @@ void app_main(void)
         // Continue anyway, as BAP is not critical for core functionality
     }
 
+    // While the device is still in setup mode (config AP up but no WiFi
+    // connection), expose the BLE provisioning service so the miner can be
+    // configured over Bluetooth. A short grace period avoids spinning up BLE on
+    // a normal boot that connects within a few seconds. setup_ble_start() is
+    // idempotent and only takes effect once the AP is actually enabled.
+    int setup_ble_grace_ms = 0;
     while (!GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
+        if (GLOBAL_STATE.SYSTEM_MODULE.ap_enabled && setup_ble_grace_ms >= 5000) {
+            setup_ble_start(&GLOBAL_STATE);
+        }
+        setup_ble_grace_ms += 100;
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
+
+    // Connected to WiFi: tear down the setup BLE service to free the radio.
+    setup_ble_stop();
 
     queue_init(&GLOBAL_STATE.stratum_queue);
 
