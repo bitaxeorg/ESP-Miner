@@ -16,7 +16,11 @@
     }
 
     td {
-        transition: background-color 2s ease-in-out;
+        &.heatmap-cell {
+            text-align: center;
+            transition: background-color 2s ease-in-out;
+            background-color: oklch(from var(--primary-color) var(--lightness, 0.5) c h);
+        }
     }
 }
 
