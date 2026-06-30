@@ -457,14 +457,20 @@ export class SystemApiService {
     if (environment.production && uri) {
       return this.httpClient.get<string[]>(`${uri}/api/display/variables`).pipe(timeout(API_TIMEOUT));
     }
+    // Mock fields only for local frontend testing
     return of([
-      "hashrate", "hashrate_1m", "hashrate_10m", "hashrate_1h", "hashrate_expected",
-      "frequency", "power", "efficiency", "voltage", "core_voltage", "current", "power_fault",
-      "asic1_temp", "asic2_temp", "vr_temp", "target_temp", "fan_perc", "fan1_rpm", "fan2_rpm",
-      "pool_url", "pool_diff", "response_time", "pool_connection_info", "is_using_fallback_stratum",
-      "shares_accepted", "shares_rejected", "work_received", "error_percentage", "session_diff", "best_diff", "block_found",
-      "ssid", "wifi_status", "ip", "ipv6", "rssi", "signal", "uptime", "network_diff", "scriptsig", "block_height",
-      "hostname", "device_model", "asic_model", "board_version", "version", "axe_os_version", "free_heap"
+      "hashrate",
+      "efficiency",
+      "power",
+      "asic1_temp",
+      "vr_temp",
+      "fan_perc",
+      "pool_url",
+      "shares_accepted",
+      "shares_rejected",
+      "ssid",
+      "ip",
+      "hostname"
     ]).pipe(delay(1000));
   }
 
