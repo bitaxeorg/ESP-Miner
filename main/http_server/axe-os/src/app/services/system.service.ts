@@ -78,6 +78,8 @@ export class SystemApiService {
         coreVoltage: 1200,
         coreVoltageActual: 1200,
         hostname: "Bitaxe",
+        fullHostname: "Bitaxe.local",
+        mdnsHostname: "Bitaxe",
         macAddr: "2C:54:91:88:C9:E3",
         ssid: "default",
         ipv4: "192.168.1.1",
@@ -459,7 +461,7 @@ export class SystemApiService {
       "hashrate", "hashrate_1m", "hashrate_10m", "hashrate_1h", "hashrate_expected",
       "frequency", "power", "efficiency", "voltage", "core_voltage", "current", "power_fault",
       "asic1_temp", "asic2_temp", "vr_temp", "target_temp", "fan_perc", "fan1_rpm", "fan2_rpm",
-      "pool_url", "pool_difficulty", "response_time", "pool_connection_info", "is_using_fallback_stratum",
+      "pool_url", "pool_diff", "response_time", "pool_connection_info", "is_using_fallback_stratum",
       "shares_accepted", "shares_rejected", "work_received", "error_percentage", "session_diff", "best_diff", "block_found",
       "ssid", "wifi_status", "ip", "ipv6", "rssi", "signal", "uptime", "network_diff", "scriptsig", "block_height",
       "hostname", "device_model", "asic_model", "board_version", "version", "axe_os_version", "free_heap"

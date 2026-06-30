@@ -133,9 +133,13 @@ static void handle_block_found(GlobalState *GLOBAL_STATE, char *temp, size_t ts,
 
 static void handle_hostname(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
 {
-    char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
-    append_string(dst, remaining, hostname);
-    free(hostname);
+    if (GLOBAL_STATE && strlen(GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname) > 0) {
+        append_string(dst, remaining, GLOBAL_STATE->SYSTEM_MODULE.mdns_hostname);
+    } else {
+        char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
+        append_string(dst, remaining, hostname);
+        free(hostname);
+    }
 }
 
 static void handle_free_heap(GlobalState *GLOBAL_STATE, char *temp, size_t ts, char **dst, size_t *remaining)
@@ -175,7 +179,7 @@ static const var_entry_t variables[] = {
     { "fan2_rpm",          VAR_TYPE_UINT16,       offsetof(GlobalState, POWER_MANAGEMENT_MODULE.fan2_rpm),          "%u",   NULL },
 
     { "pool_url",          VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_pool_url },
-    { "pool_difficulty",   VAR_TYPE_UINT16,       offsetof(GlobalState, SYSTEM_MODULE.pool_difficulty),             "%u",   NULL },
+    { "pool_diff",         VAR_TYPE_UINT16,       offsetof(GlobalState, SYSTEM_MODULE.pool_difficulty),             "%u",   NULL },
     { "response_time",     VAR_TYPE_FLOAT,        offsetof(GlobalState, SYSTEM_MODULE.response_time),               "%.2f", NULL },
     { "pool_connection_info", VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, SYSTEM_MODULE.pool_connection_info),     NULL,   NULL },
     { "is_using_fallback_stratum", VAR_TYPE_CUSTOM, 0,                                                              NULL,   handle_is_using_fallback_stratum },
@@ -196,7 +200,7 @@ static const var_entry_t variables[] = {
     { "signal",            VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_signal },
     { "uptime",            VAR_TYPE_CUSTOM,       0,                                                                NULL,   handle_uptime },
 
-    { "network_diff",      VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, network_diff_string),                       NULL,   NULL },
+    { "network_diff",      VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, network_diff_string),                      NULL,   NULL },
     { "scriptsig",         VAR_TYPE_STRING_ARRAY, offsetof(GlobalState, scriptsig),                                 NULL,   NULL },
     { "block_height",      VAR_TYPE_INT32,        offsetof(GlobalState, block_height),                              "%d",   NULL },
 
