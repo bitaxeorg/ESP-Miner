@@ -43,6 +43,27 @@
     }
 }
 
+.progressbar-marker {
+    position: absolute;
+    width: 1px;
+    height: 10px;
+    top: -2px;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.85);
+    z-index: 2;
+
+    &-label {
+        position: absolute;
+        bottom: -0.9rem;
+        left: 50%;
+        transform: translateX(-50%);
+        color: var(--text-color-secondary);
+        white-space: nowrap;
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
+}
+
 /* Select - Base Reset */
 .p-select {
     background: transparent !important;

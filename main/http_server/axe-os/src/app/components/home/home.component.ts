@@ -854,7 +854,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
         this.maxPower = Math.max(info.maxPower || 0, info.power || 0);
         this.nominalVoltage = info.nominalVoltage || 5;
-        this.maxTemp = Math.max(75, info.temp || 0);
+        this.maxTemp = Math.max(75, info.temp || 0, info.temp2 || 0, info.temptarget || 0);
         this.maxRpm = Math.max(7000, info.fanrpm || 0, info.fan2rpm || 0);
         this.maxFrequency = Math.max(800, info.actualFrequency || info.frequency || 0);
         this.statsLimit = info.statsLimit || 720;
