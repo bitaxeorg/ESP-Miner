@@ -167,3 +167,36 @@ fieldset {
 table.border-1 {
     border-color: var(--card-border) !important;
 }
+
+/* Custom Screen simulation styling using default monospace font */
+textarea.screen-textarea {
+    font-family: monospace !important;
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+    background-color: #000000 !important;
+    color: var(--p-text-color) !important;
+    border: 1px solid var(--p-content-border-color) !important;
+    padding: 8px !important;
+    resize: vertical !important;
+    width: 100% !important;
+    max-width: 100%;
+    white-space: pre !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+}
+
+span.placeholder-chip {
+    background-color: var(--p-content-background) !important;
+    border: 1px solid var(--p-content-border-color) !important;
+    color: var(--p-text-color) !important;
+    display: block;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+    user-select: none;
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        border-color: var(--p-primary-color) !important;
+    }
+}

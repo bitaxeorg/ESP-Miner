@@ -1192,3 +1192,92 @@ paths:
           description: Unauthorized - Client not in allowed network range
         '500':
           description: Internal server error
+
+  /api/display/screens:
+    get:
+      summary: Get display screens
+      description: Returns the configured display screens
+      operationId: getDisplayScreens
+      tags:
+        - display
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+    post:
+      summary: Update display screens
+      description: Updates the display screens configuration
+      operationId: updateDisplayScreens
+      tags:
+        - display
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+      responses:
+        '200':
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '400':
+          description: Invalid screens configuration
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/display/screens/reset:
+    post:
+      summary: Reset display screens
+      description: Resets display screens configuration to default
+      operationId: resetDisplayScreens
+      tags:
+        - display
+      responses:
+        '200':
+          description: Screens reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/display/variables:
+    get:
+      summary: Get display variables
+      description: Returns the list of available display substitution variables
+      operationId: getDisplayVariables
+      tags:
+        - display
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+

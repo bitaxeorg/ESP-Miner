@@ -28,6 +28,9 @@
 
 #include "cJSON.h"
 #include "global_state.h"
+#include "display_config.h"
+#include "default_screens.h"
+#include "screen.h"
 #include "nvs_config.h"
 #include "system.h"
 #include "connect.h"
@@ -1412,6 +1415,186 @@ esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
     return ESP_OK;
 }
 
+static int display_prebuffer_len = 512;
+
+// GET /api/display/screens handler
+static esp_err_t GET_display_screens(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
+
+    cJSON *root = cJSON_CreateArray();
+
+    for (int i = 0; i < MAX_CAROUSEL_SCREENS; i++) {
+        char *screen = nvs_config_get_string_indexed(NVS_CONFIG_SCREENS, i);
+        if (screen) {
+            cJSON_AddItemToArray(root, cJSON_CreateString(screen));
+            free(screen);
+        } else {
+            cJSON_AddItemToArray(root, cJSON_CreateString(""));
+        }
+    }
+
+    esp_err_t res = HTTP_send_json(req, root, &display_prebuffer_len);
+    cJSON_Delete(root);
+    return res;
+}
+
+// POST /api/display/screens handler
+static esp_err_t POST_display_screens(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    int remaining = req->content_len;
+    if (remaining <= 0 || remaining > 8192) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid content length");
+        return ESP_OK;
+    }
+
+    char *buf = malloc(remaining + 1);
+    if (!buf) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    int recv_len = 0;
+    while (remaining > 0) {
+        int ret = httpd_req_recv(req, buf + recv_len, remaining);
+        if (ret <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            free(buf);
+            httpd_resp_send_500(req);
+            return ESP_OK;
+        }
+        recv_len += ret;
+        remaining -= ret;
+    }
+    buf[recv_len] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+
+    if (!root || !cJSON_IsArray(root)) {
+        if (root) cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON array");
+        return ESP_OK;
+    }
+
+    int array_size = cJSON_GetArraySize(root);
+    if (array_size > MAX_CAROUSEL_SCREENS) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Too many screens");
+        return ESP_OK;
+    }
+
+    Settings *setting = nvs_config_get_settings(NVS_CONFIG_SCREENS);
+    int max_len = (setting && setting->max > 0) ? setting->max : 256;
+
+    for (int i = 0; i < array_size; i++) {
+        cJSON *item = cJSON_GetArrayItem(root, i);
+        if (cJSON_IsString(item)) {
+            if (strlen(item->valuestring) > max_len) {
+                cJSON_Delete(root);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Screen configuration is too long");
+                return ESP_OK;
+            }
+        }
+    }
+
+    for (int i = 0; i < array_size; i++) {
+        cJSON *item = cJSON_GetArrayItem(root, i);
+        if (cJSON_IsString(item)) {
+            nvs_config_set_string_indexed(NVS_CONFIG_SCREENS, i, item->valuestring);
+        }
+    }
+
+    // Set remaining screens to empty
+    for (int i = array_size; i < MAX_CAROUSEL_SCREENS; i++) {
+        nvs_config_set_string_indexed(NVS_CONFIG_SCREENS, i, "");
+    }
+
+    cJSON_Delete(root);
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddStringToObject(resp, "message", "Screens saved successfully");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t res = HTTP_send_json(req, resp, &display_prebuffer_len);
+    cJSON_Delete(resp);
+    return res;
+}
+
+// POST /api/display/screens/reset handler
+static esp_err_t POST_display_reset(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    for (int i = 0; i < MAX_CAROUSEL_SCREENS; i++) {
+        nvs_config_set_string_indexed(NVS_CONFIG_SCREENS, i, i < DEFAULT_SCREENS_COUNT ? default_screens[i] : "");
+    }
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddStringToObject(resp, "message", "Screens reset to defaults");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t res = HTTP_send_json(req, resp, &display_prebuffer_len);
+    cJSON_Delete(resp);
+    return res;
+}
+
+// GET /api/display/variables handler
+static esp_err_t GET_display_variables(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
+
+    const char **variables = NULL;
+    size_t count = 0;
+    if (display_config_get_variables(&variables, &count) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateArray();
+    for (size_t i = 0; i < count; i++) {
+        cJSON_AddItemToArray(root, cJSON_CreateString(variables[i]));
+    }
+
+    esp_err_t res = HTTP_send_json(req, root, &display_prebuffer_len);
+    cJSON_Delete(root);
+    return res;
+}
+
 esp_err_t start_rest_server(void * pvParameters)
 {
     GLOBAL_STATE = (GlobalState *) pvParameters;
@@ -1429,7 +1612,7 @@ esp_err_t start_rest_server(void * pvParameters)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 25;
+    config.max_uri_handlers = 35;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
 
@@ -1572,6 +1755,38 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = NULL
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
+
+    httpd_uri_t display_screens_get_uri = {
+        .uri = "/api/display/screens",
+        .method = HTTP_GET,
+        .handler = GET_display_screens,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &display_screens_get_uri);
+
+    httpd_uri_t display_screens_post_uri = {
+        .uri = "/api/display/screens",
+        .method = HTTP_POST,
+        .handler = POST_display_screens,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &display_screens_post_uri);
+
+    httpd_uri_t display_reset_post_uri = {
+        .uri = "/api/display/screens/reset",
+        .method = HTTP_POST,
+        .handler = POST_display_reset,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &display_reset_post_uri);
+
+    httpd_uri_t display_variables_get_uri = {
+        .uri = "/api/display/variables",
+        .method = HTTP_GET,
+        .handler = GET_display_variables,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &display_variables_get_uri);
 
     httpd_uri_t ws = {
         .uri = "/api/ws", 
