@@ -58,6 +58,8 @@ export class PoolComponent implements OnInit {
 
   public asicModel: string = '';
 
+  public testingSv2: { [key in PoolType]: boolean } = { stratum: false, fallbackStratum: false };
+
   @Input() uri = '';
 
   constructor(
@@ -334,6 +336,29 @@ export class PoolComponent implements OnInit {
 
   isPoolV2Enabled(pool: PoolType): boolean {
     return pool === 'stratum' ? this.isStratumV2Enabled() : this.isFallbackStratumV2Enabled();
+  }
+
+  testSv2(pool: PoolType): void {
+    const url = this.form.get(`${pool}URL`)?.value;
+    const port = this.form.get(`${pool}Port`)?.value;
+
+    this.testingSv2[pool] = true;
+    this.systemService.testSv2Connection(this.uri, url, port)
+      .pipe(first())
+      .subscribe({
+        next: (res) => {
+          this.testingSv2[pool] = false;
+          if (res.supported) {
+            this.toastr.success(res.message);
+          } else {
+            this.toastr.warning(res.message);
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.testingSv2[pool] = false;
+          this.toastr.error(err?.error?.message || err?.message || 'SV2 connection test failed');
+        }
+      });
   }
 
   isStandardChannelDisabled(): boolean {
