@@ -389,12 +389,15 @@ task_result * BM1370_process_work(void * pvParameters)
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
-    if (GLOBAL_STATE->valid_jobs[job_id] == 0) {
+    // Read active_jobs[job_id] under the lock
+    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
+    if (GLOBAL_STATE->valid_jobs[job_id] == 0 || GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id] == NULL) {
+        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
         ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
         return NULL;
     }
-
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version | version_bits;
+    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
 
     result.job_id = job_id;
     result.nonce = asic_result.job.nonce;

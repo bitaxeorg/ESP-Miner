@@ -331,16 +331,25 @@ task_result *BM1397_process_work(void *pvParameters)
     uint8_t rx_midstate_index = asic_result.job.id & 0x03;
 
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
-    if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0)
+
+    // Read active_jobs[rx_job_id] under the lock: BM1397_send_work() can free and
+    // replace this slot from the create-jobs task, so dereferencing ->version /
+    // ->version_mask without the lock is a use-after-free. Snapshot both fields,
+    // then unlock and roll the version outside the critical section.
+    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
+    if (GLOBAL_STATE->valid_jobs[rx_job_id] == 0 || GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id] == NULL)
     {
+        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
         ESP_LOGW(TAG, "Invalid job nonce found, id=%d", rx_job_id);
         return NULL;
     }
-
     uint32_t rolled_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->version;
+    uint32_t version_mask = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->version_mask;
+    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+
     for (int i = 0; i < rx_midstate_index; i++)
     {
-        rolled_version = increment_bitmask(rolled_version, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id]->version_mask);
+        rolled_version = increment_bitmask(rolled_version, version_mask);
     }
 
     // ASIC may return the same nonce multiple times
