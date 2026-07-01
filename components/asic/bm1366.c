@@ -320,13 +320,15 @@ void BM1366_send_work(void * pvParameters, bm_job * next_bm_job)
     memcpy(job.prev_block_hash, next_bm_job->prev_block_hash, 32);
     memcpy(&job.version, &next_bm_job->version, 4);
 
+    // Hold valid_jobs_lock across the free + reassignment so the result task
+    // (which snapshots active_jobs[job_id] under the same lock) can never observe
+    // or copy a slot we are freeing/replacing here. valid_jobs is set inside the
+    // same critical section so validity and the pointer stay consistent.
+    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
     if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
         free_bm_job(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id]);
     }
-
     GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
-
-    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
     GLOBAL_STATE->valid_jobs[job.job_id] = 1;
     pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
 
