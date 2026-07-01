@@ -287,6 +287,9 @@ components:
           type: string
           enum: [standard, extended]
           description: Configured fallback SV2 channel type
+        fallbackStratumV2RequireAuth:
+          type: boolean
+          description: Refuse to connect unless the fallback SV2 server certificate is verified against the authority pubkey
         fanrpm:
           type: number
           description: Current fan speed in RPM
@@ -453,6 +456,9 @@ components:
           type: string
           enum: [standard, extended]
           description: Configured SV2 channel type
+        stratumV2RequireAuth:
+          type: boolean
+          description: Refuse to connect unless the SV2 server certificate is verified against the authority pubkey
         stratumSuggestedDifficulty:
           type: number
           description: Pool suggested difficulty
@@ -747,6 +753,11 @@ components:
           examples:
             - ""
             - "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
+        stratumV2RequireAuth:
+          type: boolean
+          description: Refuse to connect unless the SV2 server certificate is verified against the authority pubkey
+          examples:
+            - false
         fallbackStratumPort:
           type: integer
           description: Port number for fallback stratum server
@@ -773,6 +784,11 @@ components:
           maxLength: 52
           examples:
             - ""
+        fallbackStratumV2RequireAuth:
+          type: boolean
+          description: Refuse to connect unless the fallback SV2 server certificate is verified against the authority pubkey
+          examples:
+            - false
         ssid:
           type: string
           description: WiFi network SSID

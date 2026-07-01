@@ -85,6 +85,7 @@ export class PoolComponent implements OnInit {
           ]],
           stratumProtocol: [info.stratumProtocol || 'SV1'],
           stratumV2AuthorityPubkey: [info.stratumV2AuthorityPubkey || '', [this.base58Validator()]],
+          stratumV2RequireAuth: [info.stratumV2RequireAuth == true, [Validators.required]],
           stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == true, [Validators.required]],
           stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
           stratumUser: [info.stratumUser, [Validators.required]],
@@ -110,6 +111,7 @@ export class PoolComponent implements OnInit {
           fallbackStratumPassword: ['*****', [Validators.required]],
           fallbackStratumProtocol: [info.fallbackStratumProtocol || 'SV1'],
           fallbackStratumV2AuthorityPubkey: [info.fallbackStratumV2AuthorityPubkey || '', [this.base58Validator()]],
+          fallbackStratumV2RequireAuth: [info.fallbackStratumV2RequireAuth == true, [Validators.required]],
           stratumV2ChannelType: [info.stratumV2ChannelType || 'standard'],
           fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType || 'standard']
         });
