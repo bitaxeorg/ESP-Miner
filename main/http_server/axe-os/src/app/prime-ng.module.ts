@@ -12,6 +12,9 @@ import { SliderModule } from 'primeng/slider';
 import { TextareaModule } from 'primeng/textarea';
 import { PopoverModule } from 'primeng/popover';
 import { ProgressBarModule } from 'primeng/progressbar';
+import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
+import { BadgeModule } from 'primeng/badge';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
 
@@ -29,6 +32,9 @@ const primeNgModules = [
     TextareaModule,
     PopoverModule,
     ProgressBarModule,
+    TableModule,
+    TagModule,
+    BadgeModule,
     IconFieldModule,
     InputIconModule
 ];

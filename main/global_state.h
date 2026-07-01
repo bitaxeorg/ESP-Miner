@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "esp_partition.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/portmacro.h"
@@ -41,6 +42,13 @@ typedef struct {
     char message[64];
     uint32_t count;
 } RejectedReasonStat;
+
+typedef struct {
+    const esp_partition_t *part;
+    char version[32];
+    int usagePercent;
+    bool isCurrent;
+} cached_partition_t;
 
 typedef struct
 {
@@ -113,6 +121,8 @@ typedef struct
     char * version;
     char * axeOSVersion;
     Scoreboard scoreboard;
+    cached_partition_t cached_partitions[3];
+    int cached_partitions_count;
     char mdns_hostname[64];
     char full_hostname[70];
 } SystemModule;

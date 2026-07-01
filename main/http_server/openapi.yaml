@@ -124,6 +124,31 @@ components:
           description: Number of errors
           type: number
 
+    SystemPartition:
+      type: object
+      required:
+        - label
+        - isCurrent
+        - isFactory
+      properties:
+        label:
+          type: string
+          description: Partition label (e.g., ota_0, ota_1, factory)
+        version:
+          type: string
+          nullable: true
+          description: Firmware version on this partition
+        isCurrent:
+          type: boolean
+          description: Whether this is the currently running partition
+        isFactory:
+          type: boolean
+          description: Whether this is a factory partition
+        usagePercent:
+          type: integer
+          nullable: true
+          description: Partition space usage percentage (0-100)
+
     SystemInfo:
       type: object
       required:
@@ -221,6 +246,8 @@ components:
         - hashrateMonitor
         - miningPaused
         - statsLimit
+        - partitions
+        - useCustomWWW
       properties:
         ASICModel:
           type: string
@@ -392,6 +419,10 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
+        useCustomWWW:
+          type: integer
+          description: Whether to serve files from the SPIFFS www partition instead of the embedded Web UI (0=embedded, 1=custom/SPIFFS)
+          enum: [0, 1]
         poolConnectionInfo:
           type: string
           description: Current pool address family
@@ -562,6 +593,11 @@ components:
         statsLimit:
           type: integer
           description: Maximum number of statistics data points
+        partitions:
+          type: array
+          description: List of available app partitions and their firmware versions
+          items:
+            $ref: '#/components/schemas/SystemPartition'
 
     SystemASIC:
       type: object
@@ -824,6 +860,12 @@ components:
           enum: [0,1]
           examples:
             - 0
+        useCustomWWW:
+          type: integer
+          description: Whether to serve files from the SPIFFS www partition instead of the embedded Web UI (0=embedded, 1=custom/SPIFFS)
+          enum: [0, 1]
+          examples:
+            - 0
         invertscreen:
           type: integer
           description: Whether to invert screen colors (0=normal, 1=inverted)
@@ -1039,6 +1081,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GenericResponse'
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
+  /api/system/boot:
+    post:
+      summary: Set next boot partition
+      description: Sets the partition to be used for the next system boot
+      operationId: setBootPartition
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - partition
+              properties:
+                partition:
+                  type: string
+                  description: Partition label to boot from (e.g., ota_0, ota_1, factory)
+      responses:
+        '200':
+          description: Boot partition set successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericResponse'
+        '400':
+          description: Invalid partition label
         '401':
           description: Unauthorized - Client not in allowed network range
         '500':

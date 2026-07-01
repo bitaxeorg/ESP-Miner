@@ -1,5 +1,4 @@
 #include <inttypes.h>
-#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -10,18 +9,15 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-#include "esp_check.h"
+#include "esp_partition.h"
+#include "esp_image_format.h"
+#include "esp_ota_ops.h"
 
 #include "driver/gpio.h"
 #include "esp_app_desc.h"
 #include "esp_timer.h"
-#include "esp_wifi.h"
-#include "lwip/inet.h"
 
 #include "system.h"
-#include "i2c_bitaxe.h"
-#include "INA260.h"
-#include "adc.h"
 #include "connect.h"
 #include "nvs_config.h"
 #include "display.h"
@@ -32,6 +28,7 @@
 #include "utils.h"
 #include "self_test.h"
 #include "filesystem.h"
+#include "embedded_web_ui.h"
 #include "work_queue.h"
 #include "hashrate_monitor_task.h"
 
@@ -156,39 +153,34 @@ void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {
         GLOBAL_STATE->SYSTEM_MODULE.version = strdup("Unknown");
     }
     
-    // Read AxeOS version from SPIFFS
-    FILE *f = fopen("/version.txt", "r");
-    if (f == NULL) {
-        ESP_LOGW(TAG, "Failed to open /version.txt");
-        GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
-    } else {
-        char version[64];
-        if (fgets(version, sizeof(version), f) == NULL) {
-            ESP_LOGW(TAG, "Failed to read version from /version.txt");
-            GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
+    bool use_custom = nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) && GLOBAL_STATE->filesystem_is_available;
+    char version[64] = "Unified";
+
+    if (use_custom) {
+        // Read AxeOS version from SPIFFS
+        FILE *f = fopen("/version.txt", "r");
+        if (f != NULL) {
+            if (fgets(version, sizeof(version), f) != NULL) {
+                // Remove trailing newline if present
+                size_t len = strlen(version);
+                if (len > 0 && version[len - 1] == '\n') {
+                    version[len - 1] = '\0';
+                }
+            }
+            fclose(f);
         } else {
-            // Remove trailing newline if present
-            size_t len = strlen(version);
-            if (len > 0 && version[len - 1] == '\n') {
-                version[len - 1] = '\0';
-            }
-            GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup(version);
-            if (GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion == NULL) {
-                ESP_LOGE(TAG, "Failed to allocate memory for axeOSVersion");
-                GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
-            }
+            strlcpy(version, "Unknown", sizeof(version));
+            ESP_LOGW(TAG, "Failed to open /version.txt from SPIFFS");
         }
-        fclose(f);
+    }
+
+    GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup(version);
+    if (GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion == NULL) {
+        GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion = strdup("Unknown");
     }
     
     ESP_LOGI(TAG, "Firmware Version: %s", GLOBAL_STATE->SYSTEM_MODULE.version);
     ESP_LOGI(TAG, "AxeOS Version: %s", GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
-
-    if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.version, GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion) != 0) {
-        ESP_LOGE(TAG, "Firmware (%s) and AxeOS (%s) versions do not match. Please make sure to update both www.bin and esp-miner.bin.", 
-            GLOBAL_STATE->SYSTEM_MODULE.version, 
-            GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
-    }
 }
 
 esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
@@ -393,4 +385,44 @@ sv2_channel_type_t sv2_channel_type_from_string(const char *s)
     if (strcmp(s, SV2_CHANNEL_TYPE_EXTENDED) == 0) return SV2_CHANNEL_EXTENDED;
     if (strcmp(s, SV2_CHANNEL_TYPE_STANDARD) == 0) return SV2_CHANNEL_STANDARD;
     return SV2_CHANNEL_UNKNOWN;
+}
+
+void SYSTEM_init_partitions(GlobalState * GLOBAL_STATE) {
+    if (!GLOBAL_STATE) return;
+    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    module->cached_partitions_count = 0;
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
+    while (it != NULL && module->cached_partitions_count < 3) {
+        const esp_partition_t *p = esp_partition_get(it);
+
+        // We only care about factory, ota_0, ota_1
+        if (strcmp(p->label, "factory") == 0 || strcmp(p->label, "ota_0") == 0 || strcmp(p->label, "ota_1") == 0) {
+            cached_partition_t *cp = &module->cached_partitions[module->cached_partitions_count];
+            cp->part = p;
+            cp->isCurrent = (p == running);
+            cp->version[0] = '\0';
+            cp->usagePercent = -1;
+
+            esp_app_desc_t app_desc;
+            if (esp_ota_get_partition_description(p, &app_desc) == ESP_OK) {
+                strncpy(cp->version, app_desc.version, sizeof(cp->version) - 1);
+                cp->version[sizeof(cp->version) - 1] = '\0';
+                
+                esp_partition_pos_t part_pos = {
+                    .offset = p->address,
+                    .size = p->size,
+                };
+                esp_image_metadata_t metadata;
+                if (esp_image_get_metadata(&part_pos, &metadata) == ESP_OK) {
+                    cp->usagePercent = (metadata.image_len * 100) / p->size;
+                }
+            }
+            module->cached_partitions_count++;
+        }
+        it = esp_partition_next(it);
+    }
+    if (it != NULL) {
+        esp_partition_iterator_release(it);
+    }
 }

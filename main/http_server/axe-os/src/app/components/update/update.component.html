@@ -60,23 +60,35 @@
         </div>
         <div class="col-12 lg:col-6 xl:col-4">
             <div class="card h-full">
-                <h3>Update AxeOS</h3>
-
-                <p-fileupload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
-                    [auto]="true" chooseLabel="Browse"></p-fileupload>
-
-                <small>(www.bin)</small>
-            </div>
-        </div>
-        <div class="col-12 lg:col-6 xl:col-4">
-            <div class="card h-full">
                 <h3>Update Firmware</h3>
                 <p-fileupload #firmwareUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaUpdate($event)"
                     [auto]="true" chooseLabel="Browse"></p-fileupload>
 
                 <small>(esp-miner.bin)</small>
             </div>
+        </div>
+        <div class="col-12 lg:col-6 xl:col-4">
+            <div class="card h-full">
+                <h3>Custom Frontend</h3>
 
+                <div class="flex align-items-center gap-2 mb-2">
+                    <p-checkbox 
+                        inputId="customWWWToggle"
+                        [binary]="true"
+                        [ngModel]="(info$ | async)?.useCustomWWW === 1"
+                        (onChange)="toggleCustomWWW($event.checked)">
+                    </p-checkbox>
+                    <label for="customWWWToggle" class="font-medium cursor-pointer">Enable custom web UI</label>
+                </div>
+                <small class="text-orange-500 block mb-4">* A device restart is required to apply this change.</small>
+
+                <div *ngIf="(info$ | async)?.useCustomWWW === 1" class="border-round p-3" style="background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                    <h5 class="mt-0 mb-3">Upload Custom UI</h5>
+                    <p-fileupload #websiteUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaWWWUpdate($event)"
+                        [auto]="true" chooseLabel="Browse"></p-fileupload>
+                    <small class="block mt-1 text-500">(www.bin)</small>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -101,9 +113,6 @@
         <ng-container *ngIf="updateStatus === 'success'">
             <i class="pi pi-check-circle text-green-500" style="font-size: 3.5rem; margin-bottom: 1rem;"></i>
             <div class="text-lg text-center">{{ updateMessage }}</div>
-            <div class="mt-4" *ngIf="updateTarget !== 'AxeOS'">
-                <p-button (onClick)="progressModal.isVisible = false">Close</p-button>
-            </div>
         </ng-container>
 
         <ng-container *ngIf="updateStatus === 'error'">
@@ -115,3 +124,64 @@
         </ng-container>
     </div>
 </app-modal>
+
+<div class="card mt-4">
+    <h3 class="mb-4">Installed Firmware</h3>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-500 font-medium pb-2">Partition</th>
+                    <th class="text-500 font-medium pb-2">Version</th>
+                    <th class="text-500 font-medium pb-2">Space</th>
+                    <th class="text-500 font-medium pb-2 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let partition of (info$ | async)?.partitions" [ngClass]="{'active': partition.isCurrent}">
+                    <td>
+                        <i class="pi pi-box mr-2"></i>
+                        {{ partition.label }}
+                        <p-badge *ngIf="partition.isCurrent" value="Active" severity="info" class="ml-2"></p-badge>
+                    </td>
+                    <td class="font-monospace">
+                        {{ partition.version || 'N/A' }}
+                    </td>
+                    <td>
+                        <div *ngIf="partition.usagePercent !== undefined && partition.usagePercent !== null" class="flex align-items-center gap-2" style="max-width: 9rem;">
+                            <span class="font-monospace text-sm">{{ partition.usagePercent }}%</span>
+                            <div class="border-round overflow-hidden w-full h-6px" style="background-color: rgba(255,255,255,0.15);">
+                                <div class="bg-primary h-full border-round" [style.width.%]="partition.usagePercent"></div>
+                            </div>
+                        </div>
+                        <span *ngIf="partition.usagePercent === undefined || partition.usagePercent === null" class="text-500 italic text-sm">
+                            -
+                        </span>
+                    </td>
+                    <td class="text-right">
+                        <div class="flex gap-2 justify-content-end align-items-center">
+                            <p-button 
+                                *ngIf="!partition.isCurrent && partition.version" 
+                                label="Activate"
+                                (onClick)="switchPartition(partition.label)"
+                                severity="secondary"
+                                styleClass="p-button-sm">
+                            </p-button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="flex justify-content-end mt-4">
+        <p-button 
+            label="Restart Device" 
+            icon="pi pi-refresh" 
+            severity="danger"
+            (onClick)="restart()"
+            styleClass="p-button-sm">
+        </p-button>
+    </div>
+</div>

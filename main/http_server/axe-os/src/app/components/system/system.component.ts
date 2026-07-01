@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Observable, Subject, combineLatest, shareReplay, first, takeUntil, map } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
+import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { ToastrService } from 'ngx-toastr';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
@@ -82,7 +83,7 @@ export class SystemComponent implements OnInit, OnDestroy {
   }
 
   getSystemRows(data: CombinedData): TableRow[] {
-    return [
+    const rows: TableRow[] = [
       { label: 'Device Model', value: data.asic.deviceModel || 'Other', valueClass: 'text-' + data.asic.swarmColor + '-500' },
       { label: 'Board Version', value: data.info.boardVersion },
       { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
@@ -101,9 +102,15 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: '• Min Free (All Time)', value: ByteSuffixPipe.transform(data.info.minFreeHeap)},
       { label: '• Max Alloc Block', value: ByteSuffixPipe.transform(data.info.maxAllocHeap), class: 'pb-3' },
       { label: 'Firmware Version', value: data.info.version },
-      { label: 'AxeOS Version', value: data.info.axeOSVersion },
-      { label: 'ESP-IDF Version', value: data.info.idfVersion },
     ];
+
+    if (data.info.useCustomWWW === 1) {
+      rows.push({ label: 'AxeOS Version', value: data.info.axeOSVersion });
+    }
+
+    rows.push({ label: 'ESP-IDF Version', value: data.info.idfVersion });
+
+    return rows;
   }
 
   identifyDevice(): void {
@@ -114,7 +121,7 @@ export class SystemComponent implements OnInit, OnDestroy {
           this.toastr.success((result as GenericResponse).message);
         },
         error: (err: HttpErrorResponse) => {
-          this.toastr.error(`Could not identify device. ${err.message}`);
+          this.toastr.error(`Could not identify device. ${getHttpErrorMessage(err)}`);
         }
       });
   }

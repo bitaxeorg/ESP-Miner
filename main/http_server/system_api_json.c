@@ -1,4 +1,7 @@
 #include <stdio.h>
+#include <string.h>
+#include "esp_partition.h"
+#include "esp_image_format.h"
 #include "esp_wifi.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
@@ -204,6 +207,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     free(fallback_proto);
 
     // User Preferences
+    cJSON_AddNumberToObject(root, "useCustomWWW", nvs_config_get_bool(NVS_CONFIG_USE_CUSTOM_WWW) ? 1 : 0);
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) ? 1 : 0);
     char *disp_name = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     cJSON_AddStringToObject(root, "display", disp_name ? disp_name : "");
@@ -289,6 +293,36 @@ static void system_api_add_block_info(cJSON *root, GlobalState *g) {
     }
 }
 
+static void system_api_add_partitions(cJSON *root, GlobalState *g) {
+    if (!root || !g) return;
+
+    cJSON *partitions_array = cJSON_CreateArray();
+    cJSON_AddItemToObject(root, "partitions", partitions_array);
+
+    for (int i = 0; i < g->SYSTEM_MODULE.cached_partitions_count; i++) {
+        cached_partition_t *cp = &g->SYSTEM_MODULE.cached_partitions[i];
+        if (cp->part == NULL) continue;
+
+        cJSON *p_obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(p_obj, "label", cp->part->label);
+        cJSON_AddBoolToObject(p_obj, "isCurrent", cp->isCurrent);
+        cJSON_AddBoolToObject(p_obj, "isFactory", cp->part->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY);
+
+        if (cp->version[0] != '\0') {
+            cJSON_AddStringToObject(p_obj, "version", cp->version);
+            if (cp->usagePercent >= 0) {
+                cJSON_AddNumberToObject(p_obj, "usagePercent", cp->usagePercent);
+            } else {
+                cJSON_AddNullToObject(p_obj, "usagePercent");
+            }
+        } else {
+            cJSON_AddNullToObject(p_obj, "version");
+            cJSON_AddNullToObject(p_obj, "usagePercent");
+        }
+        cJSON_AddItemToArray(partitions_array, p_obj);
+    }
+}
+
 cJSON* system_api_get_full_json(GlobalState *g) {
     if (!g) return NULL;
     cJSON *root = cJSON_CreateObject();
@@ -297,6 +331,7 @@ cJSON* system_api_get_full_json(GlobalState *g) {
     system_api_add_telemetry(root, g);
     system_api_add_config(root, g);
     system_api_add_hashrate_monitor(root, g);
+    system_api_add_partitions(root, g);
 
     // Arrays that involve global state loops (not simple addition)
     system_api_add_rejected_reasons(root, g);
