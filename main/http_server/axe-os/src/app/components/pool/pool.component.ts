@@ -45,6 +45,7 @@ export class PoolComponent implements OnInit {
 
   public showPassword: boolean[] = [];
   public showAdvancedOptions: boolean[] = [];
+  public activeCardIndex: number | null = 0;
 
   public tlsOptions: ITlsOption[] = [
     { value: 0, label: 'No TLS' },
@@ -230,6 +231,10 @@ export class PoolComponent implements OnInit {
     return 0;
   }
 
+  toggleCard(index: number) {
+    this.activeCardIndex = this.activeCardIndex === index ? null : index;
+  }
+
   addPool() {
     if (this.poolsArray.length < 8) {
       const nextId = this.getFirstAvailableId();
@@ -266,6 +271,7 @@ export class PoolComponent implements OnInit {
 
       const index = this.poolsArray.controls.findIndex(c => c.get('id')?.value === nextId);
       this.setupTlsValidationForIndex(index);
+      this.activeCardIndex = index; // Expand newly added pool
       this.form.markAsDirty();
     }
   }
@@ -284,6 +290,12 @@ export class PoolComponent implements OnInit {
     this.poolsArray.removeAt(index);
     this.pendingDeletePoolIds.push(id);
     this.form.markAsDirty();
+
+    if (this.activeCardIndex === index) {
+      this.activeCardIndex = this.poolsArray.length > 0 ? 0 : null;
+    } else if (this.activeCardIndex !== null && this.activeCardIndex > index) {
+      this.activeCardIndex--;
+    }
   }
 
   isDeleteDisabled(id: number): boolean {

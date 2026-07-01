@@ -35,27 +35,34 @@
             </div>
         </div>
 
-        <div class="flex align-items-center justify-content-between mb-3 mt-4">
-            <h2>Pool Configurations</h2>
-        </div>
+        <h2 class="mb-3">Pool Configurations</h2>
 
-        <div formArrayName="pools" class="flex flex-column gap-3">
+        <div formArrayName="pools" class="flex flex-column mb-4">
             <div *ngFor="let poolControl of poolsArray.controls; let i = index" [formGroupName]="i" class="card border-round-xl overflow-hidden p-0 shadow-1 hover:shadow-2 transition-shadow transition-duration-200" style="border: 1px solid var(--surface-border); background-color: var(--surface-card);">
                 <!-- Card Header -->
-                <div class="flex justify-content-between align-items-center p-3" style="background-color: var(--surface-hover); border-bottom: 1px solid var(--surface-border);">
+                <div class="flex justify-content-between align-items-center p-3 cursor-pointer" style="background-color: var(--surface-hover); border-bottom: 1px solid var(--surface-border);" (click)="toggleCard(i)">
                     <div class="flex align-items-center gap-2">
+                        <i class="pi mr-1" [ngClass]="activeCardIndex === i ? 'pi-chevron-up' : 'pi-chevron-down'" style="font-size: 0.9rem; color: var(--text-color-secondary);"></i>
                         <span class="font-bold text-lg">Pool {{ poolControl.get('id')?.value + 1 }}</span>
                         <p-badge [value]="getProtocolLabel(poolControl.get('stratumProtocol')?.value)" severity="info" styleClass="text-xs font-semibold"></p-badge>
                         <p-badge *ngIf="poolControl.get('id')?.value === form.get('primaryPoolIndex')?.value" value="Primary" severity="success" styleClass="text-xs font-semibold"></p-badge>
                         <p-badge *ngIf="poolControl.get('id')?.value === form.get('secondaryPoolIndex')?.value" value="Fallback" severity="warn" styleClass="text-xs font-semibold"></p-badge>
+                        
+                        <!-- Quick Summary when collapsed -->
+                        <span *ngIf="activeCardIndex !== i && poolControl.get('stratumURL')?.value" class="text-sm text-500 ml-2 font-medium">
+                            {{ poolControl.get('stratumURL')?.value }}:{{ poolControl.get('stratumPort')?.value }}
+                        </span>
+                        <span *ngIf="activeCardIndex !== i && !poolControl.get('stratumURL')?.value" class="text-sm text-400 ml-2 font-normal italic">
+                            (not configured)
+                        </span>
                     </div>
                     <div class="flex gap-2">
                         <button pButton type="button" icon="pi pi-trash" class="p-button-danger p-button-text p-button-sm" [disabled]="isDeleteDisabled(poolControl.get('id')?.value)" (click)="deletePool(i); $event.stopPropagation();" pTooltip="Delete Pool" tooltipPosition="left"></button>
                     </div>
                 </div>
 
-                <!-- Card Content (Always Visible) -->
-                <div class="p-3">
+                <!-- Card Content (Toggleable) -->
+                <div [hidden]="activeCardIndex !== i" class="p-3">
                     <div class="field grid p-fluid">
                         <label [htmlFor]="'stratumURL_' + poolControl.get('id')?.value" class="col-12 md:col-2 md:mb-0">Stratum Host</label>
                         <div class="col-12 md:col-10">
@@ -68,6 +75,33 @@
                             <input pInputText [id]="'stratumPort_' + poolControl.get('id')?.value" formControlName="stratumPort" type="number" />
                         </div>
                     </div>
+                    
+                    <div class="field grid p-fluid">
+                        <label [htmlFor]="'stratumProtocol_' + poolControl.get('id')?.value" class="col-12 mb-2 md:col-2 md:mb-0">
+                            <tooltip-text-icon
+                                text="Stratum Protocol"
+                                tooltip="Select Stratum protocol version. Note: Not all pools support Stratum V2."
+                            />
+                        </label>
+                        <div class="col-12 md:col-10">
+                            <div class="flex flex-wrap gap-3">
+                                <div *ngFor="let option of protocolOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
+                                    <p-radioButton
+                                        name="stratumProtocol_{{poolControl.get('id')?.value}}"
+                                        [value]="option.value"
+                                        [ngModel]="poolControl.get('stratumProtocol')?.value"
+                                        [ngModelOptions]="{standalone: true}"
+                                        (ngModelChange)="poolControl.get('stratumProtocol')?.setValue($event); poolControl.get('stratumProtocol')?.markAsDirty()"
+                                        [inputId]="'stratumProtocol_' + poolControl.get('id')?.value + '_' + option.value">
+                                    </p-radioButton>
+                                    <label [for]="'stratumProtocol_' + poolControl.get('id')?.value + '_' + option.value" class="ml-2 cursor-pointer">
+                                        {{ option.label }}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="field grid p-fluid">
                         <label [htmlFor]="'stratumUser_' + poolControl.get('id')?.value" class="col-12 md:col-2 md:mb-0">User</label>
                         <div class="col-12 md:col-10">
@@ -85,7 +119,72 @@
                             </p-iconfield>
                         </div>
                     </div>
- 
+
+                    <!-- SV2-only options (above the fold if active) -->
+                    <ng-container *ngIf="isPoolV2Enabled(i)">
+                        <div class="field grid p-fluid">
+                            <label class="col-12 mb-2 md:col-2 md:mb-0">
+                                <tooltip-text-icon
+                                    text="SV2 Channel Type"
+                                    tooltip="Extended Channels are recommended for external pools — the pool sends the coinbase template so the miner can verify it. Standard Channels should only be used with a locally deployed SV2 node or JD client."
+                                />
+                            </label>
+                            <div class="col-12 md:col-10">
+                                <div class="flex flex-wrap gap-3">
+                                    <div *ngFor="let option of sv2ChannelOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
+                                        <p-radioButton
+                                            name="stratumV2ChannelType_{{poolControl.get('id')?.value}}"
+                                            [value]="option.value"
+                                            [ngModel]="poolControl.get('stratumV2ChannelType')?.value"
+                                            [ngModelOptions]="{standalone: true}"
+                                            (ngModelChange)="poolControl.get('stratumV2ChannelType')?.setValue($event); poolControl.get('stratumV2ChannelType')?.markAsDirty()"
+                                            [inputId]="'stratumV2ChannelType_' + poolControl.get('id')?.value + '_' + option.value"
+                                            [disabled]="option.value === 'standard' && isStandardChannelDisabled()">
+                                        </p-radioButton>
+                                        <label [for]="'stratumV2ChannelType_' + poolControl.get('id')?.value + '_' + option.value"
+                                            class="ml-2 cursor-pointer"
+                                            [class.text-400]="option.value === 'standard' && isStandardChannelDisabled()">
+                                            {{ option.label }}
+                                        </label>
+                                    </div>
+                                </div>
+                                <small class="block text-blue-600 mt-2" *ngIf="poolControl.get('stratumV2ChannelType')?.value === 'extended'">
+                                    Recommended for external SV2 pools. The pool sends the coinbase template, enabling transaction verification.
+                                </small>
+                                <small class="block text-orange-600 mt-2" *ngIf="poolControl.get('stratumV2ChannelType')?.value === 'standard'">
+                                    Only use with a self-deployed local SV2 node or JD client. Not supported on Bitaxe Max (BM1397).
+                                </small>
+                                <small class="block text-400 mt-2" *ngIf="isStandardChannelDisabled()">
+                                    Standard Channels are not available on BM1397 — Extended Channels are required.
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="field grid p-fluid">
+                            <label [htmlFor]="'stratumV2AuthorityPubkey_' + poolControl.get('id')?.value" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">
+                                <tooltip-text-icon
+                                    text="SV2 Authority Pubkey"
+                                    tooltip="The pool operator provides this key to prove you are connecting to the real pool and not an impersonator. Without it, the connection is still encrypted but a man-in-the-middle attack could redirect your hashrate."
+                                />
+                            </label>
+                            <div class="col-12 md:col-10">
+                                <input
+                                    pInputText
+                                    type="text"
+                                    [id]="'stratumV2AuthorityPubkey_' + poolControl.get('id')?.value"
+                                    formControlName="stratumV2AuthorityPubkey"
+                                    class="w-full text-monospace"
+                                    placeholder="Enter base58-encoded authority public key (optional, e.g., 9auqWEzQ...)" />
+                                <small *ngIf="poolControl.get('stratumV2AuthorityPubkey')?.errors?.['invalidBase58']" class="block text-red-500 mt-1">
+                                    Invalid base58 string. Only base58 characters allowed (no 0, O, I, l).
+                                </small>
+                                <small *ngIf="poolControl.get('stratumV2AuthorityPubkey')?.errors?.['invalidBase58Length']" class="block text-red-500 mt-1">
+                                    Invalid length. SV2 authority pubkeys are typically 51-52 characters.
+                                </small>
+                            </div>
+                        </div>
+                    </ng-container>
+
                     <fieldset class="m-0 p-0 mt-4 border-200 border-bottom-none border-left-none border-right-none">
                         <legend class="p-0 pr-3">
                             <span class="cursor-pointer font-semibold" (click)="showAdvancedOptions[poolControl.get('id')?.value] = !showAdvancedOptions[poolControl.get('id')?.value]">
@@ -93,100 +192,9 @@
                                 {{showAdvancedOptions[poolControl.get('id')?.value] ? 'Hide' : 'Show'}} Advanced Options
                             </span>
                         </legend>
- 
+
                         <div [hidden]="!showAdvancedOptions[poolControl.get('id')?.value]">
-                            <div class="field grid p-fluid mt-4">
-                                <label [htmlFor]="'stratumProtocol_' + poolControl.get('id')?.value" class="col-12 mb-2 md:col-2 md:mb-0">
-                                    <tooltip-text-icon
-                                        text="Stratum Protocol"
-                                        tooltip="Select Stratum protocol version. Note: Not all pools support Stratum V2."
-                                    />
-                                </label>
-                                <div class="col-12 md:col-10">
-                                    <div class="flex flex-wrap gap-3">
-                                        <div *ngFor="let option of protocolOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
-                                            <p-radioButton
-                                                name="stratumProtocol_{{poolControl.get('id')?.value}}"
-                                                [value]="option.value"
-                                                [ngModel]="poolControl.get('stratumProtocol')?.value"
-                                                [ngModelOptions]="{standalone: true}"
-                                                (ngModelChange)="poolControl.get('stratumProtocol')?.setValue($event); poolControl.get('stratumProtocol')?.markAsDirty()"
-                                                [inputId]="'stratumProtocol_' + poolControl.get('id')?.value + '_' + option.value">
-                                            </p-radioButton>
-                                            <label [for]="'stratumProtocol_' + poolControl.get('id')?.value + '_' + option.value" class="ml-2 cursor-pointer">
-                                                {{ option.label }}
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
- 
-                            <!-- SV2-only options -->
-                            <ng-container *ngIf="isPoolV2Enabled(i)">
-                                <div class="field grid p-fluid">
-                                    <label class="col-12 mb-2 md:col-2 md:mb-0">
-                                        <tooltip-text-icon
-                                            text="SV2 Channel Type"
-                                            tooltip="Extended Channels are recommended for external pools — the pool sends the coinbase template so the miner can verify it. Standard Channels should only be used with a locally deployed SV2 node or JD client."
-                                        />
-                                    </label>
-                                    <div class="col-12 md:col-10">
-                                        <div class="flex flex-wrap gap-3">
-                                            <div *ngFor="let option of sv2ChannelOptions; trackBy: trackByFn" class="field-radiobutton mb-0">
-                                                <p-radioButton
-                                                    name="stratumV2ChannelType_{{poolControl.get('id')?.value}}"
-                                                    [value]="option.value"
-                                                    [ngModel]="poolControl.get('stratumV2ChannelType')?.value"
-                                                    [ngModelOptions]="{standalone: true}"
-                                                    (ngModelChange)="poolControl.get('stratumV2ChannelType')?.setValue($event); poolControl.get('stratumV2ChannelType')?.markAsDirty()"
-                                                    [inputId]="'stratumV2ChannelType_' + poolControl.get('id')?.value + '_' + option.value"
-                                                    [disabled]="option.value === 'standard' && isStandardChannelDisabled()">
-                                                </p-radioButton>
-                                                <label [for]="'stratumV2ChannelType_' + poolControl.get('id')?.value + '_' + option.value"
-                                                    class="ml-2 cursor-pointer"
-                                                    [class.text-400]="option.value === 'standard' && isStandardChannelDisabled()">
-                                                    {{ option.label }}
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <small class="block text-blue-600 mt-2" *ngIf="poolControl.get('stratumV2ChannelType')?.value === 'extended'">
-                                            Recommended for external SV2 pools. The pool sends the coinbase template, enabling transaction verification.
-                                        </small>
-                                        <small class="block text-orange-600 mt-2" *ngIf="poolControl.get('stratumV2ChannelType')?.value === 'standard'">
-                                            Only use with a self-deployed local SV2 node or JD client. Not supported on Bitaxe Max (BM1397).
-                                        </small>
-                                        <small class="block text-400 mt-2" *ngIf="isStandardChannelDisabled()">
-                                            Standard Channels are not available on BM1397 — Extended Channels are required.
-                                        </small>
-                                    </div>
-                                </div>
-
-                                <div class="field grid p-fluid">
-                                    <label [htmlFor]="'stratumV2AuthorityPubkey_' + poolControl.get('id')?.value" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">
-                                        <tooltip-text-icon
-                                            text="SV2 Authority Pubkey"
-                                            tooltip="The pool operator provides this key to prove you are connecting to the real pool and not an impersonator. Without it, the connection is still encrypted but a man-in-the-middle attack could redirect your hashrate."
-                                        />
-                                    </label>
-                                    <div class="col-12 md:col-10">
-                                        <input
-                                            pInputText
-                                            type="text"
-                                            [id]="'stratumV2AuthorityPubkey_' + poolControl.get('id')?.value"
-                                            formControlName="stratumV2AuthorityPubkey"
-                                            class="w-full text-monospace"
-                                            placeholder="Enter base58-encoded authority public key (optional, e.g., 9auqWEzQ...)" />
-                                        <small *ngIf="poolControl.get('stratumV2AuthorityPubkey')?.errors?.['invalidBase58']" class="block text-red-500 mt-1">
-                                            Invalid base58 string. Only base58 characters allowed (no 0, O, I, l).
-                                        </small>
-                                        <small *ngIf="poolControl.get('stratumV2AuthorityPubkey')?.errors?.['invalidBase58Length']" class="block text-red-500 mt-1">
-                                            Invalid length. SV2 authority pubkeys are typically 51-52 characters.
-                                        </small>
-                                    </div>
-                                </div>
-                            </ng-container>
-
-                            <!-- SV1-only options -->
+                            <!-- SV1-only options (below the fold) -->
                             <ng-container *ngIf="!isPoolV2Enabled(i)">
                                 <div class="field grid p-fluid mt-4">
                                     <label [htmlFor]="'stratumSuggestedDifficulty_' + poolControl.get('id')?.value" class="col-12 md:col-2 md:mb-0">
@@ -263,7 +271,7 @@
                                 </div>
                             </ng-container>
 
-                            <div *ngIf="!isPoolV2Enabled(i) || isPoolV2Extended(i)" class="field-checkbox grid">
+                            <div *ngIf="!isPoolV2Enabled(i) || isPoolV2Extended(i)" class="field-checkbox grid mt-4">
                                 <div class="col-1 md:col-10 md:flex-order-2">
                                     <p-checkbox [name]="'stratumDecodeCoinbase_' + poolControl.get('id')?.value" [inputId]="'stratumDecodeCoinbase_' + poolControl.get('id')?.value" formControlName="stratumDecodeCoinbase"
                                         [binary]="true"></p-checkbox>
