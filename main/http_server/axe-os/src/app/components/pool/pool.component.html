@@ -185,7 +185,7 @@
                         </div>
                     </ng-container>
 
-                    <fieldset class="m-0 p-0 mt-4 border-200 border-bottom-none border-left-none border-right-none">
+                    <fieldset class="m-0 p-0 mt-2 border-200 border-bottom-none border-left-none border-right-none">
                         <legend class="p-0 pr-3">
                             <span class="cursor-pointer font-semibold" (click)="showAdvancedOptions[poolControl.get('id')?.value] = !showAdvancedOptions[poolControl.get('id')?.value]">
                                 <i class="pi pi-angle-{{showAdvancedOptions[poolControl.get('id')?.value] ? 'down' : 'right'}} text-sm -ml-1 mr-1"></i>
@@ -193,10 +193,10 @@
                             </span>
                         </legend>
 
-                        <div [hidden]="!showAdvancedOptions[poolControl.get('id')?.value]">
+                        <div [hidden]="!showAdvancedOptions[poolControl.get('id')?.value]" class="pt-3">
                             <!-- SV1-only options (below the fold) -->
                             <ng-container *ngIf="!isPoolV2Enabled(i)">
-                                <div class="field grid p-fluid mt-4">
+                                <div class="field grid p-fluid">
                                     <label [htmlFor]="'stratumSuggestedDifficulty_' + poolControl.get('id')?.value" class="col-12 md:col-2 md:mb-0">
                                         <tooltip-text-icon
                                             text="Suggested Difficulty"
@@ -241,7 +241,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div *ngIf="poolControl.get('stratumTLS')?.value === 2" class="field grid p-fluid mb-0">
+                                <div *ngIf="poolControl.get('stratumTLS')?.value === 2" class="field grid p-fluid">
                                     <label [htmlFor]="'stratumCert_' + poolControl.get('id')?.value" class="col-12 mb-2 md:col-2 md:mb-0 flex align-self-baseline">Certificate</label>
                                     <div class="col-12 md:col-10">
                                         <div class="p-inputgroup">
@@ -271,7 +271,7 @@
                                 </div>
                             </ng-container>
 
-                            <div *ngIf="!isPoolV2Enabled(i) || isPoolV2Extended(i)" class="field-checkbox grid mt-4">
+                            <div *ngIf="!isPoolV2Enabled(i) || isPoolV2Extended(i)" class="field-checkbox grid mb-0">
                                 <div class="col-1 md:col-10 md:flex-order-2">
                                     <p-checkbox [name]="'stratumDecodeCoinbase_' + poolControl.get('id')?.value" [inputId]="'stratumDecodeCoinbase_' + poolControl.get('id')?.value" formControlName="stratumDecodeCoinbase"
                                         [binary]="true"></p-checkbox>
