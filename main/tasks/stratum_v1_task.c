@@ -41,8 +41,40 @@
 #define TRANSPORT_TIMEOUT_MS 5000
 
 #define BUFFER_SIZE 1024
+#define MAX_ACTIVE_JOB_IDS 16
 
 static const char *TAG = "stratum_v1_task";
+
+static bool add_active_job_id(char **active_job_ids, int *count, const char *job_id)
+{
+    for (int i = 0; i < *count; i++) {
+        if (active_job_ids[i] && strcmp(active_job_ids[i], job_id) == 0) {
+            return false;
+        }
+    }
+    if (*count < MAX_ACTIVE_JOB_IDS) {
+        active_job_ids[*count] = strdup(job_id);
+        if (active_job_ids[*count]) {
+            (*count)++;
+        }
+    } else {
+        free(active_job_ids[0]);
+        for (int i = 1; i < MAX_ACTIVE_JOB_IDS; i++) {
+            active_job_ids[i - 1] = active_job_ids[i];
+        }
+        active_job_ids[MAX_ACTIVE_JOB_IDS - 1] = strdup(job_id);
+    }
+    return true;
+}
+
+static void clear_active_job_ids(char **active_job_ids, int *count)
+{
+    for (int i = 0; i < *count; i++) {
+        free(active_job_ids[i]);
+        active_job_ids[i] = NULL;
+    }
+    *count = 0;
+}
 
 static StratumApiV1Message stratum_api_v1_message = {};
 
@@ -182,11 +214,15 @@ void stratum_v1_task(void *pvParameters)
     int retry_attempts = 0;
     int retry_critical_attempts = 0;
 
+    char *active_job_ids[MAX_ACTIVE_JOB_IDS] = {0};
+    int active_job_ids_count = 0;
+
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
     while (1) {
         // Check if coordinator wants us to shut down
         if (protocol_coordinator_v1_should_shutdown()) {
             ESP_LOGI(TAG, "Coordinator requested shutdown, exiting");
+            clear_active_job_ids(active_job_ids, &active_job_ids_count);
             protocol_coordinator_v1_exited();
             vTaskDelete(NULL);
         }
@@ -209,6 +245,7 @@ void stratum_v1_task(void *pvParameters)
             // recovery — see protocol_coordinator.c.
             ESP_LOGW(TAG, "Max V1 retry attempts reached (%d), notifying coordinator", retry_attempts);
             stratum_v1_close_connection(GLOBAL_STATE);
+            clear_active_job_ids(active_job_ids, &active_job_ids_count);
             protocol_coordinator_notify_failure();
             vTaskDelete(NULL);
             return;
@@ -216,6 +253,8 @@ void stratum_v1_task(void *pvParameters)
 
         stratum_url = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_url : GLOBAL_STATE->SYSTEM_MODULE.pool_url;
         port = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_port : GLOBAL_STATE->SYSTEM_MODULE.pool_port;
+
+        clear_active_job_ids(active_job_ids, &active_job_ids_count);
 
         stratum_connection_info_t conn_info;
         if (stratum_socket_resolve(stratum_url, port, &conn_info) != ESP_OK) {
@@ -303,6 +342,7 @@ void stratum_v1_task(void *pvParameters)
             if (protocol_coordinator_v1_should_shutdown()) {
                 ESP_LOGI(TAG, "Coordinator requested shutdown during recv loop, exiting");
                 stratum_v1_close_connection(GLOBAL_STATE);
+                clear_active_job_ids(active_job_ids, &active_job_ids_count);
                 protocol_coordinator_v1_exited();
                 vTaskDelete(NULL);
             }
@@ -340,19 +380,34 @@ void stratum_v1_task(void *pvParameters)
                     break;
 
                 case MINING_NOTIFY:
-                    GLOBAL_STATE->SYSTEM_MODULE.work_received++;
-                    SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
-                    if (stratum_api_v1_message.mining_notification->clean_jobs &&
-                        (GLOBAL_STATE->stratum_queue.count > 0)) {
-                        SYSTEM_clean_jobs_queue(GLOBAL_STATE);
+                    {
+                        mining_notify *notify = stratum_api_v1_message.mining_notification;
+                        bool is_duplicate = false;
+                        if (notify && notify->job_id) {
+                            if (notify->clean_jobs) {
+                                clear_active_job_ids(active_job_ids, &active_job_ids_count);
+                            }
+                            is_duplicate = !add_active_job_id(active_job_ids, &active_job_ids_count, notify->job_id);
+                        }
+
+                        if (is_duplicate) {
+                            ESP_LOGW(TAG, "Ignoring duplicate notify for job %s", notify ? notify->job_id : "unknown");
+                        } else {
+                            GLOBAL_STATE->SYSTEM_MODULE.work_received++;
+                            SYSTEM_notify_new_ntime(GLOBAL_STATE, stratum_api_v1_message.mining_notification->ntime);
+                            if (stratum_api_v1_message.mining_notification->clean_jobs &&
+                                (GLOBAL_STATE->stratum_queue.count > 0)) {
+                                SYSTEM_clean_jobs_queue(GLOBAL_STATE);
+                            }
+                            if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
+                                mining_notify *next_notify_json_str = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
+                                STRATUM_V1_free_mining_notify(next_notify_json_str);
+                            }
+                            queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
+                            decode_mining_notification(GLOBAL_STATE, stratum_api_v1_message.mining_notification);
+                            stratum_api_v1_message.mining_notification = NULL;
+                        }
                     }
-                    if (GLOBAL_STATE->stratum_queue.count == QUEUE_SIZE) {
-                        mining_notify *next_notify_json_str = (mining_notify *) queue_dequeue(&GLOBAL_STATE->stratum_queue);
-                        STRATUM_V1_free_mining_notify(next_notify_json_str);
-                    }
-                    queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
-                    decode_mining_notification(GLOBAL_STATE, stratum_api_v1_message.mining_notification);
-                    stratum_api_v1_message.mining_notification = NULL;
                     break;
 
                 case MINING_SET_DIFFICULTY:
@@ -393,6 +448,7 @@ void stratum_v1_task(void *pvParameters)
                         stratum_api_v1_message.extranonce_str = NULL;
                         GLOBAL_STATE->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
                         free(old_extranonce_str);
+                        GLOBAL_STATE->reset_extranonce2 = true;
                     }
                     break;
 
@@ -411,7 +467,8 @@ void stratum_v1_task(void *pvParameters)
 
                 case CLIENT_GET_VERSION:
                     STRATUM_V1_send_version(GLOBAL_STATE->transport, stratum_api_v1_message.message_id);
-                    break;                case STRATUM_RESULT:
+                    break;
+                case STRATUM_RESULT:
                     {
                         float response_time_ms = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id, receive_time_us);
                         if (response_time_ms >= 0) {
@@ -455,5 +512,6 @@ void stratum_v1_task(void *pvParameters)
             }
         }
     }
+    clear_active_job_ids(active_job_ids, &active_job_ids_count);
     vTaskDelete(NULL);
 }
