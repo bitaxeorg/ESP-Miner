@@ -65,7 +65,21 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public refreshIntervalTime = 30;
   public refreshTimeSet = 30;
 
-  public totals: { hashRate: number; power: number; bestDiff: number } = { hashRate: 0, power: 0, bestDiff: 0 };
+  public totals: {
+    hashRate: number;
+    power: number;
+    bestDiff: number;
+    hashingDevices: number;
+    pausedDevices: number;
+    notAccessibleDevices: number;
+  } = {
+    hashRate: 0,
+    power: 0,
+    bestDiff: 0,
+    hashingDevices: 0,
+    pausedDevices: 0,
+    notAccessibleDevices: 0
+  };
 
   public isRefreshing = false;
 
@@ -412,6 +426,7 @@ private isIpAddress(value: string): boolean {
       version: '',
       uptimeSeconds: 0,
       poolDifficulty: 0,
+      notAccessible: true,
     });
   };
 
@@ -487,10 +502,18 @@ private isIpAddress(value: string): boolean {
     });
   }
 
+  public isNotHashing(axe: any): boolean {
+    return !!axe.miningPaused || !axe.hashRate || !!axe.notAccessible;
+  }
+
   private calculateTotals() {
-    this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (axe.hashRate || 0), 0);
-    this.totals.power = this.swarm.reduce((sum, axe) => sum + (axe.power || 0), 0);
+    this.totals.hashRate = this.swarm.reduce((sum, axe) => sum + (this.isNotHashing(axe) ? 0 : (axe.hashRate || 0)), 0);
+    this.totals.power = this.swarm.reduce((sum, axe) => sum + (this.isNotHashing(axe) ? 0 : (axe.power || 0)), 0);
     this.totals.bestDiff = this.swarm.reduce((max, axe) => Math.max(max, axe.bestDiff || 0), 0);
+
+    this.totals.hashingDevices = this.swarm.filter(axe => !this.isNotHashing(axe) && !axe.notAccessible).length;
+    this.totals.pausedDevices = this.swarm.filter(axe => !axe.notAccessible && !!axe.miningPaused).length;
+    this.totals.notAccessibleDevices = this.swarm.filter(axe => !!axe.notAccessible).length;
   }
 
   get deviceFamilies(): SwarmDevice[] {
@@ -555,6 +578,7 @@ private isIpAddress(value: string): boolean {
       overheat_mode: null,
       isUsingFallbackStratum: null,
       blockFound: null,
+      notAccessible: null,
       ...info,
       ...asic,
     };

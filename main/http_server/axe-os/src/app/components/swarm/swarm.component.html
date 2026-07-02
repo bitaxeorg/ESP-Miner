@@ -5,15 +5,36 @@
 
     <ng-container *ngIf="swarm.length; else noDevices">
         <div class="grid">
-            <div class="col-6 xl:col-3" *ngFor="let metric of [
-                { label: 'Total Devices', value: swarm.length },
-                { label: 'Total Hashrate', value: totals.hashRate | hashSuffix},
-                { label: 'Total Power', value: (totals.power | number: '1.1-1')  + ' W' },
-                { label: 'Best Diff', value: totals.bestDiff | diffSuffix }
-            ]">
-                <div class="card flex flex-column mb-0">
-                    <span class="text-color-secondary font-medium mb-3">{{metric.label}}</span>
-                    <div class="font-medium text-2xl">{{metric.value}}</div>
+            <div class="col-6 xl:col-3">
+                <div class="card flex flex-column mb-0 h-full">
+                    <span class="text-color-secondary font-medium mb-3">Total Devices</span>
+                    <div class="font-medium text-2xl">{{ totals.hashingDevices }}</div>
+                    <div *ngIf="totals.pausedDevices > 0" class="mt-1">
+                        <span class="text-yellow-500 font-medium">{{ totals.pausedDevices }} </span>
+                        <span class="text-color-secondary">paused</span>
+                    </div>
+                    <div *ngIf="totals.notAccessibleDevices > 0" class="mt-1">
+                        <span class="text-red-500 font-medium">{{ totals.notAccessibleDevices }} </span>
+                        <span class="text-color-secondary">not accessible</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 xl:col-3">
+                <div class="card flex flex-column mb-0 h-full">
+                    <span class="text-color-secondary font-medium mb-3">Total Hashrate</span>
+                    <div class="font-medium text-2xl">{{ totals.hashRate | hashSuffix }}</div>
+                </div>
+            </div>
+            <div class="col-6 xl:col-3">
+                <div class="card flex flex-column mb-0 h-full">
+                    <span class="text-color-secondary font-medium mb-3">Total Power</span>
+                    <div class="font-medium text-2xl">{{ (totals.power | number: '1.1-1') + ' W' }}</div>
+                </div>
+            </div>
+            <div class="col-6 xl:col-3">
+                <div class="card flex flex-column mb-0 h-full">
+                    <span class="text-color-secondary font-medium mb-3">Best Diff</span>
+                    <div class="font-medium text-2xl">{{ totals.bestDiff | diffSuffix }}</div>
                 </div>
             </div>
         </div>
@@ -87,7 +108,7 @@
         <ng-container *ngIf="filteredSwarm.length; else noFilterResults">
             <div class="grid" *ngIf="gridView">
                 <div class="col-12 sm:col-6 xl:col-{{staticMenuDesktopInactive ? 3 : 4}}" *ngFor="let axe of filteredSwarm">
-                    <div class="card flex justify-content-between mb-0 h-full">
+                    <div class="card flex justify-content-between mb-0 h-full" [class.not-hashing]="isNotHashing(axe)">
                         <div class="flex flex-column justify-content-between">
                                 <div class="flex flex-column">
                                     <div class="flex flex-column">
@@ -236,7 +257,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr *ngFor="let axe of filteredSwarm">
+                        <tr *ngFor="let axe of filteredSwarm" [class.not-hashing]="isNotHashing(axe)">
                             <td>
                                 <div class="flex flex-column">
                                     <a [href]="'http://' + getDeviceLink(axe)" target="_blank">
