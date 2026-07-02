@@ -517,7 +517,8 @@ static void screen_update_cb(lv_timer_t * timer)
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
 
-    char *pool_url = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
+    uint16_t pool_idx = module->is_using_fallback ? module->secondary_pool_index : module->primary_pool_index;
+    char *pool_url = module->pools[pool_idx].url;
     if (strcmp(lv_label_get_text(urls_mining_url_label), pool_url) != 0) {
         lv_label_set_text(urls_mining_url_label, pool_url);
     }

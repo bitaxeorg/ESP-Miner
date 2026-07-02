@@ -149,59 +149,64 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddStringToObject(root, "poolConnectionInfo", g->SYSTEM_MODULE.pool_connection_info);
     cJSON_AddNumberToObject(root, "isUsingFallbackStratum", g->SYSTEM_MODULE.is_using_fallback ? 1 : 0);
     
-    char *s_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL);
-    cJSON_AddStringToObject(root, "stratumURL", s_url ? s_url : "");
-    free(s_url);
-    cJSON_AddNumberToObject(root, "stratumPort", nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT));
-    char *s_user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER);
-    cJSON_AddStringToObject(root, "stratumUser", s_user ? s_user : "");
-    free(s_user);
-    cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY));
-    cJSON_AddBoolToObject(root, "stratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE));
-    cJSON_AddNumberToObject(root, "stratumTLS", nvs_config_get_u16(NVS_CONFIG_STRATUM_TLS));
-    char *s_cert = nvs_config_get_string(NVS_CONFIG_STRATUM_CERT);
-    cJSON_AddStringToObject(root, "stratumCert", s_cert ? s_cert : "");
-    free(s_cert);
-    cJSON_AddBoolToObject(root, "stratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_STRATUM_DECODE_COINBASE_TX));
+    uint16_t prim_idx = g->SYSTEM_MODULE.primary_pool_index;
+    uint16_t sec_idx = g->SYSTEM_MODULE.secondary_pool_index;
 
-    char *f_url = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL);
-    cJSON_AddStringToObject(root, "fallbackStratumURL", f_url ? f_url : "");
-    free(f_url);
-    cJSON_AddNumberToObject(root, "fallbackStratumPort", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT));
-    char *f_user = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER);
-    cJSON_AddStringToObject(root, "fallbackStratumUser", f_user ? f_user : "");
-    free(f_user);
-    cJSON_AddNumberToObject(root, "fallbackStratumSuggestedDifficulty", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY));
-    cJSON_AddBoolToObject(root, "fallbackStratumExtranonceSubscribe", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE));
-    cJSON_AddNumberToObject(root, "fallbackStratumTLS", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS));
-    char *f_cert = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_CERT);
-    cJSON_AddStringToObject(root, "fallbackStratumCert", f_cert ? f_cert : "");
-    free(f_cert);
-    cJSON_AddBoolToObject(root, "fallbackStratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX));
+    cJSON_AddNumberToObject(root, "primaryPoolIndex", prim_idx);
+    cJSON_AddNumberToObject(root, "secondaryPoolIndex", sec_idx);
+    cJSON_AddNumberToObject(root, "useFallbackStratum", g->SYSTEM_MODULE.use_fallback_stratum ? 1 : 0);
 
-    char *stratum_proto = nvs_config_get_string(NVS_CONFIG_STRATUM_PROTOCOL);
-    cJSON_AddStringToObject(root, "stratumProtocol", stratum_proto ? stratum_proto : STRATUM_V1);
-    free(stratum_proto);
+    cJSON *pools_arr = cJSON_CreateArray();
+    cJSON_AddItemToObject(root, "pools", pools_arr);
+    for (int i = 0; i < MAX_POOLS; i++) {
+        PoolConfig *p = &g->SYSTEM_MODULE.pools[i];
+        if (p->url && strlen(p->url) > 0) {
+            cJSON *p_obj = cJSON_CreateObject();
+            cJSON_AddNumberToObject(p_obj, "id", i);
+            cJSON_AddStringToObject(p_obj, "stratumProtocol", p->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
+            cJSON_AddStringToObject(p_obj, "stratumURL", p->url);
+            cJSON_AddNumberToObject(p_obj, "stratumPort", p->port);
+            cJSON_AddStringToObject(p_obj, "stratumUser", p->user ? p->user : "");
+            cJSON_AddStringToObject(p_obj, "stratumPassword", "*****"); // hide password in GET response
+            cJSON_AddNumberToObject(p_obj, "stratumSuggestedDifficulty", p->difficulty);
+            cJSON_AddBoolToObject(p_obj, "stratumExtranonceSubscribe", p->extranonce_subscribe);
+            cJSON_AddNumberToObject(p_obj, "stratumTLS", p->tls);
+            cJSON_AddStringToObject(p_obj, "stratumCert", p->cert ? p->cert : "");
+            cJSON_AddBoolToObject(p_obj, "stratumDecodeCoinbase", p->decode_coinbase_tx);
+            cJSON_AddStringToObject(p_obj, "stratumV2ChannelType", p->sv2_channel_type == SV2_CHANNEL_STANDARD ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED);
+            cJSON_AddStringToObject(p_obj, "stratumV2AuthorityPubkey", p->sv2_authority_pubkey ? p->sv2_authority_pubkey : "");
+            
+            cJSON_AddItemToArray(pools_arr, p_obj);
+        }
+    }
 
-    char *sv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_SV2_AUTHORITY_PUBKEY);
-    cJSON_AddStringToObject(root, "stratumV2AuthorityPubkey", sv2AuthPubkey ? sv2AuthPubkey : "");
-    free(sv2AuthPubkey);
+    // Legacy fields for backwards compatibility
+    PoolConfig *prim_pool = &g->SYSTEM_MODULE.pools[prim_idx];
+    PoolConfig *sec_pool = &g->SYSTEM_MODULE.pools[sec_idx];
 
-    char *sv2_chan_type = nvs_config_get_string(NVS_CONFIG_SV2_CHANNEL_TYPE);
-    cJSON_AddStringToObject(root, "stratumV2ChannelType", sv2_chan_type ? sv2_chan_type : SV2_CHANNEL_TYPE_EXTENDED);
-    free(sv2_chan_type);
+    cJSON_AddStringToObject(root, "stratumURL", prim_pool->url ? prim_pool->url : "");
+    cJSON_AddNumberToObject(root, "stratumPort", prim_pool->port);
+    cJSON_AddStringToObject(root, "stratumUser", prim_pool->user ? prim_pool->user : "");
+    cJSON_AddNumberToObject(root, "stratumSuggestedDifficulty", prim_pool->difficulty);
+    cJSON_AddBoolToObject(root, "stratumExtranonceSubscribe", prim_pool->extranonce_subscribe);
+    cJSON_AddNumberToObject(root, "stratumTLS", prim_pool->tls);
+    cJSON_AddStringToObject(root, "stratumCert", prim_pool->cert ? prim_pool->cert : "");
+    cJSON_AddBoolToObject(root, "stratumDecodeCoinbase", prim_pool->decode_coinbase_tx);
+    cJSON_AddStringToObject(root, "stratumProtocol", prim_pool->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
+    cJSON_AddStringToObject(root, "stratumV2AuthorityPubkey", prim_pool->sv2_authority_pubkey ? prim_pool->sv2_authority_pubkey : "");
+    cJSON_AddStringToObject(root, "stratumV2ChannelType", prim_pool->sv2_channel_type == SV2_CHANNEL_STANDARD ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED);
 
-    char *fallbackSv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY);
-    cJSON_AddStringToObject(root, "fallbackStratumV2AuthorityPubkey", fallbackSv2AuthPubkey ? fallbackSv2AuthPubkey : "");
-    free(fallbackSv2AuthPubkey);
-
-    char *fallback_sv2_chan_type = nvs_config_get_string(NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE);
-    cJSON_AddStringToObject(root, "fallbackStratumV2ChannelType", fallback_sv2_chan_type ? fallback_sv2_chan_type : SV2_CHANNEL_TYPE_EXTENDED);
-    free(fallback_sv2_chan_type);
-
-    char *fallback_proto = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL);
-    cJSON_AddStringToObject(root, "fallbackStratumProtocol", fallback_proto ? fallback_proto : STRATUM_V1);
-    free(fallback_proto);
+    cJSON_AddStringToObject(root, "fallbackStratumURL", sec_pool->url ? sec_pool->url : "");
+    cJSON_AddNumberToObject(root, "fallbackStratumPort", sec_pool->port);
+    cJSON_AddStringToObject(root, "fallbackStratumUser", sec_pool->user ? sec_pool->user : "");
+    cJSON_AddNumberToObject(root, "fallbackStratumSuggestedDifficulty", sec_pool->difficulty);
+    cJSON_AddBoolToObject(root, "fallbackStratumExtranonceSubscribe", sec_pool->extranonce_subscribe);
+    cJSON_AddNumberToObject(root, "fallbackStratumTLS", sec_pool->tls);
+    cJSON_AddStringToObject(root, "fallbackStratumCert", sec_pool->cert ? sec_pool->cert : "");
+    cJSON_AddBoolToObject(root, "fallbackStratumDecodeCoinbase", sec_pool->decode_coinbase_tx);
+    cJSON_AddStringToObject(root, "fallbackStratumProtocol", sec_pool->protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
+    cJSON_AddStringToObject(root, "fallbackStratumV2AuthorityPubkey", sec_pool->sv2_authority_pubkey ? sec_pool->sv2_authority_pubkey : "");
+    cJSON_AddStringToObject(root, "fallbackStratumV2ChannelType", sec_pool->sv2_channel_type == SV2_CHANNEL_STANDARD ? SV2_CHANNEL_TYPE_STANDARD : SV2_CHANNEL_TYPE_EXTENDED);
 
     // User Preferences
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) ? 1 : 0);

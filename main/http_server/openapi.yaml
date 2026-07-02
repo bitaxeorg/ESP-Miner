@@ -39,6 +39,62 @@ components:
               type: number
             message:
               type: string
+    Pool:
+      type: object
+      required:
+        - stratumURL
+        - stratumPort
+        - stratumUser
+      properties:
+        stratumProtocol:
+          type: string
+          enum: [SV1, SV2]
+          description: Stratum protocol
+        stratumURL:
+          type: string
+          description: Stratum server URL
+        stratumPort:
+          type: integer
+          description: Stratum server port
+          minimum: 1
+          maximum: 65535
+        stratumUser:
+          type: string
+          description: Stratum username
+        stratumPassword:
+          type: string
+          description: Stratum password
+          writeOnly: true
+        stratumSuggestedDifficulty:
+          type: number
+          description: Suggested difficulty
+        stratumExtranonceSubscribe:
+          type: boolean
+          description: Enable extranonce subscribe
+        stratumTLS:
+          type: integer
+          description: Enable stratum TLS (0=disabled, 1=enabled, 2=enabled with verification)
+          minimum: 0
+          maximum: 2
+        stratumCert:
+          type: string
+          description: Stratum TLS cert
+        stratumDecodeCoinbase:
+          type: boolean
+          description: Enable pool coinbase transaction decoding
+        stratumV2ChannelType:
+          type: string
+          enum: [standard, extended]
+          description: SV2 channel type
+        stratumV2AuthorityPubkey:
+          type: string
+          description: SV2 authority public key for certificate verification (base58-encoded)
+          pattern: "^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]*$"
+        id:
+          type: integer
+          description: Pool NVS slot index (0 to 7)
+          minimum: 0
+          maximum: 7
     SharesRejectedReason:
       type: object
       required:
@@ -176,6 +232,9 @@ components:
         - nominalVoltage
         - overheat_mode
         - overclockEnabled
+        - primaryPoolIndex
+        - secondaryPoolIndex
+        - pools
         - poolConnectionInfo
         - poolDifficulty
         - power
@@ -392,6 +451,17 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
+        primaryPoolIndex:
+          type: integer
+          description: Index of the primary pool
+        secondaryPoolIndex:
+          type: integer
+          description: Index of the secondary pool (fallback)
+        pools:
+          type: array
+          description: Configured stratum pools
+          items:
+            $ref: '#/components/schemas/Pool'
         poolConnectionInfo:
           type: string
           description: Current pool address family
@@ -688,6 +758,17 @@ components:
         useFallbackStratum:
           type: number
           description: Forces the use the fallback stratum pool
+        primaryPoolIndex:
+          type: integer
+          description: Index of the primary pool
+        secondaryPoolIndex:
+          type: integer
+          description: Index of the secondary pool (fallback)
+        pools:
+          type: array
+          description: Configured stratum pools
+          items:
+            $ref: '#/components/schemas/Pool'
         stratumURL:
           type: string
           description: Primary stratum server URL
