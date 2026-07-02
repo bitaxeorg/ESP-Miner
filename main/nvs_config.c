@@ -77,7 +77,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE]             = {.nvs_key_name = "fbsv2chantype",   .type = TYPE_STR,   .default_value = {.str = SV2_CHANNEL_TYPE_EXTENDED},                   .rest_name = "fallbackStratumV2ChannelType",       .min = 8,  .max = 8},
     [NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY]         = {.nvs_key_name = "fbsv2authpubk",   .type = TYPE_STR,   .default_value = {.str = ""},                                          .rest_name = "fallbackStratumV2AuthorityPubkey",   .min = 0,  .max = 52},
     [NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX]   = {.nvs_key_name = "fbstratumdecode", .type = TYPE_BOOL,  .default_value = {.b   = true},                                        .rest_name = "fallbackStratumDecodeCoinbase",      .min = 0,  .max = 1},
-    [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstartum",    .type = TYPE_BOOL,                                                                         .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
+    [NVS_CONFIG_USE_FALLBACK_STRATUM]                  = {.nvs_key_name = "usefbstratum",    .type = TYPE_BOOL,                                                                         .rest_name = "useFallbackStratum",                 .min = 0,  .max = 1},
 
     [NVS_CONFIG_ASIC_FREQUENCY]                        = {.nvs_key_name = "asicfrequency_f", .type = TYPE_FLOAT, .default_value = {.f   = CONFIG_ASIC_FREQUENCY},                       .rest_name = "frequency",                          .min = 1,  .max = UINT16_MAX},
     [NVS_CONFIG_ASIC_VOLTAGE]                          = {.nvs_key_name = "asicvoltage",     .type = TYPE_U16,   .default_value = {.u16 = CONFIG_ASIC_VOLTAGE},                         .rest_name = "coreVoltage",                        .min = 1,  .max = UINT16_MAX},
@@ -201,6 +201,17 @@ static void nvs_config_init_fallback(NvsConfigKey key, Settings * setting)
                 ESP_LOGI(TAG, "Migrating NVS config %s from u16 (%d) to string (%s)", setting->nvs_key_name, val, str_val);
                 nvs_erase_key(handle, "fbSv2ChanType");
                 nvs_set_str(handle, setting->nvs_key_name, str_val);
+            }
+        }
+    }
+    if (key == NVS_CONFIG_USE_FALLBACK_STRATUM) {
+        if (nvs_find_key(handle, setting->nvs_key_name, NULL) == ESP_ERR_NVS_NOT_FOUND) {
+            uint16_t val;
+            ret = nvs_get_u16(handle, "usefbstartum", &val);
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "Migrating NVS config usefbstartum to %s (%d)", setting->nvs_key_name, val);
+                nvs_erase_key(handle, "usefbstartum");
+                nvs_set_u16(handle, setting->nvs_key_name, val);
             }
         }
     }
