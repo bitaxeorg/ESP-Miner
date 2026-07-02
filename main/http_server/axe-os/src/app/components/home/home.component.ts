@@ -85,8 +85,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   public dataLabel: number[] = [];
   public hashrateData: number[] = [];
   public powerData: number[] = [];
-  public chartY1Data: number[] = [];
-  public chartY2Data: number[] = [];
+  public chartY1Data: (number | null)[] = [];
+  public chartY2Data: (number | null)[] = [];
   public chartData?: any;
 
   public maxPower: number = 0;
@@ -110,6 +110,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   private jobTimeout: any;
   private lastSharesCount: number = -1;
   private lastScriptsig: string = '';
+  private bestSampleDiff: number | null = null;
 
   public systemInfoError$ = new BehaviorSubject<ISystemInfoError>({
     duration: 0,
@@ -773,13 +774,27 @@ export class HomeComponent implements OnInit, OnDestroy {
           })).sort((a, b) => a.timestamp - b.timestamp);
 
           // 2. Always map and sort backend statistics
-          const backendPoints = stats.statistics.map((element: number[]) => ({
-            timestamp: Date.now() - stats.currentTimestamp + element[idxTimestamp],
-            hashrate: element[idxHashrate] || 0,
-            power: element[idxPower] || 0,
-            y1: idxChartY1Data !== -1 ? element[idxChartY1Data] : 0.0,
-            y2: idxChartY2Data !== -1 ? element[idxChartY2Data] : 0.0
-          })).sort((a, b) => a.timestamp - b.timestamp);
+          const backendPoints = stats.statistics.map((element: number[]) => {
+            let y1Val = idxChartY1Data !== -1 ? element[idxChartY1Data] : 0.0;
+            let y2Val = idxChartY2Data !== -1 ? element[idxChartY2Data] : 0.0;
+            if (y1Val === -1) {
+              y1Val = null as any;
+            } else if (chartY1DataLabel === chartLabelKey(eChartLabel.difficulty) && y1Val <= 0) {
+              y1Val = null as any;
+            }
+            if (y2Val === -1) {
+              y2Val = null as any;
+            } else if (chartY2DataLabel === chartLabelKey(eChartLabel.difficulty) && y2Val <= 0) {
+              y2Val = null as any;
+            }
+            return {
+              timestamp: Date.now() - stats.currentTimestamp + element[idxTimestamp],
+              hashrate: element[idxHashrate] || 0,
+              power: element[idxPower] || 0,
+              y1: y1Val,
+              y2: y2Val
+            };
+          }).sort((a, b) => a.timestamp - b.timestamp);
 
           // 3. Determine points to insert (all of them if clearing/empty, otherwise fill gaps)
           const pointsToInsert = existingPoints.length === 0
@@ -833,6 +848,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private startGetLiveData() {
+    this.liveDataService.shareFound$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(diff => {
+        if (this.bestSampleDiff === null || diff > this.bestSampleDiff) {
+          this.bestSampleDiff = diff;
+        }
+      });
+
     this.info$ = this.liveDataService.info$.pipe(
       map(info => {
         // Apply component-specific mapping
@@ -907,8 +930,13 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.dataLabel.push(now);
           this.hashrateData.push(info.hashRate || 0);
           this.powerData.push(info.power || 0);
-          this.chartY1Data.push(HomeComponent.getDataForLabel(chartLabelValue(this.form.get('chartY1Data')?.value), info));
-          this.chartY2Data.push(HomeComponent.getDataForLabel(chartLabelValue(this.form.get('chartY2Data')?.value), info));
+          const chartY1DataLabel = chartLabelValue(this.form.get('chartY1Data')?.value);
+          const chartY2DataLabel = chartLabelValue(this.form.get('chartY2Data')?.value);
+
+          this.chartY1Data.push(chartY1DataLabel === eChartLabel.difficulty ? this.bestSampleDiff : HomeComponent.getDataForLabel(chartY1DataLabel, info));
+          this.chartY2Data.push(chartY2DataLabel === eChartLabel.difficulty ? this.bestSampleDiff : HomeComponent.getDataForLabel(chartY2DataLabel, info));
+
+          this.bestSampleDiff = null;
 
           this.limitDataPoints(info.statsFrequency);
 
@@ -1187,6 +1215,9 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.chartData.datasets[0].label = chartY1DataLabel;
     this.chartData.datasets[1].label = chartY2DataLabel;
 
+    this.chartData.datasets[0].showLine = (chartY1DataLabel !== eChartLabel.difficulty);
+    this.chartData.datasets[1].showLine = (chartY2DataLabel !== eChartLabel.difficulty);
+
     this.chartData.datasets[0].hidden = (chartY1DataLabel === eChartLabel.none);
     this.chartData.datasets[1].hidden = (chartY2DataLabel === eChartLabel.none);
 
@@ -1200,9 +1231,17 @@ export class HomeComponent implements OnInit, OnDestroy {
       const currentBucket = statsFrequency > 0 ? Math.floor(currentInfo.uptimeSeconds / statsFrequency) : currentInfo.uptimeSeconds;
 
       if (forceScaleUpdate || currentBucket !== this.lastBucket) {
+        this.chartOptions.scales.y.type = chartY1DataLabel === eChartLabel.difficulty ? 'logarithmic' : 'linear';
+        this.chartOptions.scales.y2.type = chartY2DataLabel === eChartLabel.difficulty ? 'logarithmic' : 'linear';
+
         if (HomeComponent.isSameAxisUnit(chartY1DataLabel, chartY2DataLabel)) {
-          this.chartOptions.scales.y.suggestedMin = this.chartOptions.scales.y2.suggestedMin = Math.min(...this.chartY1Data, ...this.chartY2Data);
-          this.chartOptions.scales.y.suggestedMax = this.chartOptions.scales.y2.suggestedMax = Math.max(...this.chartY1Data, ...this.chartY2Data);
+          const validY1 = this.chartY1Data.filter((v): v is number => v !== null && v !== undefined && v > 0);
+          const validY2 = this.chartY2Data.filter((v): v is number => v !== null && v !== undefined && v > 0);
+          const validY12 = [...validY1, ...validY2];
+          const minVal = validY12.length > 0 ? Math.min(...validY12) : undefined;
+          const maxVal = validY12.length > 0 ? Math.max(...validY12) : undefined;
+          this.chartOptions.scales.y.suggestedMin = this.chartOptions.scales.y2.suggestedMin = minVal;
+          this.chartOptions.scales.y.suggestedMax = this.chartOptions.scales.y2.suggestedMax = maxVal;
         } else {
           this.chartOptions.scales.y.suggestedMin = undefined;
           this.chartOptions.scales.y2.suggestedMin = undefined;
@@ -1214,12 +1253,26 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
 
     this.updateAdaptiveTicks();
+    this.chartData = { ...this.chartData };
     this.chart?.refresh();
+  }
+
+  static consolidateMax(val1: number | null | undefined, val2: number | null | undefined): number | null {
+    if (val1 === null || val1 === undefined) {
+      return (val2 === null || val2 === undefined) ? null : val2;
+    }
+    if (val2 === null || val2 === undefined) {
+      return val1;
+    }
+    return Math.max(val1, val2);
   }
 
   public limitDataPoints(statsFrequency: number = 0) {
     const limit = this.statsLimit;
     if (this.dataLabel.length <= limit) return;
+
+    const chartY1DataLabel = chartLabelValue(this.form.get('chartY1Data')?.value);
+    const chartY2DataLabel = chartLabelValue(this.form.get('chartY2Data')?.value);
 
     const statsFrequencyMs = (statsFrequency || 30) * 1000;
     const windowDurationMs = limit * statsFrequencyMs;
@@ -1265,6 +1318,14 @@ export class HomeComponent implements OnInit, OnDestroy {
           }
         }
         
+        // Consolidate removed point (index low) into neighbor (index low - 1) only if the column is difficulty
+        if (chartY1DataLabel === eChartLabel.difficulty) {
+          this.chartY1Data[low - 1] = HomeComponent.consolidateMax(this.chartY1Data[low - 1], this.chartY1Data[low]);
+        }
+        if (chartY2DataLabel === eChartLabel.difficulty) {
+          this.chartY2Data[low - 1] = HomeComponent.consolidateMax(this.chartY2Data[low - 1], this.chartY2Data[low]);
+        }
+
         // Remove point at index 'low'.
         this.dataLabel.splice(low, 1);
         this.hashrateData.splice(low, 1);
@@ -1295,7 +1356,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     }
   }
 
-  public getSuggestedMaxForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
+  public getSuggestedMaxForLabel(label: eChartLabel | undefined, info: ISystemInfo): number | undefined {
     switch (label) {
       case eChartLabel.hashrate:
       case eChartLabel.hashrate_1m:
@@ -1313,30 +1374,32 @@ export class HomeComponent implements OnInit, OnDestroy {
       case eChartLabel.fanRpm:           return 7000;
       case eChartLabel.fan2Rpm:          return 7000;
       case eChartLabel.responseTime:     return 50;
+      case eChartLabel.difficulty:       return 10000;
       default:                           return 0;
     }
   }
 
-  static getDataForLabel(label: eChartLabel | undefined, info: ISystemInfo): number {
+  static getDataForLabel(label: eChartLabel | undefined, info: ISystemInfo): number | null {
     switch (label) {
       case eChartLabel.hashrate:           return info.hashRate;
       case eChartLabel.hashrate_1m:        return info.hashRate_1m;
       case eChartLabel.hashrate_10m:       return info.hashRate_10m;
       case eChartLabel.hashrate_1h:        return info.hashRate_1h;
       case eChartLabel.errorPercentage:    return info.errorPercentage;
-      case eChartLabel.asicTemp:           return info.temp;
-      case eChartLabel.asicTemp2:          return info.temp2;
-      case eChartLabel.vrTemp:             return info.vrTemp;
+      case eChartLabel.asicTemp:           return info.temp && info.temp !== -1 ? info.temp : null;
+      case eChartLabel.asicTemp2:          return info.temp2 && info.temp2 !== -1 ? info.temp2 : null;
+      case eChartLabel.vrTemp:             return info.vrTemp && info.vrTemp !== -1 ? info.vrTemp : null;
       case eChartLabel.asicVoltage:        return info.coreVoltageActual;
       case eChartLabel.voltage:            return info.voltage;
       case eChartLabel.power:              return info.power;
       case eChartLabel.current:            return info.current;
       case eChartLabel.fanSpeed:           return info.fanspeed;
-      case eChartLabel.fanRpm:             return info.fanrpm;
-      case eChartLabel.fan2Rpm:            return info.fan2rpm;
+      case eChartLabel.fanRpm:             return info.fanrpm && info.fanrpm !== -1 ? info.fanrpm : null;
+      case eChartLabel.fan2Rpm:            return info.fan2rpm && info.fan2rpm !== -1 ? info.fan2rpm : null;
       case eChartLabel.wifiRssi:           return info.wifiRSSI;
       case eChartLabel.freeHeap:           return info.freeHeap;
       case eChartLabel.responseTime:       return info.responseTime;
+      case eChartLabel.difficulty:         return info.difficulty && info.difficulty > 0 ? info.difficulty : null;
       default:                             return 0.0;
     }
   }
@@ -1375,6 +1438,15 @@ export class HomeComponent implements OnInit, OnDestroy {
         return HashSuffixPipe.transform(value, args);
       case eChartLabel.freeHeap:
         return ByteSuffixPipe.transform(value, args);
+      case eChartLabel.difficulty:
+        if (args?.tickmark) {
+          const log = Math.log10(value);
+          if (Math.abs(log - Math.round(log)) > 1e-9) {
+            return '';
+          }
+          return DiffSuffixPipe.transform(value).replace(/\.00(?=\s|$)/, '');
+        }
+        return DiffSuffixPipe.transform(value);
       default:
         const settings = HomeComponent.getSettingsForLabel(datasetLabel);
         return value.toLocaleString(undefined, { useGrouping: false, maximumFractionDigits: args?.tickmark ? undefined : settings.precision }) + settings.suffix;

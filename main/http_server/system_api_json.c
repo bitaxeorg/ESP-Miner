@@ -51,7 +51,7 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddFloatToObject(root, "coreVoltageActual", g->POWER_MANAGEMENT_MODULE.core_voltage);
     cJSON_AddFloatToObject(root, "actualFrequency", g->POWER_MANAGEMENT_MODULE.actual_frequency);
     cJSON_AddFloatToObject(root, "expectedHashrate", g->POWER_MANAGEMENT_MODULE.expected_hashrate);
-    cJSON_AddNumberToObject(root, "fanspeed", g->POWER_MANAGEMENT_MODULE.fan_perc);
+    cJSON_AddFloatToObject(root, "fanspeed", g->POWER_MANAGEMENT_MODULE.fan_perc);
     cJSON_AddNumberToObject(root, "fanrpm", g->POWER_MANAGEMENT_MODULE.fan_rpm);
     cJSON_AddNumberToObject(root, "fan2rpm", g->POWER_MANAGEMENT_MODULE.fan2_rpm);
 
@@ -65,6 +65,7 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "sharesRejected", g->SYSTEM_MODULE.shares_rejected);
     cJSON_AddNumberToObject(root, "bestDiff", g->SYSTEM_MODULE.best_nonce_diff);
     cJSON_AddNumberToObject(root, "bestSessionDiff", g->SYSTEM_MODULE.best_session_nonce_diff);
+    cJSON_AddNumberToObject(root, "difficulty", g->SYSTEM_MODULE.best_sample_diff);
     cJSON_AddNumberToObject(root, "poolDifficulty", g->pool_difficulty);
     cJSON_AddFloatToObject(root, "responseTime", g->SYSTEM_MODULE.response_time);
     cJSON_AddNumberToObject(root, "responseShareBatch", g->SYSTEM_MODULE.response_share_batch);
@@ -237,13 +238,13 @@ static void system_api_add_hashrate_monitor(cJSON *root, GlobalState *g) {
         cJSON *asic = cJSON_CreateObject();
         cJSON_AddItemToArray(asics, asic);
         
-        cJSON_AddNumberToObject(asic, "total", g->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
+        cJSON_AddFloatToObject(asic, "total", g->HASHRATE_MONITOR_MODULE.total_measurement[i].hashrate);
         cJSON_AddNumberToObject(asic, "errorCount", g->HASHRATE_MONITOR_MODULE.error_measurement[i].value);
         
         cJSON *domains = cJSON_CreateArray();
         cJSON_AddItemToObject(asic, "domains", domains);
         for (int j = 0; j < hash_domains; j++) {
-            cJSON_AddItemToArray(domains, cJSON_CreateNumber(g->HASHRATE_MONITOR_MODULE.domain_measurements[i][j].hashrate));
+            cJSON_AddItemToArray(domains, cJSON_CreateFloat(g->HASHRATE_MONITOR_MODULE.domain_measurements[i][j].hashrate));
         }
     }
 }

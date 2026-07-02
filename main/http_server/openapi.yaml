@@ -246,6 +246,9 @@ components:
         coreVoltageActual:
           type: number
           description: Actual measured ASIC core voltage
+        difficulty:
+          type: number
+          description: Best difficulty found in the current segment
         current:
           type: number
           description: Current draw in milliamps
@@ -973,7 +976,7 @@ paths:
             type: array
             items:
               type: string
-            example: [hashrate,hashrate_1m,hashrate_10m,hashrate_1h,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap,responseTime]
+            example: [hashrate,hashrate_1m,hashrate_10m,hashrate_1h,asicTemp,vrTemp,asicVoltage,voltage,power,current,fanSpeed,fanRpm,fan2Rpm,wifiRssi,freeHeap,responseTime,difficulty]
           description: List of labels for which data should be retrieved
       tags:
         - system

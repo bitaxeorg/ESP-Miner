@@ -127,3 +127,24 @@ void websocket_api_task(void *pvParameters)
         }
     }
 }
+
+void websocket_api_send_share_found(double diff)
+{
+    cJSON *msg = cJSON_CreateObject();
+    if (msg) {
+        cJSON_AddStringToObject(msg, "event", "share_found");
+        cJSON_AddNumberToObject(msg, "difficulty", diff);
+        char *json_str = cJSON_PrintUnformatted(msg);
+        if (json_str) {
+            httpd_ws_frame_t ws_pkt;
+            memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+            ws_pkt.payload = (uint8_t *)json_str;
+            ws_pkt.len = strlen(json_str);
+            ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+            websocket_broadcast(WS_TYPE_API, &ws_pkt);
+            free(json_str);
+        }
+        cJSON_Delete(msg);
+    }
+}
+
