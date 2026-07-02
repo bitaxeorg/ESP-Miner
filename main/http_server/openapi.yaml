@@ -419,6 +419,9 @@ components:
         sharesRejected:
           type: number
           description: Number of rejected shares
+        sharesPending:
+          type: number
+          description: Shares submitted but not yet resolved by the pool (SV2; 0 for SV1). Rises while the pool batches/buffers acks, drops to 0 once it catches up.
         sharesRejectedReasons:
           type: array
           description: Reason(s) shares were rejected
