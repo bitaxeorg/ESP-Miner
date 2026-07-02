@@ -1,0 +1,17 @@
+<div class="flex flex-column gap-3 p-2">
+  <div *ngIf="config.data.error" class="p-error text-red-500 mb-2 font-medium">
+    {{ config.data.error }}
+  </div>
+  <div class="flex flex-column gap-1">
+    <label for="username" class="font-medium text-900">Username</label>
+    <input id="username" type="text" pInputText [(ngModel)]="username" class="w-full" />
+  </div>
+  <div class="flex flex-column gap-1">
+    <label for="password" class="font-medium text-900">Password</label>
+    <input id="password" type="password" pInputText [(ngModel)]="password" class="w-full" (keydown.enter)="onSubmit()" />
+  </div>
+  <div class="flex justify-content-end gap-2 mt-3">
+    <button pButton label="Cancel" class="p-button-outlined" (click)="onCancel()"></button>
+    <button pButton label="Login" (click)="onSubmit()" [disabled]="!password"></button>
+  </div>
+</div>

@@ -9,6 +9,8 @@
 #include "websocket_log.h"
 #include "websocket_api.h"
 #include "http_server.h"
+#include "http_auth.h"
+#include "http_cors.h"
 #include "log_buffer.h"
 
 #define WS_LOG_SCRATCH_SIZE 2048
@@ -141,8 +143,12 @@ esp_err_t websocket_handler(httpd_req_t *req)
     if (httpd_req_get_hdr_value_str(req, "Upgrade", upgrade_hdr, sizeof(upgrade_hdr)) == ESP_OK &&
         strcasecmp(upgrade_hdr, "websocket") == 0) {
 
-        if (is_network_allowed(req) != ESP_OK) {
-            return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        if (http_cors_check(req) != ESP_OK) {
+            return ESP_FAIL;
+        }
+
+        if (http_auth_websocket_validate(req) != ESP_OK) {
+            return ESP_FAIL;
         }
 
         int active_clients = 0;

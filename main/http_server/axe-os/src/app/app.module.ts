@@ -1,7 +1,7 @@
 import 'chartjs-adapter-moment';
 
 import { CommonModule, HashLocationStrategy, LocationStrategy } from '@angular/common';
-import { provideHttpClient } from '@angular/common/http';
+import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { BrowserModule } from '@angular/platform-browser';
@@ -45,6 +45,8 @@ import { TooltipModule } from 'primeng/tooltip';
 import { DialogModule } from 'primeng/dialog';
 import { DialogService as PrimeDialogService } from 'primeng/dynamicdialog';
 import { DialogService, DialogListComponent } from './services/dialog.service';
+import { AuthInterceptor } from './services/auth.interceptor';
+import { LoginModalComponent } from './components/login-modal/login-modal.component';
 
 const components = [
   AppComponent,
@@ -70,7 +72,8 @@ const components = [
     ScoreboardComponent,
     ThemeConfigComponent,
     DesignComponent,
-    DialogListComponent
+    DialogListComponent,
+    LoginModalComponent
   ],
   imports: [
     BrowserModule,
@@ -97,12 +100,13 @@ const components = [
     SatsPipe,
   ],
   providers: [
+    { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },
     { provide: LocationStrategy, useClass: HashLocationStrategy },
     { provide: ApiConfiguration, useValue: { rootUrl: '' } },
     Api,
     DialogService,
     PrimeDialogService,
-    provideHttpClient(),
+    provideHttpClient(withInterceptorsFromDi()),
     providePrimeNG({
         theme: {
             preset: Aura,
