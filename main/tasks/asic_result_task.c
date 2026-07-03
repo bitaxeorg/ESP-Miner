@@ -53,19 +53,16 @@ void ASIC_result_task(void *pvParameters)
         pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
         bool valid = (GLOBAL_STATE->valid_jobs[job_id] != 0) &&
                      (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id] != NULL);
-        bm_job active_job_snapshot;
-        if (valid) {
-            active_job_snapshot = *GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id];
-            active_job_snapshot.jobid = active_job_snapshot.jobid ? strdup(active_job_snapshot.jobid) : NULL;
-            active_job_snapshot.extranonce2 = active_job_snapshot.extranonce2 ? strdup(active_job_snapshot.extranonce2) : NULL;
-        }
-        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
-
         if (!valid)
         {
+            pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
             ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
             continue;
         }
+        bm_job active_job_snapshot = *GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id];
+        active_job_snapshot.jobid = active_job_snapshot.jobid ? strdup(active_job_snapshot.jobid) : NULL;
+        active_job_snapshot.extranonce2 = active_job_snapshot.extranonce2 ? strdup(active_job_snapshot.extranonce2) : NULL;
+        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
         bm_job *active_job = &active_job_snapshot;
         // check the nonce difficulty
         double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
