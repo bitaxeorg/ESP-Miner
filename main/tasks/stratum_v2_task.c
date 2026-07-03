@@ -815,7 +815,7 @@ void stratum_v2_task(void *pvParameters)
             if (channel_type == SV2_CHANNEL_EXTENDED) {
                 ESP_LOGI(TAG, "Opening extended mining channel (user=%s)", user ? user : "(empty)");
                 frame_len = sv2_build_open_extended_mining_channel(frame_buf, SV2_MAX_FRAME_SIZE,
-                                                                    1, user ? user : "", hash_rate, 6);
+                                                                    1, user ? user : "", hash_rate, 2);
             } else {
                 ESP_LOGI(TAG, "Opening standard mining channel (user=%s)", user ? user : "(empty)");
                 frame_len = sv2_build_open_standard_mining_channel(frame_buf, SV2_MAX_FRAME_SIZE,
