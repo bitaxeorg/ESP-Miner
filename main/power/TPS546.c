@@ -601,7 +601,6 @@ void TPS546_write_entire_config(void)
     ESP_LOGI(TAG, "Setting ON_OFF_CONFIG: %02X", u8_value);
     smb_write_byte(PMBUS_ON_OFF_CONFIG, u8_value);
 
-
     // STACK_CONFIG
     ESP_LOGI(TAG, "Setting STACK_CONFIG: %04X", tps546_config.TPS546_INIT_STACK_CONFIG);
     smb_write_word(PMBUS_STACK_CONFIG, tps546_config.TPS546_INIT_STACK_CONFIG);
@@ -629,7 +628,22 @@ void TPS546_write_entire_config(void)
             tps546_config.TPS546_INIT_COMPENSATION_CONFIG[0], tps546_config.TPS546_INIT_COMPENSATION_CONFIG[1],
             tps546_config.TPS546_INIT_COMPENSATION_CONFIG[2], tps546_config.TPS546_INIT_COMPENSATION_CONFIG[3],
             tps546_config.TPS546_INIT_COMPENSATION_CONFIG[4]);
-        smb_write_block(PMBUS_COMPENSATION_CONFIG, tps546_config.TPS546_INIT_COMPENSATION_CONFIG, 5);
+        esp_err_t comp_err = smb_write_block(PMBUS_COMPENSATION_CONFIG,
+                                             tps546_config.TPS546_INIT_COMPENSATION_CONFIG,
+                                             5);
+        if (comp_err != ESP_OK) {
+            uint8_t status_cml = 0;
+            uint16_t status_word = 0;
+
+            if (smb_read_byte(PMBUS_STATUS_CML, &status_cml) == ESP_OK) {
+                ESP_LOGE(TAG, "COMPENSATION_CONFIG write failed; STATUS_CML=%02X", status_cml);
+            }
+            if (smb_read_word(PMBUS_STATUS_WORD, &status_word) == ESP_OK) {
+                ESP_LOGE(TAG, "COMPENSATION_CONFIG write failed; STATUS_WORD=%04X", status_word);
+            }
+        } else {
+            ESP_LOGI(TAG, "COMPENSATION_CONFIG write accepted");
+        }
 
     }
 
@@ -710,7 +724,7 @@ void TPS546_write_entire_config(void)
     //smb_write_block(PMBUS_COMPENSATION_CONFIG, COMPENSATION_CONFIG, 5);
 
     /* configure the bootup behavior regarding pin detect values vs NVM values */
-    ESP_LOGI(TAG, "Setting PIN_DETECT_OVERRIDE");
+    ESP_LOGI(TAG, "Setting PIN_DETECT_OVERRIDE: %04X", INIT_PIN_DETECT_OVERRIDE);
     smb_write_word(PMBUS_PIN_DETECT_OVERRIDE, INIT_PIN_DETECT_OVERRIDE);
 
     /* TODO write new MFR_REVISION number to reflect these parameters */

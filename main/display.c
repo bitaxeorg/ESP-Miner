@@ -37,31 +37,50 @@
 #define LCD_I80_GAP_X           0
 #define LCD_I80_GAP_Y           35
 
-#define LCD_PIN_DATA0           GPIO_NUM_39
-#define LCD_PIN_DATA1           GPIO_NUM_40
-#define LCD_PIN_DATA2           GPIO_NUM_41
-#define LCD_PIN_DATA3           GPIO_NUM_42
-#define LCD_PIN_DATA4           GPIO_NUM_45
-#define LCD_PIN_DATA5           GPIO_NUM_46
-#define LCD_PIN_DATA6           GPIO_NUM_47
-#define LCD_PIN_DATA7           GPIO_NUM_48
-#define LCD_PIN_RD              GPIO_NUM_9
-#define LCD_PIN_PWR             GPIO_NUM_15
-#define LCD_PIN_WR              GPIO_NUM_8
-#define LCD_PIN_CS              GPIO_NUM_6
-#define LCD_PIN_DC              GPIO_NUM_7
-#define LCD_PIN_RST             GPIO_NUM_5
-#define LCD_PIN_BK_LIGHT        GPIO_NUM_38
 #define LCD_BK_LIGHT_ON_LEVEL   1
 #define LCD_BK_LIGHT_OFF_LEVEL  0
 #define LCD_PWR_ON_LEVEL        1
 #define LCD_PWR_OFF_LEVEL       0
-#define LCD_BOOT_PROBE_MS       750
+#define LCD_BOOT_PROBE_MS       0
+
+typedef struct {
+    gpio_num_t data[8];
+    gpio_num_t rd;
+    gpio_num_t pwr;
+    gpio_num_t wr;
+    gpio_num_t cs;
+    gpio_num_t dc;
+    gpio_num_t rst;
+    gpio_num_t bk_light;
+} St7789I80Pins;
+
+static const St7789I80Pins ST7789_GAMMA_HEX_PINS = {
+    .data = { GPIO_NUM_39, GPIO_NUM_40, GPIO_NUM_41, GPIO_NUM_42, GPIO_NUM_45, GPIO_NUM_46, GPIO_NUM_47, GPIO_NUM_48 },
+    .rd = GPIO_NUM_9,
+    .pwr = GPIO_NUM_15,
+    .wr = GPIO_NUM_8,
+    .cs = GPIO_NUM_6,
+    .dc = GPIO_NUM_7,
+    .rst = GPIO_NUM_5,
+    .bk_light = GPIO_NUM_38,
+};
+
+static const St7789I80Pins ST7789_GAMMA_610_PINS = {
+    .data = { GPIO_NUM_39, GPIO_NUM_40, GPIO_NUM_41, GPIO_NUM_42, GPIO_NUM_21, GPIO_NUM_45, GPIO_NUM_35, GPIO_NUM_46 },
+    .rd = GPIO_NUM_9,
+    .pwr = GPIO_NUM_15,
+    .wr = GPIO_NUM_8,
+    .cs = GPIO_NUM_6,
+    .dc = GPIO_NUM_7,
+    .rst = GPIO_NUM_5,
+    .bk_light = GPIO_NUM_38,
+};
 
 static const char * TAG = "display";
 static const char * LVGL_TAG = "lvgl";
 
 static esp_lcd_panel_handle_t panel_handle = NULL;
+static const St7789I80Pins *current_st7789_pins = NULL;
 static bool display_state_on = false;
 static bool display_has_backlight = false;
 
@@ -74,7 +93,26 @@ LV_FONT_DECLARE(lv_font_unscii_16);
 
 esp_err_t display_on(bool display_on);
 static void my_log_cb(lv_log_level_t level, const char * buf);
+#if LCD_BOOT_PROBE_MS > 0
 static esp_err_t st7789_boot_probe(void);
+#endif
+
+static bool family_has_i80_st7789_display(Family family)
+{
+    return family == GAMMA_HEX;
+}
+
+static const St7789I80Pins *get_st7789_i80_pins(Family family)
+{
+    switch (family) {
+        case GAMMA_610:
+            return &ST7789_GAMMA_610_PINS;
+        case GAMMA_HEX:
+            return &ST7789_GAMMA_HEX_PINS;
+        default:
+            return NULL;
+    }
+}
 
 static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
     if (lv_obj_get_parent(obj) == NULL) {
@@ -84,7 +122,14 @@ static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
 
 static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
 {
-    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_HEX) {
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_610) {
+        const DisplayConfig * display_config = get_display_config("NONE");
+        GLOBAL_STATE->DISPLAY_CONFIG = *display_config;
+        ESP_LOGE(TAG, "Gamma610 ST7789 disabled: PCB routes LCD_D6 to GPIO35/SPIIO6, which is reserved by the ESP32-S3-WROOM-1-N16R8 flash/PSRAM interface");
+        return ESP_OK;
+    }
+
+    if (family_has_i80_st7789_display(GLOBAL_STATE->DEVICE_CONFIG.family.id)) {
         const DisplayConfig * display_config = get_display_config("ST7789 (320x170)");
         GLOBAL_STATE->DISPLAY_CONFIG = *display_config;
         ESP_LOGI(TAG, "%s", GLOBAL_STATE->DISPLAY_CONFIG.name);
@@ -108,31 +153,35 @@ static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
 
 static esp_err_t init_i80_st7789_display(GlobalState * GLOBAL_STATE, const lvgl_port_cfg_t *lvgl_cfg)
 {
+    const St7789I80Pins *pins = get_st7789_i80_pins(GLOBAL_STATE->DEVICE_CONFIG.family.id);
+    ESP_RETURN_ON_FALSE(pins, ESP_ERR_INVALID_ARG, TAG, "No ST7789 pin map for %s", GLOBAL_STATE->DEVICE_CONFIG.family.name);
+    current_st7789_pins = pins;
+
     ESP_LOGI(TAG, "Configure ST7789 GPIOs");
     gpio_config_t output_config = {
-        .pin_bit_mask = (1ULL << LCD_PIN_BK_LIGHT) | (1ULL << LCD_PIN_RD) | (1ULL << LCD_PIN_PWR),
+        .pin_bit_mask = (1ULL << pins->bk_light) | (1ULL << pins->rd) | (1ULL << pins->pwr),
         .mode = GPIO_MODE_OUTPUT,
     };
     ESP_RETURN_ON_ERROR(gpio_config(&output_config), TAG, "Failed to configure LCD GPIOs");
-    gpio_set_level(LCD_PIN_RD, 1);
-    gpio_set_level(LCD_PIN_PWR, LCD_PWR_ON_LEVEL);
-    gpio_set_level(LCD_PIN_BK_LIGHT, LCD_BK_LIGHT_OFF_LEVEL);
+    gpio_set_level(pins->rd, 1);
+    gpio_set_level(pins->pwr, LCD_PWR_ON_LEVEL);
+    gpio_set_level(pins->bk_light, LCD_BK_LIGHT_OFF_LEVEL);
 
     ESP_LOGI(TAG, "Initialize ST7789 Intel 8080 bus");
     esp_lcd_i80_bus_handle_t i80_bus = NULL;
     esp_lcd_i80_bus_config_t bus_config = {
-        .dc_gpio_num = LCD_PIN_DC,
-        .wr_gpio_num = LCD_PIN_WR,
+        .dc_gpio_num = pins->dc,
+        .wr_gpio_num = pins->wr,
         .clk_src = LCD_CLK_SRC_DEFAULT,
         .data_gpio_nums = {
-            LCD_PIN_DATA0,
-            LCD_PIN_DATA1,
-            LCD_PIN_DATA2,
-            LCD_PIN_DATA3,
-            LCD_PIN_DATA4,
-            LCD_PIN_DATA5,
-            LCD_PIN_DATA6,
-            LCD_PIN_DATA7,
+            pins->data[0],
+            pins->data[1],
+            pins->data[2],
+            pins->data[3],
+            pins->data[4],
+            pins->data[5],
+            pins->data[6],
+            pins->data[7],
         },
         .bus_width = 8,
         .max_transfer_bytes = LCD_I80_H_RES * LCD_I80_BUF_LINES * sizeof(uint16_t),
@@ -143,7 +192,7 @@ static esp_err_t init_i80_st7789_display(GlobalState * GLOBAL_STATE, const lvgl_
 
     esp_lcd_panel_io_handle_t io_handle = NULL;
     esp_lcd_panel_io_i80_config_t io_config = {
-        .cs_gpio_num = LCD_PIN_CS,
+        .cs_gpio_num = pins->cs,
         .pclk_hz = LCD_I80_PIXEL_CLOCK_HZ,
         .trans_queue_depth = 20,
         .lcd_cmd_bits = LCD_CMD_BITS,
@@ -159,7 +208,7 @@ static esp_err_t init_i80_st7789_display(GlobalState * GLOBAL_STATE, const lvgl_
 
     ESP_LOGI(TAG, "Install ST7789 panel driver");
     esp_lcd_panel_dev_config_t panel_config = {
-        .reset_gpio_num = LCD_PIN_RST,
+        .reset_gpio_num = pins->rst,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
         .bits_per_pixel = 16,
     };
@@ -239,6 +288,7 @@ static esp_err_t init_i80_st7789_display(GlobalState * GLOBAL_STATE, const lvgl_
     return ESP_OK;
 }
 
+#if LCD_BOOT_PROBE_MS > 0
 static esp_err_t st7789_fill_color(uint16_t color)
 {
     const size_t pixels = LCD_I80_H_RES * LCD_I80_BUF_LINES;
@@ -277,6 +327,7 @@ static esp_err_t st7789_boot_probe(void)
     vTaskDelay(pdMS_TO_TICKS(LCD_BOOT_PROBE_MS / 3));
     return ESP_OK;
 }
+#endif
 
 static void my_log_cb(lv_log_level_t level, const char * buf)
 {
@@ -477,18 +528,18 @@ esp_err_t display_on(bool display_on)
     if (NULL != panel_handle) {
         if (display_on && !display_state_on) {
             if (display_has_backlight) {
-                gpio_set_level(LCD_PIN_PWR, LCD_PWR_ON_LEVEL);
+                gpio_set_level(current_st7789_pins->pwr, LCD_PWR_ON_LEVEL);
             }
             ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, true), TAG, "Panel display on failed");
             if (display_has_backlight) {
-                gpio_set_level(LCD_PIN_BK_LIGHT, LCD_BK_LIGHT_ON_LEVEL);
+                gpio_set_level(current_st7789_pins->bk_light, LCD_BK_LIGHT_ON_LEVEL);
             }
             display_state_on = true;
         }
         else if (!display_on && display_state_on)
         {
             if (display_has_backlight) {
-                gpio_set_level(LCD_PIN_BK_LIGHT, LCD_BK_LIGHT_OFF_LEVEL);
+                gpio_set_level(current_st7789_pins->bk_light, LCD_BK_LIGHT_OFF_LEVEL);
             }
             ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, false), TAG, "Panel display off failed");
             display_state_on = false;

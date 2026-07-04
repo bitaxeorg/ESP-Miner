@@ -37,6 +37,12 @@ typedef enum {
 extern const lv_img_dsc_t bitaxe_logo;
 extern const lv_img_dsc_t osmu_logo;
 extern const lv_img_dsc_t identify_text;
+extern const lv_img_dsc_t bitaxe_background;
+extern const lv_font_t ui_font_DigitalNumbers16;
+extern const lv_font_t ui_font_DigitalNumbers28;
+extern const lv_font_t ui_font_OpenSansBold13;
+extern const lv_font_t ui_font_OpenSansBold14;
+extern const lv_font_t ui_font_AngelWish40;
 
 static lv_img_dsc_t bitaxe_logo_inverted;
 static lv_img_dsc_t osmu_logo_inverted;
@@ -80,6 +86,14 @@ static lv_obj_t *stats_hashrate_label;
 static lv_obj_t *stats_efficiency_label;
 static lv_obj_t *stats_difficulty_label;
 static lv_obj_t *stats_temp_label;
+static lv_obj_t *stats_fan_rpm_label;
+static lv_obj_t *stats_vin_label;
+static lv_obj_t *stats_vcore_label;
+static lv_obj_t *stats_current_label;
+static lv_obj_t *stats_power_label;
+static lv_obj_t *stats_uptime_label;
+static lv_obj_t *stats_ip_label;
+static lv_obj_t *stats_logo_label;
 
 static lv_obj_t *wifi_rssi_value_label;
 static lv_obj_t *wifi_signal_strength_label;
@@ -129,6 +143,54 @@ static bool is_large_display(void) {
 static void apply_screen_padding(lv_obj_t * obj) {
     if (is_large_display()) {
         lv_obj_set_style_pad_all(obj, 8, LV_PART_MAIN);
+    }
+}
+
+static bool use_stats_background(void) {
+    return is_large_display();
+}
+
+static lv_obj_t * create_positioned_label(
+    lv_obj_t * parent,
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    const lv_font_t * font,
+    const char * text,
+    lv_text_align_t align
+) {
+    lv_obj_t * label = lv_label_create(parent);
+    lv_label_set_text(label, text);
+    lv_obj_set_pos(label, x, y);
+    lv_obj_set_width(label, w);
+    lv_obj_set_height(label, h);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_pad_all(label, 0, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(label, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_align(label, align, LV_PART_MAIN);
+    lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
+    lv_obj_set_style_text_line_space(label, 0, LV_PART_MAIN);
+    return label;
+}
+
+static void format_compact_uptime(char * buf, size_t buf_size, int64_t start_time)
+{
+    uint32_t uptime_seconds = (esp_timer_get_time() - start_time) / 1000000;
+    uint32_t days = uptime_seconds / (24 * 3600);
+    uptime_seconds %= (24 * 3600);
+    uint32_t hours = uptime_seconds / 3600;
+    uptime_seconds %= 3600;
+    uint32_t minutes = uptime_seconds / 60;
+    uptime_seconds %= 60;
+
+    if (days > 0) {
+        snprintf(buf, buf_size, "%lud %luh %lum", days, hours, minutes);
+    } else if (hours > 0) {
+        snprintf(buf, buf_size, "%luh %lum", hours, minutes);
+    } else {
+        snprintf(buf, buf_size, "%lum %lus", minutes, uptime_seconds);
     }
 }
 
@@ -331,11 +393,16 @@ static lv_obj_t * create_scr_bitaxe_logo(const char * name, const char * board_v
     lv_obj_t * scr = lv_obj_create(NULL);
     apply_screen_padding(scr);
 
-    lv_obj_t *img = lv_img_create(scr);
-    lv_img_set_src(img, get_bitaxe_logo_src());
     if (is_large_display()) {
-        lv_obj_align(img, LV_ALIGN_CENTER, -42, -10);
+        lv_obj_t *logo = lv_label_create(scr);
+        lv_label_set_text(logo, "bitaxe");
+        lv_obj_set_style_text_font(logo, &ui_font_AngelWish40, LV_PART_MAIN);
+        lv_obj_set_style_text_color(logo, lv_color_white(), LV_PART_MAIN);
+        lv_obj_set_style_text_opa(logo, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_align(logo, LV_ALIGN_CENTER, -42, -16);
     } else {
+        lv_obj_t *img = lv_img_create(scr);
+        lv_img_set_src(img, get_bitaxe_logo_src());
         lv_obj_align(img, LV_ALIGN_CENTER, 0, 1);
     }
 
@@ -380,6 +447,33 @@ static lv_obj_t * create_scr_urls() {
 }
 
 static lv_obj_t * create_scr_stats() {
+    if (use_stats_background()) {
+        lv_obj_t * scr = lv_obj_create(NULL);
+        lv_obj_set_style_pad_all(scr, 0, LV_PART_MAIN);
+        lv_obj_set_style_border_opa(scr, LV_OPA_TRANSP, LV_PART_MAIN);
+        lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+
+        lv_obj_t * bg = lv_img_create(scr);
+        lv_img_set_src(bg, &bitaxe_background);
+        lv_obj_align(bg, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_move_background(bg);
+
+        stats_logo_label = create_positioned_label(scr, 15, 31, 105, 42, &ui_font_AngelWish40, "Bitaxe", LV_TEXT_ALIGN_LEFT);
+        stats_ip_label = create_positioned_label(scr, 94, 1, 100, 13, &ui_font_OpenSansBold13, "--", LV_TEXT_ALIGN_CENTER);
+        stats_hashrate_label = create_positioned_label(scr, 15, 126, 98, 36, &ui_font_DigitalNumbers28, "--", LV_TEXT_ALIGN_RIGHT);
+        stats_difficulty_label = create_positioned_label(scr, 34, 99, 84, 15, &ui_font_OpenSansBold14, "--", LV_TEXT_ALIGN_LEFT);
+        stats_fan_rpm_label = create_positioned_label(scr, 152, 70, 56, 13, &ui_font_OpenSansBold13, "--", LV_TEXT_ALIGN_CENTER);
+        stats_temp_label = create_positioned_label(scr, 136, 101, 45, 15, &ui_font_OpenSansBold14, "--", LV_TEXT_ALIGN_RIGHT);
+        stats_vin_label = create_positioned_label(scr, 234, 43, 70, 15, &ui_font_OpenSansBold14, "--", LV_TEXT_ALIGN_LEFT);
+        stats_vcore_label = create_positioned_label(scr, 234, 65, 70, 15, &ui_font_OpenSansBold14, "--", LV_TEXT_ALIGN_LEFT);
+        stats_current_label = create_positioned_label(scr, 234, 87, 70, 15, &ui_font_OpenSansBold14, "--", LV_TEXT_ALIGN_LEFT);
+        stats_power_label = create_positioned_label(scr, 234, 109, 70, 15, &ui_font_OpenSansBold14, "--", LV_TEXT_ALIGN_LEFT);
+        stats_efficiency_label = create_positioned_label(scr, 217, 136, 60, 20, &ui_font_DigitalNumbers16, "--", LV_TEXT_ALIGN_RIGHT);
+        stats_uptime_label = create_positioned_label(scr, 20, 78, 110, 13, &ui_font_OpenSansBold13, "--", LV_TEXT_ALIGN_RIGHT);
+
+        return scr;
+    }
+
     lv_obj_t * scr = create_flex_screen(4);
 
     stats_hashrate_label = lv_label_create(scr);
@@ -466,7 +560,11 @@ static bool screen_show(screen_t screen)
         is_valid = lv_obj_is_valid(scr);
         if (is_valid) {
             bool auto_del = current_screen == SCR_BITAXE_LOGO || current_screen == SCR_OSMU_LOGO;
-            lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
+            if (use_stats_background() && screen == SCR_STATS) {
+                lv_screen_load(scr);
+            } else {
+                lv_screen_load_anim(scr, LV_SCR_LOAD_ANIM_MOVE_LEFT, LV_DEF_REFR_PERIOD * 128 / 8, 0, auto_del);
+            }
         }
 
         current_screen_time_ms = 0;
@@ -478,8 +576,84 @@ static bool screen_show(screen_t screen)
     return is_valid;
 }
 
+static void update_stats_background_labels(SystemModule * module, PowerManagementModule * power_management)
+{
+    if (!use_stats_background()) {
+        return;
+    }
+
+    lv_label_set_text_fmt(stats_hashrate_label, module->current_hashrate >= 10000.0f ? "%.0f" : "%.1f", module->current_hashrate);
+
+    if (module->ip_addr_str[0] != '\0') {
+        lv_label_set_text(stats_ip_label, module->ip_addr_str);
+    } else {
+        lv_label_set_text(stats_ip_label, "--");
+    }
+
+    if (module->best_session_diff_string[0] != '\0') {
+        lv_label_set_text(stats_difficulty_label, module->best_session_diff_string);
+    } else {
+        lv_label_set_text(stats_difficulty_label, "--");
+    }
+
+    char uptime[24];
+    format_compact_uptime(uptime, sizeof(uptime), module->start_time);
+    lv_label_set_text(stats_uptime_label, uptime);
+
+    if (power_management->fan_rpm > 0) {
+        lv_label_set_text_fmt(stats_fan_rpm_label, "%u", power_management->fan_rpm);
+    } else {
+        lv_label_set_text(stats_fan_rpm_label, "--");
+    }
+
+    float temp = power_management->chip_temp2_avg > power_management->chip_temp_avg
+        ? power_management->chip_temp2_avg
+        : power_management->chip_temp_avg;
+    if (temp > 0) {
+        lv_label_set_text_fmt(stats_temp_label, "%.0f", temp);
+    } else {
+        lv_label_set_text(stats_temp_label, "--");
+    }
+
+    if (power_management->voltage > 0) {
+        lv_label_set_text_fmt(stats_vin_label, "%.1fV", power_management->voltage / 1000.0f);
+    } else {
+        lv_label_set_text(stats_vin_label, "--");
+    }
+
+    if (power_management->core_voltage > 0) {
+        lv_label_set_text_fmt(stats_vcore_label, "%.2fV", power_management->core_voltage / 1000.0f);
+    } else {
+        lv_label_set_text(stats_vcore_label, "--");
+    }
+
+    if (power_management->current > 0) {
+        lv_label_set_text_fmt(stats_current_label, "%.1fA", power_management->current / 1000.0f);
+    } else {
+        lv_label_set_text(stats_current_label, "--");
+    }
+
+    if (power_management->power > 0) {
+        lv_label_set_text_fmt(stats_power_label, "%.1fW", power_management->power);
+    } else {
+        lv_label_set_text(stats_power_label, "--");
+    }
+
+    if (power_management->power > 0 && module->current_hashrate > 0) {
+        float efficiency = power_management->power / (module->current_hashrate / 1000.0f);
+        lv_label_set_text_fmt(stats_efficiency_label, "%.1f", efficiency);
+    } else {
+        lv_label_set_text(stats_efficiency_label, "--");
+    }
+}
+
 void screen_next()
 {
+    if (use_stats_background()) {
+        screen_show(SCR_STATS);
+        return;
+    }
+
     screen_t next_scr = get_current_screen();
     do {
         next_scr++;
@@ -590,11 +764,17 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    // Carousel
+    // Connected display updates
 
     current_screen_time_ms += SCREEN_UPDATE_MS;
 
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+
+    if (use_stats_background()) {
+        update_stats_background_labels(module, power_management);
+        screen_show(SCR_STATS);
+        return;
+    }
 
     char *pool_url = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
     if (strcmp(lv_label_get_text(urls_mining_url_label), pool_url) != 0) {
@@ -639,6 +819,8 @@ static void screen_update_cb(lv_timer_t * timer)
         }
         current_chip_temp = power_management->chip_temp_avg;
     }
+
+    update_stats_background_labels(module, power_management);
 
     if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
         // SV2 standard channel: no coinbase data, so no block height or scriptsig
@@ -732,6 +914,9 @@ void screen_button_press()
 {
     if (GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms > 0) {
         GLOBAL_STATE->SYSTEM_MODULE.identify_mode_time_ms = 0;
+    } else if (use_stats_background()) {
+        screen_show(SCR_STATS);
+        lv_display_trigger_activity(NULL);
     } else {
         screen_next();
     }

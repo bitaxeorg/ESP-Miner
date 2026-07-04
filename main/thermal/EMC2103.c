@@ -33,9 +33,15 @@ esp_err_t EMC2103_init(int temp_offset_param, bool flip_param)
 
     ESP_LOGI(TAG, "EMC2103 init");
 
-    // Configure the fan setting
+    // Use direct PWM mode with the 26 kHz base frequency expected by 4-wire fans.
+    // GammaHex shares one PWM net across multiple fan connectors; push-pull gives
+    // the fan input a fast edge instead of relying on the board's 10k pull-up.
     ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_CONFIGURATION1, 0), TAG, "Failed to configure EMC2103");
-    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_CONFIG, 0x00), TAG, "Failed to configure PWM");
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_LUT_CONFIG1, EMC2103_LUT_CONFIG1_DISABLED), TAG, "Failed to disable fan LUT");
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_FAN_CONFIG1, EMC2103_FAN_CONFIG1_DIRECT_PWM), TAG, "Failed to configure direct PWM mode");
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_CONFIG, EMC2103_PWM_CONFIG_PUSH_PULL_NORMAL), TAG, "Failed to configure PWM output");
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_BASE_FREQ, EMC2103_PWM_BASE_FREQ_26KHZ), TAG, "Failed to configure PWM base frequency");
+    ESP_RETURN_ON_ERROR(i2c_bitaxe_register_write_byte(EMC2103_dev_handle, EMC2103_PWM_DIVIDE, EMC2103_PWM_DIVIDE_BY_1), TAG, "Failed to configure PWM divisor");
 
     return ESP_OK;
 
