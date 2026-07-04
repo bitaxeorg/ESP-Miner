@@ -142,7 +142,7 @@ export class PoolComponent implements OnInit {
               Validators.max(65535)
             ]],
             stratumUser: [pool.stratumUser || '', [Validators.required]],
-            stratumPassword: [pool.stratumPassword || '*****', [Validators.required]],
+            stratumPassword: [pool.stratumPassword || '*****'],
             stratumSuggestedDifficulty: [pool.stratumSuggestedDifficulty || 0, [Validators.required]],
             stratumExtranonceSubscribe: [pool.stratumExtranonceSubscribe == true, [Validators.required]],
             stratumTLS: [pool.stratumTLS || 0],
@@ -252,7 +252,7 @@ export class PoolComponent implements OnInit {
           Validators.max(65535)
         ]],
         stratumUser: ['', [Validators.required]],
-        stratumPassword: ['', [Validators.required]],
+        stratumPassword: [''],
         stratumSuggestedDifficulty: [0, [Validators.required]],
         stratumExtranonceSubscribe: [false, [Validators.required]],
         stratumTLS: [0],

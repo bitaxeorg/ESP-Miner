@@ -35,7 +35,7 @@
             </div>
         </div>
 
-        <h2 class="mb-3">Pool Configurations</h2>
+        <h2 class="mb-3">Pool Configurations <span class="text-sm text-500 font-normal ml-2">({{ poolsArray.length }}/8)</span></h2>
 
         <div formArrayName="pools" class="flex flex-column mb-4">
             <div *ngFor="let poolControl of poolsArray.controls; let i = index" [formGroupName]="i" class="card border-round-xl overflow-hidden p-0 shadow-1 hover:shadow-2 transition-shadow transition-duration-200" style="border: 1px solid var(--surface-border); background-color: var(--surface-card);">
@@ -290,13 +290,13 @@
         </div>
 
         <div class="flex mt-3">
-            <button pButton type="button" icon="pi pi-plus" label="Add Pool" class="p-button-success p-button-sm border-round-xl" [disabled]="poolsArray.length >= 8" (click)="addPool()"></button>
+            <button pButton type="button" icon="pi pi-plus" label="Add Pool" class="p-button-success p-button-sm" [disabled]="poolsArray.length >= 8" (click)="addPool()"></button>
         </div>
 
         <div class="flex mt-5 gap-3">
             <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-                class="btn btn-primary border-round-xl">Save</button>
-            <button pButton [disabled]="!savedChanges" (click)="restart()" class="border-round-xl">Restart</button>
+                class="btn btn-primary">Save</button>
+            <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
         </div>
     </div>
 </form>
