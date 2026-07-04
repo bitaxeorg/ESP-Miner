@@ -58,7 +58,9 @@ esp_err_t websocket_add_client(int fd, WebSocketClientType type)
             clients[i].type = type;
             if (type >= 0 && type < WS_TYPE_MAX) type_counts[type]++;
 
-            ESP_LOGI(TAG, "Added WebSocket %s client, fd: %d, slot: %d", type == WS_TYPE_LOGS ? "log" : "api", fd, i);
+            ESP_LOGI(TAG, "Added WebSocket %s client, fd: %d, slot: %d, type_count: %d",
+                     type == WS_TYPE_LOGS ? "log" : "api", fd, i, type_counts[type]);
+
             ret = ESP_OK;
             if (type == WS_TYPE_LOGS && s_websocket_log_task_handle) {
                 xTaskNotifyGive(s_websocket_log_task_handle);
@@ -88,7 +90,9 @@ void websocket_remove_client(int fd)
             clients[i].type = 0;
             if (type >= 0 && type < WS_TYPE_MAX) type_counts[type]--;
 
-            ESP_LOGI(TAG, "Removed WebSocket %s client, fd: %d, slot: %d", type == WS_TYPE_LOGS ? "log" : "api", fd, i);
+            ESP_LOGI(TAG, "Removed WebSocket %s client, fd: %d, slot: %d, type_count: %d",
+                     type == WS_TYPE_LOGS ? "log" : "api", fd, i, type_counts[type]);
+
             break;
         }
     }
@@ -98,9 +102,20 @@ void websocket_remove_client(int fd)
 
 void websocket_send_to_client(int fd, httpd_ws_frame_t *pkt)
 {
-    if (server_handle == NULL || fd == -1) return;
-    if (httpd_ws_send_frame_async(server_handle, fd, pkt) != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to send WebSocket frame to fd: %d", fd);
+    if (server_handle == NULL || fd == -1)
+        return;
+
+    esp_err_t err = httpd_ws_send_frame_async(server_handle, fd, pkt);
+
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG,
+                 "Send failed: fd=%d err=%s (%d) - removing client",
+                 fd,
+                 esp_err_to_name(err),
+                 err);
+
+        websocket_remove_client(fd);
+        httpd_sess_trigger_close(server_handle, fd);
     }
 }
 
@@ -108,10 +123,24 @@ void websocket_broadcast(WebSocketClientType type, httpd_ws_frame_t *pkt)
 {
     if (server_handle == NULL) return;
 
+    int fds[MAX_WEBSOCKET_CLIENTS];
+    int n = 0;
+
+    if (xSemaphoreTake(clients_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to acquire mutex for broadcast");
+        return;
+    }
+
     for (int i = 0; i < MAX_WEBSOCKET_CLIENTS; i++) {
-        if (clients[i].fd != -1 && (clients[i].type == type)) {
-            websocket_send_to_client(clients[i].fd, pkt);
+        if (clients[i].fd != -1 && clients[i].type == type) {
+            fds[n++] = clients[i].fd;
         }
+    }
+
+    xSemaphoreGive(clients_mutex);
+
+    for (int i = 0; i < n; i++) {
+        websocket_send_to_client(fds[i], pkt);
     }
 }
 
