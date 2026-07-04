@@ -1,9 +1,6 @@
 .col-fixed-width {
     min-width: 80px;
 }
-.break-all {
-    word-break: break-all;
-}
 
 .heatmap {
     width: 100%;
@@ -40,35 +37,10 @@
     }
 
     // Chart widget: make the canvas fill the full card height
-    .grid-stack-item[gs-id="chart"] {
-        .grid-stack-item-content {
-            > .card {
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-                padding-bottom: 2rem;
-
-                form {
-                    flex: 1;
-                    min-height: 0;
-                    display: flex;
-                    flex-direction: column;
-
-                    p-chart {
-                        flex: 1;
-                        min-height: 0;
-                        display: flex;
-                        flex-direction: column;
-
-                        ::ng-deep > div {
-                            flex: 1;
-                            min-height: 0;
-                            position: relative;
-                        }
-                    }
-                }
-            }
-        }
+    .grid-stack-item[gs-id="chart"] p-chart ::ng-deep > div {
+        flex: 1;
+        min-height: 0;
+        position: relative;
     }
 
     // Hide resize handles by default
@@ -130,9 +102,6 @@
 }
 
 @container widget (min-width: 500px) {
-    .card {
-        padding: 2rem;
-    }
     .text-lg { font-size: 1.15rem; }
     .text-2xl { font-size: 2.25rem; }
     h4 { font-size: 1.2rem; }

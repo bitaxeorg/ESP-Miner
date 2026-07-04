@@ -205,8 +205,8 @@
         <div class="grid-stack-item" gs-id="chart">
             <div class="grid-stack-item-content">
                 <ng-container *ngIf="!info.power_fault">
-                    <div class="card">
-                        <form [formGroup]="form">
+                    <div class="card flex flex-col overflow-hidden pb-8">
+                        <form [formGroup]="form" class="flex-1 min-h-0 flex flex-col">
                             <div class="flex flex-nowrap justify-between mb-4">
                                 <p-select
                                     [options]="chartDataSources"
@@ -228,7 +228,7 @@
                                 </p-select>
                             </div>
 
-                            <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
+                            <p-chart #chart id="chart" class="flex-1 min-h-0 flex flex-col" [data]="chartData" [options]="chartOptions"></p-chart>
                         </form>
                     </div>
                 </ng-container>
