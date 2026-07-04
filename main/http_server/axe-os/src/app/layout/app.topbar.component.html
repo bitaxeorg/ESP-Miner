@@ -28,7 +28,7 @@
                     <i class="pi pi-list-check text-xl block"></i>
                 </a>
             </li>
-            <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
+            <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block layout-widescreen-button">
                 <a class="block py-2 text-white cursor-pointer"
                     tooltipPosition="bottom"
                     [pTooltip]="layoutService.isWideView() ? 'Standard Width' : 'Wide View'"
