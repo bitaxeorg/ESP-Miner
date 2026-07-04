@@ -15,10 +15,10 @@
         0px 0px 2px rgba(0, 0, 0, 0.05),
         0px 1px 4px rgba(0, 0, 0, 0.08);
 
-    @media screen and (max-width: 575px) {
+    @media (max-width: 575.98px) {
         justify-content: space-between;
     }
-    @media screen and (max-width: 768px) {
+    @media (max-width: 767.98px) {
         padding: 0 1rem;
     }
 
@@ -39,7 +39,7 @@
             color var(--transition-duration);
         margin-left: 2rem;
 
-        @media screen and (min-width: 576px) {
+        @media (min-width: 576px) {
             margin-left: 5rem;
         }
 

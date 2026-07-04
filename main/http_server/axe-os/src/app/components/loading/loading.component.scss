@@ -12,12 +12,12 @@
     top: calc(var(--topbar-height) + var(--padding));
     padding-bottom: calc(var(--topbar-height) + var(--padding));
 
-    @media (max-width: 768px) {
+    @media (max-width: 767.98px) {
         --padding: 1rem;
     }
 
     ::ng-deep .menuIsVisible & {
-        @media screen and (min-width: 992px) {
+        @media (min-width: 992px) {
             left: calc(var(--padding) * 2 + var(--sidebar-width));
         }
     }
