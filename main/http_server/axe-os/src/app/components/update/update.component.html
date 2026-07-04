@@ -1,8 +1,8 @@
 <div class="card">
     <h2>Update</h2>
 
-    <div class="grid">
-        <div class="col-12 xl:col-4">
+    <div class="grid grid-cols-12 gap-4">
+        <div class="col-span-12 xl:col-span-4">
             <div class="card h-full">
                 <h5>Current Version: {{(info$ | async)?.version}}</h5>
 
@@ -34,7 +34,7 @@
                             [href]="latestRelease.html_url">{{latestRelease.name}}</a>
                         </h3>
 
-                        <div class="text-orange-500 mb-3">Download both files for update!</div>
+                        <div class="text-orange-500 mb-4">Download both files for update!</div>
 
                         <div *ngFor="let asset of latestRelease.assets">
                             <div *ngIf="asset.name == 'esp-miner.bin'">
@@ -47,7 +47,7 @@
                             </div>
                         </div>
 
-                        <a class="text-color-secondary underline block mt-3 cursor-pointer" (click)="releaseNotesModal.isVisible = true">
+                        <a class="text-secondary underline block mt-4 cursor-pointer" (click)="releaseNotesModal.isVisible = true">
                             Release Notes
                         </a>
 
@@ -58,7 +58,7 @@
                 </ng-template>
             </div>
         </div>
-        <div class="col-12 lg:col-6 xl:col-4">
+        <div class="col-span-12 lg:col-span-6 xl:col-span-4">
             <div class="card h-full">
                 <h3>Update AxeOS</h3>
 
@@ -68,7 +68,7 @@
                 <small>(www.bin)</small>
             </div>
         </div>
-        <div class="col-12 lg:col-6 xl:col-4">
+        <div class="col-span-12 lg:col-span-6 xl:col-span-4">
             <div class="card h-full">
                 <h3>Update Firmware</h3>
                 <p-fileupload #firmwareUpload [customUpload]="true" mode="basic" accept=".bin" (uploadHandler)="otaUpdate($event)"
@@ -81,19 +81,19 @@
     </div>
 </div>
 <app-modal #progressModal [headline]="'Updating ' + updateTarget" [closable]="updateStatus !== 'progress'">
-    <div class="flex flex-column align-items-center justify-content-center p-4">
+    <div class="flex flex-col items-center justify-center p-4">
         <ng-container *ngIf="updateStatus === 'progress'">
-            <div class="text-xl mb-3" *ngIf="updateTarget === 'AxeOS' && websiteUpdateProgress !== null">
+            <div class="text-xl mb-4" *ngIf="updateTarget === 'AxeOS' && websiteUpdateProgress !== null">
                 Uploading... {{ websiteUpdateProgress }}%
             </div>
-            <div class="text-xl mb-3" *ngIf="updateTarget === 'Firmware' && firmwareUpdateProgress !== null">
+            <div class="text-xl mb-4" *ngIf="updateTarget === 'Firmware' && firmwareUpdateProgress !== null">
                 Uploading... {{ firmwareUpdateProgress }}%
             </div>
-            <div class="text-xl mb-3" *ngIf="(updateTarget === 'AxeOS' && websiteUpdateProgress === null) || (updateTarget === 'Firmware' && firmwareUpdateProgress === null)">
+            <div class="text-xl mb-4" *ngIf="(updateTarget === 'AxeOS' && websiteUpdateProgress === null) || (updateTarget === 'Firmware' && firmwareUpdateProgress === null)">
                 Applying update...
             </div>
             <p-progressbar class="w-full" [styleClass]="'instant-progress'" [showValue]="false" [value]="updateTarget === 'AxeOS' ? websiteUpdateProgress : firmwareUpdateProgress" [style]="{'height': '1.5rem', 'width': '100%'}"></p-progressbar>
-            <div class="text-center mt-3 text-color-secondary">
+            <div class="text-center mt-3 text-secondary">
                 Please do not disconnect the power.
             </div>
         </ng-container>

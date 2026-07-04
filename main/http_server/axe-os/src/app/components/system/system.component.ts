@@ -12,7 +12,7 @@ import { SystemInfo as ISystemInfo, SystemAsic as ISystemASIC, GenericResponse, 
 type TableRow = {
   label: string;
   value: string;
-  class?: string;
+  isSeparator?: boolean;
   valueClass?: string;
   isSensitiveData?: boolean;
   tooltip?: string;
@@ -31,7 +31,7 @@ type CombinedData = {
 export class SystemComponent implements OnInit, OnDestroy {
   public info$: Observable<ISystemInfo>;
   public asic$: Observable<ISystemASIC>;
-  public combinedData$: Observable<CombinedData>;
+  public systemRows$: Observable<TableRow[]>;
   public isConnected$: Observable<boolean>;
 
   private destroy$ = new Subject<void>();
@@ -49,13 +49,14 @@ export class SystemComponent implements OnInit, OnDestroy {
       shareReplay({ refCount: true, bufferSize: 1 })
     );
 
-    this.combinedData$ = combineLatest([this.info$, this.asic$]).pipe(
-      map(([info, asic]) => ({ info, asic }))
+    this.systemRows$ = combineLatest([this.info$, this.asic$]).pipe(
+      map(([info, asic]) => this.getSystemRows({ info, asic })),
+      shareReplay({ refCount: true, bufferSize: 1 })
     );
   }
 
   ngOnInit() {
-    this.combinedData$
+    this.systemRows$
       .pipe(first(), this.loadingService.lockUIUntilComplete(), takeUntil(this.destroy$))
       .subscribe();
   }
@@ -63,6 +64,10 @@ export class SystemComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  trackByRowLabel(index: number, row: TableRow): string {
+    return row.label;
   }
 
   getWifiRssiColor(rssi: number): string {
@@ -85,21 +90,21 @@ export class SystemComponent implements OnInit, OnDestroy {
     return [
       { label: 'Device Model', value: data.asic.deviceModel || 'Other', valueClass: 'text-' + data.asic.swarmColor + '-500' },
       { label: 'Board Version', value: data.info.boardVersion },
-      { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
+      { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, isSeparator: true },
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds) },
-      { label: 'Reset Reason', value: data.info.resetReason, class: 'pb-3' },
+      { label: 'Reset Reason', value: data.info.resetReason, isSeparator: true },
       { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitiveData: true },
       { label: 'Wi-Fi Status', value: data.info.wifiStatus },
       { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + ' dBm', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) },
       { label: 'Wi-Fi IPv4', value: data.info.ipv4},
-      { label: 'Wi-Fi IPv6', value: data.info.ipv6, class: 'pb-3', isSensitiveData: true},
-      { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3', isSensitiveData: true },
+      { label: 'Wi-Fi IPv6', value: data.info.ipv6, isSeparator: true, isSensitiveData: true},
+      { label: 'MAC Address', value: data.info.macAddr, isSeparator: true, isSensitiveData: true },
       { label: 'CPU Usage', value: data.info.cpuUsage.toFixed(1) + '%'},
       { label: 'Free Heap Memory', value: ByteSuffixPipe.transform(data.info.freeHeap)},
       { label: '• Internal', value: ByteSuffixPipe.transform(data.info.freeHeapInternal)},
       { label: '• Spiram', value: ByteSuffixPipe.transform(data.info.freeHeapSpiram) },
       { label: '• Min Free (All Time)', value: ByteSuffixPipe.transform(data.info.minFreeHeap)},
-      { label: '• Max Alloc Block', value: ByteSuffixPipe.transform(data.info.maxAllocHeap), class: 'pb-3' },
+      { label: '• Max Alloc Block', value: ByteSuffixPipe.transform(data.info.maxAllocHeap), isSeparator: true },
       { label: 'Firmware Version', value: data.info.version },
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
       { label: 'ESP-IDF Version', value: data.info.idfVersion },

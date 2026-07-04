@@ -4,7 +4,7 @@
     min-height: 100vh;
     justify-content: space-between;
     padding: calc(var(--topbar-height) + 2rem) 2rem 2rem;
-    transition: margin-left $transitionDuration;
+    transition: margin-left var(--transition-duration);
 
     @media (max-width: 768px) {
         padding: calc(var(--topbar-height) + 1rem) 1rem 1rem;

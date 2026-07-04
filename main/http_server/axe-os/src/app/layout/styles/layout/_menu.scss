@@ -6,9 +6,9 @@
     user-select: none;
     top: calc(var(--topbar-height) + 2rem);
     left: 2rem;
-    transition: transform $transitionDuration, left $transitionDuration;
+    transition: transform var(--transition-duration), left var(--transition-duration);
     background-color: var(--p-card-background);
-    border-radius: $borderRadius;
+    border-radius: var(--border-radius);
     padding: 1.5rem;
     box-shadow: 0px 3px 5px rgba(0, 0, 0, .02), 0px 0px 2px rgba(0, 0, 0, .05), 0px 1px 4px rgba(0, 0, 0, .08);
 
@@ -68,8 +68,8 @@
             color: var(--text-color);
             cursor: pointer;
             padding: .75rem 1rem;
-            border-radius: $borderRadius;
-            transition: background-color $transitionDuration, box-shadow $transitionDuration;
+            border-radius: var(--border-radius);
+            transition: background-color var(--transition-duration), box-shadow var(--transition-duration);
 
             .layout-menuitem-icon {
                 margin-right: .5rem;
@@ -78,7 +78,7 @@
             .layout-submenu-toggler {
                 font-size: 75%;
                 margin-left: auto;
-                transition: transform $transitionDuration;
+                transition: transform var(--transition-duration);
             }
 
             &.active-route {
@@ -97,7 +97,7 @@
 
         ul {
             overflow: hidden;
-            border-radius: $borderRadius;
+            border-radius: var(--border-radius);
 
             li {
                 a {

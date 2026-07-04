@@ -41,15 +41,15 @@ export class DialogService {
 
 @Component({
     template: `
-    <div class="flex flex-column gap-2">
+    <div class="flex flex-col gap-2">
       <p-button *ngFor="let option of config.data.options"
         [label]="option.label"
         (onClick)="config.data.onSelect(option.value)"
-        styleClass="w-full text-left flex align-items-baseline"
+        styleClass="w-full text-left flex items-baseline justify-between"
         pTooltip="{{option.label}} ({{option.rssi}} dBm)"
         tooltipPosition="bottom"
       >
-        <wifi-icon [rssi]="option.rssi" class="flex-order-2" />
+        <wifi-icon [rssi]="option.rssi" class="order-2" />
       </p-button>
     </div>
   `,

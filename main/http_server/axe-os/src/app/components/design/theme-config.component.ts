@@ -14,42 +14,7 @@ interface ThemeOption {
 
 @Component({
     selector: 'app-theme-config',
-    template: `
-    <div class="card">
-      <div class="grid">
-        <div class="col-12">
-          <h5>Color Scheme</h5>
-          <div class="flex gap-3">
-            <div class="flex align-items-center">
-              <p-radioButton name="colorScheme" [value]="'dark'" [(ngModel)]="selectedScheme"
-                (onClick)="changeColorScheme('dark')" inputId="dark"></p-radioButton>
-              <label for="dark" class="ml-2">Dark</label>
-            </div>
-            <div class="flex align-items-center">
-              <p-radioButton name="colorScheme" [value]="'light'" [(ngModel)]="selectedScheme"
-                (onClick)="changeColorScheme('light')" inputId="light"></p-radioButton>
-              <label for="light" class="ml-2">Light</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 mt-4">
-          <h5>Theme Colors</h5>
-          <div class="grid gap-2">
-            <div *ngFor="let theme of themes" class="col-2 theme-color">
-              <button pButton [class]="'p-button-rounded p-button-text color-dot'"
-                      [style.backgroundColor]="theme.primaryColor"
-                      style="width: 2rem; height: 2rem; border: none;"
-                      (click)="changeTheme(theme)">
-                <i *ngIf="theme.primaryColor === currentColor" class="pi pi-check selected-icon"></i>
-              </button>
-              <div class="text-sm mt-1">{{theme.name}}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `,
+    templateUrl: './theme-config.component.html',
     styleUrls: ['./design-component.scss'],
     standalone: false
 })

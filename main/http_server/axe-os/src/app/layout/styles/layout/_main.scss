@@ -4,11 +4,9 @@
 
 html {
     height: 100%;
-    font-size: $scale;
 }
 
 body {
-    font-family: var(--font-family);
     color: var(--text-color);
     background-color: var(--p-content-background);
     margin: 0;

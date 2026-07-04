@@ -1,17 +1,13 @@
-import { HttpClientModule } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterModule } from '@angular/router';
-import { BadgeModule } from 'primeng/badge';
 import { InputTextModule } from 'primeng/inputtext';
-import { RadioButtonModule } from 'primeng/radiobutton';
 import { RippleModule } from 'primeng/ripple';
 import { TooltipModule } from 'primeng/tooltip';
-import { CheckboxModule } from 'primeng/checkbox';
 import { PopoverModule } from 'primeng/popover';
-import { AppFooterComponent } from './app.footer.component';
+import { CheckboxModule } from 'primeng/checkbox';
 import { AppLayoutComponent } from './app.layout.component';
 import { AppMenuComponent } from './app.menu.component';
 import { AppMenuitemComponent } from './app.menuitem.component';
@@ -24,7 +20,6 @@ import { WifiIconComponent } from '../components/wifi-icon/wifi-icon.component';
     declarations: [
         AppMenuitemComponent,
         AppTopBarComponent,
-        AppFooterComponent,
         AppMenuComponent,
         AppSidebarComponent,
         AppLayoutComponent,
@@ -34,16 +29,13 @@ import { WifiIconComponent } from '../components/wifi-icon/wifi-icon.component';
     imports: [
         BrowserModule,
         FormsModule,
-        HttpClientModule,
         BrowserAnimationsModule,
         InputTextModule,
-        BadgeModule,
-        RadioButtonModule,
         RippleModule,
         RouterModule,
         TooltipModule,
-        CheckboxModule,
         PopoverModule,
+        CheckboxModule,
     ],
     exports: [AppLayoutComponent, WifiIconComponent]
 })

@@ -110,7 +110,7 @@ const components = [
                 darkModeSelector: '.dark-mode',
                 cssLayer: {
                     name: 'primeng',
-                    order: 'primeng, axe-os'
+                    order: 'theme, base, components, primeng, layout, axe-os, utilities'
                 }
             }
         }

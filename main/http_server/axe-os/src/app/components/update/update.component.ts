@@ -160,7 +160,7 @@ export class UpdateComponent {
       .replace(/(https?:\/\/github\.com\/.+\/(.+[^\s])+)/gim, (match, p1, p2) => `<a href="${p1}" target="_blank">${match.includes('/pull/') ? '#' : ''}${p2}</a>`) // Regular links
       .replace(/@([^\s]+)/gim, ' <a href="https://github.com/$1" target="_blank">@$1</a> ') // Username links
       .replace(/^\s*[-+*]\s?(.+)$/gim, '<li>$1</li>') // Unordered list
-      .replace(/`([^`]+)`/gim, '<code class="bg-surface-100 border-round px-1">$1</code>') // Code
+      .replace(/`([^`]+)`/gim, '<code class="bg-neutral-100 dark:bg-zinc-800 rounded px-1">$1</code>') // Code
       .replace(/\r\n\r\n/gim, '<br>'); // Breaks
 
     return toHTML.trim();

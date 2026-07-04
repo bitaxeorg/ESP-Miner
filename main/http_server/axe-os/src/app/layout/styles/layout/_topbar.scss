@@ -7,7 +7,7 @@
     width: 100%;
     padding: 0 2rem;
     background-color: var(--p-card-background);
-    transition: left $transitionDuration;
+    transition: left var(--transition-duration);
     display: flex;
     align-items: center;
     box-shadow:
@@ -35,8 +35,8 @@
         height: 3rem;
         cursor: pointer;
         transition:
-            background-color $transitionDuration,
-            color $transitionDuration;
+            background-color var(--transition-duration),
+            color var(--transition-duration);
         margin-left: 2rem;
 
         @media screen and (min-width: 576px) {

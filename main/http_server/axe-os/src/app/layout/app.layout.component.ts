@@ -20,8 +20,6 @@ export class AppLayoutComponent implements OnDestroy {
 
     menuOutsideClickListener: any;
 
-    profileMenuOutsideClickListener: any;
-
     @ViewChild(AppSidebarComponent) appSidebar!: AppSidebarComponent;
 
     @ViewChild(AppTopBarComponent) appTopbar!: AppTopBarComponent;
@@ -52,7 +50,6 @@ export class AppLayoutComponent implements OnDestroy {
         this.router.events.pipe(filter(event => event instanceof NavigationEnd))
             .subscribe(() => {
                 this.hideMenu();
-                this.hideProfileMenu();
             });
     }
 
@@ -65,14 +62,6 @@ export class AppLayoutComponent implements OnDestroy {
             this.menuOutsideClickListener = null;
         }
         this.unblockBodyScroll();
-    }
-
-    hideProfileMenu() {
-        this.layoutService.state.profileSidebarVisible = false;
-        if (this.profileMenuOutsideClickListener) {
-            this.profileMenuOutsideClickListener();
-            this.profileMenuOutsideClickListener = null;
-        }
     }
 
     blockBodyScroll(): void {

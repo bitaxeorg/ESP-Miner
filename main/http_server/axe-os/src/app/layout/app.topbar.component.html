@@ -13,14 +13,14 @@
     </a>
 
     <ng-container *ngIf="info$ | async as info">
-        <span class="text-color-secondary select-none absolute left-0 bottom-0 ml-6 md:ml-7 mb-1"
+        <span class="text-secondary select-none absolute left-0 bottom-0 ml-12 md:ml-16 mb-1"
             tooltipPosition="bottom"
             pTooltip="Hostname"
         >{{info.hostname}}</span>
 
-        <ul *ngIf="!isAPMode" class="flex ml-auto list-none p-0 m-0 gap-4 lg:flex-order-2">
+        <ul *ngIf="!isAPMode" class="flex items-center ml-auto list-none p-0 m-0 gap-6 lg:order-2">
             <li *ngIf="dashboardEdit.editMode$ | async" class="hidden md:block">
-                <a class="block py-2 text-white cursor-pointer"
+                <a class="flex items-center py-2 text-white cursor-pointer"
                     tooltipPosition="bottom"
                     pTooltip="Widgets"
                     (click)="widgetPanel.toggle($event)"
@@ -96,15 +96,15 @@
         </ul>
 
         <p-popover #widgetPanel>
-            <div class="flex flex-column gap-2">
-                <div *ngFor="let widget of dashboardEdit.widgetDefs" class="flex align-items-center gap-2">
+            <div class="flex flex-col gap-2">
+                <div *ngFor="let widget of dashboardEdit.widgetDefs" class="flex items-center gap-2">
                     <p-checkbox
                         [binary]="true"
                         [ngModel]="dashboardEdit.isWidgetVisible(widget.id)"
                         (onChange)="dashboardEdit.toggleWidgetRequested$.next(widget.id)"
                         [inputId]="'widget-' + widget.id">
                     </p-checkbox>
-                    <label [for]="'widget-' + widget.id" class="text-sm cursor-pointer white-space-nowrap">{{ widget.label }}</label>
+                    <label [for]="'widget-' + widget.id" class="text-sm cursor-pointer whitespace-nowrap">{{ widget.label }}</label>
                 </div>
             </div>
         </p-popover>

@@ -117,4 +117,58 @@
     --p-message-success-border-color: #a5d6a7;
     --p-message-content-padding: 1rem;
     --p-message-border-radius: 0.5rem;
+
+    /* Font Family Settings */
+    --p-font-family: 'Nippo-Regular', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* Layout Custom Variable Mappings */
+    --text-color: var(--p-text-color);
+    --text-color-secondary: var(--p-text-muted-color);
+    --font-family: var(--p-font-family);
+    --border-radius: var(--p-border-radius);
+    --surface-border: var(--p-content-border-color);
+
+    /* Input Text Token Overrides */
+    --p-inputtext-focus-ring-shadow: none;
+    --p-inputtext-transition: none;
+
+    /* Select Token Overrides */
+    --p-select-background: transparent;
+    --p-select-focus-ring-shadow: none;
+    --p-select-transition: none;
+    --p-select-overlay-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    --p-select-overlay-background: var(--p-card-background);
+    --p-select-overlay-border-color: var(--card-border);
+    --p-select-option-focus-background: color-mix(in srgb, var(--primary-color), black 40%);
+    --p-select-option-focus-color: #ffffff;
+    --p-select-option-selected-background: var(--primary-color);
+    --p-select-option-selected-color: #ffffff;
+    --p-select-option-selected-focus-background: color-mix(in srgb, var(--primary-color), black 50%);
+    --p-select-option-selected-focus-color: #ffffff;
+    --p-select-option-padding: 0.5rem 1rem;
+    --p-select-option-border-radius: 0;
+    --p-select-option-color: var(--text-color);
+    --p-select-option-transition: background-color 0.1s;
+
+    /* Dialog Token Overrides */
+    --p-dialog-background: var(--p-card-background);
+    --p-dialog-border-color: var(--card-border);
+    --p-dialog-border-radius: var(--p-border-radius);
+    --p-dialog-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    --p-dialog-padding: 2rem;
+    --p-dialog-header-padding: 0 0 2rem 0;
+    --p-dialog-content-padding: 0;
+    --p-dialog-footer-padding: 0;
+    --p-dialog-title-font-size: 2rem;
+    --p-dialog-title-font-weight: 500;
+    --p-dialog-title-color: #ffffff;
+    --p-dialog-close-icon-color: #ffffff;
+    --p-dialog-close-icon-hover-color: #ffffff;
+    --p-dialog-close-icon-hover-background: var(--p-primary-hover-color);
+    --p-dialog-close-icon-width: 2.2rem;
+    --p-dialog-close-icon-height: 2.2rem;
+    --p-dialog-close-icon-border-radius: 0;
+
+    /* Button Icon Sizing */
+    --p-button-icon-size: 1.2rem;
 }
