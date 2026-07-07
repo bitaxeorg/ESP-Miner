@@ -59,7 +59,8 @@ esp_err_t websocket_add_client(int fd, WebSocketClientType type)
             if (type >= 0 && type < WS_TYPE_MAX) type_counts[type]++;
 
             ESP_LOGI(TAG, "Added WebSocket %s client, fd: %d, slot: %d, type_count: %d",
-                     type == WS_TYPE_LOGS ? "log" : "api", fd, i, type_counts[type]);
+                     type == WS_TYPE_LOGS ? "log" : "api", fd, i,
+                     (type >= 0 && type < WS_TYPE_MAX) ? type_counts[type] : -1);
 
             ret = ESP_OK;
             if (type == WS_TYPE_LOGS && s_websocket_log_task_handle) {
@@ -91,7 +92,8 @@ void websocket_remove_client(int fd)
             if (type >= 0 && type < WS_TYPE_MAX) type_counts[type]--;
 
             ESP_LOGI(TAG, "Removed WebSocket %s client, fd: %d, slot: %d, type_count: %d",
-                     type == WS_TYPE_LOGS ? "log" : "api", fd, i, type_counts[type]);
+                     type == WS_TYPE_LOGS ? "log" : "api", fd, i,
+                     (type >= 0 && type < WS_TYPE_MAX) ? type_counts[type] : -1);
 
             break;
         }
