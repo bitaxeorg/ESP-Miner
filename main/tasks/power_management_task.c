@@ -232,7 +232,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                                  : nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
         float asic_frequency = GLOBAL_STATE->SELF_TEST_MODULE.is_active
                                  ? GLOBAL_STATE-> DEVICE_CONFIG.family.asic.default_frequency_mhz
-                                 : nvs_config_get_u16(NVS_CONFIG_ASIC_FREQUENCY);
+                                 : nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
