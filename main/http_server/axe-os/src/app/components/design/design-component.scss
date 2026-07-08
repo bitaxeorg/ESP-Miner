@@ -8,9 +8,14 @@
 
 .color-dot {
   position: relative;
+  transition: box-shadow 0.15s ease-in-out;
+
+  &.selected {
+    box-shadow: 0 0 0 2px var(--p-card-background), 0 0 0 4px var(--dot-bg) !important;
+  }
 
   .selected-icon {
-    color: white;
+    color: contrast-color(var(--dot-bg));
     font-size: 1rem;
     position: absolute;
     top: 50%;
@@ -19,3 +24,20 @@
     pointer-events: none;
   }
 }
+
+input[type="color"] {
+  -webkit-appearance: none;
+  
+  &::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  &::-webkit-color-swatch {
+    border: none;
+    border-radius: 50%;
+  }
+  &::-moz-color-swatch {
+    border: none;
+    border-radius: 50%;
+  }
+}
+

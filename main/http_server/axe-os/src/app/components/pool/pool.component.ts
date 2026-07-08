@@ -25,9 +25,10 @@ interface IChannelOption {
 }
 
 @Component({
-  selector: 'app-pool',
-  templateUrl: './pool.component.html',
-  styleUrls: ['./pool.component.scss']
+    selector: 'app-pool',
+    templateUrl: './pool.component.html',
+    styleUrls: ['./pool.component.scss'],
+    standalone: false
 })
 export class PoolComponent implements OnInit {
   public form!: FormGroup;
@@ -293,6 +294,34 @@ export class PoolComponent implements OnInit {
 
   isAnyPoolUsingDefaultAddress(): boolean {
     return this.pools.some(pool => this.isUsingDefaultAddress(pool));
+  }
+
+  public clearFallbackConfiguration(): void {
+    if (!confirm('Clear the fallback pool configuration? You still need to click Save to apply.')) {
+      return;
+    }
+
+    const cleared: Record<string, string | number | boolean> = {
+      fallbackStratumURL: '',
+      fallbackStratumPort: 0,
+      fallbackStratumUser: '',
+      fallbackStratumPassword: '',
+      fallbackStratumCert: '',
+      fallbackStratumTLS: 0,
+      fallbackStratumSuggestedDifficulty: 0,
+      fallbackStratumExtranonceSubscribe: false,
+      fallbackStratumDecodeCoinbase: false,
+    };
+
+    Object.entries(cleared).forEach(([name, value]) => {
+      const control = this.form.get(name);
+      if (!control) return;
+      control.clearValidators();
+      control.setValue(value);
+      control.updateValueAndValidity();
+    });
+
+    this.form.markAsDirty();
   }
 
   isStratumV2Enabled(): boolean {

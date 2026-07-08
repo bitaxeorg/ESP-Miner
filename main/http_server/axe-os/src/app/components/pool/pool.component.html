@@ -34,16 +34,17 @@
                 </div>
                 <div class="field grid p-fluid">
                     <label [htmlFor]="pool + 'Password'" class="col-12 md:col-2 md:mb-0">Password</label>
-                    <div class="col-12 md:col-10 p-input-icon-right">
-                        <i *ngIf="form.get(pool + 'Password')?.dirty" class="pi cursor-pointer"
-                        [ngClass]="{'pi-eye': !showPassword[pool], 'pi-eye-slash': showPassword[pool]}"
-                        (click)="showPassword[pool] = !showPassword[pool]"></i>
-                        <input pInputText [id]="pool + 'Password'" [formControlName]="pool + 'Password'"
-                            [type]="showPassword[pool] ? 'text' : 'password'" autocomplete="off" />
+                    <div class="col-12 md:col-10">
+                        <p-iconfield iconPosition="right">
+                            <p-inputicon *ngIf="form.get(pool + 'Password')?.dirty" styleClass="pi cursor-pointer {{!showPassword[pool] ? 'pi-eye' : 'pi-eye-slash'}}"
+                            (click)="showPassword[pool] = !showPassword[pool]"></p-inputicon>
+                            <input pInputText [id]="pool + 'Password'" [formControlName]="pool + 'Password'"
+                                [type]="showPassword[pool] ? 'text' : 'password'" autocomplete="off" />
+                        </p-iconfield>
                     </div>
                 </div>
 
-                <fieldset class="m-0 p-0 mt-4 border-200 border-bottom-none border-left-none border-right-none">
+                <fieldset class="m-0 p-0 mt-4 border-bottom-none border-left-none border-right-none">
                     <legend class="p-0 pr-3">
                         <label class="cursor-pointer">
                             <input type="checkbox" hidden (click)="showAdvancedOptions[pool] = !showAdvancedOptions[pool]">
@@ -229,6 +230,21 @@
                                     tooltip="Enable decoding of the coinbase transaction to show payout addresses. Disable when mining on non-Bitcoin chains."
                                 />
                             </label>
+                        </div>
+
+                        <div *ngIf="pool === 'fallbackStratum'" class="field grid p-fluid mt-4 mb-0">
+                            <label class="col-12 md:col-2 md:mb-0">
+                                <tooltip-text-icon
+                                    text="Clear Configuration"
+                                    tooltip="Empty all fallback pool fields. Click Save afterwards to apply and disable the fallback pool."
+                                />
+                            </label>
+                            <div class="col-12 md:col-10">
+                                <button pButton type="button" icon="pi pi-trash"
+                                    label="Clear Fallback Configuration"
+                                    class="p-button-danger p-button-outlined w-auto"
+                                    (click)="clearFallbackConfiguration()"></button>
+                            </div>
                         </div>
                     </ng-container>
                 </fieldset>

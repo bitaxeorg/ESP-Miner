@@ -8,6 +8,9 @@
 # ESP-Miner
 esp-miner is open source ESP32 firmware for the [Bitaxe](https://github.com/bitaxeorg/bitaxe)
 
+## Community
+The ESP-Miner firmware is maintained by OSMU which hosts it's own discussion forum at [Forum](https://osmu.xyz).
+
 If you are looking for premade images to load on your Bitaxe, check out the [latest release](https://github.com/bitaxeorg/ESP-Miner/releases/latest) page. Maybe you want [instructions](https://github.com/bitaxeorg/ESP-Miner/blob/master/flashing.md) for loading factory images.
 
 # Bitaxetool
