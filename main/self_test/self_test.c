@@ -17,15 +17,13 @@
 #include "device_config.h"
 #include "hashrate_monitor_task.h"
 #include "PID.h"
+#include "self_test.h"
 
 #define GPIO_ASIC_ENABLE CONFIG_GPIO_ASIC_ENABLE
 
 /////Test Constants/////
 // Test Fan Speed
 #define FAN_SPEED_TARGET_MIN 1000 // RPM
-#define SELF_TEST_WARMUP_TEMP_C 55.0f
-#define SELF_TEST_TARGET_TEMP_C 65.0f
-#define SELF_TEST_MAX_TEMP_C 70.0f
 #define SELF_TEST_MIN_FAN_PERCENT 10.0f
 #define SELF_TEST_MAX_FAN_PERCENT 100.0f
 #define SELF_TEST_PID_SAMPLE_TIME_MS 100
@@ -35,9 +33,7 @@
 #define SELF_TEST_DOMAIN_HASHRATE_TOLERANCE 0.33f
 #define SELF_TEST_DOMAIN_REJECTED_WARN_RATIO 0.25f
 
-// Test Core Voltage
-#define CORE_VOLTAGE_TARGET_MIN 1000 // mV
-#define CORE_VOLTAGE_TARGET_MAX 1300 // mV
+#define SELF_TEST_CORE_VOLTAGE_TOLERANCE 0.10f
 
 // Test Power Consumption
 #define POWER_CONSUMPTION_MARGIN_PERCENT 15.0f
@@ -57,13 +53,16 @@ static bool isFactoryTest = false;
 static void tests_done(GlobalState * GLOBAL_STATE, bool test_result);
 
 typedef struct {
+    float hashrate_sum;
+    uint32_t sample_count;
+    uint32_t rejected_sample_count;
+    uint64_t last_sample_time_us;
+} SelfTestDomainAverage;
+
+typedef struct {
     int asic_count;
     int hash_domains;
-    float *hashrate_sum;
-    uint32_t *sample_count;
-    uint32_t *rejected_sample_count;
-    uint32_t *last_sample_value;
-    uint64_t *last_sample_time_us;
+    SelfTestDomainAverage *domains;
 } SelfTestDomainAverages;
 
 typedef enum {
@@ -77,6 +76,11 @@ static size_t self_test_domain_index(const SelfTestDomainAverages * averages, in
     return (size_t)asic_nr * averages->hash_domains + domain_nr;
 }
 
+static SelfTestDomainAverage * self_test_domain_get(SelfTestDomainAverages * averages, int asic_nr, int domain_nr)
+{
+    return &averages->domains[self_test_domain_index(averages, asic_nr, domain_nr)];
+}
+
 static esp_err_t self_test_domain_averages_init(SelfTestDomainAverages * averages, int asic_count, int hash_domains)
 {
     memset(averages, 0, sizeof(*averages));
@@ -84,18 +88,8 @@ static esp_err_t self_test_domain_averages_init(SelfTestDomainAverages * average
     averages->hash_domains = hash_domains;
 
     size_t domain_count = (size_t)asic_count * hash_domains;
-    averages->hashrate_sum = calloc(domain_count, sizeof(*averages->hashrate_sum));
-    averages->sample_count = calloc(domain_count, sizeof(*averages->sample_count));
-    averages->rejected_sample_count = calloc(domain_count, sizeof(*averages->rejected_sample_count));
-    averages->last_sample_value = calloc(domain_count, sizeof(*averages->last_sample_value));
-    averages->last_sample_time_us = calloc(domain_count, sizeof(*averages->last_sample_time_us));
-
-    if (!averages->hashrate_sum || !averages->sample_count || !averages->rejected_sample_count || !averages->last_sample_value || !averages->last_sample_time_us) {
-        free(averages->hashrate_sum);
-        free(averages->sample_count);
-        free(averages->rejected_sample_count);
-        free(averages->last_sample_value);
-        free(averages->last_sample_time_us);
+    averages->domains = calloc(domain_count, sizeof(*averages->domains));
+    if (!averages->domains) {
         memset(averages, 0, sizeof(*averages));
         return ESP_ERR_NO_MEM;
     }
@@ -105,27 +99,22 @@ static esp_err_t self_test_domain_averages_init(SelfTestDomainAverages * average
 
 static void self_test_domain_averages_free(SelfTestDomainAverages * averages)
 {
-    free(averages->hashrate_sum);
-    free(averages->sample_count);
-    free(averages->rejected_sample_count);
-    free(averages->last_sample_value);
-    free(averages->last_sample_time_us);
+    free(averages->domains);
     memset(averages, 0, sizeof(*averages));
 }
 
 static void self_test_domain_averages_prime(GlobalState * GLOBAL_STATE, SelfTestDomainAverages * averages)
 {
     HashrateMonitorModule * monitor = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
-    if (!monitor->is_initialized || !averages->last_sample_time_us) {
+    if (!monitor->is_initialized || !averages->domains) {
         return;
     }
 
     pthread_mutex_lock(&monitor->lock);
     for (int asic_nr = 0; asic_nr < averages->asic_count; asic_nr++) {
         for (int domain_nr = 0; domain_nr < averages->hash_domains; domain_nr++) {
-            size_t index = self_test_domain_index(averages, asic_nr, domain_nr);
-            averages->last_sample_time_us[index] = monitor->domain_measurements[asic_nr][domain_nr].time_us;
-            averages->last_sample_value[index] = monitor->domain_measurements[asic_nr][domain_nr].value;
+            SelfTestDomainAverage * average = self_test_domain_get(averages, asic_nr, domain_nr);
+            average->last_sample_time_us = monitor->domain_measurements[asic_nr][domain_nr].time_us;
         }
     }
     pthread_mutex_unlock(&monitor->lock);
@@ -136,7 +125,7 @@ static void self_test_domain_averages_sample(GlobalState * GLOBAL_STATE,
                                              float expected_domain_hashrate)
 {
     HashrateMonitorModule * monitor = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
-    if (!monitor->is_initialized || !averages->hashrate_sum || !averages->sample_count || !averages->rejected_sample_count || !averages->last_sample_value || !averages->last_sample_time_us) {
+    if (!monitor->is_initialized || !averages->domains) {
         return;
     }
 
@@ -146,87 +135,58 @@ static void self_test_domain_averages_sample(GlobalState * GLOBAL_STATE,
     for (int asic_nr = 0; asic_nr < averages->asic_count; asic_nr++) {
         for (int domain_nr = 0; domain_nr < averages->hash_domains; domain_nr++) {
             measurement_t measurement = monitor->domain_measurements[asic_nr][domain_nr];
-            size_t index = self_test_domain_index(averages, asic_nr, domain_nr);
-            uint64_t previous_sample_time_us = averages->last_sample_time_us[index];
-            uint32_t previous_sample_value = averages->last_sample_value[index];
+            SelfTestDomainAverage * average = self_test_domain_get(averages, asic_nr, domain_nr);
 
-            if (measurement.time_us == 0 || measurement.time_us == previous_sample_time_us) {
+            if (measurement.time_us == 0 || measurement.time_us == average->last_sample_time_us) {
                 continue;
             }
 
-            averages->last_sample_time_us[index] = measurement.time_us;
-            averages->last_sample_value[index] = measurement.value;
-            if (previous_sample_time_us == 0) {
+            if (average->last_sample_time_us == 0) {
+                average->last_sample_time_us = measurement.time_us;
                 continue;
             }
+            average->last_sample_time_us = measurement.time_us;
 
-            uint32_t counter_delta = measurement.value - previous_sample_value;
             bool rejected = !isfinite(measurement.hashrate) || measurement.hashrate > max_plausible_hashrate;
 
-            ESP_LOGI(TAG,
-                     "ASIC %d Domain %d sample value=0x%08" PRIX32 " prev=0x%08" PRIX32 " delta=0x%08" PRIX32 " hashrate=%.2f Gh/s%s",
-                     asic_nr,
-                     domain_nr,
-                     measurement.value,
-                     previous_sample_value,
-                     counter_delta,
-                     measurement.hashrate,
-                     rejected ? " REJECTED" : "");
-
             if (rejected) {
-                averages->rejected_sample_count[index]++;
+                average->rejected_sample_count++;
                 continue;
             }
 
-            averages->hashrate_sum[index] += measurement.hashrate;
-            averages->sample_count[index]++;
+            average->hashrate_sum += measurement.hashrate;
+            average->sample_count++;
         }
     }
     pthread_mutex_unlock(&monitor->lock);
 }
 
-static float self_test_domain_averages_get(const SelfTestDomainAverages * averages, int asic_nr, int domain_nr)
+static const SelfTestDomainAverage * self_test_domain_get_const(const SelfTestDomainAverages * averages, int asic_nr, int domain_nr)
 {
-    size_t index = self_test_domain_index(averages, asic_nr, domain_nr);
-    if (!averages->sample_count || averages->sample_count[index] == 0) {
-        return 0.0f;
-    }
-
-    return averages->hashrate_sum[index] / averages->sample_count[index];
+    return &averages->domains[self_test_domain_index(averages, asic_nr, domain_nr)];
 }
 
-static uint32_t self_test_domain_averages_count(const SelfTestDomainAverages * averages, int asic_nr, int domain_nr)
+static float self_test_domain_average_hashrate(const SelfTestDomainAverage * average)
 {
-    if (!averages->sample_count) {
-        return 0;
-    }
-
-    size_t index = self_test_domain_index(averages, asic_nr, domain_nr);
-    return averages->sample_count[index];
+    return average->sample_count > 0 ? average->hashrate_sum / average->sample_count : 0.0f;
 }
 
-static uint32_t self_test_domain_averages_rejected_count(const SelfTestDomainAverages * averages, int asic_nr, int domain_nr)
-{
-    if (!averages->rejected_sample_count) {
-        return 0;
-    }
-
-    size_t index = self_test_domain_index(averages, asic_nr, domain_nr);
-    return averages->rejected_sample_count[index];
-}
-
-static esp_err_t self_test_set_fan_percent(GlobalState * GLOBAL_STATE, float fan_percent)
+static void self_test_set_fan_percent(GlobalState * GLOBAL_STATE, float fan_percent)
 {
     if (fan_percent > SELF_TEST_MAX_FAN_PERCENT) fan_percent = SELF_TEST_MAX_FAN_PERCENT;
     if (fan_percent < 0.0f) fan_percent = 0.0f;
 
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc = fan_percent;
-    return Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_percent / 100.0f);
+    if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_percent / 100.0f) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set fan speed to %.1f%%", fan_percent);
+        self_test_show_message(GLOBAL_STATE, "FAN:FAIL");
+        tests_done(GLOBAL_STATE, false);
+    }
 }
 
 static bool self_test_temp_invalid(float temp)
 {
-    return temp == -1.0f || temp == 127.0f;
+    return !isfinite(temp) || temp == -1.0f || temp == 127.0f;
 }
 
 static float self_test_get_control_temp(GlobalState * GLOBAL_STATE)
@@ -245,25 +205,50 @@ static float self_test_get_control_temp(GlobalState * GLOBAL_STATE)
     return temp;
 }
 
+static float self_test_get_valid_control_temp(GlobalState * GLOBAL_STATE)
+{
+    float temp = self_test_get_control_temp(GLOBAL_STATE);
+    if (self_test_temp_invalid(temp)) {
+        ESP_LOGE(TAG, "Open circuit or no result on temperature sensor: %.1f°C", temp);
+        self_test_show_message(GLOBAL_STATE, "TEMP:FAIL");
+        tests_done(GLOBAL_STATE, false);
+    }
+    return temp;
+}
+
 static void self_test_start_nonce_measurement(GlobalState * GLOBAL_STATE)
 {
-    SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
+    SelfTestNonceMeasurement * measurement = &GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement;
 
-    pthread_mutex_lock(&self_test->lock);
-    self_test->nonce_count = 0;
-    self_test->nonce_rejected_count = 0;
-    self_test->nonce_hashes = 0.0;
-    self_test->nonce_measurement_active = true;
-    pthread_mutex_unlock(&self_test->lock);
+    pthread_mutex_lock(&measurement->lock);
+    measurement->accepted_count = 0;
+    measurement->rejected_count = 0;
+    measurement->hashes = 0.0;
+    measurement->is_active = true;
+    pthread_mutex_unlock(&measurement->lock);
 }
 
 static void self_test_stop_nonce_measurement(GlobalState * GLOBAL_STATE)
 {
-    SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
+    SelfTestNonceMeasurement * measurement = &GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement;
 
-    pthread_mutex_lock(&self_test->lock);
-    self_test->nonce_measurement_active = false;
-    pthread_mutex_unlock(&self_test->lock);
+    pthread_mutex_lock(&measurement->lock);
+    measurement->is_active = false;
+    pthread_mutex_unlock(&measurement->lock);
+}
+
+static void self_test_get_nonce_measurement(GlobalState * GLOBAL_STATE,
+                                            uint64_t * accepted_count,
+                                            uint64_t * rejected_count,
+                                            double * hashes)
+{
+    SelfTestNonceMeasurement * measurement = &GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement;
+
+    pthread_mutex_lock(&measurement->lock);
+    if (accepted_count) *accepted_count = measurement->accepted_count;
+    if (rejected_count) *rejected_count = measurement->rejected_count;
+    if (hashes) *hashes = measurement->hashes;
+    pthread_mutex_unlock(&measurement->lock);
 }
 
 static float self_test_get_nonce_hashrate(GlobalState * GLOBAL_STATE, uint64_t elapsed_us)
@@ -272,15 +257,29 @@ static float self_test_get_nonce_hashrate(GlobalState * GLOBAL_STATE, uint64_t e
         return 0.0f;
     }
 
-    SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
-    double nonce_hashes = 0.0;
-
-    pthread_mutex_lock(&self_test->lock);
-    nonce_hashes = self_test->nonce_hashes;
-    pthread_mutex_unlock(&self_test->lock);
+    double hashes;
+    self_test_get_nonce_measurement(GLOBAL_STATE, NULL, NULL, &hashes);
 
     double seconds = elapsed_us / 1000000.0;
-    return (float)(nonce_hashes / seconds / 1000000000.0);
+    return (float)(hashes / seconds / 1000000000.0);
+}
+
+void self_test_record_nonce(void * pvParameters, double nonce_diff)
+{
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+    SelfTestNonceMeasurement * measurement = &GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement;
+    double ticket_diff = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
+
+    pthread_mutex_lock(&measurement->lock);
+    if (measurement->is_active) {
+        if (nonce_diff >= ticket_diff) {
+            measurement->accepted_count++;
+            measurement->hashes += ticket_diff * NONCE_SPACE;
+        } else {
+            measurement->rejected_count++;
+        }
+    }
+    pthread_mutex_unlock(&measurement->lock);
 }
 
 static bool self_test_should_run()
@@ -302,7 +301,7 @@ esp_err_t self_test_init(void * pvParameters)
         GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
 
         GLOBAL_STATE->SELF_TEST_MODULE.is_active = true;
-        pthread_mutex_init(&GLOBAL_STATE->SELF_TEST_MODULE.lock, NULL);
+        pthread_mutex_init(&GLOBAL_STATE->SELF_TEST_MODULE.nonce_measurement.lock, NULL);
         GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty = DIFFICULTY;
         GLOBAL_STATE->SYSTEM_MODULE.is_connected = true;
 
@@ -339,7 +338,7 @@ void self_test_reset()
     }
 }
 
-void self_test_show_message(void * pvParameters, char * msg)
+void self_test_show_message(void * pvParameters, const char * msg)
 {
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     
@@ -352,24 +351,15 @@ void self_test_show_message(void * pvParameters, char * msg)
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 {
     uint16_t fan_speed = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+    uint16_t target_speed = FAN_SPEED_TARGET_MIN;
+
     ESP_LOGI(TAG, "fanSpeed: %d RPM", fan_speed);
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.id) {
-        case GAMMA:
-            if (fan_speed > 1000) {
-                return ESP_OK;
-            }
-            break;
-        case GAMMA_TURBO:
-        case GAMMA_HEX:
-            if (fan_speed > 500) {
-                return ESP_OK;
-            }
-            break;
-        default:
-            if (fan_speed > 1000) {
-                return ESP_OK;
-            }
-            break;
+    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_TURBO ||
+        GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_HEX) {
+        target_speed = 500;
+    }
+    if (fan_speed > target_speed) {
+        return ESP_OK;
     }
 
     // fan test failed
@@ -405,13 +395,15 @@ static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 {
     uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
-    ESP_LOGI(TAG, "Voltage: %u mV", core_voltage);
+    uint16_t target_voltage = GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv;
+    float margin = target_voltage * SELF_TEST_CORE_VOLTAGE_TOLERANCE;
+    ESP_LOGI(TAG, "Core voltage: %u mV (target: %u mV +/- %.0f mV)", core_voltage, target_voltage, margin);
 
-    if (core_voltage > CORE_VOLTAGE_TARGET_MIN && core_voltage < CORE_VOLTAGE_TARGET_MAX) {
+    if (core_voltage >= target_voltage - margin && core_voltage <= target_voltage + margin) {
         return ESP_OK;
     }
-    // tests failed
-    ESP_LOGE(TAG, "Core Voltage TEST FAIL, INCORRECT CORE VOLTAGE");
+
+    ESP_LOGE(TAG, "Core voltage test failed");
     self_test_show_message(GLOBAL_STATE, "VCORE:FAIL");
     return ESP_FAIL;
 }
@@ -553,23 +545,19 @@ void self_test_task(void * pvParameters)
 
     self_test_set_fan_percent(GLOBAL_STATE, SELF_TEST_MAX_FAN_PERCENT);
 
-    float asic_temp = self_test_get_control_temp(GLOBAL_STATE);
+    float target_temp = (float)nvs_config_get_u16(NVS_CONFIG_SELF_TEST_TEMP_TARGET);
+    float warmup_temp = (float)nvs_config_get_u16(NVS_CONFIG_SELF_TEST_TEMP_WARMUP);
+    float max_temp    = (float)nvs_config_get_u16(NVS_CONFIG_SELF_TEST_TEMP_MAX);
+
+    float asic_temp = self_test_get_valid_control_temp(GLOBAL_STATE);
     ESP_LOGI(TAG, "ASIC Temp %.1f°C", asic_temp);
 
-    // detect open circuit / no result
-    if (self_test_temp_invalid(asic_temp)) {
-        ESP_LOGE(TAG, "Open circuit or no result on temperature sensor: %.1f°C", asic_temp);
-        snprintf(logString, sizeof(logString), "TEMP:FAIL: %.1f°C", asic_temp);
-        self_test_show_message(GLOBAL_STATE, logString);
-        tests_done(GLOBAL_STATE, false);
-    }
-
     self_test_set_fan_percent(GLOBAL_STATE, SELF_TEST_MIN_FAN_PERCENT);
-    while (asic_temp < SELF_TEST_WARMUP_TEMP_C)
+    while (asic_temp < warmup_temp)
     {
         vTaskDelay(500 / portTICK_PERIOD_MS);
-        asic_temp = self_test_get_control_temp(GLOBAL_STATE);
-        ESP_LOGI(TAG, "Warming up to %.1f°C: %.1f°C", SELF_TEST_WARMUP_TEMP_C, asic_temp);
+        asic_temp = self_test_get_valid_control_temp(GLOBAL_STATE);
+        ESP_LOGI(TAG, "Warming up to %.1f°C: %.1f°C", warmup_temp, asic_temp);
         snprintf(logString, sizeof(logString), "ASIC Temp: %.1f°C", asic_temp);
         self_test_show_message(GLOBAL_STATE, logString);
     }
@@ -577,7 +565,7 @@ void self_test_task(void * pvParameters)
     PIDController pid = {0};
     float pid_input = asic_temp;
     float pid_output = SELF_TEST_MIN_FAN_PERCENT;
-    float pid_setpoint = SELF_TEST_TARGET_TEMP_C;
+    float pid_setpoint = target_temp;
     pid_init(&pid, &pid_input, &pid_output, &pid_setpoint,
              SELF_TEST_PID_P, SELF_TEST_PID_I, SELF_TEST_PID_D, PID_P_ON_E, PID_REVERSE);
     pid_set_sample_time(&pid, SELF_TEST_PID_SAMPLE_TIME_MS);
@@ -587,11 +575,11 @@ void self_test_task(void * pvParameters)
     uint64_t start_us = esp_timer_get_time();
     uint64_t hashtest_us = 30000000;
     float hashrate = 0;
-    float expected_hashrate_mhs = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value *
-                                  GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count *
-                                  GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0f *
-                                  GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target;
-    float expected_domain_hashrate = expected_hashrate_mhs /
+    float expected_hashrate = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value *
+                              GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count *
+                              GLOBAL_STATE->DEVICE_CONFIG.family.asic_count / 1000.0f *
+                              GLOBAL_STATE->DEVICE_CONFIG.family.asic.hashrate_test_percentage_target;
+    float expected_domain_hashrate = expected_hashrate /
                                      GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains /
                                      GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
 
@@ -606,28 +594,28 @@ void self_test_task(void * pvParameters)
     self_test_domain_averages_prime(GLOBAL_STATE, &domain_averages);
 
     self_test_start_nonce_measurement(GLOBAL_STATE);
-    ESP_LOGI(TAG, "Starting 30s hashrate monitoring loop, target temp %.1f°C", SELF_TEST_TARGET_TEMP_C);
+    ESP_LOGI(TAG, "Starting 30s hashrate monitoring loop, target temp %.1f°C", target_temp);
     while ((esp_timer_get_time() - start_us) < hashtest_us) {
         uint64_t elapsed_us = esp_timer_get_time() - start_us;
         hashrate = self_test_get_nonce_hashrate(GLOBAL_STATE, elapsed_us);
-        asic_temp = self_test_get_control_temp(GLOBAL_STATE);
+        asic_temp = self_test_get_valid_control_temp(GLOBAL_STATE);
         pid_input = asic_temp;
         if (pid_compute(&pid)) {
             self_test_set_fan_percent(GLOBAL_STATE, pid_output);
         }
         
-        if (asic_temp > SELF_TEST_MAX_TEMP_C) {
+        if (asic_temp > max_temp) {
             ESP_LOGE(TAG, "Overheat: %.1f°C", asic_temp);
             snprintf(logString, sizeof(logString), "TEMP:FAIL: %.1f°C", asic_temp);
             self_test_show_message(GLOBAL_STATE, logString);
             tests_done(GLOBAL_STATE, false);
         }
 
-        uint32_t remaining = (hashtest_us - (esp_timer_get_time() - start_us)) / 1000000;
+        uint32_t remaining = elapsed_us < hashtest_us ? (hashtest_us - elapsed_us) / 1000000 : 0;
         float display_hashrate = GLOBAL_STATE->SYSTEM_MODULE.current_hashrate > 0
             ? GLOBAL_STATE->SYSTEM_MODULE.current_hashrate
             : hashrate;
-        snprintf(logString, sizeof(logString), "%.0f Gh/s %.1f°C %lds", display_hashrate, asic_temp, remaining);
+        snprintf(logString, sizeof(logString), "%.0f Gh/s %.1f°C %" PRIu32 "s", display_hashrate, asic_temp, remaining);
         ESP_LOGI(TAG, "%s", logString);
 
         self_test_show_message(GLOBAL_STATE, logString);
@@ -636,15 +624,17 @@ void self_test_task(void * pvParameters)
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
     self_test_stop_nonce_measurement(GLOBAL_STATE);
+    hashrate = self_test_get_nonce_hashrate(GLOBAL_STATE, esp_timer_get_time() - start_us);
     self_test_domain_averages_sample(GLOBAL_STATE, &domain_averages, expected_domain_hashrate);
 
-    ESP_LOGI(TAG, "Hashrate: %.2f Gh/s, Expected: %.2f Gh/s", hashrate, expected_hashrate_mhs);
-    pthread_mutex_lock(&GLOBAL_STATE->SELF_TEST_MODULE.lock);
+    uint64_t accepted_count;
+    uint64_t rejected_count;
+    self_test_get_nonce_measurement(GLOBAL_STATE, &accepted_count, &rejected_count, NULL);
+    ESP_LOGI(TAG, "Hashrate: %.2f Gh/s, Expected: %.2f Gh/s", hashrate, expected_hashrate);
     ESP_LOGI(TAG,
              "Nonce measurement: %llu valid, %llu rejected",
-             (unsigned long long)GLOBAL_STATE->SELF_TEST_MODULE.nonce_count,
-             (unsigned long long)GLOBAL_STATE->SELF_TEST_MODULE.nonce_rejected_count);
-    pthread_mutex_unlock(&GLOBAL_STATE->SELF_TEST_MODULE.lock);
+             (unsigned long long)accepted_count,
+             (unsigned long long)rejected_count);
 
     // Check domain hashrates from monitor module
     bool domain_failed = false;
@@ -652,10 +642,11 @@ void self_test_task(void * pvParameters)
     for (int asic_nr = 0; asic_nr < GLOBAL_STATE->DEVICE_CONFIG.family.asic_count; asic_nr++) {
         int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
         for (int domain_nr = 0; domain_nr < hash_domains; domain_nr++) {
-            float domain_hashrate = self_test_domain_averages_get(&domain_averages, asic_nr, domain_nr);
-            uint32_t sample_count = self_test_domain_averages_count(&domain_averages, asic_nr, domain_nr);
-            uint32_t rejected_count = self_test_domain_averages_rejected_count(&domain_averages, asic_nr, domain_nr);
-            uint32_t total_domain_samples = sample_count + rejected_count;
+            const SelfTestDomainAverage * domain_average = self_test_domain_get_const(&domain_averages, asic_nr, domain_nr);
+            float domain_hashrate = self_test_domain_average_hashrate(domain_average);
+            uint32_t sample_count = domain_average->sample_count;
+            uint32_t rejected_sample_count = domain_average->rejected_sample_count;
+            uint32_t total_domain_samples = sample_count + rejected_sample_count;
             SelfTestDomainStatus domain_status = SELF_TEST_DOMAIN_OK;
 
             ESP_LOGI(TAG,
@@ -664,32 +655,32 @@ void self_test_task(void * pvParameters)
                      domain_nr,
                      domain_hashrate,
                      (unsigned long)sample_count,
-                     (unsigned long)rejected_count);
-            if (rejected_count > 0) {
+                     (unsigned long)rejected_sample_count);
+            if (rejected_sample_count > 0) {
                 ESP_LOGW(TAG,
                          "ASIC %d Domain %d ignored %lu implausible register sample(s); using nonce hashrate for total validation",
                          asic_nr,
                          domain_nr,
-                         (unsigned long)rejected_count);
+                         (unsigned long)rejected_sample_count);
             }
             
             float min_domain_hashrate = expected_domain_hashrate * (1.0f - SELF_TEST_DOMAIN_HASHRATE_TOLERANCE);
             float max_domain_hashrate = expected_domain_hashrate * (1.0f + SELF_TEST_DOMAIN_HASHRATE_TOLERANCE);
-            if (sample_count == 0 && rejected_count > 0) {
+            if (sample_count == 0 && rejected_sample_count > 0) {
                 domain_status = SELF_TEST_DOMAIN_UNRELIABLE;
                 ESP_LOGW(TAG,
                          "ASIC %d Domain %d self-reported counter is unreliable; all %lu sample(s) were implausible high, external nonce hashrate remains authoritative",
                          asic_nr,
                          domain_nr,
-                         (unsigned long)rejected_count);
+                         (unsigned long)rejected_sample_count);
             } else if (total_domain_samples > 0 &&
-                       ((float)rejected_count / (float)total_domain_samples) >= SELF_TEST_DOMAIN_REJECTED_WARN_RATIO) {
+                       ((float)rejected_sample_count / (float)total_domain_samples) >= SELF_TEST_DOMAIN_REJECTED_WARN_RATIO) {
                 domain_status = SELF_TEST_DOMAIN_UNRELIABLE;
                 ESP_LOGW(TAG,
                          "ASIC %d Domain %d self-reported counter is unstable; %lu/%lu sample(s) were implausible, external nonce hashrate remains authoritative",
                          asic_nr,
                          domain_nr,
-                         (unsigned long)rejected_count,
+                         (unsigned long)rejected_sample_count,
                          (unsigned long)total_domain_samples);
             } else if (sample_count == 0 || domain_hashrate < min_domain_hashrate || domain_hashrate > max_domain_hashrate) {
                 domain_status = SELF_TEST_DOMAIN_FAIL;
@@ -733,7 +724,7 @@ void self_test_task(void * pvParameters)
         tests_done(GLOBAL_STATE, false);
     }
 
-    if (hashrate < expected_hashrate_mhs) {
+    if (hashrate < expected_hashrate) {
         ESP_LOGE(TAG, "Total hashrate too low");
         self_test_show_message(GLOBAL_STATE, "HASHRATE:FAIL");
         tests_done(GLOBAL_STATE, false);
@@ -763,6 +754,7 @@ void self_test_task(void * pvParameters)
 static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
 {
     GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
+    self_test_stop_nonce_measurement(GLOBAL_STATE);
     VCORE_set_voltage(GLOBAL_STATE, 0.0f);
     asic_hold_reset_low();
 

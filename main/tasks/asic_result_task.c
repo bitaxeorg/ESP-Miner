@@ -4,6 +4,7 @@
 #include "work_queue.h"
 #include "serial.h"
 #include <string.h>
+#include <stdlib.h>
 #include "esp_log.h"
 #include "nvs_config.h"
 #include "utils.h"
@@ -13,6 +14,7 @@
 #include "asic.h"
 #include "freertos/task.h"
 #include "scoreboard.h"
+#include "self_test.h"
 
 static const char *TAG = "asic_result";
 
@@ -42,40 +44,40 @@ void ASIC_result_task(void *pvParameters)
 
         uint8_t job_id = asic_result->job_id;
 
+        // Snapshot the job while holding the lock. The shared slot
+        // (ASIC_TASK_MODULE.active_jobs[job_id]) can be freed and reused by
+        // BM1370_send_work() while we run the (potentially multi-second, blocking)
+        // share submit below; keeping a pointer into it is a use-after-free. The
+        // bm_job body is inline and safe to copy by value — deep-copy the two
+        // heap-owned strings so the snapshot stays valid after we unlock.
         pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
-        bool valid = (GLOBAL_STATE->valid_jobs[job_id] != 0);
-        bm_job *active_job = valid ? GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id] : NULL;
-        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
-
-        if (!valid || active_job == NULL)
+        bool valid = (GLOBAL_STATE->valid_jobs[job_id] != 0) &&
+                     (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id] != NULL);
+        if (!valid)
         {
+            pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
             ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
             continue;
         }
+        bm_job active_job_snapshot = *GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id];
+        active_job_snapshot.jobid = active_job_snapshot.jobid ? strdup(active_job_snapshot.jobid) : NULL;
+        active_job_snapshot.extranonce2 = active_job_snapshot.extranonce2 ? strdup(active_job_snapshot.extranonce2) : NULL;
+        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+        bm_job *active_job = &active_job_snapshot;
         // check the nonce difficulty
         double nonce_diff = test_nonce_value(active_job, asic_result->nonce, asic_result->rolled_version);
 
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
-            SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
-            double ticket_diff = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
-
-            pthread_mutex_lock(&self_test->lock);
-            if (self_test->nonce_measurement_active) {
-                if (nonce_diff >= ticket_diff) {
-                    self_test->nonce_count++;
-                    self_test->nonce_hashes += ticket_diff * NONCE_SPACE;
-                } else {
-                    self_test->nonce_rejected_count++;
-                }
-            }
-            pthread_mutex_unlock(&self_test->lock);
+            self_test_record_nonce(GLOBAL_STATE, nonce_diff);
+            free(active_job->jobid);
+            free(active_job->extranonce2);
             continue;
         }
 
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)
         {
-            if (GLOBAL_STATE->stratum_protocol == STRATUM_V2) {
+            if (GLOBAL_STATE->stratum_protocol == STRATUM_PROTOCOL_V2) {
                 // SV2: submit with binary protocol
                 int ret;
                 uint32_t sv2_job_id = (uint32_t)strtoul(active_job->jobid, NULL, 10);
@@ -142,8 +144,11 @@ void ASIC_result_task(void *pvParameters)
         //log the ASIC response
         ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, Core: %d/%d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %g.", active_job->jobid, asic_result->asic_nr, asic_result->core_id, asic_result->small_core_id, asic_result->rolled_version, asic_result->nonce, nonce_diff, active_job->pool_diff);
 
-        SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, job_id);
+        SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, active_job->target);
 
         scoreboard_add(&GLOBAL_STATE->SYSTEM_MODULE.scoreboard, nonce_diff, active_job->jobid, active_job->extranonce2, active_job->ntime, asic_result->nonce, version_bits);
+
+        free(active_job->jobid);
+        free(active_job->extranonce2);
     }
 }

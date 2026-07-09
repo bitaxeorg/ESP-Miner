@@ -131,6 +131,13 @@ void extranonce_2_generate(uint64_t extranonce_2, uint32_t length, char dest[sta
     bin2hex(extranonce_2_bytes, length, dest, length * 2 + 1);
 }
 
+double hash_to_pdiff(const uint8_t hash[32])
+{
+    double s64 = le256todouble(hash);
+    if (s64 == 0.0) return (double)UINT32_MAX;
+    return truediffone / s64;
+}
+
 ///////cgminer nonce testing
 /* testing a nonce and return the diff - 0 means invalid */
 double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t rolled_version)
@@ -154,9 +161,7 @@ double test_nonce_value(const bm_job *job, const uint32_t nonce, const uint32_t 
     uint8_t hash_result[32];
     double_sha256_bin(header, 80, hash_result);
 
-    double d64 = truediffone;
-    double s64 = le256todouble(hash_result);
-    return d64 / s64;
+    return hash_to_pdiff(hash_result);
 }
 
 uint32_t increment_bitmask(const uint32_t value, const uint32_t mask)

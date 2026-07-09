@@ -90,7 +90,7 @@ void task_monitor_task(void *pvParameters) {
     free(task_array1);
     free(task_array2);
 #else
-    ESP_LOGE(TAG, "Task monitor requires CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS");
+    ESP_LOGW(TAG, "Task runtime statistics are disabled");
 #endif
     vTaskDelete(NULL);
 }
@@ -117,7 +117,6 @@ void cpu_monitor_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 #else
-    ESP_LOGW(TAG, "CPU usage requires CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS");
     GLOBAL_STATE->SYSTEM_MODULE.cpu_usage = 0.0f;
     vTaskDelete(NULL);
 #endif

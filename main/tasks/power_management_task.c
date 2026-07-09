@@ -143,11 +143,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
 
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
-        // User requested pause or hardware fault
-        if ((sys_module->mining_paused || sys_module->hardware_fault) && !is_paused) {
+        // User pause, hardware fault, or all pools unreachable
+        bool wants_stop = sys_module->mining_paused || sys_module->hardware_fault || sys_module->pools_unavailable;
+        if (wants_stop && !is_paused) {
             mining_stop(GLOBAL_STATE);
             is_paused = true;
-        } else if (!sys_module->mining_paused && !sys_module->hardware_fault && is_paused) {
+        } else if (!wants_stop && is_paused) {
             mining_start(GLOBAL_STATE);
             is_paused = false;
         }
@@ -227,8 +228,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             }
         }
 
-        uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
-        float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
+        uint16_t core_voltage = GLOBAL_STATE->SELF_TEST_MODULE.is_active
+                                 ? GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv
+                                 : nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+        float asic_frequency = GLOBAL_STATE->SELF_TEST_MODULE.is_active
+                                 ? GLOBAL_STATE-> DEVICE_CONFIG.family.asic.default_frequency_mhz
+                                 : nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);

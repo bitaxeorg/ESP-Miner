@@ -24,8 +24,9 @@ type CombinedData = {
 };
 
 @Component({
-  selector: 'app-system',
-  templateUrl: './system.component.html',
+    selector: 'app-system',
+    templateUrl: './system.component.html',
+    standalone: false
 })
 export class SystemComponent implements OnInit, OnDestroy {
   public info$: Observable<ISystemInfo>;
@@ -96,7 +97,9 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'CPU Usage', value: data.info.cpuUsage.toFixed(1) + '%'},
       { label: 'Free Heap Memory', value: ByteSuffixPipe.transform(data.info.freeHeap)},
       { label: '• Internal', value: ByteSuffixPipe.transform(data.info.freeHeapInternal)},
-      { label: '• Spiram', value: ByteSuffixPipe.transform(data.info.freeHeapSpiram), class: 'pb-3' },
+      { label: '• Spiram', value: ByteSuffixPipe.transform(data.info.freeHeapSpiram) },
+      { label: '• Min Free (All Time)', value: ByteSuffixPipe.transform(data.info.minFreeHeap)},
+      { label: '• Max Alloc Block', value: ByteSuffixPipe.transform(data.info.maxAllocHeap), class: 'pb-3' },
       { label: 'Firmware Version', value: data.info.version },
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
       { label: 'ESP-IDF Version', value: data.info.idfVersion },

@@ -24,6 +24,21 @@ components:
       properties:
         message:
           type: string
+    UpdateSettingsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        redirect:
+          type: object
+          properties:
+            url:
+              type: string
+            delay:
+              type: number
+            message:
+              type: string
     SharesRejectedReason:
       type: object
       required:
@@ -139,6 +154,8 @@ components:
         - freeHeap
         - freeHeapInternal
         - freeHeapSpiram
+        - minFreeHeap
+        - maxAllocHeap
         - frequency
         - actualFrequency
         - hashRate
@@ -285,6 +302,9 @@ components:
         responseTime:
           type: number
           description: Pool response time in ms
+        responseShareBatch:
+          type: number
+          description: Number of shares acknowledged in the batch that produced responseTime (SV2; 1 = single share, >1 = batched ack)
         rotation:
           type: number
           description: Screen rotation setting (0, 90, 180, 270)
@@ -300,6 +320,12 @@ components:
         freeHeapSpiram:
           type: number
           description: Available Spiram heap memory in bytes
+        minFreeHeap:
+          type: number
+          description: All-time low watermark for free heap memory in bytes
+        maxAllocHeap:
+          type: number
+          description: Largest contiguous free block of internal heap memory in bytes
         frequency:
           type: number
           description: ASIC frequency in MHz
@@ -327,6 +353,12 @@ components:
         hostname:
           type: string
           description: Device hostname
+        fullHostname:
+          type: string
+          description: Full hostname including .local domain for mDNS
+        mdnsHostname:
+          type: string
+          description: mDNS/Bonjour hostname for network discovery
         idfVersion:
           type: string
           description: ESP-IDF version
@@ -414,9 +446,6 @@ components:
           type: string
           enum: [SV1, SV2]
           description: Configured stratum protocol
-        activeProtocolLabel:
-          type: string
-          description: Human-readable label for the active protocol (e.g. "SV1", "SV2 Extended Channel")
         stratumV2AuthorityPubkey:
           type: string
           description: SV2 authority public key for certificate verification (base58-encoded)
@@ -1097,6 +1126,10 @@ paths:
       responses:
         '200':
           description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateSettingsResponse'
         '400':
           description: Invalid settings provided
         '401':

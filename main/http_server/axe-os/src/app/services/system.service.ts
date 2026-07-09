@@ -14,6 +14,7 @@ import {
 } from '../generated/models';
 import { Api } from '../generated/api';
 import * as functions from '../generated/functions';
+import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
 
 import { environment } from '../../environments/environment';
 
@@ -30,11 +31,11 @@ export class SystemApiService {
   ) { }
 
   public downloadLogs(uri: string = ''): Observable<Blob> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.downloadSystemLogs, {}) as Promise<Blob>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.get(`${uri}/api/system/logs`, { responseType: 'blob' });
     }
 
@@ -42,11 +43,11 @@ export class SystemApiService {
   }
 
   public getInfo(uri: string = ''): Observable<ISystemInfo> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.getSystemInfo, {})).pipe(timeout(API_TIMEOUT));
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.get<ISystemInfo>(`${uri}/api/system/info`).pipe(timeout(API_TIMEOUT));
     }
 
@@ -72,6 +73,8 @@ export class SystemApiService {
         freeHeap: 200504,
         freeHeapInternal: 200504,
         freeHeapSpiram: 200504,
+        minFreeHeap: 180000,
+        maxAllocHeap: 90000,
         coreVoltage: 1200,
         coreVoltageActual: 1200,
         hostname: "Bitaxe",
@@ -92,17 +95,18 @@ export class SystemApiService {
         uptimeSeconds: 38,
         smallCoreCount: 672,
         ASICModel: "BM1370" as any,
+        stratumProtocol: "SV1" as const,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
-        stratumProtocol: "SV1" as const,
-        activeProtocolLabel: "SV1",
-        stratumV2AuthorityPubkey: "",
         stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
         stratumSuggestedDifficulty: 1000,
         stratumExtranonceSubscribe: !!0,
         stratumTLS: !!0,
         stratumCert: "",
+        stratumV2AuthorityPubkey: "",
+        stratumV2ChannelType: "extended" as const,
         stratumDecodeCoinbase: true,
+        fallbackStratumProtocol: "SV1" as const,
         fallbackStratumURL: "test.public-pool.io",
         fallbackStratumPort: 21497,
         fallbackStratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
@@ -111,8 +115,11 @@ export class SystemApiService {
         fallbackStratumTLS: !!0,
         fallbackStratumCert: "",
         fallbackStratumDecodeCoinbase: true,
+        fallbackStratumV2AuthorityPubkey: "",
+        fallbackStratumV2ChannelType: "extended" as const,
         poolDifficulty: 1000,
         responseTime: 10,
+        responseShareBatch: 1,
         isUsingFallbackStratum: 0,
         poolConnectionInfo: "IPv4 (TLS)",
         frequency: 485,
@@ -175,7 +182,7 @@ export class SystemApiService {
       columnList.push(y2);
     }
 
-    if (environment.production && this.api) {
+    if (!environment.mock && this.api) {
       return from(this.api.invoke(functions.getSystemStatistics, { columns: columnList })).pipe(timeout(API_TIMEOUT));
     }
 
@@ -236,7 +243,7 @@ export class SystemApiService {
   }
 
   public getScoreboard(uri: string = ''): Observable<ISystemScoreboardEntry[]> {
-    if (environment.production) {
+    if (!environment.mock) {
       return this.httpClient.get<ISystemScoreboardEntry[]>(`${uri}/api/system/scoreboard`).pipe(timeout(5000));
     }
 
@@ -265,11 +272,11 @@ export class SystemApiService {
   }
 
   public restart(uri: string = ''): Observable<GenericResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.restartSystem, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.post<GenericResponse>(`${uri}/api/system/restart`, {});
     }
 
@@ -277,11 +284,11 @@ export class SystemApiService {
   }
 
   public dismissBlockFound(uri: string = ''): Observable<GenericResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.dismissBlockFound, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.post<GenericResponse>(`${uri}/api/system/blockFound/dismiss`, {});
     }
 
@@ -289,11 +296,11 @@ export class SystemApiService {
   }
 
   public pauseMining(uri: string = ''): Observable<GenericResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.pauseMining, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.post<GenericResponse>(`${uri}/api/system/pause`, {});
     }
 
@@ -301,11 +308,11 @@ export class SystemApiService {
   }
 
   public resumeMining(uri: string = ''): Observable<GenericResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.resumeMining, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.post<GenericResponse>(`${uri}/api/system/resume`, {});
     }
 
@@ -313,26 +320,36 @@ export class SystemApiService {
   }
 
   public identify(uri: string = ''): Observable<GenericResponse> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.identifySystem, {}) as Promise<GenericResponse>);
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.post<GenericResponse>(`${uri}/api/system/identify`, {});
     }
 
     return of({ message: 'Device identified (mock)' });
   }
 
-  public updateSystem(uri: string = '', update: any): Observable<void> {
-    if (environment.production && this.api && !uri) {
-      return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }) as Promise<void>);
+  public updateSystem(uri: string = '', update: any): Observable<any | ISystemUpdateResponse> {
+    if (environment.mock && this.api && !uri) {
+      return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }));
     }
 
-    if (environment.production && uri) {
-      return this.httpClient.patch<void>(`${uri}/api/system`, update);
+    if (environment.mock && uri) {
+      return this.httpClient.patch(`${uri}/api/system`, update);
     }
 
+    if (update.hostname) {
+      return of({
+        status: 'success',
+        redirect: {
+          url: `http://${update.hostname}.local`,
+          delay: 2000,
+          message: 'Hostname updated. Redirecting to new address...'
+        }
+      } as ISystemUpdateResponse);
+    }
     return of(undefined);
   }
 
@@ -375,11 +392,11 @@ export class SystemApiService {
   }
 
   public getAsicSettings(uri: string = ''): Observable<ISystemASIC> {
-    if (environment.production && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.getAsicSettings, {})).pipe(timeout(API_TIMEOUT));
     }
 
-    if (environment.production && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.get<ISystemASIC>(`${uri}/api/system/asic`).pipe(timeout(API_TIMEOUT));
     }
 

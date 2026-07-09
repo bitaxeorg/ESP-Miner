@@ -10,11 +10,13 @@ import { LiveDataService } from 'src/app/services/live-data.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { WifiNetwork } from 'src/app/generated/models';
 import { first } from 'rxjs/operators';
+import { ISystemUpdateResponse } from 'src/models/ISystemUpdateResponse';
 
 @Component({
-  selector: 'app-network-edit',
-  templateUrl: './network.edit.component.html',
-  styleUrls: ['./network.edit.component.scss']
+    selector: 'app-network-edit',
+    templateUrl: './network.edit.component.html',
+    styleUrls: ['./network.edit.component.scss'],
+    standalone: false
 })
 export class NetworkEditComponent implements OnInit {
   private formSubject = new BehaviorSubject<FormGroup | null>(null);
@@ -53,6 +55,8 @@ export class NetworkEditComponent implements OnInit {
 
   public updateSystem() {
 
+    const restartAlreadyPending = this.savedChanges;
+    const restartRequired = this.isRestartRequired;
     const form = this.form.getRawValue();
 
     // Allow an empty Wi-Fi password
@@ -70,14 +74,43 @@ export class NetworkEditComponent implements OnInit {
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
-        next: () => {
-          this.toastr.warning('You must restart this device after saving for changes to take effect.');
+        next: (response: any) => {
+           // Check if response contains redirect information (hostname change)
+           if (response && response.redirect) {
+             const redirectResponse = response as ISystemUpdateResponse;
+             if (redirectResponse.redirect) {
+               let newHostname: string;
+               try {
+                 newHostname = new URL(redirectResponse.redirect.url).hostname;
+                } catch (error) {
+                  console.error('Invalid redirect URL:', redirectResponse.redirect.url, error);
+                  this.toastr.error('Failed to redirect due to invalid URL.');
+                  return; // Skip redirect on malformed URL
+                }
+               const redirectUrl = redirectResponse.redirect.url;
+               const redirectDelay = redirectResponse.redirect.delay;
+               
+               this.toastr.success(redirectResponse.redirect.message);
+               this.toastr.info(`Redirecting to ${newHostname} in ${Math.ceil(redirectDelay / 1000)} seconds...`);
+               
+               setTimeout(() => {
+                 window.location.href = redirectUrl;
+               }, redirectDelay);
+             }
+             return;
+           }
+
+           // Normal success handling
+           if (restartRequired) {
+             this.toastr.warning('You must restart this device after saving for changes to take effect.');
+           }
           this.toastr.success('Saved network settings');
-          this.savedChanges = true;
+          this.savedChanges = restartAlreadyPending || restartRequired;
+          this.form.markAsPristine();
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error(`Could not save. ${err.message}`);
-          this.savedChanges = false;
+          this.savedChanges = restartAlreadyPending;
         }
       });
   }
@@ -124,7 +157,7 @@ export class NetworkEditComponent implements OnInit {
             .subscribe((selectedSsid: string) => {
               if (selectedSsid) {
                 this.form.patchValue({ ssid: selectedSsid });
-                this.form.markAsDirty();
+                this.form.get('ssid')?.markAsDirty();
               }
             });
         },
@@ -140,10 +173,22 @@ export class NetworkEditComponent implements OnInit {
       .subscribe({
         next: () => {
           this.toastr.success('Device restarted');
+          this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
           this.toastr.error(`Could not restart. ${err.message}`);
         }
       });
+  }
+
+  get noRestartFields(): string[] {
+    return [
+      'hostname'
+    ];
+  }
+
+  get isRestartRequired(): boolean {
+    return Object.entries(this.form.controls)
+      .some(([field, control]) => control.dirty && !this.noRestartFields.includes(field));
   }
 }
