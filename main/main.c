@@ -10,6 +10,7 @@
 #include "create_jobs_task.h"
 #include "hashrate_monitor_task.h"
 #include "fan_controller_task.h"
+#include "autotune_task.h"
 #include "statistics_task.h"
 #include "system.h"
 #include "http_server.h"
@@ -141,6 +142,12 @@ void app_main(void)
         if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
             if (xTaskCreate(FAN_CONTROLLER_task, "fan_controller", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
                 ESP_LOGE(TAG, "Error creating fan controller task");
+            }
+            // Lower priority than power management: autotune only ever nudges
+            // NVS values, the reactive overheat-protection in power management
+            // always gets to react first.
+            if (xTaskCreate(AUTOTUNE_task, "autotune", 4096, (void *) &GLOBAL_STATE, 4, NULL) != pdPASS) {
+                ESP_LOGE(TAG, "Error creating autotune task");
             }
         }
     } else {
