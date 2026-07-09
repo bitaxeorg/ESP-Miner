@@ -136,6 +136,7 @@ export class SystemApiService {
         autofanspeed: 1,
         isPSRAMAvailable: 1,
         overclockEnabled: 1,
+        autotuneEnabled: 0,
         runningPartition: "factory",
         minFanSpeed: 25,
         fanspeed: 50,
