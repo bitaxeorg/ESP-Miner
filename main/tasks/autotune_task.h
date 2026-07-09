@@ -9,8 +9,20 @@ typedef enum {
     AUTOTUNE_STATE_BEYOND_SPEC,   // exploring past the vendor table (opt-in only)
 } AutotuneState;
 
+// What the last applied step actually was, so an unstable result can be
+// reverted correctly -- climbing frequency reverts by lowering frequency,
+// but an undervolt trial reverts by raising voltage back up, not by
+// touching frequency at all.
+typedef enum {
+    AUTOTUNE_ACTION_NONE = 0,
+    AUTOTUNE_ACTION_FREQ_UP,
+    AUTOTUNE_ACTION_VOLT_UP,      // tried extra voltage to stabilize a frequency step
+    AUTOTUNE_ACTION_VOLT_DOWN,    // undervolt trial: same frequency, less voltage
+} AutotuneAction;
+
 typedef struct {
     AutotuneState state;
+    AutotuneAction last_action;
     int freq_step_index;
     int volt_step_index;
     // Only used once freq_step_index is at the top of the vendor table AND
