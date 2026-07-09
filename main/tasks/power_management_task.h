@@ -1,6 +1,11 @@
 #ifndef POWER_MANAGEMENT_TASK_H_
 #define POWER_MANAGEMENT_TASK_H_
 
+// Shared with autotune_task.c so the tuner's safety margin always stays
+// anchored to the same hard cutoff the reactive overheat-protection uses.
+#define PM_THROTTLE_TEMP 75.0
+#define PM_TPS546_THROTTLE_TEMP 105.0
+
 typedef struct
 {
     float fan_perc;
