@@ -4,6 +4,19 @@
             Custom settings can cause damage & system instability. Only modify these settings if you understand the risks of running outside designed parameters.
         </p-message>
 
+        <div class="field-checkbox grid my-2">
+            <div class="col-1 md:col-10 md:flex-order-2">
+                <p-checkbox name="autotuneEnabled" formControlName="autotuneEnabled" inputId="autotuneEnabled" [binary]="true"></p-checkbox>
+            </div>
+            <label for="autotuneEnabled" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Auto-Tune</label>
+        </div>
+        <p-message *ngIf="form.controls['autotuneEnabled'].value" severity="info" icon="pi pi-info-circle" styleClass="w-full mb-3 border-round-xl">
+            Auto-Tune continuously searches for the highest stable frequency/voltage within vendor-approved limits,
+            staying a safety margin below the overheat cutoff. It backs off automatically if temperature or
+            rejected shares get too high. Keep an eye on the dashboard the first time you enable this, especially
+            with limited cooling.
+        </p-message>
+
         <div class="field grid p-fluid">
             <ng-container *ngIf="settingsUnlocked">
                 <label for="frequency" class="col-12 md:col-2 md:m-0">Frequency</label>
