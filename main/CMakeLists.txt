@@ -35,6 +35,7 @@ SRCS
     "./tasks/create_jobs_task.c"
     "./tasks/asic_result_task.c"
     "./tasks/power_management_task.c"
+    "./tasks/autotune_task.c"
     "./tasks/statistics_task.c"
     "./tasks/scoreboard.c"
     "./tasks/hashrate_monitor_task.c"
