@@ -130,6 +130,7 @@ components:
         - ASICModel
         - apEnabled
         - autofanspeed
+        - autotuneEnabled
         - bestDiff
         - bestSessionDiff
         - boardVersion
@@ -392,6 +393,9 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS
+        autotuneEnabled:
+          type: integer
+          description: Automatically tunes frequency/voltage to the highest stable, vendor-approved values
         poolConnectionInfo:
           type: string
           description: Current pool address family
@@ -821,6 +825,12 @@ components:
         overclockEnabled:
           type: integer
           description: Set custom voltage/frequency in AxeOS (0=disabled, 1=enabled)
+          enum: [0,1]
+          examples:
+            - 0
+        autotuneEnabled:
+          type: integer
+          description: Automatically tunes frequency/voltage to the highest stable, vendor-approved values (0=disabled, 1=enabled)
           enum: [0,1]
           examples:
             - 0
