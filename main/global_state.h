@@ -7,6 +7,7 @@
 #include "freertos/semphr.h"
 #include "freertos/portmacro.h"
 #include "power_management_task.h"
+#include "autotune_task.h"
 #include "hashrate_monitor_task.h"
 #include "mining.h"
 #include "coinbase_decoder.h"
@@ -158,6 +159,7 @@ typedef struct
     DisplayConfig DISPLAY_CONFIG;
     AsicTaskModule ASIC_TASK_MODULE;
     PowerManagementModule POWER_MANAGEMENT_MODULE;
+    AutotuneModule AUTOTUNE_MODULE;
     SelfTestModule SELF_TEST_MODULE;
     HashrateMonitorModule HASHRATE_MONITOR_MODULE;
 
