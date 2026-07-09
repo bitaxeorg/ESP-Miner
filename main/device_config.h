@@ -156,7 +156,7 @@ static const DeviceConfig default_configs[] = {
     { .board_version = "701",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "702",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "801",  .family = FAMILY_GAMMA_TURBO, .EMC2103 = true,                                          .temp_flip = true, .temp_offset = 0,   .TPS546 = true,                                                           .power_consumption_target = 36, },
-    { .board_version = "1300", .family = FAMILY_GAMMA_HEX,   .asic_enable = true, .asic_enable_active_high = true, .i2c_sda = 44, .i2c_scl = 43, .EMC2103 = true, .temp_flip = true, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 120, },
+    { .board_version = "1300", .family = FAMILY_GAMMA_HEX,   .asic_enable = true, .asic_enable_active_high = true, .i2c_sda = 44, .i2c_scl = 43, .EMC2103 = true, .temp_flip = true, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 135, },
 };
 
 esp_err_t device_config_init(void * pvParameters);

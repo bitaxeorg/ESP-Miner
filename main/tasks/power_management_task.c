@@ -227,9 +227,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             }
         }
 
-        uint16_t core_voltage = GLOBAL_STATE->SELF_TEST_MODULE.is_active
-                                 ? SELF_TEST_CORE_VOLTAGE_MV
-                                 : nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+        uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
         float asic_frequency = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
 
         if (core_voltage != last_core_voltage) {

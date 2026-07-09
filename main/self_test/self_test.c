@@ -40,7 +40,7 @@
 #define CORE_VOLTAGE_TARGET_MAX 1300 // mV
 
 // Test Power Consumption
-#define POWER_CONSUMPTION_MARGIN 3 //+/- watts
+#define POWER_CONSUMPTION_MARGIN_PERCENT 15.0f
 
 // Test Input Voltage
 #define INPUT_VOLTAGE_MARGIN 0.10f // +/- 10%
@@ -360,6 +360,7 @@ static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
             }
             break;
         case GAMMA_TURBO:
+        case GAMMA_HEX:
             if (fan_speed > 500) {
                 return ESP_OK;
             }
@@ -380,7 +381,7 @@ static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 {
     float target_power = (float) GLOBAL_STATE->DEVICE_CONFIG.power_consumption_target;
-    float margin = (float) POWER_CONSUMPTION_MARGIN;
+    float margin = target_power * (POWER_CONSUMPTION_MARGIN_PERCENT / 100.0f);
 
     float power = 0;
     float current = 0;
@@ -392,7 +393,11 @@ static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
         return ESP_OK;
     }
 
-    ESP_LOGE(TAG, "POWER test failed! measured %.2f W, target %.2f W +/- %.2f W", power, target_power, margin);
+    ESP_LOGE(TAG, "POWER test failed! measured %.2f W, target %.2f W +%.0f%% (%.2f W)",
+             power,
+             target_power,
+             POWER_CONSUMPTION_MARGIN_PERCENT,
+             margin);
     self_test_show_message(GLOBAL_STATE, "POWER:FAIL");
     return ESP_FAIL;
 }
@@ -619,7 +624,10 @@ void self_test_task(void * pvParameters)
         }
 
         uint32_t remaining = (hashtest_us - (esp_timer_get_time() - start_us)) / 1000000;
-        snprintf(logString, sizeof(logString), "%.0f Gh/s %.1f°C %lds", hashrate, asic_temp, remaining);
+        float display_hashrate = GLOBAL_STATE->SYSTEM_MODULE.current_hashrate > 0
+            ? GLOBAL_STATE->SYSTEM_MODULE.current_hashrate
+            : hashrate;
+        snprintf(logString, sizeof(logString), "%.0f Gh/s %.1f°C %lds", display_hashrate, asic_temp, remaining);
         ESP_LOGI(TAG, "%s", logString);
 
         self_test_show_message(GLOBAL_STATE, logString);

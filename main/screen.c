@@ -582,7 +582,7 @@ static void update_stats_background_labels(SystemModule * module, PowerManagemen
         return;
     }
 
-    lv_label_set_text_fmt(stats_hashrate_label, module->current_hashrate >= 10000.0f ? "%.0f" : "%.1f", module->current_hashrate);
+    lv_label_set_text_fmt(stats_hashrate_label, "%.0f", module->current_hashrate);
 
     if (module->ip_addr_str[0] != '\0') {
         lv_label_set_text(stats_ip_label, module->ip_addr_str);
@@ -786,7 +786,7 @@ static void screen_update_cb(lv_timer_t * timer)
     }
 
     if (current_hashrate != module->current_hashrate) {
-        lv_label_set_text_fmt(stats_hashrate_label, "Gh/s: %.2f", module->current_hashrate);
+        lv_label_set_text_fmt(stats_hashrate_label, "Gh/s: %.0f", module->current_hashrate);
     }
 
     if (current_power != power_management->power || current_hashrate != module->current_hashrate) {
