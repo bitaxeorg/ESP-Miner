@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <math.h>
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -204,6 +205,23 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
     at->last_action = AUTOTUNE_ACTION_NONE;
 }
 
+// True if the live NVS frequency/voltage no longer match what the tuner
+// itself last commanded -- meaning something external (almost always the
+// person, via the settings page) changed it while autotune was running.
+static bool settings_changed_externally(AutotuneModule * at, const uint16_t * freq_options, const uint16_t * volt_options)
+{
+    float expected_freq = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[at->freq_step_index];
+    uint16_t expected_volt = volt_options[at->volt_step_index];
+
+    float actual_freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
+    uint16_t actual_volt = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+
+    bool freq_matches = fabsf(actual_freq - expected_freq) < 0.5f;
+    bool volt_matches = (actual_volt == expected_volt);
+
+    return !freq_matches || !volt_matches;
+}
+
 void AUTOTUNE_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
@@ -264,6 +282,16 @@ void AUTOTUNE_task(void * pvParameters)
             window_open = false;
             resync_from_nvs(at, freq_options, volt_options, freq_option_count);
             continue;
+        }
+
+        if (settings_changed_externally(at, freq_options, volt_options)) {
+            // The person (or something else) changed frequency/voltage
+            // directly, outside the tuner. Treat that as a deliberate new
+            // starting point rather than silently overwriting it on the next
+            // action -- resync to it and start a fresh evaluation window.
+            ESP_LOGI(TAG, "Frequency/voltage changed externally, adopting new starting point");
+            resync_from_nvs(at, freq_options, volt_options, freq_option_count);
+            window_open = false;
         }
 
         float chip_temp = pm->chip_temp_avg;
