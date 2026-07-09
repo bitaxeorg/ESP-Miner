@@ -76,6 +76,16 @@ static float get_known_safe_ceiling_mhz(Asic asic_id)
 #define EXTENDED_MIN_SAMPLE_SHARES 30
 #define EXTENDED_REJECT_RATE_MAX 0.015f
 
+// Hard ceiling for beyond-spec frequency exploration on this specific chip:
+// the personally-verified value if one is known, otherwise the generic
+// percentage-based fallback.
+static float get_extended_ceiling_mhz(const uint16_t * freq_options, int freq_option_count, Asic asic_id)
+{
+    float vendor_max_freq = (float) freq_options[freq_option_count - 1];
+    float known_ceiling = get_known_safe_ceiling_mhz(asic_id);
+    return known_ceiling > 0.0f ? known_ceiling : (vendor_max_freq * EXTENDED_MAX_MULTIPLIER);
+}
+
 static int find_index(const uint16_t * options, uint16_t value)
 {
     if (!options) {
@@ -135,6 +145,63 @@ static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, 
 
     float vendor_max_freq = (float) freq_options[freq_option_count - 1];
     at->extended_freq_mhz = (current_freq > vendor_max_freq + 0.5f) ? current_freq : 0.0f;
+    at->last_action = AUTOTUNE_ACTION_NONE;
+}
+
+// Undo whatever the last applied step was, because it turned out unstable
+// (either the reject rate over the window, or a mid-window temperature
+// spike). Reverting the *specific* thing that changed -- rather than always
+// assuming "lower the frequency" -- is what makes the undervolt trials and
+// the extra-voltage-for-stability trials safe to attempt at all.
+static void revert_last_action(AutotuneModule * at, const uint16_t * freq_options, int freq_option_count,
+                                int volt_option_count, bool allow_voltage_rescue)
+{
+    // A frequency step that failed on rejected shares (not heat) sometimes
+    // just needs a bit more voltage headroom rather than being abandoned
+    // outright. Only offer that rescue for reject-rate-based instability --
+    // never for a temperature-driven revert, since adding voltage there
+    // would work against the very problem we're reacting to.
+    if (allow_voltage_rescue && at->last_action == AUTOTUNE_ACTION_FREQ_UP &&
+        at->volt_step_index < volt_option_count - 1) {
+        at->volt_step_index++;
+        at->last_action = AUTOTUNE_ACTION_VOLT_UP;
+        return;
+    }
+
+    switch (at->last_action) {
+        case AUTOTUNE_ACTION_VOLT_DOWN:
+            // The undervolt trial didn't hold -- go back up to the last
+            // known-good voltage for this frequency.
+            if (at->volt_step_index < volt_option_count - 1) {
+                at->volt_step_index++;
+            }
+            break;
+        case AUTOTUNE_ACTION_VOLT_UP:
+            // Even extra voltage didn't stabilize this frequency -- undo the
+            // voltage bump AND give up on this frequency step.
+            if (at->volt_step_index > 0) {
+                at->volt_step_index--;
+            }
+            if (at->freq_step_index > 0) {
+                at->freq_step_index--;
+            }
+            break;
+        case AUTOTUNE_ACTION_FREQ_UP:
+        case AUTOTUNE_ACTION_NONE:
+        default:
+            if (at->extended_freq_mhz > 0.0f) {
+                at->extended_freq_mhz -= EXTENDED_STEP_MHZ;
+                if (at->extended_freq_mhz <= (float) freq_options[freq_option_count - 1] + 0.5f) {
+                    at->extended_freq_mhz = 0.0f; // back into vendor-tested territory
+                }
+            } else if (at->freq_step_index > 0) {
+                at->freq_step_index--;
+            } else if (at->volt_step_index > 0) {
+                at->volt_step_index--;
+            }
+            break;
+    }
+    at->last_action = AUTOTUNE_ACTION_NONE;
 }
 
 void AUTOTUNE_task(void * pvParameters)
@@ -226,16 +293,7 @@ void AUTOTUNE_task(void * pvParameters)
             ESP_LOGW(TAG, "Temp %.1fC over ceiling %.1fC mid-window, stepping down early",
                      window_max_temp, TEMP_CEILING_C);
 
-            if (at->extended_freq_mhz > 0.0f) {
-                at->extended_freq_mhz -= EXTENDED_STEP_MHZ;
-                if (at->extended_freq_mhz <= (float) freq_options[freq_option_count - 1] + 0.5f) {
-                    at->extended_freq_mhz = 0.0f; // back into vendor-tested territory
-                }
-            } else if (at->freq_step_index > 0) {
-                at->freq_step_index--;
-            } else if (at->volt_step_index > 0) {
-                at->volt_step_index--;
-            }
+            revert_last_action(at, freq_options, freq_option_count, volt_option_count, false);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
             window_open = false;
@@ -269,64 +327,57 @@ void AUTOTUNE_task(void * pvParameters)
         bool unstable = reject_rate > reject_threshold;
 
         if (unstable) {
-            ESP_LOGW(TAG, "Reject rate %.1f%% over threshold at step %d/%d%s, stepping down",
+            ESP_LOGW(TAG, "Reject rate %.1f%% over threshold at step %d/%d%s, reverting",
                      reject_rate * 100.0f, at->freq_step_index, at->volt_step_index,
                      at->extended_freq_mhz > 0.0f ? " (beyond spec)" : "");
 
-            if (at->extended_freq_mhz > 0.0f) {
-                at->extended_freq_mhz -= EXTENDED_STEP_MHZ;
-                if (at->extended_freq_mhz <= (float) freq_options[freq_option_count - 1] + 0.5f) {
-                    at->extended_freq_mhz = 0.0f; // back into vendor-tested territory
-                }
-            } else if (at->freq_step_index > 0) {
-                at->freq_step_index--;
-            } else if (at->volt_step_index > 0) {
-                at->volt_step_index--;
-            }
+            revert_last_action(at, freq_options, freq_option_count, volt_option_count, true);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+        } else if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
+            // The extra voltage successfully stabilized this frequency step.
+            // Keep it, and go straight back to trying to climb frequency
+            // further on the next cycle.
+            at->last_action = AUTOTUNE_ACTION_NONE;
+            at->state = AUTOTUNE_STATE_WARMING;
         } else if (at->freq_step_index < freq_option_count - 1) {
             at->freq_step_index++;
+            at->last_action = AUTOTUNE_ACTION_FREQ_UP;
             at->step_ups_total++;
             at->state = AUTOTUNE_STATE_WARMING;
             apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, 0.0f);
-        } else if (at->volt_step_index < volt_option_count - 1) {
-            // Frequency is already at the vendor-approved ceiling; a bit more
-            // voltage headroom can sometimes buy back stability margin.
-            at->volt_step_index++;
-            at->step_ups_total++;
-            at->state = AUTOTUNE_STATE_WARMING;
-            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, 0.0f);
-        } else if (nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED)) {
-            // At the top of the vendor table for both frequency and voltage,
-            // and the user has explicitly unlocked custom settings in the UI
-            // (the same signal that exposes raw frequency/voltage entry).
-            // Keep exploring frequency alone, in small steps, up to a fixed
-            // hard ceiling relative to the vendor's own max. Voltage never
-            // moves past its vendor-max here.
+        } else if (nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) &&
+                   (at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[freq_option_count - 1]) +
+                           EXTENDED_STEP_MHZ <=
+                       get_extended_ceiling_mhz(freq_options, freq_option_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.id)) {
+            // Vendor-table frequency is maxed and custom settings are
+            // unlocked -- keep exploring frequency alone past the vendor
+            // table, up to a fixed ceiling. Voltage stays exactly where it
+            // is; extended mode never pushes voltage further.
             float vendor_max_freq = (float) freq_options[freq_option_count - 1];
-            float known_ceiling = get_known_safe_ceiling_mhz(GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
-            float extended_ceiling = known_ceiling > 0.0f ? known_ceiling : (vendor_max_freq * EXTENDED_MAX_MULTIPLIER);
             float base = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : vendor_max_freq;
-            float next_freq = base + EXTENDED_STEP_MHZ;
 
-            if (next_freq <= extended_ceiling) {
-                at->extended_freq_mhz = next_freq;
-                at->step_ups_total++;
-                at->state = AUTOTUNE_STATE_BEYOND_SPEC;
-                apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
-            } else {
-                at->state = AUTOTUNE_STATE_BEYOND_SPEC;
-                ESP_LOGI(TAG, "At beyond-spec ceiling (%.0f MHz, ceiling %.0f MHz) and stable, holding",
-                         at->extended_freq_mhz, extended_ceiling);
-            }
+            at->extended_freq_mhz = base + EXTENDED_STEP_MHZ;
+            at->last_action = AUTOTUNE_ACTION_FREQ_UP;
+            at->step_ups_total++;
+            at->state = AUTOTUNE_STATE_BEYOND_SPEC;
+            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+        } else if (at->volt_step_index > 0) {
+            // The highest frequency we currently trust is maxed out (vendor
+            // ceiling, or the beyond-spec ceiling if that's active) and
+            // stable. Try shaving voltage down at this same frequency --
+            // same hashrate, less heat, less power, if it holds.
+            at->volt_step_index--;
+            at->last_action = AUTOTUNE_ACTION_VOLT_DOWN;
+            at->state = AUTOTUNE_STATE_WARMING;
+            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
         } else {
-            // Already at the highest frequency AND voltage this ASIC's
-            // vendor-tested table exposes, and custom settings aren't
-            // unlocked -- hold here rather than guess at unvalidated values.
-            at->state = AUTOTUNE_STATE_AT_CEILING;
-            ESP_LOGI(TAG, "At vendor-max settings (%.0f MHz @ %u mV) and stable, holding",
-                     (float) freq_options[at->freq_step_index], volt_options[at->volt_step_index]);
+            // Highest trusted frequency, lowest voltage that's still stable
+            // at it -- this is the best known efficient point. Hold here.
+            at->state = (at->extended_freq_mhz > 0.0f) ? AUTOTUNE_STATE_BEYOND_SPEC : AUTOTUNE_STATE_AT_CEILING;
+            float applied_freq = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[at->freq_step_index];
+            ESP_LOGI(TAG, "At best known efficient point (%.0f MHz @ %u mV) and stable, holding",
+                     applied_freq, volt_options[at->volt_step_index]);
         }
 
         // Continuous mode: re-open a fresh window immediately so we keep
