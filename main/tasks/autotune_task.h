@@ -6,12 +6,17 @@ typedef enum {
     AUTOTUNE_STATE_PAUSED,        // waiting out an overheat/pause/fault condition
     AUTOTUNE_STATE_WARMING,       // settled on a step, collecting samples
     AUTOTUNE_STATE_AT_CEILING,    // sitting at the highest vendor-approved step
+    AUTOTUNE_STATE_BEYOND_SPEC,   // exploring past the vendor table (opt-in only)
 } AutotuneState;
 
 typedef struct {
     AutotuneState state;
     int freq_step_index;
     int volt_step_index;
+    // Only used once freq_step_index is at the top of the vendor table AND
+    // the user has explicitly unlocked custom settings (overclockEnabled).
+    // Voltage never extends past the vendor table; only frequency does.
+    float extended_freq_mhz;
     float max_temp_seen_this_window;
     float last_reject_rate;
     int step_downs_total;
@@ -20,4 +25,4 @@ typedef struct {
 
 void AUTOTUNE_task(void * pvParameters);
 
-#endif 
+#endif
