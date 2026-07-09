@@ -1,411 +1,416 @@
-#include <sys/time.h>
-#include <limits.h>
-
-#include "work_queue.h"
-#include "global_state.h"
+#include <stdint.h>
+#include <math.h>
 #include "esp_log.h"
-#include "esp_system.h"
-#include "mining.h"
-#include "string.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "global_state.h"
+#include "nvs_config.h"
+#include "autotune_task.h"
 
-#include "asic.h"
-#include "system.h"
-#include "esp_heap_caps.h"
-#include "sv2_protocol.h"
-#include "stratum_api.h"
-#include "stratum_v2_task.h"
-#include "utils.h"
+static const char * TAG = "autotune";
 
-static const char *TAG = "create_jobs_task";
+// --- Tuning behaviour ("maximaal": ride close to the limits, keep re-checking forever) ---
 
-#define MAX_EXTRANONCE2_LEN 32
-#define MAX_EXTRANONCE2_STR (MAX_EXTRANONCE2_LEN * 2 + 1)
+// How often we sample temperature/state. Kept short so an in-window temp spike
+// gets a reaction quickly, since this profile intentionally runs with a thin margin.
+#define TICK_MS 5000
 
-static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, double difficulty);
-static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *job, double difficulty);
-static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *job, double difficulty, uint64_t extranonce_2_counter);
+// How long we let a given frequency/voltage step run before judging it.
+// Long enough to gather a meaningful number of shares, short enough that the
+// tuner is responsive to changing ambient/cooling conditions (continuous mode).
+#define EVAL_WINDOW_MS (90 * 1000)
 
-// Free a work item using the correct free function for the protocol it was created under
-static void free_work_item(GlobalState *GLOBAL_STATE, void *work, stratum_protocol_t protocol)
+// Need at least this many accepted+rejected shares in a window before trusting
+// the reject rate; otherwise we extend the window rather than judge on noise.
+#define MIN_SAMPLE_SHARES 15
+
+// Safety margin below the power-management task's *reactive* hard cutoff
+// (PM_THROTTLE_TEMP). That reactive cutoff stops mining and drops to reduced
+// settings -- this tuner's job is to proactively back off *before* that ever
+// triggers, while still sitting as close to it as is reasonably safe.
+#define TEMP_MARGIN_C 2.0
+#define TEMP_CEILING_C (PM_THROTTLE_TEMP - TEMP_MARGIN_C)
+
+// If rejected shares exceed this fraction of shares seen in a window, the
+// current step is considered unstable and we back off immediately.
+#define REJECT_RATE_MAX 0.03f
+
+// --- Beyond-spec extension (opt-in only, gated on NVS_CONFIG_OVERCLOCK_ENABLED) ---
+//
+// Once the tuner reaches the top of the vendor-tested frequency table AND the
+// user has explicitly unlocked "custom settings" in the UI (the same signal
+// the UI already uses to expose raw frequency/voltage entry), the tuner is
+// allowed to keep exploring upward in small, conservative steps.
+//
+// Voltage is deliberately NOT extended past the vendor table under any
+// circumstances -- overvolting is the more likely path to permanent chip
+// damage. Frequency alone, without additional voltage, tends to fail as
+// instability (rejected shares) well before it fails as damage, which is
+// why only frequency is allowed to explore past vendor data here.
+#define EXTENDED_STEP_MHZ 5.0f
+
+// Hard, non-configurable ceiling even in beyond-spec mode: this multiplier
+// applies to the vendor table's own highest frequency. This number is not
+// exposed as a setting anywhere -- it exists so "opt-in to explore beyond
+// spec" can never become "opt-in to unbounded frequency". Used as a fallback
+// for chips without a known-safe ceiling below.
+#define EXTENDED_MAX_MULTIPLIER 1.15f
+
+// Per-chip ceilings the person has personally run stably via manual
+// overclock. A real data point from someone's own hardware is more
+// trustworthy than a generic percentage guess, so these override the
+// percentage-based ceiling for that specific chip. Only add an entry here
+// once it's been personally verified stable -- this is still a hard,
+// non-configurable ceiling, just a chip-specific one instead of a generic one.
+static float get_known_safe_ceiling_mhz(Asic asic_id)
 {
-    if (!work) return;
-    if (protocol == STRATUM_PROTOCOL_V2) {
-        if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
-            sv2_ext_job_free((sv2_ext_job_t *)work);
-        } else {
-            free(work);  // sv2_job_t is flat
-        }
-    } else {
-        STRATUM_V1_free_mining_notify(work);
+    switch (asic_id) {
+        case BM1370: return 800.0f; // user-reported stable via manual OC
+        default:     return 0.0f;   // no personal data point yet -- use percentage-based cap
     }
 }
 
-void create_jobs_task(void *pvParameters)
-{
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+// Beyond-spec steps are unvalidated, so we require a longer, cleaner window
+// before trusting a step as stable -- more shares, and a still-lower reject
+// tolerance than the standard vendor-table climbing uses.
+#define EXTENDED_MIN_SAMPLE_SHARES 30
+#define EXTENDED_REJECT_RATE_MAX 0.015f
 
-    // Initialize ASIC task module (moved from ASIC_task)
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_malloc(sizeof(bm_job *) * 128, MALLOC_CAP_SPIRAM);
-    GLOBAL_STATE->valid_jobs = heap_caps_malloc(sizeof(uint8_t) * 128, MALLOC_CAP_SPIRAM);
-    for (int i = 0; i < 128; i++) {
-        GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[i] = NULL;
-        GLOBAL_STATE->valid_jobs[i] = 0;
+// Hard ceiling for beyond-spec frequency exploration on this specific chip:
+// the personally-verified value if one is known, otherwise the generic
+// percentage-based fallback.
+static float get_extended_ceiling_mhz(const uint16_t * freq_options, int freq_option_count, Asic asic_id)
+{
+    float vendor_max_freq = (float) freq_options[freq_option_count - 1];
+    float known_ceiling = get_known_safe_ceiling_mhz(asic_id);
+    return known_ceiling > 0.0f ? known_ceiling : (vendor_max_freq * EXTENDED_MAX_MULTIPLIER);
+}
+
+static int find_index(const uint16_t * options, uint16_t value)
+{
+    if (!options) {
+        return 0;
+    }
+    int idx = 0;
+    int best_idx = 0;
+    uint16_t best_diff = UINT16_MAX;
+    while (options[idx] != 0) {
+        uint16_t diff = options[idx] > value ? options[idx] - value : value - options[idx];
+        if (diff < best_diff) {
+            best_diff = diff;
+            best_idx = idx;
+        }
+        idx++;
+    }
+    return best_idx;
+}
+
+static int count_options(const uint16_t * options)
+{
+    if (!options) {
+        return 0;
+    }
+    int count = 0;
+    while (options[count] != 0) {
+        count++;
+    }
+    return count;
+}
+
+static void apply_step(GlobalState * GLOBAL_STATE, const uint16_t * freq_options, const uint16_t * volt_options,
+                        int freq_idx, int volt_idx, float extended_freq_mhz)
+{
+    // extended_freq_mhz > 0 means we're operating past the vendor table --
+    // that value wins over whatever the table index says. Voltage always
+    // comes from the vendor table regardless of extended mode.
+    float new_freq = extended_freq_mhz > 0.0f ? extended_freq_mhz : (float) freq_options[freq_idx];
+    uint16_t new_volt = volt_options[volt_idx];
+
+    ESP_LOGI(TAG, "Applying step: %.0f MHz @ %u mV%s", new_freq, new_volt,
+             extended_freq_mhz > 0.0f ? " (beyond vendor spec)" : "");
+
+    nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, new_freq);
+    nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, new_volt);
+    // power_management_task polls these NVS values on its own ~100ms loop and
+    // applies them to the ASIC; we don't touch the hardware directly here so
+    // there's a single owner of "what the ASIC is currently told to do".
+}
+
+static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, const uint16_t * volt_options,
+                             int freq_option_count)
+{
+    float current_freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
+    at->freq_step_index = find_index(freq_options, (uint16_t) current_freq);
+    at->volt_step_index = find_index(volt_options, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
+
+    float vendor_max_freq = (float) freq_options[freq_option_count - 1];
+    at->extended_freq_mhz = (current_freq > vendor_max_freq + 0.5f) ? current_freq : 0.0f;
+    at->last_action = AUTOTUNE_ACTION_NONE;
+}
+
+// Undo whatever the last applied step was, because it turned out unstable
+// (either the reject rate over the window, or a mid-window temperature
+// spike). Reverting the *specific* thing that changed -- rather than always
+// assuming "lower the frequency" -- is what makes the undervolt trials and
+// the extra-voltage-for-stability trials safe to attempt at all.
+static void revert_last_action(AutotuneModule * at, const uint16_t * freq_options, int freq_option_count,
+                                int volt_option_count, bool allow_voltage_rescue)
+{
+    // A frequency step that failed on rejected shares (not heat) sometimes
+    // just needs a bit more voltage headroom rather than being abandoned
+    // outright. Only offer that rescue for reject-rate-based instability --
+    // never for a temperature-driven revert, since adding voltage there
+    // would work against the very problem we're reacting to.
+    if (allow_voltage_rescue && at->last_action == AUTOTUNE_ACTION_FREQ_UP &&
+        at->volt_step_index < volt_option_count - 1) {
+        at->volt_step_index++;
+        at->last_action = AUTOTUNE_ACTION_VOLT_UP;
+        return;
     }
 
-    double difficulty = GLOBAL_STATE->pool_difficulty;
-    void *current_work = NULL;
-    stratum_protocol_t current_work_protocol = GLOBAL_STATE->stratum_protocol;
-    uint64_t extranonce_2 = 0;
-    int timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+    switch (at->last_action) {
+        case AUTOTUNE_ACTION_VOLT_DOWN:
+            // The undervolt trial didn't hold -- go back up to the last
+            // known-good voltage for this frequency.
+            if (at->volt_step_index < volt_option_count - 1) {
+                at->volt_step_index++;
+            }
+            break;
+        case AUTOTUNE_ACTION_VOLT_UP:
+            // Even extra voltage didn't stabilize this frequency -- undo the
+            // voltage bump AND give up on this frequency step.
+            if (at->volt_step_index > 0) {
+                at->volt_step_index--;
+            }
+            if (at->freq_step_index > 0) {
+                at->freq_step_index--;
+            }
+            break;
+        case AUTOTUNE_ACTION_FREQ_UP:
+        case AUTOTUNE_ACTION_NONE:
+        default:
+            if (at->extended_freq_mhz > 0.0f) {
+                at->extended_freq_mhz -= EXTENDED_STEP_MHZ;
+                if (at->extended_freq_mhz <= (float) freq_options[freq_option_count - 1] + 0.5f) {
+                    at->extended_freq_mhz = 0.0f; // back into vendor-tested territory
+                }
+            } else if (at->freq_step_index > 0) {
+                at->freq_step_index--;
+            } else if (at->volt_step_index > 0) {
+                at->volt_step_index--;
+            }
+            break;
+    }
+    at->last_action = AUTOTUNE_ACTION_NONE;
+}
 
-    ESP_LOGI(TAG, "ASIC Job Interval: %d ms", timeout_ms);
-    ESP_LOGI(TAG, "ASIC Ready!");
+// True if the live NVS frequency/voltage no longer match what the tuner
+// itself last commanded -- meaning something external (almost always the
+// person, via the settings page) changed it while autotune was running.
+static bool settings_changed_externally(AutotuneModule * at, const uint16_t * freq_options, const uint16_t * volt_options)
+{
+    float expected_freq = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[at->freq_step_index];
+    uint16_t expected_volt = volt_options[at->volt_step_index];
+
+    float actual_freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
+    uint16_t actual_volt = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+
+    bool freq_matches = fabsf(actual_freq - expected_freq) < 0.5f;
+    bool volt_matches = (actual_volt == expected_volt);
+
+    return !freq_matches || !volt_matches;
+}
+
+void AUTOTUNE_task(void * pvParameters)
+{
+    ESP_LOGI(TAG, "Starting");
+
+    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+    AutotuneModule * at = &GLOBAL_STATE->AUTOTUNE_MODULE;
+    SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
+    PowerManagementModule * pm = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+
+    const uint16_t * freq_options = GLOBAL_STATE->DEVICE_CONFIG.family.asic.frequency_options;
+    const uint16_t * volt_options = GLOBAL_STATE->DEVICE_CONFIG.family.asic.voltage_options;
+    int freq_option_count = count_options(freq_options);
+    int volt_option_count = count_options(volt_options);
+
+    if (freq_option_count == 0 || volt_option_count == 0) {
+        ESP_LOGE(TAG, "No frequency/voltage option table for this ASIC, autotune cannot run");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    at->state = AUTOTUNE_STATE_IDLE;
+    resync_from_nvs(at, freq_options, volt_options, freq_option_count);
+    at->step_downs_total = 0;
+    at->step_ups_total = 0;
+
+    uint64_t window_start_accepted = 0;
+    uint64_t window_start_rejected = 0;
+    int64_t window_start_ms = 0;
+    float window_max_temp = 0.0f;
+    bool window_open = false;
 
     while (1) {
-        // Read protocol dynamically each iteration (coordinator may have switched it)
-        stratum_protocol_t active_protocol = GLOBAL_STATE->stratum_protocol;
+        vTaskDelay(TICK_MS / portTICK_PERIOD_MS);
 
-        // If protocol changed, discard current_work (it belongs to the old protocol)
-        // Always update current_work_protocol so the post-dequeue check doesn't
-        // incorrectly discard the first valid work item from the new protocol.
-        if (active_protocol != current_work_protocol) {
-            if (current_work != NULL) {
-                ESP_LOGI(TAG, "Protocol switched from %s to %s, discarding current work",
-                         current_work_protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1,
-                         active_protocol == STRATUM_PROTOCOL_V2 ? STRATUM_V2 : STRATUM_V1);
-                free_work_item(GLOBAL_STATE, current_work, current_work_protocol);
-                current_work = NULL;
-            }
-            current_work_protocol = active_protocol;
+        if (GLOBAL_STATE->SELF_TEST_MODULE.is_finished) {
+            ESP_LOGI(TAG, "Stopped");
+            vTaskDelete(NULL);
+            return;
         }
 
-        uint64_t start_time = esp_timer_get_time();
-        void *new_work = queue_dequeue_timeout(&GLOBAL_STATE->stratum_queue, timeout_ms);
-        timeout_ms -= (esp_timer_get_time() - start_time) / 1000;
-
-        if (new_work != NULL) {
-            active_protocol = GLOBAL_STATE->stratum_protocol;
-
-            // Free previous work using the protocol it was created under
-            free_work_item(GLOBAL_STATE, current_work, current_work_protocol);
-            current_work = NULL;
-
-            if (active_protocol != current_work_protocol) {
-                // Protocol switched during our blocking dequeue.
-                // The dequeued item may be from either the old or new protocol —
-                // we cannot safely determine which type it is, so discard it.
-                // free() is safe for both sv2_job_t (flat) and mining_notify (malloc'd;
-                // internal strings leak but this is a rare protocol-switch event).
-                ESP_LOGW(TAG, "Protocol switch detected during dequeue, discarding stale item");
-                free(new_work);
-                current_work_protocol = active_protocol;
-                timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
-                continue;
-            }
-
-            // Protocol unchanged — item matches current_work_protocol. Safe to cast.
-            if (current_work_protocol == STRATUM_PROTOCOL_V2) {
-                if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
-                    ESP_LOGI(TAG, "New Work Dequeued SV2 ext job %lu", ((sv2_ext_job_t *)new_work)->job_id);
-                } else {
-                    ESP_LOGI(TAG, "New Work Dequeued SV2 job %lu", ((sv2_job_t *)new_work)->job_id);
-                }
-            } else {
-                ESP_LOGI(TAG, "New Work Dequeued %s", ((mining_notify *)new_work)->job_id);
-            }
-
-            current_work = new_work;
-
-            if (GLOBAL_STATE->new_set_mining_difficulty_msg) {
-                ESP_LOGI(TAG, "New pool difficulty %.2f", GLOBAL_STATE->pool_difficulty);
-                difficulty = GLOBAL_STATE->pool_difficulty;
-                GLOBAL_STATE->new_set_mining_difficulty_msg = false;
-            }
-
-            if (GLOBAL_STATE->new_stratum_version_rolling_msg && GLOBAL_STATE->ASIC_initalized) {
-                ESP_LOGI(TAG, "Set chip version rolls %i", (int)(GLOBAL_STATE->version_mask >> 13));
-                ASIC_set_version_mask(GLOBAL_STATE, GLOBAL_STATE->version_mask);
-                GLOBAL_STATE->new_stratum_version_rolling_msg = false;
-            }
-
-            extranonce_2 = 0;
-
-            // Check clean_jobs flag
-            bool clean;
-            if (current_work_protocol == STRATUM_PROTOCOL_V2) {
-                if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
-                    clean = ((sv2_ext_job_t *)current_work)->clean_jobs;
-                } else {
-                    clean = ((sv2_job_t *)current_work)->clean_jobs;
-                }
-            } else {
-                clean = ((mining_notify *)current_work)->clean_jobs;
-            }
-            if (!clean) {
-                continue;
-            }
-        } else {
-            if (current_work == NULL) {
-                vTaskDelay(100 / portTICK_PERIOD_MS);
-                continue;
-            }
-            // SV2 standard channel: the ASIC has enough nonce+version space
-            // (2^32 nonces x version rolls) to keep mining without re-feeding.
-            // Re-sending the same job restarts the nonce search from 0 and
-            // produces duplicate shares. Only send work on new jobs.
-            // (V1 and SV2 extended are fine — extranonce_2 gives unique work each time.)
-            if (active_protocol == STRATUM_PROTOCOL_V2 && !stratum_v2_is_extended_channel(GLOBAL_STATE)) {
-                timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
-                continue;
-            }
-        }
-
-        // Final protocol check before generating work — protocol may have switched
-        // during a timeout dequeue while we still hold stale current_work
-        active_protocol = GLOBAL_STATE->stratum_protocol;
-        if (active_protocol != current_work_protocol) {
-            free_work_item(GLOBAL_STATE, current_work, current_work_protocol);
-            current_work = NULL;
-            current_work_protocol = active_protocol;
-            timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+        bool enabled = nvs_config_get_bool(NVS_CONFIG_AUTOTUNE_ENABLED);
+        if (!enabled) {
+            at->state = AUTOTUNE_STATE_IDLE;
+            window_open = false;
             continue;
         }
 
-        // Generate and send job
-        if (active_protocol == STRATUM_PROTOCOL_V2) {
-            if (stratum_v2_is_extended_channel(GLOBAL_STATE)) {
-                generate_work_sv2_ext(GLOBAL_STATE, (sv2_ext_job_t *)current_work, difficulty, extranonce_2);
-                extranonce_2++;
-            } else {
-                generate_work_sv2(GLOBAL_STATE, (sv2_job_t *)current_work, difficulty);
-            }
-        } else {
-            generate_work(GLOBAL_STATE, (mining_notify *)current_work, extranonce_2, difficulty);
-            extranonce_2++;
+        bool blocked = sys_module->overheat_mode || sys_module->mining_paused ||
+                        sys_module->hardware_fault || sys_module->pools_unavailable ||
+                        !GLOBAL_STATE->ASIC_initalized;
+
+        if (blocked) {
+            // Something else (most likely the reactive overheat-protection in
+            // power_management_task) has taken over. Don't fight it: just
+            // resync our own idea of the current step to whatever is actually
+            // configured now, and wait until things are calm again.
+            at->state = AUTOTUNE_STATE_PAUSED;
+            window_open = false;
+            resync_from_nvs(at, freq_options, volt_options, freq_option_count);
+            continue;
         }
-        timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+
+        if (settings_changed_externally(at, freq_options, volt_options)) {
+            // The person (or something else) changed frequency/voltage
+            // directly, outside the tuner. Treat that as a deliberate new
+            // starting point rather than silently overwriting it on the next
+            // action -- resync to it and start a fresh evaluation window.
+            ESP_LOGI(TAG, "Frequency/voltage changed externally, adopting new starting point");
+            resync_from_nvs(at, freq_options, volt_options, freq_option_count);
+            window_open = false;
+        }
+
+        float chip_temp = pm->chip_temp_avg;
+        if (pm->chip_temp2_avg > chip_temp) {
+            chip_temp = pm->chip_temp2_avg;
+        }
+
+        if (!window_open) {
+            window_start_accepted = sys_module->shares_accepted;
+            window_start_rejected = sys_module->shares_rejected;
+            window_start_ms = esp_timer_get_time() / 1000;
+            window_max_temp = chip_temp;
+            window_open = true;
+            at->state = AUTOTUNE_STATE_WARMING;
+            continue;
+        }
+
+        if (chip_temp > window_max_temp) {
+            window_max_temp = chip_temp;
+        }
+        at->max_temp_seen_this_window = window_max_temp;
+
+        // Fast-path safety check: don't wait for the window to complete if
+        // we're already over the ceiling. This is what keeps "maximal" mode
+        // from turning into "reactive overheat-protection kicks in instead".
+        if (window_max_temp > TEMP_CEILING_C) {
+            ESP_LOGW(TAG, "Temp %.1fC over ceiling %.1fC mid-window, stepping down early",
+                     window_max_temp, TEMP_CEILING_C);
+
+            revert_last_action(at, freq_options, freq_option_count, volt_option_count, false);
+            at->step_downs_total++;
+            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+            window_open = false;
+            continue;
+        }
+
+        int64_t now_ms = esp_timer_get_time() / 1000;
+        if (now_ms - window_start_ms < EVAL_WINDOW_MS) {
+            continue; // still collecting samples for this step
+        }
+
+        uint64_t accepted_delta = sys_module->shares_accepted - window_start_accepted;
+        uint64_t rejected_delta = sys_module->shares_rejected - window_start_rejected;
+        uint64_t total_delta = accepted_delta + rejected_delta;
+
+        // Beyond-spec steps get a stricter bar: more samples required, lower
+        // tolerance for rejects, since these values are unvalidated by the vendor.
+        int min_samples = at->extended_freq_mhz > 0.0f ? EXTENDED_MIN_SAMPLE_SHARES : MIN_SAMPLE_SHARES;
+        float reject_threshold = at->extended_freq_mhz > 0.0f ? EXTENDED_REJECT_RATE_MAX : REJECT_RATE_MAX;
+
+        if ((int) total_delta < min_samples) {
+            // Not enough shares yet to trust the reject rate (e.g. high pool
+            // difficulty). Keep the window open a bit longer instead of
+            // judging on a handful of samples.
+            continue;
+        }
+
+        float reject_rate = (float) rejected_delta / (float) total_delta;
+        at->last_reject_rate = reject_rate;
+
+        bool unstable = reject_rate > reject_threshold;
+
+        if (unstable) {
+            ESP_LOGW(TAG, "Reject rate %.1f%% over threshold at step %d/%d%s, reverting",
+                     reject_rate * 100.0f, at->freq_step_index, at->volt_step_index,
+                     at->extended_freq_mhz > 0.0f ? " (beyond spec)" : "");
+
+            revert_last_action(at, freq_options, freq_option_count, volt_option_count, true);
+            at->step_downs_total++;
+            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+        } else if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
+            // The extra voltage successfully stabilized this frequency step.
+            // Keep it, and go straight back to trying to climb frequency
+            // further on the next cycle.
+            at->last_action = AUTOTUNE_ACTION_NONE;
+            at->state = AUTOTUNE_STATE_WARMING;
+        } else if (at->freq_step_index < freq_option_count - 1) {
+            at->freq_step_index++;
+            at->last_action = AUTOTUNE_ACTION_FREQ_UP;
+            at->step_ups_total++;
+            at->state = AUTOTUNE_STATE_WARMING;
+            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, 0.0f);
+        } else if (nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) &&
+                   (at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[freq_option_count - 1]) +
+                           EXTENDED_STEP_MHZ <=
+                       get_extended_ceiling_mhz(freq_options, freq_option_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.id)) {
+            // Vendor-table frequency is maxed and custom settings are
+            // unlocked -- keep exploring frequency alone past the vendor
+            // table, up to a fixed ceiling. Voltage stays exactly where it
+            // is; extended mode never pushes voltage further.
+            float vendor_max_freq = (float) freq_options[freq_option_count - 1];
+            float base = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : vendor_max_freq;
+
+            at->extended_freq_mhz = base + EXTENDED_STEP_MHZ;
+            at->last_action = AUTOTUNE_ACTION_FREQ_UP;
+            at->step_ups_total++;
+            at->state = AUTOTUNE_STATE_BEYOND_SPEC;
+            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+        } else if (at->volt_step_index > 0) {
+            // The highest frequency we currently trust is maxed out (vendor
+            // ceiling, or the beyond-spec ceiling if that's active) and
+            // stable. Try shaving voltage down at this same frequency --
+            // same hashrate, less heat, less power, if it holds.
+            at->volt_step_index--;
+            at->last_action = AUTOTUNE_ACTION_VOLT_DOWN;
+            at->state = AUTOTUNE_STATE_WARMING;
+            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+        } else {
+            // Highest trusted frequency, lowest voltage that's still stable
+            // at it -- this is the best known efficient point. Hold here.
+            at->state = (at->extended_freq_mhz > 0.0f) ? AUTOTUNE_STATE_BEYOND_SPEC : AUTOTUNE_STATE_AT_CEILING;
+            float applied_freq = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[at->freq_step_index];
+            ESP_LOGI(TAG, "At best known efficient point (%.0f MHz @ %u mV) and stable, holding",
+                     applied_freq, volt_options[at->volt_step_index]);
+        }
+
+        // Continuous mode: re-open a fresh window immediately so we keep
+        // re-checking (and can climb back up if e.g. ambient temp drops, or
+        // step down again if it rises) for as long as autotune is enabled.
+        window_open = false;
     }
-}
-
-static void generate_work(GlobalState *GLOBAL_STATE, mining_notify *notification, uint64_t extranonce_2, double difficulty)
-{
-    if (GLOBAL_STATE->extranonce_2_len > MAX_EXTRANONCE2_LEN) {
-        ESP_LOGE(TAG, "extranonce_2_len %d exceeds maximum %d, skipping job", GLOBAL_STATE->extranonce_2_len, MAX_EXTRANONCE2_LEN);
-        return;
-    }
-    char extranonce_2_str[MAX_EXTRANONCE2_STR];
-    extranonce_2_generate(extranonce_2, GLOBAL_STATE->extranonce_2_len, extranonce_2_str);
-
-    uint8_t coinbase_tx_hash[32];
-    calculate_coinbase_tx_hash(notification->coinbase_1, notification->coinbase_2, GLOBAL_STATE->extranonce_str, extranonce_2_str, coinbase_tx_hash);
-
-    uint8_t merkle_root[32];
-    calculate_merkle_root_hash(coinbase_tx_hash, (uint8_t(*)[32])notification->merkle_branches, notification->n_merkle_branches, merkle_root);
-
-    bm_job *next_job = malloc(sizeof(bm_job));
-
-    if (next_job == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for new job");
-        return;
-    }
-
-    construct_bm_job(notification, merkle_root, GLOBAL_STATE->version_mask, difficulty, next_job);
-
-    next_job->extranonce2 = strdup(extranonce_2_str);
-    next_job->jobid = strdup(notification->job_id);
-    next_job->version_mask = GLOBAL_STATE->version_mask;
-
-    // Check if ASIC is initialized before trying to send work
-    if (!GLOBAL_STATE->ASIC_initalized) {
-        // Clean up the job since we're not sending it
-        // Note: This job was never stored in active_jobs, so it's safe to free
-        ESP_LOGW(TAG, "ASIC not initialized, skipping job send");
-        free(next_job->jobid);
-        free(next_job->extranonce2);
-        free(next_job);
-        return;
-    }
-
-    ASIC_send_work(GLOBAL_STATE, next_job);
-}
-
-// Construct bm_job directly from SV2 fields (no coinbase/merkle computation needed).
-// Standard channels rely on version rolling for unique work — the ASIC rolls the
-// version bits using version_mask, giving different midstates per nonce search space.
-static void generate_work_sv2(GlobalState *GLOBAL_STATE, sv2_job_t *sv2_job, double difficulty)
-{
-    bm_job *next_job = malloc(sizeof(bm_job));
-    if (next_job == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for new SV2 job");
-        return;
-    }
-
-    uint32_t version_mask = GLOBAL_STATE->version_mask;
-
-    next_job->version = sv2_job->version;
-    next_job->target = sv2_job->nbits;
-    next_job->ntime = sv2_job->ntime;
-    next_job->starting_nonce = 0;
-    next_job->pool_diff = difficulty;
-
-    // SV2 provides merkle_root and prev_hash in internal byte order (SHA-256 output order).
-    // For bm_job storage: apply reverse_32bit_words (same as construct_bm_job does)
-    reverse_32bit_words(sv2_job->merkle_root, next_job->merkle_root);
-    reverse_32bit_words(sv2_job->prev_hash, next_job->prev_block_hash);
-
-    // Compute midstate(s) using the same logic as construct_bm_job.
-    // Midstate covers bytes 0-63 of block header: version(4B) + prev_hash(32B) + merkle_root[0:28](28B).
-    uint8_t midstate_data[64];
-    uint32_t base_version = sv2_job->version;
-    memcpy(midstate_data, &base_version, 4);
-    memcpy(midstate_data + 4, sv2_job->prev_hash, 32);
-    memcpy(midstate_data + 36, sv2_job->merkle_root, 28);
-
-    uint8_t midstate[32];
-    midstate_sha256_bin(midstate_data, 64, midstate);
-    reverse_32bit_words(midstate, next_job->midstate);
-
-    if (version_mask != 0) {
-        uint32_t rolled_version = increment_bitmask(base_version, version_mask);
-        memcpy(midstate_data, &rolled_version, 4);
-        midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, next_job->midstate1);
-
-        rolled_version = increment_bitmask(rolled_version, version_mask);
-        memcpy(midstate_data, &rolled_version, 4);
-        midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, next_job->midstate2);
-
-        rolled_version = increment_bitmask(rolled_version, version_mask);
-        memcpy(midstate_data, &rolled_version, 4);
-        midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, next_job->midstate3);
-        next_job->num_midstates = 4;
-    } else {
-        next_job->num_midstates = 1;
-    }
-
-    // SV2 job metadata
-    char jobid_str[16];
-    snprintf(jobid_str, sizeof(jobid_str), "%" PRIu32, sv2_job->job_id);
-    next_job->jobid = strdup(jobid_str);
-    next_job->extranonce2 = strdup(""); // unused in SV2 standard
-    next_job->version_mask = version_mask;
-
-    if (!GLOBAL_STATE->ASIC_initalized) {
-        ESP_LOGW(TAG, "ASIC not initialized, skipping SV2 job send");
-        free(next_job->jobid);
-        free(next_job->extranonce2);
-        free(next_job);
-        return;
-    }
-
-    ASIC_send_work(GLOBAL_STATE, next_job);
-}
-
-// Extended channel work generation: compute coinbase hash from prefix+extranonce+suffix,
-// then merkle root from merkle path, then midstates. extranonce_2 provides unique work.
-static void generate_work_sv2_ext(GlobalState *GLOBAL_STATE, sv2_ext_job_t *ext_job,
-                                   double difficulty, uint64_t extranonce_2_counter)
-{
-    sv2_conn_t *conn = GLOBAL_STATE->sv2_conn;
-    if (!conn) return;
-
-    bm_job *next_job = malloc(sizeof(bm_job));
-    if (!next_job) {
-        ESP_LOGE(TAG, "Failed to allocate memory for SV2 ext job");
-        return;
-    }
-
-    uint32_t version_mask = GLOBAL_STATE->version_mask;
-
-    // Derive extranonce_2 from counter
-    // SV2 spec: extranonce_size is the miner's rollable portion (not total)
-    uint8_t extranonce_2_len = conn->extranonce_size;
-    uint8_t extranonce_2[32];
-    memset(extranonce_2, 0, sizeof(extranonce_2));
-    // Encode counter as big-endian bytes
-    for (int i = extranonce_2_len - 1; i >= 0 && extranonce_2_counter > 0; i--) {
-        extranonce_2[i] = (uint8_t)(extranonce_2_counter & 0xFF);
-        extranonce_2_counter >>= 8;
-    }
-
-    // Compute coinbase tx hash: prefix + extranonce_prefix + extranonce_2 + suffix
-    uint8_t coinbase_tx_hash[32];
-    calculate_coinbase_tx_hash_bin(
-        ext_job->coinbase_prefix, ext_job->coinbase_prefix_len,
-        conn->extranonce_prefix, conn->extranonce_prefix_len,
-        extranonce_2, extranonce_2_len,
-        ext_job->coinbase_suffix, ext_job->coinbase_suffix_len,
-        coinbase_tx_hash);
-
-    // Compute merkle root
-    uint8_t merkle_root[32];
-    calculate_merkle_root_hash(coinbase_tx_hash,
-                               (const uint8_t (*)[32])ext_job->merkle_path,
-                               ext_job->merkle_path_count, merkle_root);
-
-    // Fill bm_job fields
-    next_job->version = ext_job->version;
-    next_job->target = ext_job->nbits;
-    next_job->ntime = ext_job->ntime;  // no offset — extranonce provides uniqueness
-    next_job->starting_nonce = 0;
-    next_job->pool_diff = difficulty;
-
-    // Same byte-order handling as generate_work_sv2
-    reverse_32bit_words(merkle_root, next_job->merkle_root);
-    reverse_32bit_words(ext_job->prev_hash, next_job->prev_block_hash);
-
-    // Compute midstate(s)
-    uint8_t midstate_data[64];
-    uint32_t base_version = ext_job->version;
-    memcpy(midstate_data, &base_version, 4);
-    memcpy(midstate_data + 4, ext_job->prev_hash, 32);
-    memcpy(midstate_data + 36, merkle_root, 28);
-
-    uint8_t midstate[32];
-    midstate_sha256_bin(midstate_data, 64, midstate);
-    reverse_32bit_words(midstate, next_job->midstate);
-
-    if (version_mask != 0) {
-        uint32_t rolled_version = increment_bitmask(base_version, version_mask);
-        memcpy(midstate_data, &rolled_version, 4);
-        midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, next_job->midstate1);
-
-        rolled_version = increment_bitmask(rolled_version, version_mask);
-        memcpy(midstate_data, &rolled_version, 4);
-        midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, next_job->midstate2);
-
-        rolled_version = increment_bitmask(rolled_version, version_mask);
-        memcpy(midstate_data, &rolled_version, 4);
-        midstate_sha256_bin(midstate_data, 64, midstate);
-        reverse_32bit_words(midstate, next_job->midstate3);
-        next_job->num_midstates = 4;
-    } else {
-        next_job->num_midstates = 1;
-    }
-
-    // Job metadata
-    char jobid_str[16];
-    snprintf(jobid_str, sizeof(jobid_str), "%" PRIu32, ext_job->job_id);
-    next_job->jobid = strdup(jobid_str);
-
-    // Store extranonce_2 as hex for share submission
-    char en2_hex[65];
-    bin2hex(extranonce_2, extranonce_2_len, en2_hex, sizeof(en2_hex));
-    next_job->extranonce2 = strdup(en2_hex);
-    next_job->version_mask = version_mask;
-
-    if (!GLOBAL_STATE->ASIC_initalized) {
-        ESP_LOGW(TAG, "ASIC not initialized, skipping SV2 ext job send");
-        free(next_job->jobid);
-        free(next_job->extranonce2);
-        free(next_job);
-        return;
-    }
-
-    ASIC_send_work(GLOBAL_STATE, next_job);
 }
