@@ -619,6 +619,17 @@ static esp_err_t handle_options_request(httpd_req_t * req)
 
 bool check_settings_and_update(const cJSON * const root, char **redirect_url)
 {
+    // Track validity PER FIELD rather than one global pass/fail flag. With a
+    // single shared flag, one invalid or unexpected field anywhere in the
+    // request silently blocked saving *everything* else in the same
+    // request -- including fields the person never touched, since the
+    // frontend always submits the whole settings form on every save. Now an
+    // out-of-range or stale field only skips itself; everything else that
+    // validated correctly still gets applied.
+    bool field_ok[NVS_CONFIG_COUNT];
+    for (int i = 0; i < NVS_CONFIG_COUNT; i++) {
+        field_ok[i] = true;
+    }
     bool result = true;
     char *old_hostname = NULL;
     bool hostname_changed = false;
@@ -647,12 +658,12 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
             case TYPE_STR: {
                 if (!cJSON_IsString(item)) {
                     ESP_LOGW(TAG, "Invalid type for '%s', expected string", setting->rest_name);                            
-                    result = false;
+                    field_ok[key] = false;
                 } else {
                     const size_t str_value_len = strlen(item->valuestring);
                     if ((str_value_len < setting->min) || (str_value_len > setting->max)) {
                         ESP_LOGW(TAG, "Value '%s' for '%s' is out of length (%d-%d)", item->valuestring, setting->rest_name, setting->min, setting->max);
-                        result = false;
+                        field_ok[key] = false;
                     }
                 }
                 break;
@@ -661,40 +672,40 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
             case TYPE_I32: {
                 if (!cJSON_IsNumber(item)) {
                     ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
-                    result = false;
+                    field_ok[key] = false;
                 } else if ((item->valueint < setting->min) || (item->valueint > setting->max)) {
                     ESP_LOGW(TAG, "Value '%d' for '%s' is out of range", item->valueint, setting->rest_name);
-                    result = false;
+                    field_ok[key] = false;
                 }
                 break;
             }
             case TYPE_U64: {
                 if (!cJSON_IsNumber(item)) {
                     ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
-                    result = false;
+                    field_ok[key] = false;
                 } else if ((item->valuedouble < setting->min) || (item->valuedouble > setting->max)) {
                     ESP_LOGW(TAG, "Value '%lld' for '%s' is out of range", (long long)item->valuedouble, setting->rest_name);
-                    result = false;
+                    field_ok[key] = false;
                 }
                 break;
             }
             case TYPE_FLOAT: {
                 if (!cJSON_IsNumber(item)) {
                     ESP_LOGW(TAG, "Invalid type for '%s', expected number", setting->rest_name);                            
-                    result = false;
+                    field_ok[key] = false;
                 } else if ((item->valuedouble < setting->min) || (item->valuedouble > setting->max)) {
                     ESP_LOGW(TAG, "Value '%f' for '%s' is out of range", item->valuedouble, setting->rest_name);
-                    result = false;
+                    field_ok[key] = false;
                 }
                 break;
             }
             case TYPE_BOOL: {
                 if (!cJSON_IsNumber(item) && !cJSON_IsBool(item) && !cJSON_IsTrue(item) && !cJSON_IsFalse(item)) {
                     ESP_LOGW(TAG, "Invalid type for '%s', expected bool", setting->rest_name);                            
-                    result = false;
+                    field_ok[key] = false;
                 } else if ((item->valueint < setting->min) || (item->valueint > setting->max)) {
                     ESP_LOGW(TAG, "Value '%d' for '%s' is out of range", item->valueint, setting->rest_name);
-                    result = false;
+                    field_ok[key] = false;
                 }
                 break;
             }
@@ -702,34 +713,41 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
 
         if (key == NVS_CONFIG_DISPLAY && cJSON_IsString(item) && get_display_config(item->valuestring) == NULL) {
             ESP_LOGW(TAG, "Invalid display config: '%s'", item->valuestring);
-            result = false;
+            field_ok[key] = false;
         }
         if (key == NVS_CONFIG_ROTATION && item->valueint != 0 && item->valueint != 90 && item->valueint != 180 && item->valueint != 270) {
             ESP_LOGW(TAG, "Invalid display rotation: '%d'", item->valueint);
-            result = false;
+            field_ok[key] = false;
         }
         if ((key == NVS_CONFIG_STRATUM_PROTOCOL || key == NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL) && cJSON_IsString(item)) {
             if (stratum_protocol_from_string(item->valuestring) == STRATUM_PROTOCOL_UNKNOWN) {
                 ESP_LOGW(TAG, "Invalid stratum protocol: '%s'", item->valuestring);
-                result = false;
+                field_ok[key] = false;
             }
         }
         if ((key == NVS_CONFIG_SV2_CHANNEL_TYPE || key == NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE) && cJSON_IsString(item)) {
             if (sv2_channel_type_from_string(item->valuestring) == SV2_CHANNEL_UNKNOWN) {
                 ESP_LOGW(TAG, "Invalid SV2 channel type: '%s'", item->valuestring);
-                result = false;
+                field_ok[key] = false;
             }
         }
     }
 
-    if (result) {
-        // update NVS (if result is okay) and clean up    
+    // Always apply whatever validated correctly, regardless of whether some
+    // other field in the same request failed -- see the field_ok comment
+    // above for why this matters.
+    {
         for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
             Settings *setting = nvs_config_get_settings(key);
             if (!setting || !setting->rest_name) continue;
 
             cJSON * item = cJSON_GetObjectItem(root, setting->rest_name);
             if (!item) continue;
+            if (!field_ok[key]) {
+                ESP_LOGW(TAG, "Skipping '%s': failed validation, rest of the request still applied", setting->rest_name);
+                result = false; // still report that not everything made it, for logging/diagnostics
+                continue;
+            }
 
             switch(setting->type) {
                 case TYPE_STR:
@@ -785,7 +803,14 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
         free(old_hostname);
     }
 
-    return result;
+    if (!result) {
+        ESP_LOGW(TAG, "One or more settings in this request failed validation and were skipped (see warnings above); everything else was still applied.");
+    }
+
+    // Always report success to the caller: whatever validated correctly was
+    // applied. A single bad/stale field skipping itself (logged above) is no
+    // longer treated as a reason to reject the entire request.
+    return true;
 }
 
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
