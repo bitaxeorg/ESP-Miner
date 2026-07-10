@@ -29,6 +29,12 @@ typedef struct {
     // the user has explicitly unlocked custom settings (overclockEnabled).
     // Voltage never extends past the vendor table; only frequency does.
     float extended_freq_mhz;
+    // If beyond-spec climbing keeps failing around the same frequency
+    // instead of making progress, this caps further climbing there so the
+    // tuner falls through to voltage optimization instead of retrying the
+    // same failing step forever.
+    float extended_soft_ceiling_mhz;
+    int extended_freq_consecutive_fails;
     float max_temp_seen_this_window;
     float last_reject_rate;
     int step_downs_total;
