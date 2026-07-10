@@ -77,14 +77,26 @@ static float get_known_safe_ceiling_mhz(Asic asic_id)
 #define EXTENDED_MIN_SAMPLE_SHARES 30
 #define EXTENDED_REJECT_RATE_MAX 0.015f
 
+// After this many consecutive failures trying to climb past roughly the same
+// beyond-spec frequency, stop retrying it and treat that point as the
+// practical ceiling for this session -- letting the tuner move on to voltage
+// optimization instead of retrying a step that clearly isn't going to work.
+#define EXTENDED_FAIL_LIMIT 2
+
 // Hard ceiling for beyond-spec frequency exploration on this specific chip:
 // the personally-verified value if one is known, otherwise the generic
-// percentage-based fallback.
-static float get_extended_ceiling_mhz(const uint16_t * freq_options, int freq_option_count, Asic asic_id)
+// percentage-based fallback -- further capped by a soft ceiling if the
+// tuner has recently given up trying to climb past a specific point.
+static float get_extended_ceiling_mhz(const uint16_t * freq_options, int freq_option_count, Asic asic_id,
+                                       float soft_ceiling_mhz)
 {
     float vendor_max_freq = (float) freq_options[freq_option_count - 1];
     float known_ceiling = get_known_safe_ceiling_mhz(asic_id);
-    return known_ceiling > 0.0f ? known_ceiling : (vendor_max_freq * EXTENDED_MAX_MULTIPLIER);
+    float hard_ceiling = known_ceiling > 0.0f ? known_ceiling : (vendor_max_freq * EXTENDED_MAX_MULTIPLIER);
+    if (soft_ceiling_mhz > 0.0f && soft_ceiling_mhz < hard_ceiling) {
+        return soft_ceiling_mhz;
+    }
+    return hard_ceiling;
 }
 
 static int find_index(const uint16_t * options, uint16_t value)
@@ -146,6 +158,8 @@ static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, 
 
     float vendor_max_freq = (float) freq_options[freq_option_count - 1];
     at->extended_freq_mhz = (current_freq > vendor_max_freq + 0.5f) ? current_freq : 0.0f;
+    at->extended_soft_ceiling_mhz = 0.0f;
+    at->extended_freq_consecutive_fails = 0;
     at->last_action = AUTOTUNE_ACTION_NONE;
 }
 
@@ -243,7 +257,6 @@ void AUTOTUNE_task(void * pvParameters)
     }
 
     at->state = AUTOTUNE_STATE_IDLE;
-    resync_from_nvs(at, freq_options, volt_options, freq_option_count);
     at->step_downs_total = 0;
     at->step_ups_total = 0;
 
@@ -252,6 +265,9 @@ void AUTOTUNE_task(void * pvParameters)
     int64_t window_start_ms = 0;
     float window_max_temp = 0.0f;
     bool window_open = false;
+    // Tracks the disabled->enabled transition so we only reset to the
+    // bottom of the table once per "session", not on every loop tick.
+    bool was_enabled = false;
 
     while (1) {
         vTaskDelay(TICK_MS / portTICK_PERIOD_MS);
@@ -265,6 +281,30 @@ void AUTOTUNE_task(void * pvParameters)
         bool enabled = nvs_config_get_bool(NVS_CONFIG_AUTOTUNE_ENABLED);
         if (!enabled) {
             at->state = AUTOTUNE_STATE_IDLE;
+            window_open = false;
+            was_enabled = false;
+            continue;
+        }
+
+        if (!was_enabled) {
+            // Just (re)enabled. Start from the bottom of the vendor table
+            // for both frequency and voltage, and let the normal climb take
+            // it from there -- frequency climbs step by step, and voltage
+            // only goes up when a frequency step actually needs the rescue
+            // to stabilize (see revert_last_action). This tends toward a
+            // near-minimal voltage for whatever frequency is reached,
+            // rather than starting at whatever voltage happened to be set
+            // before and only ever shaving it down afterward.
+            at->freq_step_index = 0;
+            at->volt_step_index = 0;
+            at->extended_freq_mhz = 0.0f;
+            at->extended_soft_ceiling_mhz = 0.0f;
+            at->extended_freq_consecutive_fails = 0;
+            at->last_action = AUTOTUNE_ACTION_NONE;
+            apply_step(GLOBAL_STATE, freq_options, volt_options, 0, 0, 0.0f);
+            ESP_LOGI(TAG, "Autotune enabled: starting from the bottom (%.0f MHz @ %u mV) and climbing",
+                     (float) freq_options[0], volt_options[0]);
+            was_enabled = true;
             window_open = false;
             continue;
         }
@@ -321,6 +361,17 @@ void AUTOTUNE_task(void * pvParameters)
             ESP_LOGW(TAG, "Temp %.1fC over ceiling %.1fC mid-window, stepping down early",
                      window_max_temp, TEMP_CEILING_C);
 
+            if (at->last_action == AUTOTUNE_ACTION_FREQ_UP && at->extended_freq_mhz > 0.0f) {
+                at->extended_freq_consecutive_fails++;
+                if (at->extended_freq_consecutive_fails >= EXTENDED_FAIL_LIMIT) {
+                    at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_STEP_MHZ;
+                    ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failed attempts (heat), moving to voltage optimization",
+                             at->extended_soft_ceiling_mhz, at->extended_freq_consecutive_fails);
+                }
+            } else {
+                at->extended_freq_consecutive_fails = 0;
+            }
+
             revert_last_action(at, freq_options, freq_option_count, volt_option_count, false);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
@@ -359,6 +410,22 @@ void AUTOTUNE_task(void * pvParameters)
                      reject_rate * 100.0f, at->freq_step_index, at->volt_step_index,
                      at->extended_freq_mhz > 0.0f ? " (beyond spec)" : "");
 
+            // Track repeated failures trying to climb past roughly the same
+            // beyond-spec frequency -- that's what would otherwise cause an
+            // endless retry loop that never reaches voltage optimization.
+            if (at->last_action == AUTOTUNE_ACTION_FREQ_UP && at->extended_freq_mhz > 0.0f) {
+                at->extended_freq_consecutive_fails++;
+                if (at->extended_freq_consecutive_fails >= EXTENDED_FAIL_LIMIT) {
+                    // extended_freq_mhz still holds the failing value here;
+                    // the last known-good level is one step below it.
+                    at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_STEP_MHZ;
+                    ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failed attempts, moving to voltage optimization",
+                             at->extended_soft_ceiling_mhz, at->extended_freq_consecutive_fails);
+                }
+            } else {
+                at->extended_freq_consecutive_fails = 0;
+            }
+
             revert_last_action(at, freq_options, freq_option_count, volt_option_count, true);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
@@ -377,7 +444,8 @@ void AUTOTUNE_task(void * pvParameters)
         } else if (nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) &&
                    (at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[freq_option_count - 1]) +
                            EXTENDED_STEP_MHZ <=
-                       get_extended_ceiling_mhz(freq_options, freq_option_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.id)) {
+                       get_extended_ceiling_mhz(freq_options, freq_option_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.id,
+                                                 at->extended_soft_ceiling_mhz)) {
             // Vendor-table frequency is maxed and custom settings are
             // unlocked -- keep exploring frequency alone past the vendor
             // table, up to a fixed ceiling. Voltage stays exactly where it
@@ -386,6 +454,7 @@ void AUTOTUNE_task(void * pvParameters)
             float base = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : vendor_max_freq;
 
             at->extended_freq_mhz = base + EXTENDED_STEP_MHZ;
+            at->extended_freq_consecutive_fails = 0; // made real progress -- past failures no longer apply
             at->last_action = AUTOTUNE_ACTION_FREQ_UP;
             at->step_ups_total++;
             at->state = AUTOTUNE_STATE_BEYOND_SPEC;
