@@ -69,6 +69,10 @@ export class PoolComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
+    this.loadPoolSettings();
+  }
+
+  private loadPoolSettings(): void {
     this.liveDataService.info$
       .pipe(first(), this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
@@ -158,6 +162,9 @@ export class PoolComponent implements OnInit {
           this.toastr.warning('You must restart this device after saving for changes to take effect.');
           this.toastr.success(successMessage);
           this.savedChanges = true;
+          // Refresh so the fields show what's actually saved now, instead of
+          // whatever was on screen from when the page first loaded.
+          this.loadPoolSettings();
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Could not save pool settings for ${this.uri}. ${err.message}` : `Could not save pool settings. ${err.message}`;
