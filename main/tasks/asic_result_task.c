@@ -15,6 +15,7 @@
 #include "freertos/task.h"
 #include "scoreboard.h"
 #include "self_test.h"
+#include "esp_timer.h"
 
 static const char *TAG = "asic_result";
 
@@ -26,6 +27,10 @@ void ASIC_result_task(void *pvParameters)
     {
         // Check if ASIC is initialized before trying to process work
         if (!GLOBAL_STATE->ASIC_initalized) {
+            // Keep the flatline watchdog timer parked while the ASIC is not
+            // supposed to be producing (boot, self-test, overheat pause) so
+            // resuming can never trip a stale-timestamp restart.
+            GLOBAL_STATE->last_asic_result_time = esp_timer_get_time();
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
         }
@@ -41,6 +46,9 @@ void ASIC_result_task(void *pvParameters)
             hashrate_monitor_register_read(GLOBAL_STATE, asic_result->register_type, asic_result->asic_nr, asic_result->value, asic_result->timestamp_us);
             continue;
         }
+
+        // A nonce came back: the ASIC/serial result path is alive.
+        GLOBAL_STATE->last_asic_result_time = esp_timer_get_time();
 
         uint8_t job_id = asic_result->job_id;
 

@@ -197,6 +197,18 @@ typedef struct
     char network_diff_string[DIFF_STRING_SIZE];
     char block_signals[MAX_BLOCK_SIGNALS][MAX_BLOCK_SIGNAL_LEN];
     int block_signals_count;
+
+    // Timestamp (esp_timer_get_time) of the last nonce result read back from
+    // the ASIC. Register reads deliberately don't count: on wedged units the
+    // register path can stay responsive while nonce production is dead.
+    // Watched from the stratum tasks to detect a wedged ASIC (issue #1053).
+    int64_t last_asic_result_time;
 } GlobalState;
+
+// How long the ASIC may go without returning a single nonce - while the pool
+// link is demonstrably alive - before we conclude it is wedged ("Flatline of
+// Death", issue #1053) and restart. At any realistic difficulty the chip
+// answers many times a minute, so 10 minutes of true silence is a wedge.
+#define FLATLINE_RESTART_TIMEOUT_US (10LL * 60 * 1000000)
 
 #endif /* GLOBAL_STATE_H_ */
