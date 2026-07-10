@@ -263,6 +263,13 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           }
           this.toastr.success(successMessage);
           this.savedChanges = true;
+          // The form was populated once on load and never refreshed since --
+          // without this, the fields keep showing whatever was on screen at
+          // that first load (which can already be stale if something else,
+          // like Auto-Tune, changed frequency/voltage in the background)
+          // even though the save itself went through correctly. Re-fetch so
+          // what's displayed matches what's actually on the device now.
+          this.loadDeviceSettings();
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Could not save settings for ${this.uri}. ${err.message}` : `Could not save settings. ${err.message}`;
