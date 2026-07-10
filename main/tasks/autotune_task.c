@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <string.h>
 #include <math.h>
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -193,11 +194,19 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
             break;
         case AUTOTUNE_ACTION_VOLT_UP:
             // Even extra voltage didn't stabilize this frequency -- undo the
-            // voltage bump AND give up on this frequency step.
+            // voltage bump AND give up on this frequency step. If we were
+            // exploring beyond-spec, that "step" lives in extended_freq_mhz,
+            // not freq_step_index (which stays pinned at the vendor max
+            // throughout beyond-spec exploration) -- back off the right one.
             if (at->volt_step_index > 0) {
                 at->volt_step_index--;
             }
-            if (at->freq_step_index > 0) {
+            if (at->extended_freq_mhz > 0.0f) {
+                at->extended_freq_mhz -= EXTENDED_STEP_MHZ;
+                if (at->extended_freq_mhz <= (float) freq_options[freq_option_count - 1] + 0.5f) {
+                    at->extended_freq_mhz = 0.0f; // back into vendor-tested territory
+                }
+            } else if (at->freq_step_index > 0) {
                 at->freq_step_index--;
             }
             break;
@@ -236,6 +245,24 @@ static bool settings_changed_externally(AutotuneModule * at, const uint16_t * fr
     return !freq_matches || !volt_matches;
 }
 
+// The pool can reject a share for reasons that have nothing to do with
+// whether the current frequency/voltage is stable -- most commonly
+// "Duplicate share", which happens more often at low frequency/low pool
+// difficulty simply because the chip finds qualifying results faster
+// relative to how often new work arrives. Counting these against the tuner's
+// stability judgement would make even the lowest, safest settings look
+// unstable and give it nowhere left to fall back to. We look this reason up
+// by name in the existing rejected-reason breakdown and exclude it.
+static uint32_t get_rejected_reason_count(SystemModule * sys_module, const char * reason)
+{
+    for (int i = 0; i < sys_module->rejected_reason_stats_count; i++) {
+        if (strncmp(sys_module->rejected_reason_stats[i].message, reason, sizeof(sys_module->rejected_reason_stats[i].message) - 1) == 0) {
+            return sys_module->rejected_reason_stats[i].count;
+        }
+    }
+    return 0;
+}
+
 void AUTOTUNE_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
@@ -262,6 +289,7 @@ void AUTOTUNE_task(void * pvParameters)
 
     uint64_t window_start_accepted = 0;
     uint64_t window_start_rejected = 0;
+    uint32_t window_start_duplicate = 0;
     int64_t window_start_ms = 0;
     float window_max_temp = 0.0f;
     bool window_open = false;
@@ -342,6 +370,7 @@ void AUTOTUNE_task(void * pvParameters)
         if (!window_open) {
             window_start_accepted = sys_module->shares_accepted;
             window_start_rejected = sys_module->shares_rejected;
+            window_start_duplicate = get_rejected_reason_count(sys_module, "Duplicate share");
             window_start_ms = esp_timer_get_time() / 1000;
             window_max_temp = chip_temp;
             window_open = true;
@@ -385,7 +414,16 @@ void AUTOTUNE_task(void * pvParameters)
         }
 
         uint64_t accepted_delta = sys_module->shares_accepted - window_start_accepted;
-        uint64_t rejected_delta = sys_module->shares_rejected - window_start_rejected;
+        uint64_t rejected_delta_raw = sys_module->shares_rejected - window_start_rejected;
+
+        // "Duplicate share" rejections are a pool/protocol artifact, not a
+        // sign that this frequency/voltage is unstable -- see the comment on
+        // get_rejected_reason_count(). Exclude them from both the reject
+        // count and the sample total so they can't make an otherwise
+        // perfectly stable step (including the lowest, safest one) look
+        // unstable, which would leave the tuner nowhere to fall back to.
+        uint32_t duplicate_delta = get_rejected_reason_count(sys_module, "Duplicate share") - window_start_duplicate;
+        uint64_t rejected_delta = (rejected_delta_raw > duplicate_delta) ? (rejected_delta_raw - duplicate_delta) : 0;
         uint64_t total_delta = accepted_delta + rejected_delta;
 
         // Beyond-spec steps get a stricter bar: more samples required, lower
@@ -432,7 +470,9 @@ void AUTOTUNE_task(void * pvParameters)
         } else if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
             // The extra voltage successfully stabilized this frequency step.
             // Keep it, and go straight back to trying to climb frequency
-            // further on the next cycle.
+            // further on the next cycle. This frequency level did ultimately
+            // work, so it shouldn't count toward "repeatedly failing here".
+            at->extended_freq_consecutive_fails = 0;
             at->last_action = AUTOTUNE_ACTION_NONE;
             at->state = AUTOTUNE_STATE_WARMING;
         } else if (at->freq_step_index < freq_option_count - 1) {
