@@ -332,11 +332,11 @@ export class SystemApiService {
   }
 
   public updateSystem(uri: string = '', update: any): Observable<any | ISystemUpdateResponse> {
-    if (environment.mock && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }));
     }
 
-    if (environment.mock && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.patch(`${uri}/api/system`, update);
     }
 
