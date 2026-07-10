@@ -395,7 +395,10 @@ static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 {
     uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
-    uint16_t target_voltage = GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv;
+    uint16_t target_voltage = GLOBAL_STATE->DEVICE_CONFIG.family.default_voltage_mv;
+    if (target_voltage == 0) {
+        target_voltage = GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv;
+    }
     float margin = target_voltage * SELF_TEST_CORE_VOLTAGE_TOLERANCE;
     ESP_LOGI(TAG, "Core voltage: %u mV (target: %u mV +/- %.0f mV)", core_voltage, target_voltage, margin);
 
