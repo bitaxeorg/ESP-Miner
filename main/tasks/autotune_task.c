@@ -37,6 +37,14 @@ static const char * TAG = "autotune";
 // current step is considered unstable and we back off immediately.
 #define REJECT_RATE_MAX 0.03f
 
+// The ASIC reports its own on-chip computation error rate directly from a
+// hardware register -- this is a cleaner, lower-latency instability signal
+// than pool-level rejected shares, since it isn't affected by network/pool
+// noise at all (see the "Duplicate share" saga above). Checked continuously,
+// not just at the end of an evaluation window, since it updates almost
+// immediately and there's no reason to wait 90 seconds to react to it.
+#define ERROR_PERCENTAGE_MAX 2.0f
+
 // --- Beyond-spec extension (opt-in only, gated on NVS_CONFIG_OVERCLOCK_ENABLED) ---
 //
 // Once the tuner reaches the top of the vendor-tested frequency table AND the
@@ -77,6 +85,7 @@ static float get_known_safe_ceiling_mhz(Asic asic_id)
 // tolerance than the standard vendor-table climbing uses.
 #define EXTENDED_MIN_SAMPLE_SHARES 30
 #define EXTENDED_REJECT_RATE_MAX 0.015f
+#define EXTENDED_ERROR_PERCENTAGE_MAX 1.0f
 
 // After this many consecutive failures trying to climb past roughly the same
 // beyond-spec frequency, stop retrying it and treat that point as the
@@ -402,6 +411,35 @@ void AUTOTUNE_task(void * pvParameters)
             }
 
             revert_last_action(at, freq_options, freq_option_count, volt_option_count, false);
+            at->step_downs_total++;
+            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+            window_open = false;
+            continue;
+        }
+
+        // Fast-path safety check on the ASIC's own on-chip error rate --
+        // see the ERROR_PERCENTAGE_MAX comment for why this matters and why
+        // it isn't held for the full evaluation window. Unlike the
+        // temperature check, a voltage rescue is worth trying here first,
+        // since (like rejected shares) this can reflect insufficient
+        // voltage headroom at the current frequency rather than heat.
+        float error_threshold = at->extended_freq_mhz > 0.0f ? EXTENDED_ERROR_PERCENTAGE_MAX : ERROR_PERCENTAGE_MAX;
+        if (sys_module->error_percentage > error_threshold) {
+            ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%% mid-window, reverting",
+                     sys_module->error_percentage, error_threshold);
+
+            if (at->last_action == AUTOTUNE_ACTION_FREQ_UP && at->extended_freq_mhz > 0.0f) {
+                at->extended_freq_consecutive_fails++;
+                if (at->extended_freq_consecutive_fails >= EXTENDED_FAIL_LIMIT) {
+                    at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_STEP_MHZ;
+                    ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failed attempts (ASIC errors), moving to voltage optimization",
+                             at->extended_soft_ceiling_mhz, at->extended_freq_consecutive_fails);
+                }
+            } else {
+                at->extended_freq_consecutive_fails = 0;
+            }
+
+            revert_last_action(at, freq_options, freq_option_count, volt_option_count, true);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
             window_open = false;
