@@ -8,13 +8,21 @@
             <div class="col-1 md:col-10 md:flex-order-2">
                 <p-checkbox name="autotuneEnabled" formControlName="autotuneEnabled" inputId="autotuneEnabled" [binary]="true"></p-checkbox>
             </div>
-            <label for="autotuneEnabled" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Auto-Tune</label>
+            <label for="autotuneEnabled" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Auto-Tune (Overclock)</label>
         </div>
-        <p-message *ngIf="form.controls['autotuneEnabled'].value" severity="info" icon="pi pi-info-circle" styleClass="w-full mb-3 border-round-xl">
-            Auto-Tune continuously searches for the highest stable frequency/voltage within vendor-approved limits,
-            staying a safety margin below the overheat cutoff. It backs off automatically if temperature or
-            rejected shares get too high. Keep an eye on the dashboard the first time you enable this, especially
-            with limited cooling.
+        <p-message *ngIf="form.controls['autotuneEnabled'].value && !settingsUnlocked" severity="info" icon="pi pi-info-circle" styleClass="w-full mb-3 border-round-xl">
+            Auto-Tune continuously searches for the highest stable frequency/voltage this chip will run, using the
+            frequency/voltage steps offered in this UI, staying a safety margin below the overheat cutoff. It backs
+            off automatically if temperature or rejected shares get too high. Keep an eye on the dashboard the
+            first time you enable this, especially with limited cooling.
+        </p-message>
+        <p-message *ngIf="form.controls['autotuneEnabled'].value && settingsUnlocked" severity="warn" icon="pi pi-exclamation-triangle" styleClass="w-full mb-3 border-round-xl">
+            Auto-Tune is an overclocking feature. With Custom Settings unlocked, once it reaches the highest
+            frequency offered in this UI, it keeps pushing frequency further in small steps, past what the
+            manufacturer has tested, up to a fixed internal ceiling. This is unvalidated territory for your
+            specific chip and carries real risk of instability or reduced lifespan. It still backs off
+            automatically on high temperature or rejected shares, and keeps the overheat cutoff as a last resort,
+            but "automatic" does not mean "safe." Keep an eye on the dashboard, especially with limited cooling.
         </p-message>
 
         <div class="field grid p-fluid">
