@@ -18,6 +18,9 @@
                         <small *ngIf="isPoolV2Enabled(pool)" class="block text-blue-600 mt-1">
                             SV2 Mode
                         </small>
+                        <small *ngIf="form.get(pool + 'URL')?.invalid && form.get(pool + 'URL')?.touched" class="block text-red-500 mt-1">
+                            Enter just the host (e.g. <code>eu.molepool.com</code>) -- no <code>stratum+tcp://</code> prefix and no <code>:port</code> at the end. The port goes in the Stratum Port field below.
+                        </small>
                     </div>
                 </div>
                 <div class="field grid p-fluid">
