@@ -138,6 +138,12 @@ export class SystemApiService {
         overclockEnabled: 1,
         autotuneEnabled: 0,
         autotuneProfile: 1,
+        autotuneMaxMHz: 0,
+        autotuneState: 0,
+        autotuneBeyondSpec: false,
+        autotuneStepUps: 0,
+        autotuneStepDowns: 0,
+        autotuneLastRejectRate: 0,
         runningPartition: "factory",
         minFanSpeed: 25,
         fanspeed: 50,
@@ -334,11 +340,11 @@ export class SystemApiService {
   }
 
   public updateSystem(uri: string = '', update: any): Observable<any | ISystemUpdateResponse> {
-    if (!environment.mock && this.api && !uri) {
+    if (environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }));
     }
 
-    if (!environment.mock && uri) {
+    if (environment.mock && uri) {
       return this.httpClient.patch(`${uri}/api/system`, update);
     }
 
