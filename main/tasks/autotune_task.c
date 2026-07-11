@@ -108,24 +108,20 @@ static const AutotuneProfileConfig * get_active_profile(void)
 #define EXTENDED_STEP_MHZ 5.0f
 
 // Hard, non-configurable ceiling even in beyond-spec mode: this multiplier
-// applies to the vendor table's own highest frequency. This number is not
-// exposed as a setting anywhere -- it exists so "opt-in to explore beyond
-// spec" can never become "opt-in to unbounded frequency". Used as a fallback
-// for chips without a known-safe ceiling below.
+// applies to the vendor table's own highest frequency. This is the default
+// fallback for anyone who hasn't set their own verified ceiling below.
 #define EXTENDED_MAX_MULTIPLIER 1.15f
 
-// Per-chip ceilings the person has personally run stably via manual
-// overclock. A real data point from someone's own hardware is more
-// trustworthy than a generic percentage guess, so these override the
-// percentage-based ceiling for that specific chip. Only add an entry here
-// once it's been personally verified stable -- this is still a hard,
-// non-configurable ceiling, just a chip-specific one instead of a generic one.
-static float get_known_safe_ceiling_mhz(Asic asic_id)
+// A personally-verified ceiling the *person* has typed in, via
+// NVS_CONFIG_AUTOTUNE_MAX_MHZ -- not a value baked into the firmware for a
+// whole chip family. Silicon varies between individual units of the same
+// chip ("silicon lottery"), so a value one person confirmed stable on their
+// own hardware isn't safe to assume for everyone else running this same
+// firmware. Defaults to 0 (unset), which falls back to the generic
+// percentage-based ceiling below.
+static float get_user_verified_ceiling_mhz(void)
 {
-    switch (asic_id) {
-        case BM1370: return 800.0f; // user-reported stable via manual OC
-        default:     return 0.0f;   // no personal data point yet -- use percentage-based cap
-    }
+    return nvs_config_get_float(NVS_CONFIG_AUTOTUNE_MAX_MHZ);
 }
 
 // Beyond-spec steps are unvalidated, so we require a longer, cleaner window
@@ -140,15 +136,15 @@ static float get_known_safe_ceiling_mhz(Asic asic_id)
 // optimization instead of retrying a step that clearly isn't going to work.
 #define EXTENDED_FAIL_LIMIT 2
 
-// Hard ceiling for beyond-spec frequency exploration on this specific chip:
-// the personally-verified value if one is known, otherwise the generic
-// percentage-based fallback -- further capped by a soft ceiling if the
-// tuner has recently given up trying to climb past a specific point.
-static float get_extended_ceiling_mhz(const uint16_t * freq_options, int freq_option_count, Asic asic_id,
+// Hard ceiling for beyond-spec frequency exploration: the person's own
+// verified value if they've set one, otherwise the generic percentage-based
+// fallback -- further capped by a soft ceiling if the tuner has recently
+// given up trying to climb past a specific point.
+static float get_extended_ceiling_mhz(const uint16_t * freq_options, int freq_option_count,
                                        float soft_ceiling_mhz)
 {
     float vendor_max_freq = (float) freq_options[freq_option_count - 1];
-    float known_ceiling = get_known_safe_ceiling_mhz(asic_id);
+    float known_ceiling = get_user_verified_ceiling_mhz();
     float hard_ceiling = known_ceiling > 0.0f ? known_ceiling : (vendor_max_freq * EXTENDED_MAX_MULTIPLIER);
     if (soft_ceiling_mhz > 0.0f && soft_ceiling_mhz < hard_ceiling) {
         return soft_ceiling_mhz;
@@ -157,15 +153,13 @@ static float get_extended_ceiling_mhz(const uint16_t * freq_options, int freq_op
 }
 
 // True if there's still room for one more beyond-spec climb step without
-// going over this chip's ceiling (known-safe, percentage-based, or the
+// going over the ceiling (user-verified, percentage-based, or the
 // session's soft ceiling from repeated failures -- whichever applies).
-static bool next_extended_step_within_ceiling(AutotuneModule * at, GlobalState * GLOBAL_STATE,
-                                               const uint16_t * freq_options, int freq_option_count)
+static bool next_extended_step_within_ceiling(AutotuneModule * at, const uint16_t * freq_options, int freq_option_count)
 {
     float vendor_max_freq = (float) freq_options[freq_option_count - 1];
     float current = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : vendor_max_freq;
-    float ceiling = get_extended_ceiling_mhz(freq_options, freq_option_count,
-                                              GLOBAL_STATE->DEVICE_CONFIG.family.asic.id, at->extended_soft_ceiling_mhz);
+    float ceiling = get_extended_ceiling_mhz(freq_options, freq_option_count, at->extended_soft_ceiling_mhz);
     return (current + EXTENDED_STEP_MHZ) <= ceiling;
 }
 
@@ -579,7 +573,7 @@ void AUTOTUNE_task(void * pvParameters)
             at->state = AUTOTUNE_STATE_WARMING;
             apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, 0.0f);
         } else if (profile->allow_beyond_spec && nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) &&
-                   next_extended_step_within_ceiling(at, GLOBAL_STATE, freq_options, freq_option_count)) {
+                   next_extended_step_within_ceiling(at, freq_options, freq_option_count)) {
             // Vendor-table frequency is maxed, this profile allows going
             // further, and custom settings are unlocked -- keep exploring
             // frequency alone past the vendor table, up to a fixed ceiling.
