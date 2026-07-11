@@ -6,6 +6,7 @@ import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Obs
 import { LoadingService } from 'src/app/services/loading.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { SystemApiService } from 'src/app/services/system.service';
+import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
@@ -51,6 +52,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   public savedChanges: boolean = false;
   public settingsUnlocked: boolean = false;
+  public deviceInfo?: ISystemInfo;
 
   @Input() uri = '';
 
@@ -165,6 +167,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       takeUntil(this.destroy$)
     )
     .subscribe(({ info, asic }) => {
+      // Stored for read-only display (e.g. live Auto-Tune status) --
+      // separate from the form, since these aren't editable fields.
+      this.deviceInfo = info;
+
       // Store the frequency and voltage options from the API
       this.defaultFrequency = asic.defaultFrequency;
       this.frequencyOptions = asic.frequencyOptions;
@@ -194,6 +200,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           frequency: [info.frequency, [Validators.required]],
           autotuneEnabled: [info.autotuneEnabled == 1, [Validators.required]],
           autotuneProfile: [info.autotuneProfile ?? 1, [Validators.required]],
+          autotuneMaxMHz: [info.autotuneMaxMHz ?? 0, [Validators.required, Validators.min(0), Validators.max(1500)]],
           autofanspeed: [info.autofanspeed == 1, [Validators.required]],
           minfanspeed: [info.minFanSpeed, [Validators.required]],
           manualFanSpeed: [info.manualFanSpeed, [Validators.required]],
@@ -333,6 +340,17 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     ];
   }
 
+  get autotuneStateLabel(): string {
+    switch (this.deviceInfo?.autotuneState) {
+      case 0: return 'Idle';
+      case 1: return 'Paused (waiting out an overheat/fault condition)';
+      case 2: return 'Warming up on a new step, collecting samples';
+      case 3: return 'Holding at the highest tested-safe frequency';
+      case 4: return 'Exploring or holding beyond the vendor-tested table';
+      default: return 'Unknown';
+    }
+  }
+
   get displayTimeoutMaxSteps(): number {
     return DISPLAY_TIMEOUT_STEPS.length - 1;
   }
@@ -385,6 +403,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       'frequency',
       'autotuneEnabled',
       'autotuneProfile',
+      'autotuneMaxMHz',
       'autofanspeed',
       'manualFanSpeed',
       'temptarget',
