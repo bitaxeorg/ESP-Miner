@@ -37,6 +37,28 @@
             automatically on high temperature or rejected shares, and keeps the overheat cutoff as a last resort,
             but "automatic" does not mean "safe." Switch to Eco or Balanced to stay within vendor-tested limits.
         </p-message>
+        <div class="field grid p-fluid" *ngIf="form.controls['autotuneEnabled'].value && settingsUnlocked && form.controls['autotuneProfile'].value === 2">
+            <label for="autotuneMaxMHz" class="col-12 md:col-2 md:m-0">Beyond-Spec Ceiling (MHz)</label>
+            <div class="col-12 md:col-10">
+                <input pInputText type="number" id="autotuneMaxMHz" formControlName="autotuneMaxMHz" />
+                <small class="block text-color-secondary mt-1">
+                    Only set this to a frequency you've personally tested stable on this exact chip via manual
+                    overclock. Leave at 0 to use a conservative default margin instead -- a value that worked for
+                    someone else's chip is not guaranteed to be safe for yours.
+                </small>
+            </div>
+        </div>
+        <div class="field grid p-fluid" *ngIf="form.controls['autotuneEnabled'].value && deviceInfo">
+            <label class="col-12 md:col-2 md:m-0">Auto-Tune Status</label>
+            <div class="col-12 md:col-10">
+                <p class="m-0">{{ autotuneStateLabel }}</p>
+                <small class="block text-color-secondary mt-1">
+                    {{ deviceInfo!.autotuneBeyondSpec ? 'Currently beyond the vendor-tested table. ' : '' }}Steps
+                    up: {{ deviceInfo!.autotuneStepUps }} · Steps back: {{ deviceInfo!.autotuneStepDowns }} · Last
+                    reject rate: {{ ((deviceInfo!.autotuneLastRejectRate || 0) * 100).toFixed(1) }}%
+                </small>
+            </div>
+        </div>
 
         <div class="field grid p-fluid">
             <ng-container *ngIf="settingsUnlocked">
