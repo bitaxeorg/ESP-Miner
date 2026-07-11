@@ -10,19 +10,32 @@
             </div>
             <label for="autotuneEnabled" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Auto-Tune (Overclock)</label>
         </div>
-        <p-message *ngIf="form.controls['autotuneEnabled'].value && !settingsUnlocked" severity="info" icon="pi pi-info-circle" styleClass="w-full mb-3 border-round-xl">
-            Auto-Tune continuously searches for the highest stable frequency/voltage this chip will run, using the
-            frequency/voltage steps offered in this UI, staying a safety margin below the overheat cutoff. It backs
-            off automatically if temperature or rejected shares get too high. Keep an eye on the dashboard the
-            first time you enable this, especially with limited cooling.
+        <div class="field grid p-fluid" *ngIf="form.controls['autotuneEnabled'].value">
+            <label for="autotuneProfile" class="col-12 md:col-2 md:m-0">Tuning Profile</label>
+            <div class="col-12 md:col-10">
+                <p-select
+                    [options]="autotuneProfileOptions"
+                    optionLabel="name"
+                    optionValue="value"
+                    formControlName="autotuneProfile"
+                    inputId="autotuneProfile"
+                ></p-select>
+            </div>
+        </div>
+        <p-message *ngIf="form.controls['autotuneEnabled'].value && !(settingsUnlocked && form.controls['autotuneProfile'].value === 2)" severity="info" icon="pi pi-info-circle" styleClass="w-full mb-3 border-round-xl">
+            Auto-Tune continuously searches for the highest stable frequency/voltage this chip will run within the
+            chosen profile, using the frequency/voltage steps offered in this UI, staying a safety margin below the
+            overheat cutoff (a wider margin for Eco, tighter for Aggressive). It backs off automatically if
+            temperature or rejected shares get too high. Keep an eye on the dashboard the first time you enable
+            this, especially with limited cooling.
         </p-message>
-        <p-message *ngIf="form.controls['autotuneEnabled'].value && settingsUnlocked" severity="warn" icon="pi pi-exclamation-triangle" styleClass="w-full mb-3 border-round-xl">
-            Auto-Tune is an overclocking feature. With Custom Settings unlocked, once it reaches the highest
-            frequency offered in this UI, it keeps pushing frequency further in small steps, past what the
+        <p-message *ngIf="form.controls['autotuneEnabled'].value && settingsUnlocked && form.controls['autotuneProfile'].value === 2" severity="warn" icon="pi pi-exclamation-triangle" styleClass="w-full mb-3 border-round-xl">
+            The Aggressive profile is an overclocking feature. With Custom Settings unlocked, once it reaches the
+            highest frequency offered in this UI, it keeps pushing frequency further in small steps, past what the
             manufacturer has tested, up to a fixed internal ceiling. This is unvalidated territory for your
             specific chip and carries real risk of instability or reduced lifespan. It still backs off
             automatically on high temperature or rejected shares, and keeps the overheat cutoff as a last resort,
-            but "automatic" does not mean "safe." Keep an eye on the dashboard, especially with limited cooling.
+            but "automatic" does not mean "safe." Switch to Eco or Balanced to stay within vendor-tested limits.
         </p-message>
 
         <div class="field grid p-fluid">
