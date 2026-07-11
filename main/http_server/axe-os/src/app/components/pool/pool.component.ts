@@ -73,8 +73,12 @@ export class PoolComponent implements OnInit {
   }
 
   private loadPoolSettings(): void {
-    this.liveDataService.info$
-      .pipe(first(), this.loadingService.lockUIUntilComplete())
+    // Always fetch a fresh snapshot directly rather than the live websocket
+    // stream's next emission -- right after a save, that stream can still
+    // hand back the pre-save value for a moment, showing stale fields even
+    // though the save itself succeeded.
+    this.systemService.getInfo(this.uri)
+      .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
         this.asicModel = info.ASICModel || '';
         this.form = this.fb.group({
