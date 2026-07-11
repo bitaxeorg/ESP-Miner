@@ -2,6 +2,12 @@
 #define AUTOTUNE_TASK_H_
 
 typedef enum {
+    AUTOTUNE_PROFILE_ECO = 0,        // prioritizes low temperature/power over top speed
+    AUTOTUNE_PROFILE_BALANCED,       // decent frequency, still keeps some thermal margin
+    AUTOTUNE_PROFILE_AGGRESSIVE,     // rides close to the limits, includes beyond-spec if unlocked
+} AutotuneProfile;
+
+typedef enum {
     AUTOTUNE_STATE_IDLE = 0,      // disabled via NVS
     AUTOTUNE_STATE_PAUSED,        // waiting out an overheat/pause/fault condition
     AUTOTUNE_STATE_WARMING,       // settled on a step, collecting samples
@@ -23,6 +29,7 @@ typedef enum {
 typedef struct {
     AutotuneState state;
     AutotuneAction last_action;
+    AutotuneProfile active_profile;
     int freq_step_index;
     int volt_step_index;
     // Only used once freq_step_index is at the top of the vendor table AND
