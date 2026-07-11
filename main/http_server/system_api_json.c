@@ -206,6 +206,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     // User Preferences
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) ? 1 : 0);
     cJSON_AddNumberToObject(root, "autotuneEnabled", nvs_config_get_bool(NVS_CONFIG_AUTOTUNE_ENABLED) ? 1 : 0);
+    cJSON_AddNumberToObject(root, "autotuneProfile", nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_PROFILE));
     char *disp_name = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     cJSON_AddStringToObject(root, "display", disp_name ? disp_name : "");
     free(disp_name);
