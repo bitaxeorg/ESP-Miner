@@ -131,6 +131,7 @@ components:
         - apEnabled
         - autofanspeed
         - autotuneEnabled
+        - autotuneProfile
         - bestDiff
         - bestSessionDiff
         - boardVersion
@@ -396,6 +397,9 @@ components:
         autotuneEnabled:
           type: integer
           description: Automatically tunes frequency/voltage to the highest stable, vendor-approved values
+        autotuneProfile:
+          type: integer
+          description: "Auto-Tune behaviour profile: 0=Eco, 1=Balanced, 2=Aggressive"
         poolConnectionInfo:
           type: string
           description: Current pool address family
@@ -834,6 +838,12 @@ components:
           enum: [0,1]
           examples:
             - 0
+        autotuneProfile:
+          type: integer
+          description: "Auto-Tune behaviour profile: 0=Eco, 1=Balanced, 2=Aggressive"
+          enum: [0,1,2]
+          examples:
+            - 1
         invertscreen:
           type: integer
           description: Whether to invert screen colors (0=normal, 1=inverted)
