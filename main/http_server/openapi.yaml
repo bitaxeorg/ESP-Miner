@@ -130,8 +130,14 @@ components:
         - ASICModel
         - apEnabled
         - autofanspeed
+        - autotuneBeyondSpec
         - autotuneEnabled
+        - autotuneLastRejectRate
+        - autotuneMaxMHz
         - autotuneProfile
+        - autotuneState
+        - autotuneStepDowns
+        - autotuneStepUps
         - bestDiff
         - bestSessionDiff
         - boardVersion
@@ -400,6 +406,30 @@ components:
         autotuneProfile:
           type: integer
           description: "Auto-Tune behaviour profile: 0=Eco, 1=Balanced, 2=Aggressive"
+        autotuneMaxMHz:
+          type: number
+          description: >-
+            Personally-verified beyond-spec frequency ceiling in MHz, set by the person after their own manual
+            testing. 0 means unset, in which case a conservative 15% margin over the vendor-tested maximum is
+            used instead. Only takes effect with the Aggressive profile and Custom Settings unlocked.
+        autotuneState:
+          type: integer
+          description: >-
+            Current live state of the running tuner: 0=idle (disabled), 1=paused (waiting out an overheat/fault
+            condition), 2=warming (just changed a step, collecting samples), 3=at vendor-table ceiling and
+            stable, 4=exploring or holding beyond the vendor table
+        autotuneBeyondSpec:
+          type: boolean
+          description: Whether the tuner is currently running a frequency above the vendor-tested table
+        autotuneStepUps:
+          type: integer
+          description: Total number of times Auto-Tune has stepped frequency or voltage up since it was last (re-)enabled
+        autotuneStepDowns:
+          type: integer
+          description: Total number of times Auto-Tune has reverted a step since it was last (re-)enabled
+        autotuneLastRejectRate:
+          type: number
+          description: Rejected-share rate observed during the most recently completed evaluation window (0-1)
         poolConnectionInfo:
           type: string
           description: Current pool address family
@@ -844,6 +874,13 @@ components:
           enum: [0,1,2]
           examples:
             - 1
+        autotuneMaxMHz:
+          type: number
+          description: >-
+            Personally-verified beyond-spec frequency ceiling in MHz. Only set this to a value you have manually
+            tested stable on your own hardware -- leave at 0 to use the conservative default margin instead.
+          examples:
+            - 0
         invertscreen:
           type: integer
           description: Whether to invert screen colors (0=normal, 1=inverted)
