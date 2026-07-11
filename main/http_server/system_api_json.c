@@ -6,6 +6,7 @@
 #include "esp_timer.h"
 #include "system_api_json.h"
 #include "nvs_config.h"
+#include "autotune_task.h"
 #include "sv2_protocol.h"
 #include "vcore.h"
 #include "connect.h"
@@ -207,6 +208,15 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "overclockEnabled", nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) ? 1 : 0);
     cJSON_AddNumberToObject(root, "autotuneEnabled", nvs_config_get_bool(NVS_CONFIG_AUTOTUNE_ENABLED) ? 1 : 0);
     cJSON_AddNumberToObject(root, "autotuneProfile", nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_PROFILE));
+    cJSON_AddNumberToObject(root, "autotuneMaxMHz", nvs_config_get_float(NVS_CONFIG_AUTOTUNE_MAX_MHZ));
+    // Live status of the running tuner, not just what's configured -- lets
+    // the UI show what it's actually doing right now without the person
+    // having to read through the logs to find out.
+    cJSON_AddNumberToObject(root, "autotuneState", g->AUTOTUNE_MODULE.state);
+    cJSON_AddBoolToObject(root, "autotuneBeyondSpec", g->AUTOTUNE_MODULE.extended_freq_mhz > 0.0f);
+    cJSON_AddNumberToObject(root, "autotuneStepUps", g->AUTOTUNE_MODULE.step_ups_total);
+    cJSON_AddNumberToObject(root, "autotuneStepDowns", g->AUTOTUNE_MODULE.step_downs_total);
+    cJSON_AddNumberToObject(root, "autotuneLastRejectRate", g->AUTOTUNE_MODULE.last_reject_rate);
     char *disp_name = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     cJSON_AddStringToObject(root, "display", disp_name ? disp_name : "");
     free(disp_name);
