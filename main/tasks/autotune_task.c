@@ -109,6 +109,19 @@ static float get_extended_ceiling_mhz(const uint16_t * freq_options, int freq_op
     return hard_ceiling;
 }
 
+// True if there's still room for one more beyond-spec climb step without
+// going over this chip's ceiling (known-safe, percentage-based, or the
+// session's soft ceiling from repeated failures -- whichever applies).
+static bool next_extended_step_within_ceiling(AutotuneModule * at, GlobalState * GLOBAL_STATE,
+                                               const uint16_t * freq_options, int freq_option_count)
+{
+    float vendor_max_freq = (float) freq_options[freq_option_count - 1];
+    float current = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : vendor_max_freq;
+    float ceiling = get_extended_ceiling_mhz(freq_options, freq_option_count,
+                                              GLOBAL_STATE->DEVICE_CONFIG.family.asic.id, at->extended_soft_ceiling_mhz);
+    return (current + EXTENDED_STEP_MHZ) <= ceiling;
+}
+
 static int find_index(const uint16_t * options, uint16_t value)
 {
     if (!options) {
@@ -252,6 +265,30 @@ static bool settings_changed_externally(AutotuneModule * at, const uint16_t * fr
     bool volt_matches = (actual_volt == expected_volt);
 
     return !freq_matches || !volt_matches;
+}
+
+// Called on every reverted/backed-off step. If the step we just gave up on
+// was a beyond-spec frequency climb, count it -- after enough consecutive
+// failures at roughly the same point, get_extended_ceiling_mhz() will stop
+// letting the tuner retry it (see extended_soft_ceiling_mhz) and it'll move
+// on to voltage optimization instead. Any other kind of revert (an
+// undervolt trial, or a vendor-table-only step) resets the streak, since
+// it's not part of a beyond-spec climb attempt.
+static void track_extended_climb_failure(AutotuneModule * at, const char * reason)
+{
+    if (at->last_action != AUTOTUNE_ACTION_FREQ_UP || at->extended_freq_mhz <= 0.0f) {
+        at->extended_freq_consecutive_fails = 0;
+        return;
+    }
+
+    at->extended_freq_consecutive_fails++;
+    if (at->extended_freq_consecutive_fails >= EXTENDED_FAIL_LIMIT) {
+        // extended_freq_mhz still holds the failing value here; the last
+        // known-good level is one step below it.
+        at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_STEP_MHZ;
+        ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failed attempts (%s), moving to voltage optimization",
+                 at->extended_soft_ceiling_mhz, at->extended_freq_consecutive_fails, reason);
+    }
 }
 
 // The pool can reject a share for reasons that have nothing to do with
@@ -399,16 +436,7 @@ void AUTOTUNE_task(void * pvParameters)
             ESP_LOGW(TAG, "Temp %.1fC over ceiling %.1fC mid-window, stepping down early",
                      window_max_temp, TEMP_CEILING_C);
 
-            if (at->last_action == AUTOTUNE_ACTION_FREQ_UP && at->extended_freq_mhz > 0.0f) {
-                at->extended_freq_consecutive_fails++;
-                if (at->extended_freq_consecutive_fails >= EXTENDED_FAIL_LIMIT) {
-                    at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_STEP_MHZ;
-                    ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failed attempts (heat), moving to voltage optimization",
-                             at->extended_soft_ceiling_mhz, at->extended_freq_consecutive_fails);
-                }
-            } else {
-                at->extended_freq_consecutive_fails = 0;
-            }
+            track_extended_climb_failure(at, "heat");
 
             revert_last_action(at, freq_options, freq_option_count, volt_option_count, false);
             at->step_downs_total++;
@@ -428,16 +456,7 @@ void AUTOTUNE_task(void * pvParameters)
             ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%% mid-window, reverting",
                      sys_module->error_percentage, error_threshold);
 
-            if (at->last_action == AUTOTUNE_ACTION_FREQ_UP && at->extended_freq_mhz > 0.0f) {
-                at->extended_freq_consecutive_fails++;
-                if (at->extended_freq_consecutive_fails >= EXTENDED_FAIL_LIMIT) {
-                    at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_STEP_MHZ;
-                    ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failed attempts (ASIC errors), moving to voltage optimization",
-                             at->extended_soft_ceiling_mhz, at->extended_freq_consecutive_fails);
-                }
-            } else {
-                at->extended_freq_consecutive_fails = 0;
-            }
+            track_extended_climb_failure(at, "ASIC errors");
 
             revert_last_action(at, freq_options, freq_option_count, volt_option_count, true);
             at->step_downs_total++;
@@ -486,21 +505,7 @@ void AUTOTUNE_task(void * pvParameters)
                      reject_rate * 100.0f, at->freq_step_index, at->volt_step_index,
                      at->extended_freq_mhz > 0.0f ? " (beyond spec)" : "");
 
-            // Track repeated failures trying to climb past roughly the same
-            // beyond-spec frequency -- that's what would otherwise cause an
-            // endless retry loop that never reaches voltage optimization.
-            if (at->last_action == AUTOTUNE_ACTION_FREQ_UP && at->extended_freq_mhz > 0.0f) {
-                at->extended_freq_consecutive_fails++;
-                if (at->extended_freq_consecutive_fails >= EXTENDED_FAIL_LIMIT) {
-                    // extended_freq_mhz still holds the failing value here;
-                    // the last known-good level is one step below it.
-                    at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_STEP_MHZ;
-                    ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failed attempts, moving to voltage optimization",
-                             at->extended_soft_ceiling_mhz, at->extended_freq_consecutive_fails);
-                }
-            } else {
-                at->extended_freq_consecutive_fails = 0;
-            }
+            track_extended_climb_failure(at, "rejected shares");
 
             revert_last_action(at, freq_options, freq_option_count, volt_option_count, true);
             at->step_downs_total++;
@@ -520,10 +525,7 @@ void AUTOTUNE_task(void * pvParameters)
             at->state = AUTOTUNE_STATE_WARMING;
             apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, 0.0f);
         } else if (nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) &&
-                   (at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[freq_option_count - 1]) +
-                           EXTENDED_STEP_MHZ <=
-                       get_extended_ceiling_mhz(freq_options, freq_option_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.id,
-                                                 at->extended_soft_ceiling_mhz)) {
+                   next_extended_step_within_ceiling(at, GLOBAL_STATE, freq_options, freq_option_count)) {
             // Vendor-table frequency is maxed and custom settings are
             // unlocked -- keep exploring frequency alone past the vendor
             // table, up to a fixed ceiling. Voltage stays exactly where it
