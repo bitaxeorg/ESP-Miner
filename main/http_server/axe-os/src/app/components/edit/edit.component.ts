@@ -1,390 +1,214 @@
-import { HttpErrorResponse } from '@angular/common/http';
-import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
-import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
-import { ToastrService } from 'ngx-toastr';
-import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable, first } from 'rxjs';
-import { LoadingService } from 'src/app/services/loading.service';
-import { LiveDataService } from 'src/app/services/live-data.service';
-import { SystemApiService } from 'src/app/services/system.service';
-import { ActivatedRoute } from '@angular/router';
-import { CommonModule } from '@angular/common';
-import { ButtonModule } from 'primeng/button';
-import { CheckboxModule } from 'primeng/checkbox';
-import { SelectModule } from 'primeng/select';
-import { MessageModule } from 'primeng/message';
-import { SliderModule } from 'primeng/slider';
-import { TooltipModule } from 'primeng/tooltip';
-import { InputTextModule } from 'primeng/inputtext';
-import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
+<form *ngIf="form" [formGroup]="form">
+    <div class="card">
+        <p-message *ngIf="settingsUnlocked" severity="warn" icon="pi pi-exclamation-triangle" styleClass="w-full mb-3 border-round-xl">
+            Custom settings can cause damage & system instability. Only modify these settings if you understand the risks of running outside designed parameters.
+        </p-message>
 
-type SelectOption = {
-  name: string;
-  value: number;
-};
+        <div class="field-checkbox grid my-2">
+            <div class="col-1 md:col-10 md:flex-order-2">
+                <p-checkbox name="autotuneEnabled" formControlName="autotuneEnabled" inputId="autotuneEnabled" [binary]="true"></p-checkbox>
+            </div>
+            <label for="autotuneEnabled" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Auto-Tune (Overclock)</label>
+        </div>
+        <div class="field grid p-fluid" *ngIf="form.controls['autotuneEnabled'].value">
+            <label for="autotuneProfile" class="col-12 md:col-2 md:m-0">Tuning Profile</label>
+            <div class="col-12 md:col-10">
+                <p-select
+                    [options]="autotuneProfileOptions"
+                    optionLabel="name"
+                    optionValue="value"
+                    formControlName="autotuneProfile"
+                    inputId="autotuneProfile"
+                ></p-select>
+            </div>
+        </div>
+        <p-message *ngIf="form.controls['autotuneEnabled'].value && !(settingsUnlocked && form.controls['autotuneProfile'].value === 2)" severity="info" icon="pi pi-info-circle" styleClass="w-full mb-3 border-round-xl">
+            Auto-Tune continuously searches for the highest stable frequency/voltage this chip will run within the
+            chosen profile, using the frequency/voltage steps offered in this UI, staying a safety margin below the
+            overheat cutoff (a wider margin for Eco, tighter for Aggressive). It backs off automatically if
+            temperature or rejected shares get too high. Keep an eye on the dashboard the first time you enable
+            this, especially with limited cooling.
+        </p-message>
+        <p-message *ngIf="form.controls['autotuneEnabled'].value && settingsUnlocked && form.controls['autotuneProfile'].value === 2" severity="warn" icon="pi pi-exclamation-triangle" styleClass="w-full mb-3 border-round-xl">
+            The Aggressive profile is an overclocking feature. With Custom Settings unlocked, once it reaches the
+            highest frequency offered in this UI, it keeps pushing frequency further in small steps, past what the
+            manufacturer has tested, up to a fixed internal ceiling. This is unvalidated territory for your
+            specific chip and carries real risk of instability or reduced lifespan. It still backs off
+            automatically on high temperature or rejected shares, and keeps the overheat cutoff as a last resort,
+            but "automatic" does not mean "safe." Switch to Eco or Balanced to stay within vendor-tested limits.
+        </p-message>
 
-const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
-const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
+        <div class="field grid p-fluid">
+            <ng-container *ngIf="settingsUnlocked">
+                <label for="frequency" class="col-12 md:col-2 md:m-0">Frequency</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="frequency" formControlName="frequency" type="number" />
+                </div>
+            </ng-container>
+            <ng-container *ngIf="!settingsUnlocked">
+                <label (click)="frequencySelect.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Frequency</label>
+                <div class="col-12 md:col-10">
+                    <p-select
+                        [options]="selectFrequency"
+                        optionLabel="name"
+                        optionValue="value"
+                        formControlName="frequency"
+                        #frequencySelect
+                    ></p-select>
+                </div>
+            </ng-container>
+        </div>
 
-@Component({
-    selector: 'app-edit',
-    templateUrl: './edit.component.html',
-    standalone: true,
-    imports: [
-        CommonModule,
-        ReactiveFormsModule,
-        ButtonModule,
-        CheckboxModule,
-        SelectModule,
-        InputTextModule,
-        MessageModule,
-        SliderModule,
-        TooltipModule,
-        DateAgoPipe,
-    ]
-})
+        <div class="field grid p-fluid">
+            <ng-container *ngIf="settingsUnlocked">
+                <label for="coreVoltage" class="col-12 md:col-2 md:m-0">Core Voltage</label>
+                <div class="col-12 md:col-10">
+                    <input pInputText id="coreVoltage" formControlName="coreVoltage" type="number" />
+                </div>
+            </ng-container>
+            <ng-container *ngIf="!settingsUnlocked">
+                <label (click)="voltageSelect.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Core Voltage</label>
+                <div class="col-12 md:col-10">
+                    <p-select
+                        [options]="selectVoltage"
+                        optionLabel="name"
+                        optionValue="value"
+                        formControlName="coreVoltage"
+                        #voltageSelect
+                    ></p-select>
+                </div>
+            </ng-container>
+        </div>
 
-export class EditComponent implements OnInit, OnDestroy, OnChanges {
-  private formSubject = new BehaviorSubject<FormGroup | null>(null);
-  public form$: Observable<FormGroup | null> = this.formSubject.asObservable();
+        <div *ngIf="form.get('overheat_mode')?.value === 1" class="mt-4">
+            <button pButton type="button" label="Disable Overheat Mode"
+                    class="p-button-danger w-full"
+                    (click)="disableOverheatMode()">
+            </button>
+            <small class="block mt-1 text-center text-primary">
+                Make sure to reset Frequency and Voltage before clicking this button.
+            </small>
+        </div>
 
-  public form!: FormGroup;
+        <div class="field-checkbox grid my-2">
+            <div class="col-1 md:col-10 md:flex-order-2">
+                <p-checkbox name="autofanspeed" formControlName="autofanspeed" inputId="autofanspeed" [binary]="true"></p-checkbox>
+            </div>
+            <label for="autofanspeed" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Automatic Fan Control</label>
+        </div>
 
-  public savedChanges: boolean = false;
-  public settingsUnlocked: boolean = false;
+        <div *ngIf="form.controls['autofanspeed'].value" class="grid p-fluid my-2">
+            <label class="hidden md:flex md:col-2 md:m-0 hover-next-input">Target Temperature</label>
+            <div class="col-12 md:col-10">
+                <label class="block mb-1">
+                    <span class="md:hidden mr-1">Target Temperature:</span>{{form.controls['temptarget'].value}} °C
+                </label>
+                <p-slider [min]="35" [max]="66" formControlName="temptarget"></p-slider>
+            </div>
+        </div>
 
-  @Input() uri = '';
+        <div *ngIf="form.controls['autofanspeed'].value" class="grid p-fluid">
+            <label class="hidden md:flex md:col-2 md:m-0 hover-next-input">Minimum Fan Speed</label>
+            <div class="col-12 md:col-10">
+                <label class="block mb-1">
+                    <span class="md:hidden mr-1">Minimum Fan Speed:</span>{{form.controls['minfanspeed'].value}} %
+                </label>
+                <p-slider [min]="0" [max]="99" formControlName="minfanspeed"></p-slider>
+            </div>
+        </div>
 
-  // Store frequency and voltage options from API
-  public defaultFrequency: number = 0;
-  public frequencyOptions: number[] = [];
-  public defaultVoltage: number = 0;
-  public voltageOptions: number[] = [];
+        <div *ngIf="!form.controls['autofanspeed'].value" class="grid p-fluid mt-2">
+            <label class="hidden md:flex md:col-2 md:m-0 hover-next-input">Fan Speed</label>
+            <div class="col-12 md:col-10">
+                <label class="block mb-1">
+                    <span class="md:hidden mr-1">Fan Speed:</span>{{form.controls['manualFanSpeed'].value}} %
+                    <b *ngIf="form.controls['manualFanSpeed'].value < 33" class="text-primary">
+                        Danger: Could Cause Overheating
+                    </b>
+                    <b *ngIf="form.controls['manualFanSpeed'].value == 100" class="text-orange-500 ml-2">
+                        S19 Simulator
+                    </b>
+                </label>
+                <p-slider formControlName="manualFanSpeed"></p-slider>
+            </div>
+        </div>
+    </div>
 
-  private destroy$ = new Subject<void>();
+    <h3 class="mt-5">Display</h3>
 
-  public displays = ["NONE", "SSD1306 (128x32)", "SSD1309 (128x64)", "SH1107 (64x128)", "SH1107 (128x128)"];
-  public rotations = [0, 90, 180, 270];
-  public displayTimeoutControl: FormControl;
-  public statsFrequencyControl: FormControl;
-  public statsLimit: number = 720;
+    <div class="card">
+        <div class="field grid p-fluid">
+            <label (click)="displaySelect.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Type</label>
+            <div class="col-12 md:col-10">
+                <p-select [options]="displays" formControlName="display" #displaySelect></p-select>
+            </div>
+        </div>
 
-  constructor(
-    private fb: FormBuilder,
-    private systemService: SystemApiService,
-    private liveDataService: LiveDataService,
-    private toastr: ToastrService,
-    private loadingService: LoadingService,
-    private route: ActivatedRoute,
-  ) {
-    // Check URL parameter for settings unlock
-    this.route.queryParams.subscribe(params => {
-      const urlOcParam = params['oc'] !== undefined;
-      if (urlOcParam) {
-        // If ?oc is in URL, enable overclock and save to NVS
-        this.settingsUnlocked = true;
-        this.saveOverclockSetting(1);
-        console.log(
-          '🎉 The ancient seals have been broken!\n' +
-          '⚡ Unlimited power flows through your miner...\n' +
-          '🔧 You can now set custom frequency and voltage values.\n' +
-          '⚠️ Remember: with great power comes great responsibility!'
-        );
-      } else {
-        // If ?oc is not in URL, check NVS setting (will be loaded in ngOnInit)
-        console.log('🔒 Here be dragons! Advanced settings are locked for your protection. \n' +
-          'Only the bravest miners dare to venture forth... \n' +
-          'If you wish to unlock dangerous overclocking powers, add: %c?oc',
-          'color: #ff4400; text-decoration: underline; cursor: pointer; font-weight: bold;',
-          'to the current URL'
-        );
-      }
-    });
+        <div class="field grid p-fluid">
+            <label (click)="rotationSelect.show()" class="col-12 md:col-2 md:m-0 hover-next-input">Rotation</label>
+            <div class="col-12 md:col-10">
+                <p-select [options]="rotations" formControlName="rotation" #rotationSelect></p-select>
+            </div>
+        </div>
 
-    this.displayTimeoutControl = new FormControl();
-    this.displayTimeoutControl.valueChanges.pipe(pairwise()).subscribe(([prev, next]) => {
-      if (prev === next) {
-        return;
-      }
+        <div class="field grid p-fluid">
+            <label class="col-12 md:col-2 hidden md:flex md:m-0 relative hover-next-input">
+                Sleep
+            </label>
+            <div class="col-12 md:col-10">
+                <label class="block mb-1">
+                    <ng-container *ngIf="this.form.controls['displayTimeout'].value == 0">
+                        <span class="md:hidden mr-1">Display</span> Always Off
+                    </ng-container>
+                    <ng-container *ngIf="this.form.controls['displayTimeout'].value > 0">
+                        <span class="md:hidden mr-1">Display</span> Timeout: {{this.form.controls['displayTimeout'].value * 60 | dateAgo}}
+                    </ng-container>
+                    <ng-container *ngIf="this.form.controls['displayTimeout'].value == -1">
+                        <span class="md:hidden mr-1">Display</span> Always On
+                    </ng-container>
+                </label>
+                <p-slider [min]="0" [max]="displayTimeoutMaxSteps" [step]="1" [formControl]="displayTimeoutControl"></p-slider>
+                <input type="hidden" formControlName="displayTimeout" />
+            </div>
+        </div>
 
-      this.form.patchValue({ displayTimeout: DISPLAY_TIMEOUT_STEPS[next] });
-      this.form.controls['displayTimeout'].markAsDirty();
-    });
+        <div class="field-checkbox grid mt-2 mb-0">
+            <div class="col-1 md:col-10 md:flex-order-2">
+                <p-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen" [binary]="true"></p-checkbox>
+            </div>
+            <label for="invertscreen" class="col-11 m-0 pl-3 md:col-2 md:flex-order-1 md:p-2">Invert Display Colors</label>
+        </div>
+    </div>
 
-    this.statsFrequencyControl = new FormControl();
-    this.statsFrequencyControl.valueChanges.pipe(pairwise()).subscribe(([prev, next]) => {
-      if (prev === next) {
-        return;
-      }
+    <h3 class="mt-5">Statistics</h3>
 
-      this.form.patchValue({ statsFrequency: STATS_FREQUENCY_STEPS[next] });
-      this.form.controls['statsFrequency'].markAsDirty();
-    });
-  }
+    <div class="card">
+        <div class="grid p-fluid">
+            <label class="col-12 md:col-2 hidden md:flex md:m-0 relative hover-next-input">
+                Data Logging
+            </label>
+            <div class="col-12 md:col-10">
+                <label class="block mb-2">
+                    <ng-container *ngIf="this.form.controls['statsFrequency'].value == 0">
+                        <span class="md:hidden mr-1">Data Logging</span>Disabled
+                    </ng-container>
+                    <ng-container *ngIf="this.form.controls['statsFrequency'].value > 0">
+                        <span class="md:hidden mr-1">Log Data</span>Every {{form.controls['statsFrequency'].value | dateAgo: {strict: true} }} for {{(form.controls['statsFrequency'].value * statsLimit) | dateAgo}}
+                    </ng-container>
+                </label>
+                <p-slider [min]="0" [max]="statsFrequencyMaxSteps" [step]="1" [formControl]="statsFrequencyControl"></p-slider>
+                <input type="hidden" formControlName="statsFrequency" />
+            </div>
+        </div>
+    </div>
 
-  private saveOverclockSetting(enabled: number) {
-    const deviceUri = this.uri || '';
-    this.systemService.updateSystem(deviceUri, { overclockEnabled: enabled })
-      .subscribe({
-        next: () => {
-          console.log(`Overclock setting saved: ${enabled === 1 ? 'enabled' : 'disabled'}`);
-        },
-        error: (err) => {
-          console.error(`Failed to save overclock setting: ${err.message}`);
-        }
-      });
-  }
+    <div class="flex mt-5 gap-3">
+        <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
+            class="btn btn-primary">Save</button>
 
-  ngOnInit(): void {
-    this.loadDeviceSettings();
-  }
+        <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
 
-  ngOnChanges(changes: SimpleChanges): void {
-    // When URI changes, reload the device settings
-    if (changes['uri'] && changes['uri'].currentValue && !changes['uri'].firstChange) {
-      this.loadDeviceSettings();
-    }
-  }
-
-  private loadDeviceSettings(): void {
-    const deviceUri = this.uri || '';
-
-    // Always fetch a genuinely fresh snapshot here rather than the live
-    // websocket stream's next emission -- that stream only updates on its
-    // own schedule, so right after a save it can still hand back the
-    // pre-save value for a moment, showing stale fields even though the
-    // save itself succeeded.
-    const info$ = this.systemService.getInfo(deviceUri);
-
-    // Fetch both system info and ASIC settings in parallel
-    forkJoin({
-      info: info$,
-      asic: this.systemService.getAsicSettings(deviceUri)
-    })
-    .pipe(
-      this.loadingService.lockUIUntilComplete(),
-      takeUntil(this.destroy$)
-    )
-    .subscribe(({ info, asic }) => {
-      // Store the frequency and voltage options from the API
-      this.defaultFrequency = asic.defaultFrequency;
-      this.frequencyOptions = asic.frequencyOptions;
-      this.defaultVoltage = asic.defaultVoltage;
-      this.voltageOptions = asic.voltageOptions;
-      this.statsLimit = info.statsLimit || 720;
-
-      // Check if overclock is enabled in NVS
-      if (info.overclockEnabled) {
-        this.settingsUnlocked = true;
-        console.log(
-          '🎉 Overclock mode is enabled from NVS settings!\n' +
-          '⚡ Custom frequency and voltage values are available.'
-        );
-      }
-
-        this.form = this.fb.group({
-          display: [info.display, [Validators.required]],
-          rotation: [info.rotation, [Validators.required]],
-          invertscreen: [info.invertscreen == 1],
-          displayTimeout: [info.displayTimeout, [
-            Validators.required,
-            Validators.min(-1),
-            Validators.max(this.displayTimeoutMaxValue)
-          ]],
-          coreVoltage: [info.coreVoltage, [Validators.required]],
-          frequency: [info.frequency, [Validators.required]],
-          autotuneEnabled: [info.autotuneEnabled == 1, [Validators.required]],
-          autofanspeed: [info.autofanspeed == 1, [Validators.required]],
-          minfanspeed: [info.minFanSpeed, [Validators.required]],
-          manualFanSpeed: [info.manualFanSpeed, [Validators.required]],
-          temptarget: [info.temptarget, [Validators.required]],
-          overheat_mode: [info.overheat_mode, [Validators.required]],
-          statsFrequency: [info.statsFrequency, [
-            Validators.required,
-            Validators.min(0),
-            Validators.max(this.statsFrequencyMaxValue)
-          ]]
-        });
-
-        this.formSubject.next(this.form);
-
-      this.form.controls['autofanspeed'].valueChanges.pipe(
-        startWith(this.form.controls['autofanspeed'].value),
-        takeUntil(this.destroy$)
-      ).subscribe(autofanspeed => {
-        if (autofanspeed) {
-          this.form.controls['manualFanSpeed'].disable();
-          this.form.controls['temptarget'].enable();
-        } else {
-          this.form.controls['manualFanSpeed'].enable();
-          this.form.controls['temptarget'].disable();
-        }
-      });
-
-      // Add custom value to predefined steps
-      if (DISPLAY_TIMEOUT_STEPS.filter(x => x === info.displayTimeout).length === 0) {
-        DISPLAY_TIMEOUT_STEPS.push(info.displayTimeout);
-        DISPLAY_TIMEOUT_STEPS.sort((a, b) => a - b);
-        DISPLAY_TIMEOUT_STEPS.push(DISPLAY_TIMEOUT_STEPS.shift() as number);
-      }
-
-      this.displayTimeoutControl.setValue(
-        DISPLAY_TIMEOUT_STEPS.findIndex(x => x === info.displayTimeout)
-      );
-
-      // Add custom value to predefined steps
-      if (STATS_FREQUENCY_STEPS.filter(x => x === info.statsFrequency).length === 0) {
-        STATS_FREQUENCY_STEPS.push(info.statsFrequency);
-        STATS_FREQUENCY_STEPS.sort((a, b) => a - b);
-      }
-
-      this.statsFrequencyControl.setValue(
-        STATS_FREQUENCY_STEPS.findIndex(x => x === info.statsFrequency)
-      );
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
-
-  public updateSystem() {
-    const form = this.form.getRawValue();
-
-    if (form.stratumPassword === '*****') {
-      delete form.stratumPassword;
-    }
-
-    const deviceUri = this.uri || '';
-    this.systemService.updateSystem(deviceUri, form)
-      .pipe(this.loadingService.lockUIUntilComplete())
-      .subscribe({
-        next: () => {
-          const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
-          if (this.isRestartRequired) {
-            this.toastr.warning('You must restart this device after saving for changes to take effect.');
-          }
-          this.toastr.success(successMessage);
-          this.savedChanges = true;
-          // The form was populated once on load and never refreshed since --
-          // without this, the fields keep showing whatever was on screen at
-          // that first load (which can already be stale if something else,
-          // like Auto-Tune, changed frequency/voltage in the background)
-          // even though the save itself went through correctly. Re-fetch so
-          // what's displayed matches what's actually on the device now.
-          this.loadDeviceSettings();
-        },
-        error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Could not save settings for ${this.uri}. ${err.message}` : `Could not save settings. ${err.message}`;
-          this.toastr.error(errorMessage);
-          this.savedChanges = false;
-        }
-      });
-  }
-
-  disableOverheatMode() {
-    this.form.patchValue({ overheat_mode: 0 });
-    this.updateSystem();
-  }
-
-  toggleOverclockMode(enable: boolean) {
-    this.settingsUnlocked = enable;
-    this.saveOverclockSetting(enable ? 1 : 0);
-
-    if (enable) {
-      console.log(
-        '🎉 Overclock mode enabled!\n' +
-        '⚡ Custom frequency and voltage values are now available.'
-      );
-    } else {
-      console.log('🔒 Overclock mode disabled. Using safe preset values only.');
-    }
-  }
-
-  public restart() {
-    this.systemService.restart(this.uri)
-      .pipe(this.loadingService.lockUIUntilComplete())
-      .subscribe({
-        next: () => {
-          const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
-          this.toastr.success(successMessage);
-        },
-        error: (err: HttpErrorResponse) => {
-          const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
-          this.toastr.error(errorMessage);
-        }
-      });
-  }
-
-  get selectFrequency(): SelectOption[] {
-    return this.buildSelectOptions('frequency', this.frequencyOptions, this.defaultFrequency);
-  }
-
-  get selectVoltage(): SelectOption[] {
-    return this.buildSelectOptions('coreVoltage', this.voltageOptions, this.defaultVoltage);
-  }
-
-  get displayTimeoutMaxSteps(): number {
-    return DISPLAY_TIMEOUT_STEPS.length - 1;
-  }
-
-  get displayTimeoutMaxValue(): number {
-    return DISPLAY_TIMEOUT_STEPS[this.displayTimeoutMaxSteps - 1];
-  }
-
-  get statsFrequencyMaxSteps(): number {
-    return STATS_FREQUENCY_STEPS.length - 1;
-  }
-
-  get statsFrequencyMaxValue(): number {
-    return STATS_FREQUENCY_STEPS[this.statsFrequencyMaxSteps];
-  }
-
-  buildSelectOptions(formField: string, apiOptions: number[], defaultValue: number): SelectOption[] {
-    if (!apiOptions.length) {
-      return [];
-    }
-
-    // Convert options from API to select format
-    const options = apiOptions.map(option => {
-      return {
-        name: defaultValue === option ? `${option} (Default)` : `${option}`,
-        value: option
-      };
-    });
-
-    // Get current field value from form
-    const currentValue = this.form?.get(formField)?.value;
-
-    // If current field value exists and isn't in the options
-    if (currentValue && !options.some(opt => opt.value === currentValue)) {
-      options.push({
-        name: `${currentValue} (Custom)`,
-        value: currentValue
-      });
-      // Sort options by value
-      options.sort((a, b) => a.value - b.value);
-    }
-
-    return options;
-  }
-
-  get noRestartFields(): string[] {
-    return [
-      'displayTimeout',
-      'coreVoltage',
-      'frequency',
-      'autotuneEnabled',
-      'autofanspeed',
-      'manualFanSpeed',
-      'temptarget',
-      'overheat_mode',
-      'statsFrequency'
-    ];
-  }
-
-  get isRestartRequired(): boolean {
-    return !! Object.entries(this.form.controls)
-      .filter(([field, control]) => control.dirty && !this.noRestartFields.includes(field)).length
-  }
-}
+        <button *ngIf="settingsUnlocked" pButton pButton="p-button-danger" (click)="toggleOverclockMode(false)"
+            class="p-button-danger" pTooltip="Return to safe preset values only">Disable Overclock Mode</button>
+    </div>
+</form>
