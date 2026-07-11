@@ -256,7 +256,7 @@ static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, 
 {
     float current_freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
     at->freq_step_index = find_index(freq_options, (uint16_t) current_freq);
-    at->voltage_mv = nvs_config_get_float(NVS_CONFIG_ASIC_VOLTAGE);
+    at->voltage_mv = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
 
     float vendor_max_freq = (float) freq_options[freq_option_count - 1];
     at->extended_freq_mhz = (current_freq > vendor_max_freq + 0.5f) ? current_freq : 0.0f;
@@ -333,7 +333,7 @@ static bool settings_changed_externally(AutotuneModule * at, const uint16_t * fr
     float expected_freq = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[at->freq_step_index];
 
     float actual_freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
-    float actual_volt = nvs_config_get_float(NVS_CONFIG_ASIC_VOLTAGE);
+    float actual_volt = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
 
     bool freq_matches = fabsf(actual_freq - expected_freq) < 0.5f;
     // Voltage is stored as an integer mV in NVS, so allow for that rounding
