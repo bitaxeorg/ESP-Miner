@@ -85,6 +85,17 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // the reject rate; otherwise we extend the window rather than judge on noise.
 #define MIN_SAMPLE_SHARES 15
 
+// Voltage is adjusted in small, continuous mV steps rather than jumping
+// between the vendor table's handful of discrete entries (which can be
+// 40-60mV apart). The voltage regulator itself has no problem with
+// arbitrary values in between -- the vendor table is a firmware-level
+// convenience, not a hardware restriction -- so this is purely a precision
+// improvement: the tuner can settle much closer to the true minimum stable
+// voltage for a given frequency, instead of overshooting to the next
+// coarse step every time. Voltage is still hard-clamped to the vendor
+// table's own min/max, in every profile, regardless of this finer step size.
+#define VOLTAGE_STEP_MV 10.0f
+
 // Thermal margin, reject-rate tolerance, ASIC-error tolerance, and whether
 // beyond-spec/voltage-rescue are allowed at all now come from the active
 // AutotuneProfileConfig (see AUTOTUNE_PROFILES above) instead of being
@@ -194,14 +205,42 @@ static int count_options(const uint16_t * options)
     return count;
 }
 
-static void apply_step(GlobalState * GLOBAL_STATE, const uint16_t * freq_options, const uint16_t * volt_options,
-                        int freq_idx, int volt_idx, float extended_freq_mhz)
+static float clamp_voltage(float voltage_mv, float min_voltage_mv, float max_voltage_mv)
+{
+    if (voltage_mv < min_voltage_mv) {
+        return min_voltage_mv;
+    }
+    if (voltage_mv > max_voltage_mv) {
+        return max_voltage_mv;
+    }
+    return voltage_mv;
+}
+
+// Scales how far we are into the frequency table onto the voltage range, so
+// voltage can be raised proactively in step with frequency instead of only
+// reactively once a step actually fails. Reaching a given frequency without
+// first burning through several failed-attempt-then-rescue cycles (each a
+// full ~90s evaluation window) gets there noticeably faster. This doesn't
+// compromise final efficiency: the undervolt-optimization phase that runs
+// once the ceiling is reached will still shave voltage back down, in the
+// same fine 10mV steps, to whatever the minimum actually needed turns out
+// to be.
+static float proportional_voltage_mv(int freq_step_index, int freq_option_count, float min_voltage_mv, float max_voltage_mv)
+{
+    if (freq_option_count <= 1) {
+        return min_voltage_mv;
+    }
+    float progress = (float) freq_step_index / (float) (freq_option_count - 1);
+    return min_voltage_mv + progress * (max_voltage_mv - min_voltage_mv);
+}
+
+static void apply_step(GlobalState * GLOBAL_STATE, const uint16_t * freq_options,
+                        int freq_idx, float voltage_mv, float extended_freq_mhz)
 {
     // extended_freq_mhz > 0 means we're operating past the vendor table --
-    // that value wins over whatever the table index says. Voltage always
-    // comes from the vendor table regardless of extended mode.
+    // that value wins over whatever the table index says.
     float new_freq = extended_freq_mhz > 0.0f ? extended_freq_mhz : (float) freq_options[freq_idx];
-    uint16_t new_volt = volt_options[volt_idx];
+    uint16_t new_volt = (uint16_t) (voltage_mv + 0.5f);
 
     ESP_LOGI(TAG, "Applying step: %.0f MHz @ %u mV%s", new_freq, new_volt,
              extended_freq_mhz > 0.0f ? " (beyond vendor spec)" : "");
@@ -213,12 +252,11 @@ static void apply_step(GlobalState * GLOBAL_STATE, const uint16_t * freq_options
     // there's a single owner of "what the ASIC is currently told to do".
 }
 
-static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, const uint16_t * volt_options,
-                             int freq_option_count)
+static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, int freq_option_count)
 {
     float current_freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
     at->freq_step_index = find_index(freq_options, (uint16_t) current_freq);
-    at->volt_step_index = find_index(volt_options, nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE));
+    at->voltage_mv = nvs_config_get_float(NVS_CONFIG_ASIC_VOLTAGE);
 
     float vendor_max_freq = (float) freq_options[freq_option_count - 1];
     at->extended_freq_mhz = (current_freq > vendor_max_freq + 0.5f) ? current_freq : 0.0f;
@@ -233,7 +271,7 @@ static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, 
 // assuming "lower the frequency" -- is what makes the undervolt trials and
 // the extra-voltage-for-stability trials safe to attempt at all.
 static void revert_last_action(AutotuneModule * at, const uint16_t * freq_options, int freq_option_count,
-                                int volt_option_count, bool allow_voltage_rescue)
+                                float min_voltage_mv, float max_voltage_mv, bool allow_voltage_rescue)
 {
     // A frequency step that failed on rejected shares (not heat) sometimes
     // just needs a bit more voltage headroom rather than being abandoned
@@ -241,8 +279,8 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
     // never for a temperature-driven revert, since adding voltage there
     // would work against the very problem we're reacting to.
     if (allow_voltage_rescue && at->last_action == AUTOTUNE_ACTION_FREQ_UP &&
-        at->volt_step_index < volt_option_count - 1) {
-        at->volt_step_index++;
+        at->voltage_mv < max_voltage_mv - 0.5f) {
+        at->voltage_mv = clamp_voltage(at->voltage_mv + VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
         at->last_action = AUTOTUNE_ACTION_VOLT_UP;
         return;
     }
@@ -251,9 +289,7 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
         case AUTOTUNE_ACTION_VOLT_DOWN:
             // The undervolt trial didn't hold -- go back up to the last
             // known-good voltage for this frequency.
-            if (at->volt_step_index < volt_option_count - 1) {
-                at->volt_step_index++;
-            }
+            at->voltage_mv = clamp_voltage(at->voltage_mv + VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
             break;
         case AUTOTUNE_ACTION_VOLT_UP:
             // Even extra voltage didn't stabilize this frequency -- undo the
@@ -261,9 +297,7 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
             // exploring beyond-spec, that "step" lives in extended_freq_mhz,
             // not freq_step_index (which stays pinned at the vendor max
             // throughout beyond-spec exploration) -- back off the right one.
-            if (at->volt_step_index > 0) {
-                at->volt_step_index--;
-            }
+            at->voltage_mv = clamp_voltage(at->voltage_mv - VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
             if (at->extended_freq_mhz > 0.0f) {
                 at->extended_freq_mhz -= EXTENDED_STEP_MHZ;
                 if (at->extended_freq_mhz <= (float) freq_options[freq_option_count - 1] + 0.5f) {
@@ -283,8 +317,8 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
                 }
             } else if (at->freq_step_index > 0) {
                 at->freq_step_index--;
-            } else if (at->volt_step_index > 0) {
-                at->volt_step_index--;
+            } else if (at->voltage_mv > min_voltage_mv + 0.5f) {
+                at->voltage_mv = clamp_voltage(at->voltage_mv - VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
             }
             break;
     }
@@ -294,16 +328,17 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
 // True if the live NVS frequency/voltage no longer match what the tuner
 // itself last commanded -- meaning something external (almost always the
 // person, via the settings page) changed it while autotune was running.
-static bool settings_changed_externally(AutotuneModule * at, const uint16_t * freq_options, const uint16_t * volt_options)
+static bool settings_changed_externally(AutotuneModule * at, const uint16_t * freq_options)
 {
     float expected_freq = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[at->freq_step_index];
-    uint16_t expected_volt = volt_options[at->volt_step_index];
 
     float actual_freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
-    uint16_t actual_volt = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+    float actual_volt = nvs_config_get_float(NVS_CONFIG_ASIC_VOLTAGE);
 
     bool freq_matches = fabsf(actual_freq - expected_freq) < 0.5f;
-    bool volt_matches = (actual_volt == expected_volt);
+    // Voltage is stored as an integer mV in NVS, so allow for that rounding
+    // when comparing against our own float-tracked value.
+    bool volt_matches = fabsf(actual_volt - at->voltage_mv) < 1.0f;
 
     return !freq_matches || !volt_matches;
 }
@@ -370,6 +405,13 @@ void AUTOTUNE_task(void * pvParameters)
         return;
     }
 
+    // Voltage is tuned continuously (see VOLTAGE_STEP_MV) between the
+    // vendor table's own lowest and highest entries -- those two values are
+    // still the hard bounds in every profile, we just no longer skip
+    // everything in between.
+    float min_voltage_mv = (float) volt_options[0];
+    float max_voltage_mv = (float) volt_options[volt_option_count - 1];
+
     at->state = AUTOTUNE_STATE_IDLE;
     at->step_downs_total = 0;
     at->step_ups_total = 0;
@@ -413,19 +455,20 @@ void AUTOTUNE_task(void * pvParameters)
             // for both frequency and voltage, and let the normal climb take
             // it from there -- frequency climbs step by step, and voltage
             // only goes up when a frequency step actually needs the rescue
-            // to stabilize (see revert_last_action). This tends toward a
-            // near-minimal voltage for whatever frequency is reached,
-            // rather than starting at whatever voltage happened to be set
-            // before and only ever shaving it down afterward.
+            // to stabilize (see revert_last_action), or proactively in step
+            // with frequency (see proportional_voltage_mv). This tends
+            // toward a near-minimal voltage for whatever frequency is
+            // reached, rather than starting at whatever voltage happened to
+            // be set before and only ever shaving it down afterward.
             at->freq_step_index = 0;
-            at->volt_step_index = 0;
+            at->voltage_mv = min_voltage_mv;
             at->extended_freq_mhz = 0.0f;
             at->extended_soft_ceiling_mhz = 0.0f;
             at->extended_freq_consecutive_fails = 0;
             at->last_action = AUTOTUNE_ACTION_NONE;
-            apply_step(GLOBAL_STATE, freq_options, volt_options, 0, 0, 0.0f);
-            ESP_LOGI(TAG, "Autotune enabled (%s profile): starting from the bottom (%.0f MHz @ %u mV) and climbing",
-                     profile->name, (float) freq_options[0], volt_options[0]);
+            apply_step(GLOBAL_STATE, freq_options, 0, at->voltage_mv, 0.0f);
+            ESP_LOGI(TAG, "Autotune enabled (%s profile): starting from the bottom (%.0f MHz @ %.0f mV) and climbing",
+                     profile->name, (float) freq_options[0], at->voltage_mv);
             was_enabled = true;
             window_open = false;
             continue;
@@ -442,17 +485,17 @@ void AUTOTUNE_task(void * pvParameters)
             // configured now, and wait until things are calm again.
             at->state = AUTOTUNE_STATE_PAUSED;
             window_open = false;
-            resync_from_nvs(at, freq_options, volt_options, freq_option_count);
+            resync_from_nvs(at, freq_options, freq_option_count);
             continue;
         }
 
-        if (settings_changed_externally(at, freq_options, volt_options)) {
+        if (settings_changed_externally(at, freq_options)) {
             // The person (or something else) changed frequency/voltage
             // directly, outside the tuner. Treat that as a deliberate new
             // starting point rather than silently overwriting it on the next
             // action -- resync to it and start a fresh evaluation window.
             ESP_LOGI(TAG, "Frequency/voltage changed externally, adopting new starting point");
-            resync_from_nvs(at, freq_options, volt_options, freq_option_count);
+            resync_from_nvs(at, freq_options, freq_option_count);
             window_open = false;
         }
 
@@ -486,9 +529,9 @@ void AUTOTUNE_task(void * pvParameters)
 
             track_extended_climb_failure(at, "heat");
 
-            revert_last_action(at, freq_options, freq_option_count, volt_option_count, false);
+            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
             at->step_downs_total++;
-            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
             window_open = false;
             continue;
         }
@@ -506,9 +549,9 @@ void AUTOTUNE_task(void * pvParameters)
 
             track_extended_climb_failure(at, "ASIC errors");
 
-            revert_last_action(at, freq_options, freq_option_count, volt_option_count, profile->allow_voltage_rescue);
+            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
             at->step_downs_total++;
-            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
             window_open = false;
             continue;
         }
@@ -549,15 +592,15 @@ void AUTOTUNE_task(void * pvParameters)
         bool unstable = reject_rate > reject_threshold;
 
         if (unstable) {
-            ESP_LOGW(TAG, "Reject rate %.1f%% over threshold at step %d/%d%s, reverting",
-                     reject_rate * 100.0f, at->freq_step_index, at->volt_step_index,
+            ESP_LOGW(TAG, "Reject rate %.1f%% over threshold at %d/%.0fMHz @ %.0fmV%s, reverting",
+                     reject_rate * 100.0f, at->freq_step_index, (float) freq_options[at->freq_step_index], at->voltage_mv,
                      at->extended_freq_mhz > 0.0f ? " (beyond spec)" : "");
 
             track_extended_climb_failure(at, "rejected shares");
 
-            revert_last_action(at, freq_options, freq_option_count, volt_option_count, profile->allow_voltage_rescue);
+            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
             at->step_downs_total++;
-            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
         } else if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
             // The extra voltage successfully stabilized this frequency step.
             // Keep it, and go straight back to trying to climb frequency
@@ -571,7 +614,19 @@ void AUTOTUNE_task(void * pvParameters)
             at->last_action = AUTOTUNE_ACTION_FREQ_UP;
             at->step_ups_total++;
             at->state = AUTOTUNE_STATE_WARMING;
-            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, 0.0f);
+
+            // Proactively bring voltage along for the ride (Eco stays
+            // reactive-only, in line with its "accept a lower ceiling
+            // rather than spend extra heat/power" philosophy -- see
+            // allow_voltage_rescue).
+            if (profile->allow_voltage_rescue) {
+                float target_voltage = proportional_voltage_mv(at->freq_step_index, freq_option_count, min_voltage_mv, max_voltage_mv);
+                if (target_voltage > at->voltage_mv) {
+                    at->voltage_mv = clamp_voltage(target_voltage, min_voltage_mv, max_voltage_mv);
+                }
+            }
+
+            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, 0.0f);
         } else if (profile->allow_beyond_spec && nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) &&
                    next_extended_step_within_ceiling(at, freq_options, freq_option_count)) {
             // Vendor-table frequency is maxed, this profile allows going
@@ -587,23 +642,24 @@ void AUTOTUNE_task(void * pvParameters)
             at->last_action = AUTOTUNE_ACTION_FREQ_UP;
             at->step_ups_total++;
             at->state = AUTOTUNE_STATE_BEYOND_SPEC;
-            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
-        } else if (at->volt_step_index > 0) {
+            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+        } else if (at->voltage_mv > min_voltage_mv + 0.5f) {
             // The highest frequency we currently trust is maxed out (vendor
             // ceiling, or the beyond-spec ceiling if that's active) and
-            // stable. Try shaving voltage down at this same frequency --
-            // same hashrate, less heat, less power, if it holds.
-            at->volt_step_index--;
+            // stable. Try shaving voltage down at this same frequency, in
+            // fine 10mV steps -- same hashrate, less heat, less power, if
+            // it holds.
+            at->voltage_mv = clamp_voltage(at->voltage_mv - VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
             at->last_action = AUTOTUNE_ACTION_VOLT_DOWN;
             at->state = AUTOTUNE_STATE_WARMING;
-            apply_step(GLOBAL_STATE, freq_options, volt_options, at->freq_step_index, at->volt_step_index, at->extended_freq_mhz);
+            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
         } else {
             // Highest trusted frequency, lowest voltage that's still stable
             // at it -- this is the best known efficient point. Hold here.
             at->state = (at->extended_freq_mhz > 0.0f) ? AUTOTUNE_STATE_BEYOND_SPEC : AUTOTUNE_STATE_AT_CEILING;
             float applied_freq = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[at->freq_step_index];
-            ESP_LOGI(TAG, "At best known efficient point for %s profile (%.0f MHz @ %u mV) and stable, holding",
-                     profile->name, applied_freq, volt_options[at->volt_step_index]);
+            ESP_LOGI(TAG, "At best known efficient point for %s profile (%.0f MHz @ %.0f mV) and stable, holding",
+                     profile->name, applied_freq, at->voltage_mv);
         }
 
         // Continuous mode: re-open a fresh window immediately so we keep
