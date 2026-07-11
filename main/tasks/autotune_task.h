@@ -31,7 +31,11 @@ typedef struct {
     AutotuneAction last_action;
     AutotuneProfile active_profile;
     int freq_step_index;
-    int volt_step_index;
+    // Continuously tracked in mV (10mV resolution) rather than an index into
+    // the vendor table's handful of discrete entries, so the tuner can
+    // settle much closer to the true minimum stable voltage. Still always
+    // clamped to the vendor table's own lowest/highest entries.
+    float voltage_mv;
     // Only used once freq_step_index is at the top of the vendor table AND
     // the user has explicitly unlocked custom settings (overclockEnabled).
     // Voltage never extends past the vendor table; only frequency does.
