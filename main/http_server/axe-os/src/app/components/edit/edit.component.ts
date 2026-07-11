@@ -148,9 +148,12 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   private loadDeviceSettings(): void {
     const deviceUri = this.uri || '';
 
-    const info$ = deviceUri
-      ? this.systemService.getInfo(deviceUri)
-      : this.liveDataService.info$.pipe(first());
+    // Always fetch a genuinely fresh snapshot here rather than the live
+    // websocket stream's next emission -- that stream only updates on its
+    // own schedule, so right after a save it can still hand back the
+    // pre-save value for a moment, showing stale fields even though the
+    // save itself succeeded.
+    const info$ = this.systemService.getInfo(deviceUri);
 
     // Fetch both system info and ASIC settings in parallel
     forkJoin({
