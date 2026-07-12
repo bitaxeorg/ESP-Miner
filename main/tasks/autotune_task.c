@@ -15,50 +15,55 @@ static const char * TAG = "autotune";
 //
 // Everything that stays the same across profiles (timing, sample sizes,
 // hard safety ceilings) is still a plain #define below. Everything that
-// defines "how close to the edge" the tuner is willing to sit -- thermal
-// margin, instability tolerances, and whether it reaches for beyond-spec
-// or an extra-voltage rescue at all -- lives in this table instead.
+// defines what the tuner is actually optimizing for -- a target
+// temperature, instability tolerances, whether it reaches for beyond-spec
+// or an extra-voltage rescue, and whether it's chasing top speed or peak
+// efficiency -- lives in this table instead.
 typedef struct {
     const char * name;
-    float temp_margin_c;              // safety margin below the reactive throttle cutoff
+    float target_temp_c;              // stop climbing once the chip reaches this temperature
     float reject_rate_max;            // vendor-table reject-rate tolerance
     float error_percentage_max;       // vendor-table ASIC-error tolerance
     float extended_reject_rate_max;   // beyond-spec reject-rate tolerance
     float extended_error_percentage_max; // beyond-spec ASIC-error tolerance
     bool allow_beyond_spec;           // ever climb past the vendor table, even if unlocked
     bool allow_voltage_rescue;        // try extra voltage to save a failing frequency step
+    bool optimize_efficiency;         // stop climbing at peak hash/watt instead of at the thermal/stability ceiling
 } AutotuneProfileConfig;
 
 static const AutotuneProfileConfig AUTOTUNE_PROFILES[] = {
     [AUTOTUNE_PROFILE_ECO] = {
         .name = "eco",
-        .temp_margin_c = 10.0f,
+        .target_temp_c = 65.0f,
         .reject_rate_max = 0.02f,
         .error_percentage_max = 1.0f,
         .extended_reject_rate_max = 0.01f,
         .extended_error_percentage_max = 0.5f,
         .allow_beyond_spec = false,
         .allow_voltage_rescue = false, // accept a lower ceiling rather than spend extra heat/power to hold one
+        .optimize_efficiency = true,   // stops at peak hash/watt, not at the thermal ceiling -- see efficiency_still_improving()
     },
     [AUTOTUNE_PROFILE_BALANCED] = {
         .name = "balanced",
-        .temp_margin_c = 5.0f,
+        .target_temp_c = 70.0f,
         .reject_rate_max = 0.03f,
         .error_percentage_max = 2.0f,
         .extended_reject_rate_max = 0.015f,
         .extended_error_percentage_max = 1.0f,
         .allow_beyond_spec = false, // full vendor-table speed, but stops there even if beyond-spec is unlocked
         .allow_voltage_rescue = true,
+        .optimize_efficiency = false,
     },
     [AUTOTUNE_PROFILE_AGGRESSIVE] = {
         .name = "aggressive",
-        .temp_margin_c = 2.0f,
+        .target_temp_c = 73.0f,
         .reject_rate_max = 0.03f,
         .error_percentage_max = 2.0f,
         .extended_reject_rate_max = 0.015f,
         .extended_error_percentage_max = 1.0f,
         .allow_beyond_spec = true, // if custom settings are unlocked, keeps climbing past the vendor table
         .allow_voltage_rescue = true,
+        .optimize_efficiency = false,
     },
 };
 #define AUTOTUNE_PROFILE_COUNT (sizeof(AUTOTUNE_PROFILES) / sizeof(AUTOTUNE_PROFILES[0]))
@@ -95,6 +100,18 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // coarse step every time. Voltage is still hard-clamped to the vendor
 // table's own min/max, in every profile, regardless of this finer step size.
 #define VOLTAGE_STEP_MV 10.0f
+
+// The board's *input* voltage (from the power supply/USB-C, not the ASIC
+// core voltage) can sag under load well before the ASIC itself shows any
+// sign of trouble -- if the power brick can't sustain the draw, that's a
+// power-delivery problem, not an ASIC stability problem, and it can
+// precede hashrate/error-register symptoms entirely. Checked against a
+// fraction of this board's own nominal input voltage (5V or 12V,
+// depending on the model) rather than a fixed number, since that varies
+// by board family. Never offer a voltage rescue for this -- pushing the
+// ASIC's own voltage higher would only draw more current from a supply
+// that's already struggling.
+#define INPUT_VOLTAGE_SAG_FRACTION 0.92f
 
 // Thermal margin, reject-rate tolerance, ASIC-error tolerance, and whether
 // beyond-spec/voltage-rescue are allowed at all now come from the active
@@ -271,6 +288,8 @@ static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, 
     at->extended_soft_ceiling_expiry_ms = 0;
     at->extended_last_failed_mhz = 0.0f;
     at->extended_freq_consecutive_fails = 0;
+    at->best_efficiency_ghs_per_watt = 0.0f;
+    at->best_efficiency_freq_step = -1;
     at->last_action = AUTOTUNE_ACTION_NONE;
 }
 
@@ -425,6 +444,31 @@ static void enforce_soft_ceiling(AutotuneModule * at)
     }
 }
 
+// For efficiency-optimizing profiles (currently just Eco), whether climbing
+// one more frequency step is still worth it in hash/watt terms. Voltage
+// requirements tend to grow faster than frequency near the top of a chip's
+// range, so peak efficiency is usually reached well before the thermal or
+// stability ceiling -- this is what lets Eco stop there instead of just
+// climbing with a wider thermal margin (which was never really "optimizing
+// for efficiency", just delaying the same ceiling-seeking behaviour).
+// Records the current step as the new best point as a side effect whenever
+// it does still look like an improvement, so callers don't need to
+// separately track that. Returns true (i.e. "keep climbing") if there's no
+// usable power reading yet, rather than blocking progress on missing data.
+static bool efficiency_still_improving(AutotuneModule * at, SystemModule * sys_module, PowerManagementModule * pm)
+{
+    if (pm->power < 0.5f) {
+        return true;
+    }
+    float current_efficiency = sys_module->current_hashrate / pm->power; // GH/s per W
+    if (at->best_efficiency_freq_step < 0 || current_efficiency >= at->best_efficiency_ghs_per_watt) {
+        at->best_efficiency_ghs_per_watt = current_efficiency;
+        at->best_efficiency_freq_step = at->freq_step_index;
+        return true;
+    }
+    return false;
+}
+
 void AUTOTUNE_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
@@ -488,7 +532,7 @@ void AUTOTUNE_task(void * pvParameters)
         // effect on the next evaluation rather than requiring a re-enable.
         const AutotuneProfileConfig * profile = get_active_profile();
         at->active_profile = (AutotuneProfile) (profile - AUTOTUNE_PROFILES);
-        float temp_ceiling_c = PM_THROTTLE_TEMP - profile->temp_margin_c;
+        float temp_ceiling_c = profile->target_temp_c;
 
         // A frequency that repeatedly failed gets a cooldown rather than a
         // permanent ban for the rest of the session -- once that cooldown
@@ -522,6 +566,8 @@ void AUTOTUNE_task(void * pvParameters)
             at->extended_soft_ceiling_expiry_ms = 0;
             at->extended_last_failed_mhz = 0.0f;
             at->extended_freq_consecutive_fails = 0;
+            at->best_efficiency_ghs_per_watt = 0.0f;
+            at->best_efficiency_freq_step = -1;
             at->last_action = AUTOTUNE_ACTION_NONE;
             apply_step(GLOBAL_STATE, freq_options, 0, at->voltage_mv, 0.0f);
             ESP_LOGI(TAG, "Autotune enabled (%s profile): starting from the bottom (%.0f MHz @ %.0f mV) and climbing",
@@ -585,6 +631,27 @@ void AUTOTUNE_task(void * pvParameters)
                      window_max_temp, temp_ceiling_c);
 
             track_extended_climb_failure(at, "heat");
+
+            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
+            enforce_soft_ceiling(at);
+            at->step_downs_total++;
+            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            window_open = false;
+            continue;
+        }
+
+        // Fast-path safety check on the board's input voltage (from the
+        // power supply, not the ASIC core voltage) -- see the
+        // INPUT_VOLTAGE_SAG_FRACTION comment for why this matters. A guard
+        // against pm->voltage being 0 (not yet measured, e.g. right after
+        // boot) avoids a false trigger before the first real reading.
+        float nominal_input_voltage = (float) GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage;
+        float input_voltage_floor = nominal_input_voltage * INPUT_VOLTAGE_SAG_FRACTION;
+        if (pm->voltage > 0.5f && pm->voltage < input_voltage_floor) {
+            ESP_LOGW(TAG, "Input voltage %.2fV under %.0f%% of nominal %.0fV mid-window, stepping down early (power supply may be struggling)",
+                     pm->voltage, INPUT_VOLTAGE_SAG_FRACTION * 100.0f, nominal_input_voltage);
+
+            track_extended_climb_failure(at, "input voltage sag");
 
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
             enforce_soft_ceiling(at);
@@ -669,7 +736,8 @@ void AUTOTUNE_task(void * pvParameters)
             at->extended_freq_consecutive_fails = 0;
             at->last_action = AUTOTUNE_ACTION_NONE;
             at->state = AUTOTUNE_STATE_WARMING;
-        } else if (at->freq_step_index < freq_option_count - 1) {
+        } else if (at->freq_step_index < freq_option_count - 1 &&
+                   (!profile->optimize_efficiency || efficiency_still_improving(at, sys_module, pm))) {
             at->freq_step_index++;
             at->last_action = AUTOTUNE_ACTION_FREQ_UP;
             at->step_ups_total++;
@@ -686,6 +754,18 @@ void AUTOTUNE_task(void * pvParameters)
                 }
             }
 
+            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, 0.0f);
+        } else if (profile->optimize_efficiency && at->best_efficiency_freq_step >= 0 &&
+                   at->freq_step_index > at->best_efficiency_freq_step) {
+            // Efficiency dropped compared to the best point seen -- we've
+            // passed the peak. Retreat one step at a time back toward it
+            // rather than continuing to climb; once there, this falls
+            // through to the normal undervolt-optimization phase below,
+            // same as any other profile that's done climbing.
+            at->freq_step_index--;
+            at->last_action = AUTOTUNE_ACTION_NONE;
+            at->step_downs_total++;
+            at->state = AUTOTUNE_STATE_WARMING;
             apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, 0.0f);
         } else if (profile->allow_beyond_spec && nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) &&
                    next_extended_step_within_ceiling(at, freq_options, freq_option_count)) {
