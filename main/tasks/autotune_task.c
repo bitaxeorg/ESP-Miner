@@ -400,6 +400,24 @@ static uint32_t get_rejected_reason_count(SystemModule * sys_module, const char 
     return 0;
 }
 
+// A newly-set (or still-active) soft ceiling only blocks *future* climb
+// attempts on its own -- it doesn't retroactively touch whatever frequency
+// the tuner happens to be sitting at right now. Without this, a voltage
+// rescue can keep holding the tuner at the exact frequency that just
+// triggered the ceiling in the first place (rescue succeeds, next window
+// the blocked climb falls through to undervolting, undervolting fails,
+// rescue again, forever) instead of actually retreating to the last
+// confirmed-good level. Call this right after revert_last_action(), before
+// applying the step, so the ceiling is honored immediately rather than
+// only being enforced the next time a climb is attempted.
+static void enforce_soft_ceiling(AutotuneModule * at)
+{
+    if (at->extended_soft_ceiling_mhz > 0.0f && at->extended_freq_mhz > at->extended_soft_ceiling_mhz) {
+        at->extended_freq_mhz = at->extended_soft_ceiling_mhz;
+        at->last_action = AUTOTUNE_ACTION_NONE;
+    }
+}
+
 void AUTOTUNE_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
@@ -562,6 +580,7 @@ void AUTOTUNE_task(void * pvParameters)
             track_extended_climb_failure(at, "heat");
 
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
+            enforce_soft_ceiling(at);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
             window_open = false;
@@ -582,6 +601,7 @@ void AUTOTUNE_task(void * pvParameters)
             track_extended_climb_failure(at, "ASIC errors");
 
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+            enforce_soft_ceiling(at);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
             window_open = false;
@@ -631,6 +651,7 @@ void AUTOTUNE_task(void * pvParameters)
             track_extended_climb_failure(at, "rejected shares");
 
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+            enforce_soft_ceiling(at);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
         } else if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
