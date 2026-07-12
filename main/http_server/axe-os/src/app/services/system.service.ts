@@ -340,21 +340,25 @@ export class SystemApiService {
   }
 
   public updateSystem(uri: string = '', update: any): Observable<any | ISystemUpdateResponse> {
-    if (environment.mock && this.api && !uri) {
+    if (!environment.mock && this.api && !uri) {
       return from(this.api.invoke(functions.updateSystemSettings, { body: update as Settings }));
     }
 
-    if (environment.mock && uri) {
+    if (!environment.mock && uri) {
       return this.httpClient.patch(`${uri}/api/system`, update);
     }
 
-    // Real device (not mock): actually send the request. This branch was
-    // missing entirely -- every save silently did nothing except for
-    // hostname changes, which faked a success response locally instead of
-    // using the real one. The backend already returns the correct
-    // status/redirect payload itself (see PATCH_update_settings in
-    // http_server.c), so we just forward its actual response.
-    return this.httpClient.patch<ISystemUpdateResponse>(`${uri}/api/system`, update);
+    if (update.hostname) {
+      return of({
+        status: 'success',
+        redirect: {
+          url: `http://${update.hostname}.local`,
+          delay: 2000,
+          message: 'Hostname updated. Redirecting to new address...'
+        }
+      } as ISystemUpdateResponse);
+    }
+    return of(undefined);
   }
 
   private otaUpdate(file: File | Blob, url: string): Observable<HttpEvent<string>> {
