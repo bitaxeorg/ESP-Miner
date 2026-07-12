@@ -141,11 +141,18 @@ static float get_user_verified_ceiling_mhz(void)
 // profile (see extended_reject_rate_max / extended_error_percentage_max).
 #define EXTENDED_MIN_SAMPLE_SHARES 30
 
-// After this many consecutive failures trying to climb past roughly the same
-// beyond-spec frequency, stop retrying it and treat that point as the
-// practical ceiling for this session -- letting the tuner move on to voltage
-// optimization instead of retrying a step that clearly isn't going to work.
+// After this many failures near roughly the same beyond-spec frequency
+// (not necessarily consecutive -- see track_extended_climb_failure), treat
+// that point as off-limits for a cooldown period rather than retrying it
+// forever, letting the tuner move on to voltage optimization in the meantime.
 #define EXTENDED_FAIL_LIMIT 2
+
+// How long a frequency stays off-limits after repeatedly failing near it,
+// before the tuner is willing to probe it again. An hour is long enough for
+// ambient conditions (or whatever else was marginal) to plausibly have
+// changed, without abandoning a genuinely-too-high frequency for the rest
+// of an indefinitely-long session.
+#define EXTENDED_COOLDOWN_MS (60LL * 60LL * 1000LL)
 
 // Hard ceiling for beyond-spec frequency exploration: the person's own
 // verified value if they've set one, otherwise the generic percentage-based
@@ -261,6 +268,8 @@ static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, 
     float vendor_max_freq = (float) freq_options[freq_option_count - 1];
     at->extended_freq_mhz = (current_freq > vendor_max_freq + 0.5f) ? current_freq : 0.0f;
     at->extended_soft_ceiling_mhz = 0.0f;
+    at->extended_soft_ceiling_expiry_ms = 0;
+    at->extended_last_failed_mhz = 0.0f;
     at->extended_freq_consecutive_fails = 0;
     at->last_action = AUTOTUNE_ACTION_NONE;
 }
@@ -343,26 +352,32 @@ static bool settings_changed_externally(AutotuneModule * at, const uint16_t * fr
     return !freq_matches || !volt_matches;
 }
 
-// Called on every reverted/backed-off step. If the step we just gave up on
-// was a beyond-spec frequency climb, count it -- after enough consecutive
-// failures at roughly the same point, get_extended_ceiling_mhz() will stop
-// letting the tuner retry it (see extended_soft_ceiling_mhz) and it'll move
-// on to voltage optimization instead. Any other kind of revert (an
-// undervolt trial, or a vendor-table-only step) resets the streak, since
-// it's not part of a beyond-spec climb attempt.
+// Called on every reverted/backed-off step while exploring beyond-spec.
+// Tracks failures by *proximity to the last failing frequency* rather than
+// strict "this exact step in a row" -- a level can look fine for a window
+// or two before failing again (heat one time, ASIC error rate the next),
+// and treating each of those as an isolated, forgotten incident just leads
+// to endlessly re-probing a level that's never actually going to hold. Once
+// enough failures pile up near the same point, that frequency gets a
+// cooldown (see EXTENDED_COOLDOWN_MS) instead of being retried forever.
 static void track_extended_climb_failure(AutotuneModule * at, const char * reason)
 {
-    if (at->last_action != AUTOTUNE_ACTION_FREQ_UP || at->extended_freq_mhz <= 0.0f) {
+    if (at->extended_freq_mhz <= 0.0f) {
+        // Not currently in beyond-spec territory -- nothing to track.
         at->extended_freq_consecutive_fails = 0;
         return;
     }
 
-    at->extended_freq_consecutive_fails++;
+    bool near_last_failure = fabsf(at->extended_freq_mhz - at->extended_last_failed_mhz) < (EXTENDED_STEP_MHZ * 1.5f);
+    at->extended_freq_consecutive_fails = near_last_failure ? at->extended_freq_consecutive_fails + 1 : 1;
+    at->extended_last_failed_mhz = at->extended_freq_mhz;
+
     if (at->extended_freq_consecutive_fails >= EXTENDED_FAIL_LIMIT) {
         // extended_freq_mhz still holds the failing value here; the last
         // known-good level is one step below it.
         at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_STEP_MHZ;
-        ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failed attempts (%s), moving to voltage optimization",
+        at->extended_soft_ceiling_expiry_ms = (esp_timer_get_time() / 1000) + EXTENDED_COOLDOWN_MS;
+        ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failures near this level (%s), backing off for an hour",
                  at->extended_soft_ceiling_mhz, at->extended_freq_consecutive_fails, reason);
     }
 }
@@ -450,6 +465,21 @@ void AUTOTUNE_task(void * pvParameters)
         at->active_profile = (AutotuneProfile) (profile - AUTOTUNE_PROFILES);
         float temp_ceiling_c = PM_THROTTLE_TEMP - profile->temp_margin_c;
 
+        // A frequency that repeatedly failed gets a cooldown rather than a
+        // permanent ban for the rest of the session -- once that cooldown
+        // has passed, forget it ever failed and let the tuner probe it
+        // again (ambient conditions, or whatever else was marginal, may
+        // well have changed by now).
+        if (at->extended_soft_ceiling_mhz > 0.0f &&
+            (esp_timer_get_time() / 1000) > at->extended_soft_ceiling_expiry_ms) {
+            ESP_LOGI(TAG, "Cooldown expired for the %.0f MHz soft ceiling, willing to probe higher again",
+                     at->extended_soft_ceiling_mhz);
+            at->extended_soft_ceiling_mhz = 0.0f;
+            at->extended_soft_ceiling_expiry_ms = 0;
+            at->extended_last_failed_mhz = 0.0f;
+            at->extended_freq_consecutive_fails = 0;
+        }
+
         if (!was_enabled) {
             // Just (re)enabled. Start from the bottom of the vendor table
             // for both frequency and voltage, and let the normal climb take
@@ -464,6 +494,8 @@ void AUTOTUNE_task(void * pvParameters)
             at->voltage_mv = min_voltage_mv;
             at->extended_freq_mhz = 0.0f;
             at->extended_soft_ceiling_mhz = 0.0f;
+            at->extended_soft_ceiling_expiry_ms = 0;
+            at->extended_last_failed_mhz = 0.0f;
             at->extended_freq_consecutive_fails = 0;
             at->last_action = AUTOTUNE_ACTION_NONE;
             apply_step(GLOBAL_STATE, freq_options, 0, at->voltage_mv, 0.0f);
