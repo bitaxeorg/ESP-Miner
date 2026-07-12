@@ -2,8 +2,8 @@
 #define AUTOTUNE_TASK_H_
 
 typedef enum {
-    AUTOTUNE_PROFILE_ECO = 0,        // prioritizes low temperature/power over top speed
-    AUTOTUNE_PROFILE_BALANCED,       // decent frequency, still keeps some thermal margin
+    AUTOTUNE_PROFILE_ECO = 0,        // stops at peak hash/watt, not top speed -- see optimize_efficiency
+    AUTOTUNE_PROFILE_BALANCED,       // climbs to the vendor-tested ceiling, moderate target temperature
     AUTOTUNE_PROFILE_AGGRESSIVE,     // rides close to the limits, includes beyond-spec if unlocked
 } AutotuneProfile;
 
@@ -52,6 +52,13 @@ typedef struct {
     int extended_freq_consecutive_fails;
     float max_temp_seen_this_window;
     float last_reject_rate;
+    // Only used by profiles with optimize_efficiency set (currently Eco).
+    // Tracks hash-per-watt at the best frequency step found so far, so
+    // climbing can stop at the efficiency peak instead of the thermal or
+    // stability ceiling -- those are usually not the same point, since
+    // voltage requirements tend to grow faster than frequency near the top.
+    float best_efficiency_ghs_per_watt;
+    int best_efficiency_freq_step;
     int step_downs_total;
     int step_ups_total;
 } AutotuneModule;
