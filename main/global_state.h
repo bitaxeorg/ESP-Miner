@@ -198,17 +198,19 @@ typedef struct
     char block_signals[MAX_BLOCK_SIGNALS][MAX_BLOCK_SIGNAL_LEN];
     int block_signals_count;
 
-    // Timestamp (esp_timer_get_time) of the last nonce result read back from
-    // the ASIC. Register reads deliberately don't count: on wedged units the
-    // register path can stay responsive while nonce production is dead.
+    // Timestamp (esp_timer_get_time) of the last share the pool accepted.
     // Watched from the stratum tasks to detect a wedged ASIC (issue #1053).
-    int64_t last_asic_result_time;
+    // A wedged chip may go silent or babble garbage nonces; garbage can fool
+    // local counters but never passes pool validation, so accepted shares
+    // are the ground truth for "actually mining".
+    int64_t last_accepted_share_time;
 } GlobalState;
 
-// How long the ASIC may go without returning a single nonce - while the pool
-// link is demonstrably alive - before we conclude it is wedged ("Flatline of
-// Death", issue #1053) and restart. At any realistic difficulty the chip
-// answers many times a minute, so 10 minutes of true silence is a wedge.
+// Minimum time without a pool-accepted share - while the pool link is
+// demonstrably alive - before we conclude the ASIC is wedged ("Flatline of
+// Death", issue #1053) and restart. The effective timeout scales up with
+// pool difficulty (see SYSTEM_check_flatline_watchdog) so vardiff cannot
+// cause false restarts; this floor applies at typical difficulties.
 #define FLATLINE_RESTART_TIMEOUT_US (10LL * 60 * 1000000)
 
 #endif /* GLOBAL_STATE_H_ */

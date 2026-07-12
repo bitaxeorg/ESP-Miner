@@ -16,6 +16,11 @@ void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE);
 
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE);
 void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg);
+
+// Flatline-of-Death watchdog (#1053): restart if the pool link is alive but
+// no share has been accepted for a difficulty-scaled timeout. Call from the
+// stratum tasks right after pool traffic is received.
+void SYSTEM_check_flatline_watchdog(GlobalState * GLOBAL_STATE);
 void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint32_t target);
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime);
 

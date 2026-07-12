@@ -298,6 +298,10 @@ void stratum_v1_task(void *pvParameters)
         //mining.authorize - ID: 3
         STRATUM_V1_authorize(GLOBAL_STATE->transport, authorize_message_id, username, password);
 
+        // Fresh connection: restart the flatline watchdog clock so time
+        // spent disconnected is never counted against the ASIC.
+        GLOBAL_STATE->last_accepted_share_time = esp_timer_get_time();
+
         while (1) {
             // Check if coordinator wants us to shut down
             if (protocol_coordinator_v1_should_shutdown()) {
@@ -324,17 +328,12 @@ void stratum_v1_task(void *pvParameters)
             }
 
             // Flatline of Death detection (#1053): we just received a line,
-            // so the pool link is alive - but if the ASIC has not returned a
-            // single nonce in FLATLINE_RESTART_TIMEOUT_US the chip is wedged
-            // and only a reset recovers it. Gating on pool traffic means a
-            // pool outage can never cause a restart loop.
-            if (GLOBAL_STATE->last_asic_result_time > 0 &&
-                esp_timer_get_time() - GLOBAL_STATE->last_asic_result_time > FLATLINE_RESTART_TIMEOUT_US) {
-                ESP_LOGE(TAG, "No ASIC results for %d minutes despite a healthy pool connection - "
-                         "restarting to recover from wedged ASIC (#1053)",
-                         (int) (FLATLINE_RESTART_TIMEOUT_US / 60000000));
-                esp_restart();
-            }
+            // so the pool link is alive - restart if no share has been
+            // accepted for a difficulty-scaled timeout (a wedged ASIC may go
+            // silent or babble garbage; garbage never passes pool
+            // validation). Gating on pool traffic means a pool outage can
+            // never cause a restart loop.
+            SYSTEM_check_flatline_watchdog(GLOBAL_STATE);
 
             int64_t receive_time_us = esp_timer_get_time();
 
