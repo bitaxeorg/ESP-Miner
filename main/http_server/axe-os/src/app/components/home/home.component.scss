@@ -18,7 +18,7 @@
     td {
         transition: background-color 2s ease-in-out;
         background-color: var(--heatmap-bg);
-        color: contrast-color(var(--primary-color));
+        color: contrast-color(var(--color-primary));
     }
 }
 
@@ -93,7 +93,7 @@
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    border: 2px dashed var(--primary-color);
+                    border: 2px dashed var(--color-primary);
                     border-radius: inherit;
                     pointer-events: none;
                     z-index: 1;

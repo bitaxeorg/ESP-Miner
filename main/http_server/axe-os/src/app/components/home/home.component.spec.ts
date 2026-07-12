@@ -6,11 +6,8 @@ import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Title } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { MessageModule } from 'primeng/message';
-import { SelectModule } from 'primeng/select';
-import { ChartModule } from 'primeng/chart';
-import { ProgressBarModule } from 'primeng/progressbar';
-import { TooltipModule } from 'primeng/tooltip';
+import { AppChartComponent } from 'src/app/components/chart/app-chart.component';
+import { TooltipDirective } from 'src/app/directives/tooltip.directive';
 
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
 import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
@@ -48,11 +45,8 @@ describe('HomeComponent', () => {
         ReactiveFormsModule,
         FormsModule,
         NoopAnimationsModule,
-        MessageModule,
-        SelectModule,
-        ChartModule,
-        ProgressBarModule,
-        TooltipModule,
+        AppChartComponent,
+        TooltipDirective,
         HashSuffixPipe,
         DiffSuffixPipe,
         DateAgoPipe,

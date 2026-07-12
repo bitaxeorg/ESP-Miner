@@ -16,8 +16,13 @@ import { ThemeService } from 'src/app/services/theme.service';
 import { LayoutService } from 'src/app/layout/service/app.layout.service';
 import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated/models';
 import { Title } from '@angular/platform-browser';
-import { UIChart } from 'primeng/chart';
-import { SelectItem } from 'primeng/api';
+import { AppChartComponent } from '../chart/app-chart.component';
+
+export interface SelectItem<T = any> {
+  label?: string;
+  value: T;
+  disabled?: boolean;
+}
 import { eChartLabel } from 'src/models/enum/eChartLabel';
 import { chartLabelValue } from 'src/models/enum/eChartLabel';
 import { chartLabelKey } from 'src/models/enum/eChartLabel';
@@ -123,7 +128,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   ];
 
   @ViewChild('chart')
-  private chart?: UIChart
+  private chart?: AppChartComponent
 
   private gridStackEl?: ElementRef<HTMLElement>;
   @ViewChild('gridStack', { static: false })
@@ -484,9 +489,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = (documentStyle.getPropertyValue('--p-text-muted-color') || documentStyle.getPropertyValue('--text-color-secondary')).trim();
-    const surfaceBorder = (documentStyle.getPropertyValue('--p-content-border-color') || documentStyle.getPropertyValue('--surface-border')).trim();
-    const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
+    const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim();
+    const surfaceBorder = documentStyle.getPropertyValue('--color-border-content').trim();
+    const primaryColor = documentStyle.getPropertyValue('--color-primary').trim();
     this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     // Update chart colors
@@ -532,9 +537,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = (documentStyle.getPropertyValue('--p-text-muted-color') || documentStyle.getPropertyValue('--text-color-secondary')).trim();
-    const surfaceBorder = (documentStyle.getPropertyValue('--p-content-border-color') || documentStyle.getPropertyValue('--surface-border')).trim();
-    const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
+    const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim();
+    const surfaceBorder = documentStyle.getPropertyValue('--color-border-content').trim();
+    const primaryColor = documentStyle.getPropertyValue('--color-primary').trim();
     this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.chartData = {
@@ -981,7 +986,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       }));
   }
 
-  onPoolChange(event: { originalEvent: Event; value: PoolLabel }) {
+  onPoolChange(event: { originalEvent?: Event; value: PoolLabel }) {
     const useFallbackStratum = Number(event.value === 'Fallback');
 
     this.systemService.updateSystem('', { useFallbackStratum })

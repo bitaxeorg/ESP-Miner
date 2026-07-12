@@ -29,9 +29,7 @@ type CombinedData = {
     standalone: false
 })
 export class SystemComponent implements OnInit, OnDestroy {
-  public info$: Observable<ISystemInfo>;
-  public asic$: Observable<ISystemASIC>;
-  public combinedData$: Observable<CombinedData>;
+  public systemRows$: Observable<TableRow[]>;
   public isConnected$: Observable<boolean>;
 
   private destroy$ = new Subject<void>();
@@ -42,20 +40,24 @@ export class SystemComponent implements OnInit, OnDestroy {
     private loadingService: LoadingService,
     private toastr: ToastrService,
   ) {
-    this.info$ = this.liveDataService.info$;
     this.isConnected$ = this.liveDataService.connected$;
     
-    this.asic$ = this.systemService.getAsicSettings().pipe(
+    const info$ = this.liveDataService.info$;
+    const asic$ = this.systemService.getAsicSettings().pipe(
       shareReplay({ refCount: true, bufferSize: 1 })
     );
 
-    this.combinedData$ = combineLatest([this.info$, this.asic$]).pipe(
+    const combinedData$ = combineLatest([info$, asic$]).pipe(
       map(([info, asic]) => ({ info, asic }))
+    );
+
+    this.systemRows$ = combinedData$.pipe(
+      map(data => this.getSystemRows(data))
     );
   }
 
   ngOnInit() {
-    this.combinedData$
+    this.systemRows$
       .pipe(first(), this.loadingService.lockUIUntilComplete(), takeUntil(this.destroy$))
       .subscribe();
   }
@@ -63,6 +65,10 @@ export class SystemComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  trackByRowLabel(index: number, row: TableRow): string {
+    return row.label;
   }
 
   getWifiRssiColor(rssi: number): string {
