@@ -362,8 +362,15 @@ static bool settings_changed_externally(AutotuneModule * at, const uint16_t * fr
 // cooldown (see EXTENDED_COOLDOWN_MS) instead of being retried forever.
 static void track_extended_climb_failure(AutotuneModule * at, const char * reason)
 {
-    if (at->extended_freq_mhz <= 0.0f) {
-        // Not currently in beyond-spec territory -- nothing to track.
+    // Only a failure that happened while actually trying to reach or hold
+    // this frequency (a straight climb, or a voltage rescue attempting to
+    // save one) says anything about whether the frequency itself is too
+    // high. A failure during an undervolt trial (AUTOTUNE_ACTION_VOLT_DOWN)
+    // means the *voltage* was shaved a step too far at an already-proven
+    // frequency -- that's revert_last_action's job to walk back on its own,
+    // and should never drag the frequency ceiling down with it.
+    bool was_climb_related = at->last_action == AUTOTUNE_ACTION_FREQ_UP || at->last_action == AUTOTUNE_ACTION_VOLT_UP;
+    if (!was_climb_related || at->extended_freq_mhz <= 0.0f) {
         at->extended_freq_consecutive_fails = 0;
         return;
     }
