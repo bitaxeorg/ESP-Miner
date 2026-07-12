@@ -549,16 +549,38 @@ void AUTOTUNE_task(void * pvParameters)
             at->extended_freq_consecutive_fails = 0;
         }
 
+        bool blocked = sys_module->overheat_mode || sys_module->mining_paused ||
+                        sys_module->hardware_fault || sys_module->pools_unavailable ||
+                        !GLOBAL_STATE->ASIC_initalized;
+
+        if (blocked) {
+            // Something else (most likely the reactive overheat-protection in
+            // power_management_task, or the ASIC simply not being ready yet
+            // right after boot) has taken over, or we're not ready to act
+            // yet at all. Crucially, this is checked *before* the
+            // just-enabled reset below: writing a frequency/voltage step
+            // while the ASIC hasn't finished its own init sequence could
+            // interfere with it. Don't fight it: just resync our own idea
+            // of the current step to whatever is actually configured now
+            // (a no-op if nothing's been applied yet), and wait until
+            // things are calm/ready.
+            at->state = AUTOTUNE_STATE_PAUSED;
+            window_open = false;
+            resync_from_nvs(at, freq_options, freq_option_count);
+            continue;
+        }
+
         if (!was_enabled) {
-            // Just (re)enabled. Start from the bottom of the vendor table
-            // for both frequency and voltage, and let the normal climb take
-            // it from there -- frequency climbs step by step, and voltage
-            // only goes up when a frequency step actually needs the rescue
-            // to stabilize (see revert_last_action), or proactively in step
-            // with frequency (see proportional_voltage_mv). This tends
-            // toward a near-minimal voltage for whatever frequency is
-            // reached, rather than starting at whatever voltage happened to
-            // be set before and only ever shaving it down afterward.
+            // Just (re)enabled -- and the ASIC is confirmed initialized, so
+            // it's now safe to apply a step. Start from the bottom of the
+            // vendor table for both frequency and voltage, and let the
+            // normal climb take it from there -- frequency climbs step by
+            // step, and voltage only goes up when a frequency step actually
+            // needs the rescue to stabilize (see revert_last_action), or
+            // proactively in step with frequency (see proportional_voltage_mv).
+            // This tends toward a near-minimal voltage for whatever frequency
+            // is reached, rather than starting at whatever voltage happened
+            // to be set before and only ever shaving it down afterward.
             at->freq_step_index = 0;
             at->voltage_mv = min_voltage_mv;
             at->extended_freq_mhz = 0.0f;
@@ -574,21 +596,6 @@ void AUTOTUNE_task(void * pvParameters)
                      profile->name, (float) freq_options[0], at->voltage_mv);
             was_enabled = true;
             window_open = false;
-            continue;
-        }
-
-        bool blocked = sys_module->overheat_mode || sys_module->mining_paused ||
-                        sys_module->hardware_fault || sys_module->pools_unavailable ||
-                        !GLOBAL_STATE->ASIC_initalized;
-
-        if (blocked) {
-            // Something else (most likely the reactive overheat-protection in
-            // power_management_task) has taken over. Don't fight it: just
-            // resync our own idea of the current step to whatever is actually
-            // configured now, and wait until things are calm again.
-            at->state = AUTOTUNE_STATE_PAUSED;
-            window_open = false;
-            resync_from_nvs(at, freq_options, freq_option_count);
             continue;
         }
 
