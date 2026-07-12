@@ -4,7 +4,7 @@ import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
 @Component({
-  selector: 'p-chart',
+  selector: 'app-chart',
   template: `<div class="relative w-full h-full"><canvas #canvas></canvas></div>`,
   styles: [`
     :host {
