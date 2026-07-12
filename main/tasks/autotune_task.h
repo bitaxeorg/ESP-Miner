@@ -2,9 +2,8 @@
 #define AUTOTUNE_TASK_H_
 
 typedef enum {
-    AUTOTUNE_PROFILE_ECO = 0,        // stops at peak hash/watt, not top speed -- see optimize_efficiency
-    AUTOTUNE_PROFILE_BALANCED,       // climbs to the vendor-tested ceiling, moderate target temperature
-    AUTOTUNE_PROFILE_AGGRESSIVE,     // rides close to the limits, includes beyond-spec if unlocked
+    AUTOTUNE_PROFILE_EFFICIENCY = 0, // stops climbing at peak hash/watt -- see optimize_efficiency
+    AUTOTUNE_PROFILE_PERFORMANCE,    // climbs to the vendor ceiling, and past it too if Custom Settings is unlocked
 } AutotuneProfile;
 
 typedef enum {

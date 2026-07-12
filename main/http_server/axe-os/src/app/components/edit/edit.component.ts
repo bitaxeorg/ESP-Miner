@@ -334,9 +334,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   get autotuneProfileOptions(): SelectOption[] {
     return [
-      { name: 'Eco (lower temps, less power)', value: 0 },
-      { name: 'Balanced', value: 1 },
-      { name: 'Aggressive (top speed)', value: 2 },
+      { name: 'Efficiency (peak hash/watt, lower temps)', value: 0 },
+      { name: 'Performance (top speed)', value: 1 },
     ];
   }
 

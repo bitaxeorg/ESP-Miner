@@ -11,14 +11,15 @@
 
 static const char * TAG = "autotune";
 
-// --- Tuning behaviour: three selectable profiles (NVS_CONFIG_AUTOTUNE_PROFILE) ---
+// --- Tuning behaviour: two selectable profiles (NVS_CONFIG_AUTOTUNE_PROFILE) ---
 //
 // Everything that stays the same across profiles (timing, sample sizes,
-// hard safety ceilings) is still a plain #define below. Everything that
-// defines what the tuner is actually optimizing for -- a target
-// temperature, instability tolerances, whether it reaches for beyond-spec
-// or an extra-voltage rescue, and whether it's chasing top speed or peak
-// efficiency -- lives in this table instead.
+// hard safety ceilings) is still a plain #define below. What's actually
+// being optimized for -- efficiency (peak hash/watt) or performance (top
+// speed) -- lives in this table instead. Whether Performance is also
+// allowed to climb past the vendor-tested table is a separate axis
+// entirely: it only happens when Custom Settings is *also* unlocked
+// (NVS_CONFIG_OVERCLOCK_ENABLED) -- see where allow_beyond_spec is used.
 typedef struct {
     const char * name;
     float target_temp_c;              // stop climbing once the chip reaches this temperature
@@ -32,36 +33,25 @@ typedef struct {
 } AutotuneProfileConfig;
 
 static const AutotuneProfileConfig AUTOTUNE_PROFILES[] = {
-    [AUTOTUNE_PROFILE_ECO] = {
-        .name = "eco",
-        .target_temp_c = 65.0f,
+    [AUTOTUNE_PROFILE_EFFICIENCY] = {
+        .name = "efficiency",
+        .target_temp_c = 65.0f,        // a safety-net ceiling -- efficiency-seeking should stop well before this anyway
         .reject_rate_max = 0.02f,
         .error_percentage_max = 1.0f,
         .extended_reject_rate_max = 0.01f,
         .extended_error_percentage_max = 0.5f,
-        .allow_beyond_spec = false,
+        .allow_beyond_spec = false,    // never, regardless of Custom Settings -- contradicts the whole point of this profile
         .allow_voltage_rescue = false, // accept a lower ceiling rather than spend extra heat/power to hold one
-        .optimize_efficiency = true,   // stops at peak hash/watt, not at the thermal ceiling -- see efficiency_still_improving()
+        .optimize_efficiency = true,   // stops at peak hash/watt -- see efficiency_still_improving()
     },
-    [AUTOTUNE_PROFILE_BALANCED] = {
-        .name = "balanced",
-        .target_temp_c = 70.0f,
-        .reject_rate_max = 0.03f,
-        .error_percentage_max = 2.0f,
-        .extended_reject_rate_max = 0.015f,
-        .extended_error_percentage_max = 1.0f,
-        .allow_beyond_spec = false, // full vendor-table speed, but stops there even if beyond-spec is unlocked
-        .allow_voltage_rescue = true,
-        .optimize_efficiency = false,
-    },
-    [AUTOTUNE_PROFILE_AGGRESSIVE] = {
-        .name = "aggressive",
+    [AUTOTUNE_PROFILE_PERFORMANCE] = {
+        .name = "performance",
         .target_temp_c = 73.0f,
         .reject_rate_max = 0.03f,
         .error_percentage_max = 2.0f,
         .extended_reject_rate_max = 0.015f,
         .extended_error_percentage_max = 1.0f,
-        .allow_beyond_spec = true, // if custom settings are unlocked, keeps climbing past the vendor table
+        .allow_beyond_spec = true,     // only actually happens if NVS_CONFIG_OVERCLOCK_ENABLED is also set
         .allow_voltage_rescue = true,
         .optimize_efficiency = false,
     },
@@ -72,7 +62,7 @@ static const AutotuneProfileConfig * get_active_profile(void)
 {
     uint16_t idx = nvs_config_get_u16(NVS_CONFIG_AUTOTUNE_PROFILE);
     if (idx >= AUTOTUNE_PROFILE_COUNT) {
-        idx = AUTOTUNE_PROFILE_BALANCED; // unexpected NVS value -- fall back to the safe default
+        idx = AUTOTUNE_PROFILE_PERFORMANCE; // unexpected NVS value -- fall back to the safe default
     }
     return &AUTOTUNE_PROFILES[idx];
 }

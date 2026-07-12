@@ -405,7 +405,7 @@ components:
           description: Automatically tunes frequency/voltage to the highest stable, vendor-approved values
         autotuneProfile:
           type: integer
-          description: "Auto-Tune behaviour profile: 0=Eco, 1=Balanced, 2=Aggressive"
+          description: "Auto-Tune behaviour profile: 0=Efficiency (peak hash/watt), 1=Performance (top speed, plus beyond-spec if Custom Settings is also unlocked)"
         autotuneMaxMHz:
           type: number
           description: >-
@@ -870,8 +870,8 @@ components:
             - 0
         autotuneProfile:
           type: integer
-          description: "Auto-Tune behaviour profile: 0=Eco, 1=Balanced, 2=Aggressive"
-          enum: [0,1,2]
+          description: "Auto-Tune behaviour profile: 0=Efficiency (peak hash/watt), 1=Performance (top speed, plus beyond-spec if Custom Settings is also unlocked)"
+          enum: [0,1]
           examples:
             - 1
         autotuneMaxMHz:
