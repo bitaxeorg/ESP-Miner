@@ -216,7 +216,6 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddBoolToObject(root, "autotuneBeyondSpec", g->AUTOTUNE_MODULE.extended_freq_mhz > 0.0f);
     cJSON_AddNumberToObject(root, "autotuneStepUps", g->AUTOTUNE_MODULE.step_ups_total);
     cJSON_AddNumberToObject(root, "autotuneStepDowns", g->AUTOTUNE_MODULE.step_downs_total);
-    cJSON_AddNumberToObject(root, "autotuneLastRejectRate", g->AUTOTUNE_MODULE.last_reject_rate);
     char *disp_name = nvs_config_get_string(NVS_CONFIG_DISPLAY);
     cJSON_AddStringToObject(root, "display", disp_name ? disp_name : "");
     free(disp_name);

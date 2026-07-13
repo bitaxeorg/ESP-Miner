@@ -143,7 +143,6 @@ export class SystemApiService {
         autotuneBeyondSpec: false,
         autotuneStepUps: 0,
         autotuneStepDowns: 0,
-        autotuneLastRejectRate: 0,
         runningPartition: "factory",
         minFanSpeed: 25,
         fanspeed: 50,

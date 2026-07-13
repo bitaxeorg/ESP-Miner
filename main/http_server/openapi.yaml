@@ -132,7 +132,6 @@ components:
         - autofanspeed
         - autotuneBeyondSpec
         - autotuneEnabled
-        - autotuneLastRejectRate
         - autotuneMaxMHz
         - autotuneProfile
         - autotuneState
@@ -427,9 +426,6 @@ components:
         autotuneStepDowns:
           type: integer
           description: Total number of times Auto-Tune has reverted a step since it was last (re-)enabled
-        autotuneLastRejectRate:
-          type: number
-          description: Rejected-share rate observed during the most recently completed evaluation window (0-1)
         poolConnectionInfo:
           type: string
           description: Current pool address family

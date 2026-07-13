@@ -55,8 +55,7 @@
                 <p class="m-0">{{ autotuneStateLabel }}</p>
                 <small class="block text-color-secondary mt-1">
                     {{ deviceInfo!.autotuneBeyondSpec ? 'Currently beyond the vendor-tested table. ' : '' }}Steps
-                    up: {{ deviceInfo!.autotuneStepUps }} · Steps back: {{ deviceInfo!.autotuneStepDowns }} · Last
-                    reject rate: {{ ((deviceInfo!.autotuneLastRejectRate || 0) * 100).toFixed(1) }}%
+                    up: {{ deviceInfo!.autotuneStepUps }} · Steps back: {{ deviceInfo!.autotuneStepDowns }}
                 </small>
             </div>
         </div>

@@ -50,7 +50,6 @@ typedef struct {
     float extended_last_failed_mhz;
     int extended_freq_consecutive_fails;
     float max_temp_seen_this_window;
-    float last_reject_rate;
     // Set every time a step is applied, so the fast-path safety checks can
     // give the chip a brief moment to settle (PLL relock, voltage regulator
     // ramp) before judging it -- without this, a normal settling transient
@@ -66,15 +65,21 @@ typedef struct {
     // voltage requirements tend to grow faster than frequency near the top.
     float best_efficiency_ghs_per_watt;
     int best_efficiency_freq_step;
-    // Counts consecutive fast-path ticks where measured hashrate fell short
-    // of the theoretical expectation. current_hashrate is a single-interval
-    // instantaneous reading (see update_hash_counter in
-    // hashrate_monitor_task.c), which has real sample-to-sample variance,
-    // especially at low absolute hashrates -- requiring this to persist
-    // across a couple of ticks filters that noise out while still catching
-    // a genuinely sustained shortfall (e.g. real partial core dropout from
-    // insufficient voltage) quickly.
+    // Counts consecutive periodic checks (10s apart) where a given signal
+    // read as bad. current_hashrate and error_percentage are both
+    // short-interval instantaneous readings with real sample-to-sample
+    // variance, especially at low absolute hashrates -- requiring a signal
+    // to persist across a couple of checks filters that noise out while
+    // still catching a genuinely sustained problem quickly. Temperature and
+    // input voltage don't get this treatment: those are direct physical
+    // readings that react immediately, on purpose.
     int hashrate_shortfall_ticks;
+    int asic_error_bad_ticks;
+    // How many consecutive clean checks (all signals fine) have been seen
+    // at the current step -- once this reaches the profile/zone's required
+    // count, the step is treated as confirmed stable and the tuner decides
+    // what to do next (climb further, shave voltage, hold, etc).
+    int consecutive_good_checks;
     int step_downs_total;
     int step_ups_total;
 } AutotuneModule;

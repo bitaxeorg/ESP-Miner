@@ -13,19 +13,17 @@ static const char * TAG = "autotune";
 
 // --- Tuning behaviour: two selectable profiles (NVS_CONFIG_AUTOTUNE_PROFILE) ---
 //
-// Everything that stays the same across profiles (timing, sample sizes,
-// hard safety ceilings) is still a plain #define below. What's actually
-// being optimized for -- efficiency (peak hash/watt) or performance (top
-// speed) -- lives in this table instead. Whether Performance is also
-// allowed to climb past the vendor-tested table is a separate axis
-// entirely: it only happens when Custom Settings is *also* unlocked
-// (NVS_CONFIG_OVERCLOCK_ENABLED) -- see where allow_beyond_spec is used.
+// Everything that stays the same across profiles (timing, hard safety
+// ceilings) is still a plain #define below. What's actually being
+// optimized for -- efficiency (peak hash/watt) or performance (top speed)
+// -- lives in this table instead. Whether Performance is also allowed to
+// climb past the vendor-tested table is a separate axis entirely: it only
+// happens when Custom Settings is *also* unlocked (NVS_CONFIG_OVERCLOCK_ENABLED)
+// -- see where allow_beyond_spec is used.
 typedef struct {
     const char * name;
     float target_temp_c;              // stop climbing once the chip reaches this temperature
-    float reject_rate_max;            // vendor-table reject-rate tolerance
     float error_percentage_max;       // vendor-table ASIC-error tolerance
-    float extended_reject_rate_max;   // beyond-spec reject-rate tolerance
     float extended_error_percentage_max; // beyond-spec ASIC-error tolerance
     bool allow_beyond_spec;           // ever climb past the vendor table, even if unlocked
     bool allow_voltage_rescue;        // try extra voltage to save a failing frequency step
@@ -36,9 +34,7 @@ static const AutotuneProfileConfig AUTOTUNE_PROFILES[] = {
     [AUTOTUNE_PROFILE_EFFICIENCY] = {
         .name = "efficiency",
         .target_temp_c = 65.0f,        // a safety-net ceiling -- efficiency-seeking should stop well before this anyway
-        .reject_rate_max = 0.02f,
         .error_percentage_max = 1.0f,
-        .extended_reject_rate_max = 0.01f,
         .extended_error_percentage_max = 0.5f,
         .allow_beyond_spec = false,    // never, regardless of Custom Settings -- contradicts the whole point of this profile
         .allow_voltage_rescue = false, // accept a lower ceiling rather than spend extra heat/power to hold one
@@ -47,9 +43,7 @@ static const AutotuneProfileConfig AUTOTUNE_PROFILES[] = {
     [AUTOTUNE_PROFILE_PERFORMANCE] = {
         .name = "performance",
         .target_temp_c = 73.0f,
-        .reject_rate_max = 0.03f,
         .error_percentage_max = 2.0f,
-        .extended_reject_rate_max = 0.015f,
         .extended_error_percentage_max = 1.0f,
         .allow_beyond_spec = true,     // only actually happens if NVS_CONFIG_OVERCLOCK_ENABLED is also set
         .allow_voltage_rescue = true,
@@ -67,9 +61,12 @@ static const AutotuneProfileConfig * get_active_profile(void)
     return &AUTOTUNE_PROFILES[idx];
 }
 
-// How often we sample temperature/state. Kept short so an in-window temp spike
-// gets a reaction quickly, since this profile intentionally runs with a thin margin.
-#define TICK_MS 5000
+// How often each step gets re-checked. Every signal below (temperature,
+// input voltage, ASIC error rate, hashrate) is evaluated fresh on every
+// tick rather than accumulated over a longer window -- there's no more
+// share-counting involved at all (see the removal of the old reject-rate
+// check further down for why).
+#define TICK_MS 10000
 
 // After applying any step, the chip needs a brief moment to actually
 // settle (PLL relock, voltage regulator ramp) before its temperature/error
@@ -78,42 +75,19 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // step after a fresh (re-)enable, which is also usually the single biggest
 // frequency/voltage jump of the whole session (whatever it was before,
 // straight down to the bottom of the table) and has nowhere lower left to
-// retreat to if that transient trips a fast-path check.
+// retreat to if that transient trips a check.
 #define SETTLING_GRACE_MS (10 * 1000)
 
-// How long we let a given frequency/voltage step run before judging it.
-// Long enough to gather a meaningful number of shares, short enough that the
-// tuner is responsive to changing ambient/cooling conditions (continuous mode).
-#define EVAL_WINDOW_MS (90 * 1000)
-
-// Need at least this many accepted+rejected shares in a window before trusting
-// the reject rate; otherwise we extend the window rather than judge on noise.
-#define MIN_SAMPLE_SHARES 15
-
-// The bottom of the vendor-tested frequency table is, almost by definition,
-// the safest region to be in -- it's well within what the manufacturer
-// validated, and every step through it still has the full 5-second-latency
-// fast-path checks (temperature, ASIC error rate, input voltage) watching
-// the whole time regardless of any of this. Waiting a full 90 seconds and
-// demanding 15 samples per step here mostly just delays reaching a
-// meaningful frequency after every restart, without buying much real
-// safety margin. Steps in the bottom half of the table use a much shorter
-// window and lower sample requirement instead; the top half (closer to the
-// vendor's own tested ceiling, where a wrong call actually matters) still
-// gets the full treatment, as does anything beyond-spec.
-#define FAST_CLIMB_EVAL_WINDOW_MS (20 * 1000)
-#define FAST_CLIMB_MIN_SAMPLE_SHARES 10
-
-// With a sample count this small, the reject-rate check needs its own,
-// much wider tolerance -- the profile's normal reject_rate_max (2-3%)
-// isn't statistically meaningful here: with only 10 samples, a *single*
-// ordinary reject (the kind that happens in healthy mining too, e.g. from
-// network/pool timing, completely unrelated to frequency/voltage
-// stability) already reads as 10%, well past that threshold. This
-// tolerance is set high enough to absorb one such incidental reject
-// without a false trigger, while still catching a genuinely bad step
-// (multiple rejects in the same short window).
-#define FAST_CLIMB_REJECT_RATE_MAX 0.25f
+// How many consecutive clean 10-second checks (all signals fine) are
+// required before a step is treated as confirmed stable and the tuner
+// decides what to do next. The bottom of the vendor-tested table is, almost
+// by definition, the safest region to be in -- it's well within what the
+// manufacturer validated -- so it only needs a couple of clean checks.
+// Steps closer to the vendor's own ceiling get more scrutiny, and anything
+// beyond-spec (unvalidated territory) gets the most.
+#define GOOD_CHECKS_REQUIRED_FAST 2
+#define GOOD_CHECKS_REQUIRED_NORMAL 4
+#define GOOD_CHECKS_REQUIRED_EXTENDED 6
 
 // Voltage is adjusted in small, continuous mV steps rather than jumping
 // between the vendor table's handful of discrete entries (which can be
@@ -135,7 +109,8 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // depending on the model) rather than a fixed number, since that varies
 // by board family. Never offer a voltage rescue for this -- pushing the
 // ASIC's own voltage higher would only draw more current from a supply
-// that's already struggling.
+// that's already struggling. Reacts immediately (no debounce), same as
+// temperature -- both are direct physical readings, not noisy ratios.
 #define INPUT_VOLTAGE_SAG_FRACTION 0.92f
 
 // Minimum acceptable ratio of measured to theoretically-expected hashrate
@@ -143,22 +118,16 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // power_management_task.c). Deliberately lenient -- some natural variance
 // between measured and theoretical hashrate is normal -- but low enough to
 // catch a meaningful chunk of the ASIC going quiet, which insufficient
-// voltage can cause without tripping the error-rate or reject-rate checks
-// at all.
+// voltage can cause without tripping the error-rate check at all.
 #define HASHRATE_RATIO_MIN 0.80f
 
-// How many consecutive 5-second checks the hashrate has to stay below
-// HASHRATE_RATIO_MIN before it's trusted -- see the debounce comment where
-// this is used for why a single low reading isn't enough on its own.
+// How many consecutive checks a signal has to stay bad before it's
+// trusted. current_hashrate and error_percentage are both short-interval
+// instantaneous readings (see hashrate_monitor_task.c) with real
+// sample-to-sample variance, especially at low absolute hashrates -- a
+// single bad reading isn't enough on its own.
 #define HASHRATE_SHORTFALL_TICKS_REQUIRED 2
-
-// Thermal margin, reject-rate tolerance, ASIC-error tolerance, and whether
-// beyond-spec/voltage-rescue are allowed at all now come from the active
-// AutotuneProfileConfig (see AUTOTUNE_PROFILES above) instead of being
-// fixed here -- that's what makes eco/balanced/aggressive behave
-// differently. The reactive throttle cutoff itself (PM_THROTTLE_TEMP) is
-// unaffected by any profile: it's power_management_task's hard backstop,
-// not something this tuner controls.
+#define ASIC_ERROR_BAD_TICKS_REQUIRED 2
 
 // --- Beyond-spec extension (opt-in only, gated on NVS_CONFIG_OVERCLOCK_ENABLED) ---
 //
@@ -170,8 +139,8 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // Voltage is deliberately NOT extended past the vendor table under any
 // circumstances -- overvolting is the more likely path to permanent chip
 // damage. Frequency alone, without additional voltage, tends to fail as
-// instability (rejected shares) well before it fails as damage, which is
-// why only frequency is allowed to explore past vendor data here.
+// instability well before it fails as damage, which is why only frequency
+// is allowed to explore past vendor data here.
 #define EXTENDED_STEP_MHZ 5.0f
 
 // Hard, non-configurable ceiling even in beyond-spec mode: this multiplier
@@ -190,12 +159,6 @@ static float get_user_verified_ceiling_mhz(void)
 {
     return nvs_config_get_float(NVS_CONFIG_AUTOTUNE_MAX_MHZ);
 }
-
-// Beyond-spec steps are unvalidated, so we require a longer, cleaner window
-// before trusting a step as stable than the standard vendor-table climbing
-// uses. The reject-rate/error tolerances themselves come from the active
-// profile (see extended_reject_rate_max / extended_error_percentage_max).
-#define EXTENDED_MIN_SAMPLE_SHARES 30
 
 // After this many failures near roughly the same beyond-spec frequency
 // (not necessarily consecutive -- see track_extended_climb_failure), treat
@@ -279,15 +242,22 @@ static float clamp_voltage(float voltage_mv, float min_voltage_mv, float max_vol
     return voltage_mv;
 }
 
+// True while still in the bottom half of the vendor-tested table. Used to
+// pick a lower GOOD_CHECKS_REQUIRED (this is the safest, most thoroughly
+// vendor-tested part of the range) and to gate the proactive voltage climb
+// below (which otherwise reached vendor-max voltage well before frequency
+// did, spending more heat/power than most of that climb ever actually needed).
+static bool in_fast_climb_zone(AutotuneModule * at, int freq_option_count)
+{
+    return at->extended_freq_mhz <= 0.0f && at->freq_step_index < (freq_option_count / 2);
+}
+
 // Scales how far we are into the frequency table onto the voltage range, so
 // voltage can be raised proactively in step with frequency instead of only
-// reactively once a step actually fails. Reaching a given frequency without
-// first burning through several failed-attempt-then-rescue cycles (each a
-// full ~90s evaluation window) gets there noticeably faster. This doesn't
-// compromise final efficiency: the undervolt-optimization phase that runs
-// once the ceiling is reached will still shave voltage back down, in the
-// same fine 10mV steps, to whatever the minimum actually needed turns out
-// to be.
+// reactively once a step actually fails. This doesn't compromise final
+// efficiency: the undervolt-optimization phase that runs once the ceiling
+// is reached will still shave voltage back down, in the same fine 10mV
+// steps, to whatever the minimum actually needed turns out to be.
 static float proportional_voltage_mv(int freq_step_index, int freq_option_count, float min_voltage_mv, float max_voltage_mv)
 {
     if (freq_option_count <= 1) {
@@ -295,6 +265,28 @@ static float proportional_voltage_mv(int freq_step_index, int freq_option_count,
     }
     float progress = (float) freq_step_index / (float) (freq_option_count - 1);
     return min_voltage_mv + progress * (max_voltage_mv - min_voltage_mv);
+}
+
+// For efficiency-optimizing profiles (currently just Eco), whether climbing
+// one more frequency step is still worth it in hash/watt terms. Voltage
+// requirements tend to grow faster than frequency near the top of a chip's
+// range, so peak efficiency is usually reached well before the thermal or
+// stability ceiling. Records the current step as the new best point as a
+// side effect whenever it does still look like an improvement. Returns
+// true (i.e. "keep climbing") if there's no usable power reading yet,
+// rather than blocking progress on missing data.
+static bool efficiency_still_improving(AutotuneModule * at, SystemModule * sys_module, PowerManagementModule * pm)
+{
+    if (pm->power < 0.5f) {
+        return true;
+    }
+    float current_efficiency = sys_module->current_hashrate / pm->power; // GH/s per W
+    if (at->best_efficiency_freq_step < 0 || current_efficiency >= at->best_efficiency_ghs_per_watt) {
+        at->best_efficiency_ghs_per_watt = current_efficiency;
+        at->best_efficiency_freq_step = at->freq_step_index;
+        return true;
+    }
+    return false;
 }
 
 static void apply_step(GlobalState * GLOBAL_STATE, AutotuneModule * at, const uint16_t * freq_options,
@@ -314,6 +306,12 @@ static void apply_step(GlobalState * GLOBAL_STATE, AutotuneModule * at, const ui
     // applies them to the ASIC; we don't touch the hardware directly here so
     // there's a single owner of "what the ASIC is currently told to do".
     at->step_applied_at_ms = esp_timer_get_time() / 1000;
+    // Every applied step -- whether a climb or a revert -- starts its own
+    // fresh confirmation period. Debounce counters reset here too, since
+    // they track whether *this* step looks bad, not some previous one.
+    at->consecutive_good_checks = 0;
+    at->asic_error_bad_ticks = 0;
+    at->hashrate_shortfall_ticks = 0;
 }
 
 static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, int freq_option_count)
@@ -331,22 +329,23 @@ static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, 
     at->best_efficiency_ghs_per_watt = 0.0f;
     at->best_efficiency_freq_step = -1;
     at->hashrate_shortfall_ticks = 0;
+    at->asic_error_bad_ticks = 0;
+    at->consecutive_good_checks = 0;
     at->last_action = AUTOTUNE_ACTION_NONE;
 }
 
-// Undo whatever the last applied step was, because it turned out unstable
-// (either the reject rate over the window, or a mid-window temperature
-// spike). Reverting the *specific* thing that changed -- rather than always
+// Undo whatever the last applied step was, because it turned out unstable.
+// Reverting the *specific* thing that changed -- rather than always
 // assuming "lower the frequency" -- is what makes the undervolt trials and
 // the extra-voltage-for-stability trials safe to attempt at all.
 static void revert_last_action(AutotuneModule * at, const uint16_t * freq_options, int freq_option_count,
                                 float min_voltage_mv, float max_voltage_mv, bool allow_voltage_rescue)
 {
-    // A frequency step that failed on rejected shares (not heat) sometimes
+    // A frequency step that failed on something other than heat sometimes
     // just needs a bit more voltage headroom rather than being abandoned
-    // outright. Only offer that rescue for reject-rate-based instability --
-    // never for a temperature-driven revert, since adding voltage there
-    // would work against the very problem we're reacting to.
+    // outright. Only offer that rescue when the caller says it's
+    // appropriate -- never for a temperature-driven revert, since adding
+    // voltage there would work against the very problem we're reacting to.
     if (allow_voltage_rescue && at->last_action == AUTOTUNE_ACTION_FREQ_UP &&
         at->voltage_mv < max_voltage_mv - 0.5f) {
         at->voltage_mv = clamp_voltage(at->voltage_mv + VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
@@ -402,7 +401,7 @@ static bool settings_changed_externally(AutotuneModule * at, const uint16_t * fr
     float expected_freq = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[at->freq_step_index];
 
     float actual_freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
-    float actual_volt = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+    float actual_volt = nvs_config_get_float(NVS_CONFIG_ASIC_VOLTAGE);
 
     bool freq_matches = fabsf(actual_freq - expected_freq) < 0.5f;
     // Voltage is stored as an integer mV in NVS, so allow for that rounding
@@ -412,25 +411,16 @@ static bool settings_changed_externally(AutotuneModule * at, const uint16_t * fr
     return !freq_matches || !volt_matches;
 }
 
-// Called on every reverted/backed-off step while exploring beyond-spec.
-// Tracks failures by *proximity to the last failing frequency* rather than
-// strict "this exact step in a row" -- a level can look fine for a window
-// or two before failing again (heat one time, ASIC error rate the next),
-// and treating each of those as an isolated, forgotten incident just leads
-// to endlessly re-probing a level that's never actually going to hold. Once
-// enough failures pile up near the same point, that frequency gets a
-// cooldown (see EXTENDED_COOLDOWN_MS) instead of being retried forever.
+// Called on every reverted/backed-off step. If the step we just gave up on
+// was a beyond-spec frequency climb, count it -- after enough failures near
+// roughly the same point, get_extended_ceiling_mhz() will stop letting the
+// tuner retry it (see extended_soft_ceiling_mhz) and it'll move on to
+// voltage optimization instead. Any other kind of revert (an undervolt
+// trial, or a vendor-table-only step) resets the streak, since it's not
+// part of a beyond-spec climb attempt.
 static void track_extended_climb_failure(AutotuneModule * at, const char * reason)
 {
-    // Only a failure that happened while actually trying to reach or hold
-    // this frequency (a straight climb, or a voltage rescue attempting to
-    // save one) says anything about whether the frequency itself is too
-    // high. A failure during an undervolt trial (AUTOTUNE_ACTION_VOLT_DOWN)
-    // means the *voltage* was shaved a step too far at an already-proven
-    // frequency -- that's revert_last_action's job to walk back on its own,
-    // and should never drag the frequency ceiling down with it.
-    bool was_climb_related = at->last_action == AUTOTUNE_ACTION_FREQ_UP || at->last_action == AUTOTUNE_ACTION_VOLT_UP;
-    if (!was_climb_related || at->extended_freq_mhz <= 0.0f) {
+    if (at->extended_freq_mhz <= 0.0f) {
         at->extended_freq_consecutive_fails = 0;
         return;
     }
@@ -449,73 +439,21 @@ static void track_extended_climb_failure(AutotuneModule * at, const char * reaso
     }
 }
 
-// The pool can reject a share for reasons that have nothing to do with
-// whether the current frequency/voltage is stable -- most commonly
-// "Duplicate share", which happens more often at low frequency/low pool
-// difficulty simply because the chip finds qualifying results faster
-// relative to how often new work arrives. Counting these against the tuner's
-// stability judgement would make even the lowest, safest settings look
-// unstable and give it nowhere left to fall back to. We look this reason up
-// by name in the existing rejected-reason breakdown and exclude it.
-static uint32_t get_rejected_reason_count(SystemModule * sys_module, const char * reason)
-{
-    for (int i = 0; i < sys_module->rejected_reason_stats_count; i++) {
-        if (strncmp(sys_module->rejected_reason_stats[i].message, reason, sizeof(sys_module->rejected_reason_stats[i].message) - 1) == 0) {
-            return sys_module->rejected_reason_stats[i].count;
-        }
-    }
-    return 0;
-}
-
 // A newly-set (or still-active) soft ceiling only blocks *future* climb
 // attempts on its own -- it doesn't retroactively touch whatever frequency
 // the tuner happens to be sitting at right now. Without this, a voltage
 // rescue can keep holding the tuner at the exact frequency that just
-// triggered the ceiling in the first place (rescue succeeds, next window
-// the blocked climb falls through to undervolting, undervolting fails,
-// rescue again, forever) instead of actually retreating to the last
-// confirmed-good level. Call this right after revert_last_action(), before
-// applying the step, so the ceiling is honored immediately rather than
-// only being enforced the next time a climb is attempted.
+// triggered the ceiling in the first place, instead of actually retreating
+// to the last confirmed-good level. Call this right after
+// revert_last_action(), before applying the step, so the ceiling is
+// honored immediately rather than only being enforced the next time a
+// climb is attempted.
 static void enforce_soft_ceiling(AutotuneModule * at)
 {
     if (at->extended_soft_ceiling_mhz > 0.0f && at->extended_freq_mhz > at->extended_soft_ceiling_mhz) {
         at->extended_freq_mhz = at->extended_soft_ceiling_mhz;
         at->last_action = AUTOTUNE_ACTION_NONE;
     }
-}
-
-// For efficiency-optimizing profiles (currently just Eco), whether climbing
-// one more frequency step is still worth it in hash/watt terms. Voltage
-// requirements tend to grow faster than frequency near the top of a chip's
-// range, so peak efficiency is usually reached well before the thermal or
-// stability ceiling -- this is what lets Eco stop there instead of just
-// climbing with a wider thermal margin (which was never really "optimizing
-// for efficiency", just delaying the same ceiling-seeking behaviour).
-// Records the current step as the new best point as a side effect whenever
-// it does still look like an improvement, so callers don't need to
-// separately track that. Returns true (i.e. "keep climbing") if there's no
-// usable power reading yet, rather than blocking progress on missing data.
-// True while still in the bottom half of the vendor-tested table -- see the
-// FAST_CLIMB_EVAL_WINDOW_MS comment for why that gets a shorter, more
-// lenient evaluation than everything above it.
-static bool in_fast_climb_zone(AutotuneModule * at, int freq_option_count)
-{
-    return at->extended_freq_mhz <= 0.0f && at->freq_step_index < (freq_option_count / 2);
-}
-
-static bool efficiency_still_improving(AutotuneModule * at, SystemModule * sys_module, PowerManagementModule * pm)
-{
-    if (pm->power < 0.5f) {
-        return true;
-    }
-    float current_efficiency = sys_module->current_hashrate / pm->power; // GH/s per W
-    if (at->best_efficiency_freq_step < 0 || current_efficiency >= at->best_efficiency_ghs_per_watt) {
-        at->best_efficiency_ghs_per_watt = current_efficiency;
-        at->best_efficiency_freq_step = at->freq_step_index;
-        return true;
-    }
-    return false;
 }
 
 void AUTOTUNE_task(void * pvParameters)
@@ -549,12 +487,6 @@ void AUTOTUNE_task(void * pvParameters)
     at->step_downs_total = 0;
     at->step_ups_total = 0;
 
-    uint64_t window_start_accepted = 0;
-    uint64_t window_start_rejected = 0;
-    uint32_t window_start_duplicate = 0;
-    int64_t window_start_ms = 0;
-    float window_max_temp = 0.0f;
-    bool window_open = false;
     // Tracks the disabled->enabled transition so we only reset to the
     // bottom of the table once per "session", not on every loop tick.
     bool was_enabled = false;
@@ -571,7 +503,6 @@ void AUTOTUNE_task(void * pvParameters)
         bool enabled = nvs_config_get_bool(NVS_CONFIG_AUTOTUNE_ENABLED);
         if (!enabled) {
             at->state = AUTOTUNE_STATE_IDLE;
-            window_open = false;
             was_enabled = false;
             continue;
         }
@@ -593,9 +524,34 @@ void AUTOTUNE_task(void * pvParameters)
             ESP_LOGI(TAG, "Cooldown expired for the %.0f MHz soft ceiling, willing to probe higher again",
                      at->extended_soft_ceiling_mhz);
             at->extended_soft_ceiling_mhz = 0.0f;
+            at->extended_freq_consecutive_fails = 0;
+        }
+
+        if (!was_enabled) {
+            // Just (re)enabled. Start from the bottom of the vendor table
+            // for both frequency and voltage, and let the normal climb take
+            // it from there -- frequency climbs step by step, and voltage
+            // only goes up when a frequency step actually needs the rescue
+            // to stabilize (see revert_last_action), or proactively in step
+            // with frequency (see proportional_voltage_mv). This tends
+            // toward a near-minimal voltage for whatever frequency is
+            // reached, rather than starting at whatever voltage happened to
+            // be set before and only ever shaving it down afterward.
+            at->freq_step_index = 0;
+            at->voltage_mv = min_voltage_mv;
+            at->extended_freq_mhz = 0.0f;
+            at->extended_soft_ceiling_mhz = 0.0f;
             at->extended_soft_ceiling_expiry_ms = 0;
             at->extended_last_failed_mhz = 0.0f;
             at->extended_freq_consecutive_fails = 0;
+            at->best_efficiency_ghs_per_watt = 0.0f;
+            at->best_efficiency_freq_step = -1;
+            at->last_action = AUTOTUNE_ACTION_NONE;
+            apply_step(GLOBAL_STATE, at, freq_options, 0, at->voltage_mv, 0.0f);
+            ESP_LOGI(TAG, "Autotune enabled (%s profile): starting from the bottom (%.0f MHz @ %.0f mV) and climbing",
+                     profile->name, (float) freq_options[0], at->voltage_mv);
+            was_enabled = true;
+            continue;
         }
 
         bool blocked = sys_module->overheat_mode || sys_module->mining_paused ||
@@ -607,45 +563,14 @@ void AUTOTUNE_task(void * pvParameters)
             // power_management_task, or the ASIC simply not being ready yet
             // right after boot) has taken over, or we're not ready to act
             // yet at all. Crucially, this is checked *before* the
-            // just-enabled reset below: writing a frequency/voltage step
+            // just-enabled reset above: writing a frequency/voltage step
             // while the ASIC hasn't finished its own init sequence could
             // interfere with it. Don't fight it: just resync our own idea
             // of the current step to whatever is actually configured now
             // (a no-op if nothing's been applied yet), and wait until
             // things are calm/ready.
             at->state = AUTOTUNE_STATE_PAUSED;
-            window_open = false;
             resync_from_nvs(at, freq_options, freq_option_count);
-            continue;
-        }
-
-        if (!was_enabled) {
-            // Just (re)enabled -- and the ASIC is confirmed initialized, so
-            // it's now safe to apply a step. Start from the bottom of the
-            // vendor table for both frequency and voltage, and let the
-            // normal climb take it from there -- frequency climbs step by
-            // step, and voltage only goes up when a frequency step actually
-            // needs the rescue to stabilize (see revert_last_action), or
-            // proactively in step with frequency (see proportional_voltage_mv).
-            // This tends toward a near-minimal voltage for whatever frequency
-            // is reached, rather than starting at whatever voltage happened
-            // to be set before and only ever shaving it down afterward.
-            at->freq_step_index = 0;
-            at->voltage_mv = min_voltage_mv;
-            at->extended_freq_mhz = 0.0f;
-            at->extended_soft_ceiling_mhz = 0.0f;
-            at->extended_soft_ceiling_expiry_ms = 0;
-            at->extended_last_failed_mhz = 0.0f;
-            at->extended_freq_consecutive_fails = 0;
-            at->best_efficiency_ghs_per_watt = 0.0f;
-            at->best_efficiency_freq_step = -1;
-            at->hashrate_shortfall_ticks = 0;
-            at->last_action = AUTOTUNE_ACTION_NONE;
-            apply_step(GLOBAL_STATE, at, freq_options, 0, at->voltage_mv, 0.0f);
-            ESP_LOGI(TAG, "Autotune enabled (%s profile): starting from the bottom (%.0f MHz @ %.0f mV) and climbing",
-                     profile->name, (float) freq_options[0], at->voltage_mv);
-            was_enabled = true;
-            window_open = false;
             continue;
         }
 
@@ -653,132 +578,79 @@ void AUTOTUNE_task(void * pvParameters)
             // The person (or something else) changed frequency/voltage
             // directly, outside the tuner. Treat that as a deliberate new
             // starting point rather than silently overwriting it on the next
-            // action -- resync to it and start a fresh evaluation window.
+            // action -- resync to it and start a fresh confirmation period.
             ESP_LOGI(TAG, "Frequency/voltage changed externally, adopting new starting point");
             resync_from_nvs(at, freq_options, freq_option_count);
-            window_open = false;
+            continue;
+        }
+
+        // Give the chip a moment to settle after any step before judging
+        // it -- see the SETTLING_GRACE_MS comment for why.
+        if ((esp_timer_get_time() / 1000) - at->step_applied_at_ms < SETTLING_GRACE_MS) {
+            continue;
         }
 
         float chip_temp = pm->chip_temp_avg;
         if (pm->chip_temp2_avg > chip_temp) {
             chip_temp = pm->chip_temp2_avg;
         }
+        at->max_temp_seen_this_window = chip_temp;
 
-        if (!window_open) {
-            window_start_accepted = sys_module->shares_accepted;
-            window_start_rejected = sys_module->shares_rejected;
-            window_start_duplicate = get_rejected_reason_count(sys_module, "Duplicate share");
-            window_start_ms = esp_timer_get_time() / 1000;
-            window_max_temp = chip_temp;
-            window_open = true;
-            at->state = AUTOTUNE_STATE_WARMING;
-            continue;
-        }
-
-        if (chip_temp > window_max_temp) {
-            window_max_temp = chip_temp;
-        }
-        at->max_temp_seen_this_window = window_max_temp;
-
-        // Give the chip a moment to settle after any step before judging
-        // it -- see the SETTLING_GRACE_MS comment for why. Applies to all
-        // four fast-path checks below, not just one of them, since a
-        // settling transient can show up as a temperature blip, an ASIC
-        // error spike, an input-voltage dip, or a momentary hashrate
-        // shortfall, depending on the board.
-        if ((esp_timer_get_time() / 1000) - at->step_applied_at_ms < SETTLING_GRACE_MS) {
-            continue;
-        }
-
-        // Fast-path safety check: don't wait for the window to complete if
-        // we're already over the ceiling. Performance rides close to this
-        // line; Efficiency keeps a much wider margin (see AUTOTUNE_PROFILES).
-        if (window_max_temp > temp_ceiling_c) {
-            ESP_LOGW(TAG, "Temp %.1fC over ceiling %.1fC mid-window, stepping down early",
-                     window_max_temp, temp_ceiling_c);
-
+        // 1. Temperature -- reacts immediately, no debounce, no voltage
+        // rescue (that would only make a heat problem worse).
+        if (chip_temp > temp_ceiling_c) {
+            ESP_LOGW(TAG, "Temp %.1fC over ceiling %.1fC, stepping down early",
+                     chip_temp, temp_ceiling_c);
             track_extended_climb_failure(at, "heat");
-
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
             enforce_soft_ceiling(at);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-            window_open = false;
             continue;
         }
 
-        // Fast-path safety check on the board's input voltage (from the
-        // power supply, not the ASIC core voltage) -- see the
-        // INPUT_VOLTAGE_SAG_FRACTION comment for why this matters. A guard
-        // against pm->voltage being 0 (not yet measured, e.g. right after
-        // boot) avoids a false trigger before the first real reading.
+        // 2. Input voltage sag -- also immediate, also never rescued with
+        // more ASIC voltage (see INPUT_VOLTAGE_SAG_FRACTION comment).
         float nominal_input_voltage = (float) GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage;
         float input_voltage_floor = nominal_input_voltage * INPUT_VOLTAGE_SAG_FRACTION;
         if (pm->voltage > 0.5f && pm->voltage < input_voltage_floor) {
-            ESP_LOGW(TAG, "Input voltage %.2fV under %.0f%% of nominal %.0fV mid-window, stepping down early (power supply may be struggling)",
+            ESP_LOGW(TAG, "Input voltage %.2fV under %.0f%% of nominal %.0fV, stepping down early (power supply may be struggling)",
                      pm->voltage, INPUT_VOLTAGE_SAG_FRACTION * 100.0f, nominal_input_voltage);
-
             track_extended_climb_failure(at, "input voltage sag");
-
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
             enforce_soft_ceiling(at);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-            window_open = false;
             continue;
         }
 
-        // Fast-path safety check on the ASIC's own on-chip error rate --
-        // see the profile's error_percentage_max comment for why this matters and why
-        // it isn't held for the full evaluation window. Unlike the
-        // temperature check, a voltage rescue is worth trying here first
-        // (if this profile allows it), since (like rejected shares) this
-        // can reflect insufficient voltage headroom rather than heat.
-        //
-        // Skipped in the fast-climb zone: error_percentage is error_hashrate
-        // divided by current_hashrate, and at the bottom of the vendor table
-        // current_hashrate is small -- the same handful of error nonces that
-        // would barely register as a percentage at a higher frequency can
-        // read as a large, sustained-looking percentage here purely from
-        // that small denominator, not from genuine instability. This is
-        // also the safest, most thoroughly vendor-tested part of the range,
-        // so skipping this one specific check here is a reasonable trade;
-        // temperature/input-voltage and the share-based reject-rate check
-        // (real counts, not a hashrate ratio) still apply throughout.
-        if (!in_fast_climb_zone(at, freq_option_count)) {
-            float error_threshold = at->extended_freq_mhz > 0.0f ? profile->extended_error_percentage_max : profile->error_percentage_max;
-            if (sys_module->error_percentage > error_threshold) {
-                ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%% mid-window, reverting",
-                         sys_module->error_percentage, error_threshold);
-
-                track_extended_climb_failure(at, "ASIC errors");
-
-                revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
-                enforce_soft_ceiling(at);
-                at->step_downs_total++;
-                apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-                window_open = false;
-                continue;
-            }
+        // 3. ASIC on-chip error rate -- debounced (see
+        // ASIC_ERROR_BAD_TICKS_REQUIRED), voltage rescue offered first if
+        // this profile allows it, since insufficient voltage headroom is a
+        // common cause.
+        float error_threshold = at->extended_freq_mhz > 0.0f ? profile->extended_error_percentage_max : profile->error_percentage_max;
+        if (sys_module->error_percentage > error_threshold) {
+            at->asic_error_bad_ticks++;
+        } else {
+            at->asic_error_bad_ticks = 0;
+        }
+        if (at->asic_error_bad_ticks >= ASIC_ERROR_BAD_TICKS_REQUIRED) {
+            ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%%, sustained over %d checks, reverting",
+                     sys_module->error_percentage, error_threshold, at->asic_error_bad_ticks);
+            at->asic_error_bad_ticks = 0;
+            track_extended_climb_failure(at, "ASIC errors");
+            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+            enforce_soft_ceiling(at);
+            at->step_downs_total++;
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            continue;
         }
 
-        // Fast-path safety check comparing measured hashrate against the
-        // chip's own theoretical expected hashrate for the current
-        // frequency (frequency * core count, computed independently of any
-        // error/reject counting). Insufficient voltage can cause some
-        // cores to simply stop contributing rather than produce wrong
-        // results -- that shows up as a hashrate shortfall, not as ASIC
-        // errors or rejected shares, so neither of those checks catches it
-        // on their own. Voltage rescue is exactly the fix here (matches
-        // what manually adding voltage does), so it's offered the same way
-        // as the ASIC-error check above.
-        //
-        // current_hashrate is a single-interval instantaneous reading (see
-        // update_hash_counter in hashrate_monitor_task.c) with real
-        // sample-to-sample variance, particularly at low absolute
-        // hashrates -- so a lone low reading isn't trusted on its own; see
-        // hashrate_shortfall_ticks. That debounce is what makes it safe to
-        // apply this check throughout, including the fast-climb zone.
+        // 4. Hashrate shortfall against the chip's own theoretical
+        // expectation for this frequency -- also debounced. Insufficient
+        // voltage can cause some cores to simply stop contributing rather
+        // than produce wrong results, which neither of the checks above
+        // would catch on their own.
         if (pm->expected_hashrate > 0.5f && sys_module->current_hashrate < pm->expected_hashrate * HASHRATE_RATIO_MIN) {
             at->hashrate_shortfall_ticks++;
         } else {
@@ -788,100 +660,51 @@ void AUTOTUNE_task(void * pvParameters)
             ESP_LOGW(TAG, "Hashrate %.1f GH/s is only %.0f%% of the %.1f GH/s expected for this frequency, sustained over %d checks, reverting (possible partial core dropout from insufficient voltage)",
                      sys_module->current_hashrate, (sys_module->current_hashrate / pm->expected_hashrate) * 100.0f,
                      pm->expected_hashrate, at->hashrate_shortfall_ticks);
-
             at->hashrate_shortfall_ticks = 0;
             track_extended_climb_failure(at, "hashrate shortfall");
-
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
             enforce_soft_ceiling(at);
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-            window_open = false;
             continue;
         }
 
-        int64_t now_ms = esp_timer_get_time() / 1000;
-        int64_t eval_window_ms = in_fast_climb_zone(at, freq_option_count) ? FAST_CLIMB_EVAL_WINDOW_MS : EVAL_WINDOW_MS;
-        if (now_ms - window_start_ms < eval_window_ms) {
-            continue; // still collecting samples for this step
-        }
+        // All four signals look fine on this check.
+        at->state = AUTOTUNE_STATE_WARMING;
+        at->consecutive_good_checks++;
 
-        uint64_t accepted_delta = sys_module->shares_accepted - window_start_accepted;
-        uint64_t rejected_delta_raw = sys_module->shares_rejected - window_start_rejected;
-
-        // "Duplicate share" rejections are a pool/protocol artifact, not a
-        // sign that this frequency/voltage is unstable -- see the comment on
-        // get_rejected_reason_count(). Exclude them from both the reject
-        // count and the sample total so they can't make an otherwise
-        // perfectly stable step (including the lowest, safest one) look
-        // unstable, which would leave the tuner nowhere to fall back to.
-        uint32_t duplicate_delta = get_rejected_reason_count(sys_module, "Duplicate share") - window_start_duplicate;
-        uint64_t rejected_delta = (rejected_delta_raw > duplicate_delta) ? (rejected_delta_raw - duplicate_delta) : 0;
-        uint64_t total_delta = accepted_delta + rejected_delta;
-
-        // Beyond-spec steps get a stricter bar: more samples required, lower
-        // tolerance for rejects, since these values are unvalidated by the vendor.
-        // The bottom of the vendor table goes the other way, with a lower bar,
-        // for the reasons in the FAST_CLIMB_EVAL_WINDOW_MS comment above.
-        int min_samples = MIN_SAMPLE_SHARES;
+        int good_checks_required = GOOD_CHECKS_REQUIRED_NORMAL;
         if (at->extended_freq_mhz > 0.0f) {
-            min_samples = EXTENDED_MIN_SAMPLE_SHARES;
+            good_checks_required = GOOD_CHECKS_REQUIRED_EXTENDED;
         } else if (in_fast_climb_zone(at, freq_option_count)) {
-            min_samples = FAST_CLIMB_MIN_SAMPLE_SHARES;
-        }
-        float reject_threshold = profile->reject_rate_max;
-        if (at->extended_freq_mhz > 0.0f) {
-            reject_threshold = profile->extended_reject_rate_max;
-        } else if (in_fast_climb_zone(at, freq_option_count)) {
-            reject_threshold = FAST_CLIMB_REJECT_RATE_MAX;
+            good_checks_required = GOOD_CHECKS_REQUIRED_FAST;
         }
 
-        if ((int) total_delta < min_samples) {
-            // Not enough shares yet to trust the reject rate (e.g. high pool
-            // difficulty). Keep the window open a bit longer instead of
-            // judging on a handful of samples.
-            continue;
+        if (at->consecutive_good_checks < good_checks_required) {
+            continue; // not yet confirmed stable -- keep checking
         }
+        at->consecutive_good_checks = 0;
 
-        float reject_rate = (float) rejected_delta / (float) total_delta;
-        at->last_reject_rate = reject_rate;
-
-        bool unstable = reject_rate > reject_threshold;
-
-        if (unstable) {
-            ESP_LOGW(TAG, "Reject rate %.1f%% over threshold at %d/%.0fMHz @ %.0fmV%s, reverting",
-                     reject_rate * 100.0f, at->freq_step_index, (float) freq_options[at->freq_step_index], at->voltage_mv,
-                     at->extended_freq_mhz > 0.0f ? " (beyond spec)" : "");
-
-            track_extended_climb_failure(at, "rejected shares");
-
-            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
-            enforce_soft_ceiling(at);
-            at->step_downs_total++;
-            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-        } else if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
+        if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
             // The extra voltage successfully stabilized this frequency step.
             // Keep it, and go straight back to trying to climb frequency
             // further on the next cycle. This frequency level did ultimately
             // work, so it shouldn't count toward "repeatedly failing here".
             at->extended_freq_consecutive_fails = 0;
             at->last_action = AUTOTUNE_ACTION_NONE;
-            at->state = AUTOTUNE_STATE_WARMING;
         } else if (at->freq_step_index < freq_option_count - 1 &&
                    (!profile->optimize_efficiency || efficiency_still_improving(at, sys_module, pm))) {
             at->freq_step_index++;
             at->last_action = AUTOTUNE_ACTION_FREQ_UP;
             at->step_ups_total++;
-            at->state = AUTOTUNE_STATE_WARMING;
 
             // Proactively bring voltage along for the ride, but only once
-            // past the safe bottom half of the table (the same split used
-            // for the fast-climb zone) -- proactively scaling voltage all
-            // the way from the very first step meant it was already sitting
-            // at vendor-max by the time frequency reached vendor-max too,
-            // even though most of that climb never actually needed it.
-            // Below that point, voltage only moves reactively (see
-            // revert_last_action's rescue), the same as Eco always does.
+            // past the safe bottom half of the table -- proactively scaling
+            // voltage all the way from the very first step meant it was
+            // already sitting at vendor-max by the time frequency reached
+            // vendor-max too, even though most of that climb never actually
+            // needed it. Below that point, voltage only moves reactively
+            // (see revert_last_action's rescue), the same as Eco always does.
             if (profile->allow_voltage_rescue && !in_fast_climb_zone(at, freq_option_count)) {
                 float target_voltage = proportional_voltage_mv(at->freq_step_index, freq_option_count, min_voltage_mv, max_voltage_mv);
                 if (target_voltage > at->voltage_mv) {
@@ -900,7 +723,6 @@ void AUTOTUNE_task(void * pvParameters)
             at->freq_step_index--;
             at->last_action = AUTOTUNE_ACTION_NONE;
             at->step_downs_total++;
-            at->state = AUTOTUNE_STATE_WARMING;
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, 0.0f);
         } else if (profile->allow_beyond_spec && nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) &&
                    next_extended_step_within_ceiling(at, freq_options, freq_option_count)) {
@@ -915,11 +737,7 @@ void AUTOTUNE_task(void * pvParameters)
             at->extended_freq_mhz = base + EXTENDED_STEP_MHZ;
             // Only treat this as "real progress" (and forget past failures)
             // if it's not just re-attempting a level we already know is
-            // troublesome. Without this check, climbing right back to a
-            // frequency that just failed twice resets the counter before it
-            // ever reaches EXTENDED_FAIL_LIMIT, so a level that genuinely
-            // can't hold gets retried forever instead of ever triggering
-            // the cooldown.
+            // troublesome.
             bool near_known_failure = fabsf(at->extended_freq_mhz - at->extended_last_failed_mhz) < (EXTENDED_STEP_MHZ * 1.5f);
             if (!near_known_failure) {
                 at->extended_freq_consecutive_fails = 0;
@@ -936,7 +754,6 @@ void AUTOTUNE_task(void * pvParameters)
             // it holds.
             at->voltage_mv = clamp_voltage(at->voltage_mv - VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
             at->last_action = AUTOTUNE_ACTION_VOLT_DOWN;
-            at->state = AUTOTUNE_STATE_WARMING;
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
         } else {
             // Highest trusted frequency, lowest voltage that's still stable
@@ -946,10 +763,5 @@ void AUTOTUNE_task(void * pvParameters)
             ESP_LOGI(TAG, "At best known efficient point for %s profile (%.0f MHz @ %.0f mV) and stable, holding",
                      profile->name, applied_freq, at->voltage_mv);
         }
-
-        // Continuous mode: re-open a fresh window immediately so we keep
-        // re-checking (and can climb back up if e.g. ambient temp drops, or
-        // step down again if it rises) for as long as autotune is enabled.
-        window_open = false;
     }
 }
