@@ -775,7 +775,17 @@ void AUTOTUNE_task(void * pvParameters)
             float base = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : vendor_max_freq;
 
             at->extended_freq_mhz = base + EXTENDED_STEP_MHZ;
-            at->extended_freq_consecutive_fails = 0; // made real progress -- past failures no longer apply
+            // Only treat this as "real progress" (and forget past failures)
+            // if it's not just re-attempting a level we already know is
+            // troublesome. Without this check, climbing right back to a
+            // frequency that just failed twice resets the counter before it
+            // ever reaches EXTENDED_FAIL_LIMIT, so a level that genuinely
+            // can't hold gets retried forever instead of ever triggering
+            // the cooldown.
+            bool near_known_failure = fabsf(at->extended_freq_mhz - at->extended_last_failed_mhz) < (EXTENDED_STEP_MHZ * 1.5f);
+            if (!near_known_failure) {
+                at->extended_freq_consecutive_fails = 0;
+            }
             at->last_action = AUTOTUNE_ACTION_FREQ_UP;
             at->step_ups_total++;
             at->state = AUTOTUNE_STATE_BEYOND_SPEC;
