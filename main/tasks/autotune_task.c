@@ -401,7 +401,7 @@ static bool settings_changed_externally(AutotuneModule * at, const uint16_t * fr
     float expected_freq = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[at->freq_step_index];
 
     float actual_freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
-    float actual_volt = nvs_config_get_float(NVS_CONFIG_ASIC_VOLTAGE);
+    float actual_volt = (float) nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
 
     bool freq_matches = fabsf(actual_freq - expected_freq) < 0.5f;
     // Voltage is stored as an integer mV in NVS, so allow for that rounding
