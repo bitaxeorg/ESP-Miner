@@ -706,19 +706,32 @@ void AUTOTUNE_task(void * pvParameters)
         // temperature check, a voltage rescue is worth trying here first
         // (if this profile allows it), since (like rejected shares) this
         // can reflect insufficient voltage headroom rather than heat.
-        float error_threshold = at->extended_freq_mhz > 0.0f ? profile->extended_error_percentage_max : profile->error_percentage_max;
-        if (sys_module->error_percentage > error_threshold) {
-            ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%% mid-window, reverting",
-                     sys_module->error_percentage, error_threshold);
+        //
+        // Skipped in the fast-climb zone: error_percentage is error_hashrate
+        // divided by current_hashrate, and at the bottom of the vendor table
+        // current_hashrate is small -- the same handful of error nonces that
+        // would barely register as a percentage at a higher frequency can
+        // read as a large, sustained-looking percentage here purely from
+        // that small denominator, not from genuine instability. This is
+        // also the safest, most thoroughly vendor-tested part of the range,
+        // so skipping this one specific check here is a reasonable trade;
+        // temperature/input-voltage and the share-based reject-rate check
+        // (real counts, not a hashrate ratio) still apply throughout.
+        if (!in_fast_climb_zone(at, freq_option_count)) {
+            float error_threshold = at->extended_freq_mhz > 0.0f ? profile->extended_error_percentage_max : profile->error_percentage_max;
+            if (sys_module->error_percentage > error_threshold) {
+                ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%% mid-window, reverting",
+                         sys_module->error_percentage, error_threshold);
 
-            track_extended_climb_failure(at, "ASIC errors");
+                track_extended_climb_failure(at, "ASIC errors");
 
-            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
-            enforce_soft_ceiling(at);
-            at->step_downs_total++;
-            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-            window_open = false;
-            continue;
+                revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+                enforce_soft_ceiling(at);
+                at->step_downs_total++;
+                apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+                window_open = false;
+                continue;
+            }
         }
 
         int64_t now_ms = esp_timer_get_time() / 1000;
