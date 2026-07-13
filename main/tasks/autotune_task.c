@@ -628,22 +628,36 @@ void AUTOTUNE_task(void * pvParameters)
         // ASIC_ERROR_BAD_TICKS_REQUIRED), voltage rescue offered first if
         // this profile allows it, since insufficient voltage headroom is a
         // common cause.
-        float error_threshold = at->extended_freq_mhz > 0.0f ? profile->extended_error_percentage_max : profile->error_percentage_max;
-        if (sys_module->error_percentage > error_threshold) {
-            at->asic_error_bad_ticks++;
-        } else {
-            at->asic_error_bad_ticks = 0;
-        }
-        if (at->asic_error_bad_ticks >= ASIC_ERROR_BAD_TICKS_REQUIRED) {
-            ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%%, sustained over %d checks, reverting",
-                     sys_module->error_percentage, error_threshold, at->asic_error_bad_ticks);
-            at->asic_error_bad_ticks = 0;
-            track_extended_climb_failure(at, "ASIC errors");
-            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
-            enforce_soft_ceiling(at);
-            at->step_downs_total++;
-            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-            continue;
+        //
+        // Skipped entirely in the fast-climb zone: error_percentage is
+        // error_hashrate divided by current_hashrate, and at the bottom of
+        // the vendor table current_hashrate is small enough that this
+        // reads as *sustainedly* elevated (10-18%+, not just a brief
+        // blip) purely from that small denominator -- a couple of
+        // consecutive debounce checks doesn't filter that out, it just
+        // delays the same false trigger by one tick. This is also the
+        // safest, most thoroughly vendor-tested part of the range, so
+        // skipping this one specific check here is a reasonable trade;
+        // temperature/input-voltage and the debounced hashrate-shortfall
+        // check still apply throughout.
+        if (!in_fast_climb_zone(at, freq_option_count)) {
+            float error_threshold = at->extended_freq_mhz > 0.0f ? profile->extended_error_percentage_max : profile->error_percentage_max;
+            if (sys_module->error_percentage > error_threshold) {
+                at->asic_error_bad_ticks++;
+            } else {
+                at->asic_error_bad_ticks = 0;
+            }
+            if (at->asic_error_bad_ticks >= ASIC_ERROR_BAD_TICKS_REQUIRED) {
+                ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%%, sustained over %d checks, reverting",
+                         sys_module->error_percentage, error_threshold, at->asic_error_bad_ticks);
+                at->asic_error_bad_ticks = 0;
+                track_extended_climb_failure(at, "ASIC errors");
+                revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+                enforce_soft_ceiling(at);
+                at->step_downs_total++;
+                apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+                continue;
+            }
         }
 
         // 4. Hashrate shortfall against the chip's own theoretical
