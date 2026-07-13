@@ -71,6 +71,16 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // gets a reaction quickly, since this profile intentionally runs with a thin margin.
 #define TICK_MS 5000
 
+// After applying any step, the chip needs a brief moment to actually
+// settle (PLL relock, voltage regulator ramp) before its temperature/error
+// readings mean anything. Without this, a normal settling transient can
+// get misread as genuine instability -- most damagingly on the very first
+// step after a fresh (re-)enable, which is also usually the single biggest
+// frequency/voltage jump of the whole session (whatever it was before,
+// straight down to the bottom of the table) and has nowhere lower left to
+// retreat to if that transient trips a fast-path check.
+#define SETTLING_GRACE_MS (10 * 1000)
+
 // How long we let a given frequency/voltage step run before judging it.
 // Long enough to gather a meaningful number of shares, short enough that the
 // tuner is responsive to changing ambient/cooling conditions (continuous mode).
@@ -262,7 +272,7 @@ static float proportional_voltage_mv(int freq_step_index, int freq_option_count,
     return min_voltage_mv + progress * (max_voltage_mv - min_voltage_mv);
 }
 
-static void apply_step(GlobalState * GLOBAL_STATE, const uint16_t * freq_options,
+static void apply_step(GlobalState * GLOBAL_STATE, AutotuneModule * at, const uint16_t * freq_options,
                         int freq_idx, float voltage_mv, float extended_freq_mhz)
 {
     // extended_freq_mhz > 0 means we're operating past the vendor table --
@@ -278,6 +288,7 @@ static void apply_step(GlobalState * GLOBAL_STATE, const uint16_t * freq_options
     // power_management_task polls these NVS values on its own ~100ms loop and
     // applies them to the ASIC; we don't touch the hardware directly here so
     // there's a single owner of "what the ASIC is currently told to do".
+    at->step_applied_at_ms = esp_timer_get_time() / 1000;
 }
 
 static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, int freq_option_count)
@@ -603,7 +614,7 @@ void AUTOTUNE_task(void * pvParameters)
             at->best_efficiency_ghs_per_watt = 0.0f;
             at->best_efficiency_freq_step = -1;
             at->last_action = AUTOTUNE_ACTION_NONE;
-            apply_step(GLOBAL_STATE, freq_options, 0, at->voltage_mv, 0.0f);
+            apply_step(GLOBAL_STATE, at, freq_options, 0, at->voltage_mv, 0.0f);
             ESP_LOGI(TAG, "Autotune enabled (%s profile): starting from the bottom (%.0f MHz @ %.0f mV) and climbing",
                      profile->name, (float) freq_options[0], at->voltage_mv);
             was_enabled = true;
@@ -642,9 +653,18 @@ void AUTOTUNE_task(void * pvParameters)
         }
         at->max_temp_seen_this_window = window_max_temp;
 
+        // Give the chip a moment to settle after any step before judging
+        // it -- see the SETTLING_GRACE_MS comment for why. Applies to all
+        // three fast-path checks below, not just one of them, since a
+        // settling transient can show up as a temperature blip, an ASIC
+        // error spike, or an input-voltage dip depending on the board.
+        if ((esp_timer_get_time() / 1000) - at->step_applied_at_ms < SETTLING_GRACE_MS) {
+            continue;
+        }
+
         // Fast-path safety check: don't wait for the window to complete if
-        // we're already over the ceiling. Aggressive profile rides close to
-        // this line; eco/balanced keep a much wider margin (see AUTOTUNE_PROFILES).
+        // we're already over the ceiling. Performance rides close to this
+        // line; Efficiency keeps a much wider margin (see AUTOTUNE_PROFILES).
         if (window_max_temp > temp_ceiling_c) {
             ESP_LOGW(TAG, "Temp %.1fC over ceiling %.1fC mid-window, stepping down early",
                      window_max_temp, temp_ceiling_c);
@@ -654,7 +674,7 @@ void AUTOTUNE_task(void * pvParameters)
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
             enforce_soft_ceiling(at);
             at->step_downs_total++;
-            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
             window_open = false;
             continue;
         }
@@ -675,7 +695,7 @@ void AUTOTUNE_task(void * pvParameters)
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
             enforce_soft_ceiling(at);
             at->step_downs_total++;
-            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
             window_open = false;
             continue;
         }
@@ -696,7 +716,7 @@ void AUTOTUNE_task(void * pvParameters)
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
             enforce_soft_ceiling(at);
             at->step_downs_total++;
-            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
             window_open = false;
             continue;
         }
@@ -754,7 +774,7 @@ void AUTOTUNE_task(void * pvParameters)
             revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
             enforce_soft_ceiling(at);
             at->step_downs_total++;
-            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
         } else if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
             // The extra voltage successfully stabilized this frequency step.
             // Keep it, and go straight back to trying to climb frequency
@@ -781,7 +801,7 @@ void AUTOTUNE_task(void * pvParameters)
                 }
             }
 
-            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, 0.0f);
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, 0.0f);
         } else if (profile->optimize_efficiency && at->best_efficiency_freq_step >= 0 &&
                    at->freq_step_index > at->best_efficiency_freq_step) {
             // Efficiency dropped compared to the best point seen -- we've
@@ -793,7 +813,7 @@ void AUTOTUNE_task(void * pvParameters)
             at->last_action = AUTOTUNE_ACTION_NONE;
             at->step_downs_total++;
             at->state = AUTOTUNE_STATE_WARMING;
-            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, 0.0f);
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, 0.0f);
         } else if (profile->allow_beyond_spec && nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) &&
                    next_extended_step_within_ceiling(at, freq_options, freq_option_count)) {
             // Vendor-table frequency is maxed, this profile allows going
@@ -819,7 +839,7 @@ void AUTOTUNE_task(void * pvParameters)
             at->last_action = AUTOTUNE_ACTION_FREQ_UP;
             at->step_ups_total++;
             at->state = AUTOTUNE_STATE_BEYOND_SPEC;
-            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
         } else if (at->voltage_mv > min_voltage_mv + 0.5f) {
             // The highest frequency we currently trust is maxed out (vendor
             // ceiling, or the beyond-spec ceiling if that's active) and
@@ -829,7 +849,7 @@ void AUTOTUNE_task(void * pvParameters)
             at->voltage_mv = clamp_voltage(at->voltage_mv - VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
             at->last_action = AUTOTUNE_ACTION_VOLT_DOWN;
             at->state = AUTOTUNE_STATE_WARMING;
-            apply_step(GLOBAL_STATE, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
         } else {
             // Highest trusted frequency, lowest voltage that's still stable
             // at it -- this is the best known efficient point. Hold here.

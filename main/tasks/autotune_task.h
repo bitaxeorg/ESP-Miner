@@ -51,6 +51,14 @@ typedef struct {
     int extended_freq_consecutive_fails;
     float max_temp_seen_this_window;
     float last_reject_rate;
+    // Set every time a step is applied, so the fast-path safety checks can
+    // give the chip a brief moment to settle (PLL relock, voltage regulator
+    // ramp) before judging it -- without this, a normal settling transient
+    // right after a big frequency/voltage change can look identical to
+    // genuine instability, most notably on the very first step out of a
+    // fresh (re-)enable, where there's nowhere lower left to retreat to if
+    // that transient gets misread as "this step doesn't work".
+    int64_t step_applied_at_ms;
     // Only used by profiles with optimize_efficiency set (currently Eco).
     // Tracks hash-per-watt at the best frequency step found so far, so
     // climbing can stop at the efficiency peak instead of the thermal or
