@@ -30,9 +30,9 @@
         <!-- Hashrate -->
         <div class="grid-stack-item" gs-id="hashrate">
             <div class="grid-stack-item-content">
-                <div class="card mb-0">
+                <div class="card">
                     <div class="flex flex-col justify-between">
-                        <span class="block text-lg font-medium !mb-4">Hashrate</span>
+                        <span class="block text-lg font-medium mb-4">Hashrate</span>
 
                         <ng-container *ngIf="!info.power_fault; else powerFault">
                             <div class="flex items-center justify-between gap-2 mb-4">
@@ -91,9 +91,9 @@
         <!-- Efficiency -->
         <div class="grid-stack-item" gs-id="efficiency">
             <div class="grid-stack-item-content">
-                <div class="card mb-0">
+                <div class="card">
                     <div class="flex flex-col justify-between">
-                        <span class="block text-lg font-medium !mb-4">Efficiency</span>
+                        <span class="block text-lg font-medium mb-4">Efficiency</span>
 
                         <ng-container *ngIf="!info.power_fault; else powerFault">
                             <div class="flex items-center justify-between gap-2 mb-4">
@@ -135,8 +135,8 @@
         <!-- Shares -->
         <div class="grid-stack-item" gs-id="shares">
             <div class="grid-stack-item-content">
-                <div class="card mb-0">
-                    <div class="flex justify-between !mb-4">
+                <div class="card">
+                    <div class="flex justify-between mb-4">
                         <div>
                             <span class="block text-lg font-medium mb-4">Shares
                                 <i class="pi pi-arrow-up transition-opacity duration-500 ml-2" [ngClass]="{'opacity-100 text-green-500': flashShare, 'opacity-0': !flashShare}" appTooltip="Share Sent" tooltipPosition="top"></i>
@@ -171,8 +171,8 @@
         <!-- Best Difficulty -->
         <div class="grid-stack-item" gs-id="bestdiff">
             <div class="grid-stack-item-content">
-                <div class="card mb-0">
-                    <div class="flex justify-between !mb-4">
+                <div class="card">
+                    <div class="flex justify-between mb-4">
                         <div>
                             <span class="block text-lg font-medium mb-4">Best Difficulty</span>
                             <div class="font-medium text-2xl">
@@ -180,7 +180,7 @@
                                     {{info.bestDiff | diffSuffix}}
                                 </span>
                                 <span class="text-secondary text-lg">all-time best</span>
-                                <span class="text-sm font-medium !mb-4" *ngIf="info.networkDifficulty">
+                                <span class="text-sm font-medium mb-4" *ngIf="info.networkDifficulty">
                                     <tooltip-text-icon
                                         [text]="'(' + networkDifficultyPercentage + '%)'"
                                         tooltip="Chance to find a Block"
@@ -233,8 +233,8 @@
                 <div class="card">
                     <h4 class="text-center font-medium">Power</h4>
 
-                    <div class="!mb-4">
-                        <h6 class="flex justify-between !mb-1">
+                    <div class="mb-4">
+                        <h6 class="flex justify-between mb-1">
                             Power<span>{{info.power}} W</span>
                         </h6>
                         @let powerProgress = ((info.power / info.maxPower) * 100);
@@ -243,8 +243,8 @@
                         </div>
                     </div>
 
-                    <div class="!mb-4">
-                        <h6 class="flex justify-between !mb-1">
+                    <div class="mb-4">
+                        <h6 class="flex justify-between mb-1">
                             Input Voltage<span>{{info.voltage}} V</span>
                         </h6>
                         <div class="relative">
@@ -268,8 +268,8 @@
                         </strong>
                     </div>
 
-                    <div class="!mb-4">
-                        <h6 class="flex justify-between !mb-1">
+                    <div class="mb-4">
+                        <h6 class="flex justify-between mb-1">
                             ASIC Frequency<span>{{info.actualFrequency | number: '1.0-4'}} MHz</span>
                         </h6>
                         @let freqProgress = ((info.actualFrequency / maxFrequency) * 100);
@@ -279,7 +279,7 @@
                     </div>
 
                     <div>
-                        <h6 class="flex justify-between !mb-1">
+                        <h6 class="flex justify-between mb-1">
                             Measured ASIC Voltage<span>{{info.coreVoltageActual}} V</span>
                         </h6>
                         @let coreVoltProgress = ((info.coreVoltageActual / 1.8) * 100);
@@ -297,8 +297,8 @@
                 <div class="card">
                     <h4 class="text-center font-medium">Heat</h4>
 
-                    <div class="!mb-4">
-                        <h6 class="flex justify-between !mb-1">
+                    <div class="mb-4">
+                        <h6 class="flex justify-between mb-1">
                             <ng-container *ngIf="info.temp2 > 0; else singleTemp">
                                 ASIC Temperature 1
                             </ng-container>
@@ -321,8 +321,8 @@
                         </strong>
                     </div>
 
-                    <div class="!mb-4" *ngIf="info.temp2 > 0">
-                        <h6 class="flex justify-between !mb-1">
+                    <div class="mb-4" *ngIf="info.temp2 > 0">
+                        <h6 class="flex justify-between mb-1">
                             ASIC Temperature 2
                             <span>
                                 {{info.temp2}} &deg;C
@@ -338,8 +338,8 @@
                         </strong>
                     </div>
 
-                    <div class="!mb-4" *ngIf="info.vrTemp > 0">
-                        <h6 class="flex justify-between !mb-1">
+                    <div class="mb-4" *ngIf="info.vrTemp > 0">
+                        <h6 class="flex justify-between mb-1">
                             Voltage Regulator Temperature<span>{{info.vrTemp}} &deg;C</span>
                         </h6>
                         @let vrTempProgress = ((info.vrTemp / 120) * 100);
@@ -361,8 +361,8 @@
                 <div class="card">
                     <h4 class="text-center font-medium">Fan</h4>
 
-                    <div class="!mb-4">
-                        <h6 class="flex justify-between !mb-1" tooltipPosition="top"
+                    <div class="mb-4">
+                        <h6 class="flex justify-between mb-1" tooltipPosition="top"
                                 appTooltip="{{info.fan2rpm > 0 ? 'Fan 1: ' : ''}}{{info.fanrpm}} RPM{{info.fan2rpm > 0 ? '<br>Fan 2: ' + info.fan2rpm + ' RPM' : ''}}">
 
                             <ng-container *ngIf="info.fan2rpm > 0; else singleFan">
@@ -389,7 +389,7 @@
                 <ng-container *ngIf="activePoolUser">
                     <div class="card">
                         <div class="flex flex-nowrap justify-between relative">
-                            <h4 class="mb-0 font-medium">
+                            <h4 class="font-medium">
                                 Pool
                                 <a
                                     *ngIf="(quickLink$ | async) as quickLink"

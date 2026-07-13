@@ -14,6 +14,7 @@ type TableRow = {
   value: string;
   class?: string;
   valueClass?: string;
+  color?: string;
   isSensitiveData?: boolean;
   tooltip?: string;
 }
@@ -89,7 +90,7 @@ export class SystemComponent implements OnInit, OnDestroy {
 
   getSystemRows(data: CombinedData): TableRow[] {
     return [
-      { label: 'Device Model', value: data.asic.deviceModel || 'Other', valueClass: 'text-' + data.asic.swarmColor + '-500' },
+      { label: 'Device Model', value: data.asic.deviceModel || 'Other', color: data.asic.swarmColor || 'gray' },
       { label: 'Board Version', value: data.info.boardVersion },
       { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds) },

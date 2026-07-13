@@ -1,3 +1,5 @@
+@layer theme, base, components, layout, axe-os, utilities;
+
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark-mode, .dark-mode *));
