@@ -264,21 +264,6 @@ static bool in_fast_climb_zone(AutotuneModule * at, int freq_option_count)
     return at->extended_freq_mhz <= 0.0f && at->freq_step_index < (freq_option_count / 2);
 }
 
-// Scales how far we are into the frequency table onto the voltage range, so
-// voltage can be raised proactively in step with frequency instead of only
-// reactively once a step actually fails. This doesn't compromise final
-// efficiency: the undervolt-optimization phase that runs once the ceiling
-// is reached will still shave voltage back down, in the same fine 10mV
-// steps, to whatever the minimum actually needed turns out to be.
-static float proportional_voltage_mv(int freq_step_index, int freq_option_count, float min_voltage_mv, float max_voltage_mv)
-{
-    if (freq_option_count <= 1) {
-        return min_voltage_mv;
-    }
-    float progress = (float) freq_step_index / (float) (freq_option_count - 1);
-    return min_voltage_mv + progress * (max_voltage_mv - min_voltage_mv);
-}
-
 // For efficiency-optimizing profiles (currently just Eco), whether climbing
 // one more frequency step is still worth it in hash/watt terms. Voltage
 // requirements tend to grow faster than frequency near the top of a chip's
@@ -539,13 +524,35 @@ void AUTOTUNE_task(void * pvParameters)
             at->extended_freq_consecutive_fails = 0;
         }
 
+        bool blocked = sys_module->overheat_mode || sys_module->mining_paused ||
+                        sys_module->hardware_fault || sys_module->pools_unavailable ||
+                        !GLOBAL_STATE->ASIC_initalized;
+
+        if (blocked) {
+            // Something else (most likely the reactive overheat-protection in
+            // power_management_task, or the ASIC simply not being ready yet
+            // right after boot) has taken over, or we're not ready to act
+            // yet at all. Crucially, this is checked *before* the
+            // just-enabled reset below: writing a frequency/voltage step
+            // while the ASIC hasn't finished its own init sequence could
+            // interfere with it. Don't fight it: just resync our own idea
+            // of the current step to whatever is actually configured now
+            // (a no-op if nothing's been applied yet), and wait until
+            // things are calm/ready.
+            at->state = AUTOTUNE_STATE_PAUSED;
+            resync_from_nvs(at, freq_options, freq_option_count);
+            continue;
+        }
+
         if (!was_enabled) {
-            // Just (re)enabled. Start from the bottom of the vendor table
-            // for both frequency and voltage, and let the normal climb take
-            // it from there -- frequency climbs step by step, and voltage
-            // only goes up when a frequency step actually needs the rescue
-            // to stabilize (see revert_last_action), or proactively in step
-            // with frequency (see proportional_voltage_mv). This tends
+            // Just (re)enabled -- and the ASIC is confirmed initialized, so
+            // it's now safe to apply a step. Start from the bottom of the
+            // vendor table for both frequency and voltage, and let the
+            // normal climb take it from there -- frequency climbs step by
+            // step, and voltage only goes up when a frequency step actually
+            // needs the rescue to stabilize (see revert_last_action), or
+            // proactively in step with frequency, one get_voltage_step_mv
+            // increment at a time once past the fast-climb zone. This tends
             // toward a near-minimal voltage for whatever frequency is
             // reached, rather than starting at whatever voltage happened to
             // be set before and only ever shaving it down afterward.
@@ -563,26 +570,6 @@ void AUTOTUNE_task(void * pvParameters)
             ESP_LOGI(TAG, "Autotune enabled (%s profile): starting from the bottom (%.0f MHz @ %.0f mV) and climbing",
                      profile->name, (float) freq_options[0], at->voltage_mv);
             was_enabled = true;
-            continue;
-        }
-
-        bool blocked = sys_module->overheat_mode || sys_module->mining_paused ||
-                        sys_module->hardware_fault || sys_module->pools_unavailable ||
-                        !GLOBAL_STATE->ASIC_initalized;
-
-        if (blocked) {
-            // Something else (most likely the reactive overheat-protection in
-            // power_management_task, or the ASIC simply not being ready yet
-            // right after boot) has taken over, or we're not ready to act
-            // yet at all. Crucially, this is checked *before* the
-            // just-enabled reset above: writing a frequency/voltage step
-            // while the ASIC hasn't finished its own init sequence could
-            // interfere with it. Don't fight it: just resync our own idea
-            // of the current step to whatever is actually configured now
-            // (a no-op if nothing's been applied yet), and wait until
-            // things are calm/ready.
-            at->state = AUTOTUNE_STATE_PAUSED;
-            resync_from_nvs(at, freq_options, freq_option_count);
             continue;
         }
 
@@ -731,11 +718,14 @@ void AUTOTUNE_task(void * pvParameters)
             // vendor-max too, even though most of that climb never actually
             // needed it. Below that point, voltage only moves reactively
             // (see revert_last_action's rescue), the same as Eco always does.
+            //
+            // One step at a time (get_voltage_step_mv), same as every other
+            // voltage change in this file -- this used to jump straight to
+            // a proportionally-scaled target, which could be a much bigger
+            // single jump than any other voltage change here ever makes
+            // (e.g. +150mV in one step right at this zone's boundary).
             if (profile->allow_voltage_rescue && !in_fast_climb_zone(at, freq_option_count)) {
-                float target_voltage = proportional_voltage_mv(at->freq_step_index, freq_option_count, min_voltage_mv, max_voltage_mv);
-                if (target_voltage > at->voltage_mv) {
-                    at->voltage_mv = clamp_voltage(target_voltage, min_voltage_mv, max_voltage_mv);
-                }
+                at->voltage_mv = clamp_voltage(at->voltage_mv + get_voltage_step_mv(at), min_voltage_mv, max_voltage_mv);
             }
 
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, 0.0f);
