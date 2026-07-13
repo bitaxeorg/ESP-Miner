@@ -80,6 +80,20 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // the reject rate; otherwise we extend the window rather than judge on noise.
 #define MIN_SAMPLE_SHARES 15
 
+// The bottom of the vendor-tested frequency table is, almost by definition,
+// the safest region to be in -- it's well within what the manufacturer
+// validated, and every step through it still has the full 5-second-latency
+// fast-path checks (temperature, ASIC error rate, input voltage) watching
+// the whole time regardless of any of this. Waiting a full 90 seconds and
+// demanding 15 samples per step here mostly just delays reaching a
+// meaningful frequency after every restart, without buying much real
+// safety margin. Steps in the bottom half of the table use a much shorter
+// window and lower sample requirement instead; the top half (closer to the
+// vendor's own tested ceiling, where a wrong call actually matters) still
+// gets the full treatment, as does anything beyond-spec.
+#define FAST_CLIMB_EVAL_WINDOW_MS (20 * 1000)
+#define FAST_CLIMB_MIN_SAMPLE_SHARES 5
+
 // Voltage is adjusted in small, continuous mV steps rather than jumping
 // between the vendor table's handful of discrete entries (which can be
 // 40-60mV apart). The voltage regulator itself has no problem with
@@ -445,6 +459,14 @@ static void enforce_soft_ceiling(AutotuneModule * at)
 // it does still look like an improvement, so callers don't need to
 // separately track that. Returns true (i.e. "keep climbing") if there's no
 // usable power reading yet, rather than blocking progress on missing data.
+// True while still in the bottom half of the vendor-tested table -- see the
+// FAST_CLIMB_EVAL_WINDOW_MS comment for why that gets a shorter, more
+// lenient evaluation than everything above it.
+static bool in_fast_climb_zone(AutotuneModule * at, int freq_option_count)
+{
+    return at->extended_freq_mhz <= 0.0f && at->freq_step_index < (freq_option_count / 2);
+}
+
 static bool efficiency_still_improving(AutotuneModule * at, SystemModule * sys_module, PowerManagementModule * pm)
 {
     if (pm->power < 0.5f) {
@@ -680,7 +702,8 @@ void AUTOTUNE_task(void * pvParameters)
         }
 
         int64_t now_ms = esp_timer_get_time() / 1000;
-        if (now_ms - window_start_ms < EVAL_WINDOW_MS) {
+        int64_t eval_window_ms = in_fast_climb_zone(at, freq_option_count) ? FAST_CLIMB_EVAL_WINDOW_MS : EVAL_WINDOW_MS;
+        if (now_ms - window_start_ms < eval_window_ms) {
             continue; // still collecting samples for this step
         }
 
@@ -699,7 +722,14 @@ void AUTOTUNE_task(void * pvParameters)
 
         // Beyond-spec steps get a stricter bar: more samples required, lower
         // tolerance for rejects, since these values are unvalidated by the vendor.
-        int min_samples = at->extended_freq_mhz > 0.0f ? EXTENDED_MIN_SAMPLE_SHARES : MIN_SAMPLE_SHARES;
+        // The bottom of the vendor table goes the other way, with a lower bar,
+        // for the reasons in the FAST_CLIMB_EVAL_WINDOW_MS comment above.
+        int min_samples = MIN_SAMPLE_SHARES;
+        if (at->extended_freq_mhz > 0.0f) {
+            min_samples = EXTENDED_MIN_SAMPLE_SHARES;
+        } else if (in_fast_climb_zone(at, freq_option_count)) {
+            min_samples = FAST_CLIMB_MIN_SAMPLE_SHARES;
+        }
         float reject_threshold = at->extended_freq_mhz > 0.0f ? profile->extended_reject_rate_max : profile->reject_rate_max;
 
         if ((int) total_delta < min_samples) {
