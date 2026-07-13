@@ -803,11 +803,15 @@ void AUTOTUNE_task(void * pvParameters)
             at->step_ups_total++;
             at->state = AUTOTUNE_STATE_WARMING;
 
-            // Proactively bring voltage along for the ride (Eco stays
-            // reactive-only, in line with its "accept a lower ceiling
-            // rather than spend extra heat/power" philosophy -- see
-            // allow_voltage_rescue).
-            if (profile->allow_voltage_rescue) {
+            // Proactively bring voltage along for the ride, but only once
+            // past the safe bottom half of the table (the same split used
+            // for the fast-climb zone) -- proactively scaling voltage all
+            // the way from the very first step meant it was already sitting
+            // at vendor-max by the time frequency reached vendor-max too,
+            // even though most of that climb never actually needed it.
+            // Below that point, voltage only moves reactively (see
+            // revert_last_action's rescue), the same as Eco always does.
+            if (profile->allow_voltage_rescue && !in_fast_climb_zone(at, freq_option_count)) {
                 float target_voltage = proportional_voltage_mv(at->freq_step_index, freq_option_count, min_voltage_mv, max_voltage_mv);
                 if (target_voltage > at->voltage_mv) {
                     at->voltage_mv = clamp_voltage(target_voltage, min_voltage_mv, max_voltage_mv);
