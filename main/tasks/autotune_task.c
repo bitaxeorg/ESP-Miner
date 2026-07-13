@@ -102,7 +102,18 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // vendor's own tested ceiling, where a wrong call actually matters) still
 // gets the full treatment, as does anything beyond-spec.
 #define FAST_CLIMB_EVAL_WINDOW_MS (20 * 1000)
-#define FAST_CLIMB_MIN_SAMPLE_SHARES 5
+#define FAST_CLIMB_MIN_SAMPLE_SHARES 10
+
+// With a sample count this small, the reject-rate check needs its own,
+// much wider tolerance -- the profile's normal reject_rate_max (2-3%)
+// isn't statistically meaningful here: with only 10 samples, a *single*
+// ordinary reject (the kind that happens in healthy mining too, e.g. from
+// network/pool timing, completely unrelated to frequency/voltage
+// stability) already reads as 10%, well past that threshold. This
+// tolerance is set high enough to absorb one such incidental reject
+// without a false trigger, while still catching a genuinely bad step
+// (multiple rejects in the same short window).
+#define FAST_CLIMB_REJECT_RATE_MAX 0.25f
 
 // Voltage is adjusted in small, continuous mV steps rather than jumping
 // between the vendor table's handful of discrete entries (which can be
@@ -126,6 +137,20 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // ASIC's own voltage higher would only draw more current from a supply
 // that's already struggling.
 #define INPUT_VOLTAGE_SAG_FRACTION 0.92f
+
+// Minimum acceptable ratio of measured to theoretically-expected hashrate
+// for the current frequency (see expected_hashrate() in
+// power_management_task.c). Deliberately lenient -- some natural variance
+// between measured and theoretical hashrate is normal -- but low enough to
+// catch a meaningful chunk of the ASIC going quiet, which insufficient
+// voltage can cause without tripping the error-rate or reject-rate checks
+// at all.
+#define HASHRATE_RATIO_MIN 0.80f
+
+// How many consecutive 5-second checks the hashrate has to stay below
+// HASHRATE_RATIO_MIN before it's trusted -- see the debounce comment where
+// this is used for why a single low reading isn't enough on its own.
+#define HASHRATE_SHORTFALL_TICKS_REQUIRED 2
 
 // Thermal margin, reject-rate tolerance, ASIC-error tolerance, and whether
 // beyond-spec/voltage-rescue are allowed at all now come from the active
@@ -305,6 +330,7 @@ static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, 
     at->extended_freq_consecutive_fails = 0;
     at->best_efficiency_ghs_per_watt = 0.0f;
     at->best_efficiency_freq_step = -1;
+    at->hashrate_shortfall_ticks = 0;
     at->last_action = AUTOTUNE_ACTION_NONE;
 }
 
@@ -613,6 +639,7 @@ void AUTOTUNE_task(void * pvParameters)
             at->extended_freq_consecutive_fails = 0;
             at->best_efficiency_ghs_per_watt = 0.0f;
             at->best_efficiency_freq_step = -1;
+            at->hashrate_shortfall_ticks = 0;
             at->last_action = AUTOTUNE_ACTION_NONE;
             apply_step(GLOBAL_STATE, at, freq_options, 0, at->voltage_mv, 0.0f);
             ESP_LOGI(TAG, "Autotune enabled (%s profile): starting from the bottom (%.0f MHz @ %.0f mV) and climbing",
@@ -655,9 +682,10 @@ void AUTOTUNE_task(void * pvParameters)
 
         // Give the chip a moment to settle after any step before judging
         // it -- see the SETTLING_GRACE_MS comment for why. Applies to all
-        // three fast-path checks below, not just one of them, since a
+        // four fast-path checks below, not just one of them, since a
         // settling transient can show up as a temperature blip, an ASIC
-        // error spike, or an input-voltage dip depending on the board.
+        // error spike, an input-voltage dip, or a momentary hashrate
+        // shortfall, depending on the board.
         if ((esp_timer_get_time() / 1000) - at->step_applied_at_ms < SETTLING_GRACE_MS) {
             continue;
         }
@@ -734,6 +762,44 @@ void AUTOTUNE_task(void * pvParameters)
             }
         }
 
+        // Fast-path safety check comparing measured hashrate against the
+        // chip's own theoretical expected hashrate for the current
+        // frequency (frequency * core count, computed independently of any
+        // error/reject counting). Insufficient voltage can cause some
+        // cores to simply stop contributing rather than produce wrong
+        // results -- that shows up as a hashrate shortfall, not as ASIC
+        // errors or rejected shares, so neither of those checks catches it
+        // on their own. Voltage rescue is exactly the fix here (matches
+        // what manually adding voltage does), so it's offered the same way
+        // as the ASIC-error check above.
+        //
+        // current_hashrate is a single-interval instantaneous reading (see
+        // update_hash_counter in hashrate_monitor_task.c) with real
+        // sample-to-sample variance, particularly at low absolute
+        // hashrates -- so a lone low reading isn't trusted on its own; see
+        // hashrate_shortfall_ticks. That debounce is what makes it safe to
+        // apply this check throughout, including the fast-climb zone.
+        if (pm->expected_hashrate > 0.5f && sys_module->current_hashrate < pm->expected_hashrate * HASHRATE_RATIO_MIN) {
+            at->hashrate_shortfall_ticks++;
+        } else {
+            at->hashrate_shortfall_ticks = 0;
+        }
+        if (at->hashrate_shortfall_ticks >= HASHRATE_SHORTFALL_TICKS_REQUIRED) {
+            ESP_LOGW(TAG, "Hashrate %.1f GH/s is only %.0f%% of the %.1f GH/s expected for this frequency, sustained over %d checks, reverting (possible partial core dropout from insufficient voltage)",
+                     sys_module->current_hashrate, (sys_module->current_hashrate / pm->expected_hashrate) * 100.0f,
+                     pm->expected_hashrate, at->hashrate_shortfall_ticks);
+
+            at->hashrate_shortfall_ticks = 0;
+            track_extended_climb_failure(at, "hashrate shortfall");
+
+            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+            enforce_soft_ceiling(at);
+            at->step_downs_total++;
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            window_open = false;
+            continue;
+        }
+
         int64_t now_ms = esp_timer_get_time() / 1000;
         int64_t eval_window_ms = in_fast_climb_zone(at, freq_option_count) ? FAST_CLIMB_EVAL_WINDOW_MS : EVAL_WINDOW_MS;
         if (now_ms - window_start_ms < eval_window_ms) {
@@ -763,7 +829,12 @@ void AUTOTUNE_task(void * pvParameters)
         } else if (in_fast_climb_zone(at, freq_option_count)) {
             min_samples = FAST_CLIMB_MIN_SAMPLE_SHARES;
         }
-        float reject_threshold = at->extended_freq_mhz > 0.0f ? profile->extended_reject_rate_max : profile->reject_rate_max;
+        float reject_threshold = profile->reject_rate_max;
+        if (at->extended_freq_mhz > 0.0f) {
+            reject_threshold = profile->extended_reject_rate_max;
+        } else if (in_fast_climb_zone(at, freq_option_count)) {
+            reject_threshold = FAST_CLIMB_REJECT_RATE_MAX;
+        }
 
         if ((int) total_delta < min_samples) {
             // Not enough shares yet to trust the reject rate (e.g. high pool

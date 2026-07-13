@@ -66,6 +66,15 @@ typedef struct {
     // voltage requirements tend to grow faster than frequency near the top.
     float best_efficiency_ghs_per_watt;
     int best_efficiency_freq_step;
+    // Counts consecutive fast-path ticks where measured hashrate fell short
+    // of the theoretical expectation. current_hashrate is a single-interval
+    // instantaneous reading (see update_hash_counter in
+    // hashrate_monitor_task.c), which has real sample-to-sample variance,
+    // especially at low absolute hashrates -- requiring this to persist
+    // across a couple of ticks filters that noise out while still catching
+    // a genuinely sustained shortfall (e.g. real partial core dropout from
+    // insufficient voltage) quickly.
+    int hashrate_shortfall_ticks;
     int step_downs_total;
     int step_ups_total;
 } AutotuneModule;
