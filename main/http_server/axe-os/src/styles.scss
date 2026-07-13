@@ -18,3 +18,7 @@
 @layer axe-os {
     @import "app/layout/styles/layout/axe-os";
 }
+
+.text-primary {
+    color: var(--primary-color) !important;
+}
