@@ -28,7 +28,7 @@
           <button [class.selected]="theme.primaryColor === currentColor"
                   [style.--dot-bg]="theme.primaryColor"
                   [style.backgroundColor]="'var(--dot-bg)'"
-                  class="w-8 h-8 rounded-full border-none flex items-center justify-center cursor-pointer transition transform hover:scale-110 active:scale-95"
+                  class="color-dot w-8 h-8 rounded-full border-none flex items-center justify-center cursor-pointer transition transform hover:scale-110 active:scale-95"
                   (click)="changeTheme(theme)">
             <i *ngIf="theme.primaryColor === currentColor" class="pi pi-check text-white text-xs"></i>
           </button>
