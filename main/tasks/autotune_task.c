@@ -98,7 +98,19 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // voltage for a given frequency, instead of overshooting to the next
 // coarse step every time. Voltage is still hard-clamped to the vendor
 // table's own min/max, in every profile, regardless of this finer step size.
-#define VOLTAGE_STEP_MV 10.0f
+//
+// The step size itself is bigger while still within the vendor-tested
+// table (converges to a working voltage in fewer rescue/undervolt cycles,
+// each of which costs a full debounce round-trip) and finer once exploring
+// beyond-spec, where the extra precision matters more than the extra speed
+// in unvalidated territory.
+#define VOLTAGE_STEP_MV_NORMAL 25.0f
+#define VOLTAGE_STEP_MV_EXTENDED 10.0f
+
+static float get_voltage_step_mv(const AutotuneModule * at)
+{
+    return at->extended_freq_mhz > 0.0f ? VOLTAGE_STEP_MV_EXTENDED : VOLTAGE_STEP_MV_NORMAL;
+}
 
 // The board's *input* voltage (from the power supply/USB-C, not the ASIC
 // core voltage) can sag under load well before the ASIC itself shows any
@@ -348,7 +360,7 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
     // voltage there would work against the very problem we're reacting to.
     if (allow_voltage_rescue && at->last_action == AUTOTUNE_ACTION_FREQ_UP &&
         at->voltage_mv < max_voltage_mv - 0.5f) {
-        at->voltage_mv = clamp_voltage(at->voltage_mv + VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
+        at->voltage_mv = clamp_voltage(at->voltage_mv + get_voltage_step_mv(at), min_voltage_mv, max_voltage_mv);
         at->last_action = AUTOTUNE_ACTION_VOLT_UP;
         return;
     }
@@ -357,7 +369,7 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
         case AUTOTUNE_ACTION_VOLT_DOWN:
             // The undervolt trial didn't hold -- go back up to the last
             // known-good voltage for this frequency.
-            at->voltage_mv = clamp_voltage(at->voltage_mv + VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
+            at->voltage_mv = clamp_voltage(at->voltage_mv + get_voltage_step_mv(at), min_voltage_mv, max_voltage_mv);
             break;
         case AUTOTUNE_ACTION_VOLT_UP:
             // Even extra voltage didn't stabilize this frequency -- undo the
@@ -365,7 +377,7 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
             // exploring beyond-spec, that "step" lives in extended_freq_mhz,
             // not freq_step_index (which stays pinned at the vendor max
             // throughout beyond-spec exploration) -- back off the right one.
-            at->voltage_mv = clamp_voltage(at->voltage_mv - VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
+            at->voltage_mv = clamp_voltage(at->voltage_mv - get_voltage_step_mv(at), min_voltage_mv, max_voltage_mv);
             if (at->extended_freq_mhz > 0.0f) {
                 at->extended_freq_mhz -= EXTENDED_STEP_MHZ;
                 if (at->extended_freq_mhz <= (float) freq_options[freq_option_count - 1] + 0.5f) {
@@ -386,7 +398,7 @@ static void revert_last_action(AutotuneModule * at, const uint16_t * freq_option
             } else if (at->freq_step_index > 0) {
                 at->freq_step_index--;
             } else if (at->voltage_mv > min_voltage_mv + 0.5f) {
-                at->voltage_mv = clamp_voltage(at->voltage_mv - VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
+                at->voltage_mv = clamp_voltage(at->voltage_mv - get_voltage_step_mv(at), min_voltage_mv, max_voltage_mv);
             }
             break;
     }
@@ -476,7 +488,7 @@ void AUTOTUNE_task(void * pvParameters)
         return;
     }
 
-    // Voltage is tuned continuously (see VOLTAGE_STEP_MV) between the
+    // Voltage is tuned continuously (see get_voltage_step_mv) between the
     // vendor table's own lowest and highest entries -- those two values are
     // still the hard bounds in every profile, we just no longer skip
     // everything in between.
@@ -766,7 +778,7 @@ void AUTOTUNE_task(void * pvParameters)
             // stable. Try shaving voltage down at this same frequency, in
             // fine 10mV steps -- same hashrate, less heat, less power, if
             // it holds.
-            at->voltage_mv = clamp_voltage(at->voltage_mv - VOLTAGE_STEP_MV, min_voltage_mv, max_voltage_mv);
+            at->voltage_mv = clamp_voltage(at->voltage_mv - get_voltage_step_mv(at), min_voltage_mv, max_voltage_mv);
             at->last_action = AUTOTUNE_ACTION_VOLT_DOWN;
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
         } else {
