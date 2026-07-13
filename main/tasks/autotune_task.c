@@ -178,6 +178,13 @@ static float get_user_verified_ceiling_mhz(void)
 // forever, letting the tuner move on to voltage optimization in the meantime.
 #define EXTENDED_FAIL_LIMIT 2
 
+// How far below a repeatedly-failing frequency the tuner settles once it
+// gives up on it -- deliberately bigger than a single EXTENDED_STEP_MHZ
+// climb step, so it holds with a real safety cushion below the point that
+// just proved unreliable, rather than parking right at the edge of it
+// again.
+#define EXTENDED_GIVE_UP_MARGIN_MHZ 10.0f
+
 // How long a frequency stays off-limits after repeatedly failing near it,
 // before the tuner is willing to probe it again. An hour is long enough for
 // ambient conditions (or whatever else was marginal) to plausibly have
@@ -427,9 +434,10 @@ static void track_extended_climb_failure(AutotuneModule * at, const char * reaso
     at->extended_last_failed_mhz = at->extended_freq_mhz;
 
     if (at->extended_freq_consecutive_fails >= EXTENDED_FAIL_LIMIT) {
-        // extended_freq_mhz still holds the failing value here; the last
-        // known-good level is one step below it.
-        at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_STEP_MHZ;
+        // extended_freq_mhz still holds the failing value here; settle a
+        // bit further below it than a single climb step would, for a real
+        // safety cushion while parked here.
+        at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_GIVE_UP_MARGIN_MHZ;
         at->extended_soft_ceiling_expiry_ms = (esp_timer_get_time() / 1000) + EXTENDED_COOLDOWN_MS;
         ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failures near this level (%s), backing off for an hour",
                  at->extended_soft_ceiling_mhz, at->extended_freq_consecutive_fails, reason);
@@ -439,14 +447,27 @@ static void track_extended_climb_failure(AutotuneModule * at, const char * reaso
 // A newly-set (or still-active) soft ceiling only blocks *future* climb
 // attempts on its own -- it doesn't retroactively touch whatever frequency
 // the tuner happens to be sitting at right now. Without this, a voltage
-// rescue can keep holding the tuner at the exact frequency that just
-// triggered the ceiling in the first place, instead of actually retreating
-// to the last confirmed-good level. Call this right after
-// revert_last_action(), before applying the step, so the ceiling is
-// honored immediately rather than only being enforced the next time a
-// climb is attempted.
+// rescue that's already been confirmed stable could keep holding the tuner
+// at a frequency above the ceiling instead of actually retreating to the
+// last confirmed-good level. Call this right after revert_last_action(),
+// before applying the step, so the ceiling is honored immediately rather
+// than only being enforced the next time a climb is attempted -- except
+// for a rescue that was *just* attempted this same cycle (see the
+// AUTOTUNE_ACTION_VOLT_UP check below), which needs a real chance to be
+// tested before anything decides it didn't work.
 static void enforce_soft_ceiling(AutotuneModule * at)
 {
+    if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
+        // A voltage rescue was just attempted for the frequency that
+        // triggered this ceiling -- it hasn't been given a chance to prove
+        // itself yet. Dragging frequency down here regardless would mean
+        // the rescue mechanism could never actually be tested: every
+        // failure would immediately force a step down on the same cycle,
+        // before revert_last_action's own VOLT_UP-failure handling (which
+        // already backs off correctly if the rescue itself later fails)
+        // ever gets a chance to run.
+        return;
+    }
     if (at->extended_soft_ceiling_mhz > 0.0f && at->extended_freq_mhz > at->extended_soft_ceiling_mhz) {
         at->extended_freq_mhz = at->extended_soft_ceiling_mhz;
         at->last_action = AUTOTUNE_ACTION_NONE;
