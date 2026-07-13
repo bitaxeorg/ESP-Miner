@@ -59,7 +59,7 @@ export class DialogService {
       <div class="flex flex-col gap-2 pt-2">
         <button *ngFor="let option of dialog.options"
                 (click)="selectOption(dialog, option.value)"
-                class="w-full text-left flex items-center justify-between btn btn-secondary px-4 py-3"
+                class="w-full text-left !flex items-center !justify-start btn btn-secondary px-4 py-3 gap-3"
                 appTooltip="{{option.label}} ({{option.rssi}} dBm)"
                 tooltipPosition="bottom"
         >

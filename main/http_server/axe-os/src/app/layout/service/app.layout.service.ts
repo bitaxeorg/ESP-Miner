@@ -6,9 +6,7 @@ import { LocalStorageService } from '../../local-storage.service';
 const STATIC_MENU_DESKTOP_INACTIVE = 'STATIC_MENU_DESKTOP_INACTIVE'
 
 export interface AppConfig {
-    inputStyle: string;
     colorScheme: string;
-    ripple: boolean;
     menuMode: string;
     scale: number;
 }
@@ -66,8 +64,6 @@ export class LayoutService {
     };
 
     _config: AppConfig = {
-        ripple: false,
-        inputStyle: 'outlined',
         menuMode: 'static',
         colorScheme: 'dark',
         scale: 14,
