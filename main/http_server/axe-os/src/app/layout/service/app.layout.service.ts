@@ -203,7 +203,7 @@ export class LayoutService {
             document.documentElement.style.setProperty(key, value);
         });
 
-        // Toggle dark-mode class for PrimeNG Aura Theme
+        // Toggle dark-mode class for theme switching
         if (config.colorScheme === 'white') {
             document.documentElement.classList.remove('dark-mode');
         } else {

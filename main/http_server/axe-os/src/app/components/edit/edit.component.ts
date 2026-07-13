@@ -7,17 +7,13 @@ import { LoadingService } from 'src/app/services/loading.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { ActivatedRoute } from '@angular/router';
+import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
+import { DropdownComponent } from '../dropdown/dropdown.component';
+import { SelectOption } from '../../models/select-option.model';
 import { CommonModule } from '@angular/common';
 import { TooltipDirective } from '../../directives/tooltip.directive';
 import { CheckboxComponent } from '../checkbox/checkbox.component';
 import { SliderComponent } from '../slider/slider.component';
-import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
-import { DropdownComponent } from '../dropdown/dropdown.component';
-
-type SelectOption = {
-  name: string;
-  value: any;
-};
 
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
 const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];

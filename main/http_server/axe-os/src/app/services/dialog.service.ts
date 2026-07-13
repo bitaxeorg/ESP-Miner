@@ -1,4 +1,5 @@
 import { Component, Injectable } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject } from 'rxjs';
 
 export interface DialogOption {
@@ -74,7 +75,9 @@ export class DialogListComponent {
   public dialogs: DialogInstance[] = [];
 
   constructor(private dialogService: DialogService) {
-    this.dialogService.activeDialogs$.subscribe(dialogs => {
+    this.dialogService.activeDialogs$.pipe(
+      takeUntilDestroyed()
+    ).subscribe(dialogs => {
       this.dialogs = dialogs;
     });
   }
