@@ -178,13 +178,6 @@ static float get_user_verified_ceiling_mhz(void)
 // forever, letting the tuner move on to voltage optimization in the meantime.
 #define EXTENDED_FAIL_LIMIT 2
 
-// How far below a repeatedly-failing frequency the tuner settles once it
-// gives up on it -- deliberately bigger than a single EXTENDED_STEP_MHZ
-// climb step, so it holds with a real safety cushion below the point that
-// just proved unreliable, rather than parking right at the edge of it
-// again.
-#define EXTENDED_GIVE_UP_MARGIN_MHZ 10.0f
-
 // How long a frequency stays off-limits after repeatedly failing near it,
 // before the tuner is willing to probe it again. An hour is long enough for
 // ambient conditions (or whatever else was marginal) to plausibly have
@@ -330,6 +323,8 @@ static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, 
     at->extended_soft_ceiling_expiry_ms = 0;
     at->extended_last_failed_mhz = 0.0f;
     at->extended_freq_consecutive_fails = 0;
+    at->last_confirmed_extended_freq_mhz = at->extended_freq_mhz;
+    at->last_confirmed_voltage_mv = at->voltage_mv;
     at->best_efficiency_ghs_per_watt = 0.0f;
     at->best_efficiency_freq_step = -1;
     at->hashrate_shortfall_ticks = 0;
@@ -417,12 +412,15 @@ static bool settings_changed_externally(AutotuneModule * at, const uint16_t * fr
 
 // Called on every reverted/backed-off step. If the step we just gave up on
 // was a beyond-spec frequency climb, count it -- after enough failures near
-// roughly the same point, get_extended_ceiling_mhz() will stop letting the
-// tuner retry it (see extended_soft_ceiling_mhz) and it'll move on to
-// voltage optimization instead. Any other kind of revert (an undervolt
-// trial, or a vendor-table-only step) resets the streak, since it's not
-// part of a beyond-spec climb attempt.
-static void track_extended_climb_failure(AutotuneModule * at, const char * reason)
+// roughly the same point, this stops exploring entirely for a while and
+// falls back to the last frequency/voltage combo that actually proved
+// itself, rather than a calculated "a bit lower" guess. Returns true if it
+// just did that full restoration itself, in which case the caller should
+// skip revert_last_action()/enforce_soft_ceiling() and go straight to
+// apply_step() -- those would otherwise fight over what to do with a state
+// this function already fully resolved.
+static bool track_extended_climb_failure(AutotuneModule * at, const uint16_t * freq_options, int freq_option_count,
+                                          const char * reason)
 {
     // Only a failure that happened while actually trying to reach or hold
     // this frequency (a straight climb, or a voltage rescue attempting to
@@ -436,22 +434,32 @@ static void track_extended_climb_failure(AutotuneModule * at, const char * reaso
     bool was_climb_related = at->last_action == AUTOTUNE_ACTION_FREQ_UP || at->last_action == AUTOTUNE_ACTION_VOLT_UP;
     if (!was_climb_related || at->extended_freq_mhz <= 0.0f) {
         at->extended_freq_consecutive_fails = 0;
-        return;
+        return false;
     }
 
     bool near_last_failure = fabsf(at->extended_freq_mhz - at->extended_last_failed_mhz) < (EXTENDED_STEP_MHZ * 1.5f);
     at->extended_freq_consecutive_fails = near_last_failure ? at->extended_freq_consecutive_fails + 1 : 1;
     at->extended_last_failed_mhz = at->extended_freq_mhz;
 
-    if (at->extended_freq_consecutive_fails >= EXTENDED_FAIL_LIMIT) {
-        // extended_freq_mhz still holds the failing value here; settle a
-        // bit further below it than a single climb step would, for a real
-        // safety cushion while parked here.
-        at->extended_soft_ceiling_mhz = at->extended_freq_mhz - EXTENDED_GIVE_UP_MARGIN_MHZ;
-        at->extended_soft_ceiling_expiry_ms = (esp_timer_get_time() / 1000) + EXTENDED_COOLDOWN_MS;
-        ESP_LOGI(TAG, "Giving up climbing past %.0f MHz after %d failures near this level (%s), backing off for an hour",
-                 at->extended_soft_ceiling_mhz, at->extended_freq_consecutive_fails, reason);
+    if (at->extended_freq_consecutive_fails < EXTENDED_FAIL_LIMIT) {
+        return false;
     }
+
+    // Give up entirely: stop exploring (no more climbing, no more
+    // voltage shaving) and hold the last confirmed-good combo fixed for
+    // the cooldown period. Reactive safety checks (temperature, input
+    // voltage, and the debounced ASIC-error/hashrate checks) still apply
+    // throughout regardless -- this only pauses further exploration.
+    float vendor_max_freq = (float) freq_options[freq_option_count - 1];
+    at->extended_freq_mhz = at->last_confirmed_extended_freq_mhz; // 0 if nothing beyond vendor spec was ever confirmed
+    at->voltage_mv = at->last_confirmed_voltage_mv;
+    at->extended_soft_ceiling_mhz = at->last_confirmed_extended_freq_mhz > 0.0f ? at->last_confirmed_extended_freq_mhz : vendor_max_freq;
+    at->extended_soft_ceiling_expiry_ms = (esp_timer_get_time() / 1000) + EXTENDED_COOLDOWN_MS;
+    at->last_action = AUTOTUNE_ACTION_NONE;
+    ESP_LOGI(TAG, "Giving up after %d failures near %.0f MHz (%s) -- holding the last confirmed-good %.0f MHz @ %.0f mV for an hour",
+             at->extended_freq_consecutive_fails, at->extended_last_failed_mhz, reason,
+             at->extended_freq_mhz, at->voltage_mv);
+    return true;
 }
 
 // A newly-set (or still-active) soft ceiling only blocks *future* climb
@@ -594,6 +602,8 @@ void AUTOTUNE_task(void * pvParameters)
             at->extended_soft_ceiling_expiry_ms = 0;
             at->extended_last_failed_mhz = 0.0f;
             at->extended_freq_consecutive_fails = 0;
+            at->last_confirmed_extended_freq_mhz = 0.0f;
+            at->last_confirmed_voltage_mv = min_voltage_mv;
             at->best_efficiency_ghs_per_watt = 0.0f;
             at->best_efficiency_freq_step = -1;
             at->last_action = AUTOTUNE_ACTION_NONE;
@@ -631,9 +641,11 @@ void AUTOTUNE_task(void * pvParameters)
         if (chip_temp > temp_ceiling_c) {
             ESP_LOGW(TAG, "Temp %.1fC over ceiling %.1fC, stepping down early",
                      chip_temp, temp_ceiling_c);
-            track_extended_climb_failure(at, "heat");
-            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
-            enforce_soft_ceiling(at);
+            bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "heat");
+            if (!gave_up) {
+                revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
+                enforce_soft_ceiling(at);
+            }
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
             continue;
@@ -646,9 +658,11 @@ void AUTOTUNE_task(void * pvParameters)
         if (pm->voltage > 0.5f && pm->voltage < input_voltage_floor) {
             ESP_LOGW(TAG, "Input voltage %.2fV under %.0f%% of nominal %.0fV, stepping down early (power supply may be struggling)",
                      pm->voltage, INPUT_VOLTAGE_SAG_FRACTION * 100.0f, nominal_input_voltage);
-            track_extended_climb_failure(at, "input voltage sag");
-            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
-            enforce_soft_ceiling(at);
+            bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "input voltage sag");
+            if (!gave_up) {
+                revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, false);
+                enforce_soft_ceiling(at);
+            }
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
             continue;
@@ -681,9 +695,11 @@ void AUTOTUNE_task(void * pvParameters)
                 ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%%, sustained over %d checks, reverting",
                          sys_module->error_percentage, error_threshold, at->asic_error_bad_ticks);
                 at->asic_error_bad_ticks = 0;
-                track_extended_climb_failure(at, "ASIC errors");
-                revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
-                enforce_soft_ceiling(at);
+                bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "ASIC errors");
+                if (!gave_up) {
+                    revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+                    enforce_soft_ceiling(at);
+                }
                 at->step_downs_total++;
                 apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
                 continue;
@@ -705,9 +721,11 @@ void AUTOTUNE_task(void * pvParameters)
                      sys_module->current_hashrate, (sys_module->current_hashrate / pm->expected_hashrate) * 100.0f,
                      pm->expected_hashrate, at->hashrate_shortfall_ticks);
             at->hashrate_shortfall_ticks = 0;
-            track_extended_climb_failure(at, "hashrate shortfall");
-            revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
-            enforce_soft_ceiling(at);
+            bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "hashrate shortfall");
+            if (!gave_up) {
+                revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+                enforce_soft_ceiling(at);
+            }
             at->step_downs_total++;
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
             continue;
@@ -728,6 +746,21 @@ void AUTOTUNE_task(void * pvParameters)
             continue; // not yet confirmed stable -- keep checking
         }
         at->consecutive_good_checks = 0;
+
+        // This combo just proved itself over a full confirmation period --
+        // remember it as the point to fall back to if a give-up happens
+        // later (see track_extended_climb_failure), rather than some
+        // calculated "X MHz lower" guess that was never actually tested.
+        at->last_confirmed_extended_freq_mhz = at->extended_freq_mhz;
+        at->last_confirmed_voltage_mv = at->voltage_mv;
+
+        // While a give-up cooldown is active, pause exploration entirely --
+        // no more climbing (already blocked by next_extended_step_within_ceiling
+        // via the ceiling), and no more voltage shaving either. Just hold
+        // the restored combo fixed until the cooldown expires; the fast-path
+        // safety checks above keep running every cycle regardless.
+        bool in_give_up_hold = at->extended_soft_ceiling_mhz > 0.0f &&
+                                (esp_timer_get_time() / 1000) < at->extended_soft_ceiling_expiry_ms;
 
         if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
             // The extra voltage successfully stabilized this frequency step.
@@ -793,7 +826,7 @@ void AUTOTUNE_task(void * pvParameters)
             at->step_ups_total++;
             at->state = AUTOTUNE_STATE_BEYOND_SPEC;
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-        } else if (at->voltage_mv > min_voltage_mv + 0.5f) {
+        } else if (!in_give_up_hold && at->voltage_mv > min_voltage_mv + 0.5f) {
             // The highest frequency we currently trust is maxed out (vendor
             // ceiling, or the beyond-spec ceiling if that's active) and
             // stable. Try shaving voltage down at this same frequency, in
@@ -804,10 +837,13 @@ void AUTOTUNE_task(void * pvParameters)
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
         } else {
             // Highest trusted frequency, lowest voltage that's still stable
-            // at it -- this is the best known efficient point. Hold here.
+            // at it -- this is the best known efficient point (or we're in
+            // a post-give-up cooldown hold, deliberately not exploring
+            // further right now). Hold here.
             at->state = (at->extended_freq_mhz > 0.0f) ? AUTOTUNE_STATE_BEYOND_SPEC : AUTOTUNE_STATE_AT_CEILING;
             float applied_freq = at->extended_freq_mhz > 0.0f ? at->extended_freq_mhz : (float) freq_options[at->freq_step_index];
-            ESP_LOGI(TAG, "At best known efficient point for %s profile (%.0f MHz @ %.0f mV) and stable, holding",
+            ESP_LOGI(TAG, "%s%s profile (%.0f MHz @ %.0f mV) and stable, holding",
+                     in_give_up_hold ? "In post-failure cooldown for " : "At best known efficient point for ",
                      profile->name, applied_freq, at->voltage_mv);
         }
     }

@@ -48,6 +48,15 @@ typedef struct {
     float extended_soft_ceiling_mhz;
     int64_t extended_soft_ceiling_expiry_ms;
     float extended_last_failed_mhz;
+    // The most recent frequency/voltage combo that actually survived a
+    // full confirmation period (see GOOD_CHECKS_REQUIRED_*). When the
+    // tuner gives up on a beyond-spec excursion after repeated failures,
+    // it falls back to exactly this -- not a calculated "a bit lower"
+    // guess -- and holds it fixed for the cooldown period rather than
+    // continuing to explore. 0 means nothing beyond the vendor table has
+    // been confirmed yet this session.
+    float last_confirmed_extended_freq_mhz;
+    float last_confirmed_voltage_mv;
     int extended_freq_consecutive_fails;
     float max_temp_seen_this_window;
     // Set every time a step is applied, so the fast-path safety checks can
