@@ -16,11 +16,21 @@ import { SliderModule } from 'primeng/slider';
 import { TooltipModule } from 'primeng/tooltip';
 import { InputTextModule } from 'primeng/inputtext';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
+import { LocalStorageService } from 'src/app/local-storage.service';
 
 type SelectOption = {
   name: string;
   value: number;
 };
+
+type Preset = {
+  name: string;
+  frequency: number;
+  coreVoltage: number;
+};
+
+const PRESETS_KEY = 'ASIC_PRESETS';
+const MAX_PRESETS = 5;
 
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
 const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
@@ -68,6 +78,11 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public statsFrequencyControl: FormControl;
   public statsLimit: number = 720;
 
+  public presets: Preset[] = [];
+  public presetName = new FormControl('');
+  public editingIndex: number | null = null;
+  public readonly maxPresets = MAX_PRESETS;
+
   constructor(
     private fb: FormBuilder,
     private systemService: SystemApiService,
@@ -75,6 +90,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private route: ActivatedRoute,
+    private localStorageService: LocalStorageService,
   ) {
     // Check URL parameter for settings unlock
     this.route.queryParams.subscribe(params => {
@@ -136,6 +152,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
   ngOnInit(): void {
     this.loadDeviceSettings();
+    this.loadPresets();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -269,6 +286,120 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
           this.savedChanges = false;
         }
       });
+  }
+
+  private loadPresets(): void {
+    this.presets = this.localStorageService.getObject(PRESETS_KEY) ?? [];
+  }
+
+  private savePresets(): void {
+    this.localStorageService.setObject(PRESETS_KEY, this.presets);
+  }
+
+  public addOrUpdatePreset(): void {
+    const name = (this.presetName.value || '').trim();
+    const frequency = this.form.get('frequency')?.value;
+    const coreVoltage = this.form.get('coreVoltage')?.value;
+
+    if (!name) {
+      this.toastr.warning('Please enter a preset name.');
+      return;
+    }
+    if (typeof frequency !== 'number' || typeof coreVoltage !== 'number') {
+      this.toastr.warning('Set a valid Frequency and Core Voltage first.');
+      return;
+    }
+
+    if (this.editingIndex !== null) {
+      this.presets[this.editingIndex] = { name, frequency, coreVoltage };
+    } else {
+      if (this.presets.length >= MAX_PRESETS) {
+        this.toastr.warning(`You can save at most ${MAX_PRESETS} presets.`);
+        return;
+      }
+      this.presets.push({ name, frequency, coreVoltage });
+    }
+
+    this.savePresets();
+    this.presetName.reset('');
+    this.editingIndex = null;
+  }
+
+  public startEditPreset(index: number): void {
+    this.editingIndex = index;
+    this.presetName.setValue(this.presets[index].name);
+  }
+
+  public deletePreset(index: number): void {
+    this.presets.splice(index, 1);
+    this.savePresets();
+    if (this.editingIndex === index) {
+      this.editingIndex = null;
+      this.presetName.reset('');
+    }
+  }
+
+  public applyPreset(preset: Preset): void {
+    this.form.patchValue({ frequency: preset.frequency, coreVoltage: preset.coreVoltage });
+    this.form.controls['frequency'].markAsDirty();
+    this.form.controls['coreVoltage'].markAsDirty();
+
+    this.systemService.updateSystem(this.uri || '', {
+      frequency: preset.frequency,
+      coreVoltage: preset.coreVoltage
+    })
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => this.toastr.success(`Applied preset "${preset.name}"`),
+        error: (err: HttpErrorResponse) => this.toastr.error(`Could not apply preset. ${err.message}`)
+      });
+  }
+
+  public exportPresets(): void {
+    const blob = new Blob([JSON.stringify(this.presets, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'axeos-presets.json';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  public importPresets(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        if (!Array.isArray(parsed)) {
+          throw new Error('Expected an array of presets');
+        }
+        const valid = parsed.filter((p: any) =>
+          p && typeof p.name === 'string' &&
+          typeof p.frequency === 'number' &&
+          typeof p.coreVoltage === 'number'
+        ).slice(0, MAX_PRESETS);
+
+        this.presets = valid.map((p: any) => ({
+          name: p.name,
+          frequency: p.frequency,
+          coreVoltage: p.coreVoltage
+        }));
+        this.savePresets();
+        this.editingIndex = null;
+        this.presetName.reset('');
+        this.toastr.success(`Imported ${this.presets.length} preset(s).`);
+      } catch (err: any) {
+        this.toastr.error(`Could not import presets. ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+    input.value = '';
   }
 
   disableOverheatMode() {
