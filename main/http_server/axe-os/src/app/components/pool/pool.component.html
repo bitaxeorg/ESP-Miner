@@ -38,7 +38,7 @@
         <h2 class="mb-3">Pool Configurations <span class="text-sm text-500 font-normal ml-2">({{ poolsArray.length }}/8)</span></h2>
 
         <div formArrayName="pools" class="flex flex-column mb-4">
-            <div *ngFor="let poolControl of poolsArray.controls; let i = index" [formGroupName]="i" class="card border-round-xl overflow-hidden p-0 shadow-1 hover:shadow-2 transition-shadow transition-duration-200" style="border: 1px solid var(--surface-border); background-color: var(--surface-card);">
+            <div *ngFor="let poolControl of poolsArray.controls; let i = index" [formGroupName]="i" class="card border-round-xs overflow-hidden p-0 shadow-1 hover:shadow-2 transition-shadow transition-duration-200" style="border: 1px solid var(--surface-border); background-color: var(--surface-card);">
                 <!-- Card Header -->
                 <div class="flex justify-content-between align-items-center p-3 cursor-pointer" style="background-color: var(--surface-hover); border-bottom: 1px solid var(--surface-border);" (click)="toggleCard(i)">
                     <div class="flex align-items-center gap-2">
