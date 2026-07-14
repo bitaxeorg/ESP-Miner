@@ -775,24 +775,38 @@ void AUTOTUNE_task(void * pvParameters)
         // voltage can cause some cores to simply stop contributing rather
         // than produce wrong results, which neither of the checks above
         // would catch on their own.
-        if (pm->expected_hashrate > 0.5f && sys_module->current_hashrate < pm->expected_hashrate * HASHRATE_RATIO_MIN) {
-            at->hashrate_shortfall_ticks++;
-        } else {
-            at->hashrate_shortfall_ticks = 0;
-        }
-        if (at->hashrate_shortfall_ticks >= HASHRATE_SHORTFALL_TICKS_REQUIRED) {
-            ESP_LOGW(TAG, "Hashrate %.1f GH/s is only %.0f%% of the %.1f GH/s expected for this frequency, sustained over %d checks, reverting (possible partial core dropout from insufficient voltage)",
-                     sys_module->current_hashrate, (sys_module->current_hashrate / pm->expected_hashrate) * 100.0f,
-                     pm->expected_hashrate, at->hashrate_shortfall_ticks);
-            at->hashrate_shortfall_ticks = 0;
-            bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "hashrate shortfall");
-            if (!gave_up) {
-                revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
-                enforce_soft_ceiling(at);
+        //
+        // Skipped in the fast-climb zone for the same reason as the
+        // ASIC-error check: current_hashrate is a small, short-interval
+        // measurement there, with real sample-to-sample variance that
+        // debouncing over a couple of ticks doesn't fully filter out if
+        // it's sustained rather than a one-off blip. Without this
+        // exemption, a profile that never does a voltage rescue (Eco) and
+        // starts at the very bottom of the table (freq_step_index=0,
+        // voltage already at the floor) has nowhere left to retreat to if
+        // this fires there -- revert_last_action can't lower anything
+        // further, so it would just get stuck rather than ever climbing
+        // out of the fast-climb zone at all.
+        if (!in_fast_climb_zone(at, freq_option_count)) {
+            if (pm->expected_hashrate > 0.5f && sys_module->current_hashrate < pm->expected_hashrate * HASHRATE_RATIO_MIN) {
+                at->hashrate_shortfall_ticks++;
+            } else {
+                at->hashrate_shortfall_ticks = 0;
             }
-            at->step_downs_total++;
-            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-            continue;
+            if (at->hashrate_shortfall_ticks >= HASHRATE_SHORTFALL_TICKS_REQUIRED) {
+                ESP_LOGW(TAG, "Hashrate %.1f GH/s is only %.0f%% of the %.1f GH/s expected for this frequency, sustained over %d checks, reverting (possible partial core dropout from insufficient voltage)",
+                         sys_module->current_hashrate, (sys_module->current_hashrate / pm->expected_hashrate) * 100.0f,
+                         pm->expected_hashrate, at->hashrate_shortfall_ticks);
+                at->hashrate_shortfall_ticks = 0;
+                bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "hashrate shortfall");
+                if (!gave_up) {
+                    revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+                    enforce_soft_ceiling(at);
+                }
+                at->step_downs_total++;
+                apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+                continue;
+            }
         }
 
         // All four signals look fine on this check.
