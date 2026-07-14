@@ -302,19 +302,30 @@ static bool efficiency_still_improving(AutotuneModule * at, SystemModule * sys_m
         return true;
     }
     float current_efficiency = sys_module->current_hashrate / pm->power; // GH/s per W
-    // Within the fast-climb zone, voltage never moves (the proactive
-    // voltage climb further down is itself gated to skip this same zone),
-    // so hash/watt differences between adjacent frequency steps there are
-    // naturally tiny -- efficiency is mostly a function of voltage, not
-    // frequency, so climbing frequency alone at a fixed voltage barely
-    // moves it either way. Requiring a meaningful improvement here would
-    // mean giving up and settling at the very bottom of the table almost
-    // immediately, every time, which isn't a sensible "peak" at all. Climb
-    // through this safe, vendor-tested region unconditionally instead; the
-    // improvement bar only makes sense once voltage can actually move and
-    // real efficiency trade-offs start to show up.
-    float required_ratio = in_fast_climb_zone(at, freq_option_count) ? 1.0f : EFFICIENCY_MIN_IMPROVEMENT_RATIO;
-    if (at->best_efficiency_freq_step < 0 || current_efficiency >= at->best_efficiency_ghs_per_watt * required_ratio) {
+
+    if (in_fast_climb_zone(at, freq_option_count)) {
+        // Within the fast-climb zone, voltage never moves (the proactive
+        // voltage climb further down is itself gated to skip this same
+        // zone), so hash/watt differences between adjacent frequency steps
+        // there are naturally tiny -- efficiency is mostly a function of
+        // voltage, not frequency, so climbing frequency alone at a fixed
+        // voltage barely moves it either way. This needs to be a genuinely
+        // unconditional "keep climbing", not just a very low bar: even a
+        // bar of "at least as good as before, no threshold" can still fail
+        // on nothing more than ordinary measurement noise, which would
+        // cause the exact same "give up and settle at the very bottom"
+        // problem this is meant to avoid. Still record the running best
+        // (without letting a worse reading overwrite a better one) so the
+        // comparison baseline is accurate by the time real trade-offs
+        // start to matter just past this zone.
+        if (at->best_efficiency_freq_step < 0 || current_efficiency > at->best_efficiency_ghs_per_watt) {
+            at->best_efficiency_ghs_per_watt = current_efficiency;
+        }
+        at->best_efficiency_freq_step = at->freq_step_index;
+        return true;
+    }
+
+    if (at->best_efficiency_freq_step < 0 || current_efficiency >= at->best_efficiency_ghs_per_watt * EFFICIENCY_MIN_IMPROVEMENT_RATIO) {
         at->best_efficiency_ghs_per_watt = current_efficiency;
         at->best_efficiency_freq_step = at->freq_step_index;
         return true;
