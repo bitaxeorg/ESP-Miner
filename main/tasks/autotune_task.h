@@ -74,6 +74,13 @@ typedef struct {
     // voltage requirements tend to grow faster than frequency near the top.
     float best_efficiency_ghs_per_watt;
     int best_efficiency_freq_step;
+    // Once the efficiency peak is found and the tuner has retreated back
+    // to it, this holds it there for a while instead of re-probing past
+    // it every single confirmation cycle -- without this, ordinary
+    // measurement noise in hash/watt could occasionally look like "still
+    // improving" and trigger another climb-then-retreat that never
+    // actually finds anything better. 0 means not currently settled.
+    int64_t efficiency_settled_expiry_ms;
     // Counts consecutive periodic checks (10s apart) where a given signal
     // read as bad. current_hashrate and error_percentage are both
     // short-interval instantaneous readings with real sample-to-sample

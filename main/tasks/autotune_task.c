@@ -185,6 +185,12 @@ static float get_user_verified_ceiling_mhz(void)
 // of an indefinitely-long session.
 #define EXTENDED_COOLDOWN_MS (60LL * 60LL * 1000LL)
 
+// How long Eco (optimize_efficiency) holds firmly at a found peak before
+// checking whether a higher peak is now reachable -- same duration as
+// EXTENDED_COOLDOWN_MS, for the same reason: long enough for ambient
+// conditions to plausibly have changed, without constantly re-probing.
+#define EFFICIENCY_SETTLE_MS (60LL * 60LL * 1000LL)
+
 // Hard ceiling for beyond-spec frequency exploration: the person's own
 // verified value if they've set one, otherwise the generic percentage-based
 // fallback -- further capped by a soft ceiling if the tuner has recently
@@ -272,13 +278,27 @@ static bool in_fast_climb_zone(AutotuneModule * at, int freq_option_count)
 // side effect whenever it does still look like an improvement. Returns
 // true (i.e. "keep climbing") if there's no usable power reading yet,
 // rather than blocking progress on missing data.
+// For ASIC chips, power draw scales roughly with voltage-squared times
+// frequency, while hashrate scales roughly linearly with frequency alone --
+// so hash/watt efficiency is mostly driven by voltage, not frequency. Since
+// the vendor table already pairs each frequency step with a reasonably
+// well-matched voltage, the efficiency curve climbing through it tends to
+// stay fairly flat for a long stretch rather than clearly peaking well
+// below the top. Requiring the *literal* peak (any improvement at all, no
+// matter how tiny, counts as "still worth climbing for") means Eco often
+// ends up barely different from Performance. Requiring a genuinely
+// meaningful improvement instead makes it stop once returns diminish, for
+// a result that's actually noticeably more efficient, not just technically
+// optimal by a fraction of a percent.
+#define EFFICIENCY_MIN_IMPROVEMENT_RATIO 1.02f
+
 static bool efficiency_still_improving(AutotuneModule * at, SystemModule * sys_module, PowerManagementModule * pm)
 {
     if (pm->power < 0.5f) {
         return true;
     }
     float current_efficiency = sys_module->current_hashrate / pm->power; // GH/s per W
-    if (at->best_efficiency_freq_step < 0 || current_efficiency >= at->best_efficiency_ghs_per_watt) {
+    if (at->best_efficiency_freq_step < 0 || current_efficiency >= at->best_efficiency_ghs_per_watt * EFFICIENCY_MIN_IMPROVEMENT_RATIO) {
         at->best_efficiency_ghs_per_watt = current_efficiency;
         at->best_efficiency_freq_step = at->freq_step_index;
         return true;
@@ -327,6 +347,7 @@ static void resync_from_nvs(AutotuneModule * at, const uint16_t * freq_options, 
     at->last_confirmed_voltage_mv = at->voltage_mv;
     at->best_efficiency_ghs_per_watt = 0.0f;
     at->best_efficiency_freq_step = -1;
+    at->efficiency_settled_expiry_ms = 0;
     at->hashrate_shortfall_ticks = 0;
     at->asic_error_bad_ticks = 0;
     at->consecutive_good_checks = 0;
@@ -492,6 +513,37 @@ static void enforce_soft_ceiling(AutotuneModule * at)
     }
 }
 
+// Resets to the bottom of the vendor table and lets the normal climb take
+// it from there -- frequency climbs step by step, and voltage only goes up
+// when a frequency step actually needs the rescue to stabilize (see
+// revert_last_action), or proactively in step with frequency, one
+// get_voltage_step_mv increment at a time once past the fast-climb zone.
+// This tends toward a near-minimal voltage for whatever frequency is
+// reached, rather than carrying over whatever frequency/voltage happened
+// to be set before (which could be a world away from what's actually
+// efficient/safe under a newly-selected profile's own rules) and only ever
+// shaving it down from there.
+static void reset_to_bottom_and_climb(GlobalState * GLOBAL_STATE, AutotuneModule * at, const uint16_t * freq_options,
+                                       float min_voltage_mv, const AutotuneProfileConfig * profile, const char * reason)
+{
+    at->freq_step_index = 0;
+    at->voltage_mv = min_voltage_mv;
+    at->extended_freq_mhz = 0.0f;
+    at->extended_soft_ceiling_mhz = 0.0f;
+    at->extended_soft_ceiling_expiry_ms = 0;
+    at->extended_last_failed_mhz = 0.0f;
+    at->extended_freq_consecutive_fails = 0;
+    at->last_confirmed_extended_freq_mhz = 0.0f;
+    at->last_confirmed_voltage_mv = min_voltage_mv;
+    at->best_efficiency_ghs_per_watt = 0.0f;
+    at->best_efficiency_freq_step = -1;
+    at->efficiency_settled_expiry_ms = 0;
+    at->last_action = AUTOTUNE_ACTION_NONE;
+    apply_step(GLOBAL_STATE, at, freq_options, 0, at->voltage_mv, 0.0f);
+    ESP_LOGI(TAG, "%s (%s profile): starting from the bottom (%.0f MHz @ %.0f mV) and climbing",
+             reason, profile->name, (float) freq_options[0], at->voltage_mv);
+}
+
 void AUTOTUNE_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
@@ -526,6 +578,12 @@ void AUTOTUNE_task(void * pvParameters)
     // Tracks the disabled->enabled transition so we only reset to the
     // bottom of the table once per "session", not on every loop tick.
     bool was_enabled = false;
+    // Tracks the previously-seen profile so a switch (Performance -> Eco or
+    // back) can also trigger a fresh climb -- otherwise the new profile
+    // would just inherit whatever frequency/voltage the old one had
+    // settled on (e.g. a beyond-spec Performance point), which usually
+    // isn't a sensible starting point for the new profile's own rules.
+    int last_seen_profile_idx = -1;
 
     while (1) {
         vTaskDelay(TICK_MS / portTICK_PERIOD_MS);
@@ -540,6 +598,7 @@ void AUTOTUNE_task(void * pvParameters)
         if (!enabled) {
             at->state = AUTOTUNE_STATE_IDLE;
             was_enabled = false;
+            last_seen_profile_idx = -1;
             continue;
         }
 
@@ -561,6 +620,19 @@ void AUTOTUNE_task(void * pvParameters)
                      at->extended_soft_ceiling_mhz);
             at->extended_soft_ceiling_mhz = 0.0f;
             at->extended_freq_consecutive_fails = 0;
+        }
+
+        // Same idea for Eco's efficiency-peak settle: once the hold period
+        // is up, allow checking for a higher peak again. Reset the
+        // recorded best so the very next measurement can freely become
+        // the new reference, rather than being unfairly compared against
+        // a (possibly stale, ambient-condition-dependent) value from an
+        // hour ago.
+        if (at->efficiency_settled_expiry_ms > 0 &&
+            (esp_timer_get_time() / 1000) > at->efficiency_settled_expiry_ms) {
+            ESP_LOGI(TAG, "Efficiency settle period expired, willing to check for a higher peak again");
+            at->efficiency_settled_expiry_ms = 0;
+            at->best_efficiency_ghs_per_watt = 0.0f;
         }
 
         bool blocked = sys_module->overheat_mode || sys_module->mining_paused ||
@@ -585,32 +657,24 @@ void AUTOTUNE_task(void * pvParameters)
 
         if (!was_enabled) {
             // Just (re)enabled -- and the ASIC is confirmed initialized, so
-            // it's now safe to apply a step. Start from the bottom of the
-            // vendor table for both frequency and voltage, and let the
-            // normal climb take it from there -- frequency climbs step by
-            // step, and voltage only goes up when a frequency step actually
-            // needs the rescue to stabilize (see revert_last_action), or
-            // proactively in step with frequency, one get_voltage_step_mv
-            // increment at a time once past the fast-climb zone. This tends
-            // toward a near-minimal voltage for whatever frequency is
-            // reached, rather than starting at whatever voltage happened to
-            // be set before and only ever shaving it down afterward.
-            at->freq_step_index = 0;
-            at->voltage_mv = min_voltage_mv;
-            at->extended_freq_mhz = 0.0f;
-            at->extended_soft_ceiling_mhz = 0.0f;
-            at->extended_soft_ceiling_expiry_ms = 0;
-            at->extended_last_failed_mhz = 0.0f;
-            at->extended_freq_consecutive_fails = 0;
-            at->last_confirmed_extended_freq_mhz = 0.0f;
-            at->last_confirmed_voltage_mv = min_voltage_mv;
-            at->best_efficiency_ghs_per_watt = 0.0f;
-            at->best_efficiency_freq_step = -1;
-            at->last_action = AUTOTUNE_ACTION_NONE;
-            apply_step(GLOBAL_STATE, at, freq_options, 0, at->voltage_mv, 0.0f);
-            ESP_LOGI(TAG, "Autotune enabled (%s profile): starting from the bottom (%.0f MHz @ %.0f mV) and climbing",
-                     profile->name, (float) freq_options[0], at->voltage_mv);
+            // it's now safe to apply a step.
+            reset_to_bottom_and_climb(GLOBAL_STATE, at, freq_options, min_voltage_mv, profile, "Autotune enabled");
             was_enabled = true;
+            last_seen_profile_idx = (int) at->active_profile;
+            continue;
+        }
+
+        if (last_seen_profile_idx != (int) at->active_profile) {
+            // The profile itself changed while already running (e.g.
+            // Performance -> Eco). Whatever frequency/voltage the old
+            // profile had settled on is not a meaningful starting point
+            // for the new one's own rules -- most notably, switching to
+            // Eco while sitting at a beyond-spec Performance point would
+            // otherwise just shave a bit of voltage off that same high
+            // frequency instead of actually searching for an efficient
+            // one. Start the new profile fresh from the bottom instead.
+            reset_to_bottom_and_climb(GLOBAL_STATE, at, freq_options, min_voltage_mv, profile, "Profile changed");
+            last_seen_profile_idx = (int) at->active_profile;
             continue;
         }
 
@@ -762,6 +826,12 @@ void AUTOTUNE_task(void * pvParameters)
         bool in_give_up_hold = at->extended_soft_ceiling_mhz > 0.0f &&
                                 (esp_timer_get_time() / 1000) < at->extended_soft_ceiling_expiry_ms;
 
+        // Same idea as in_give_up_hold, but for Eco's efficiency peak: once
+        // settled there, don't re-probe past it every cycle (see
+        // EFFICIENCY_SETTLE_MS) until the hold period is up.
+        bool in_efficiency_settle = profile->optimize_efficiency && at->efficiency_settled_expiry_ms > 0 &&
+                                     (esp_timer_get_time() / 1000) < at->efficiency_settled_expiry_ms;
+
         if (at->last_action == AUTOTUNE_ACTION_VOLT_UP) {
             // The extra voltage successfully stabilized this frequency step.
             // Keep it, and go straight back to trying to climb frequency
@@ -769,7 +839,7 @@ void AUTOTUNE_task(void * pvParameters)
             // work, so it shouldn't count toward "repeatedly failing here".
             at->extended_freq_consecutive_fails = 0;
             at->last_action = AUTOTUNE_ACTION_NONE;
-        } else if (at->freq_step_index < freq_option_count - 1 &&
+        } else if (!in_efficiency_settle && at->freq_step_index < freq_option_count - 1 &&
                    (!profile->optimize_efficiency || efficiency_still_improving(at, sys_module, pm))) {
             at->freq_step_index++;
             at->last_action = AUTOTUNE_ACTION_FREQ_UP;
@@ -803,6 +873,14 @@ void AUTOTUNE_task(void * pvParameters)
             at->freq_step_index--;
             at->last_action = AUTOTUNE_ACTION_NONE;
             at->step_downs_total++;
+            if (at->freq_step_index == at->best_efficiency_freq_step) {
+                // Back at the peak -- settle here instead of immediately
+                // trying to climb past it again next cycle (see
+                // in_efficiency_settle / EFFICIENCY_SETTLE_MS).
+                at->efficiency_settled_expiry_ms = (esp_timer_get_time() / 1000) + EFFICIENCY_SETTLE_MS;
+                ESP_LOGI(TAG, "Settled at peak efficiency (%.0f MHz), holding for an hour before checking for a higher peak again",
+                         (float) freq_options[at->freq_step_index]);
+            }
             apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, 0.0f);
         } else if (profile->allow_beyond_spec && nvs_config_get_bool(NVS_CONFIG_OVERCLOCK_ENABLED) &&
                    next_extended_step_within_ceiling(at, freq_options, freq_option_count)) {
