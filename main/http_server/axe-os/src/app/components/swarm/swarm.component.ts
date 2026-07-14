@@ -366,18 +366,20 @@ private isIpAddress(value: string): boolean {
             return of('Identify signal sent - device should say "Hi!"');
           }
         }
-        let errorMsg = `Failed to ${action} device at ${device.address}`;
+        let errorMsg = `Failed to ${action} device at ${this.getDeviceDisplayName(device)}`;
         if (error.name === 'TimeoutError') {
           errorMsg = 'Request timed out';
         } else if (error.message) {
           errorMsg += `: ${error.message}`;
         }
-        this.toastr.error(errorMsg, `Device at ${device.address}`);
+        this.toastr.error(errorMsg, `Device at ${this.getDeviceDisplayName(device)}`);
         return of(null);
       })
     ).subscribe((res: any) => {
       if (res !== null) {
-        this.toastr.success(res, `Device at ${device.address}`);
+        let message = res;
+        try { message = JSON.parse(res)?.message ?? res; } catch {}
+        this.toastr.success(message, `Device at ${this.getDeviceDisplayName(device)}`);
         this.refreshList(false);
       }
     });
