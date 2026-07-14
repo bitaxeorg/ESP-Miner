@@ -136,6 +136,27 @@ static float get_voltage_step_mv(const AutotuneModule * at)
 // voltage can cause without tripping the error-rate check at all.
 #define HASHRATE_RATIO_MIN 0.80f
 
+// A much wider version of the same idea, specifically for the fast-climb
+// zone: current_hashrate is a small, short-interval measurement there with
+// real sample-to-sample variance (observed up to roughly 15-20% off, even
+// when nothing was actually wrong), which the normal 80% bar can't
+// reliably tell apart from real trouble. Rather than skip this check there
+// entirely (which would mean a genuinely broken combo -- e.g. running a
+// frequency well below the voltage the vendor's own table pairs with it --
+// could go completely undetected), this stays active but only reacts to a
+// much more severe shortfall, one well past what ordinary measurement
+// noise would produce.
+#define HASHRATE_RATIO_MIN_FAST_CLIMB 0.50f
+
+// Same idea as HASHRATE_RATIO_MIN_FAST_CLIMB, for the ASIC error-rate
+// check: error_percentage is error_hashrate divided by current_hashrate,
+// and at the bottom of the vendor table current_hashrate is small enough
+// that this reads as sustainedly elevated (10-18%+ observed) purely from
+// that small denominator, not genuine instability. 30% is comfortably
+// above that observed noise ceiling, so it still catches a chip that's
+// actually producing mostly garbage results.
+#define ERROR_PERCENTAGE_MAX_FAST_CLIMB 30.0f
+
 // How many consecutive checks a signal has to stay bad before it's
 // trusted. current_hashrate and error_percentage are both short-interval
 // instantaneous readings (see hashrate_monitor_task.c) with real
@@ -647,8 +668,19 @@ void AUTOTUNE_task(void * pvParameters)
         // (voltage differences don't meaningfully matter there anyway, see
         // efficiency_still_improving), but allow it once past that, where
         // real efficiency trade-offs start to exist.
-        bool allow_voltage_rescue_now = profile->allow_voltage_rescue ||
-                                         (profile->optimize_efficiency && !in_fast_climb_zone(at, freq_option_count));
+        // Eco never proactively climbs voltage (see the proactive-climb
+        // gate further down), but without *any* ability to try a bit more
+        // voltage when a frequency step genuinely fails, it can only ever
+        // run at the single voltage level it started at (the vendor-table
+        // minimum) -- even in regions where the vendor's own table pairs
+        // that frequency with meaningfully more voltage than that (e.g.
+        // 525 MHz is vendor-tested at 1100mV, not the 1000mV floor).
+        // Denying a rescue there wouldn't be "more efficient", just
+        // unsafe: a genuinely broken combo staying broken. So: rescue is
+        // available everywhere for every profile; the fast-climb zone
+        // only affects how *proactively* voltage moves (see below), not
+        // whether it's allowed to react at all.
+        bool allow_voltage_rescue_now = profile->allow_voltage_rescue || profile->optimize_efficiency;
 
         // A frequency that repeatedly failed gets a cooldown rather than a
         // permanent ban for the rest of the session -- once that cooldown
@@ -776,78 +808,63 @@ void AUTOTUNE_task(void * pvParameters)
         // 3. ASIC on-chip error rate -- debounced (see
         // ASIC_ERROR_BAD_TICKS_REQUIRED), voltage rescue offered first if
         // this profile allows it, since insufficient voltage headroom is a
-        // common cause.
-        //
-        // Skipped entirely in the fast-climb zone: error_percentage is
-        // error_hashrate divided by current_hashrate, and at the bottom of
-        // the vendor table current_hashrate is small enough that this
-        // reads as *sustainedly* elevated (10-18%+, not just a brief
-        // blip) purely from that small denominator -- a couple of
-        // consecutive debounce checks doesn't filter that out, it just
-        // delays the same false trigger by one tick. This is also the
-        // safest, most thoroughly vendor-tested part of the range, so
-        // skipping this one specific check here is a reasonable trade;
-        // temperature/input-voltage and the debounced hashrate-shortfall
-        // check still apply throughout.
-        if (!in_fast_climb_zone(at, freq_option_count)) {
-            float error_threshold = at->extended_freq_mhz > 0.0f ? profile->extended_error_percentage_max : profile->error_percentage_max;
-            if (sys_module->error_percentage > error_threshold) {
-                at->asic_error_bad_ticks++;
-            } else {
-                at->asic_error_bad_ticks = 0;
+        // common cause. Stays active throughout, including the fast-climb
+        // zone -- see ERROR_PERCENTAGE_MAX_FAST_CLIMB for why that needs
+        // its own, much wider tolerance rather than being skipped
+        // outright. With allow_voltage_rescue_now now available in every
+        // zone, a real problem here can actually be responded to instead
+        // of just being silently ignored.
+        bool in_fast_zone_now = in_fast_climb_zone(at, freq_option_count);
+        float error_threshold = in_fast_zone_now ? ERROR_PERCENTAGE_MAX_FAST_CLIMB
+                                 : (at->extended_freq_mhz > 0.0f ? profile->extended_error_percentage_max : profile->error_percentage_max);
+        if (sys_module->error_percentage > error_threshold) {
+            at->asic_error_bad_ticks++;
+        } else {
+            at->asic_error_bad_ticks = 0;
+        }
+        if (at->asic_error_bad_ticks >= ASIC_ERROR_BAD_TICKS_REQUIRED) {
+            ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%%, sustained over %d checks, reverting",
+                     sys_module->error_percentage, error_threshold, at->asic_error_bad_ticks);
+            at->asic_error_bad_ticks = 0;
+            bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "ASIC errors");
+            if (!gave_up) {
+                revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, allow_voltage_rescue_now);
+                enforce_soft_ceiling(at);
             }
-            if (at->asic_error_bad_ticks >= ASIC_ERROR_BAD_TICKS_REQUIRED) {
-                ESP_LOGW(TAG, "ASIC error rate %.1f%% over threshold %.1f%%, sustained over %d checks, reverting",
-                         sys_module->error_percentage, error_threshold, at->asic_error_bad_ticks);
-                at->asic_error_bad_ticks = 0;
-                bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "ASIC errors");
-                if (!gave_up) {
-                    revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, allow_voltage_rescue_now);
-                    enforce_soft_ceiling(at);
-                }
-                at->step_downs_total++;
-                apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-                continue;
-            }
+            at->step_downs_total++;
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            continue;
         }
 
         // 4. Hashrate shortfall against the chip's own theoretical
         // expectation for this frequency -- also debounced. Insufficient
         // voltage can cause some cores to simply stop contributing rather
         // than produce wrong results, which neither of the checks above
-        // would catch on their own.
-        //
-        // Skipped in the fast-climb zone for the same reason as the
-        // ASIC-error check: current_hashrate is a small, short-interval
-        // measurement there, with real sample-to-sample variance that
-        // debouncing over a couple of ticks doesn't fully filter out if
-        // it's sustained rather than a one-off blip. Without this
-        // exemption, a profile that never does a voltage rescue (Eco) and
-        // starts at the very bottom of the table (freq_step_index=0,
-        // voltage already at the floor) has nowhere left to retreat to if
-        // this fires there -- revert_last_action can't lower anything
-        // further, so it would just get stuck rather than ever climbing
-        // out of the fast-climb zone at all.
-        if (!in_fast_climb_zone(at, freq_option_count)) {
-            if (pm->expected_hashrate > 0.5f && sys_module->current_hashrate < pm->expected_hashrate * HASHRATE_RATIO_MIN) {
-                at->hashrate_shortfall_ticks++;
-            } else {
-                at->hashrate_shortfall_ticks = 0;
+        // would catch on their own. Stays active throughout, including the
+        // fast-climb zone -- see HASHRATE_RATIO_MIN_FAST_CLIMB for why that
+        // needs its own, much wider tolerance rather than being skipped
+        // outright. With allow_voltage_rescue_now now available in every
+        // zone, a real shortfall can actually be responded to (more
+        // voltage) instead of just being silently ignored.
+        float hashrate_ratio_min = in_fast_zone_now ? HASHRATE_RATIO_MIN_FAST_CLIMB : HASHRATE_RATIO_MIN;
+        if (pm->expected_hashrate > 0.5f && sys_module->current_hashrate < pm->expected_hashrate * hashrate_ratio_min) {
+            at->hashrate_shortfall_ticks++;
+        } else {
+            at->hashrate_shortfall_ticks = 0;
+        }
+        if (at->hashrate_shortfall_ticks >= HASHRATE_SHORTFALL_TICKS_REQUIRED) {
+            ESP_LOGW(TAG, "Hashrate %.1f GH/s is only %.0f%% of the %.1f GH/s expected for this frequency, sustained over %d checks, reverting (possible partial core dropout from insufficient voltage)",
+                     sys_module->current_hashrate, (sys_module->current_hashrate / pm->expected_hashrate) * 100.0f,
+                     pm->expected_hashrate, at->hashrate_shortfall_ticks);
+            at->hashrate_shortfall_ticks = 0;
+            bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "hashrate shortfall");
+            if (!gave_up) {
+                revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, allow_voltage_rescue_now);
+                enforce_soft_ceiling(at);
             }
-            if (at->hashrate_shortfall_ticks >= HASHRATE_SHORTFALL_TICKS_REQUIRED) {
-                ESP_LOGW(TAG, "Hashrate %.1f GH/s is only %.0f%% of the %.1f GH/s expected for this frequency, sustained over %d checks, reverting (possible partial core dropout from insufficient voltage)",
-                         sys_module->current_hashrate, (sys_module->current_hashrate / pm->expected_hashrate) * 100.0f,
-                         pm->expected_hashrate, at->hashrate_shortfall_ticks);
-                at->hashrate_shortfall_ticks = 0;
-                bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "hashrate shortfall");
-                if (!gave_up) {
-                    revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, allow_voltage_rescue_now);
-                    enforce_soft_ceiling(at);
-                }
-                at->step_downs_total++;
-                apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
-                continue;
-            }
+            at->step_downs_total++;
+            apply_step(GLOBAL_STATE, at, freq_options, at->freq_step_index, at->voltage_mv, at->extended_freq_mhz);
+            continue;
         }
 
         // All four signals look fine on this check.
@@ -859,16 +876,16 @@ void AUTOTUNE_task(void * pvParameters)
             good_checks_required = GOOD_CHECKS_REQUIRED_EXTENDED;
         } else if (in_fast_climb_zone(at, freq_option_count) && !profile->optimize_efficiency) {
             // The shorter confirmation time is purely a speed shortcut
-            // (unlike the ASIC-error/hashrate-check exemptions above, which
-            // exist because those specific signals are statistically
+            // (unlike the ASIC-error/hashrate wider tolerances above,
+            // which exist because those specific signals are statistically
             // unreliable at low frequency, not because we care less down
-            // here -- those stay skipped for every profile regardless).
-            // Eco has no reason to rush through this region: taking the
-            // normal, longer confirmation time here costs it nothing and
-            // gives a more thoroughly-confirmed base to build on, while
-            // Performance benefits from getting through the safe, already
-            // vendor-tested region quickly so it can spend more of its
-            // time actually probing beyond-spec.
+            // here -- those wider tolerances apply for every profile
+            // regardless). Eco has no reason to rush through this region:
+            // taking the normal, longer confirmation time here costs it
+            // nothing and gives a more thoroughly-confirmed base to build
+            // on, while Performance benefits from getting through the
+            // safe, already vendor-tested region quickly so it can spend
+            // more of its time actually probing beyond-spec.
             good_checks_required = GOOD_CHECKS_REQUIRED_FAST;
         }
 
