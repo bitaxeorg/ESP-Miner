@@ -84,7 +84,10 @@ static const AutotuneProfileConfig * get_active_profile(void)
 // by definition, the safest region to be in -- it's well within what the
 // manufacturer validated -- so it only needs a couple of clean checks.
 // Steps closer to the vendor's own ceiling get more scrutiny, and anything
-// beyond-spec (unvalidated territory) gets the most.
+// beyond-spec (unvalidated territory) gets the most. GOOD_CHECKS_REQUIRED_FAST
+// specifically is only used for profiles chasing speed (Performance) --
+// Eco has no reason to rush through this region and uses the normal
+// confirmation time there instead (see where good_checks_required is set).
 #define GOOD_CHECKS_REQUIRED_FAST 2
 #define GOOD_CHECKS_REQUIRED_NORMAL 4
 #define GOOD_CHECKS_REQUIRED_EXTENDED 6
@@ -292,13 +295,26 @@ static bool in_fast_climb_zone(AutotuneModule * at, int freq_option_count)
 // optimal by a fraction of a percent.
 #define EFFICIENCY_MIN_IMPROVEMENT_RATIO 1.02f
 
-static bool efficiency_still_improving(AutotuneModule * at, SystemModule * sys_module, PowerManagementModule * pm)
+static bool efficiency_still_improving(AutotuneModule * at, SystemModule * sys_module, PowerManagementModule * pm,
+                                        int freq_option_count)
 {
     if (pm->power < 0.5f) {
         return true;
     }
     float current_efficiency = sys_module->current_hashrate / pm->power; // GH/s per W
-    if (at->best_efficiency_freq_step < 0 || current_efficiency >= at->best_efficiency_ghs_per_watt * EFFICIENCY_MIN_IMPROVEMENT_RATIO) {
+    // Within the fast-climb zone, voltage never moves (the proactive
+    // voltage climb further down is itself gated to skip this same zone),
+    // so hash/watt differences between adjacent frequency steps there are
+    // naturally tiny -- efficiency is mostly a function of voltage, not
+    // frequency, so climbing frequency alone at a fixed voltage barely
+    // moves it either way. Requiring a meaningful improvement here would
+    // mean giving up and settling at the very bottom of the table almost
+    // immediately, every time, which isn't a sensible "peak" at all. Climb
+    // through this safe, vendor-tested region unconditionally instead; the
+    // improvement bar only makes sense once voltage can actually move and
+    // real efficiency trade-offs start to show up.
+    float required_ratio = in_fast_climb_zone(at, freq_option_count) ? 1.0f : EFFICIENCY_MIN_IMPROVEMENT_RATIO;
+    if (at->best_efficiency_freq_step < 0 || current_efficiency >= at->best_efficiency_ghs_per_watt * required_ratio) {
         at->best_efficiency_ghs_per_watt = current_efficiency;
         at->best_efficiency_freq_step = at->freq_step_index;
         return true;
@@ -609,6 +625,20 @@ void AUTOTUNE_task(void * pvParameters)
         at->active_profile = (AutotuneProfile) (profile - AUTOTUNE_PROFILES);
         float temp_ceiling_c = profile->target_temp_c;
 
+        // Eco never proactively climbs voltage (see the proactive-climb
+        // gate further down), but without *any* ability to try a bit more
+        // voltage when a frequency step fails, it can only ever explore
+        // the single voltage level it started at (the vendor-table
+        // minimum) -- meaning it could never discover that a slightly
+        // higher frequency plus a modest voltage bump is actually a more
+        // efficient combo than just stopping at a lower frequency and
+        // never finding out. So: still no rescue in the fast-climb zone
+        // (voltage differences don't meaningfully matter there anyway, see
+        // efficiency_still_improving), but allow it once past that, where
+        // real efficiency trade-offs start to exist.
+        bool allow_voltage_rescue_now = profile->allow_voltage_rescue ||
+                                         (profile->optimize_efficiency && !in_fast_climb_zone(at, freq_option_count));
+
         // A frequency that repeatedly failed gets a cooldown rather than a
         // permanent ban for the rest of the session -- once that cooldown
         // has passed, forget it ever failed and let the tuner probe it
@@ -761,7 +791,7 @@ void AUTOTUNE_task(void * pvParameters)
                 at->asic_error_bad_ticks = 0;
                 bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "ASIC errors");
                 if (!gave_up) {
-                    revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+                    revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, allow_voltage_rescue_now);
                     enforce_soft_ceiling(at);
                 }
                 at->step_downs_total++;
@@ -800,7 +830,7 @@ void AUTOTUNE_task(void * pvParameters)
                 at->hashrate_shortfall_ticks = 0;
                 bool gave_up = track_extended_climb_failure(at, freq_options, freq_option_count, "hashrate shortfall");
                 if (!gave_up) {
-                    revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, profile->allow_voltage_rescue);
+                    revert_last_action(at, freq_options, freq_option_count, min_voltage_mv, max_voltage_mv, allow_voltage_rescue_now);
                     enforce_soft_ceiling(at);
                 }
                 at->step_downs_total++;
@@ -816,7 +846,18 @@ void AUTOTUNE_task(void * pvParameters)
         int good_checks_required = GOOD_CHECKS_REQUIRED_NORMAL;
         if (at->extended_freq_mhz > 0.0f) {
             good_checks_required = GOOD_CHECKS_REQUIRED_EXTENDED;
-        } else if (in_fast_climb_zone(at, freq_option_count)) {
+        } else if (in_fast_climb_zone(at, freq_option_count) && !profile->optimize_efficiency) {
+            // The shorter confirmation time is purely a speed shortcut
+            // (unlike the ASIC-error/hashrate-check exemptions above, which
+            // exist because those specific signals are statistically
+            // unreliable at low frequency, not because we care less down
+            // here -- those stay skipped for every profile regardless).
+            // Eco has no reason to rush through this region: taking the
+            // normal, longer confirmation time here costs it nothing and
+            // gives a more thoroughly-confirmed base to build on, while
+            // Performance benefits from getting through the safe, already
+            // vendor-tested region quickly so it can spend more of its
+            // time actually probing beyond-spec.
             good_checks_required = GOOD_CHECKS_REQUIRED_FAST;
         }
 
@@ -854,7 +895,7 @@ void AUTOTUNE_task(void * pvParameters)
             at->extended_freq_consecutive_fails = 0;
             at->last_action = AUTOTUNE_ACTION_NONE;
         } else if (!in_efficiency_settle && at->freq_step_index < freq_option_count - 1 &&
-                   (!profile->optimize_efficiency || efficiency_still_improving(at, sys_module, pm))) {
+                   (!profile->optimize_efficiency || efficiency_still_improving(at, sys_module, pm, freq_option_count))) {
             at->freq_step_index++;
             at->last_action = AUTOTUNE_ACTION_FREQ_UP;
             at->step_ups_total++;
