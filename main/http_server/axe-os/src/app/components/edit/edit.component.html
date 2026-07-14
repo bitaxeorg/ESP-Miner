@@ -100,6 +100,37 @@
         </div>
     </div>
 
+    <h3 class="mt-5">Presets</h3>
+
+    <div class="card">
+        <div class="field grid p-fluid">
+            <label class="col-12 md:col-2 md:m-0">Name</label>
+            <div class="col-12 md:col-7">
+                <input pInputText [formControl]="presetName" placeholder="e.g. Quiet / Turbo" />
+            </div>
+            <div class="col-12 md:col-3">
+                <button pButton type="button"
+                        [label]="editingIndex === null ? 'Save Preset' : 'Update'"
+                        [disabled]="!presetName.value || (presets.length >= maxPresets && editingIndex === null)"
+                        (click)="addOrUpdatePreset()"></button>
+            </div>
+        </div>
+        <small class="block mb-3">Captures the current Frequency and Core Voltage above. Max {{ maxPresets }} presets.</small>
+
+        <div *ngFor="let p of presets; let i = index" class="flex align-items-center gap-2 py-1">
+            <span class="flex-1">{{ p.name }} — {{ p.frequency }} MHz / {{ p.coreVoltage }} mV</span>
+            <button pButton type="button" label="Apply" (click)="applyPreset(p)"></button>
+            <button pButton type="button" label="Edit" class="p-button-secondary" (click)="startEditPreset(i)"></button>
+            <button pButton type="button" icon="pi pi-trash" class="p-button-danger" (click)="deletePreset(i)"></button>
+        </div>
+
+        <div class="flex gap-3 mt-3">
+            <button pButton type="button" label="Export" class="p-button-secondary" (click)="exportPresets()"></button>
+            <button pButton type="button" label="Import" class="p-button-secondary" (click)="fileInput.click()"></button>
+            <input #fileInput type="file" accept="application/json" hidden (change)="importPresets($event)" />
+        </div>
+    </div>
+
     <h3 class="mt-5">Display</h3>
 
     <div class="card">
