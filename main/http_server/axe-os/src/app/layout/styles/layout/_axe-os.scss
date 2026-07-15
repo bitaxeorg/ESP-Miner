@@ -153,7 +153,7 @@
     }
 }
 h1, h2, h3, h4, h5, h6, .p-dialog-title {
-    color: #ffffff !important;
+    color: var(--p-text-color) !important;
 }
 
 .p-fileupload-basic {
