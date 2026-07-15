@@ -169,6 +169,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   private lastBucket: number = -1;
 
   // Performance optimization cache properties
+  private primaryColorRgb: { r: number, g: number, b: number } = { r: 0, g: 0, b: 0 };
   private isHardwareConfigInitialized = false;
   public asicsAmount: number = 0;
   public asicDomainsAmount: number = 0;
@@ -560,6 +561,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const textColorSecondary = (documentStyle.getPropertyValue('--p-text-muted-color') || documentStyle.getPropertyValue('--text-color-secondary')).trim();
     const surfaceBorder = (documentStyle.getPropertyValue('--p-content-border-color') || documentStyle.getPropertyValue('--surface-border')).trim();
     const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
+    this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.rebuildChartDatasets();
 
@@ -601,6 +603,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const textColorSecondary = (documentStyle.getPropertyValue('--p-text-muted-color') || documentStyle.getPropertyValue('--text-color-secondary')).trim();
     const surfaceBorder = (documentStyle.getPropertyValue('--p-content-border-color') || documentStyle.getPropertyValue('--surface-border')).trim();
     const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
+    this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.chartData = {
       labels: this.dataLabel,
@@ -1109,6 +1112,19 @@ export class HomeComponent implements OnInit, OnDestroy {
 
 
 
+  private hexToRgb(hex: string): { r: number, g: number, b: number } {
+    if (hex[0] === '#') hex = hex.slice(1);
+    if (hex.length === 3) {
+      hex = hex.split('').map((h: string) => h + h).join('');
+    }
+
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+
+    return { r, g, b };
+  }
+
   getRejectionExplanation(reason: string): string | null {
     return this.shareRejectReasonsService.getExplanation(reason);
   }
@@ -1186,17 +1202,20 @@ export class HomeComponent implements OnInit, OnDestroy {
     return percentage < 10 ? percentage.toPrecision(2) : percentage.toFixed(1);
   }
 
-  public getHeatmapLightness(domainHashrate: number, expectedHashrate: number): string {
+  public getHeatmapColor(domainHashrate: number, expectedHashrate: number): string {
     const expected = expectedHashrate || 1;
     const ratio = Math.max(0, Math.min(2, (domainHashrate / expected) * this.asicsAmount) * this.asicDomainsAmount);
     const deviation = isNaN(ratio) ? 1 : Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
-    const t = 1 - Math.pow(1 - deviation, 1.5); // Exponent controls graduality
+    const t = 1 - Math.pow(1 - deviation, 1.5); // Exponent controls graduality (lower = more gradual, 7 was very steep)
+    const target = ratio > 1 ? 255 : 0; // gradient from 0: black, 1: primary-color, 2: white
 
-    const direction = ratio > 1 ? 1 : -1;
-    const amount = direction * t * 0.4;
-    const lightness = 0.5 + amount;
+    const { r, g, b } = this.primaryColorRgb;
 
-    return lightness.toFixed(3);
+    const finalR = (r * (1 - t) + target * t) | 0;
+    const finalG = (g * (1 - t) + target * t) | 0;
+    const finalB = (b * (1 - t) + target * t) | 0;
+
+    return `rgb(${finalR}, ${finalG}, ${finalB})`;
   }
 
   private updateChartUnitGroups() {
