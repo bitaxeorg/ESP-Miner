@@ -6,7 +6,8 @@
   },
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "ng serve --hmr",
+    "start:proxy": "ng serve --hmr --configuration=proxy --proxy-config proxy.conf.js",
     "build": "npm run generate:api && ng build --configuration=production && gzipper compress --gzip --gzip-level 9 --exclude woff2 ./dist/axe-os && node only-gzip.js && node generate-version.js",
     "build:no-api-gen": "ng build --configuration=production && gzipper compress --gzip --gzip-level 9 --exclude woff2 ./dist/axe-os && node only-gzip.js && node generate-version.js",
     "watch": "ng build --watch --configuration development",

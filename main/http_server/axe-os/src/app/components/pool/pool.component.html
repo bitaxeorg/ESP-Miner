@@ -232,6 +232,20 @@
                             </label>
                         </div>
 
+                        <div *ngIf="pool === 'fallbackStratum'" class="field grid p-fluid mt-4 mb-0">
+                            <label class="col-12 md:col-2 md:mb-0">
+                                <tooltip-text-icon
+                                    text="Clear Configuration"
+                                    tooltip="Empty all fallback pool fields. Click Save afterwards to apply and disable the fallback pool."
+                                />
+                            </label>
+                            <div class="col-12 md:col-10">
+                                <button pButton type="button" icon="pi pi-trash"
+                                    label="Clear Fallback Configuration"
+                                    class="p-button-danger p-button-outlined w-auto"
+                                    (click)="clearFallbackConfiguration()"></button>
+                            </div>
+                        </div>
                     </ng-container>
                 </fieldset>
             </div>

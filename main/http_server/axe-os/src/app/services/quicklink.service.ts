@@ -32,6 +32,7 @@ export class QuicklinkService {
       { search: 'solohash.co.uk', url: `https://solohash.co.uk/user/${user}` },
       { search: 'solo.stratum.braiins.com', url: `https://solo.braiins.com/stats/${user}` },
       { search: 'parasite.wtf', url: `https://parasite.space/user/${user}` },
+      { search: 'sololuck.io', url: `https://sololuck.io/users/${user}` },
       { regex: /^(eu|au)?solo[46]?.ckpool\.org/, url: `https://$1solostats.ckpool.org/users/${user}` },
       { search: 'atlaspool.io', url: `https://atlaspool.io/dashboard.html?wallet=${user}` },
       { regex: /^(eu\.|tinyminer\.)?m45core\.com$/, url: `https://$1m45core.com/user/${user}` },
