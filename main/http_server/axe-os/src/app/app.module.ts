@@ -7,8 +7,12 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { ToastrModule } from 'ngx-toastr';
-import { providePrimeNG } from 'primeng/config';
-import Aura from '@primeuix/themes/aura';
+import { TooltipDirective } from './directives/tooltip.directive';
+import { CheckboxComponent } from './components/checkbox/checkbox.component';
+import { RadioButtonComponent } from './components/radio-button/radio-button.component';
+import { SliderComponent } from './components/slider/slider.component';
+import { AppChartComponent } from './components/chart/app-chart.component';
+import { DropdownComponent } from './components/dropdown/dropdown.component';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -39,11 +43,6 @@ import { HashSuffixPipe } from './pipes/hash-suffix.pipe';
 import { DiffSuffixPipe } from './pipes/diff-suffix.pipe';
 import { AddressPipe } from './pipes/address.pipe';
 import { SatsPipe } from './pipes/sats.pipe';
-import { PrimeNGModule } from './prime-ng.module';
-import { MessageModule } from 'primeng/message';
-import { TooltipModule } from 'primeng/tooltip';
-import { DialogModule } from 'primeng/dialog';
-import { DialogService as PrimeDialogService } from 'primeng/dynamicdialog';
 import { DialogService, DialogListComponent } from './services/dialog.service';
 
 const components = [
@@ -82,11 +81,13 @@ const components = [
     }),
     BrowserAnimationsModule,
     CommonModule,
-    PrimeNGModule,
     AppLayoutModule,
-    MessageModule,
-    TooltipModule,
-    DialogModule,
+    TooltipDirective,
+    CheckboxComponent,
+    DropdownComponent,
+    RadioButtonComponent,
+    SliderComponent,
+    AppChartComponent,
     EditComponent,
     SettingsComponent,
     ANSIPipe,
@@ -101,20 +102,7 @@ const components = [
     { provide: ApiConfiguration, useValue: { rootUrl: '' } },
     Api,
     DialogService,
-    PrimeDialogService,
-    provideHttpClient(),
-    providePrimeNG({
-        theme: {
-            preset: Aura,
-            options: {
-                darkModeSelector: '.dark-mode',
-                cssLayer: {
-                    name: 'primeng',
-                    order: 'primeng, axe-os'
-                }
-            }
-        }
-    })
+    provideHttpClient()
   ],
   bootstrap: [AppComponent]
 })

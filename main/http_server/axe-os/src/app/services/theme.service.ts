@@ -23,8 +23,8 @@ export class ThemeService {
     const focusRingColor = this.hexToRgba(primaryColor, 0.2);
     
     return {
-      '--primary-color': primaryColor,
-      '--primary-color-text': '#ffffff',
+      '--color-primary': primaryColor,
+      '--color-primary-text': '#ffffff',
       '--highlight-bg': primaryColor,
       '--highlight-text-color': '#ffffff',
       '--focus-ring': `0 0 0 0.2rem ${focusRingColor}`,
@@ -37,7 +37,7 @@ export class ThemeService {
       '--checkbox-bg': primaryColor,
       '--checkbox-hover-bg': hoverColor,
       '--button-bg': primaryColor,
-      '--button-hover-bg': hoverColor,
+      '--color-primary-hover': hoverColor,
       '--button-focus-shadow': `0 0 0 2px #ffffff, 0 0 0 4px ${primaryColor}`,
       '--togglebutton-bg': primaryColor,
       '--togglebutton-border': `1px solid ${primaryColor}`,
