@@ -253,8 +253,8 @@
 
         <div class="flex mt-5 gap-3">
             <button [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-                class="btn btn-primary">Save</button>
-            <button [disabled]="!savedChanges" (click)="restart()" class="btn btn-secondary">Restart</button>
+                class="btn">Save</button>
+            <button [disabled]="!savedChanges" (click)="restart()" class="btn" [class.btn-secondary]="!savedChanges">Restart</button>
         </div>
     </div>
 </form>

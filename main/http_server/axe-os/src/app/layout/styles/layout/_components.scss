@@ -12,7 +12,7 @@
   cursor: pointer;
   border: 1px solid var(--button-bg);
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: var(--color-primary-hover);
     border-color: var(--color-primary-hover);
   }
@@ -27,7 +27,7 @@
   color: var(--color-text-main);
   border-color: var(--color-surface-border);
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: var(--color-bg-hover);
     border-color: var(--color-surface-border);
   }
@@ -38,7 +38,7 @@
   border-color: #ef4444;
   color: #ffffff;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: #dc2626;
     border-color: #dc2626;
   }
