@@ -22,8 +22,7 @@
 #define OPERATION_ON  0x80
 
 #define TPS546_INIT_PHASE_SINGLE 0x00  /* Single-phase (Single TPS) */
-#define TPS546_INIT_PHASE_ALL    0xFF  /* All phases / broadcast selector */
-#define TPS546_INIT_PHASE_MULTI  TPS546_INIT_PHASE_ALL  /* Multi-phase stack (Multi TPS) */
+#define TPS546_INIT_PHASE_MULTI   0xFF  /* Multi-phase stack (Multi TPS) */
 
 #define TPS546_INIT_FREQUENCY 650  /* KHz */
 

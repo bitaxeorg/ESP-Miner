@@ -35,6 +35,7 @@ typedef enum {
 #define OSMU_LOGO_INVERTED_SIZE (125 * 27 * 2)
 
 extern const lv_img_dsc_t bitaxe_logo;
+extern const lv_img_dsc_t bitaxe_logo_large;
 extern const lv_img_dsc_t osmu_logo;
 extern const lv_img_dsc_t identify_text;
 extern const lv_img_dsc_t bitaxe_background;
@@ -394,12 +395,9 @@ static lv_obj_t * create_scr_bitaxe_logo(const char * name, const char * board_v
     apply_screen_padding(scr);
 
     if (is_large_display()) {
-        lv_obj_t *logo = lv_label_create(scr);
-        lv_label_set_text(logo, "bitaxe");
-        lv_obj_set_style_text_font(logo, &ui_font_AngelWish40, LV_PART_MAIN);
-        lv_obj_set_style_text_color(logo, lv_color_white(), LV_PART_MAIN);
-        lv_obj_set_style_text_opa(logo, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_align(logo, LV_ALIGN_CENTER, -42, -16);
+        lv_obj_t *img = lv_img_create(scr);
+        lv_img_set_src(img, &bitaxe_logo_large);
+        lv_obj_align(img, LV_ALIGN_CENTER, -42, -8);
     } else {
         lv_obj_t *img = lv_img_create(scr);
         lv_img_set_src(img, get_bitaxe_logo_src());

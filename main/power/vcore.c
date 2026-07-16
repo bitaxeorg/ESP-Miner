@@ -49,28 +49,6 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
 
     // Set family-specific parameters
     switch (family->id) {
-    case GAMMA_610:
-        config.TPS546_INIT_PHASE = TPS546_INIT_PHASE_ALL;
-        config.TPS546_INIT_VIN_ON = 11.0;
-        config.TPS546_INIT_VIN_OFF = 10.5;
-        config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
-        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
-        config.TPS546_INIT_SCALE_LOOP = 0.25;
-        config.TPS546_INIT_VOUT_MIN = 1;
-        config.TPS546_INIT_VOUT_MAX = 2;
-        config.TPS546_INIT_VOUT_COMMAND = 1.2;
-        config.TPS546_INIT_IOUT_OC_WARN_LIMIT = 25.00;
-        config.TPS546_INIT_IOUT_OC_FAULT_LIMIT = 30.00;
-        config.TPS546_INIT_STACK_CONFIG = 0x0000; // 1 module
-        config.TPS546_INIT_SYNC_CONFIG = 0x10;    // Disable SYNC
-        // Use the all-phase PMBus selector so phase-scoped commands such as COMPENSATION_CONFIG are accepted.
-        config.TPS546_INIT_COMPENSATION_CONFIG[0] = 0x02;
-        config.TPS546_INIT_COMPENSATION_CONFIG[1] = 0x64;
-        config.TPS546_INIT_COMPENSATION_CONFIG[2] = 0x82;
-        config.TPS546_INIT_COMPENSATION_CONFIG[3] = 0x11;
-        config.TPS546_INIT_COMPENSATION_CONFIG[4] = 0x06;
-        break;
-
     case GAMMA_HEX:
         if (family->voltage_domains != GAMMA_HEX_VOLTAGE_DOMAINS) {
             ESP_LOGE(TAG, "GammaHex must be configured for %u voltage domains", GAMMA_HEX_VOLTAGE_DOMAINS);

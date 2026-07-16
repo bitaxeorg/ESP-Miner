@@ -65,17 +65,6 @@ static const St7789I80Pins ST7789_GAMMA_HEX_PINS = {
     .bk_light = GPIO_NUM_38,
 };
 
-static const St7789I80Pins ST7789_GAMMA_610_PINS = {
-    .data = { GPIO_NUM_39, GPIO_NUM_40, GPIO_NUM_41, GPIO_NUM_42, GPIO_NUM_21, GPIO_NUM_45, GPIO_NUM_35, GPIO_NUM_46 },
-    .rd = GPIO_NUM_9,
-    .pwr = GPIO_NUM_15,
-    .wr = GPIO_NUM_8,
-    .cs = GPIO_NUM_6,
-    .dc = GPIO_NUM_7,
-    .rst = GPIO_NUM_5,
-    .bk_light = GPIO_NUM_38,
-};
-
 static const char * TAG = "display";
 static const char * LVGL_TAG = "lvgl";
 
@@ -105,8 +94,6 @@ static bool family_has_i80_st7789_display(Family family)
 static const St7789I80Pins *get_st7789_i80_pins(Family family)
 {
     switch (family) {
-        case GAMMA_610:
-            return &ST7789_GAMMA_610_PINS;
         case GAMMA_HEX:
             return &ST7789_GAMMA_HEX_PINS;
         default:
@@ -122,13 +109,6 @@ static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
 
 static esp_err_t read_display_config(GlobalState * GLOBAL_STATE)
 {
-    if (GLOBAL_STATE->DEVICE_CONFIG.family.id == GAMMA_610) {
-        const DisplayConfig * display_config = get_display_config("NONE");
-        GLOBAL_STATE->DISPLAY_CONFIG = *display_config;
-        ESP_LOGE(TAG, "Gamma610 ST7789 disabled: PCB routes LCD_D6 to GPIO35/SPIIO6, which is reserved by the ESP32-S3-WROOM-1-N16R8 flash/PSRAM interface");
-        return ESP_OK;
-    }
-
     if (family_has_i80_st7789_display(GLOBAL_STATE->DEVICE_CONFIG.family.id)) {
         const DisplayConfig * display_config = get_display_config("ST7789 (320x170)");
         GLOBAL_STATE->DISPLAY_CONFIG = *display_config;

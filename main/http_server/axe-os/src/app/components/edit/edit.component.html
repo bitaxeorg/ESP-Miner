@@ -103,10 +103,14 @@
             <label for="displaySelect" class="w-full md:w-2/12 font-medium cursor-pointer">Type</label>
             <div class="w-full md:w-10/12">
                 <app-dropdown
+                    *ngIf="isDisplayConfigurable"
                     id="displaySelect"
                     formControlName="display"
                     [options]="displayOptions">
                 </app-dropdown>
+                <span *ngIf="!isDisplayConfigurable" class="input-text block opacity-70">
+                    {{form.controls['display'].value}}
+                </span>
             </div>
         </div>
 

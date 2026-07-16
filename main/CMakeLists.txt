@@ -14,6 +14,7 @@ SRCS
     "lv_font_portfolio-6x8.c"
     "logo.c"
     "images/generated/bitaxe_background.c"
+    "images/generated/bitaxe_logo_large.c"
     "images/fonts/ui_font_DigitalNumbers16.c"
     "images/fonts/ui_font_DigitalNumbers28.c"
     "images/fonts/ui_font_OpenSansBold13.c"

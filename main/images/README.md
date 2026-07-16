@@ -18,3 +18,14 @@ Then add the generated C file to `main/CMakeLists.txt` as:
 ```cmake
 "images/generated/gammahex_bg.c"
 ```
+
+The dedicated GammaHex splash logo is generated from `BitaxeLogoLarge.png`:
+
+```sh
+python3 tools/lvgl_image.py main/images/BitaxeLogoLarge.png \
+    --output main/images/generated/bitaxe_logo_large.c \
+    --symbol bitaxe_logo_large \
+    --size 150x65 \
+    --fit none \
+    --byte-order little
+```

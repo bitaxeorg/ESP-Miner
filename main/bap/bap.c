@@ -29,7 +29,7 @@ esp_err_t BAP_init(GlobalState *state) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (state->DEVICE_CONFIG.family.id == GAMMA_610 || state->DEVICE_CONFIG.family.id == GAMMA_HEX) {
+    if (state->DEVICE_CONFIG.disable_bap) {
         ESP_LOGW(TAG, "BAP UART disabled on %s because LCD uses the configured BAP pins", state->DEVICE_CONFIG.family.name);
         return ESP_OK;
     }

@@ -41,7 +41,6 @@ typedef enum
     HEX,
     SUPRA,
     GAMMA,
-    GAMMA_610,
     GAMMA_DUO,
     SUPRA_HEX,
     GAMMA_HEX,
@@ -68,6 +67,7 @@ typedef struct {
     bool plug_sense;
     bool asic_enable;
     bool asic_enable_active_high;
+    bool disable_bap : 1;
     uint8_t i2c_sda;
     uint8_t i2c_scl;
     bool EMC2101 : 1;
@@ -116,7 +116,6 @@ static const FamilyConfig FAMILY_ULTRA       = { .id = ULTRA,       .name = "Ult
 static const FamilyConfig FAMILY_HEX         = { .id = HEX,         .name = "Hex",        .asic = ASIC_BM1366,   .asic_count = 6, .default_frequency_mhz = 485, .default_voltage_mv = 1200, .max_power =  90, .power_offset = 12, .nominal_voltage = 12, .voltage_domains = 3, .swarm_color = "orange",   };
 static const FamilyConfig FAMILY_SUPRA       = { .id = SUPRA,       .name = "Supra",      .asic = ASIC_BM1368,   .asic_count = 1, .default_frequency_mhz = 490, .default_voltage_mv = 1166, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "blue",     };
 static const FamilyConfig FAMILY_GAMMA       = { .id = GAMMA,       .name = "Gamma",      .asic = ASIC_BM1370,   .asic_count = 1, .default_frequency_mhz = 525, .default_voltage_mv = 1150, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "green",    };
-static const FamilyConfig FAMILY_GAMMA_610   = { .id = GAMMA_610,   .name = "Gamma610",   .asic = ASIC_BM1370,   .asic_count = 1, .default_frequency_mhz = 525, .default_voltage_mv = 1150, .max_power =  40, .power_offset = 5,  .nominal_voltage = 12, .voltage_domains = 1, .swarm_color = "green",    };
 static const FamilyConfig FAMILY_GAMMA_DUO   = { .id = GAMMA_DUO,   .name = "GammaDuo",   .asic = ASIC_BM1370XP, .asic_count = 2, .default_frequency_mhz = 400, .default_voltage_mv = 1150, .max_power =  40, .power_offset = 5,  .nominal_voltage = 5,  .voltage_domains = 1, .swarm_color = "green",    };
 static const FamilyConfig FAMILY_SUPRA_HEX   = { .id = SUPRA_HEX,   .name = "SupraHex",   .asic = ASIC_BM1368,   .asic_count = 6, .default_frequency_mhz = 490, .default_voltage_mv = 1166, .max_power = 120, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = 3, .swarm_color = "darkblue", };
 static const FamilyConfig FAMILY_GAMMA_HEX   = { .id = GAMMA_HEX,   .name = "GammaHex",   .asic = ASIC_BM1370,   .asic_count = 6, .default_frequency_mhz = 690, .default_voltage_mv = 1200, .max_power = 180, .power_offset = 25, .nominal_voltage = 12, .voltage_domains = GAMMA_HEX_VOLTAGE_DOMAINS, .swarm_color = "cyan",     };
@@ -128,7 +127,6 @@ static const FamilyConfig default_families[] = {
     FAMILY_HEX,
     FAMILY_SUPRA,
     FAMILY_GAMMA,
-    FAMILY_GAMMA_610,
     FAMILY_SUPRA_HEX,
     FAMILY_GAMMA_HEX,
     FAMILY_GAMMA_TURBO,
@@ -154,12 +152,11 @@ static const DeviceConfig default_configs[] = {
     { .board_version = "601",  .family = FAMILY_GAMMA,       .EMC2101 = true, .emc_ideality_factor = 0x24, .emc_beta_compensation = 0x00,                     .TPS546 = true,                                                           .power_consumption_target = 19, },
     { .board_version = "602",  .family = FAMILY_GAMMA,       .EMC2101 = true, .emc_ideality_factor = 0x24, .emc_beta_compensation = 0x00,                     .TPS546 = true,                                                           .power_consumption_target = 22, },
     { .board_version = "603",  .family = FAMILY_GAMMA,       .EMC2101 = true, .emc_ideality_factor = 0x24, .emc_beta_compensation = 0x00,                     .TPS546 = true,                                                           .power_consumption_target = 22, },
-    { .board_version = "610",  .family = FAMILY_GAMMA_610,   .EMC2101 = true, .emc_ideality_factor = 0x24, .emc_beta_compensation = 0x00,                     .TPS546 = true,                                                           .power_consumption_target = 22, },
     { .board_version = "650",  .family = FAMILY_GAMMA_DUO,   .EMC2101 = true, .emc_ideality_factor = 0x24, .emc_beta_compensation = 0x00,                     .TPS546 = true,                                                           .power_consumption_target = 35, },
     { .board_version = "701",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "702",  .family = FAMILY_SUPRA_HEX,   .EMC2302 = true, .TMP1075 = true,                                            .temp_offset = 10,  .TPS546 = true,                                                           .power_consumption_target = 90, },
     { .board_version = "801",  .family = FAMILY_GAMMA_TURBO, .EMC2103 = true,                                          .temp_flip = true, .temp_offset = 0,   .TPS546 = true,                                                           .power_consumption_target = 36, },
-    { .board_version = "1300", .family = FAMILY_GAMMA_HEX,   .asic_enable = true, .asic_enable_active_high = true, .i2c_sda = 44, .i2c_scl = 43, .EMC2103 = true, .temp_flip = true, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 135, },
+    { .board_version = "1300", .family = FAMILY_GAMMA_HEX,   .asic_enable = true, .asic_enable_active_high = true, .disable_bap = true, .i2c_sda = 44, .i2c_scl = 43, .EMC2103 = true, .temp_flip = true, .temp_offset = 0, .TPS546 = true, .power_consumption_target = 135, },
 };
 
 esp_err_t device_config_init(void * pvParameters);
