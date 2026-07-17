@@ -8,19 +8,19 @@
 
 <ng-container *ngIf="info$ | async as info">
     <ng-container *ngFor="let message of messages">
-        <p-message
-            [severity]="message.severity"
-            [icon]="message.severity === 'info' ? 'pi pi-info-circle' : message.severity === 'warn' ? 'pi pi-exclamation-triangle' : 'pi pi-times-circle'"
-            [styleClass]="'w-full mb-3 border-round-lg'"
-        >
-            {{message.text}}
-        </p-message>
+        <div class="flex items-center justify-center gap-2 p-4 rounded-lg border w-full mb-3 text-center"
+             [style.background-color]="'var(--color-message-' + message.severity + '-bg)'"
+             [style.color]="'var(--color-message-' + message.severity + '-text)'"
+             [style.border-color]="'var(--color-message-' + message.severity + '-border)'">
+            <i [class]="message.severity === 'info' ? 'pi pi-info-circle' : message.severity === 'warn' ? 'pi pi-exclamation-triangle' : 'pi pi-times-circle'"></i>
+            <span>{{message.text}}</span>
+        </div>
     </ng-container>
 
-    <div *ngIf="info.showNewBlock" class="p-inline-message p-inline-message-success w-full mb-3 py-3 border-round-lg">
-        <div class="flex justify-content-between align-items-center w-full px-3">
+    <div *ngIf="info.showNewBlock" class="bg-green-100 dark:bg-green-950 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 w-full mb-3 py-3 rounded-lg">
+        <div class="flex justify-between items-center w-full px-3">
             <span>Today is your lucky day! Your device has found {{ info.blockFound === 1 ? 'a block' : info.blockFound + ' blocks' }} 🎉</span>
-            <button type="button" class="p-link" style="line-height: 1;" (click)="dismissBlockFound()" pTooltip="Dismiss" tooltipPosition="left">
+            <button type="button" class="cursor-pointer" style="line-height: 1;" (click)="dismissBlockFound()" appTooltip="Dismiss" tooltipPosition="left">
                 <i class="pi pi-times"></i>
             </button>
         </div>
@@ -30,35 +30,35 @@
         <!-- Hashrate -->
         <div class="grid-stack-item" gs-id="hashrate">
             <div class="grid-stack-item-content">
-                <div class="card mb-0">
-                    <div class="flex flex-column justify-content-between">
-                        <span class="block text-lg font-medium mb-3">Hashrate</span>
+                <div class="card">
+                    <div class="flex flex-col justify-between">
+                        <span class="block text-lg font-medium mb-4">Hashrate</span>
 
                         <ng-container *ngIf="!info.power_fault; else powerFault">
-                            <div class="flex align-items-center justify-content-between gap-2 mb-3">
-                                <span class="font-medium text-2xl white-space-nowrap">
+                            <div class="flex items-center justify-between gap-2 mb-4">
+                                <span class="font-medium text-2xl whitespace-nowrap">
                                     {{info.hashRate | hashSuffix}}
                                 </span>
                                 <table class="text-sm">
                                     <thead>
                                         <tr>
-                                            <th class="p-0 text-color-secondary font-normal line-height-1">
+                                            <th class="p-0 text-secondary font-normal leading-none">
                                                 <tooltip-text-icon class="pl-2"
                                                     text="Error"
                                                     tooltip="Hash error percentage as reported by the ASIC. A small amount of errors every few seconds is normal. Frequency changes, agressive overclocking, undervoltage or a bad power supply can significantly increase the error rate."
                                                 />
                                             </th>
-                                            <th *ngIf="info.expectedHashrate" class="p-0 pl-3 text-color-secondary font-normal line-height-1">
+                                            <th *ngIf="info.expectedHashrate" class="p-0 pl-3 text-secondary font-normal leading-none">
                                                 Expected
                                             </th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td class="p-0 text-center line-height-1">
+                                            <td class="p-0 text-center leading-none">
                                                 {{info.errorPercentage | number: '1.2-2'}}%
                                             </td>
-                                            <td *ngIf="info.expectedHashrate" class="p-0 pl-3 text-center line-height-1 white-space-nowrap">
+                                            <td *ngIf="info.expectedHashrate" class="p-0 pl-3 text-center leading-none whitespace-nowrap">
                                                 {{info.expectedHashrate | hashSuffix: { tickmark: true } }}
                                             </td>
                                         </tr>
@@ -66,10 +66,10 @@
                                 </table>
                             </div>
 
-                            <table class="px-1 border-1 border-round-xs">
+                            <table class="px-1 border border-surface rounded-sm">
                                 <thead>
                                     <tr>
-                                        <th *ngFor="let i of hashrateAverages" class="p-0 text-color-secondary font-normal line-height-1">
+                                        <th *ngFor="let i of hashrateAverages" class="p-0 text-secondary font-normal leading-none">
                                             {{i.label}}
                                         </th>
                                     </tr>
@@ -91,26 +91,26 @@
         <!-- Efficiency -->
         <div class="grid-stack-item" gs-id="efficiency">
             <div class="grid-stack-item-content">
-                <div class="card mb-0">
-                    <div class="flex flex-column justify-content-between">
-                        <span class="block text-lg font-medium mb-3">Efficiency</span>
+                <div class="card">
+                    <div class="flex flex-col justify-between">
+                        <span class="block text-lg font-medium mb-4">Efficiency</span>
 
                         <ng-container *ngIf="!info.power_fault; else powerFault">
-                            <div class="flex align-items-center justify-content-between gap-2 mb-3">
-                                <span class="font-medium text-2xl white-space-nowrap">
+                            <div class="flex items-center justify-between gap-2 mb-4">
+                                <span class="font-medium text-2xl whitespace-nowrap">
                                     {{efficiency | number: '1.2-2'}} J/Th
                                 </span>
                                 <table class="text-sm">
                                     <thead>
                                         <tr>
-                                            <th class="p-0 text-color-secondary font-normal line-height-1">
+                                            <th class="p-0 text-secondary font-normal leading-none">
                                                 Expected
                                             </th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td class="p-0 text-center line-height-1 white-space-nowrap">
+                                            <td class="p-0 text-center leading-none whitespace-nowrap">
                                                 {{expectedEfficiency | number: '1.2-2'}} J/Th
                                             </td>
                                         </tr>
@@ -119,10 +119,10 @@
                             </div>
 
                             <div>
-                                <span class="text-primary font-medium white-space-nowrap">
+                                <span class="text-primary font-medium whitespace-nowrap">
                                     {{efficiencyAverage | number: '1.2-2'}} J/Th
                                 </span>
-                                <span class="text-color-secondary">
+                                <span class="text-secondary">
                                     Average
                                 </span>
                             </div>
@@ -135,11 +135,11 @@
         <!-- Shares -->
         <div class="grid-stack-item" gs-id="shares">
             <div class="grid-stack-item-content">
-                <div class="card mb-0">
-                    <div class="flex justify-content-between mb-3">
+                <div class="card">
+                    <div class="flex justify-between mb-4">
                         <div>
-                            <span class="block text-lg font-medium mb-3">Shares
-                                <i class="pi pi-arrow-up transition-opacity transition-duration-500 ml-2" [ngClass]="{'opacity-100 text-green-500': flashShare, 'opacity-0': !flashShare}" pTooltip="Share Sent" tooltipPosition="top"></i>
+                            <span class="block text-lg font-medium mb-4">Shares
+                                <i class="pi pi-arrow-up transition-opacity duration-500 ml-2" [ngClass]="{'opacity-100 text-green-500': flashShare, 'opacity-0': !flashShare}" appTooltip="Share Sent" tooltipPosition="top"></i>
                             </span>
                             <div class="font-medium text-2xl">
                                 {{info.sharesAccepted | number: '1.0-0'}}
@@ -148,14 +148,14 @@
                     </div>
                     <div *ngIf="info.sharesRejected === 0">
                         <span class="text-red-500 font-medium">0 </span>
-                        <span class="text-color-secondary">rejected</span>
+                        <span class="text-secondary">rejected</span>
                     </div>
                     <ng-container *ngIf="info.sharesRejected > 0">
                         <div *ngFor="let sharesRejectedReason of sortedRejectionReasons; trackBy: trackByReason">
                             <span class="text-red-500 font-medium">
                                 {{ sharesRejectedReason.count | number: '1.0-0' }}
                             </span>
-                            <span class="text-color-secondary">
+                            <span class="text-secondary">
                                 {{ sharesRejectedReason.message }}
                             </span>
                             <tooltip-text-icon
@@ -171,16 +171,16 @@
         <!-- Best Difficulty -->
         <div class="grid-stack-item" gs-id="bestdiff">
             <div class="grid-stack-item-content">
-                <div class="card mb-0">
-                    <div class="flex justify-content-between mb-3">
+                <div class="card">
+                    <div class="flex justify-between mb-4">
                         <div>
-                            <span class="block text-lg font-medium mb-3">Best Difficulty</span>
+                            <span class="block text-lg font-medium mb-4">Best Difficulty</span>
                             <div class="font-medium text-2xl">
-                                <span class="cursor-pointer" pTooltip="{{info.bestDiff | number:'1.0-0'}}" tooltipPosition="bottom">
+                                <span class="cursor-pointer" appTooltip="{{info.bestDiff | number:'1.0-0'}}" tooltipPosition="bottom">
                                     {{info.bestDiff | diffSuffix}}
                                 </span>
-                                <span class="text-color-secondary text-lg">all-time best</span>
-                                <span class="text-sm font-medium mb-3" *ngIf="info.networkDifficulty">
+                                <span class="text-secondary text-lg">all-time best</span>
+                                <span class="text-sm font-medium mb-4" *ngIf="info.networkDifficulty">
                                     <tooltip-text-icon
                                         [text]="'(' + networkDifficultyPercentage + '%)'"
                                         tooltip="Chance to find a Block"
@@ -191,10 +191,10 @@
                         </div>
                     </div>
                     <div>
-                        <span class="font-medium cursor-pointer" pTooltip="{{info.bestSessionDiff | number:'1.0-0'}}" tooltipPosition="bottom">
+                        <span class="font-medium cursor-pointer" appTooltip="{{info.bestSessionDiff | number:'1.0-0'}}" tooltipPosition="bottom">
                             {{info.bestSessionDiff | diffSuffix}}
                         </span>
-                        <span class="text-color-secondary text-lg">session best</span>
+                        <span class="text-secondary text-lg">session best</span>
                         <span class="text-sm font-medium mb-3"> ({{ info.uptimeSeconds | dateAgo: { intervals: 2, strict:true, short:true } }})</span>
                     </div>
                 </div>
@@ -207,28 +207,20 @@
                 <ng-container *ngIf="!info.power_fault">
                     <div class="card">
                         <form [formGroup]="form">
-                            <div class="flex flex-nowrap justify-content-between mb-3">
-                                <p-select
-                                    [options]="chartDataSources"
-                                    optionLabel="name"
-                                    optionValue="value"
+                            <div class="flex flex-nowrap justify-between mb-3">
+                                <app-dropdown
                                     formControlName="chartY1Data"
-                                    appendTo="body"
-                                    panelStyleClass="p-select--small"
-                                    styleClass="w-10rem p-select--small">
-                                </p-select>
-                                <p-select
                                     [options]="chartDataSources"
-                                    optionLabel="name"
-                                    optionValue="value"
+                                    class="w-40 text-sm">
+                                </app-dropdown>
+                                <app-dropdown
                                     formControlName="chartY2Data"
-                                    appendTo="body"
-                                    panelStyleClass="p-select--small"
-                                    styleClass="w-10rem p-select--small">
-                                </p-select>
+                                    [options]="chartDataSources"
+                                    class="w-40 text-sm">
+                                </app-dropdown>
                             </div>
 
-                            <p-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></p-chart>
+                            <app-chart #chart id="chart" [data]="chartData" [options]="chartOptions"></app-chart>
                         </form>
                     </div>
                 </ng-container>
@@ -239,32 +231,33 @@
         <div class="grid-stack-item" gs-id="power">
             <div class="grid-stack-item-content">
                 <div class="card">
-                    <h4 class="text-center">Power</h4>
+                    <h4 class="text-center font-medium">Power</h4>
 
-                    <div class="mb-3">
-                        <h6 class="flex justify-content-between mb-1">
+                    <div class="mb-4">
+                        <h6 class="flex justify-between mb-1">
                             Power<span>{{info.power}} W</span>
                         </h6>
-                        <p-progressbar [value]="(info.power / info.maxPower) * 100" [styleClass]="'p-progressbar--thin'">
-                            <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressbar>
+                        @let powerProgress = ((info.power / info.maxPower) * 100);
+                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
+                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="powerProgress"></div>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <h6 class="flex justify-content-between mb-1">
+                    <div class="mb-4">
+                        <h6 class="flex justify-between mb-1">
                             Input Voltage<span>{{info.voltage}} V</span>
                         </h6>
                         <div class="relative">
-                            <p-progressbar [value]="(info.voltage / (info.nominalVoltage + .5)) * 100"
-                                [styleClass]="'p-progressbar--thin'">
-                                <ng-template pTemplate="content" let-value></ng-template>
-                            </p-progressbar>
+                            @let voltageProgress = ((info.voltage / (info.nominalVoltage + .5)) * 100);
+                            <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
+                                <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="voltageProgress"></div>
+                            </div>
 
                             <!-- Conditional marker based on nominal voltage-->
                             <div class="absolute bg-white h-full top-0"
                                 [style.left]="(info.nominalVoltage / (info.nominalVoltage + .5)) * 100 + '%'"
                                 style="width: 3px;">
-                                <small class="absolute text-white white-space-nowrap text-xs"
+                                <small class="absolute text-white whitespace-nowrap text-xs"
                                     style="bottom: -1rem; transform: translateX(-50%)">
                                     {{info.nominalVoltage}} V
                                 </small>
@@ -275,22 +268,24 @@
                         </strong>
                     </div>
 
-                    <div class="mb-3">
-                        <h6 class="flex justify-content-between mb-1">
+                    <div class="mb-4">
+                        <h6 class="flex justify-between mb-1">
                             ASIC Frequency<span>{{info.actualFrequency | number: '1.0-4'}} MHz</span>
                         </h6>
-                        <p-progressbar [value]="(info.actualFrequency / maxFrequency) * 100" [styleClass]="'p-progressbar--thin'">
-                            <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressbar>
+                        @let freqProgress = ((info.actualFrequency / maxFrequency) * 100);
+                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
+                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="freqProgress"></div>
+                        </div>
                     </div>
 
                     <div>
-                        <h6 class="flex justify-content-between mb-1">
+                        <h6 class="flex justify-between mb-1">
                             Measured ASIC Voltage<span>{{info.coreVoltageActual}} V</span>
                         </h6>
-                        <p-progressbar [value]="(info.coreVoltageActual / 1.8) * 100" [styleClass]="'p-progressbar--thin'">
-                            <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressbar>
+                        @let coreVoltProgress = ((info.coreVoltageActual / 1.8) * 100);
+                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
+                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="coreVoltProgress"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -300,10 +295,10 @@
         <div class="grid-stack-item" gs-id="heat">
             <div class="grid-stack-item-content">
                 <div class="card">
-                    <h4 class="text-center">Heat</h4>
+                    <h4 class="text-center font-medium">Heat</h4>
 
-                    <div class="mb-3">
-                        <h6 class="flex justify-content-between mb-1">
+                    <div class="mb-4">
+                        <h6 class="flex justify-between mb-1">
                             <ng-container *ngIf="info.temp2 > 0; else singleTemp">
                                 ASIC Temperature 1
                             </ng-container>
@@ -316,38 +311,41 @@
                                 </ng-container>
                             </span>
                         </h6>
-                        <p-progressbar [value]="(info.temp / maxTemp) * 100" [styleClass]="'p-progressbar--thin'">
-                            <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressbar>
+                        @let tempProgress = ((info.temp / maxTemp) * 100);
+                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
+                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="tempProgress"></div>
+                        </div>
 
                         <strong class="text-red-500" *ngIf="info.temp >= 70">
                             Danger: High Temperature
                         </strong>
                     </div>
 
-                    <div class="mb-3" *ngIf="info.temp2 > 0">
-                        <h6 class="flex justify-content-between mb-1">
+                    <div class="mb-4" *ngIf="info.temp2 > 0">
+                        <h6 class="flex justify-between mb-1">
                             ASIC Temperature 2
                             <span>
                                 {{info.temp2}} &deg;C
                             </span>
                         </h6>
-                        <p-progressbar [value]="(info.temp2 / maxTemp) * 100" [styleClass]="'p-progressbar--thin'">
-                            <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressbar>
+                        @let temp2Progress = ((info.temp2 / maxTemp) * 100);
+                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
+                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="temp2Progress"></div>
+                        </div>
 
                         <strong class="text-red-500" *ngIf="info.temp2 >= 70">
                             Danger: High Temperature
                         </strong>
                     </div>
 
-                    <div class="mb-3" *ngIf="info.vrTemp > 0">
-                        <h6 class="flex justify-content-between mb-1">
+                    <div class="mb-4" *ngIf="info.vrTemp > 0">
+                        <h6 class="flex justify-between mb-1">
                             Voltage Regulator Temperature<span>{{info.vrTemp}} &deg;C</span>
                         </h6>
-                        <p-progressbar [value]="(info.vrTemp / 120) * 100" [styleClass]="'p-progressbar--thin'">
-                            <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressbar>
+                        @let vrTempProgress = ((info.vrTemp / 120) * 100);
+                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
+                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="vrTempProgress"></div>
+                        </div>
 
                         <strong class="text-red-500" *ngIf="info.vrTemp >= 105">
                             Danger: High Temperature
@@ -361,11 +359,11 @@
         <div class="grid-stack-item" gs-id="fan">
             <div class="grid-stack-item-content">
                 <div class="card">
-                    <h4 class="text-center">Fan</h4>
+                    <h4 class="text-center font-medium">Fan</h4>
 
-                    <div class="mb-3">
-                        <h6 class="flex justify-content-between mb-1" tooltipPosition="top"
-                                pTooltip="{{info.fan2rpm > 0 ? 'Fan 1: ' : ''}}{{info.fanrpm}} RPM{{info.fan2rpm > 0 ? '<br>Fan 2: ' + info.fan2rpm + ' RPM' : ''}}">
+                    <div class="mb-4">
+                        <h6 class="flex justify-between mb-1" tooltipPosition="top"
+                                appTooltip="{{info.fan2rpm > 0 ? 'Fan 1: ' : ''}}{{info.fanrpm}} RPM{{info.fan2rpm > 0 ? '<br>Fan 2: ' + info.fan2rpm + ' RPM' : ''}}">
 
                             <ng-container *ngIf="info.fan2rpm > 0; else singleFan">
                                 Fan Speeds
@@ -376,9 +374,10 @@
 
                             <span>{{info.fanspeed.toFixed(1)}} %</span>
                         </h6>
-                        <p-progressbar [value]="info.fanspeed" [styleClass]="'p-progressbar--thin'">
-                            <ng-template pTemplate="content" let-value></ng-template>
-                        </p-progressbar>
+                        @let fanProgress = info.fanspeed;
+                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
+                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="fanProgress"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -389,36 +388,33 @@
             <div class="grid-stack-item-content">
                 <ng-container *ngIf="activePoolUser">
                     <div class="card">
-                        <div class="flex flex-nowrap justify-content-between mb-3 relative">
-                            <h4 class="mb-0">
+                        <div class="flex flex-nowrap justify-between relative">
+                            <h4 class="font-medium">
                                 Pool
                                 <a
                                     *ngIf="(quickLink$ | async) as quickLink"
                                     [href]="quickLink"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="ml-1"
+                                    class="ml-1 text-white"
                                     [attr.aria-label]="'Open pool dashboard in new tab'"
-                                    pTooltip="Open pool dashboard"
+                                    appTooltip="Open pool dashboard"
                                     tooltipPosition="top"
                                 >
-                                    <i class="pi pi-external-link"></i>
+                                    <i class="pi pi-external-link text-base text-primary"></i>
                                 </a>
                             </h4>
-                            <p-select
+                            <app-dropdown
+                                [ngModel]="activePoolLabel"
+                                (ngModelChange)="activePoolLabel = $event; onPoolChange({value: $event})"
+                                [ngModelOptions]="{standalone: true}"
                                 [options]="(pools$ | async) ?? []"
-                                [(ngModel)]="activePoolLabel"
-                                optionLabel="label"
-                                optionValue="value"
-                                (onChange)="onPoolChange($event)"
-                                appendTo="body"
-                                panelStyleClass="p-select--small"
-                                styleClass="p-select--small absolute right-0"
-                            />
+                                class="w-28 text-sm">
+                            </app-dropdown>
                         </div>
 
                         <div class="flex flex-nowrap">
-                            <div class="col-fixed-width text-color-secondary">
+                            <div class="w-24 shrink-0 text-secondary">
                                 <span>URL</span>
                             </div>
                             <div>
@@ -429,31 +425,31 @@
                             </div>
                         </div>
 
-                        <div class="flex flex-nowrap align-items-baseline">
-                            <div class="col-fixed-width text-color-secondary">
+                        <div class="flex flex-nowrap items-baseline">
+                            <div class="w-24 shrink-0 text-secondary">
                                 User
                             </div>
 
-                            <div pTooltip="{{ activePoolUser }}" tooltipPosition="top" sensitive-data>
-                                <span class="text-monospace font-bold">{{ activePoolUserAddressPart | address }}</span>{{ activePoolUserSuffixPart }}
+                            <div appTooltip="{{ activePoolUser }}" tooltipPosition="top" sensitive-data>
+                                <span class="font-mono font-bold text-base">{{ activePoolUserAddressPart | address }}</span>{{ activePoolUserSuffixPart }}
                             </div>
                         </div>
 
                         <div class="flex flex-nowrap">
-                            <div class="col-fixed-width text-color-secondary">
+                            <div class="w-24 shrink-0 text-secondary">
                                 <tooltip-text-icon
                                     text="Time"
                                     tooltip="Time it takes for the pool to respond to a share"
                                 />
                             </div>
                             <ng-container *ngIf="info.responseTime > 0; else noValue">
-                                {{ info.responseTime | number:'1.1-1' }} ms<span *ngIf="(info.responseShareBatch ?? 0) > 1" class="text-500" pTooltip="The pool acknowledged {{ info.responseShareBatch }} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window" tooltipPosition="top">&nbsp;(batched ×{{ info.responseShareBatch }})</span>
+                                {{ info.responseTime | number:'1.1-1' }} ms<span *ngIf="(info.responseShareBatch ?? 0) > 1" class="text-neutral-500" appTooltip="The pool acknowledged {{ info.responseShareBatch }} shares in one batch; the time reflects the most recent share, so it may include the pool's batching window" tooltipPosition="top">&nbsp;(batched ×{{ info.responseShareBatch }})</span>
                             </ng-container>
                         </div>
                         <div class="flex flex-nowrap" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
                             @let percentage = payoutPercentage;
                             <ng-container *ngIf="percentage >= 95">
-                                <div class="col-fixed-width text-color-secondary">
+                                <div class="w-24 shrink-0 text-secondary">
                                     <tooltip-text-icon text="Fee" tooltip="Percentage of the bitcoin block reward that will be paid out to the pool if you find a block." />
                                 </div>
                                 <div [style.color]="percentage < 100 ? 'inherit' : 'green'">
@@ -461,7 +457,7 @@
                                 </div>
                             </ng-container>
                             <ng-container *ngIf="percentage < 95">
-                                <div class="col-fixed-width text-color-secondary">
+                                <div class="w-24 shrink-0 text-secondary">
                                     <tooltip-text-icon text="Share" tooltip="Percentage of the bitcoin block reward that will be paid out to your address if you find a block." />
                                 </div>
                                 <div *ngIf="percentage !== -1; else noValue" [style.color]="'red'">
@@ -470,7 +466,7 @@
                             </ng-container>
                         </div>
                         <div class="flex flex-nowrap">
-                            <div class="col-fixed-width text-color-secondary">
+                            <div class="w-24 shrink-0 text-secondary">
                                 <span>Difficulty</span>
                             </div>
                             <ng-container *ngIf="info.poolDifficulty > 0; else noValue">
@@ -478,7 +474,7 @@
                             </ng-container>
                         </div>
                         <div class="flex flex-nowrap">
-                            <div class="col-fixed-width text-500">
+                            <div class="w-24 shrink-0 text-neutral-500">
                                 <span>Mode</span>
                             </div>
                             <div>{{ activePoolProtocol }}</div>
@@ -492,16 +488,16 @@
         <div class="grid-stack-item" gs-id="blockheader">
             <div class="grid-stack-item-content">
                 <div class="card">
-                    <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis">
+                    <h4 class="whitespace-nowrap overflow-hidden text-ellipsis font-medium">
                         Block Header
-                        <i class="pi pi-arrow-down transition-opacity transition-duration-500 ml-2 text-sm vertical-align-middle" [ngClass]="{'opacity-100 text-blue-500': flashJob, 'opacity-0': !flashJob}" pTooltip="New Job Received" tooltipPosition="top"></i>
-                        <span *ngIf="info.blockSignals && info.blockSignals.length > 0" class="vertical-align-bottom ml-2">
-                            <span *ngFor="let signal of info.blockSignals" class="p-badge p-badge-success ml-1">{{ signal }}</span>
+                        <i class="pi pi-arrow-down transition-opacity duration-500 ml-2 text-sm align-middle" [ngClass]="{'opacity-100 text-blue-500': flashJob, 'opacity-0': !flashJob}" appTooltip="New Job Received" tooltipPosition="top"></i>
+                        <span *ngIf="info.blockSignals && info.blockSignals.length > 0" class="align-bottom ml-2">
+                            <span *ngFor="let signal of info.blockSignals" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-500 text-white ml-1">{{ signal }}</span>
                         </span>
                     </h4>
 
                     <div class="flex flex-nowrap">
-                        <div class="col-fixed-width text-color-secondary">
+                        <div class="w-24 shrink-0 text-secondary">
                             <span>Height</span>
                         </div>
                         <div>
@@ -510,51 +506,51 @@
                     </div>
 
                     <div class="flex flex-nowrap">
-                        <div class="col-fixed-width text-color-secondary">
+                        <div class="w-24 shrink-0 text-secondary">
                             <span>Difficulty</span>
                         </div>
-                        <div *ngIf="info.networkDifficulty" class="cursor-pointer" pTooltip="{{info.networkDifficulty | number:'1.0-0'}}" tooltipPosition="bottom">
+                        <div *ngIf="info.networkDifficulty" class="cursor-pointer" appTooltip="{{info.networkDifficulty | number:'1.0-0'}}" tooltipPosition="bottom">
                             {{ info.networkDifficulty | diffSuffix }}
                         </div>
                     </div>
 
-                    <div class="flex flex-nowrap align-items-baseline">
-                        <div class="col-fixed-width text-color-secondary">
+                    <div class="flex flex-nowrap items-baseline">
+                        <div class="w-24 shrink-0 text-secondary">
                             <span>Scriptsig</span>
                         </div>
-                        <div class="text-monospace text-sm">
+                        <div class="font-mono text-sm">
                             {{ info.scriptsig }}
                         </div>
                     </div>
-                    <div class="flex flex-nowrap justify-content-between" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
-                        <div class="col-fixed-width text-color-secondary">
+                    <div class="flex flex-nowrap justify-between" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
+                        <div class="w-24 shrink-0 text-secondary">
                             <tooltip-text-icon text="Value" tooltip="Total value of transaction outputs in BTC. For non-bitcoin chains, disable 'Decode Coinbase Tx' in Advanced Pool Options." />
                         </div>
                         <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
                             {{ info.coinbaseValueTotalSatoshis | sats }}
                         </ng-container>
                     </div>
-                    <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
-                        <div class="col-fixed-width text-color-secondary">
+                    <div class="flex flex-nowrap items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) > 0">
+                        <div class="w-24 shrink-0 text-secondary">
                             <span>Outputs</span>
                         </div>
                         <div class="w-full">
-                            <div *ngFor="let output of info.coinbaseOutputs; let i = index" class="flex justify-content-between">
+                            <div *ngFor="let output of info.coinbaseOutputs; let i = index" class="flex justify-between">
                                 @if (output.value > 0) {
                                     @if (output.address === activePoolUserAddressPart) {
-                                        <span><span class="text-monospace text-sm font-bold" pTooltip="Your payout address" tooltipPosition="top" sensitive-data>{{ output.address | address }}</span>&nbsp;<i class="pi pi-star-fill text-xs"></i></span>
+                                        <span><span class="font-mono text-sm font-bold" appTooltip="Your payout address" tooltipPosition="top" sensitive-data>{{ output.address | address }}</span>&nbsp;<i class="pi pi-star-fill text-xs"></i></span>
                                     } @else {
-                                        <span class="text-monospace text-sm" pTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
+                                        <span class="font-mono text-sm" appTooltip="{{ output.address }}" tooltipPosition="top">{{ output.address | address }}</span>
                                     }
                                     <span class="text-sm">{{ output.value | sats }}</span>
                                 } @else {
-                                    <span class="text-monospace text-xs">{{ output.address }}</span>
+                                    <span class="font-mono text-xs">{{ output.address }}</span>
                                 }
                             </div>
                         </div>
                     </div>
-                    <div class="flex flex-nowrap align-items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) == 0">
-                        <div class="col-fixed-width text-color-secondary">
+                    <div class="flex flex-nowrap items-baseline" *ngIf="(info.coinbaseOutputs?.length ?? 0) == 0">
+                        <div class="w-24 shrink-0 text-secondary">
                             Amount
                         </div>
                         <ng-container *ngIf="info.coinbaseValueTotalSatoshis && info.coinbaseValueTotalSatoshis > 0">
@@ -569,10 +565,10 @@
         <div class="grid-stack-item" gs-id="registers">
             <div class="grid-stack-item-content">
                 <div class="card">
-                    <h4 class="white-space-nowrap overflow-hidden text-overflow-ellipsis">Hashrate Registers</h4>
+                    <h4 class="whitespace-nowrap overflow-hidden text-ellipsis font-medium">Hashrate Registers</h4>
 
                     <ng-container *ngIf="asicsAmount as asicAmount">
-                        <table class="heatmap text-{{asicAmount <= 2 ? 'sm' : 'xs'}}">
+                        <table class="heatmap text-{{asicAmount <= 2 ? 'sm' : 'xs'}} w-full">
                             <thead>
                                 <tr>
                                     <th *ngIf="asicAmount > 1" class="text-left">ASIC</th>
@@ -585,9 +581,9 @@
                             </thead>
                             <tbody>
                             <tr class="cursor-pointer" *ngFor="let asic of info.hashrateMonitor?.asics; let i = index; trackBy: trackByIndex"
-                                        [pTooltip]="(asicAmount > 1 ? 'ASIC ' + (i + 1) + ' - ' : '') + 'Error count: ' + asic.errorCount"
+                                        [appTooltip]="(asicAmount > 1 ? 'ASIC ' + (i + 1) + ' - ' : '') + 'Error count: ' + asic.errorCount"
                                         tooltipPosition="bottom">
-                                    <td *ngIf="asicAmount > 1" class="text-color-secondary text-left">
+                                    <td *ngIf="asicAmount > 1" class="text-secondary text-left">
                                         {{ i + 1 }}
                                     </td>
                                 <td *ngFor="let domain of asic?.domains; trackBy: trackByIndex"

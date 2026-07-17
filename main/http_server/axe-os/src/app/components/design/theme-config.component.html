@@ -1,50 +1,50 @@
-<div class="card">
-  <div class="grid">
-    <div class="col-12">
-      <h5>Color Scheme</h5>
+<div>
+  <div class="flex flex-wrap -mx-2">
+    <div class="w-full px-2 mb-6">
+      <h5 class="font-medium text-lg mb-2">Color Scheme</h5>
       <div class="flex gap-3">
-        <div class="flex align-items-center">
-          <p-radioButton name="colorScheme" [value]="'dark'" [(ngModel)]="selectedScheme"
-            (onClick)="changeColorScheme('dark')" inputId="dark"></p-radioButton>
-          <label for="dark" class="ml-2">Dark</label>
+        <div class="flex items-center">
+          <app-radio-button name="colorScheme" [value]="'dark'" [(ngModel)]="selectedScheme"
+            (onClick)="changeColorScheme('dark')" inputId="dark"></app-radio-button>
+          <label for="dark" class="ml-2 cursor-pointer">Dark</label>
         </div>
-        <div class="flex align-items-center">
-          <p-radioButton name="colorScheme" [value]="'light'" [(ngModel)]="selectedScheme"
-            (onClick)="changeColorScheme('light')" inputId="light"></p-radioButton>
-          <label for="light" class="ml-2">Light</label>
+        <div class="flex items-center">
+          <app-radio-button name="colorScheme" [value]="'light'" [(ngModel)]="selectedScheme"
+            (onClick)="changeColorScheme('light')" inputId="light"></app-radio-button>
+          <label for="light" class="ml-2 cursor-pointer">Light</label>
         </div>
-        <div class="flex align-items-center">
-          <p-radioButton name="colorScheme" [value]="'white'" [(ngModel)]="selectedScheme"
-            (onClick)="changeColorScheme('white')" inputId="white"></p-radioButton>
-          <label for="white" class="ml-2">White</label>
+        <div class="flex items-center">
+          <app-radio-button name="colorScheme" [value]="'white'" [(ngModel)]="selectedScheme"
+            (onClick)="changeColorScheme('white')" inputId="white"></app-radio-button>
+          <label for="white" class="ml-2 cursor-pointer">White</label>
         </div>
       </div>
     </div>
 
-    <div class="col-12 mt-4">
-      <h5>Theme Color</h5>
-      <div class="grid gap-2">
-        <div *ngFor="let theme of themes" class="col-2 theme-color">
-          <button pButton [class]="'p-button-rounded p-button-text color-dot'"
-                  [class.selected]="theme.primaryColor === currentColor"
+    <div class="w-full px-2 mb-6">
+      <h5 class="font-medium text-lg mb-2">Theme Color</h5>
+      <div class="flex flex-wrap gap-6">
+        <div *ngFor="let theme of themes" class="flex flex-col items-center text-center w-24">
+          <button [class.selected]="theme.primaryColor === currentColor"
                   [style.--dot-bg]="theme.primaryColor"
                   [style.backgroundColor]="'var(--dot-bg)'"
-                  style="width: 2rem; height: 2rem; border: none;"
+                  class="color-dot w-8 h-8 rounded-full border-none flex items-center justify-center cursor-pointer transition transform hover:scale-110 active:scale-95"
                   (click)="changeTheme(theme)">
-            <i *ngIf="theme.primaryColor === currentColor" class="pi pi-check selected-icon"></i>
+            <i *ngIf="theme.primaryColor === currentColor" class="pi pi-check text-white text-xs"></i>
           </button>
-          <div class="text-sm mt-1">{{theme.name}}</div>
+          <div class="mt-1 text-secondary">{{theme.name}}</div>
         </div>
       </div>
     </div>
 
-    <div class="col-12 mt-4">
-      <h5>Custom Color</h5>
-      <div class="flex align-items-center gap-3">
+    <div class="w-full px-2">
+      <h5 class="font-medium text-lg mb-2">Custom Color</h5>
+      <div class="flex items-center gap-3">
         <input type="color" [ngModel]="currentColor" (change)="onCustomColorChange($event)" 
-               style="width: 3rem; height: 3rem; border: 1px solid var(--surface-border); border-radius: 50%; cursor: pointer; background: transparent; padding: 0;">
+               class="w-12 h-12 rounded-full border border-surface cursor-pointer bg-transparent p-0 overflow-hidden">
         <span class="text-lg font-mono">{{currentColor}}</span>
       </div>
     </div>
   </div>
 </div>
+

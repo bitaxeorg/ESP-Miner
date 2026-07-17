@@ -7,7 +7,6 @@ import { LayoutService } from './service/app.layout.service';
 import { SensitiveData } from 'src/app/services/sensitive-data.service';
 import { DashboardEditService } from 'src/app/services/dashboard-edit.service';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
-import { MenuItem } from 'primeng/api';
 
 @Component({
     selector: 'app-topbar',
@@ -20,7 +19,7 @@ export class AppTopBarComponent implements OnInit, OnDestroy {
   public info$: Observable<ISystemInfo>;
   public sensitiveDataHidden: boolean = false;
   public isMiningPaused: boolean = false;
-  public items!: MenuItem[];
+  public isWidgetPanelOpen = false;
 
   @Input() isAPMode: boolean = false;
 

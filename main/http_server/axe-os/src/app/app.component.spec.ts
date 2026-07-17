@@ -7,11 +7,12 @@ import { ThemeService } from './services/theme.service';
 import { LocalStorageService } from './local-storage.service';
 import { provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
+import { DialogListComponent } from './services/dialog.service';
 
 describe('AppComponent', () => {
   beforeEach(() => TestBed.configureTestingModule({
     imports: [RouterModule],
-    declarations: [AppComponent, SnowflakesComponent],
+    declarations: [AppComponent, SnowflakesComponent, DialogListComponent],
     providers: [
       provideRouter([]),
       LayoutService,

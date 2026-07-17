@@ -27,7 +27,6 @@ interface IChannelOption {
 @Component({
     selector: 'app-pool',
     templateUrl: './pool.component.html',
-    styleUrls: ['./pool.component.scss'],
     standalone: false
 })
 export class PoolComponent implements OnInit {
@@ -150,6 +149,8 @@ export class PoolComponent implements OnInit {
       delete form.fallbackStratumPassword;
     }
 
+    const restartAlreadyPending = this.savedChanges;
+
     this.systemService.updateSystem(this.uri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
@@ -157,12 +158,13 @@ export class PoolComponent implements OnInit {
           const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
           this.toastr.warning('You must restart this device after saving for changes to take effect.');
           this.toastr.success(successMessage);
+          this.form.markAsPristine();
           this.savedChanges = true;
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Could not save pool settings for ${this.uri}. ${err.message}` : `Could not save pool settings. ${err.message}`;
           this.toastr.error(errorMessage);
-          this.savedChanges = false;
+          this.savedChanges = restartAlreadyPending;
         }
       });
   }
@@ -174,6 +176,7 @@ export class PoolComponent implements OnInit {
         next: () => {
           const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
           this.toastr.success(successMessage);
+          this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
