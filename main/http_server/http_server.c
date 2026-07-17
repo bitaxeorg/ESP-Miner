@@ -619,13 +619,8 @@ static esp_err_t handle_options_request(httpd_req_t * req)
 
 bool check_settings_and_update(const cJSON * const root, char **redirect_url)
 {
-    // Track validity PER FIELD rather than one global pass/fail flag. With a
-    // single shared flag, one invalid or unexpected field anywhere in the
-    // request silently blocked saving *everything* else in the same
-    // request -- including fields the person never touched, since the
-    // frontend always submits the whole settings form on every save. Now an
-    // out-of-range or stale field only skips itself; everything else that
-    // validated correctly still gets applied.
+    // Track validity per field instead of one shared pass/fail flag, so an
+    // invalid field only skips itself instead of blocking the whole request.
     bool field_ok[NVS_CONFIG_COUNT];
     for (int i = 0; i < NVS_CONFIG_COUNT; i++) {
         field_ok[i] = true;
@@ -733,9 +728,6 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
         }
     }
 
-    // Always apply whatever validated correctly, regardless of whether some
-    // other field in the same request failed -- see the field_ok comment
-    // above for why this matters.
     {
         for (NvsConfigKey key = 0; key < NVS_CONFIG_COUNT; key++) {
             Settings *setting = nvs_config_get_settings(key);
@@ -745,7 +737,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
             if (!item) continue;
             if (!field_ok[key]) {
                 ESP_LOGW(TAG, "Skipping '%s': failed validation, rest of the request still applied", setting->rest_name);
-                result = false; // still report that not everything made it, for logging/diagnostics
+                result = false;
                 continue;
             }
 
