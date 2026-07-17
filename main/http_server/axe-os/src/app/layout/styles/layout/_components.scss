@@ -1,0 +1,65 @@
+/* Global UI Component Classes & Overrides */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius, 2px);
+  font-weight: 500;
+  transition: all 0.2s;
+  background-color: var(--button-bg);
+  color: var(--color-primary-text);
+  cursor: pointer;
+  border: 1px solid var(--button-bg);
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--color-text-main);
+  border-color: var(--color-surface-border);
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-bg-hover);
+    border-color: var(--color-surface-border);
+  }
+}
+
+.btn-danger {
+  background-color: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+
+  &:hover:not(:disabled) {
+    background-color: #dc2626;
+    border-color: #dc2626;
+  }
+}
+
+.input-text {
+  width: 100%;
+  font-size: 0.9rem;
+  padding: 0.3rem 0.7rem;
+  background-color: var(--color-bg-card);
+  color: var(--color-text-main);
+  border: 1px solid #52525b;
+  border-radius: var(--border-radius, 2px);
+  outline: none;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--color-primary);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

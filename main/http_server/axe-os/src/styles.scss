@@ -1,4 +1,4 @@
-@layer layout, primeng, axe-os;
+@layer theme, base, components, layout, axe-os, utilities;
 
 @font-face {
     font-family: 'Nippo-Regular';
@@ -8,17 +8,15 @@
     font-style: normal;
 }
 
-@import "app/layout/styles/layout/layout.scss" layer(layout);
-@import "app/layout/styles/modules/primeicons.css" layer(layout);
-@import "../node_modules/primeflex/primeflex.min.css" layer(layout);
+@layer layout {
+    @import "./app/layout/styles/layout/layout.scss";
+    @import "./app/layout/styles/layout/theme";
+}
 
-/* PrimeNG component token overrides (must be unlayered to override PrimeNG defaults) */
-@import "app/layout/styles/layout/theme";
+@import "./app/layout/styles/modules/primeicons";
 
 @layer axe-os {
-    @import "app/layout/styles/layout/axe-os";
+    @import "./app/layout/styles/layout/axe-os";
 }
 
-.text-primary {
-    color: var(--primary-color) !important;
-}
+@import "./app/layout/styles/layout/components";

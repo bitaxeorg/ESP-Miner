@@ -1,5 +1,5 @@
 .card {
-    background: var(--p-card-background);
+    background: var(--color-bg-card);
     border: 1px solid var(--card-border);
     padding: 1.5rem;
     margin-bottom: 1rem;
@@ -26,15 +26,7 @@
     line-height: unset;
 }
 
-.p-toast {
-    &.p-toast-top-right,
-    &.p-toast-top-left,
-    &.p-toast-top-center {
-        top: 100px;
-    }
-}
-
-.p-tooltip-text {
+.app-tooltip-text {
     font-size: 0.9rem;
 }
 
@@ -46,14 +38,14 @@
         display: inline-block;
         white-space: nowrap;        
 
-        &.p-inputtext {
+        &.input-text {
             -webkit-text-security: disc;
-            color: var(--text-color); 
+            color: var(--color-text-main); 
         }
 
         &::before {
             content: '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••';
-            color: var(--text-color); 
+            color: var(--color-text-main); 
             position: absolute;
             left: 0;
             width: 100%;
@@ -73,4 +65,3 @@
     font-family: monospace;
     font-size: medium;
 }
-

@@ -1,9 +1,8 @@
-import { Component, ViewChild } from '@angular/core';
-import { Observable, map, tap } from 'rxjs';
+import { Component, ViewChild, ElementRef } from '@angular/core';
+import { Observable, map } from 'rxjs';
 import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { getHttpErrorMessage } from 'src/app/utils/error-handler';
 import { ToastrService } from 'ngx-toastr';
-import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
@@ -29,8 +28,8 @@ export class UpdateComponent {
 
   public info$: Observable<SystemInfo>;
 
-  @ViewChild('firmwareUpload') firmwareUpload!: FileUpload;
-  @ViewChild('websiteUpload') websiteUpload!: FileUpload;
+  @ViewChild('firmwareUpload') firmwareUpload!: ElementRef<HTMLInputElement>;
+  @ViewChild('websiteUpload') websiteUpload!: ElementRef<HTMLInputElement>;
 
   @ViewChild('privacyModal') privacyModal?: ModalComponent;
   @ViewChild('progressModal') progressModal?: ModalComponent;
@@ -71,9 +70,22 @@ export class UpdateComponent {
     });
   }
 
-  otaUpdate(event: FileUploadHandlerEvent) {
-    const file = event.files[0];
-    this.firmwareUpload.clear(); // clear the file upload component
+  onFileSelected(event: Event, target: 'websiteUpload' | 'firmwareUpload') {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      if (target === 'websiteUpload') {
+        this.otaWWWUpdate(file);
+      } else {
+        this.otaUpdate(file);
+      }
+    }
+  }
+
+  otaUpdate(file: File) {
+    if (this.firmwareUpload) {
+      this.firmwareUpload.nativeElement.value = '';
+    }
 
     if (file.name != 'esp-miner.bin') {
       this.toastrService.error('Incorrect file, looking for esp-miner.bin.');
@@ -117,9 +129,10 @@ export class UpdateComponent {
       });
   }
 
-  otaWWWUpdate(event: FileUploadHandlerEvent) {
-    const file = event.files[0];
-    this.websiteUpload.clear(); // clear the file upload component
+  otaWWWUpdate(file: File) {
+    if (this.websiteUpload) {
+      this.websiteUpload.nativeElement.value = '';
+    }
 
     if (file.name != 'www.bin') {
       this.toastrService.error('Incorrect file, looking for www.bin.');
@@ -173,7 +186,7 @@ export class UpdateComponent {
       .replace(/(https?:\/\/github\.com\/.+\/(.+[^\s])+)/gim, (match, p1, p2) => `<a href="${p1}" target="_blank">${match.includes('/pull/') ? '#' : ''}${p2}</a>`) // Regular links
       .replace(/@([^\s]+)/gim, ' <a href="https://github.com/$1" target="_blank">@$1</a> ') // Username links
       .replace(/^\s*[-+*]\s?(.+)$/gim, '<li>$1</li>') // Unordered list
-      .replace(/`([^`]+)`/gim, '<code class="bg-surface-100 border-round px-1">$1</code>') // Code
+      .replace(/`([^`]+)`/gim, '<code class="bg-surface-100 rounded px-1">$1</code>') // Code
       .replace(/\r\n\r\n/gim, '<br>'); // Breaks
 
     return toHTML.trim();
