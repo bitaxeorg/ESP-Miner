@@ -63,7 +63,7 @@
             <label class="hidden md:flex w-full md:w-2/12 font-medium">Target Temperature</label>
             <div class="w-full md:w-10/12">
                 <label class="block mb-1">
-                    <span class="md:hidden mr-1">Target Temperature:</span>{{form.controls['temptarget'].value}} °C
+                    <span class="md:hidden mr-1">Target Temperature:</span>{{form.controls['temptarget'].value}} &deg;C
                 </label>
                 <app-slider [min]="35" [max]="66" formControlName="temptarget"></app-slider>
             </div>

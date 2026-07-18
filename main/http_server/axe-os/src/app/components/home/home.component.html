@@ -237,32 +237,17 @@
                         <h6 class="flex justify-between mb-1">
                             Power<span>{{info.power}} W</span>
                         </h6>
-                        @let powerProgress = ((info.power / info.maxPower) * 100);
-                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="powerProgress"></div>
-                        </div>
+                        <app-progressbar [value]="(info.power / info.maxPower) * 100"></app-progressbar>
                     </div>
 
                     <div class="mb-4">
                         <h6 class="flex justify-between mb-1">
                             Input Voltage<span>{{info.voltage}} V</span>
                         </h6>
-                        <div class="relative">
-                            @let voltageProgress = ((info.voltage / (info.nominalVoltage + .5)) * 100);
-                            <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                                <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="voltageProgress"></div>
-                            </div>
-
-                            <!-- Conditional marker based on nominal voltage-->
-                            <div class="absolute bg-white h-full top-0"
-                                [style.left]="(info.nominalVoltage / (info.nominalVoltage + .5)) * 100 + '%'"
-                                style="width: 3px;">
-                                <small class="absolute text-white whitespace-nowrap text-xs"
-                                    style="bottom: -1rem; transform: translateX(-50%)">
-                                    {{info.nominalVoltage}} V
-                                </small>
-                            </div>
-                        </div>
+                        <app-progressbar
+                            [value]="(info.voltage / (info.nominalVoltage + .5)) * 100"
+                            [markers]="[{ value: (info.nominalVoltage / (info.nominalVoltage + .5)) * 100, label: info.nominalVoltage + ' V' }]">
+                        </app-progressbar>
                         <strong class="text-red-500" *ngIf="info.voltage < (info.nominalVoltage + .5) * 0.87">
                             Danger: Low Voltage
                         </strong>
@@ -272,20 +257,14 @@
                         <h6 class="flex justify-between mb-1">
                             ASIC Frequency<span>{{info.actualFrequency | number: '1.0-4'}} MHz</span>
                         </h6>
-                        @let freqProgress = ((info.actualFrequency / maxFrequency) * 100);
-                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="freqProgress"></div>
-                        </div>
+                        <app-progressbar [value]="(info.actualFrequency / maxFrequency) * 100"></app-progressbar>
                     </div>
 
                     <div>
                         <h6 class="flex justify-between mb-1">
                             Measured ASIC Voltage<span>{{info.coreVoltageActual}} V</span>
                         </h6>
-                        @let coreVoltProgress = ((info.coreVoltageActual / 1.8) * 100);
-                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="coreVoltProgress"></div>
-                        </div>
+                        <app-progressbar [value]="(info.coreVoltageActual / 1.8) * 100"></app-progressbar>
                     </div>
                 </div>
             </div>
@@ -311,10 +290,10 @@
                                 </ng-container>
                             </span>
                         </h6>
-                        @let tempProgress = ((info.temp / maxTemp) * 100);
-                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="tempProgress"></div>
-                        </div>
+                        <app-progressbar
+                            [value]="(info.temp / maxTemp) * 100"
+                            [markers]="[{ value: (info.temptarget / maxTemp) * 100, label: info.temptarget + ' &deg;C', visible: info.autofanspeed === 1 && 0 >= info.temp2 }]">
+                        </app-progressbar>
 
                         <strong class="text-red-500" *ngIf="info.temp >= 70">
                             Danger: High Temperature
@@ -328,10 +307,10 @@
                                 {{info.temp2}} &deg;C
                             </span>
                         </h6>
-                        @let temp2Progress = ((info.temp2 / maxTemp) * 100);
-                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="temp2Progress"></div>
-                        </div>
+                        <app-progressbar
+                            [value]="(info.temp2 / maxTemp) * 100"
+                            [markers]="[{ value: (info.temptarget / maxTemp) * 100, label: info.temptarget + ' &deg;C', visible: info.autofanspeed === 1 }]">
+                        </app-progressbar>
 
                         <strong class="text-red-500" *ngIf="info.temp2 >= 70">
                             Danger: High Temperature
@@ -342,10 +321,7 @@
                         <h6 class="flex justify-between mb-1">
                             Voltage Regulator Temperature<span>{{info.vrTemp}} &deg;C</span>
                         </h6>
-                        @let vrTempProgress = ((info.vrTemp / 120) * 100);
-                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="vrTempProgress"></div>
-                        </div>
+                        <app-progressbar [value]="(info.vrTemp / 120) * 100"></app-progressbar>
 
                         <strong class="text-red-500" *ngIf="info.vrTemp >= 105">
                             Danger: High Temperature
@@ -374,10 +350,7 @@
 
                             <span>{{info.fanspeed.toFixed(1)}} %</span>
                         </h6>
-                        @let fanProgress = info.fanspeed;
-                        <div class="w-full bg-progressbar rounded-sm overflow-hidden h-[6px]">
-                            <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="fanProgress"></div>
-                        </div>
+                        <app-progressbar [value]="info.fanspeed"></app-progressbar>
                     </div>
                 </div>
             </div>
