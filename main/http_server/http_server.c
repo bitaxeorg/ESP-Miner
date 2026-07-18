@@ -44,6 +44,7 @@
 #include "log_buffer.h"
 #include "cjson_utils.h"
 #include "utils.h"
+#include "http_auth.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -306,11 +307,45 @@ static void normalize_hostname(char *hostname, size_t max_len) {
     }
 }
 
+// Optional HTTP Basic authentication gate.
+//
+// Returns ESP_OK when the request may proceed (auth disabled, AP setup mode, a
+// CORS preflight, or valid credentials). Returns ESP_FAIL when the client must
+// authenticate; in that case a "WWW-Authenticate" header is queued so the
+// caller's 401 response makes the browser show its native login dialog.
+//
+// This is intentionally a no-op unless the user has configured a password, so
+// existing devices behave exactly as before after updating. AP mode always
+// bypasses authentication, which keeps the physical-button recovery flow (and
+// therefore the ability to reset a forgotten password) working.
+static esp_err_t http_auth_gate(httpd_req_t * req)
+{
+    if (req->method == HTTP_OPTIONS) {
+        return ESP_OK; // never challenge CORS preflight requests
+    }
+    if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
+        return ESP_OK; // AP setup / recovery: no authentication
+    }
+    if (!http_auth_is_enabled()) {
+        return ESP_OK; // opt-in: no password configured
+    }
+    if (http_auth_check_request(req) == ESP_OK) {
+        return ESP_OK; // valid credentials
+    }
+    httpd_resp_set_hdr(req, "WWW-Authenticate", HTTP_AUTH_WWW_AUTHENTICATE);
+    return ESP_FAIL;
+}
+
 esp_err_t is_network_allowed(httpd_req_t * req)
 {
     if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
         ESP_LOGI(CORS_TAG, "Device in AP mode. Allowing CORS.");
         return ESP_OK;
+    }
+
+    // Enforce HTTP authentication (no-op when no password is configured).
+    if (http_auth_gate(req) != ESP_OK) {
+        return ESP_FAIL;
     }
 
     int sockfd = httpd_req_to_sockfd(req);
@@ -532,6 +567,14 @@ static bool file_exists(const char *path) {
 /* Send HTTP response with the contents of the requested file */
 static esp_err_t rest_common_get_handler(httpd_req_t * req)
 {
+    // Challenge for credentials on the page load itself (when auth is enabled)
+    // so the browser shows its login dialog before the app shell renders. Note:
+    // this only adds the auth check, not the CORS/origin restriction, so serving
+    // the UI is unchanged when authentication is disabled.
+    if (http_auth_gate(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
     char filepath[FILE_PATH_MAX];
     char gz_file[FILE_PATH_MAX];
     uint8_t filePathLength = sizeof(filepath);
@@ -1035,6 +1078,125 @@ static esp_err_t POST_mining_resume(httpd_req_t * req)
     return res;
 }
 
+/* GET /api/system/auth - report whether web authentication is enabled */
+static esp_err_t GET_auth_info(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    char username[HTTP_AUTH_USERNAME_MAX + 1];
+    http_auth_get_username(username, sizeof(username));
+
+    cJSON * root = cJSON_CreateObject();
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_OK;
+    }
+    cJSON_AddNumberToObject(root, "enabled", http_auth_is_enabled() ? 1 : 0);
+    cJSON_AddStringToObject(root, "username", username);
+
+    esp_err_t res = HTTP_send_json(req, root, &api_common_prebuffer_len);
+    cJSON_Delete(root);
+    return res;
+}
+
+/* POST /api/system/auth - set, change, or clear the web authentication password.
+ * Body: { "username": "...", "newPassword": "..." }
+ * An empty newPassword disables authentication. When authentication is already
+ * enabled, the network gate above requires valid current credentials before
+ * this handler runs, so a password can only be changed by an authenticated user. */
+static esp_err_t POST_auth_update(httpd_req_t * req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    int total_len = req->content_len;
+    if (total_len <= 0 || total_len >= SCRATCH_BUFSIZE) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid content length");
+        return ESP_OK;
+    }
+    char * buf = ((rest_server_context_t *) (req->user_ctx))->scratch;
+    int cur_len = 0;
+    int received = 0;
+    while (cur_len < total_len) {
+        received = httpd_req_recv(req, buf + cur_len, total_len - cur_len);
+        if (received <= 0) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to read request");
+            return ESP_OK;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    cJSON * root = cJSON_Parse(buf);
+    // Scrub the raw request body: it contains the plaintext password.
+    memset(buf, 0, total_len);
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
+    cJSON * pw_item = cJSON_GetObjectItem(root, "newPassword");
+    cJSON * user_item = cJSON_GetObjectItem(root, "username");
+    if (pw_item != NULL && !cJSON_IsString(pw_item)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "newPassword must be a string");
+        return ESP_OK;
+    }
+    if (user_item != NULL && !cJSON_IsString(user_item)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "username must be a string");
+        return ESP_OK;
+    }
+
+    const char * new_password = pw_item ? pw_item->valuestring : NULL;
+    const char * new_username = user_item ? user_item->valuestring : NULL;
+
+    esp_err_t err = http_auth_set_credentials(new_username, new_password);
+
+    // Scrub the parsed plaintext password before freeing.
+    if (pw_item && pw_item->valuestring) {
+        memset(pw_item->valuestring, 0, strlen(pw_item->valuestring));
+    }
+    cJSON_Delete(root);
+
+    if (err == ESP_ERR_INVALID_ARG) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Username or password too long");
+        return ESP_OK;
+    }
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to store credentials");
+        return ESP_OK;
+    }
+
+    bool enabled = http_auth_is_enabled();
+    httpd_resp_set_type(req, "application/json");
+    cJSON * resp = cJSON_CreateObject();
+    if (resp == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_OK;
+    }
+    cJSON_AddNumberToObject(resp, "enabled", enabled ? 1 : 0);
+    cJSON_AddStringToObject(resp, "message",
+        enabled ? "Authentication enabled. You may be asked to sign in again."
+                : "Authentication disabled.");
+    esp_err_t res = HTTP_send_json(req, resp, &api_common_prebuffer_len);
+    cJSON_Delete(resp);
+    return res;
+}
+
 /* Simple handler for getting system handler */
 static esp_err_t GET_system_info(httpd_req_t * req)
 {
@@ -1418,6 +1580,10 @@ esp_err_t start_rest_server(void * pvParameters)
     
     // Initialize the ASIC API with the global state
     asic_api_init(GLOBAL_STATE);
+
+    // Load the (optional) web authentication credentials from NVS.
+    http_auth_init();
+
     const char * base_path = "";
 
     REST_CHECK(base_path, "wrong base path", err);
@@ -1429,7 +1595,7 @@ esp_err_t start_rest_server(void * pvParameters)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
     config.max_open_sockets = 20;
-    config.max_uri_handlers = 25;
+    config.max_uri_handlers = 28;
     config.close_fn = websocket_close_fn;
     config.lru_purge_enable = true;
 
@@ -1466,6 +1632,24 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &system_info_get_uri);
+
+    /* URI handler for reading web authentication status */
+    httpd_uri_t auth_info_get_uri = {
+        .uri = "/api/system/auth",
+        .method = HTTP_GET,
+        .handler = GET_auth_info,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &auth_info_get_uri);
+
+    /* URI handler for setting/clearing the web authentication password */
+    httpd_uri_t auth_update_post_uri = {
+        .uri = "/api/system/auth",
+        .method = HTTP_POST,
+        .handler = POST_auth_update,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &auth_update_post_uri);
 
     /* URI handler for fetching system asic values */
     httpd_uri_t system_asic_get_uri = {

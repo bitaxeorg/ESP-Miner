@@ -86,6 +86,7 @@ PRIV_REQUIRES
     "tcp_transport"
     "stratum_v2"
     "esp_mm"
+    "http_auth"
 
 EMBED_FILES "http_server/recovery_page.html"
 )
