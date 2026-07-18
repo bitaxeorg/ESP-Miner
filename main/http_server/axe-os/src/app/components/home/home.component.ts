@@ -16,8 +16,8 @@ import { ThemeService } from 'src/app/services/theme.service';
 import { LayoutService } from 'src/app/layout/service/app.layout.service';
 import { SystemInfo as ISystemInfo, SystemStatistics as ISystemStatistics } from 'src/app/generated/models';
 import { Title } from '@angular/platform-browser';
-import { UIChart } from 'primeng/chart';
-import { SelectItem } from 'primeng/api';
+import { AppChartComponent } from '../chart/app-chart.component';
+import { SelectOption } from 'src/app/models/select-option.model';
 import { eChartLabel, ChartUnitGroups, chartLabelValue, chartLabelKey } from 'src/models/enum/eChartLabel';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { GridStack, GridItemHTMLElement } from 'gridstack';
@@ -78,7 +78,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public info$!: Observable<ISystemInfo>;
   public stats$!: Observable<ISystemStatistics>;
-  public pools$!: Observable<SelectItem<PoolLabel>[]>;
+  public pools$!: Observable<SelectOption<PoolLabel>[]>;
 
   public chartOptions: any;
   public dataLabel: number[] = [];
@@ -123,7 +123,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   ];
 
   @ViewChild('chart')
-  private chart?: UIChart
+  private chart?: AppChartComponent
 
   private gridStackEl?: ElementRef<HTMLElement>;
   @ViewChild('gridStack', { static: false })
@@ -538,9 +538,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private rebuildChartDatasets() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const primaryColor = documentStyle.getPropertyValue('--primary-color').trim() || '#6366f1';
-    const textColor = documentStyle.getPropertyValue('--text-color').trim() || '#ffffff';
-    const textColorSecondary = documentStyle.getPropertyValue('--text-color-secondary').trim() || '#808080';
+    const primaryColor = documentStyle.getPropertyValue('--color-primary').trim() || '#F80421';
+    const textColor = documentStyle.getPropertyValue('--color-text-main').trim() || '#ffffff';
+    const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim() || '#808080';
 
     const datasets = [
       ...this.createChartDatasets('chartY1Unit', primaryColor, textColor, true, 'y'),
@@ -558,9 +558,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private updateChartColors() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = (documentStyle.getPropertyValue('--p-text-muted-color') || documentStyle.getPropertyValue('--text-color-secondary')).trim();
-    const surfaceBorder = (documentStyle.getPropertyValue('--p-content-border-color') || documentStyle.getPropertyValue('--surface-border')).trim();
-    const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
+    const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim();
+    const surfaceBorder = documentStyle.getPropertyValue('--color-border-content').trim();
+    const primaryColor = documentStyle.getPropertyValue('--color-primary').trim();
     this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.rebuildChartDatasets();
@@ -600,9 +600,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private initializeChart() {
     const documentStyle = getComputedStyle(document.documentElement);
-    const textColorSecondary = (documentStyle.getPropertyValue('--p-text-muted-color') || documentStyle.getPropertyValue('--text-color-secondary')).trim();
-    const surfaceBorder = (documentStyle.getPropertyValue('--p-content-border-color') || documentStyle.getPropertyValue('--surface-border')).trim();
-    const primaryColor = documentStyle.getPropertyValue('--primary-color').trim();
+    const textColorSecondary = documentStyle.getPropertyValue('--color-text-secondary').trim();
+    const surfaceBorder = documentStyle.getPropertyValue('--color-border-content').trim();
+    const primaryColor = documentStyle.getPropertyValue('--color-primary').trim();
     this.primaryColorRgb = this.hexToRgb(primaryColor);
 
     this.chartData = {
@@ -1042,7 +1042,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.pools$ = this.info$
       .pipe(map(info => {
-        const result: SelectItem<PoolLabel>[] = [];
+        const result: SelectOption<PoolLabel>[] = [];
         if (info.stratumURL) {
           result.push({ label: 'Primary', value: 'Primary' });
         }
@@ -1053,7 +1053,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       }));
   }
 
-  onPoolChange(event: { originalEvent: Event; value: PoolLabel }) {
+  onPoolChange(event: { originalEvent?: Event; value: PoolLabel }) {
     const useFallbackStratum = Number(event.value === 'Fallback');
 
     this.systemService.updateSystem('', { useFallbackStratum })

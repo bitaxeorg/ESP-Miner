@@ -4,8 +4,8 @@
     width: 3rem;
     height: 3rem;
     line-height: 3rem;
-    background: var(--primary-color);
-    color: var(--primary-color-text);
+    background: var(--color-primary);
+    color: var(--color-primary-text);
     text-align: center;
     top: 50%;
     right: 0;
@@ -28,15 +28,6 @@
     }
     
     &:hover {
-        background: var(--p-primary-hover-color);
-    }
-}
-
-.layout-config-sidebar {
-    &.p-sidebar {
-        .p-sidebar-content {
-            padding-left: 2rem;
-            padding-right: 2rem;
-        }
+        background: var(--color-primary-hover);
     }
 }

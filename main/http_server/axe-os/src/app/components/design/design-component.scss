@@ -11,7 +11,7 @@
   transition: box-shadow 0.15s ease-in-out;
 
   &.selected {
-    box-shadow: 0 0 0 2px var(--p-card-background), 0 0 0 4px var(--dot-bg) !important;
+    box-shadow: 0 0 0 2px var(--color-bg-card), 0 0 0 4px var(--dot-bg) !important;
   }
 
   .selected-icon {
@@ -26,15 +26,16 @@
 }
 
 input[type="color"] {
-  -webkit-appearance: none;
-  
+  appearance: none;
   &::-webkit-color-swatch-wrapper {
     padding: 0;
   }
+
   &::-webkit-color-swatch {
     border: none;
     border-radius: 50%;
   }
+
   &::-moz-color-swatch {
     border: none;
     border-radius: 50%;

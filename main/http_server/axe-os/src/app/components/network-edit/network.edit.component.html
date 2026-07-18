@@ -1,46 +1,50 @@
 <form *ngIf="form" [formGroup]="form">
     <div class="card">
-        <div class="field grid p-fluid">
-            <label for="hostname" class="col-12 md:col-2 md:m-0">
+        <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+            <label for="hostname" class="w-full md:w-2/12 font-medium">
                 <tooltip-text-icon
                     text="Hostname"
                     tooltip="Name of the device on your local network"
                 />
             </label>
-            <div class="col-12 md:col-10">
-                <input pInputText id="hostname" type="text" formControlName="hostname" />
+            <div class="w-full md:w-10/12">
+                <input class="input-text" id="hostname" type="text" formControlName="hostname" />
             </div>
         </div>
-        <div class="field grid p-fluid">
-            <label for="ssid" class="col-12 md:col-2 md:m-0">Wi-Fi SSID</label>
-            <div class="col-12 md:col-10 flex gap-2 align-items-center">
-                <input pInputText id="ssid" type="text" formControlName="ssid" class="flex-grow-1" />
-                <p-button
-                    icon="pi pi-search"
-                    pp-button
+        <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+            <label for="ssid" class="w-full md:w-2/12 font-medium">Wi-Fi SSID</label>
+            <div class="w-full md:w-10/12 flex gap-2 items-center">
+                <input class="input-text flex-grow" id="ssid" type="text" formControlName="ssid" />
+                <button
+                    type="button"
+                    class="btn btn-secondary px-3.5 py-2.5 cursor-pointer"
                     (click)="scanWifi()"
-                    [loading]="scanning"
-                    pTooltip="Scan Wi-Fi"
-                    tooltipPosition="left"></p-button>
+                    [disabled]="scanning"
+                    appTooltip="Scan Wi-Fi"
+                    tooltipPosition="left">
+                    <i class="pi {{scanning ? 'pi-spinner pi-spin' : 'pi-search'}}"></i>
+                </button>
             </div>
         </div>
-        <div class="field grid p-fluid">
-            <label for="wifiPass" class="col-12 md:col-2 md:m-0">Wi-Fi Password</label>
-            <div class="col-12 md:col-10">
-                <p-iconfield iconPosition="right">
-                    <p-inputicon *ngIf="form.get('wifiPass')?.dirty" styleClass="pi cursor-pointer {{!showWifiPassword ? 'pi-eye' : 'pi-eye-slash'}}"
-                        (click)="toggleWifiPasswordVisibility()"></p-inputicon>
-                    <input pInputText id="wifiPass" formControlName="wifiPass"
+        <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+            <label for="wifiPass" class="w-full md:w-2/12 font-medium">Wi-Fi Password</label>
+            <div class="w-full md:w-10/12">
+                <div class="relative w-full">
+                    <input class="input-text pr-10" id="wifiPass" formControlName="wifiPass"
                         [type]="showWifiPassword ? 'text' : 'password'"
                         placeholder="Enter Wi-Fi password" />
-                </p-iconfield>
+                    <span *ngIf="form.get('wifiPass')?.dirty" class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-secondary hover:text-main"
+                          (click)="toggleWifiPasswordVisibility()">
+                        <i class="pi {{!showWifiPassword ? 'pi-eye' : 'pi-eye-slash'}}"></i>
+                    </span>
+                </div>
             </div>
         </div>
 
         <div class="flex mt-5 gap-3">
-            <button pButton [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
-                class="btn btn-primary">Save</button>
-            <button pButton [disabled]="!savedChanges" (click)="restart()">Restart</button>
+            <button [disabled]="!form.dirty || form.invalid" (click)="updateSystem()"
+                class="btn">Save</button>
+            <button [disabled]="!savedChanges" (click)="restart()" class="btn" [class.btn-secondary]="!savedChanges">Restart</button>
         </div>
     </div>
 </form>

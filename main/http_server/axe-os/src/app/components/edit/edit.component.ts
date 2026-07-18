@@ -7,20 +7,13 @@ import { LoadingService } from 'src/app/services/loading.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { ActivatedRoute } from '@angular/router';
-import { CommonModule } from '@angular/common';
-import { ButtonModule } from 'primeng/button';
-import { CheckboxModule } from 'primeng/checkbox';
-import { SelectModule } from 'primeng/select';
-import { MessageModule } from 'primeng/message';
-import { SliderModule } from 'primeng/slider';
-import { TooltipModule } from 'primeng/tooltip';
-import { InputTextModule } from 'primeng/inputtext';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
-
-type SelectOption = {
-  name: string;
-  value: number;
-};
+import { DropdownComponent } from '../dropdown/dropdown.component';
+import { SelectOption } from '../../models/select-option.model';
+import { CommonModule } from '@angular/common';
+import { TooltipDirective } from '../../directives/tooltip.directive';
+import { CheckboxComponent } from '../checkbox/checkbox.component';
+import { SliderComponent } from '../slider/slider.component';
 
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
 const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
@@ -32,13 +25,10 @@ const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 
     imports: [
         CommonModule,
         ReactiveFormsModule,
-        ButtonModule,
-        CheckboxModule,
-        SelectModule,
-        InputTextModule,
-        MessageModule,
-        SliderModule,
-        TooltipModule,
+        CheckboxComponent,
+        DropdownComponent,
+        SliderComponent,
+        TooltipDirective,
         DateAgoPipe,
     ]
 })
@@ -59,6 +49,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public frequencyOptions: number[] = [];
   public defaultVoltage: number = 0;
   public voltageOptions: number[] = [];
+  public selectFrequencyOptions: SelectOption[] = [];
+  public selectVoltageOptions: SelectOption[] = [];
 
   private destroy$ = new Subject<void>();
 
@@ -203,6 +195,16 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
 
         this.formSubject.next(this.form);
 
+        this.updateSelectOptions();
+
+        this.form.controls['frequency'].valueChanges.pipe(
+          takeUntil(this.destroy$)
+        ).subscribe(() => this.updateSelectOptions());
+
+        this.form.controls['coreVoltage'].valueChanges.pipe(
+          takeUntil(this.destroy$)
+        ).subscribe(() => this.updateSelectOptions());
+
       this.form.controls['autofanspeed'].valueChanges.pipe(
         startWith(this.form.controls['autofanspeed'].value),
         takeUntil(this.destroy$)
@@ -252,21 +254,25 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     }
 
     const deviceUri = this.uri || '';
+    const restartAlreadyPending = this.savedChanges;
+    const restartRequired = this.isRestartRequired;
+
     this.systemService.updateSystem(deviceUri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
           const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
-          if (this.isRestartRequired) {
+          if (restartRequired) {
             this.toastr.warning('You must restart this device after saving for changes to take effect.');
           }
           this.toastr.success(successMessage);
-          this.savedChanges = true;
+          this.form.markAsPristine();
+          this.savedChanges = restartAlreadyPending || restartRequired;
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Could not save settings for ${this.uri}. ${err.message}` : `Could not save settings. ${err.message}`;
           this.toastr.error(errorMessage);
-          this.savedChanges = false;
+          this.savedChanges = restartAlreadyPending;
         }
       });
   }
@@ -297,6 +303,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
         next: () => {
           const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
           this.toastr.success(successMessage);
+          this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
@@ -305,12 +312,17 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       });
   }
 
-  get selectFrequency(): SelectOption[] {
-    return this.buildSelectOptions('frequency', this.frequencyOptions, this.defaultFrequency);
+  private updateSelectOptions() {
+    this.selectFrequencyOptions = this.buildSelectOptions('frequency', this.frequencyOptions, this.defaultFrequency);
+    this.selectVoltageOptions = this.buildSelectOptions('coreVoltage', this.voltageOptions, this.defaultVoltage);
   }
 
-  get selectVoltage(): SelectOption[] {
-    return this.buildSelectOptions('coreVoltage', this.voltageOptions, this.defaultVoltage);
+  get displayOptions(): SelectOption[] {
+    return this.displays.map(display => ({ name: display, value: display }));
+  }
+
+  get rotationOptions(): SelectOption[] {
+    return this.rotations.map(rotation => ({ name: `${rotation}°`, value: rotation }));
   }
 
   get displayTimeoutMaxSteps(): number {

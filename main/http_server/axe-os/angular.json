@@ -37,6 +37,7 @@
               "src/bitcoin.pdf"
             ],
             "styles": [
+              "src/tailwind.css",
               "src/styles.scss",
               "node_modules/ngx-toastr/toastr.css",
               "node_modules/gridstack/dist/gridstack.min.css"
@@ -52,6 +53,14 @@
           },
           "configurations": {
             "production": {
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": true
+              },
               "budgets": [
                 {
                   "type": "initial",
@@ -60,8 +69,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "2kb",
-                  "maximumError": "4kb"
+                  "maximumWarning": "4kb",
+                  "maximumError": "5kb"
                 }
               ],
               "outputHashing": "all",
@@ -130,6 +139,7 @@
               "src/assets"
             ],
             "styles": [
+              "src/tailwind.css",
               "src/styles.scss"
             ],
             "scripts": [],
