@@ -25,6 +25,9 @@ static const char *TAG = "http_auth";
 // "<32 hex salt>:<64 hex sha256>" = 97 chars + NUL. Round up for headroom.
 #define AUTH_HASH_STR_MAX  128
 #define AUTH_DEFAULT_USER  "admin"
+// Upper bound for the "Authorization" header we will parse (base64 of user:pass
+// plus the "Basic " prefix stays well under this).
+#define AUTH_HEADER_MAX    512
 
 const char *const HTTP_AUTH_WWW_AUTHENTICATE = "Basic realm=\"AxeOS\", charset=\"UTF-8\"";
 
@@ -372,7 +375,7 @@ esp_err_t http_auth_check_request(httpd_req_t *req)
     }
 
     size_t hdr_len = httpd_req_get_hdr_value_len(req, "Authorization");
-    if (hdr_len == 0 || hdr_len > 512) {
+    if (hdr_len == 0 || hdr_len > AUTH_HEADER_MAX) {
         return ESP_FAIL;
     }
     char *hdr = malloc(hdr_len + 1);
