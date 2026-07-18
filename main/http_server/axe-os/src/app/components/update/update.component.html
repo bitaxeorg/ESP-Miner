@@ -100,9 +100,7 @@
             </div>
             
             @let progressVal = (updateTarget === 'AxeOS' ? websiteUpdateProgress : firmwareUpdateProgress);
-            <div class="w-full bg-progressbar rounded-sm overflow-hidden h-6">
-                <div class="bg-progressbar-value h-full transition-all duration-300" [style.width.%]="progressVal"></div>
-            </div>
+            <app-progressbar [value]="progressVal ?? 0" heightClass="h-6"></app-progressbar>
             
             <div class="text-center mt-3 text-secondary">
                 Please do not disconnect the power.

@@ -10,6 +10,7 @@ import { provideRouter } from '@angular/router';
 import { AppChartComponent } from 'src/app/components/chart/app-chart.component';
 import { TooltipDirective } from 'src/app/directives/tooltip.directive';
 import { DropdownComponent } from 'src/app/components/dropdown/dropdown.component';
+import { ProgressbarComponent } from 'src/app/components/progressbar/progressbar.component';
 import { BehaviorSubject, of } from 'rxjs';
 
 import { HashSuffixPipe } from 'src/app/pipes/hash-suffix.pipe';
@@ -160,6 +161,7 @@ describe('HomeComponent', () => {
         NoopAnimationsModule,
         AppChartComponent,
         DropdownComponent,
+        ProgressbarComponent,
         TooltipDirective,
         HashSuffixPipe,
         DiffSuffixPipe,
