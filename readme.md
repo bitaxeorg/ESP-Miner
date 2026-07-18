@@ -134,6 +134,17 @@ curl -X PATCH http://YOUR-BITAXE-IP/api/system \
      -H "Content-Type: application/json" \
      -d '{"fanspeed": "desired_speed_value"}'
 
+# Get web authentication status
+curl http://YOUR-BITAXE-IP/api/system/auth
+
+# Enable/change the web password (empty newPassword disables it)
+curl -X POST http://YOUR-BITAXE-IP/api/system/auth \
+     -H "Content-Type: application/json" \
+     -d '{"username": "admin", "newPassword": "your_password"}'
+
+# When authentication is enabled, pass credentials on every request
+curl -u admin:your_password http://YOUR-BITAXE-IP/api/system/info
+
 # Stream logs
 websocat ws://YOUR-BITAXE-IP/api/ws
 
@@ -212,6 +223,17 @@ In the event that the admin web front end is inaccessible, for example because o
 ### Unlock Settings
 
 In order to unlock the Input fields for ASIC Frequency and ASIC Core Voltage you need to append `?oc` to the end of the settings tab URL in your browser. Be aware that without additional cooling overclocking can overheat and/or damage your Bitaxe.
+
+### Web Authentication
+
+By default the web interface is open to anyone on the local network. You can optionally protect it with a password from **Settings → Security**.
+
+- Authentication uses standard HTTP Basic auth, so your browser shows its native sign-in dialog and remembers the credentials for the session. The password is never stored in clear text — only a salted SHA-256 hash is kept on the device.
+- It is **opt-in**: until you set a password nothing changes, so existing setups keep working after updating.
+- Once enabled, all API access (reading data, changing settings, OTA updates) requires the username and password.
+- **Forgot the password?** Hold the `BOOT` button to start the device in access-point (setup) mode, which bypasses authentication. From there you can open **Settings → Security** and set a new password or disable authentication. A full factory reset (erasing NVS) also clears it.
+
+> Note: the connection is plain HTTP, so this protects against casual access on a shared/local network but does not encrypt traffic. Do not expose the device directly to the internet.
 
 ## Development using esp-miner/devcontainer
 
