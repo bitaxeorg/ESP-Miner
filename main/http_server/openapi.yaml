@@ -1063,6 +1063,50 @@ paths:
         '500':
           description: Internal server error
 
+  /api/system/test/sv2:
+    post:
+      summary: Test Stratum V2 support of a pool
+      description: Opens a throwaway Stratum V2 (Noise) handshake to the given pool and reports whether it supports SV2. Does not affect the running miner.
+      operationId: testSv2Connection
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+                - port
+              properties:
+                url:
+                  type: string
+                  description: Pool host to test
+                port:
+                  type: number
+                  description: Pool port to test
+      responses:
+        '200':
+          description: Test completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supported:
+                    type: boolean
+                    description: Whether the pool responded to a Stratum V2 handshake
+                  message:
+                    type: string
+                    description: Human-readable result
+        '400':
+          description: Missing or invalid url/port
+        '401':
+          description: Unauthorized - Client not in allowed network range
+        '500':
+          description: Internal server error
+
   /api/system/identify:
     post:
       summary: Identify the device
