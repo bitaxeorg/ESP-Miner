@@ -48,10 +48,11 @@ export class NetworkEditComponent implements OnInit {
     this.liveDataService.info$
       .pipe(first(), this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
+        const initialValidators = (info.networkMode === 'usb') ? [] : [Validators.required];
         this.form = this.fb.group({
           networkMode: [info.networkMode || 'wifi', [Validators.required]],
-          hostname: [info.hostname, [Validators.required]],
-          ssid: [info.ssid],  // Not required when USB mode
+          hostname: [info.hostname, [Validators.required, Validators.pattern('^[a-zA-Z0-9-]+$')]],
+          ssid: [info.ssid, initialValidators],
           wifiPass: ['*****'],
         });
         
