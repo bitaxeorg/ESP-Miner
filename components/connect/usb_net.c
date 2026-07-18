@@ -153,8 +153,12 @@ void usb_net_init(void * pvParameters)
     string_descriptors[1] = "ESP-Miner"; // Manufacturer
 
     static char product_str[64];
-    snprintf(product_str, 64, "Bitaxe %s %s (%s)", GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version, hostname);
+    snprintf(product_str, 64, "Bitaxe %s %s (%s)", GLOBAL_STATE->DEVICE_CONFIG.family.name, GLOBAL_STATE->DEVICE_CONFIG.board_version, hostname ? hostname : "Unknown");
     string_descriptors[2] = product_str; // Product
+
+    if (hostname) {
+        free(hostname);
+    }
 
     uint8_t mac[6];
     esp_efuse_mac_get_default(mac);
