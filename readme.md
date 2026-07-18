@@ -65,6 +65,7 @@ Available API endpoints:
 * `/api/system/scoreboard` Get top 20 highest difficulty shares
 * `/api/system/wifi/scan` Scan for available Wi-Fi networks
 * `/api/system/logs` Download system logs
+* `/api/system/auth` Get web authentication status
 
 **POST**
 
@@ -72,6 +73,7 @@ Available API endpoints:
 * `/api/system/identify` Identify the device
 * `/api/system/OTA` Update system firmware
 * `/api/system/OTAWWW` Update AxeOS
+* `/api/system/auth` Set or clear the web authentication password
 
 **PATCH**
 
