@@ -11,7 +11,7 @@ describe('EditComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [EditComponent],
+      imports: [EditComponent],
       providers: [provideHttpClient(), provideToastr(), provideRouter([])]
     });
     fixture = TestBed.createComponent(EditComponent);

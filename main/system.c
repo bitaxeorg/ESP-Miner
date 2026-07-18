@@ -33,6 +33,8 @@
 #include "utils.h"
 #include "self_test.h"
 #include "filesystem.h"
+#include "work_queue.h"
+#include "hashrate_monitor_task.h"
 
 #define NVS_COUNTER_UPDATE_INTERVAL_MS 60 * 60 * 1000  // Update NVS once per hour
 #define NOINIT_SENTINEL_VALUE 0x4C4F4732       // "LOG2" in hex
@@ -140,6 +142,17 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     // set based on config
     module->is_using_fallback = module->use_fallback_stratum;
 
+    // load fallback pool protocol
+    char *fb_proto_str = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL);
+    stratum_protocol_t fb_proto_val = stratum_protocol_from_string(fb_proto_str);
+    if (fb_proto_val != STRATUM_PROTOCOL_UNKNOWN) {
+        module->fallback_pool_protocol = fb_proto_val;
+    } else {
+        ESP_LOGW(TAG, "Invalid fallback stratum protocol in NVS: '%s', defaulting to SV1", fb_proto_str ? fb_proto_str : "NULL");
+        module->fallback_pool_protocol = STRATUM_PROTOCOL_V1;
+    }
+    free(fb_proto_str);
+
     // Initialize pool connection info
     strcpy(module->pool_connection_info, "Not Connected");
 
@@ -148,6 +161,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     ESP_LOGI(TAG, "Initial overheat_mode value: %d", module->overheat_mode);
 
     module->mining_paused = false;
+    module->pools_unavailable = false;
 
     //Initialize power_fault fault mode
     module->power_fault = 0;
@@ -155,6 +169,18 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     // set the best diff string
     suffixString(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     suffixString(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
+
+    // Load stratum protocol selection
+    char *proto_str = nvs_config_get_string(NVS_CONFIG_STRATUM_PROTOCOL);
+    stratum_protocol_t proto_val = stratum_protocol_from_string(proto_str);
+    if (proto_val != STRATUM_PROTOCOL_UNKNOWN) {
+        GLOBAL_STATE->stratum_protocol = proto_val;
+    } else {
+        ESP_LOGW(TAG, "Invalid stratum protocol in NVS: '%s', defaulting to SV1", proto_str ? proto_str : "NULL");
+        GLOBAL_STATE->stratum_protocol = STRATUM_PROTOCOL_V1;
+    }
+    free(proto_str);
+    GLOBAL_STATE->sv2_conn = NULL;
 
     // Initialize mutexes
     pthread_mutex_init(&GLOBAL_STATE->valid_jobs_lock, NULL);
@@ -268,7 +294,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
         vTaskDelay(500 / portTICK_PERIOD_MS);
 
-        ret = VCORE_set_voltage(GLOBAL_STATE, 1.150);
+        ret = VCORE_set_voltage(GLOBAL_STATE, (float)GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv / 1000.0f);
         if (ret != ESP_OK) {
             self_test_show_message(GLOBAL_STATE, "VCORE:FAIL");
             ESP_LOGE(TAG, "VCORE set failed");
@@ -284,6 +310,21 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     }
 
     return ESP_OK;
+}
+
+void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE)
+{
+    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
+    queue_clear(&GLOBAL_STATE->stratum_queue);
+
+    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
+    for (int i = 0; i < 128; i = i + 4) {
+        GLOBAL_STATE->valid_jobs[i] = 0;
+    }
+    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+
+    // Reset hashrate measurements to prevent a spike on reconnection
+    hashrate_monitor_reset_measurements(GLOBAL_STATE);
 }
 
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE)
@@ -312,7 +353,7 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg)
         }
     }
 
-    if (module->rejected_reason_stats_count < sizeof(module->rejected_reason_stats)) {
+    if (module->rejected_reason_stats_count < (int)(sizeof(module->rejected_reason_stats) / sizeof(module->rejected_reason_stats[0]))) {
         strncpy(module->rejected_reason_stats[module->rejected_reason_stats_count].message, 
                 error_msg, 
                 sizeof(module->rejected_reason_stats[module->rejected_reason_stats_count].message) - 1);
@@ -343,7 +384,7 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime)
     settimeofday(&tv, NULL);
 }
 
-void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id)
+void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint32_t target)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
@@ -352,7 +393,7 @@ void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t 
         suffixString((uint64_t) diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
     }
 
-    double network_diff = networkDifficulty(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->target);
+    double network_diff = networkDifficulty(target);
     if (diff >= network_diff) {
         module->block_found++;
         module->show_new_block = true;
@@ -447,4 +488,20 @@ double SYSTEM_noinit_get_total_log2_work()
     double high_plus_fraction = (double)noinit_state.cumulative_hashes_high + 
                                 (double)noinit_state.cumulative_hashes_low / 18446744073709551616.0;
     return 64.0 + log2(high_plus_fraction);
+}
+
+stratum_protocol_t stratum_protocol_from_string(const char *s)
+{
+    if (!s) return STRATUM_PROTOCOL_UNKNOWN;
+    if (strcmp(s, STRATUM_V1) == 0) return STRATUM_PROTOCOL_V1;
+    if (strcmp(s, STRATUM_V2) == 0) return STRATUM_PROTOCOL_V2;
+    return STRATUM_PROTOCOL_UNKNOWN;
+}
+
+sv2_channel_type_t sv2_channel_type_from_string(const char *s)
+{
+    if (!s) return SV2_CHANNEL_UNKNOWN;
+    if (strcmp(s, SV2_CHANNEL_TYPE_EXTENDED) == 0) return SV2_CHANNEL_EXTENDED;
+    if (strcmp(s, SV2_CHANNEL_TYPE_STANDARD) == 0) return SV2_CHANNEL_STANDARD;
+    return SV2_CHANNEL_UNKNOWN;
 }

@@ -1,8 +1,9 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { Observable, Subject, combineLatest, switchMap, shareReplay, first, takeUntil, map, timer } from 'rxjs';
+import { Observable, Subject, combineLatest, shareReplay, first, takeUntil, map } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
 import { SystemApiService } from 'src/app/services/system.service';
+import { LiveDataService } from 'src/app/services/live-data.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { ByteSuffixPipe } from 'src/app/pipes/byte-suffix.pipe';
@@ -14,6 +15,7 @@ type TableRow = {
   value: string;
   class?: string;
   valueClass?: string;
+  color?: string;
   isSensitiveData?: boolean;
   tooltip?: string;
 }
@@ -24,48 +26,51 @@ type CombinedData = {
 };
 
 @Component({
-  selector: 'app-system',
-  templateUrl: './system.component.html',
+    selector: 'app-system',
+    templateUrl: './system.component.html',
+    standalone: false
 })
 export class SystemComponent implements OnInit, OnDestroy {
-  public info$: Observable<ISystemInfo>;
-  public asic$: Observable<ISystemASIC>;
-  public combinedData$: Observable<{ info: ISystemInfo, asic: ISystemASIC }>
+  public systemRows$: Observable<TableRow[]>;
+  public isConnected$: Observable<boolean>;
 
   private destroy$ = new Subject<void>();
 
   constructor(
     private systemService: SystemApiService,
+    private liveDataService: LiveDataService,
     private loadingService: LoadingService,
     private toastr: ToastrService,
   ) {
-    this.info$ = timer(0, 5000).pipe(
-      switchMap(() => this.systemService.getInfo()),
+    this.isConnected$ = this.liveDataService.connected$;
+    
+    const info$ = this.liveDataService.info$;
+    const asic$ = this.systemService.getAsicSettings().pipe(
       shareReplay({ refCount: true, bufferSize: 1 })
     );
 
-    this.asic$ = this.systemService.getAsicSettings().pipe(
-      shareReplay({ refCount: true, bufferSize: 1 })
-    );
-
-    this.combinedData$ = combineLatest([this.info$, this.asic$]).pipe(
+    const combinedData$ = combineLatest([info$, asic$]).pipe(
       map(([info, asic]) => ({ info, asic }))
+    );
+
+    this.systemRows$ = combinedData$.pipe(
+      map(data => this.getSystemRows(data))
     );
   }
 
   ngOnInit() {
-    this.loadingService.loading$.next(true);
-
-    this.combinedData$
-      .pipe(first(), takeUntil(this.destroy$))
-      .subscribe({
-        next: () => this.loadingService.loading$.next(false)
-      });
+    this.systemRows$
+      .pipe(first(), this.loadingService.lockUIUntilComplete(), takeUntil(this.destroy$))
+      .subscribe();
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  trackByRowLabel(index: number, row: TableRow): string {
+    return row.label;
   }
 
   getWifiRssiColor(rssi: number): string {
@@ -86,24 +91,26 @@ export class SystemComponent implements OnInit, OnDestroy {
 
   getSystemRows(data: CombinedData): TableRow[] {
     return [
-      { label: 'Device Model', value: data.asic.deviceModel || 'Other', valueClass: 'text-' + data.asic.swarmColor + '-500' },
+      { label: 'Device Model', value: data.asic.deviceModel || 'Other', color: data.asic.swarmColor || 'gray' },
       { label: 'Board Version', value: data.info.boardVersion },
-      { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-3' },
+      { label: 'ASIC Type', value: (data.asic.asicCount > 1 ? data.asic.asicCount + 'x ' : ' ') + data.asic.ASICModel, class: 'pb-6' },
       { label: 'Uptime', value: DateAgoPipe.transform(data.info.uptimeSeconds) },
       { label: 'Total Uptime', value: DateAgoPipe.transform(data.info.totalUptimeSeconds || 0) },
       { label: 'Total Work (log2)', value: (data.info.totalLog2Work || 0).toFixed(6) },
       { label: 'Total Hashes', value: formatNumber(data.info.totalHashes || 0, 'en-us')},
-      { label: 'Reset Reason', value: data.info.resetReason, class: 'pb-3' },
+      { label: 'Reset Reason', value: data.info.resetReason, class: 'pb-6' },
       { label: 'Wi-Fi SSID', value: data.info.ssid, isSensitiveData: true },
       { label: 'Wi-Fi Status', value: data.info.wifiStatus },
       { label: 'Wi-Fi RSSI', value: data.info.wifiRSSI + ' dBm', valueClass: this.getWifiRssiColor(data.info.wifiRSSI), tooltip: this.getWifiRssiTooltip(data.info.wifiRSSI) },
       { label: 'Wi-Fi IPv4', value: data.info.ipv4},
-      { label: 'Wi-Fi IPv6', value: data.info.ipv6, class: 'pb-3', isSensitiveData: true},
-      { label: 'MAC Address', value: data.info.macAddr, class: 'pb-3', isSensitiveData: true },
+      { label: 'Wi-Fi IPv6', value: data.info.ipv6, class: 'pb-6', isSensitiveData: true},
+      { label: 'MAC Address', value: data.info.macAddr, class: 'pb-6', isSensitiveData: true },
       { label: 'CPU Usage', value: data.info.cpuUsage.toFixed(1) + '%'},
       { label: 'Free Heap Memory', value: ByteSuffixPipe.transform(data.info.freeHeap)},
       { label: '• Internal', value: ByteSuffixPipe.transform(data.info.freeHeapInternal)},
-      { label: '• Spiram', value: ByteSuffixPipe.transform(data.info.freeHeapSpiram), class: 'pb-3' },
+      { label: '• Spiram', value: ByteSuffixPipe.transform(data.info.freeHeapSpiram) },
+      { label: '• Min Free (All Time)', value: ByteSuffixPipe.transform(data.info.minFreeHeap)},
+      { label: '• Max Alloc Block', value: ByteSuffixPipe.transform(data.info.maxAllocHeap), class: 'pb-6' },
       { label: 'Firmware Version', value: data.info.version },
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
       { label: 'ESP-IDF Version', value: data.info.idfVersion },

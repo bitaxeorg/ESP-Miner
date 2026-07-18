@@ -1,11 +1,11 @@
-import { Component, ViewChild } from '@angular/core';
-import { Observable, switchMap, shareReplay, map, timer, distinctUntilChanged } from 'rxjs';
+import { Component, ViewChild, ElementRef } from '@angular/core';
+import { Observable, map } from 'rxjs';
 import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { ToastrService } from 'ngx-toastr';
-import { FileUploadHandlerEvent, FileUpload } from 'primeng/fileupload';
 import { GithubUpdateService } from 'src/app/services/github-update.service';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
+import { LiveDataService } from 'src/app/services/live-data.service';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { ModalComponent } from '../modal/modal.component';
 import { SystemInfo } from 'src/app/generated/models';
@@ -13,9 +13,10 @@ import { SystemInfo } from 'src/app/generated/models';
 const IGNORE_RELEASE_CHECK_WARNING = 'IGNORE_RELEASE_CHECK_WARNING';
 
 @Component({
-  selector: 'app-update',
-  templateUrl: './update.component.html',
-  styleUrls: ['./update.component.scss']
+    selector: 'app-update',
+    templateUrl: './update.component.html',
+    styleUrls: ['./update.component.scss'],
+    standalone: false
 })
 export class UpdateComponent {
 
@@ -27,8 +28,8 @@ export class UpdateComponent {
 
   public info$: Observable<SystemInfo>;
 
-  @ViewChild('firmwareUpload') firmwareUpload!: FileUpload;
-  @ViewChild('websiteUpload') websiteUpload!: FileUpload;
+  @ViewChild('firmwareUpload') firmwareUpload!: ElementRef<HTMLInputElement>;
+  @ViewChild('websiteUpload') websiteUpload!: ElementRef<HTMLInputElement>;
 
   @ViewChild('privacyModal') privacyModal?: ModalComponent;
   @ViewChild('progressModal') progressModal?: ModalComponent;
@@ -39,6 +40,7 @@ export class UpdateComponent {
 
   constructor(
     private systemService: SystemApiService,
+    private liveDataService: LiveDataService,
     private toastrService: ToastrService,
     private loadingService: LoadingService,
     private githubUpdateService: GithubUpdateService,
@@ -48,16 +50,25 @@ export class UpdateComponent {
       return (releases as any)[0];
     }));
 
-    this.info$ = timer(0, 5000).pipe(
-      switchMap(() => this.systemService.getInfo()),
-      distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr)),
-      shareReplay({ refCount: true, bufferSize: 1 })
-    );
+    this.info$ = this.liveDataService.info$;
   }
 
-  otaUpdate(event: FileUploadHandlerEvent) {
-    const file = event.files[0];
-    this.firmwareUpload.clear(); // clear the file upload component
+  onFileSelected(event: Event, target: 'websiteUpload' | 'firmwareUpload') {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      if (target === 'websiteUpload') {
+        this.otaWWWUpdate(file);
+      } else {
+        this.otaUpdate(file);
+      }
+    }
+  }
+
+  otaUpdate(file: File) {
+    if (this.firmwareUpload) {
+      this.firmwareUpload.nativeElement.value = '';
+    }
 
     if (file.name != 'esp-miner.bin') {
       this.toastrService.error('Incorrect file, looking for esp-miner.bin.');
@@ -102,9 +113,10 @@ export class UpdateComponent {
       });
   }
 
-  otaWWWUpdate(event: FileUploadHandlerEvent) {
-    const file = event.files[0];
-    this.websiteUpload.clear(); // clear the file upload component
+  otaWWWUpdate(file: File) {
+    if (this.websiteUpload) {
+      this.websiteUpload.nativeElement.value = '';
+    }
 
     if (file.name != 'www.bin') {
       this.toastrService.error('Incorrect file, looking for www.bin.');
@@ -161,7 +173,7 @@ export class UpdateComponent {
       .replace(/(https?:\/\/github\.com\/.+\/(.+[^\s])+)/gim, (match, p1, p2) => `<a href="${p1}" target="_blank">${match.includes('/pull/') ? '#' : ''}${p2}</a>`) // Regular links
       .replace(/@([^\s]+)/gim, ' <a href="https://github.com/$1" target="_blank">@$1</a> ') // Username links
       .replace(/^\s*[-+*]\s?(.+)$/gim, '<li>$1</li>') // Unordered list
-      .replace(/`([^`]+)`/gim, '<code class="surface-100">$1</code>') // Code
+      .replace(/`([^`]+)`/gim, '<code class="bg-surface-100 rounded px-1">$1</code>') // Code
       .replace(/\r\n\r\n/gim, '<br>'); // Breaks
 
     return toHTML.trim();

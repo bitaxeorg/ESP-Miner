@@ -1,7 +1,7 @@
 import { provideRouter } from '@angular/router';
 import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
 import { DiffSuffixPipe } from 'src/app/pipes/diff-suffix.pipe';
-import { TooltipModule } from 'primeng/tooltip';
+import { TooltipDirective } from 'src/app/directives/tooltip.directive';
 import { CommonModule } from '@angular/common';
 import { LocalStorageService } from 'src/app/local-storage.service';
 import { LoadingService } from 'src/app/services/loading.service';
@@ -16,8 +16,8 @@ describe('ScoreboardComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ScoreboardComponent, DiffSuffixPipe, DateAgoPipe],
-      imports: [CommonModule, TooltipModule],
+      declarations: [ScoreboardComponent],
+      imports: [CommonModule, TooltipDirective, DiffSuffixPipe, DateAgoPipe],
       providers: [
         provideRouter([]),
         provideHttpClient(),

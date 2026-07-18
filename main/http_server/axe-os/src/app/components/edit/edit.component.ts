@@ -1,23 +1,36 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
-import { FormBuilder, FormGroup, FormControl, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable } from 'rxjs';
+import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable, first } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
+import { LiveDataService } from 'src/app/services/live-data.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { ActivatedRoute } from '@angular/router';
-
-type Dropdown = {
-  name: string;
-  value: number;
-}[]
+import { DateAgoPipe } from 'src/app/pipes/date-ago.pipe';
+import { DropdownComponent } from '../dropdown/dropdown.component';
+import { SelectOption } from '../../models/select-option.model';
+import { CommonModule } from '@angular/common';
+import { TooltipDirective } from '../../directives/tooltip.directive';
+import { CheckboxComponent } from '../checkbox/checkbox.component';
+import { SliderComponent } from '../slider/slider.component';
 
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
-const STATS_FREQUENCY_STEPS = [0, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
+const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
 
 @Component({
-  selector: 'app-edit',
-  templateUrl: './edit.component.html'
+    selector: 'app-edit',
+    templateUrl: './edit.component.html',
+    standalone: true,
+    imports: [
+        CommonModule,
+        ReactiveFormsModule,
+        CheckboxComponent,
+        DropdownComponent,
+        SliderComponent,
+        TooltipDirective,
+        DateAgoPipe,
+    ]
 })
 
 export class EditComponent implements OnInit, OnDestroy, OnChanges {
@@ -36,6 +49,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public frequencyOptions: number[] = [];
   public defaultVoltage: number = 0;
   public voltageOptions: number[] = [];
+  public selectFrequencyOptions: SelectOption[] = [];
+  public selectVoltageOptions: SelectOption[] = [];
 
   private destroy$ = new Subject<void>();
 
@@ -43,10 +58,12 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public rotations = [0, 90, 180, 270];
   public displayTimeoutControl: FormControl;
   public statsFrequencyControl: FormControl;
+  public statsLimit: number = 720;
 
   constructor(
     private fb: FormBuilder,
     private systemService: SystemApiService,
+    private liveDataService: LiveDataService,
     private toastr: ToastrService,
     private loadingService: LoadingService,
     private route: ActivatedRoute,
@@ -123,10 +140,13 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   private loadDeviceSettings(): void {
     const deviceUri = this.uri || '';
 
+    const info$ = deviceUri
+      ? this.systemService.getInfo(deviceUri)
+      : this.liveDataService.info$.pipe(first());
 
     // Fetch both system info and ASIC settings in parallel
     forkJoin({
-      info: this.systemService.getInfo(deviceUri),
+      info: info$,
       asic: this.systemService.getAsicSettings(deviceUri)
     })
     .pipe(
@@ -139,9 +159,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       this.frequencyOptions = asic.frequencyOptions;
       this.defaultVoltage = asic.defaultVoltage;
       this.voltageOptions = asic.voltageOptions;
+      this.statsLimit = info.statsLimit || 720;
 
       // Check if overclock is enabled in NVS
-      if (info.overclockEnabled === 1) {
+      if (info.overclockEnabled) {
         this.settingsUnlocked = true;
         console.log(
           '🎉 Overclock mode is enabled from NVS settings!\n' +
@@ -173,6 +194,16 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
         });
 
         this.formSubject.next(this.form);
+
+        this.updateSelectOptions();
+
+        this.form.controls['frequency'].valueChanges.pipe(
+          takeUntil(this.destroy$)
+        ).subscribe(() => this.updateSelectOptions());
+
+        this.form.controls['coreVoltage'].valueChanges.pipe(
+          takeUntil(this.destroy$)
+        ).subscribe(() => this.updateSelectOptions());
 
       this.form.controls['autofanspeed'].valueChanges.pipe(
         startWith(this.form.controls['autofanspeed'].value),
@@ -223,21 +254,25 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     }
 
     const deviceUri = this.uri || '';
+    const restartAlreadyPending = this.savedChanges;
+    const restartRequired = this.isRestartRequired;
+
     this.systemService.updateSystem(deviceUri, form)
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
           const successMessage = this.uri ? `Saved settings for ${this.uri}` : 'Saved settings';
-          if (this.isRestartRequired) {
+          if (restartRequired) {
             this.toastr.warning('You must restart this device after saving for changes to take effect.');
           }
           this.toastr.success(successMessage);
-          this.savedChanges = true;
+          this.form.markAsPristine();
+          this.savedChanges = restartAlreadyPending || restartRequired;
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Could not save settings for ${this.uri}. ${err.message}` : `Could not save settings. ${err.message}`;
           this.toastr.error(errorMessage);
-          this.savedChanges = false;
+          this.savedChanges = restartAlreadyPending;
         }
       });
   }
@@ -268,6 +303,7 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
         next: () => {
           const successMessage = this.uri ? `Device at ${this.uri} restarted` : 'Device restarted';
           this.toastr.success(successMessage);
+          this.savedChanges = false;
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Failed to restart device at ${this.uri}. ${err.message}` : `Failed to restart device. ${err.message}`;
@@ -276,12 +312,17 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       });
   }
 
-  get dropdownFrequency(): Dropdown {
-    return this.buildDropdown('frequency', this.frequencyOptions, this.defaultFrequency);
+  private updateSelectOptions() {
+    this.selectFrequencyOptions = this.buildSelectOptions('frequency', this.frequencyOptions, this.defaultFrequency);
+    this.selectVoltageOptions = this.buildSelectOptions('coreVoltage', this.voltageOptions, this.defaultVoltage);
   }
 
-  get dropdownVoltage(): Dropdown {
-    return this.buildDropdown('coreVoltage', this.voltageOptions, this.defaultVoltage);
+  get displayOptions(): SelectOption[] {
+    return this.displays.map(display => ({ name: display, value: display }));
+  }
+
+  get rotationOptions(): SelectOption[] {
+    return this.rotations.map(rotation => ({ name: `${rotation}°`, value: rotation }));
   }
 
   get displayTimeoutMaxSteps(): number {
@@ -300,12 +341,12 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
     return STATS_FREQUENCY_STEPS[this.statsFrequencyMaxSteps];
   }
 
-  buildDropdown(formField: string, apiOptions: number[], defaultValue: number): Dropdown {
+  buildSelectOptions(formField: string, apiOptions: number[], defaultValue: number): SelectOption[] {
     if (!apiOptions.length) {
       return [];
     }
 
-    // Convert options from API to dropdown format
+    // Convert options from API to select format
     const options = apiOptions.map(option => {
       return {
         name: defaultValue === option ? `${option} (Default)` : `${option}`,
