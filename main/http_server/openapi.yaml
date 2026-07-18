@@ -919,6 +919,75 @@ paths:
         '500':
           description: Internal server error
 
+  /api/system/auth:
+    get:
+      summary: Get web authentication status
+      description: >-
+        Reports whether HTTP Basic authentication is currently required to
+        access the web interface, and the configured username.
+      operationId: getAuthStatus
+      tags:
+        - system
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: integer
+                    description: 1 when authentication is enabled, 0 when disabled
+                  username:
+                    type: string
+                    description: The configured username (default "admin")
+        '401':
+          description: Unauthorized - Client not in allowed network range or invalid credentials
+        '500':
+          description: Internal server error
+    post:
+      summary: Set or clear the web authentication password
+      description: >-
+        Sets, changes or clears the web interface password. Sending an empty
+        newPassword disables authentication. When authentication is already
+        enabled, valid current credentials are required to call this endpoint.
+      operationId: updateAuth
+      tags:
+        - system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: Username to store (optional; keeps the current value when omitted)
+                newPassword:
+                  type: string
+                  description: New password; an empty string disables authentication
+      responses:
+        '200':
+          description: Authentication settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: integer
+                    description: 1 when authentication is enabled, 0 when disabled
+                  message:
+                    type: string
+        '400':
+          description: Invalid input (username or password too long, or malformed body)
+        '401':
+          description: Unauthorized - Client not in allowed network range or invalid credentials
+        '500':
+          description: Internal server error
+
   /api/system/logs:
     get:
       summary: Download system logs

@@ -1,0 +1,68 @@
+<div class="card">
+    <h2>Security</h2>
+
+    <p class="mb-4 text-sm">
+        <ng-container *ngIf="authEnabled">
+            <i class="pi pi-lock text-primary"></i>
+            Web authentication is <strong>enabled</strong>. A username and password are required to access this device.
+        </ng-container>
+        <ng-container *ngIf="!authEnabled">
+            <i class="pi pi-lock-open"></i>
+            Web authentication is <strong>disabled</strong>. Anyone on the network can access and change this device.
+        </ng-container>
+    </p>
+
+    <form [formGroup]="form" (ngSubmit)="save()">
+        <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+            <label for="authUsername" class="w-full md:w-3/12 font-medium">Username</label>
+            <div class="w-full md:w-9/12">
+                <input class="input-text" id="authUsername" formControlName="username" type="text"
+                       autocomplete="username" [maxlength]="usernameMax" />
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row md:items-center mb-4 gap-2">
+            <label for="authNewPassword" class="w-full md:w-3/12 font-medium">
+                {{ authEnabled ? 'New Password' : 'Password' }}
+            </label>
+            <div class="w-full md:w-9/12">
+                <input class="input-text" id="authNewPassword" formControlName="newPassword" type="password"
+                       autocomplete="new-password" [maxlength]="passwordMax" />
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row md:items-center mb-2 gap-2">
+            <label for="authConfirmPassword" class="w-full md:w-3/12 font-medium">Confirm Password</label>
+            <div class="w-full md:w-9/12">
+                <input class="input-text" id="authConfirmPassword" formControlName="confirmPassword" type="password"
+                       autocomplete="new-password" [maxlength]="passwordMax" />
+            </div>
+        </div>
+
+        <div class="mb-4 min-h-[1.25rem]">
+            <small *ngIf="form.get('newPassword')?.touched && form.get('newPassword')?.hasError('minlength')"
+                   class="text-red-500">Password must be at least {{ passwordMin }} characters.</small>
+            <small *ngIf="form.hasError('passwordMismatch') && form.get('confirmPassword')?.touched"
+                   class="text-red-500">Passwords do not match.</small>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-2">
+            <button type="submit" class="btn w-full sm:w-auto" [disabled]="saving || loading || form.invalid">
+                {{ authEnabled ? 'Change Password' : 'Enable Authentication' }}
+            </button>
+            <button *ngIf="authEnabled" type="button" class="btn btn-danger w-full sm:w-auto"
+                    [disabled]="saving || loading" (click)="disable()">
+                Disable Authentication
+            </button>
+        </div>
+    </form>
+
+    <div class="mt-4 flex items-start gap-2 p-3 rounded-lg border text-sm bg-[#ffecb3] text-[#614a00] border-[#ffe082]">
+        <i class="pi pi-info-circle mt-0.5"></i>
+        <span>
+            After enabling or changing the password your browser will ask you to sign in again.
+            If you ever forget it, hold the <strong>BOOT</strong> button to start the device in
+            access-point (setup) mode, which bypasses authentication so you can reset it.
+        </span>
+    </div>
+</div>
