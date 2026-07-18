@@ -236,7 +236,7 @@ By default the web interface is open to anyone on the local network. You can opt
 > Notes / scope:
 > - The connection is plain HTTP, so this protects against access on a shared/local network but does not encrypt traffic. Do not expose the device directly to the internet.
 > - The **setup access point** (shown during first-time setup, or after the device loses Wi-Fi, or on a `BOOT`-button press) is intentionally *not* password protected — that is what makes password recovery possible. Protecting the setup AP is out of scope for the LAN threat model above, since joining it requires being in radio range of the device rather than simply being on your Wi-Fi.
-> - If the device's display is non-functional the `BOOT`-button shortcut may be unavailable; in that case recover with a USB re-flash / NVS erase (see [Recovery](#recovery)).
+> - If the device's display is non-functional the `BOOT`-button shortcut may be unavailable; in that case erase NVS to recover — a full factory-image flash or `idf.py erase-flash` (a plain app-only firmware update keeps the password). See [Recovery](#recovery).
 
 ## Development using esp-miner/devcontainer
 

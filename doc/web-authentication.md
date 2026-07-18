@@ -15,8 +15,9 @@ same Wi-Fi/LAN from reading data or changing settings/firmware without credentia
   dialog appears on the first page load. When enabled, every `/api/*` route,
   both WebSockets, and OTA are covered.
 - **Recovery.** AP setup mode (hold `BOOT`) bypasses auth so a forgotten password
-  can always be reset from **Settings → Security**. A factory reset (NVS erase)
-  or USB re-flash also clears it.
+  can always be reset from **Settings → Security**. Erasing NVS also clears it
+  (a full factory-image flash or `idf.py erase-flash`); a plain app-only re-flash
+  keeps the stored hash because it lives in the separate `nvs` partition.
 - **Storage.** Only a salted SHA-256 hash is kept, in its own NVS namespace
   (`authcfg`); it is never returned by any API.
 
