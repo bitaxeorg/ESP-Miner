@@ -1,5 +1,5 @@
 <ng-container *ngIf="tooltip">
-    <i *ngIf="!isMobile" pTooltip="{{tooltip}}" [ngClass]="tooltipIconClass"></i>
+    <i *ngIf="!isMobile" appTooltip="{{tooltip}}" [ngClass]="tooltipIconClass"></i>
 
     <button *ngIf="isMobile" (click)="showMobileTooltip = true" [ngClass]="tooltipIconClass"></button>
 
