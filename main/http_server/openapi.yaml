@@ -15,7 +15,22 @@ servers:
         default: "192.168.1.1"
         description: IP address of the ESP-Miner device
 
+# HTTP Basic authentication is optional (disabled by default). When a password is
+# configured via POST /api/system/auth it is required on every endpoint; the empty
+# requirement object below expresses that unauthenticated access is also valid.
+security:
+  - {}
+  - basicAuth: []
+
 components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: >-
+        Optional HTTP Basic authentication. Disabled by default; once a password is
+        set (POST /api/system/auth) every endpoint requires the username/password and
+        returns 401 otherwise. AP setup mode bypasses it for recovery.
   schemas:
     GenericResponse:
       type: object
@@ -896,7 +911,7 @@ paths:
                     items:
                       $ref: '#/components/schemas/WifiNetwork'
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -915,7 +930,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SystemInfo'
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -964,9 +979,11 @@ paths:
               properties:
                 username:
                   type: string
+                  maxLength: 32
                   description: Username to store (optional; keeps the current value when omitted)
                 newPassword:
                   type: string
+                  maxLength: 64
                   description: New password; an empty string disables authentication
       responses:
         '200':
@@ -1004,7 +1021,7 @@ paths:
                 type: string
                 format: binary
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -1023,7 +1040,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SystemASIC'
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -1054,7 +1071,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SystemStatistics'
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -1090,7 +1107,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/GenericResponse'
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -1109,7 +1126,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/GenericResponse'
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -1128,7 +1145,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/GenericResponse'
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -1147,7 +1164,7 @@ paths:
               schema:
                 '$ref': '#/components/schemas/GenericResponse'
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -1175,7 +1192,7 @@ paths:
                   message:
                     type: string
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -1202,7 +1219,7 @@ paths:
         '400':
           description: Invalid settings provided
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -1230,7 +1247,7 @@ paths:
         '400':
           description: Invalid firmware file
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
 
@@ -1258,6 +1275,6 @@ paths:
         '400':
           description: Invalid web interface file
         '401':
-          description: Unauthorized - Client not in allowed network range
+          description: Unauthorized - Client not in allowed network range, or invalid credentials when authentication is enabled
         '500':
           description: Internal server error
