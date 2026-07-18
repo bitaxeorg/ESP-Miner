@@ -16,7 +16,7 @@ void SYSTEM_clean_jobs_queue(GlobalState * GLOBAL_STATE);
 
 void SYSTEM_notify_accepted_share(GlobalState * GLOBAL_STATE);
 void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg);
-void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint8_t job_id);
+void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint32_t target);
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime);
 
 stratum_protocol_t stratum_protocol_from_string(const char *s);

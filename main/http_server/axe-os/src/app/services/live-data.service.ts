@@ -4,6 +4,7 @@ import { catchError, retry, share, tap, switchMap, startWith, scan, shareReplay,
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 import { SystemApiService } from './system.service';
+import { environment } from 'src/environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -72,7 +73,7 @@ export class LiveDataService {
   }
 
   private connect(): Observable<any> {
-    if (this.socket$ || !window.location.host) {
+    if (environment.mock || this.socket$ || !window.location.host) {
       return EMPTY;
     }
 
