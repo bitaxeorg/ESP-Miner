@@ -2,10 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { UpdateComponent } from './update.component';
 import { ModalComponent } from '../modal/modal.component';
-import { FileUploadModule } from 'primeng/fileupload';
-import { CheckboxModule } from 'primeng/checkbox';
-import { ProgressBarModule } from 'primeng/progressbar';
-import { ButtonModule } from 'primeng/button';
+import { CheckboxComponent } from '../checkbox/checkbox.component';
 import { provideHttpClient } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
 
@@ -16,7 +13,7 @@ describe('UpdateComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       declarations: [UpdateComponent, ModalComponent],
-      imports: [FileUploadModule, CheckboxModule, ButtonModule, ProgressBarModule],
+      imports: [CheckboxComponent],
       providers: [provideHttpClient(), provideToastr()]
     });
     fixture = TestBed.createComponent(UpdateComponent);
@@ -28,3 +25,5 @@ describe('UpdateComponent', () => {
     expect(component).toBeTruthy();
   });
 });
+
+

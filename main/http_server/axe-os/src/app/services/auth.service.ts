@@ -1,15 +1,20 @@
 import { Injectable } from '@angular/core';
-import { DialogService } from 'primeng/dynamicdialog';
-import { Observable, Subject } from 'rxjs';
-import { LoginModalComponent } from '../components/login-modal/login-modal.component';
+import { BehaviorSubject, Observable, Subject } from 'rxjs';
+
+export interface AuthPromptState {
+  host: string;
+  error?: string;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   private activePrompt: Subject<string | null> | null = null;
+  private promptSubject = new BehaviorSubject<AuthPromptState | null>(null);
+  public promptState$ = this.promptSubject.asObservable();
 
-  constructor(private dialogService: DialogService) {}
+  constructor() {}
 
   public getCredentials(host: string): string | null {
     const tokens = this.getTokens();
@@ -45,27 +50,28 @@ export class AuthService {
     }
 
     this.activePrompt = new Subject<string | null>();
+    this.promptSubject.next({ host, error });
+
+    return this.activePrompt.asObservable();
+  }
+
+  public submitPrompt(result: any | null): void {
+    if (!this.activePrompt) {
+      return;
+    }
     const currentPrompt = this.activePrompt;
+    const currentState = this.promptSubject.value;
 
-    const ref = this.dialogService.open(LoginModalComponent, {
-      header: `Authentication Required - ${host}`,
-      width: '400px',
-      closable: false,
-      data: { error }
-    });
+    this.activePrompt = null;
+    this.promptSubject.next(null);
 
-    ref.onClose.subscribe((result: any) => {
-      this.activePrompt = null;
-      if (result) {
-        const token = window.btoa(`${result.username}:${result.password}`);
-        this.setCredentials(host, token);
-        currentPrompt.next(token);
-      } else {
-        currentPrompt.next(null);
-      }
-      currentPrompt.complete();
-    });
-
-    return currentPrompt.asObservable();
+    if (result && currentState) {
+      const token = window.btoa(`${result.username}:${result.password}`);
+      this.setCredentials(currentState.host, token);
+      currentPrompt.next(token);
+    } else {
+      currentPrompt.next(null);
+    }
+    currentPrompt.complete();
   }
 }

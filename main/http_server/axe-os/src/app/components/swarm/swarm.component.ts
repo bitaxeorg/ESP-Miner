@@ -82,6 +82,21 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public currentDeviceIp: string | null = null;
   private currentDeviceVersion: string | null = null;
 
+  public isSortDropdownOpen = false;
+
+  getSelectedSortLabel(): string {
+    const selected = this.sortOptions.find(opt => opt.value.sortField === this.selectedSort.sortField && opt.value.sortDirection === this.selectedSort.sortDirection);
+    return selected ? selected.label : 'Sort';
+  }
+
+  selectSortOption(value: {sortField: string; sortDirection: string}) {
+    this.selectedSort = {
+      sortField: value.sortField,
+      sortDirection: value.sortDirection as 'asc' | 'desc'
+    };
+    this.sortBy(value.sortField, this.selectedSort.sortDirection);
+  }
+
   @HostListener('document:keydown.esc', ['$event'])
   onEscKey() {
     if (this.filterText) {
@@ -366,18 +381,20 @@ private isIpAddress(value: string): boolean {
             return of('Identify signal sent - device should say "Hi!"');
           }
         }
-        let errorMsg = `Failed to ${action} device at ${device.address}`;
+        let errorMsg = `Failed to ${action} device at ${this.getDeviceDisplayName(device)}`;
         if (error.name === 'TimeoutError') {
           errorMsg = 'Request timed out';
         } else if (error.message) {
           errorMsg += `: ${error.message}`;
         }
-        this.toastr.error(errorMsg, `Device at ${device.address}`);
+        this.toastr.error(errorMsg, `Device at ${this.getDeviceDisplayName(device)}`);
         return of(null);
       })
     ).subscribe((res: any) => {
       if (res !== null) {
-        this.toastr.success(res, `Device at ${device.address}`);
+        let message = res;
+        try { message = JSON.parse(res)?.message ?? res; } catch {}
+        this.toastr.success(message, `Device at ${this.getDeviceDisplayName(device)}`);
         this.refreshList(false);
       }
     });

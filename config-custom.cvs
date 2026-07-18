@@ -63,3 +63,4 @@ selftest_temp,data,u16,65
 selftest_warm,data,u16,55
 # Self-test Max Temperature
 selftest_max,data,u16,70
+selftest_fan,data,u16,1000
