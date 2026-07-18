@@ -5,5 +5,7 @@
         'wifi-icon--fair': rssi <= -60 && rssi > -70,
         'wifi-icon--weak': rssi <= -70
     }">
-    <i *ngFor="let item of [1, 2, 3, 4]"></i>
+  @for (item of [1, 2, 3, 4]; track item) {
+    <i></i>
+  }
 </figure>

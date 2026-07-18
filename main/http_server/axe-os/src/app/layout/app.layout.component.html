@@ -1,17 +1,19 @@
 <div class="layout-wrapper" [ngClass]="containerClass">
-    <app-topbar [isAPMode]="isAPMode"></app-topbar>
-    <div class="layout-sidebar" *ngIf="!isAPMode">
-        <app-sidebar></app-sidebar>
+  <app-topbar [isAPMode]="isAPMode"></app-topbar>
+  @if (!isAPMode) {
+    <div class="layout-sidebar">
+      <app-sidebar></app-sidebar>
     </div>
-    <div class="layout-main-container">
-        <div class="layout-main">
-            <router-outlet></router-outlet>
-        </div>
-        <app-footer></app-footer>
+  }
+  <div class="layout-main-container">
+    <div class="layout-main">
+      <router-outlet></router-outlet>
     </div>
+    <app-footer></app-footer>
+  </div>
 
-    <div class="layout-mask"></div>
-    <app-loading
-        [ngClass]="{'menuIsVisible': !layoutService.state.staticMenuDesktopInactive}"
-    ></app-loading>
+  <div class="layout-mask"></div>
+  <app-loading
+    [ngClass]="{'menuIsVisible': !layoutService.state.staticMenuDesktopInactive}"
+  ></app-loading>
 </div>

@@ -19,25 +19,26 @@ import { SelectOption } from '../../models/select-option.model';
         <span>{{ selectedOptionName }}</span>
         <i class="pi pi-chevron-down text-xs transition-transform duration-200" [class.rotate-180]="isOpen"></i>
       </div>
-
-      <ul
-        *ngIf="isOpen"
-        class="absolute z-50 left-0 w-full mt-1 max-h-60 overflow-y-auto bg-bg-card border border-surface rounded shadow-lg list-none p-0 m-0"
-      >
-        <li
-          *ngFor="let option of options; trackBy: trackByOption; let i = index"
-          (mouseenter)="focusedIndex = i"
-          (mousedown)="$event.preventDefault()"
-          (click)="select(option, $event)"
-          class="px-3 py-2 cursor-pointer select-none"
-          [class.bg-primary]="i === focusedIndex"
-          [class.text-white]="i === focusedIndex"
-          [class.bg-bg-hover]="i !== focusedIndex && option.value === value"
-          [class.text-primary]="i !== focusedIndex && option.value === value"
+      @if (isOpen) {
+        <ul
+          class="absolute z-50 left-0 w-full mt-1 max-h-60 overflow-y-auto bg-bg-card border border-surface rounded shadow-lg list-none p-0 m-0"
         >
-          {{ option.name || option.label }}
-        </li>
-      </ul>
+          @for (option of options; track option.value ?? $index; let i = $index) {
+            <li
+              (mouseenter)="focusedIndex = i"
+              (mousedown)="$event.preventDefault()"
+              (click)="select(option, $event)"
+              class="px-3 py-2 cursor-pointer select-none"
+              [class.bg-primary]="i === focusedIndex"
+              [class.text-white]="i === focusedIndex"
+              [class.bg-bg-hover]="i !== focusedIndex && option.value === value"
+              [class.text-primary]="i !== focusedIndex && option.value === value"
+            >
+              {{ option.name || option.label }}
+            </li>
+          }
+        </ul>
+      }
     </div>
   `,
   providers: [
@@ -176,4 +177,3 @@ export class DropdownComponent implements ControlValueAccessor {
     this.disabled = isDisabled;
   }
 }
-
