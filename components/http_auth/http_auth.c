@@ -249,12 +249,11 @@ static esp_err_t nvs_read_str(const char *key, char *buf, size_t buf_len)
 
 esp_err_t http_auth_init(void)
 {
-    esp_err_t err = ensure_mutex();
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    // Best-effort mutex creation. We deliberately continue even if it fails so
+    // that a configured password is still reflected by http_auth_is_enabled():
+    // that makes a mutex failure fail CLOSED (deny, recover via AP mode) rather
+    // than fail open. There is no concurrency during init.
+    ensure_mutex();
 
     char user[HTTP_AUTH_USERNAME_MAX + 1];
     char hash[AUTH_HASH_STR_MAX];
@@ -263,12 +262,12 @@ esp_err_t http_auth_init(void)
     }
     nvs_read_str(AUTH_NVS_KEY_HASH, hash, sizeof(hash));
 
+    if (s_mutex != NULL) xSemaphoreTake(s_mutex, portMAX_DELAY);
     strlcpy(s_auth.username, user, sizeof(s_auth.username));
     strlcpy(s_auth.hash, hash, sizeof(s_auth.hash));
     s_auth.loaded = true;
-
     bool enabled = s_auth.hash[0] != '\0';
-    xSemaphoreGive(s_mutex);
+    if (s_mutex != NULL) xSemaphoreGive(s_mutex);
 
     ESP_LOGI(TAG, "Web authentication %s", enabled ? "ENABLED" : "disabled");
     return ESP_OK;
@@ -276,12 +275,14 @@ esp_err_t http_auth_init(void)
 
 bool http_auth_is_enabled(void)
 {
-    if (s_mutex == NULL) {
-        return false;
-    }
-    xSemaphoreTake(s_mutex, portMAX_DELAY);
-    bool enabled = s_auth.loaded && s_auth.hash[0] != '\0';
-    xSemaphoreGive(s_mutex);
+    // Reflect the stored password even when the mutex is unavailable so a
+    // configured password is never silently ignored. When a password is set
+    // but the mutex failed, http_auth_check_request() denies every request
+    // (fail closed); recovery is still possible through AP setup mode.
+    bool enabled;
+    if (s_mutex != NULL) xSemaphoreTake(s_mutex, portMAX_DELAY);
+    enabled = s_auth.loaded && s_auth.hash[0] != '\0';
+    if (s_mutex != NULL) xSemaphoreGive(s_mutex);
     return enabled;
 }
 

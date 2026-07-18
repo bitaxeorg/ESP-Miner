@@ -230,10 +230,13 @@ By default the web interface is open to anyone on the local network. You can opt
 
 - Authentication uses standard HTTP Basic auth, so your browser shows its native sign-in dialog and remembers the credentials for the session. The password is never stored in clear text — only a salted SHA-256 hash is kept on the device.
 - It is **opt-in**: until you set a password nothing changes, so existing setups keep working after updating.
-- Once enabled, all API access (reading data, changing settings, OTA updates) requires the username and password.
-- **Forgot the password?** Hold the `BOOT` button to start the device in access-point (setup) mode, which bypasses authentication. From there you can open **Settings → Security** and set a new password or disable authentication. A full factory reset (erasing NVS) also clears it.
+- Once enabled, everyone on your Wi-Fi/LAN must supply the username and password before they can read data, change any setting, or flash firmware (OTA). This is the case it is designed to protect.
+- **Forgot the password?** Hold the `BOOT` button to start the device in access-point (setup) mode, which bypasses authentication so you can reconnect and open **Settings → Security** to set a new password or disable it. A full factory reset (erasing NVS) also clears it.
 
-> Note: the connection is plain HTTP, so this protects against casual access on a shared/local network but does not encrypt traffic. Do not expose the device directly to the internet.
+> Notes / scope:
+> - The connection is plain HTTP, so this protects against access on a shared/local network but does not encrypt traffic. Do not expose the device directly to the internet.
+> - The **setup access point** (shown during first-time setup, or after the device loses Wi-Fi, or on a `BOOT`-button press) is intentionally *not* password protected — that is what makes password recovery possible. Protecting the setup AP is out of scope for the LAN threat model above, since joining it requires being in radio range of the device rather than simply being on your Wi-Fi.
+> - If the device's display is non-functional the `BOOT`-button shortcut may be unavailable; in that case recover with a USB re-flash / NVS erase (see [Recovery](#recovery)).
 
 ## Development using esp-miner/devcontainer
 
