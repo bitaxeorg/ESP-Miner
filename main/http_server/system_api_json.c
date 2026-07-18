@@ -191,6 +191,8 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddStringToObject(root, "stratumV2ChannelType", sv2_chan_type ? sv2_chan_type : SV2_CHANNEL_TYPE_EXTENDED);
     free(sv2_chan_type);
 
+    cJSON_AddBoolToObject(root, "stratumV2RequireAuth", nvs_config_get_bool(NVS_CONFIG_SV2_REQUIRE_AUTH));
+
     char *fallbackSv2AuthPubkey = nvs_config_get_string(NVS_CONFIG_FALLBACK_SV2_AUTHORITY_PUBKEY);
     cJSON_AddStringToObject(root, "fallbackStratumV2AuthorityPubkey", fallbackSv2AuthPubkey ? fallbackSv2AuthPubkey : "");
     free(fallbackSv2AuthPubkey);
@@ -198,6 +200,8 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     char *fallback_sv2_chan_type = nvs_config_get_string(NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE);
     cJSON_AddStringToObject(root, "fallbackStratumV2ChannelType", fallback_sv2_chan_type ? fallback_sv2_chan_type : SV2_CHANNEL_TYPE_EXTENDED);
     free(fallback_sv2_chan_type);
+
+    cJSON_AddBoolToObject(root, "fallbackStratumV2RequireAuth", nvs_config_get_bool(NVS_CONFIG_FALLBACK_SV2_REQUIRE_AUTH));
 
     char *fallback_proto = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL);
     cJSON_AddStringToObject(root, "fallbackStratumProtocol", fallback_proto ? fallback_proto : STRATUM_V1);

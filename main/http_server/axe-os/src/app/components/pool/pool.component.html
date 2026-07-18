@@ -143,6 +143,22 @@
                                     </small>
                                 </div>
                             </div>
+
+                            <div class="field-checkbox grid">
+                                <div class="col-1 md:col-10 md:flex-order-2">
+                                    <p-checkbox [name]="pool === 'stratum' ? 'stratumV2RequireAuth' : 'fallbackStratumV2RequireAuth'"
+                                        [inputId]="pool === 'stratum' ? 'stratumV2RequireAuth' : 'fallbackStratumV2RequireAuth'"
+                                        [formControlName]="pool === 'stratum' ? 'stratumV2RequireAuth' : 'fallbackStratumV2RequireAuth'"
+                                        [binary]="true"></p-checkbox>
+                                </div>
+                                <label [htmlFor]="pool === 'stratum' ? 'stratumV2RequireAuth' : 'fallbackStratumV2RequireAuth'" class="col-11 m-0 pb-0 pl-3 md:col-2 md:flex-order-1 md:pl-2">
+                                    Require<br class="hidden md:inline">
+                                    <tooltip-text-icon
+                                        text="Authentication"
+                                        tooltip="Refuse to connect unless the server certificate is verified against the Authority Pubkey above. Protects against the man-in-the-middle redirect described for the Authority Pubkey. When enabled without a key set, the miner will not connect."
+                                    />
+                                </label>
+                            </div>
                         </ng-container>
 
                         <!-- SV1-only options -->

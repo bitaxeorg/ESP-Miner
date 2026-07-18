@@ -75,6 +75,15 @@ static bool stratum_v2_load_authority_pubkey(uint8_t out[32], bool use_fallback)
     return true;
 }
 
+// Whether the pool requires the server certificate to be verified before mining.
+// Defaults to false so existing configs keep today's connect-unauthenticated behavior.
+static bool stratum_v2_require_auth(bool use_fallback)
+{
+    NvsConfigKey key = use_fallback ? NVS_CONFIG_FALLBACK_SV2_REQUIRE_AUTH
+                                    : NVS_CONFIG_SV2_REQUIRE_AUTH;
+    return nvs_config_get_bool(key);
+}
+
 static sv2_channel_type_t sv2_select_channel_type(GlobalState *GLOBAL_STATE, bool use_fallback)
 {
     NvsConfigKey key = use_fallback ? NVS_CONFIG_FALLBACK_SV2_CHANNEL_TYPE
@@ -708,9 +717,22 @@ void stratum_v2_task(void *pvParameters)
         }
         GLOBAL_STATE->sv2_noise_ctx = noise_ctx;
 
-        // Load optional authority pubkey from NVS
+        // Load the optional authority pubkey and whether the pool requires it.
         uint8_t auth_key[32];
         bool has_auth = stratum_v2_load_authority_pubkey(auth_key, use_fallback);
+        bool require_auth = stratum_v2_require_auth(use_fallback);
+
+        // Enforcement: when the pool requires authentication but no authority key
+        // is configured, refuse rather than connect to an unverifiable server.
+        if (require_auth && !has_auth) {
+            ESP_LOGE(TAG, "SV2 authentication is required but no authority pubkey is configured; refusing to connect");
+            snprintf(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info,
+                     sizeof(GLOBAL_STATE->SYSTEM_MODULE.pool_connection_info), "SV2: Auth required - no key");
+            stratum_v2_close_connection(GLOBAL_STATE);
+            retry_attempts++;
+            continue;
+        }
+
         if (has_auth) {
             ESP_LOGI(TAG, "Authority pubkey configured, will verify server certificate");
         } else {
