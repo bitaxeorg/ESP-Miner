@@ -24,26 +24,10 @@ td {
     }
 }
 tbody tr {
-    border-top: 1px solid var(--p-content-border-color);
+    border-top: 1px solid var(--color-border-content);
 
     &:last-child td {
         padding-bottom: 0;
-    }
-}
-
-.button-text {
-    min-width: 8rem;
-}
-
-::ng-deep {
-    .p-button.button-icon {
-        width: 2.2rem;
-        height: 2.2rem;
-        margin-top: 0.25rem;
-    }
-    .p-button.button-icon-small {
-        width: 1.5rem;
-        height: 1.5rem;
     }
 }
 

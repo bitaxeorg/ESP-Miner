@@ -1,15 +1,15 @@
-<div class="card" *ngIf="combinedData$ | async as data">
+<div class="card" *ngIf="systemRows$ | async as rows">
     <h2>System</h2>
 
-    <div class="card">
+    <div class="mt-4">
         <table>
-            <tr *ngFor="let row of getSystemRows(data)">
-                <td class="text-color-secondary vertical-align-top white-space-nowrap pr-4" [ngClass]="row.class">{{ row.label }}</td>
-                <td class="vertical-align-top line-break-anywhere" [ngClass]="(row.class || '') + ' ' + (row.valueClass || '')" [attr.sensitive-data]="row.isSensitiveData ? '' : null" [pTooltip]="row.tooltip">{{ row.value }}</td>
+            <tr *ngFor="let row of rows; trackBy: trackByRowLabel">
+                <td class="text-secondary align-top whitespace-nowrap pr-4 py-1" [ngClass]="row.class">{{ row.label }}</td>
+                <td class="align-top line-break-anywhere py-1" [ngClass]="(row.class || '') + ' ' + (row.valueClass || '')" [style.color]="row.color || null" [attr.sensitive-data]="row.isSensitiveData ? '' : null" [appTooltip]="row.tooltip ?? ''">{{ row.value }}</td>
             </tr>
         </table>
 
-        <button pButton class="btn btn-primary mt-5" (click)="identifyDevice()">
+        <button class="btn btn-primary mt-5" (click)="identifyDevice()">
             Identify device
         </button>
     </div>

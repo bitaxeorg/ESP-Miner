@@ -125,6 +125,7 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_SELF_TEST_TEMP_TARGET]                 = {.nvs_key_name = "selftest_temp",   .type = TYPE_U16,   .default_value = {.u16 = 65}},
     [NVS_CONFIG_SELF_TEST_TEMP_WARMUP]                 = {.nvs_key_name = "selftest_warm",   .type = TYPE_U16,   .default_value = {.u16 = 55}},
     [NVS_CONFIG_SELF_TEST_TEMP_MAX]                    = {.nvs_key_name = "selftest_max",    .type = TYPE_U16,   .default_value = {.u16 = 70}},
+    [NVS_CONFIG_SELF_TEST_FAN_SPEED]                   = {.nvs_key_name = "selftest_fan",    .type = TYPE_U16,   .default_value = {.u16 = 1000}},
 };
 
 Settings *nvs_config_get_settings(NvsConfigKey key)

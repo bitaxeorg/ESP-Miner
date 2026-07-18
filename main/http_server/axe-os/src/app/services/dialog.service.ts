@@ -1,60 +1,94 @@
 import { Component, Injectable } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject } from 'rxjs';
-import { DialogService as PrimeDialogService, DynamicDialogConfig } from 'primeng/dynamicdialog';
 
-interface DialogOption {
+export interface DialogOption {
   label: string;
   rssi: number;
   value: string;
+}
+
+export interface DialogInstance {
+  title: string;
+  options: DialogOption[];
+  selectSubject: Subject<string>;
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class DialogService {
-  constructor(private primeDialogService: PrimeDialogService) {}
+  private activeDialogsSubject = new Subject<DialogInstance[]>();
+  public activeDialogs$ = this.activeDialogsSubject.asObservable();
+  
+  private activeDialogs: DialogInstance[] = [];
+
+  constructor() {}
 
   open(title: string, options: DialogOption[]): Observable<string> {
-    const result = new Subject<string>();
+    const selectSubject = new Subject<string>();
 
-    const ref = this.primeDialogService.open(DialogListComponent, {
-      header: title,
-      width: '500px',
-      closable: true,
-      showHeader: true,
-      data: {
-        options: options,
-        onSelect: (value: string) => {
-          result.next(value);
-          ref.close();
-        }
+    const instance: DialogInstance = {
+      title,
+      options,
+      selectSubject
+    };
+
+    this.activeDialogs.push(instance);
+    this.activeDialogsSubject.next([...this.activeDialogs]);
+
+    selectSubject.subscribe({
+      complete: () => {
+        this.activeDialogs = this.activeDialogs.filter(d => d !== instance);
+        this.activeDialogsSubject.next([...this.activeDialogs]);
       }
     });
 
-    ref.onClose.subscribe(() => {
-      result.complete();
-    });
-
-    return result.asObservable();
+    return selectSubject.asObservable();
   }
 }
 
 @Component({
+    selector: 'app-dialog-list',
     template: `
-    <div class="flex flex-column gap-2">
-      <p-button *ngFor="let option of config.data.options"
-        [label]="option.label"
-        (onClick)="config.data.onSelect(option.value)"
-        styleClass="w-full text-left flex align-items-baseline"
-        pTooltip="{{option.label}} ({{option.rssi}} dBm)"
-        tooltipPosition="bottom"
-      >
-        <wifi-icon [rssi]="option.rssi" class="flex-order-2" />
-      </p-button>
-    </div>
+    <app-modal *ngFor="let dialog of dialogs"
+               [headline]="dialog.title"
+               [closable]="true"
+               (close)="closeDialog(dialog)"
+               [isVisible]="true">
+      <div class="flex flex-col gap-2 pt-2">
+        <button *ngFor="let option of dialog.options"
+                (click)="selectOption(dialog, option.value)"
+                class="w-full text-left !flex items-center !justify-start btn btn-secondary px-4 py-3 gap-3"
+                appTooltip="{{option.label}} ({{option.rssi}} dBm)"
+                tooltipPosition="bottom"
+        >
+          <span>{{option.label}}</span>
+          <wifi-icon [rssi]="option.rssi" />
+        </button>
+      </div>
+    </app-modal>
   `,
     standalone: false
 })
 export class DialogListComponent {
-  constructor(public config: DynamicDialogConfig) {}
+  public dialogs: DialogInstance[] = [];
+
+  constructor(private dialogService: DialogService) {
+    this.dialogService.activeDialogs$.pipe(
+      takeUntilDestroyed()
+    ).subscribe(dialogs => {
+      this.dialogs = dialogs;
+    });
+  }
+
+  selectOption(dialog: DialogInstance, value: string) {
+    dialog.selectSubject.next(value);
+    dialog.selectSubject.complete();
+  }
+
+  closeDialog(dialog: DialogInstance) {
+    dialog.selectSubject.next('');
+    dialog.selectSubject.complete();
+  }
 }
