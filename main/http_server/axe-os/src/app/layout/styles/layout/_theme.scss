@@ -1,0 +1,46 @@
+:root {
+    /* Branding Source Variables (Reactive via JS) */
+    --color-primary: #F80421;
+    --color-primary-text: #ffffff;
+    --button-bg: #F80421;
+    --color-primary-hover: #e63c2e;
+    --checkbox-bg: #F80421;
+    --checkbox-border: #F80421;
+    --checkbox-hover-bg: #e63c2e;
+    --slider-range-bg: #F80421;
+    --slider-handle-bg: #F80421;
+    --togglebutton-bg: #F80421;
+    --togglebutton-hover-bg: #e63c2e;
+    
+
+    /* Layout & Sizing */
+    font-size: 14px;
+    --topbar-height: 5.5rem;
+    --sidebar-width: 12rem;
+    --transition-duration: 0.2s;
+    --card-shadow: 0 2px 1px -1px rgba(0, 0, 0, 0.2), 0 1px 1px 0 rgba(0, 0, 0, 0.14), 0 1px 3px 0 rgba(0, 0, 0, 0.12);
+    
+    /* Theme Settings & Sizing Defaults */
+    --color-bg-hover: rgba(0, 0, 0, 0.04);
+    --border-radius: 2px;
+    --font-family: 'Nippo-Regular';
+
+    /* Custom Message severity styles */
+    --color-message-warn-bg: #ffecb3;
+    --color-message-warn-text: #614a00;
+    --color-message-warn-border: #ffe082;
+    --color-message-error-bg: #ffcdd2;
+    --color-message-error-text: #73000c;
+    --color-message-error-border: #ef9a9a;
+    --color-message-info-bg: #b3e5fc;
+    --color-message-info-text: #01579b;
+    --color-message-info-border: #81d4fa;
+    --color-message-success-bg: #c8e6c9;
+    --color-message-success-text: #256029;
+    --color-message-success-border: #a5d6a7;
+}
+
+.dark-mode {
+    --color-bg-hover: rgba(255, 255, 255, 0.05);
+}
+

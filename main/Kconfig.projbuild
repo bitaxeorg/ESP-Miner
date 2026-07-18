@@ -199,4 +199,10 @@ menu "Stratum Configuration"
         help
             A starting difficulty to use with the fallback pool.
 
+    config ENABLE_TASK_MONITOR
+        bool "Task Monitor"
+        default n
+        help
+            Enable task monitor. NOTE: This is intended for debugging use only as the use of uxTaskGetSystemState results in the scheduler remaining suspended for an extended period.
+
 endmenu

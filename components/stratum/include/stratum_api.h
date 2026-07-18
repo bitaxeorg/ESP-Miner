@@ -1,7 +1,6 @@
 #ifndef STRATUM_API_H
 #define STRATUM_API_H
 
-#include "cJSON.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/time.h>
@@ -13,20 +12,22 @@
 #define COINBASE2_SIZE 128
 #define MAX_REQUEST_IDS 1024
 #define MAX_EXTRANONCE_2_LEN 32
+#define MAX_POOL_MESSAGE_LEN 256
 
 typedef enum
 {
-    STRATUM_UNKNOWN,
+    METHOD_UNKNOWN,
     MINING_NOTIFY,
     MINING_SET_DIFFICULTY,
     MINING_SET_VERSION_MASK,
     MINING_SET_EXTRANONCE,
     MINING_PING,
     STRATUM_RESULT,
-    STRATUM_RESULT_SETUP,
-    STRATUM_RESULT_VERSION_MASK,
     STRATUM_RESULT_SUBSCRIBE,
-    CLIENT_RECONNECT
+    STRATUM_RESULT_CONFIGURE,
+    CLIENT_RECONNECT,
+    CLIENT_SHOW_MESSAGE,
+    CLIENT_GET_VERSION,
 } stratum_method;
 
 typedef enum
@@ -35,9 +36,6 @@ typedef enum
     BUNDLED_CRT = 1,
     CUSTOM_CRT = 2,
 } tls_mode;
-
-static const int  STRATUM_ID_CONFIGURE    = 1;
-static const int  STRATUM_ID_SUBSCRIBE    = 2;
 
 typedef struct
 {
@@ -55,7 +53,7 @@ typedef struct
 
 typedef struct
 {
-    char * extranonce_str;
+    char *extranonce_str;
     int extranonce_2_len;
 
     int message_id;
@@ -65,12 +63,14 @@ typedef struct
     // mining.notify
     mining_notify *mining_notification;
     // mining.set_difficulty
-    uint32_t new_difficulty;
+    double new_difficulty;
     // mining.set_version_mask
     uint32_t version_mask;
     // result
     bool response_success;
-    char * error_str;
+    char *error_str;
+    char *show_message;
+    char *version_string;
 } StratumApiV1Message;
 
 typedef struct {
@@ -86,7 +86,9 @@ char *STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport);
 
 int STRATUM_V1_subscribe(esp_transport_handle_t transport, int send_uid, const char * model);
 
-void STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
+bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json);
+
+void STRATUM_V1_reset_message(StratumApiV1Message *message);
 
 void STRATUM_V1_free_mining_notify(mining_notify *params);
 
@@ -96,13 +98,15 @@ int STRATUM_V1_configure_version_rolling(esp_transport_handle_t transport, int s
 
 int STRATUM_V1_pong(esp_transport_handle_t transport, int message_id);
 
+int STRATUM_V1_send_version(esp_transport_handle_t transport, int message_id);
+
 int STRATUM_V1_suggest_difficulty(esp_transport_handle_t transport, int send_uid, uint32_t difficulty);
 
 int STRATUM_V1_extranonce_subscribe(esp_transport_handle_t transport, int send_uid);
 
 int STRATUM_V1_submit_share(esp_transport_handle_t transport, int send_uid, const char *username, const char *job_id,
                             const char *extranonce_2, const uint32_t ntime, const uint32_t nonce,
-                            const uint32_t version_bits);
+                            const uint32_t version_bits, uint64_t *out_sent_time_us);
 
 float STRATUM_V1_get_response_time_ms(int request_id, int64_t receive_time_us);
 

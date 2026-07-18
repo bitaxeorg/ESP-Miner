@@ -16,4 +16,5 @@ REQUIRES
     "stratum"
     "esp_eth"
     "esp_tinyusb"
+    "espressif__mdns"
 )

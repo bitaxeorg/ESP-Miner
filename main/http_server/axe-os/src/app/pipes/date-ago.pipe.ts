@@ -1,8 +1,8 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
 @Pipe({
-  name: 'dateAgo',
-  pure: true
+    name: 'dateAgo',
+    pure: true
 })
 export class DateAgoPipe implements PipeTransform {
   private static _this = new DateAgoPipe();
@@ -35,12 +35,11 @@ export class DateAgoPipe implements PipeTransform {
           if (result) result += args?.short ? ' ' : ', ';
           result += counter + (args?.short ? i[0] : ' ' + i + (counter > 1 ? 's' : ''));
           seconds -= intervals[i] * counter
-          shownIntervals++;
         }
+        if (result) shownIntervals++;
       }
       return result;
     }
     return value;
   }
-
 }

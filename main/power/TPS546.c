@@ -35,6 +35,13 @@ static i2c_master_dev_handle_t tps546_i2c_handle;
 
 static TPS546_CONFIG tps546_config;
 
+// Cached values to handle I2C failures robustly
+static float last_vin = 0.0f;
+static float last_iout = 0.0f;
+static float last_vout = 0.0f;
+static int last_temp = 0;
+
+
 static esp_err_t TPS546_parse_status(uint16_t);
 
 /**
@@ -704,8 +711,13 @@ int TPS546_get_temperature(void)
     uint16_t value = 0;
     int temp;
 
-    smb_read_word(PMBUS_READ_TEMPERATURE_1, &value);
+    if (smb_read_word(PMBUS_READ_TEMPERATURE_1, &value) != ESP_OK) {
+        ESP_LOGE(TAG, "Could not read temperature");
+        return last_temp;
+    }
+    
     temp = slinear11_2_int(value);
+    last_temp = temp;
     return temp;
 }
 
@@ -717,12 +729,13 @@ float TPS546_get_vin(void)
     /* Get voltage input (ULINEAR16) */
     if (smb_read_word(PMBUS_READ_VIN, &u16_value) != ESP_OK) {
         ESP_LOGE(TAG, "Could not read VIN");
-        return 0;
+        return last_vin;
     } else {
         vin = slinear11_2_float(u16_value);
         #ifdef DEBUG_TPS546_MEAS
         ESP_LOGI(TAG, "Got Vin: %2.3f V", vin);
         #endif
+        last_vin = vin;
         return vin;
     }    
 }
@@ -735,14 +748,14 @@ float TPS546_get_iout(void)
     /* Get current output (SLINEAR11) */
     if (smb_read_word(PMBUS_READ_IOUT, &u16_value) != ESP_OK) {
         ESP_LOGE(TAG, "Could not read Iout");
-        return 0;
+        return last_iout;
     } else {
         iout = slinear11_2_float(u16_value);
 
     #ifdef DEBUG_TPS546_MEAS
         ESP_LOGI(TAG, "Got Iout: %2.3f A", iout);
     #endif
-
+        last_iout = iout;
         return iout;
     }
 }
@@ -755,12 +768,13 @@ float TPS546_get_vout(void)
     /* Get voltage output (ULINEAR16) */
     if (smb_read_word(PMBUS_READ_VOUT, &u16_value) != ESP_OK) {
         ESP_LOGE(TAG, "Could not read Vout");
-        return 0;
+        return last_vout;
     } else {
         vout = ulinear16_2_float(u16_value);
     #ifdef DEBUG_TPS546_MEAS
         ESP_LOGI(TAG, "Got Vout: %2.3f V", vout);
     #endif
+        last_vout = vout;
         return vout;
     }
 }

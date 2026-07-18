@@ -1,4 +1,5 @@
 #include "usb_net.h"
+#include "connect.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -101,6 +102,8 @@ static void usb_ip_event_handler(void* arg, esp_event_base_t event_base,
         if (ipv6_err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to create IPv6 link-local address: %s", esp_err_to_name(ipv6_err));
         }
+
+        connect_spawn_mdns_init(GLOBAL_STATE);
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
@@ -117,6 +120,8 @@ static void usb_ip_event_handler(void* arg, esp_event_base_t event_base,
             GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str[sizeof(GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str) - 1] = '\0';
             ESP_LOGI(TAG, "IPv6 Address: %s", GLOBAL_STATE->SYSTEM_MODULE.ipv6_addr_str);
         }
+
+        connect_spawn_mdns_init(GLOBAL_STATE);
     }
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_ETH_LOST_IP) {

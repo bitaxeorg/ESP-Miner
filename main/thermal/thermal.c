@@ -22,7 +22,7 @@ esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG)
         }
     }
     if (DEVICE_CONFIG->EMC2103) {
-        ESP_RETURN_ON_ERROR(EMC2103_init(DEVICE_CONFIG->temp_offset), TAG, "Failed to initialise EMC2103");
+        ESP_RETURN_ON_ERROR(EMC2103_init(DEVICE_CONFIG->temp_offset, DEVICE_CONFIG->temp_flip), TAG, "Failed to initialise EMC2103");
     }
     if (DEVICE_CONFIG->EMC2302) {
         ESP_RETURN_ON_ERROR(EMC2302_init(), TAG, "Failed to initialise EMC2302");
@@ -44,7 +44,7 @@ esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent)
         return EMC2103_set_fan_speed(percent);
     }
     if (DEVICE_CONFIG->EMC2302) {
-        EMC2302_set_fan_speed(percent);
+        return EMC2302_set_fan_speed(percent);
     }
     return ESP_OK;
 }

@@ -13,7 +13,7 @@
 
 #define HASHRATE_UNIT 0x100000uLL // Hashrate register unit (2^24 hashes)
 
-#define POLL_RATE 5000
+#define POLL_RATE 1000
 #define HASHRATE_1M_SIZE (60000 / POLL_RATE)  // 12
 #define HASHRATE_10M_SIZE 10
 #define HASHRATE_1H_SIZE 6
@@ -52,9 +52,11 @@ void hashrate_monitor_reset_measurements(void *pvParameters)
     int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
     int hash_domains = GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains;
 
+    pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
     memset(HASHRATE_MONITOR_MODULE->total_measurement, 0, asic_count * sizeof(measurement_t));
     memset(HASHRATE_MONITOR_MODULE->domain_measurements[0], 0, asic_count * hash_domains * sizeof(measurement_t));
     memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
+    pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 }
 
 void update_hashrate(measurement_t * measurement, uint32_t value)
@@ -73,6 +75,10 @@ void update_hash_counter(measurement_t * measurement, uint32_t value, uint64_t t
     uint64_t previous_time_us = measurement->time_us;
     if (previous_time_us != 0) {
         uint64_t duration_us = time_us - previous_time_us;
+        if (duration_us < 1000000) {
+            // Ignore updates that are too close (e.g. rapid bursts) to avoid huge hashrate spikes
+            return;
+        }
         uint32_t counter = value - measurement->value; // Compute counter difference, handling uint32_t wraparound
         measurement->hashrate = hashCounterToGhs(duration_us, counter);
     }
@@ -152,34 +158,50 @@ void hashrate_monitor_task(void *pvParameters)
     }
     HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
 
+    pthread_mutex_init(&HASHRATE_MONITOR_MODULE->lock, NULL);
+    HASHRATE_MONITOR_MODULE->is_initialized = true;
+
     hashrate_monitor_reset_measurements(GLOBAL_STATE);
 
     init_averages();
 
-    HASHRATE_MONITOR_MODULE->is_initialized = true;
-
+    bool was_asic_initialized = false;
     TickType_t taskWakeTime = xTaskGetTickCount();
     while (1) {
-        ASIC_read_registers(GLOBAL_STATE);
+        bool is_asic_initialized = GLOBAL_STATE->ASIC_initalized;
 
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        if (was_asic_initialized && !is_asic_initialized) {
+            // ASIC just stopped (pause or overheat): clear measurements so that
+            // time_us resets to 0. This prevents update_hash_counter from computing
+            // a huge uint32_t wraparound diff (counter resets to 0 on ASIC reset)
+            // which would cause a hashrate spike when resuming.
+            hashrate_monitor_reset_measurements(GLOBAL_STATE);
+        }
+        was_asic_initialized = is_asic_initialized;
 
-        float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
-        float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
+        if (is_asic_initialized) {
+            ASIC_read_registers(GLOBAL_STATE);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
 
-        SYSTEM_MODULE->current_hashrate = current_hashrate;
-        SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
+            pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
+            float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
+            float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
+            pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 
-        if(current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
+            SYSTEM_MODULE->current_hashrate = current_hashrate;
+            SYSTEM_MODULE->error_percentage = current_hashrate > 0 ? error_hashrate / current_hashrate * 100.f : 0;
+
+            if (current_hashrate > 0.0f) update_hashrate_averages(SYSTEM_MODULE);
+        } else {
+            SYSTEM_MODULE->current_hashrate = 0;
+        }
 
         vTaskDelayUntil(&taskWakeTime, POLL_RATE / portTICK_PERIOD_MS);
     }
 }
 
-void hashrate_monitor_register_read(void *pvParameters, register_type_t register_type, uint8_t asic_nr, uint32_t value)
+void hashrate_monitor_register_read(void *pvParameters, register_type_t register_type, uint8_t asic_nr, uint32_t value, uint64_t timestamp_us)
 {
-    uint64_t time_us = esp_timer_get_time();
-
     GlobalState * GLOBAL_STATE = (GlobalState *)pvParameters;
     HashrateMonitorModule * HASHRATE_MONITOR_MODULE = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
 
@@ -190,28 +212,30 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
         return;
     }
 
+    pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
+
     switch(register_type) {
         case REGISTER_HASHRATE:
             update_hashrate(&HASHRATE_MONITOR_MODULE->total_measurement[asic_nr], value);
             update_hashrate(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][0], value);
             break;
         case REGISTER_TOTAL_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->total_measurement[asic_nr], value, time_us);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->total_measurement[asic_nr], value, timestamp_us);
             break;
         case REGISTER_DOMAIN_0_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][0], value, time_us);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][0], value, timestamp_us);
             break;
         case REGISTER_DOMAIN_1_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][1], value, time_us);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][1], value, timestamp_us);
             break;
         case REGISTER_DOMAIN_2_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][2], value, time_us);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][2], value, timestamp_us);
             break;
         case REGISTER_DOMAIN_3_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][3], value, time_us);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->domain_measurements[asic_nr][3], value, timestamp_us);
             break;
         case REGISTER_ERROR_COUNT:
-            update_hash_counter(&HASHRATE_MONITOR_MODULE->error_measurement[asic_nr], value, time_us);
+            update_hash_counter(&HASHRATE_MONITOR_MODULE->error_measurement[asic_nr], value, timestamp_us);
             break;
         case REGISTER_PLL_PARAM:
             ESP_LOGD(TAG, "PLL param read asic %d: 0x%08" PRIX32, asic_nr, value);
@@ -220,6 +244,8 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
             ESP_LOGE(TAG, "Invalid register type");
             break;
     }
+
+    pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 }
 
 /*

@@ -6,9 +6,7 @@ import { LocalStorageService } from '../../local-storage.service';
 const STATIC_MENU_DESKTOP_INACTIVE = 'STATIC_MENU_DESKTOP_INACTIVE'
 
 export interface AppConfig {
-    inputStyle: string;
     colorScheme: string;
-    ripple: boolean;
     menuMode: string;
     scale: number;
 }
@@ -27,44 +25,45 @@ interface LayoutState {
 })
 export class LayoutService {
     private darkTheme = {
-        '--surface-a': '#0B1219',  // Darker navy
-        '--surface-b': '#070D17',  // Very dark navy (from image)
-        '--surface-c': 'rgba(255,255,255,0.03)',
-        '--surface-d': '#1A2632',  // Slightly lighter navy
-        '--surface-e': '#0B1219',
-        '--surface-f': '#0B1219',
-        '--surface-ground': '#070D17',
-        '--surface-section': '#070D17',
-        '--surface-card': '#0B1219',
-        '--surface-overlay': '#0B1219',
-        '--surface-border': '#1A2632',
-        '--surface-hover': 'rgba(255,255,255,0.03)',
-        '--text-color': 'rgba(255, 255, 255, 0.87)',
-        '--text-color-secondary': 'rgba(255, 255, 255, 0.6)',
-        '--maskbg': 'rgba(0,0,0,0.4)'
+        '--color-bg-content': '#070D17',  // Very dark navy
+        '--color-bg-card': '#0B1219',     // Darker navy
+        '--color-border-content': '#454d59', // Unified separator border
+        '--card-border': '#1A2632',           // Darker card border
+        '--surface-border': '#192730',        // Verified border color from master
+        '--color-text-main': 'rgba(255, 255, 255, 0.87)',
+        '--color-text-secondary': 'rgba(255, 255, 255, 0.6)',
+        '--color-mask-bg': 'rgba(0, 0, 0, 0.4)',
+        '--color-overlay-select-bg': '#0B1219',
+        '--color-overlay-select-border': '#1A2632'
     };
 
     private lightTheme = {
-        '--surface-a': '#1a2632',  // Lighter navy for main background
-        '--surface-b': '#243447',  // Medium navy for secondary background
-        '--surface-c': 'rgba(255,255,255,0.03)',
-        '--surface-d': '#2f4562',  // Light navy for borders
-        '--surface-e': '#1a2632',
-        '--surface-f': '#1a2632',
-        '--surface-ground': '#243447',
-        '--surface-section': '#1a2632',
-        '--surface-card': '#1a2632',
-        '--surface-overlay': '#1a2632',
-        '--surface-border': '#2f4562',
-        '--surface-hover': 'rgba(255,255,255,0.03)',
-        '--text-color': 'rgba(255, 255, 255, 0.9)',  // Slightly brighter text
-        '--text-color-secondary': 'rgba(255, 255, 255, 0.7)',  // Brighter secondary text
-        '--maskbg': 'rgba(0,0,0,0.2)'
+        '--color-bg-content': '#243447',  // Medium navy
+        '--color-bg-card': '#1a2632',     // Lighter navy
+        '--color-border-content': '#454d59',
+        '--card-border': '#2f4562',
+        '--surface-border': '#2f4562',        // Verified border color from master
+        '--color-text-main': 'rgba(255, 255, 255, 0.9)',
+        '--color-text-secondary': 'rgba(255, 255, 255, 0.7)',
+        '--color-mask-bg': 'rgba(0, 0, 0, 0.2)',
+        '--color-overlay-select-bg': '#1a2632',
+        '--color-overlay-select-border': '#2f4562'
+    };
+
+    private whiteTheme = {
+        '--color-bg-content': '#f8fafc',  // Softer blue-gray off-white (slate-100)
+        '--color-bg-card': '#f1f5f9',     // Card background is slate-50 (off-white, not pure white)
+        '--color-border-content': '#e2e8f0', // Light border
+        '--card-border': '#e2e8f0',           // Light card border
+        '--surface-border': '#cbd5e1',        // Slate-300 dark grey border for white theme
+        '--color-text-main': '#0f172a',          // Dark text (slate-900)
+        '--color-text-secondary': '#64748b',    // Muted dark text (slate-500)
+        '--color-mask-bg': 'rgba(0, 0, 0, 0.2)',
+        '--color-overlay-select-bg': '#f1f5f9',
+        '--color-overlay-select-border': '#e2e8f0'
     };
 
     _config: AppConfig = {
-        ripple: false,
-        inputStyle: 'outlined',
         menuMode: 'static',
         colorScheme: 'dark',
         scale: 14,
@@ -80,6 +79,8 @@ export class LayoutService {
         staticMenuMobileActive: false,
         menuHoverActive: false,
     };
+
+    isWideView = signal<boolean>(this.localStorageService.getBool('DASHBOARD_WIDE_VIEW'));
 
     private overlayOpen = new Subject<any>();
     overlayOpen$ = this.overlayOpen.asObservable();
@@ -98,40 +99,23 @@ export class LayoutService {
                         ...this._config,
                         colorScheme: settings.colorScheme,
                     };
-                    // Apply accent colors if they exist
-                    if (settings.accentColors) {
-                        Object.entries(settings.accentColors).forEach(([key, value]) => {
-                            document.documentElement.style.setProperty(key, value);
-                        });
-                    }
+                    // Apply accent colors dynamically
+                    const accentColors = ThemeService.generateThemeVariables(settings.primaryColor);
+                    Object.entries(accentColors).forEach(([key, value]) => {
+                        document.documentElement.style.setProperty(key, value);
+                    });
                 } else {
                     // Save default red dark theme if no settings exist
+                    const defaultPrimary = '#F80421';
                     this.themeService.saveThemeSettings({
                         colorScheme: 'dark',
-                        accentColors: {
-                            '--primary-color': '#F80421',
-                            '--primary-color-text': '#ffffff',
-                            '--highlight-bg': '#F80421',
-                            '--highlight-text-color': '#ffffff',
-                            '--focus-ring': '0 0 0 0.2rem rgba(248,4,33,0.2)',
-                            '--slider-bg': '#dee2e6',
-                            '--slider-range-bg': '#F80421',
-                            '--slider-handle-bg': '#F80421',
-                            '--progressbar-bg': '#dee2e6',
-                            '--progressbar-value-bg': '#F80421',
-                            '--checkbox-border': '#F80421',
-                            '--checkbox-bg': '#F80421',
-                            '--checkbox-hover-bg': '#df031d',
-                            '--button-bg': '#F80421',
-                            '--button-hover-bg': '#df031d',
-                            '--button-focus-shadow': '0 0 0 2px #ffffff, 0 0 0 4px #F80421',
-                            '--togglebutton-bg': '#F80421',
-                            '--togglebutton-border': '1px solid #F80421',
-                            '--togglebutton-hover-bg': '#df031d',
-                            '--togglebutton-hover-border': '1px solid #df031d',
-                            '--togglebutton-text-color': '#ffffff'
-                        }
+                        primaryColor: defaultPrimary
                     }).subscribe();
+                    
+                    const accentColors = ThemeService.generateThemeVariables(defaultPrimary);
+                    Object.entries(accentColors).forEach(([key, value]) => {
+                        document.documentElement.style.setProperty(key, value);
+                    });
                 }
                 // Update signal with config
                 this.config.set(this._config);
@@ -204,17 +188,30 @@ export class LayoutService {
     changeTheme() {
         const config = this.config();
 
-        // Apply light/dark theme variables
-        const themeVars = config.colorScheme === 'light' ? this.lightTheme : this.darkTheme;
+        // Apply light/dark/white theme variables
+        let themeVars = this.darkTheme;
+        if (config.colorScheme === 'light') {
+            themeVars = this.lightTheme;
+        } else if (config.colorScheme === 'white') {
+            themeVars = this.whiteTheme;
+        }
         Object.entries(themeVars).forEach(([key, value]) => {
             document.documentElement.style.setProperty(key, value);
         });
 
+        // Toggle dark-mode class for theme switching
+        if (config.colorScheme === 'white') {
+            document.documentElement.classList.remove('dark-mode');
+        } else {
+            document.documentElement.classList.add('dark-mode');
+        }
+
         // Load theme settings from NVS
         this.themeService.getThemeSettings().subscribe(
             settings => {
-                if (settings && settings.accentColors) {
-                    Object.entries(settings.accentColors).forEach(([key, value]) => {
+                if (settings && settings.primaryColor) {
+                    const accentColors = ThemeService.generateThemeVariables(settings.primaryColor);
+                    Object.entries(accentColors).forEach(([key, value]) => {
                         document.documentElement.style.setProperty(key, value);
                     });
                 }
@@ -234,6 +231,11 @@ export class LayoutService {
 
         this.state.staticMenuDesktopInactive = this.localStorageService.getBool(STATIC_MENU_DESKTOP_INACTIVE);
         this.staticMenuDesktopInactive$.next(this.state.staticMenuDesktopInactive);
+    }
+
+    toggleWideView() {
+        this.isWideView.set(!this.isWideView());
+        this.localStorageService.setBool('DASHBOARD_WIDE_VIEW', this.isWideView());
     }
 
     getStaticMenuDesktopInactive$() {

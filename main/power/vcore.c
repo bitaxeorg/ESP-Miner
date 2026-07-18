@@ -25,7 +25,7 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         config.TPS546_INIT_VIN_ON = 11.0;
         config.TPS546_INIT_VIN_OFF = 10.5;
         config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
-        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.8;
         config.TPS546_INIT_SCALE_LOOP = 0.25;
         config.TPS546_INIT_VOUT_MIN = 1;
         config.TPS546_INIT_VOUT_MAX = 3;
@@ -48,7 +48,7 @@ static TPS546_CONFIG get_tps546_config(const FamilyConfig * family)
         config.TPS546_INIT_VIN_ON = 11.5;
         config.TPS546_INIT_VIN_OFF = 11.0;
         config.TPS546_INIT_VIN_UV_WARN_LIMIT = 11.0;
-        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.0;
+        config.TPS546_INIT_VIN_OV_FAULT_LIMIT = 14.8;
         config.TPS546_INIT_SCALE_LOOP = 0.125;
         config.TPS546_INIT_VOUT_MIN = 2.5;
         config.TPS546_INIT_VOUT_MAX = 4.5;
@@ -120,6 +120,11 @@ esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
 {
     ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
 
+    // Enable/disable the ASIC power enable GPIO before touching the regulator
+    if (GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
+        gpio_set_level(GPIO_ASIC_ENABLE, core_voltage == 0.0f ? 1 : 0);
+    }
+
     if (GLOBAL_STATE->DEVICE_CONFIG.DS4432U) {
         if (core_voltage != 0.0f) {
             ESP_RETURN_ON_ERROR(DS4432U_set_voltage(core_voltage), TAG, "DS4432U set voltage failed!");
@@ -128,9 +133,6 @@ esp_err_t VCORE_set_voltage(GlobalState * GLOBAL_STATE, float core_voltage)
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
         uint16_t voltage_domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
         ESP_RETURN_ON_ERROR(TPS546_set_vout(core_voltage * voltage_domains), TAG, "TPS546 set voltage failed!");
-    }
-    if (core_voltage == 0.0f && GLOBAL_STATE->DEVICE_CONFIG.asic_enable) {
-        gpio_set_level(GPIO_ASIC_ENABLE, 1);
     }
 
     return ESP_OK;

@@ -1,22 +1,24 @@
 import { Component, OnInit } from '@angular/core';
-import { Observable, shareReplay } from 'rxjs';
-import { SystemApiService } from '../services/system.service';
+import { Observable } from 'rxjs';
+import { LiveDataService } from '../services/live-data.service';
 import { LayoutService } from './service/app.layout.service';
-import { SystemInfo as ISystemInfo } from 'src/app/generated';
+import { SystemInfo as ISystemInfo } from 'src/app/generated/models';
 
 @Component({
-  selector: 'app-menu',
-  templateUrl: './app.menu.component.html'
+    selector: 'app-menu',
+    templateUrl: './app.menu.component.html',
+    standalone: false
 })
 export class AppMenuComponent implements OnInit {
-  public info$!: Observable<ISystemInfo>;
+  public info$: Observable<ISystemInfo>;
 
   model: any[] = [];
 
-  constructor(public layoutService: LayoutService,
-    private systemService: SystemApiService,
+  constructor(
+    public layoutService: LayoutService,
+    private liveDataService: LiveDataService
   ) {
-    this.info$ = this.systemService.getInfo().pipe(shareReplay({ refCount: true, bufferSize: 1 }))
+    this.info$ = this.liveDataService.info$;
   }
 
   ngOnInit() {
@@ -25,6 +27,7 @@ export class AppMenuComponent implements OnInit {
         label: 'Menu',
         items: [
           { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/'] },
+          { label: 'Scoreboard', icon: 'pi pi-fw pi-trophy', routerLink: ['scoreboard'] },
           { label: 'Swarm', icon: 'pi pi-fw pi-list', routerLink: ['swarm'] },
           { label: 'Logs', icon: 'pi pi-fw pi-clipboard', routerLink: ['logs'] },
           { label: 'System', icon: 'pi pi-fw pi-wave-pulse', routerLink: ['system'] },

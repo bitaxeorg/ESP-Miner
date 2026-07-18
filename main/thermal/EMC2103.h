@@ -62,9 +62,9 @@
 
 esp_err_t EMC2103_set_fan_speed(float);
 uint16_t EMC2103_get_fan_speed(void);
-esp_err_t EMC2103_init();
+esp_err_t EMC2103_init(int temp_offset_param, bool flip_param);
 float EMC2103_get_external_temp(void);
 float EMC2103_get_external_temp2(void);
-esp_err_t EMC2103_set_ideality_factor(uint8_t);
-esp_err_t EMC2103_set_beta_compensation(uint8_t);
+esp_err_t EMC2103_set_ideality_factor(uint8_t ideality);
+esp_err_t EMC2103_set_beta_compensation(uint8_t beta);
 #endif /* EMC2103_H_ */

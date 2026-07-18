@@ -4,14 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterModule } from '@angular/router';
-import { BadgeModule } from 'primeng/badge';
-import { InputSwitchModule } from 'primeng/inputswitch';
-import { InputTextModule } from 'primeng/inputtext';
-import { RadioButtonModule } from 'primeng/radiobutton';
-import { RippleModule } from 'primeng/ripple';
-import { SidebarModule } from 'primeng/sidebar';
-import { TooltipModule } from 'primeng/tooltip';
-import { PrimeNGModule } from '../prime-ng.module';
+import { TooltipDirective } from '../directives/tooltip.directive';
+import { CheckboxComponent } from '../components/checkbox/checkbox.component';
 import { AppFooterComponent } from './app.footer.component';
 import { AppLayoutComponent } from './app.layout.component';
 import { AppMenuComponent } from './app.menu.component';
@@ -37,15 +31,9 @@ import { WifiIconComponent } from '../components/wifi-icon/wifi-icon.component';
         FormsModule,
         HttpClientModule,
         BrowserAnimationsModule,
-        InputTextModule,
-        SidebarModule,
-        BadgeModule,
-        RadioButtonModule,
-        InputSwitchModule,
-        RippleModule,
+        TooltipDirective,
+        CheckboxComponent,
         RouterModule,
-        PrimeNGModule,
-        TooltipModule,
     ],
     exports: [AppLayoutComponent, WifiIconComponent]
 })
