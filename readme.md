@@ -134,6 +134,38 @@ curl -X PATCH http://YOUR-BITAXE-IP/api/system \
      -H "Content-Type: application/json" \
      -d '{"fanspeed": "desired_speed_value"}'
 
+# Configure a Stratum V1 Pool (Slot Index 0)
+curl -X PUT http://YOUR-BITAXE-IP/api/system/pools/0 \
+     -H "Content-Type: application/json" \
+     -d '{
+       "stratumProtocol": "SV1",
+       "stratumURL": "solo.ckpool.org",
+       "stratumPort": 3333,
+       "stratumUser": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.worker1",
+       "stratumPassword": "x",
+       "stratumSuggestedDifficulty": 0,
+       "stratumExtranonceSubscribe": true,
+       "stratumTLS": 0,
+       "stratumDecodeCoinbase": true
+     }'
+
+# Configure a Stratum V2 Pool (Slot Index 1)
+curl -X PUT http://YOUR-BITAXE-IP/api/system/pools/1 \
+     -H "Content-Type: application/json" \
+     -d '{
+       "stratumProtocol": "SV2",
+       "stratumURL": "v2.srtm.ocean.xyz",
+       "stratumPort": 3334,
+       "stratumUser": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.worker1",
+       "stratumPassword": "x",
+       "stratumSuggestedDifficulty": 0,
+       "stratumExtranonceSubscribe": true,
+       "stratumTLS": 0,
+       "stratumDecodeCoinbase": true,
+       "stratumV2ChannelType": "extended",
+       "stratumV2AuthorityPubkey": "your_base58_sv2_authority_public_key"
+     }'
+
 # Stream logs
 websocat ws://YOUR-BITAXE-IP/api/ws
 

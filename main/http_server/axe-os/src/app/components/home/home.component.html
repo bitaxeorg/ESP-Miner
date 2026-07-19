@@ -587,9 +587,9 @@
                                         {{ i + 1 }}
                                     </td>
                                 <td *ngFor="let domain of asic?.domains; trackBy: trackByIndex"
-                                    [style.--heatmap-bg]="getHeatmapColor(domain, info.expectedHashrate)"
+                                    [style.--lightness]="getHeatmapLightness(domain, info.expectedHashrate)"
                                         [style.height]="(asicAmount <= 2 ? '2rem' : null)"
-                                        class="text-center">
+                                        class="heatmap-cell">
                                         <span class="text-xs">{{ domain | hashSuffix }}</span>
                                     </td>
                                 </tr>

@@ -15,12 +15,12 @@
   --color-surface: var(--surface-border);
   --color-main: var(--color-text-main);
   --color-secondary: var(--color-text-secondary);
-  --color-progressbar: var(--progressbar-bg, #dee2e6);
-  --color-progressbar-value: var(--progressbar-value-bg, #F80421);
-  --color-checkbox-border: var(--checkbox-border, #F80421);
-  --color-checkbox-bg: var(--checkbox-bg, #F80421);
-  --color-checkbox-hover: var(--checkbox-hover-bg, #e63c2e);
-  --color-slider-handle: var(--slider-handle-bg, #F80421);
+  --color-progressbar: var(--slider-bg, #dee2e6);
+  --color-progressbar-value: var(--color-primary, #F80421);
+  --color-checkbox-border: var(--color-primary, #F80421);
+  --color-checkbox-bg: var(--color-primary, #F80421);
+  --color-checkbox-hover: var(--color-primary-hover, #e63c2e);
+  --color-slider-handle: var(--color-primary, #F80421);
   --color-mask-bg: var(--color-mask-bg);
   --color-overlay-select-bg: var(--color-overlay-select-bg);
   --color-overlay-select-border: var(--color-overlay-select-border);
