@@ -245,6 +245,19 @@ In the event that the admin web front end is inaccessible, for example because o
 
 In order to unlock the Input fields for ASIC Frequency and ASIC Core Voltage you need to append `?oc` to the end of the settings tab URL in your browser. Be aware that without additional cooling overclocking can overheat and/or damage your Bitaxe.
 
+## Unified Firmware & Rollbacks
+
+Starting with the unified firmware releases, ESP-Miner uses a unified architecture where the AxeOS frontend is compiled, gzipped, and embedded directly into the firmware application binary (`esp-miner.bin`). 
+
+A separate Web UI image (`www.bin`) is no longer required for standard usage since the web interface is served directly from the firmware. If you want to use a custom or modified AxeOS frontend, you can still enable the **custom web UI** option in the settings. This allows you to upload and serve a separate `www.bin` from the SPIFFS partition, which takes priority over the built-in assets.
+
+### Rollback to Pre-Unified Firmware
+
+If you roll back the firmware from a unified version to an older, pre-unified version (which expects a separate web partition):
+
+- **www partition persistence**: The `www` (SPIFFS) partition on the flash chip will remain untouched during the rollback, keeping whatever latest non-unified Web UI version was last active on the device.
+- **Potential UI Version Mismatch**: Since older firmware relies entirely on the separate `www` partition to serve the web interface, the device will load whatever files exist in that partition. If you experience layout errors or missing features after rolling back, you will need to manually flash or upload a compatible `www.bin` version that matches the older firmware version.
+
 ## Development using esp-miner/devcontainer
 
 This configuration allows you to edit locally and compile the source code using a docker container so you don't have to install the ESP-IDF toolchain and other supporting software on your computer to compile the firmware.
