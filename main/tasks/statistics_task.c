@@ -115,6 +115,12 @@ bool addStatisticData(StatisticsDataPtr data, uint16_t statsFrequency)
 
             // Shift and append (Standard linear array shift)
             if (indexToRemove < maxDataCount - 1) {
+                if (indexToRemove > 0) {
+                    uint16_t neighborIndex = indexToRemove - 1;
+                    if (statisticsBuffer[indexToRemove].difficulty > statisticsBuffer[neighborIndex].difficulty) {
+                        statisticsBuffer[neighborIndex].difficulty = statisticsBuffer[indexToRemove].difficulty;
+                    }
+                }
                 memmove(&statisticsBuffer[indexToRemove], &statisticsBuffer[indexToRemove + 1], (maxDataCount - indexToRemove - 1) * sizeof(struct StatisticsData));
             }
             statisticsBuffer[maxDataCount - 1] = *data;
@@ -187,6 +193,8 @@ void statistics_task(void * pvParameters)
                 statsData.wifiRSSI = wifiRSSI;
                 statsData.freeHeap = esp_get_free_heap_size();
                 statsData.responseTime = sys_module->response_time;
+                statsData.difficulty = sys_module->best_sample_diff;
+                sys_module->best_sample_diff = 0.0;
 
                 addStatisticData(&statsData, configStatsFrequency);
             }

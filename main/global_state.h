@@ -73,6 +73,7 @@ typedef struct
     int rejected_reason_stats_count;
     int screen_page;
     uint64_t best_nonce_diff;
+    double best_sample_diff;
     char best_diff_string[DIFF_STRING_SIZE];
     uint64_t best_session_nonce_diff;
     char best_session_diff_string[DIFF_STRING_SIZE];

@@ -12,9 +12,11 @@ import { environment } from 'src/environments/environment';
 export class LiveDataService {
   private socket$: WebSocketSubject<any> | null = null;
   private updates$ = new Subject<Partial<ISystemInfo>>();
+  private shareFoundSubject = new Subject<number>();
   
   // Shared info stream for the whole app
   public readonly info$: Observable<ISystemInfo>;
+  public readonly shareFound$ = this.shareFoundSubject.asObservable();
   
   // Connection status for the UI
   private connectedSubject = new BehaviorSubject<boolean>(false);
@@ -103,6 +105,8 @@ export class LiveDataService {
       tap(msg => {
         if (msg.event === 'update' && msg.data) {
           this.updates$.next(msg.data);
+        } else if (msg.event === 'share_found' && msg.difficulty) {
+          this.shareFoundSubject.next(msg.difficulty);
         }
       }),
       retry({ delay: 5000 }),
