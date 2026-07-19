@@ -149,7 +149,7 @@
                     <th class="text-secondary font-medium pb-2 text-left">Partition</th>
                     <th class="text-secondary font-medium pb-2 text-left">Version</th>
                     <th class="text-secondary font-medium pb-2 text-left">Space</th>
-                    <th class="text-secondary font-medium pb-2 text-right">Actions</th>
+                    <th class="text-secondary font-medium pb-2 text-left">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -173,8 +173,8 @@
                             -
                         </span>
                     </td>
-                    <td class="text-right">
-                        <div class="flex gap-2 justify-end items-center">
+                    <td class="text-left">
+                        <div class="flex gap-2 justify-start items-center">
                             <button 
                                 *ngIf="!partition.isCurrent && partition.version" 
                                 (click)="switchPartition(partition.label)"

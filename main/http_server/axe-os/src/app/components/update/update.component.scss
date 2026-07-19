@@ -7,7 +7,8 @@ a {
 }
 
 table {
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 th,
@@ -28,9 +29,11 @@ td {
     padding-top: 0.5rem;
 }
 
-tbody tr {
+tbody td {
     border-top: 1px solid var(--surface-border);
+}
 
+tbody tr {
     &:last-child td {
         padding-bottom: 0;
     }
