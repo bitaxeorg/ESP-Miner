@@ -46,6 +46,8 @@ typedef struct {
 typedef struct {
     const esp_partition_t *part;
     char version[32];
+    char compileDate[16];
+    char compileTime[16];
     int usagePercent;
     bool isCurrent;
 } cached_partition_t;

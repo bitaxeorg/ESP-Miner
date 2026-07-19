@@ -138,6 +138,14 @@ components:
           type: string
           nullable: true
           description: Firmware version on this partition
+        compileDate:
+          type: string
+          nullable: true
+          description: Compile date of the firmware on this partition
+        compileTime:
+          type: string
+          nullable: true
+          description: Compile time of the firmware on this partition
         isCurrent:
           type: boolean
           description: Whether this is the currently running partition

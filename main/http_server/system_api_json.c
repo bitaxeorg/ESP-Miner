@@ -310,6 +310,8 @@ static void system_api_add_partitions(cJSON *root, GlobalState *g) {
 
         if (cp->version[0] != '\0') {
             cJSON_AddStringToObject(p_obj, "version", cp->version);
+            cJSON_AddStringToObject(p_obj, "compileDate", cp->compileDate);
+            cJSON_AddStringToObject(p_obj, "compileTime", cp->compileTime);
             if (cp->usagePercent >= 0) {
                 cJSON_AddNumberToObject(p_obj, "usagePercent", cp->usagePercent);
             } else {
@@ -317,6 +319,8 @@ static void system_api_add_partitions(cJSON *root, GlobalState *g) {
             }
         } else {
             cJSON_AddNullToObject(p_obj, "version");
+            cJSON_AddNullToObject(p_obj, "compileDate");
+            cJSON_AddNullToObject(p_obj, "compileTime");
             cJSON_AddNullToObject(p_obj, "usagePercent");
         }
         cJSON_AddItemToArray(partitions_array, p_obj);

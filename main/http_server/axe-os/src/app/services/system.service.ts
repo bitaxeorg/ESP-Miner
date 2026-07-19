@@ -152,9 +152,9 @@ export class SystemApiService {
         statsLimit: 720,
 
         partitions: [
-          { label: 'factory', version: 'v2.11.0', isCurrent: false, isFactory: true, usagePercent: 58 },
-          { label: 'ota_0', version: 'v2.12.0', isCurrent: true, isFactory: false, usagePercent: 58 },
-          { label: 'ota_1', version: 'v2.10.0', isCurrent: false, isFactory: false, usagePercent: 58 }
+          { label: 'factory', version: 'v2.11.0', compileDate: 'Jul 10 2026', compileTime: '12:00:00', isCurrent: false, isFactory: true, usagePercent: 58 },
+          { label: 'ota_0', version: 'v2.12.0', compileDate: 'Jul 19 2026', compileTime: '15:30:00', isCurrent: true, isFactory: false, usagePercent: 58 },
+          { label: 'ota_1', version: 'v2.10.0', compileDate: 'Jun 20 2026', compileTime: '08:45:00', isCurrent: false, isFactory: false, usagePercent: 58 }
         ],
 
         blockHeight: 811111,

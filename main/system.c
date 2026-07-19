@@ -402,12 +402,18 @@ void SYSTEM_init_partitions(GlobalState * GLOBAL_STATE) {
             cp->part = p;
             cp->isCurrent = (p == running);
             cp->version[0] = '\0';
+            cp->compileDate[0] = '\0';
+            cp->compileTime[0] = '\0';
             cp->usagePercent = -1;
 
             esp_app_desc_t app_desc;
             if (esp_ota_get_partition_description(p, &app_desc) == ESP_OK) {
                 strncpy(cp->version, app_desc.version, sizeof(cp->version) - 1);
                 cp->version[sizeof(cp->version) - 1] = '\0';
+                strncpy(cp->compileDate, app_desc.date, sizeof(cp->compileDate) - 1);
+                cp->compileDate[sizeof(cp->compileDate) - 1] = '\0';
+                strncpy(cp->compileTime, app_desc.time, sizeof(cp->compileTime) - 1);
+                cp->compileTime[sizeof(cp->compileTime) - 1] = '\0';
                 
                 esp_partition_pos_t part_pos = {
                     .offset = p->address,

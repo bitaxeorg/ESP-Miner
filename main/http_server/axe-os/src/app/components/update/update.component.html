@@ -146,9 +146,10 @@
         <table class="w-full">
             <thead>
                 <tr>
-                    <th class="text-secondary font-medium pb-2 text-left">Partition</th>
-                    <th class="text-secondary font-medium pb-2 text-left">Version</th>
-                    <th class="text-secondary font-medium pb-2 text-left">Space</th>
+                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Partition</th>
+                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Version</th>
+                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Build time</th>
+                    <th class="text-secondary font-medium pb-2 text-left w-1/4">Space</th>
                     <th class="text-secondary font-medium pb-2 text-left">Actions</th>
                 </tr>
             </thead>
@@ -161,6 +162,10 @@
                     </td>
                     <td class="font-mono">
                         {{ partition.version || 'N/A' }}
+                    </td>
+                    <td>
+                        <div class="font-medium text-sm">{{ partition.compileDate || 'N/A' }}</div>
+                        <div class="text-xs text-secondary mt-0.5" *ngIf="partition.compileDate">{{ partition.compileTime }}</div>
                     </td>
                     <td>
                         <div *ngIf="partition.usagePercent !== undefined && partition.usagePercent !== null" class="flex items-center gap-2" style="max-width: 9rem;">
