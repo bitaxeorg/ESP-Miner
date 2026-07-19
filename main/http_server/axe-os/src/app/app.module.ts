@@ -32,6 +32,7 @@ import { SystemComponent } from './components/system/system.component';
 import { UpdateComponent } from './components/update/update.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SettingsComponent } from './components/settings/settings.component';
+import { SecurityComponent } from './components/security/security.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
 import { ScoreboardComponent } from './components/scoreboard/scoreboard.component';
 import { ThemeConfigComponent } from './components/design/theme-config.component';
@@ -90,6 +91,7 @@ const components = [
     AppChartComponent,
     EditComponent,
     SettingsComponent,
+    SecurityComponent,
     ANSIPipe,
     DateAgoPipe,
     HashSuffixPipe,

@@ -14,8 +14,9 @@ same Wi-Fi/LAN from reading data or changing settings/firmware without credentia
   calls `http_auth_gate()`; the static-file handler calls it too so the login
   dialog appears on the first page load. When enabled, every `/api/*` route,
   both WebSockets, and OTA are covered.
-- **Recovery.** AP setup mode (hold `BOOT`) bypasses auth so a forgotten password
-  can always be reset from **Settings → Security**. Erasing NVS also clears it
+- **Recovery.** AP setup mode (hold `BOOT`) bypasses auth, and the setup page shows
+  the **Security** panel so a forgotten password can always be cleared there
+  (the normal Settings pages are redirected to the setup page in AP mode). Erasing NVS also clears it
   (a full factory-image flash or `idf.py erase-flash`); a plain app-only re-flash
   keeps the stored hash because it lives in the separate `nvs` partition.
 - **Storage.** Only a salted SHA-256 hash is kept, in its own NVS namespace

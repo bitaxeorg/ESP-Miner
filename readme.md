@@ -233,7 +233,7 @@ By default the web interface is open to anyone on the local network. You can opt
 - Authentication uses standard HTTP Basic auth, so your browser shows its native sign-in dialog and remembers the credentials for the session. The password is never stored in clear text — only a salted SHA-256 hash is kept on the device.
 - It is **opt-in**: until you set a password nothing changes, so existing setups keep working after updating.
 - Once enabled, everyone on your Wi-Fi/LAN must supply the username and password before they can read data, change any setting, or flash firmware (OTA). This is the case it is designed to protect.
-- **Forgot the password?** Hold the `BOOT` button to start the device in access-point (setup) mode, which bypasses authentication so you can reconnect and open **Settings → Security** to set a new password or disable it. A full factory reset (erasing NVS) also clears it.
+- **Forgot the password?** Hold the `BOOT` button to start the device in access-point (setup) mode. It bypasses authentication, and the setup page includes the **Security** panel where you can set a new password or disable it. A full factory reset (erasing NVS) also clears it.
 
 > Notes / scope:
 > - The connection is plain HTTP, so this protects against access on a shared/local network but does not encrypt traffic. Do not expose the device directly to the internet.

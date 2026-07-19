@@ -3,3 +3,7 @@
 
     <app-network-edit></app-network-edit>
 </div>
+
+<!-- AP setup/recovery only: lets a user clear a forgotten password (auth is
+     bypassed in AP mode, so this reset is always reachable without signing in). -->
+<app-security *ngIf="isAPMode"></app-security>
