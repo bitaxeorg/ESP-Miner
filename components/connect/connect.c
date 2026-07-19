@@ -3,18 +3,14 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "mdns.h"
-#include "esp_system.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
 #include "lwip/err.h"
-#include "lwip/lwip_napt.h"
-#include "lwip/sys.h"
 #include "lwip/sockets.h"
 #include "esp_netif.h"
-#include "nvs_flash.h"
 #include "esp_wifi_types_generic.h"
 
 #include "connect.h"
@@ -22,6 +18,7 @@
 #include "global_state.h"
 #include "nvs_config.h"
 #include "esp_app_desc.h"
+#include "esp_mac.h"
 
 // Maximum number of access points to scan
 #define MAX_AP_COUNT 20
@@ -601,21 +598,9 @@ void toggle_wifi_softap(void)
     }
 }
 
-<<<<<<< HEAD
-=======
-static void wifi_softap_off(void)
-{
-    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
-    if (is_wifi_operation_allowed(err)) {
-        ESP_ERROR_CHECK(err);
-    }
-}
-
-
-
 static char* generate_unique_hostname(const char *base) {
     uint8_t mac[6];
-    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
     char suffix[6];
     snprintf(suffix, sizeof(suffix), "-%02x%02x", mac[4], mac[5]);
     char *new_hostname = malloc(strlen(base) + strlen(suffix) + 1);
@@ -660,16 +645,6 @@ static char* check_and_resolve_hostname_conflict(const char *hostname, const cha
     mdns_query_results_free(results);
     return strdup(hostname);
 }
-
-static void wifi_softap_on(void)
-{
-    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
-    if (is_wifi_operation_allowed(err)) {
-        ESP_ERROR_CHECK(err);
-    }
-}
-
->>>>>>> upstream/master
 /* Initialize wifi station */
 static esp_netif_t *wifi_init_sta(const char *wifi_ssid, const char *wifi_pass)
 {
