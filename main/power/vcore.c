@@ -146,6 +146,20 @@ int16_t VCORE_get_voltage_mv(GlobalState * GLOBAL_STATE)
     return ADC_get_vcore();
 }
 
+// Lowest core voltage (mV) the regulator will accept. TPS546_set_vout() rejects
+// anything below VOUT_MIN as out of range, so callers must not command below this.
+int16_t VCORE_get_voltage_min_mv(GlobalState * GLOBAL_STATE)
+{
+    if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
+        TPS546_CONFIG config = get_tps546_config(&GLOBAL_STATE->DEVICE_CONFIG.family);
+        uint16_t domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
+        if (domains == 0) domains = 1;
+        // Round up so core_mv * domains never lands just below VOUT_MIN.
+        return (int16_t) ceilf(config.TPS546_INIT_VOUT_MIN / domains * 1000.0f);
+    }
+    return 0; // non-TPS546 boards have no PMBus minimum
+}
+
 esp_err_t VCORE_check_fault(GlobalState * GLOBAL_STATE)
 {
     if (GLOBAL_STATE->DEVICE_CONFIG.TPS546) {
