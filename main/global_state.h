@@ -36,13 +36,13 @@ typedef struct {
     char * url;
     char * user;
     char * pass;
+    char * cert;
+    char * sv2_authority_pubkey;
     stratum_protocol_t protocol;
     uint16_t port;
     uint16_t difficulty;
     uint16_t tls;
     uint16_t sv2_channel_type;
-    char * cert;
-    char * sv2_authority_pubkey;
     bool decode_coinbase_tx;
     bool extranonce_subscribe;
 } PoolConfig;
@@ -61,6 +61,8 @@ typedef struct {
 typedef struct
 {
     int64_t start_time;
+    uint32_t shares_accepted;
+    uint32_t shares_rejected;
     float current_hashrate;
     float hashrate_1m;
     float hashrate_10m;
@@ -72,24 +74,21 @@ typedef struct
     uint16_t power_fault;
     uint16_t response_share_batch;
     uint32_t lastClockSync;
-    uint32_t shares_accepted;
-    uint32_t shares_rejected;
     uint32_t work_received;
-    int rejected_reason_stats_count;
     int screen_page;
-    char * ssid;
-    uint64_t best_nonce_diff;
-    uint64_t best_session_nonce_diff;
-    char best_diff_string[DIFF_STRING_SIZE];
-    char best_session_diff_string[DIFF_STRING_SIZE];
-    char pool_connection_info[64];
+    int rejected_reason_stats_count;
     RejectedReasonStat rejected_reason_stats[10];
-    Scoreboard scoreboard;
-    PoolConfig pools[MAX_POOLS];
+
     uint16_t primary_pool_index;
     uint16_t secondary_pool_index;
+    PoolConfig pools[MAX_POOLS];
+
+    Scoreboard scoreboard;
+    uint64_t best_nonce_diff;
+    uint64_t best_session_nonce_diff;
     int identify_mode_time_ms;
     int block_found;
+
     bool show_new_block;
     bool ap_enabled;
     bool is_connected;
@@ -100,13 +99,19 @@ typedef struct
     bool pools_unavailable;
     bool is_screen_active;
     bool is_firmware_update;
-    char firmware_update_filename[20];
-    char firmware_update_status[20];
     bool hardware_fault;
-    char hardware_fault_msg[64];
+
     const char * asic_status;
     char * version;
     char * axeOSVersion;
+    char * ssid;
+
+    char best_diff_string[DIFF_STRING_SIZE];
+    char best_session_diff_string[DIFF_STRING_SIZE];
+    char pool_connection_info[64];
+    char firmware_update_filename[20];
+    char firmware_update_status[20];
+    char hardware_fault_msg[64];
     char mdns_hostname[64];
     char full_hostname[70];
     char wifi_status[256];
