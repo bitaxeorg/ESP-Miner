@@ -24,7 +24,7 @@
 
 #define LV_FONT_MONTSERRAT_14 0
 
-#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(lv_font_portfolio_6x8)
+#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(lv_font_portfolio_6x8) LV_FONT_DECLARE(lv_font_nix8810_m15)
 #define LV_FONT_DEFAULT        &lv_font_portfolio_6x8
 
 #define LV_USE_FONT_PLACEHOLDER 0

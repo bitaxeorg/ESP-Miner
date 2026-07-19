@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
-import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
+import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges, ViewChildren, QueryList, ElementRef } from '@angular/core';
+import { FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, startWith, Subject, takeUntil, pairwise, BehaviorSubject, Observable, first } from 'rxjs';
 import { LoadingService } from 'src/app/services/loading.service';
@@ -14,6 +14,7 @@ import { CommonModule } from '@angular/common';
 import { TooltipDirective } from '../../directives/tooltip.directive';
 import { CheckboxComponent } from '../checkbox/checkbox.component';
 import { SliderComponent } from '../slider/slider.component';
+import { ModalComponent } from '../modal/modal.component';
 
 const DISPLAY_TIMEOUT_STEPS = [0, 1, 2, 5, 15, 30, 60, 60 * 2, 60 * 4, 60* 8, -1];
 const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 60 * 28, 60 * 60];
@@ -25,11 +26,13 @@ const STATS_FREQUENCY_STEPS = [0, 1, 2, 5, 10, 30, 60, 60 * 2, 60 * 6, 60 * 14, 
     imports: [
         CommonModule,
         ReactiveFormsModule,
+        FormsModule,
         CheckboxComponent,
         DropdownComponent,
         SliderComponent,
         TooltipDirective,
         DateAgoPipe,
+        ModalComponent,
     ]
 })
 
@@ -59,6 +62,13 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   public displayTimeoutControl: FormControl;
   public statsFrequencyControl: FormControl;
   public statsLimit: number = 720;
+  public displayScreens: string[] = [];
+  public displayVariables: string[] = [];
+
+  @ViewChildren('screenTextarea') screenTextareas!: QueryList<ElementRef<HTMLTextAreaElement>>;
+  public lastFocusedTextareaIndex: number | null = null;
+  public showScreenCustomization: boolean = false;
+  public showResetConfirm: boolean = false;
 
   constructor(
     private fb: FormBuilder,
@@ -144,16 +154,20 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       ? this.systemService.getInfo(deviceUri)
       : this.liveDataService.info$.pipe(first());
 
-    // Fetch both system info and ASIC settings in parallel
+    // Fetch system info, ASIC settings, display screens, and variables in parallel
     forkJoin({
       info: info$,
-      asic: this.systemService.getAsicSettings(deviceUri)
+      asic: this.systemService.getAsicSettings(deviceUri),
+      screens: this.systemService.getDisplayScreens(deviceUri),
+      variables: this.systemService.getDisplayVariables(deviceUri)
     })
     .pipe(
       this.loadingService.lockUIUntilComplete(),
       takeUntil(this.destroy$)
     )
-    .subscribe(({ info, asic }) => {
+    .subscribe(({ info, asic, screens, variables }) => {
+      this.setDisplayScreens(screens);
+      this.displayVariables = [...variables].sort();
       // Store the frequency and voltage options from the API
       this.defaultFrequency = asic.defaultFrequency;
       this.frequencyOptions = asic.frequencyOptions;
@@ -386,5 +400,106 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
   get isRestartRequired(): boolean {
     return !! Object.entries(this.form.controls)
       .filter(([field, control]) => control.dirty && !this.noRestartFields.includes(field)).length
+  }
+
+  public trackByIndex(index: number, obj: any): any {
+    return index;
+  }
+
+  public saveDisplayScreens() {
+    const deviceUri = this.uri || '';
+    this.systemService.updateDisplayScreens(this.displayScreens, deviceUri)
+      .pipe(this.loadingService.lockUIUntilComplete())
+      .subscribe({
+        next: () => {
+          this.toastr.success('Saved display screens successfully');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.toastr.error(`Could not save display screens. ${err.message}`);
+        }
+      });
+  }
+
+   public resetDisplayScreens() {
+     this.showResetConfirm = true;
+   }
+
+   public confirmResetDisplayScreens() {
+     this.showResetConfirm = false;
+     const deviceUri = this.uri || '';
+     this.systemService.resetDisplayScreens(deviceUri)
+       .pipe(this.loadingService.lockUIUntilComplete())
+       .subscribe({
+         next: () => {
+           this.toastr.success('Reset display screens to defaults');
+           this.loadDisplayScreens();
+         },
+         error: (err: HttpErrorResponse) => {
+           this.toastr.error(`Could not reset display screens. ${err.message}`);
+         }
+       });
+   }
+
+  private loadDisplayScreens() {
+    const deviceUri = this.uri || '';
+    this.systemService.getDisplayScreens(deviceUri)
+      .subscribe({
+        next: (screens) => {
+          this.setDisplayScreens(screens);
+        },
+        error: (err) => {
+          console.error(`Failed to load display screens: ${err.message}`);
+        }
+      });
+  }
+
+  public addScreen() {
+    if (this.displayScreens.length < 8) {
+      this.displayScreens.push("");
+    }
+  }
+
+  public removeScreen(index: number) {
+    if (this.displayScreens.length > 0) {
+      this.displayScreens.splice(index, 1);
+    }
+  }
+
+  private setDisplayScreens(screens: string[]) {
+    let lastNonEmptyIndex = -1;
+    for (let i = screens.length - 1; i >= 0; i--) {
+      if (screens[i] && screens[i].trim() !== '') {
+        lastNonEmptyIndex = i;
+        break;
+      }
+    }
+    this.displayScreens = screens.slice(0, lastNonEmptyIndex + 1);
+  }
+
+  public onTextareaFocus(index: number) {
+    this.lastFocusedTextareaIndex = index;
+  }
+
+  public insertPlaceholder(placeholder: string) {
+    if (this.lastFocusedTextareaIndex === null) {
+      return;
+    }
+    const index = this.lastFocusedTextareaIndex;
+    const textareas = this.screenTextareas.toArray();
+    const textareaEl = textareas[index]?.nativeElement;
+    if (!textareaEl) {
+      return;
+    }
+
+    const value = this.displayScreens[index] || '';
+    const caretPos = textareaEl.selectionStart || 0;
+    const newValue = value.substring(0, caretPos) + `{${placeholder}}` + value.substring(textareaEl.selectionEnd || caretPos);
+    this.displayScreens[index] = newValue;
+
+    setTimeout(() => {
+      textareaEl.focus();
+      const newCaretPos = caretPos + placeholder.length + 2; // +2 for { and }
+      textareaEl.setSelectionRange(newCaretPos, newCaretPos);
+    });
   }
 }

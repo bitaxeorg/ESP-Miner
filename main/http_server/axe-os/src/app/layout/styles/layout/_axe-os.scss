@@ -18,3 +18,37 @@ fieldset {
 table.border-1 {
     border-color: var(--card-border) !important;
 }
+
+/* Custom Screen simulation styling using default monospace font */
+textarea.screen-textarea {
+    font-family: monospace !important;
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+    background-color: #000000 !important;
+    color: var(--color-text-main) !important;
+    border: 1px solid var(--color-border-content) !important;
+    padding: 8px !important;
+    resize: vertical !important;
+    width: 100% !important;
+    max-width: 100%;
+    white-space: pre !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+}
+
+span.placeholder-chip {
+    background-color: var(--color-bg-card) !important;
+    border: 1px solid var(--color-border-content) !important;
+    color: var(--color-text-main) !important;
+    display: block;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+    user-select: none;
+    border-radius: var(--border-radius, 2px);
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        border-color: var(--color-primary) !important;
+    }
+}

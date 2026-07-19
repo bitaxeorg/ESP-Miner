@@ -148,6 +148,56 @@
                 <app-checkbox name="invertscreen" formControlName="invertscreen" inputId="invertscreen" [binary]="true"></app-checkbox>
             </div>
         </div>
+
+        <div class="w-full mt-3 select-none flex items-center">
+            <label class="cursor-pointer font-bold flex items-center gap-1">
+                <input type="checkbox" hidden (click)="showScreenCustomization = !showScreenCustomization">
+                <i class="pi pi-angle-{{showScreenCustomization ? 'down' : 'right'}} text-sm"></i>
+                {{showScreenCustomization ? 'Hide' : 'Show'}} Screen Customization
+            </label>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3" *ngIf="showScreenCustomization">
+            <div class="w-full">
+                <div class="card mb-0 bg-transparent p-0 border-none shadow-none">
+                    <div *ngFor="let screen of displayScreens; let i = index; trackBy: trackByIndex" class="flex flex-col md:flex-row items-stretch mb-3 gap-2">
+                        <label class="w-full md:w-2/12 font-semibold self-start pt-2">Screen {{ i + 1 }}</label>
+                        <div class="w-full md:w-9/12">
+                            <textarea #screenTextarea rows="4" class="screen-textarea" [(ngModel)]="displayScreens[i]" [ngModelOptions]="{standalone: true}" (focus)="onTextareaFocus(i)" placeholder="Enter screen content..."></textarea>
+                        </div>
+                        <div class="w-full md:w-1/12 flex md:flex-col justify-end md:justify-between items-center gap-2 py-1 self-stretch">
+                            <button type="button" class="btn btn-secondary border-none text-red-500 p-2" (click)="removeScreen(i)"><i class="pi pi-trash"></i></button>
+                            <button *ngIf="i === displayScreens.length - 1 && displayScreens.length < 8" type="button" class="btn btn-secondary border-none p-2 md:mt-auto" (click)="addScreen()" appTooltip="Add Screen" tooltipPosition="top"><i class="pi pi-plus"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 mt-4">
+                        <button type="button" class="btn" (click)="saveDisplayScreens()">Save Screens</button>
+                        <button type="button" class="btn btn-secondary" (click)="resetDisplayScreens()">Reset to Defaults</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full">
+                <div class="card h-full mb-0">
+                    <h3 class="m-0 mb-3 font-bold text-base">Available Fields</h3>
+                    <div class="grid grid-cols-3 gap-2 text-xs font-mono mb-3">
+                        <div *ngFor="let variable of displayVariables" class="py-1">
+                            <span class="placeholder-chip px-2 py-1 rounded" (click)="insertPlaceholder(variable)">
+                                {{ '{' + variable + '}' }}
+                            </span>
+                        </div>
+                    </div>
+                    <h3 class="m-0 mb-3 font-bold text-sm">Layout</h3>
+                    <p class="text-sm text-secondary mb-2 leading-relaxed">
+                        Prefix any line with <strong>#</strong> to use the double-height font (e.g. <code>#&#123;ip&#125;</code>).
+                    </p>
+                    <p class="text-sm text-secondary mb-0 leading-relaxed">
+                        Add <code>:width</code> inside braces to pad with spaces (e.g. <code>&#123;hashrate:10&#125;</code> for right-aligned, or <code>&#123;ip:-15&#125;</code> for left-aligned).
+                    </p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <h3 class="mt-5">Statistics</h3>
@@ -182,3 +232,13 @@
             class="btn btn-danger" appTooltip="Return to safe preset values only">Disable Overclock Mode</button>
     </div>
 </form>
+
+<app-modal [isVisible]="showResetConfirm" (close)="showResetConfirm = false" [headline]="'Confirm Reset'">
+    <div class="mb-4 text-main">
+        Are you sure you want to reset all screens to their default layouts? This action cannot be undone.
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+        <button type="button" class="btn btn-secondary" (click)="showResetConfirm = false">Cancel</button>
+        <button type="button" class="btn btn-danger" (click)="confirmResetDisplayScreens()">Reset to Defaults</button>
+    </div>
+</app-modal>
