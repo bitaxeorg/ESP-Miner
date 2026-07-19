@@ -1109,7 +1109,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     updateMessage(info.version !== info.axeOSVersion, 'VERSION_MISMATCH', 'warn', `Firmware (${info.version}) and AxeOS (${info.axeOSVersion}) versions do not match. Please make sure to update both www.bin and esp-miner.bin.`);
     if (info.coinbaseOutputs && info.coinbaseOutputs.length > 0) {
       let percentage = this.getPayoutPercentage(info);
-      updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'warn', `Your share of the mining reward is only ${percentage.toFixed(1)}%`);
+      updateMessage(percentage > 0 && percentage < 95, 'NOT_SOLO_MINING', 'info', `Mining reward is split; your decoded share is ${percentage.toFixed(1)}%`);
       updateMessage(percentage === 0, 'NO_MINING_REWARD', 'warn', `You don't have a share in the mining reward`);
     }
   }
