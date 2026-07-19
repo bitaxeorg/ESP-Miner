@@ -2,6 +2,7 @@
 #include "esp_wifi.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
+#include "esp_mac.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "system_api_json.h"
@@ -92,10 +93,13 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddBoolToObject(root, "miningPaused", g->SYSTEM_MODULE.mining_paused);
     cJSON_AddNumberToObject(root, "overheat_mode", g->SYSTEM_MODULE.overheat_mode ? 1 : 0);
     cJSON_AddStringToObject(root, "wifiStatus", g->SYSTEM_MODULE.wifi_status);
+    cJSON_AddStringToObject(root, "networkStatus", g->SYSTEM_MODULE.wifi_status);
 
-    int8_t rssi = -90;
-    get_wifi_current_rssi(&rssi);
-    cJSON_AddNumberToObject(root, "wifiRSSI", rssi);
+    if (g->SYSTEM_MODULE.network_mode == NETWORK_MODE_WIFI) {
+        int8_t rssi = -90;
+        get_wifi_current_rssi(&rssi);
+        cJSON_AddNumberToObject(root, "wifiRSSI", rssi);
+    }
 
     // Faults
     if (g->SYSTEM_MODULE.power_fault > 0) {
@@ -127,7 +131,7 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddStringToObject(root, "runningPartition", running ? running->label : "Unknown");
 
     uint8_t mac[6];
-    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
     char formattedMac[18];
     snprintf(formattedMac, sizeof(formattedMac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
@@ -144,6 +148,10 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddStringToObject(root, "ipv4", g->SYSTEM_MODULE.ip_addr_str);
     cJSON_AddStringToObject(root, "ipv6", g->SYSTEM_MODULE.ipv6_addr_str);
     cJSON_AddNumberToObject(root, "apEnabled", g->SYSTEM_MODULE.ap_enabled ? 1 : 0);
+
+    char *network_mode = nvs_config_get_string(NVS_CONFIG_NETWORK_MODE);
+    cJSON_AddStringToObject(root, "networkMode", network_mode ? network_mode : "wifi");
+    free(network_mode);
 
     // Pool Configuration
     cJSON_AddStringToObject(root, "poolConnectionInfo", g->SYSTEM_MODULE.pool_connection_info);
