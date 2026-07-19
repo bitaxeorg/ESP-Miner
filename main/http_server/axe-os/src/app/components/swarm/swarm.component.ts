@@ -82,6 +82,21 @@ export class SwarmComponent implements OnInit, OnDestroy {
   public currentDeviceIp: string | null = null;
   private currentDeviceVersion: string | null = null;
 
+  public isSortDropdownOpen = false;
+
+  getSelectedSortLabel(): string {
+    const selected = this.sortOptions.find(opt => opt.value.sortField === this.selectedSort.sortField && opt.value.sortDirection === this.selectedSort.sortDirection);
+    return selected ? selected.label : 'Sort';
+  }
+
+  selectSortOption(value: {sortField: string; sortDirection: string}) {
+    this.selectedSort = {
+      sortField: value.sortField,
+      sortDirection: value.sortDirection as 'asc' | 'desc'
+    };
+    this.sortBy(value.sortField, this.selectedSort.sortDirection);
+  }
+
   @HostListener('document:keydown.esc', ['$event'])
   onEscKey() {
     if (this.filterText) {
