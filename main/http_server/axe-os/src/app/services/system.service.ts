@@ -88,6 +88,7 @@ export class SystemApiService {
         apEnabled: 0,
         sharesAccepted: 1,
         sharesRejected: 10,
+        sharesPending: 0,
         sharesRejectedReasons: [
           { message: "Above target", count: 8 },
           { message: "Duplicate share", count: 2 }
