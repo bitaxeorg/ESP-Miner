@@ -1,13 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, ValidatorFn, ValidationErrors, AbstractControl, FormControl } from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, Validators, ValidatorFn, ValidationErrors, AbstractControl } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { LoadingService } from 'src/app/services/loading.service';
 import { SystemApiService } from 'src/app/services/system.service';
 import { LiveDataService } from 'src/app/services/live-data.service';
 import { first } from 'rxjs';
-
-type PoolType = 'stratum' | 'fallbackStratum';
 
 interface ITlsOption {
   value: number;
@@ -24,6 +22,11 @@ interface IChannelOption {
   label: string;
 }
 
+interface IPoolDropdownOption {
+  value: number;
+  label: string;
+}
+
 @Component({
     selector: 'app-pool',
     templateUrl: './pool.component.html',
@@ -33,11 +36,15 @@ export class PoolComponent implements OnInit {
   public form!: FormGroup;
   public savedChanges: boolean = false;
 
+  private previousPrim: number = 0;
+  private previousSec: number = 1;
+  private pendingDeletePoolIds: number[] = [];
+
   public readonly DEFAULT_BITCOIN_ADDRESS = 'bc1qnp980s5fpp8l94p5cvttmtdqy8rvrq74qly2yrfmzkdsntqzlc5qkc4rkq';
 
-  public pools: PoolType[] = ['stratum', 'fallbackStratum'];
-  public showPassword = { 'stratum': false, 'fallbackStratum': false };
-  public showAdvancedOptions = { 'stratum': false, 'fallbackStratum': false };
+  public showPassword: boolean[] = [];
+  public showAdvancedOptions: boolean[] = [];
+  public activeCardIndex: number | null = 0;
 
   public tlsOptions: ITlsOption[] = [
     { value: 0, label: 'No TLS' },
@@ -72,82 +79,232 @@ export class PoolComponent implements OnInit {
       .pipe(first(), this.loadingService.lockUIUntilComplete())
       .subscribe(info => {
         this.asicModel = info.ASICModel || '';
-        this.form = this.fb.group({
-          stratumURL: [info.stratumURL, [
-            Validators.required,
-            Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
-          ]],
-          stratumPort: [info.stratumPort, [
-            Validators.required,
-            Validators.pattern(/^[^:]*$/),
-            Validators.min(0),
-            Validators.max(65535)
-          ]],
-          stratumProtocol: [info.stratumProtocol || 'SV1'],
-          stratumV2AuthorityPubkey: [info.stratumV2AuthorityPubkey || '', [this.base58Validator()]],
-          stratumExtranonceSubscribe: [info.stratumExtranonceSubscribe == true, [Validators.required]],
-          stratumSuggestedDifficulty: [info.stratumSuggestedDifficulty, [Validators.required]],
-          stratumUser: [info.stratumUser, [Validators.required]],
-          stratumPassword: ['*****', [Validators.required]],
-          stratumTLS: [info.stratumTLS || 0],
-          stratumCert: [info.stratumCert],
-          stratumDecodeCoinbase: [info.stratumDecodeCoinbase == true, [Validators.required]],
-          fallbackStratumURL: [info.fallbackStratumURL, [
-            Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
-          ]],
-          fallbackStratumPort: [info.fallbackStratumPort, [
-            Validators.required,
-            Validators.pattern(/^[^:]*$/),
-            Validators.min(0),
-            Validators.max(65535)
-          ]],
-          fallbackStratumExtranonceSubscribe: [info.fallbackStratumExtranonceSubscribe == true, [Validators.required]],
-          fallbackStratumSuggestedDifficulty: [info.fallbackStratumSuggestedDifficulty, [Validators.required]],
-          fallbackStratumTLS: [info.fallbackStratumTLS || 0],
-          fallbackStratumCert: [info.fallbackStratumCert],
-          fallbackStratumDecodeCoinbase: [info.fallbackStratumDecodeCoinbase == true, [Validators.required]],
-          fallbackStratumUser: [info.fallbackStratumUser, [Validators.required]],
-          fallbackStratumPassword: ['*****', [Validators.required]],
-          fallbackStratumProtocol: [info.fallbackStratumProtocol || 'SV1'],
-          fallbackStratumV2AuthorityPubkey: [info.fallbackStratumV2AuthorityPubkey || '', [this.base58Validator()]],
-          stratumV2ChannelType: [info.stratumV2ChannelType || 'standard'],
-          fallbackStratumV2ChannelType: [info.fallbackStratumV2ChannelType || 'standard']
+
+        const poolsList = [...(info.pools || [])];
+        
+        // Ensure primary pool index slot is in the list
+        if (!poolsList.some(p => p.id === info.primaryPoolIndex)) {
+          poolsList.push({
+            id: info.primaryPoolIndex,
+            stratumProtocol: 'SV1',
+            stratumURL: '',
+            stratumPort: 3333,
+            stratumUser: '',
+            stratumPassword: '',
+            stratumSuggestedDifficulty: 0,
+            stratumExtranonceSubscribe: false,
+            stratumTLS: 0,
+            stratumCert: '',
+            stratumDecodeCoinbase: true,
+            stratumV2ChannelType: 'extended',
+            stratumV2AuthorityPubkey: ''
+          });
+        }
+        
+        // Ensure secondary pool index slot is in the list
+        if (!poolsList.some(p => p.id === info.secondaryPoolIndex)) {
+          poolsList.push({
+            id: info.secondaryPoolIndex,
+            stratumProtocol: 'SV1',
+            stratumURL: '',
+            stratumPort: 3333,
+            stratumUser: '',
+            stratumPassword: '',
+            stratumSuggestedDifficulty: 0,
+            stratumExtranonceSubscribe: false,
+            stratumTLS: 0,
+            stratumCert: '',
+            stratumDecodeCoinbase: true,
+            stratumV2ChannelType: 'extended',
+            stratumV2AuthorityPubkey: ''
+          });
+        }
+
+        // Sort by ID to keep the card order ascending
+        poolsList.sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+
+        const poolsFormGroups = poolsList.map((pool: any) => {
+          this.showPassword[pool.id] = false;
+          this.showAdvancedOptions[pool.id] = false;
+
+          return this.fb.group({
+            id: [pool.id],
+            stratumProtocol: [pool.stratumProtocol || 'SV1'],
+            stratumURL: [pool.stratumURL || '', [
+              Validators.required,
+              Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
+            ]],
+            stratumPort: [pool.stratumPort || 3333, [
+              Validators.required,
+              Validators.pattern(/^[^:]*$/),
+              Validators.min(0),
+              Validators.max(65535)
+            ]],
+            stratumUser: [pool.stratumUser || '', [Validators.required]],
+            stratumPassword: [pool.stratumPassword || '*****'],
+            stratumSuggestedDifficulty: [pool.stratumSuggestedDifficulty || 0, [Validators.required]],
+            stratumExtranonceSubscribe: [pool.stratumExtranonceSubscribe == true, [Validators.required]],
+            stratumTLS: [pool.stratumTLS || 0],
+            stratumCert: [pool.stratumCert || ''],
+            stratumDecodeCoinbase: [pool.stratumDecodeCoinbase == true, [Validators.required]],
+            stratumV2ChannelType: [pool.stratumV2ChannelType || 'extended'],
+            stratumV2AuthorityPubkey: [pool.stratumV2AuthorityPubkey || '', [this.base58Validator()]]
+          });
         });
 
-        const setupTlsValidation = (tlsControlName: string, certControlName: string) => {
-          this.form.get(tlsControlName)?.valueChanges.subscribe(value => {
-            const certControl = this.form.get(certControlName);
-            if (value === 2) {
-              certControl?.setValidators([
-                Validators.required,
-                this.pemCertificateValidator()
-              ]);
-            } else {
-              certControl?.clearValidators();
-            }
-            certControl?.updateValueAndValidity();
-          });
-        };
+        this.form = this.fb.group({
+          primaryPoolIndex: [info.primaryPoolIndex, [Validators.required]],
+          secondaryPoolIndex: [info.secondaryPoolIndex, [Validators.required]],
+          pools: this.fb.array(poolsFormGroups)
+        });
 
-        // Setup tls validation
-        setupTlsValidation('stratumTLS', 'stratumCert');
-        setupTlsValidation('fallbackStratumTLS', 'fallbackStratumCert');
+        for (let i = 0; i < poolsFormGroups.length; i++) {
+          this.setupTlsValidationForIndex(i);
+        }
 
-        // Trigger initial validation
-        this.form.get('stratumTLS')?.updateValueAndValidity();
-        this.form.get('fallbackStratumTLS')?.updateValueAndValidity();
+        this.previousPrim = info.primaryPoolIndex;
+        this.previousSec = info.secondaryPoolIndex;
+
+        this.form.get('primaryPoolIndex')?.valueChanges.subscribe(primVal => {
+          const secVal = this.form.get('secondaryPoolIndex')?.value;
+          if (primVal === secVal) {
+            this.form.get('secondaryPoolIndex')?.setValue(this.previousPrim, { emitEvent: false });
+            this.previousSec = this.previousPrim;
+          }
+          this.previousPrim = primVal;
+        });
+
+        this.form.get('secondaryPoolIndex')?.valueChanges.subscribe(secVal => {
+          const primVal = this.form.get('primaryPoolIndex')?.value;
+          if (secVal === primVal) {
+            this.form.get('primaryPoolIndex')?.setValue(this.previousSec, { emitEvent: false });
+            this.previousPrim = this.previousSec;
+          }
+          this.previousSec = secVal;
+        });
       });
+  }
+
+  get poolsArray(): FormArray {
+    return this.form?.get('pools') as FormArray;
+  }
+
+  get poolDropdownOptions(): IPoolDropdownOption[] {
+    if (!this.poolsArray) return [];
+    return this.poolsArray.controls.map((control) => {
+      const id = control.get('id')?.value;
+      const url = control.get('stratumURL')?.value || '';
+      const proto = control.get('stratumProtocol')?.value || 'SV1';
+      const urlDisplay = url ? `${url} (${proto})` : '(not configured)';
+      return {
+        value: id,
+        label: `Pool ${id + 1}: ${urlDisplay}`
+      };
+    });
+  }
+
+  setupTlsValidationForIndex(index: number) {
+    const poolGroup = this.poolsArray.at(index) as FormGroup;
+    poolGroup.get('stratumTLS')?.valueChanges.subscribe(value => {
+      const certControl = poolGroup.get('stratumCert');
+      if (value === 2) {
+        certControl?.setValidators([
+          Validators.required,
+          this.pemCertificateValidator()
+        ]);
+      } else {
+        certControl?.clearValidators();
+      }
+      certControl?.updateValueAndValidity();
+    });
+    poolGroup.get('stratumTLS')?.updateValueAndValidity();
+  }
+
+  private getFirstAvailableId(): number {
+    const existingIds = this.poolsArray.controls.map(c => c.get('id')?.value);
+    for (let i = 0; i < 8; i++) {
+      if (!existingIds.includes(i)) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  toggleCard(index: number) {
+    this.activeCardIndex = this.activeCardIndex === index ? null : index;
+  }
+
+  addPool() {
+    if (this.poolsArray.length < 8) {
+      const nextId = this.getFirstAvailableId();
+      const poolGroup = this.fb.group({
+        id: [nextId],
+        stratumProtocol: ['SV1'],
+        stratumURL: ['', [
+          Validators.required,
+          Validators.pattern(/^(?!.*stratum\+tcp:\/\/)(?!.*:[1-9]\d{0,4}$).*$/),
+        ]],
+        stratumPort: [3333, [
+          Validators.required,
+          Validators.pattern(/^[^:]*$/),
+          Validators.min(0),
+          Validators.max(65535)
+        ]],
+        stratumUser: ['', [Validators.required]],
+        stratumPassword: [''],
+        stratumSuggestedDifficulty: [0, [Validators.required]],
+        stratumExtranonceSubscribe: [false, [Validators.required]],
+        stratumTLS: [0],
+        stratumCert: [''],
+        stratumDecodeCoinbase: [true, [Validators.required]],
+        stratumV2ChannelType: ['extended'],
+        stratumV2AuthorityPubkey: ['', [this.base58Validator()]]
+      });
+
+      this.poolsArray.push(poolGroup);
+      this.showPassword[nextId] = false;
+      this.showAdvancedOptions[nextId] = false;
+
+      // Sort visual cards ascending by ID
+      this.poolsArray.controls.sort((a, b) => a.get('id')?.value - b.get('id')?.value);
+
+      const index = this.poolsArray.controls.findIndex(c => c.get('id')?.value === nextId);
+      this.setupTlsValidationForIndex(index);
+      this.activeCardIndex = index; // Expand newly added pool
+      this.form.markAsDirty();
+    }
+  }
+
+  deletePool(index: number) {
+    const poolGroup = this.poolsArray.at(index);
+    if (!poolGroup) return;
+    const id = poolGroup.get('id')?.value;
+    const prim = this.form.get('primaryPoolIndex')?.value;
+    const sec = this.form.get('secondaryPoolIndex')?.value;
+    if (id === prim || id === sec) {
+      this.toastr.error('Cannot delete a pool that is currently selected as primary or fallback.');
+      return;
+    }
+
+    this.poolsArray.removeAt(index);
+    this.pendingDeletePoolIds.push(id);
+    this.form.markAsDirty();
+
+    if (this.activeCardIndex === index) {
+      this.activeCardIndex = this.poolsArray.length > 0 ? 0 : null;
+    } else if (this.activeCardIndex !== null && this.activeCardIndex > index) {
+      this.activeCardIndex--;
+    }
+  }
+
+  isDeleteDisabled(id: number): boolean {
+    const prim = this.form?.get('primaryPoolIndex')?.value;
+    const sec = this.form?.get('secondaryPoolIndex')?.value;
+    return id === prim || id === sec;
   }
 
   public updateSystem() {
     const form = this.form.getRawValue();
-
-    if (form.stratumPassword === '*****') {
-      delete form.stratumPassword;
-    }
-    if (form.fallbackStratumPassword === '*****') {
-      delete form.fallbackStratumPassword;
-    }
 
     const restartAlreadyPending = this.savedChanges;
 
@@ -155,11 +312,24 @@ export class PoolComponent implements OnInit {
       .pipe(this.loadingService.lockUIUntilComplete())
       .subscribe({
         next: () => {
-          const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
-          this.toastr.warning('You must restart this device after saving for changes to take effect.');
-          this.toastr.success(successMessage);
-          this.form.markAsPristine();
-          this.savedChanges = true;
+          const deleteRequests = this.pendingDeletePoolIds.map(id => this.systemService.deletePool(this.uri, id));
+          if (deleteRequests.length > 0) {
+            import('rxjs').then(({ forkJoin }) => {
+              forkJoin(deleteRequests)
+                .pipe(this.loadingService.lockUIUntilComplete())
+                .subscribe({
+                  next: () => {
+                    this.onSaveSuccess();
+                  },
+                  error: (err: HttpErrorResponse) => {
+                    this.toastr.error(`Saved settings, but failed to delete cleared pools: ${err.message}`);
+                    this.onSaveSuccess();
+                  }
+                });
+            });
+          } else {
+            this.onSaveSuccess();
+          }
         },
         error: (err: HttpErrorResponse) => {
           const errorMessage = this.uri ? `Could not save pool settings for ${this.uri}. ${err.message}` : `Could not save pool settings. ${err.message}`;
@@ -167,6 +337,15 @@ export class PoolComponent implements OnInit {
           this.savedChanges = restartAlreadyPending;
         }
       });
+  }
+
+  private onSaveSuccess() {
+    const successMessage = this.uri ? `Saved pool settings for ${this.uri}` : 'Saved pool settings';
+    this.toastr.warning('You must restart this device after saving for changes to take effect.');
+    this.toastr.success(successMessage);
+    this.savedChanges = true;
+    this.pendingDeletePoolIds = [];
+    this.form.markAsPristine();
   }
 
   public restart() {
@@ -194,14 +373,16 @@ export class PoolComponent implements OnInit {
     return { cleanUrl: url };
   }
 
-  public onUrlChange(poolType: PoolType) {
-    const urlControl = this.form.get(`${poolType}URL`);
-    const portControl = this.form.get(`${poolType}Port`);
-    const tlsControl = this.form.get(`${poolType}TLS`);
+  public onUrlChange(index: number) {
+    const poolGroup = this.poolsArray.at(index);
+    if (!poolGroup) return;
+
+    const urlControl = poolGroup.get('stratumURL');
+    const portControl = poolGroup.get('stratumPort');
+    const tlsControl = poolGroup.get('stratumTLS');
     if (!urlControl || !portControl || !tlsControl) return;
 
-    let urlValue = urlControl.value.trim() || '';
-
+    let urlValue = urlControl.value?.trim() || '';
     if (!urlValue) return;
 
     const prefixes = [
@@ -224,9 +405,10 @@ export class PoolComponent implements OnInit {
     }
     urlControl.setValue(cleanUrl);
     tlsControl.setValue(isTlsMode);
+    urlControl.markAsDirty();
   }
 
-  onCertFileSelected(event: Event, formControlName: string): void {
+  onCertFileSelected(event: Event, index: number): void {
     const fileInput = event.target as HTMLInputElement;
 
     if (fileInput.files && fileInput.files.length > 0) {
@@ -235,21 +417,18 @@ export class PoolComponent implements OnInit {
 
       reader.onload = () => {
         const fileContent = reader.result as string;
-        // Update the corresponding certificate field in the form
-        this.form.get(formControlName)?.setValue(fileContent);
-        this.form.get(formControlName)?.markAsDirty();
+        const poolGroup = this.poolsArray.at(index);
+        poolGroup.get('stratumCert')?.setValue(fileContent);
+        poolGroup.get('stratumCert')?.markAsDirty();
 
-        // Reset file input so the same file can be selected again
         fileInput.value = '';
       };
 
       reader.onerror = () => {
-        // Error handling when reading the certificate file
         this.toastr.error('Failed to read certificate file');
         fileInput.value = '';
       };
 
-      // Read the file as text
       reader.readAsText(file);
     }
   }
@@ -271,13 +450,11 @@ export class PoolComponent implements OnInit {
       const value = control.value?.trim();
       if (!value) return null;
 
-      // Base58 alphabet (no 0, O, I, l)
       const base58Regex = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
       if (!base58Regex.test(value)) {
         return { invalidBase58: true };
       }
 
-      // SV2 authority pubkeys are typically 51-52 characters
       if (value.length < 40 || value.length > 52) {
         return { invalidBase58Length: true };
       }
@@ -290,62 +467,39 @@ export class PoolComponent implements OnInit {
     return option.value;
   }
 
-  isUsingDefaultAddress(pool: PoolType): boolean {
-    const userValue = this.form?.get(pool + 'User')?.value || '';
+  isUsingDefaultAddress(index: number): boolean {
+    if (!this.poolsArray) return false;
+    const poolGroup = this.poolsArray.at(index);
+    const userValue = poolGroup?.get('stratumUser')?.value || '';
     return userValue.includes(this.DEFAULT_BITCOIN_ADDRESS);
   }
 
   isAnyPoolUsingDefaultAddress(): boolean {
-    return this.pools.some(pool => this.isUsingDefaultAddress(pool));
-  }
-
-  public clearFallbackConfiguration(): void {
-    if (!confirm('Clear the fallback pool configuration? You still need to click Save to apply.')) {
-      return;
+    if (!this.form || !this.poolsArray) return false;
+    for (let i = 0; i < this.poolsArray.length; i++) {
+      if (this.isUsingDefaultAddress(i)) return true;
     }
-
-    const cleared: Record<string, string | number | boolean> = {
-      fallbackStratumURL: '',
-      fallbackStratumPort: 0,
-      fallbackStratumUser: '',
-      fallbackStratumPassword: '',
-      fallbackStratumCert: '',
-      fallbackStratumTLS: 0,
-      fallbackStratumSuggestedDifficulty: 0,
-      fallbackStratumExtranonceSubscribe: false,
-      fallbackStratumDecodeCoinbase: false,
-    };
-
-    Object.entries(cleared).forEach(([name, value]) => {
-      const control = this.form.get(name);
-      if (!control) return;
-      control.clearValidators();
-      control.setValue(value);
-      control.updateValueAndValidity();
-    });
-
-    this.form.markAsDirty();
+    return false;
   }
 
-  isStratumV2Enabled(): boolean {
-    return this.form?.get('stratumProtocol')?.value === 'SV2';
+  isPoolV2Enabled(index: number): boolean {
+    if (!this.poolsArray) return false;
+    const poolGroup = this.poolsArray.at(index);
+    return poolGroup?.get('stratumProtocol')?.value === 'SV2';
   }
 
-  isFallbackStratumV2Enabled(): boolean {
-    return this.form?.get('fallbackStratumProtocol')?.value === 'SV2';
-  }
-
-  isPoolV2Enabled(pool: PoolType): boolean {
-    return pool === 'stratum' ? this.isStratumV2Enabled() : this.isFallbackStratumV2Enabled();
+  isPoolV2Extended(index: number): boolean {
+    if (!this.isPoolV2Enabled(index)) return false;
+    const poolGroup = this.poolsArray.at(index);
+    return poolGroup?.get('stratumV2ChannelType')?.value === 'extended';
   }
 
   isStandardChannelDisabled(): boolean {
     return this.asicModel === 'BM1397';
   }
 
-  isPoolV2Extended(pool: PoolType): boolean {
-    if (!this.isPoolV2Enabled(pool)) return false;
-    const key = pool === 'stratum' ? 'stratumV2ChannelType' : 'fallbackStratumV2ChannelType';
-    return this.form?.get(key)?.value === 'extended';
+  getProtocolLabel(value: string): string {
+    const option = this.protocolOptions.find(opt => opt.value === value);
+    return option ? option.label : value;
   }
 }

@@ -1129,20 +1129,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     return percentage < 10 ? percentage.toPrecision(2) : percentage.toFixed(1);
   }
 
-  public getHeatmapColor(domainHashrate: number, expectedHashrate: number): string {
+  public getHeatmapLightness(domainHashrate: number, expectedHashrate: number): string {
     const expected = expectedHashrate || 1;
     const ratio = Math.max(0, Math.min(2, (domainHashrate / expected) * this.asicsAmount) * this.asicDomainsAmount);
     const deviation = isNaN(ratio) ? 1 : Math.abs(ratio - 1);  // 0 = perfect, 1 = 100% off
-    const t = 1 - Math.pow(1 - deviation, 1.5); // Exponent controls graduality (lower = more gradual, 7 was very steep)
-    const target = ratio > 1 ? 255 : 0; // gradient from 0: black, 1: primary-color, 2: white
+    const t = 1 - Math.pow(1 - deviation, 1.5); // Exponent controls graduality
 
-    const { r, g, b } = this.primaryColorRgb;
+    const direction = ratio > 1 ? 1 : -1;
+    const amount = direction * t * 0.4;
+    const lightness = 0.5 + amount;
 
-    const finalR = (r * (1 - t) + target * t) | 0;
-    const finalG = (g * (1 - t) + target * t) | 0;
-    const finalB = (b * (1 - t) + target * t) | 0;
-
-    return `rgb(${finalR}, ${finalG}, ${finalB})`;
+    return lightness.toFixed(3);
   }
 
   private updateChartDataSources(info: ISystemInfo) {

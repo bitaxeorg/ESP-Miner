@@ -16,9 +16,12 @@
     }
 
     td {
-        transition: background-color 2s ease-in-out;
-        background-color: var(--heatmap-bg);
-        color: contrast-color(var(--color-primary));
+        &.heatmap-cell {
+            text-align: center;
+            transition: background-color 2s ease-in-out;
+            background-color: oklch(from var(--color-primary) var(--lightness, 0.5) c h);
+            color: contrast-color(oklch(from var(--color-primary) var(--lightness, 0.5) c h));
+        }
     }
 }
 

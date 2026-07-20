@@ -21,5 +21,6 @@ void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime);
 
 stratum_protocol_t stratum_protocol_from_string(const char *s);
 sv2_channel_type_t sv2_channel_type_from_string(const char *s);
+void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i);
 
 #endif /* SYSTEM_H_ */

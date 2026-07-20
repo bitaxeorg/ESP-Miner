@@ -95,6 +95,40 @@ export class SystemApiService {
         uptimeSeconds: 38,
         smallCoreCount: 672,
         ASICModel: "BM1370" as any,
+        primaryPoolIndex: 0,
+        secondaryPoolIndex: 1,
+        pools: [
+          {
+            id: 0,
+            stratumProtocol: "SV1" as const,
+            stratumURL: "public-pool.io",
+            stratumPort: 21496,
+            stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
+            stratumPassword: "x",
+            stratumSuggestedDifficulty: 1000,
+            stratumExtranonceSubscribe: false,
+            stratumTLS: 0,
+            stratumCert: "",
+            stratumDecodeCoinbase: true,
+            stratumV2ChannelType: "extended" as const,
+            stratumV2AuthorityPubkey: ""
+          },
+          {
+            id: 1,
+            stratumProtocol: "SV1" as const,
+            stratumURL: "test.public-pool.io",
+            stratumPort: 21497,
+            stratumUser: "bc1q99n3pu025yyu0jlywpmwzalyhm36tg5u37w20d.bitaxe-U1",
+            stratumPassword: "x",
+            stratumSuggestedDifficulty: 1000,
+            stratumExtranonceSubscribe: false,
+            stratumTLS: 0,
+            stratumCert: "",
+            stratumDecodeCoinbase: true,
+            stratumV2ChannelType: "extended" as const,
+            stratumV2AuthorityPubkey: ""
+          }
+        ],
         stratumProtocol: "SV1" as const,
         stratumURL: "public-pool.io",
         stratumPort: 21496,
@@ -351,6 +385,14 @@ export class SystemApiService {
       } as ISystemUpdateResponse);
     }
     return of(undefined);
+  }
+
+  public deletePool(uri: string = '', id: number): Observable<any> {
+    if (environment.production) {
+      const targetUri = uri ? `${uri}/api/system/pools/${id}` : `/api/system/pools/${id}`;
+      return this.httpClient.delete<any>(targetUri);
+    }
+    return of({ message: 'Pool deleted successfully (mock)' }).pipe(delay(500));
   }
 
   private otaUpdate(file: File | Blob, url: string): Observable<HttpEvent<string>> {
