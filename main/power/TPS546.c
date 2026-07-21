@@ -845,6 +845,47 @@ float TPS546_get_vout(void)
     }
 }
 
+esp_err_t TPS546_check_phase_currents(uint8_t phase_count, float minimum_current_a)
+{
+    uint8_t original_phase = 0;
+    esp_err_t result = smb_read_byte(PMBUS_PHASE, &original_phase);
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "Could not read PHASE before buck participation test");
+        return result;
+    }
+
+    for (uint8_t phase = 0; phase < phase_count; phase++) {
+        uint16_t raw_iout = 0;
+
+        result = smb_write_byte(PMBUS_PHASE, phase);
+        if (result == ESP_OK) {
+            result = smb_read_word(PMBUS_READ_IOUT, &raw_iout);
+        }
+        if (result != ESP_OK) {
+            ESP_LOGE(TAG, "Buck phase %u current read failed: %s", phase, esp_err_to_name(result));
+            break;
+        }
+
+        float current_a = slinear11_2_float(raw_iout);
+        ESP_LOGI(TAG, "Buck phase %u current: %.3f A", phase, current_a);
+        if (current_a < minimum_current_a) {
+            ESP_LOGE(TAG, "Buck phase %u is not participating (%.3f A, minimum %.3f A)",
+                     phase, current_a, minimum_current_a);
+            result = ESP_FAIL;
+            break;
+        }
+    }
+
+    esp_err_t restore_result = smb_write_byte(PMBUS_PHASE, original_phase);
+    if (restore_result != ESP_OK) {
+        ESP_LOGE(TAG, "Could not restore PHASE=0x%02X after buck participation test: %s",
+                 original_phase, esp_err_to_name(restore_result));
+        return restore_result;
+    }
+
+    return result;
+}
+
 esp_err_t TPS546_check_status(GlobalState * GLOBAL_STATE) {
 
     SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;

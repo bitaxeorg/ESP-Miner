@@ -202,6 +202,7 @@ float TPS546_get_vout(void);
 esp_err_t TPS546_set_vout(float volts);
 void TPS546_show_voltage_settings(void);
 void TPS546_print_status(void);
+esp_err_t TPS546_check_phase_currents(uint8_t phase_count, float minimum_current_a);
 
 esp_err_t TPS546_check_status(GlobalState * GLOBAL_STATE);
 esp_err_t TPS546_clear_faults(void);
