@@ -7,7 +7,7 @@
     top: calc(var(--topbar-height) + 2rem);
     left: 2rem;
     transition: transform $transitionDuration, left $transitionDuration;
-    background-color: var(--p-card-background);
+    background-color: var(--color-bg-card);
     border-radius: $borderRadius;
     padding: 1.5rem;
     box-shadow: 0px 3px 5px rgba(0, 0, 0, .02), 0px 0px 2px rgba(0, 0, 0, .05), 0px 1px 4px rgba(0, 0, 0, .08);
@@ -27,7 +27,7 @@
             font-size: .857rem;
             text-transform: uppercase;
             font-weight: 700;
-            color: var(--p-text-muted-color);
+            color: var(--color-text-secondary);
             margin: .5rem 0;
             line-height: 1.3rem;
         }
@@ -65,7 +65,7 @@
             align-items: center;
             position: relative;
             outline: 0 none;
-            color: var(--text-color);
+            color: var(--color-text-main);
             cursor: pointer;
             padding: .75rem 1rem;
             border-radius: $borderRadius;
@@ -83,11 +83,11 @@
 
             &.active-route {
                 font-weight: 700;
-                color: var(--primary-color);
+                color: var(--color-primary);
             }
 
             &:hover {
-                background-color: var(--p-content-hover-background);
+                background-color: var(--color-bg-hover);
             }
 
             &:focus {

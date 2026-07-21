@@ -21,7 +21,7 @@
 
     &-content {
         width: 100%;
-        background: var(--p-content-hover-background);
+        background: var(--color-bg-hover);
         color: #fff;
         padding: 1.5rem 4rem 1.5rem 1.5rem;
         border-radius: 1.5rem 1.5rem 0 0;
@@ -36,7 +36,7 @@
         right: 1.5rem;
         top: 1.5rem;
         border: none;
-        background: var(--button-bg);
+        background: var(--color-primary);
         font-size: 18px;
         line-height: 18px;
         display: flex;

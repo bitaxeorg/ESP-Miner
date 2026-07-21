@@ -3,7 +3,7 @@ h1, h2, h3, h4, h5, h6 {
     font-family: inherit;
     font-weight: 500;
     line-height: 1.2;
-    color: var(--p-text-color);
+    color: var(--color-text-main);
 
     &:first-child {
         margin-top: 0;
@@ -48,14 +48,14 @@ blockquote {
 }
 
 hr {
-    border-top: solid var(--p-content-border-color);
+    border-top: solid var(--color-border-content);
     border-width: 1px 0 0 0;
     margin: 1rem 0;
 }
 
 p {
     margin: 0 0 1rem 0;
-    line-height: 1.5;
+    line-height: inherit;
 
     &:last-child {
         margin-bottom: 0;

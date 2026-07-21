@@ -107,7 +107,8 @@ void ASIC_result_task(void *pvParameters)
                 }
             } else {
                 // V1: submit with JSON-RPC
-                char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+                uint16_t active_idx = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.secondary_pool_index : GLOBAL_STATE->SYSTEM_MODULE.primary_pool_index;
+                char * user = GLOBAL_STATE->SYSTEM_MODULE.pools[active_idx].user;
 
                 taskENTER_CRITICAL(&GLOBAL_STATE->stratum_mux);
                 esp_transport_handle_t transport = GLOBAL_STATE->transport;

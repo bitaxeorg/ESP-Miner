@@ -106,8 +106,7 @@ export class ThemeConfigComponent implements OnInit {
             }
             if (settings.primaryColor) {
               this.currentColor = settings.primaryColor.toUpperCase();
-              const accentColors = ThemeService.generateThemeVariables(this.currentColor);
-              this.applyThemeColors(accentColors);
+              document.documentElement.style.setProperty('--color-primary', this.currentColor);
             }
           }
         },
@@ -118,12 +117,6 @@ export class ThemeConfigComponent implements OnInit {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
-  }
-
-  private applyThemeColors(colors: { [key: string]: string }) {
-    Object.entries(colors).forEach(([key, value]) => {
-      document.documentElement.style.setProperty(key, value);
-    });
   }
 
   changeColorScheme(scheme: string) {
@@ -141,8 +134,7 @@ export class ThemeConfigComponent implements OnInit {
 
   changeTheme(theme: ThemeOption) {
     this.currentColor = theme.primaryColor;
-    const accentColors = ThemeService.generateThemeVariables(this.currentColor);
-    this.applyThemeColors(accentColors);
+    document.documentElement.style.setProperty('--color-primary', this.currentColor);
 
     this.themeService.saveThemeSettings({
       colorScheme: this.selectedScheme,
@@ -156,8 +148,7 @@ export class ThemeConfigComponent implements OnInit {
   onCustomColorChange(event: any) {
     const color = event.target.value;
     this.currentColor = color.toUpperCase();
-    const accentColors = ThemeService.generateThemeVariables(this.currentColor);
-    this.applyThemeColors(accentColors);
+    document.documentElement.style.setProperty('--color-primary', this.currentColor);
 
     this.themeService.saveThemeSettings({
       colorScheme: this.selectedScheme,

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
+#include "cJSON.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -40,6 +41,106 @@ static const char * TAG = "system";
 //local function prototypes
 static esp_err_t ensure_overheat_mode_config();
 
+static void parse_pool_config_json(const char *json_str, PoolConfig *cfg, int index) {
+    // Set default values first
+    cfg->protocol = STRATUM_PROTOCOL_V1;
+    cfg->url = strdup(index == 0 ? CONFIG_STRATUM_URL : "");
+    cfg->port = index == 0 ? CONFIG_STRATUM_PORT : 3333;
+    cfg->user = strdup(index == 0 ? CONFIG_STRATUM_USER : "");
+    cfg->pass = strdup(index == 0 ? CONFIG_STRATUM_PW : "x");
+    cfg->difficulty = index == 0 ? CONFIG_STRATUM_DIFFICULTY : 0;
+#ifdef CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE
+    cfg->extranonce_subscribe = true;
+#else
+    cfg->extranonce_subscribe = false;
+#endif
+    cfg->tls = index == 0 ? CONFIG_STRATUM_TLS : 0;
+    cfg->cert = strdup("");
+    cfg->decode_coinbase_tx = true;
+    cfg->sv2_channel_type = SV2_CHANNEL_EXTENDED;
+    cfg->sv2_authority_pubkey = strdup("");
+
+    if (!json_str || strlen(json_str) == 0) {
+        return;
+    }
+
+    cJSON *root = cJSON_Parse(json_str);
+    if (!root) {
+        return;
+    }
+
+    cJSON *item;
+
+    item = cJSON_GetObjectItem(root, "stratumProtocol");
+    if (item && cJSON_IsString(item)) {
+        stratum_protocol_t p = stratum_protocol_from_string(item->valuestring);
+        if (p != STRATUM_PROTOCOL_UNKNOWN) cfg->protocol = p;
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumURL");
+    if (item && cJSON_IsString(item)) {
+        free(cfg->url);
+        cfg->url = strdup(item->valuestring);
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumPort");
+    if (item && cJSON_IsNumber(item)) {
+        cfg->port = item->valueint;
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumUser");
+    if (item && cJSON_IsString(item)) {
+        free(cfg->user);
+        cfg->user = strdup(item->valuestring);
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumPassword");
+    if (item && cJSON_IsString(item)) {
+        free(cfg->pass);
+        cfg->pass = strdup(item->valuestring);
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumSuggestedDifficulty");
+    if (item && cJSON_IsNumber(item)) {
+        cfg->difficulty = item->valueint;
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumExtranonceSubscribe");
+    if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
+        cfg->extranonce_subscribe = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumTLS");
+    if (item && cJSON_IsNumber(item)) {
+        cfg->tls = item->valueint;
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumCert");
+    if (item && cJSON_IsString(item)) {
+        free(cfg->cert);
+        cfg->cert = strdup(item->valuestring);
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumDecodeCoinbase");
+    if (item && (cJSON_IsBool(item) || cJSON_IsNumber(item))) {
+        cfg->decode_coinbase_tx = cJSON_IsTrue(item) || (cJSON_IsNumber(item) && item->valueint != 0);
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumV2ChannelType");
+    if (item && cJSON_IsString(item)) {
+        sv2_channel_type_t t = sv2_channel_type_from_string(item->valuestring);
+        if (t != SV2_CHANNEL_UNKNOWN) cfg->sv2_channel_type = t;
+    }
+
+    item = cJSON_GetObjectItem(root, "stratumV2AuthorityPubkey");
+    if (item && cJSON_IsString(item)) {
+        free(cfg->sv2_authority_pubkey);
+        cfg->sv2_authority_pubkey = strdup(item->valuestring);
+    }
+
+    cJSON_Delete(root);
+}
+
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 {
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
@@ -59,58 +160,32 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     strcpy(module->ipv6_addr_str, "");
     strcpy(module->wifi_status, "Initializing...");
     
-    // set the pool url
-    module->pool_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL);
-    module->fallback_pool_url = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL);
+    // set the pool configurations
+    for (int i = 0; i < MAX_POOLS; i++) {
+        module->pools[i].url = NULL;
+        module->pools[i].user = NULL;
+        module->pools[i].pass = NULL;
+        module->pools[i].cert = NULL;
+        module->pools[i].sv2_authority_pubkey = NULL;
+        SYSTEM_load_pool_from_nvs(GLOBAL_STATE, i);
+    }
 
-    // set the pool port
-    module->pool_port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT);
-    module->fallback_pool_port = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT);
+    // load primary and secondary pool index selectors
+    module->primary_pool_index = nvs_config_get_u16(NVS_CONFIG_PRIMARY_POOL_INDEX);
+    module->secondary_pool_index = nvs_config_get_u16(NVS_CONFIG_SECONDARY_POOL_INDEX);
 
-    // set the pool tls
-    module->pool_tls = nvs_config_get_u16(NVS_CONFIG_STRATUM_TLS);
-    module->fallback_pool_tls = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS);
-
-    // set the pool cert
-    module->pool_cert = nvs_config_get_string(NVS_CONFIG_STRATUM_CERT);
-    module->fallback_pool_cert = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_CERT);
-
-    // set the pool user
-    module->pool_user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER);
-    module->fallback_pool_user = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER);
-
-    // set the pool password
-    module->pool_pass = nvs_config_get_string(NVS_CONFIG_STRATUM_PASS);
-    module->fallback_pool_pass = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PASS);
-
-    // set the pool difficulty
-    module->pool_difficulty = nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY);
-    module->fallback_pool_difficulty = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY);
-
-    // set the pool extranonce subscribe
-    module->pool_extranonce_subscribe = nvs_config_get_bool(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE);
-    module->fallback_pool_extranonce_subscribe = nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUBSCRIBE);
-
-    // set the pool decode coinbase
-    module->pool_decode_coinbase_tx = nvs_config_get_bool(NVS_CONFIG_STRATUM_DECODE_COINBASE_TX);
-    module->fallback_pool_decode_coinbase_tx = nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX);
+    if (module->primary_pool_index >= MAX_POOLS) {
+        module->primary_pool_index = 0;
+    }
+    if (module->secondary_pool_index >= MAX_POOLS) {
+        module->secondary_pool_index = 1;
+    }
 
     // use fallback stratum
     module->use_fallback_stratum = nvs_config_get_bool(NVS_CONFIG_USE_FALLBACK_STRATUM);
 
     // set based on config
     module->is_using_fallback = module->use_fallback_stratum;
-
-    // load fallback pool protocol
-    char *fb_proto_str = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PROTOCOL);
-    stratum_protocol_t fb_proto_val = stratum_protocol_from_string(fb_proto_str);
-    if (fb_proto_val != STRATUM_PROTOCOL_UNKNOWN) {
-        module->fallback_pool_protocol = fb_proto_val;
-    } else {
-        ESP_LOGW(TAG, "Invalid fallback stratum protocol in NVS: '%s', defaulting to SV1", fb_proto_str ? fb_proto_str : "NULL");
-        module->fallback_pool_protocol = STRATUM_PROTOCOL_V1;
-    }
-    free(fb_proto_str);
 
     // Initialize pool connection info
     strcpy(module->pool_connection_info, "Not Connected");
@@ -129,16 +204,9 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     suffixString(module->best_nonce_diff, module->best_diff_string, DIFF_STRING_SIZE, 0);
     suffixString(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 
-    // Load stratum protocol selection
-    char *proto_str = nvs_config_get_string(NVS_CONFIG_STRATUM_PROTOCOL);
-    stratum_protocol_t proto_val = stratum_protocol_from_string(proto_str);
-    if (proto_val != STRATUM_PROTOCOL_UNKNOWN) {
-        GLOBAL_STATE->stratum_protocol = proto_val;
-    } else {
-        ESP_LOGW(TAG, "Invalid stratum protocol in NVS: '%s', defaulting to SV1", proto_str ? proto_str : "NULL");
-        GLOBAL_STATE->stratum_protocol = STRATUM_PROTOCOL_V1;
-    }
-    free(proto_str);
+    // Load stratum protocol selection from the active pool configuration
+    uint16_t active_pool_idx = module->is_using_fallback ? module->secondary_pool_index : module->primary_pool_index;
+    GLOBAL_STATE->stratum_protocol = module->pools[active_pool_idx].protocol;
     GLOBAL_STATE->sv2_conn = NULL;
 
     // Initialize mutexes
@@ -393,4 +461,25 @@ sv2_channel_type_t sv2_channel_type_from_string(const char *s)
     if (strcmp(s, SV2_CHANNEL_TYPE_EXTENDED) == 0) return SV2_CHANNEL_EXTENDED;
     if (strcmp(s, SV2_CHANNEL_TYPE_STANDARD) == 0) return SV2_CHANNEL_STANDARD;
     return SV2_CHANNEL_UNKNOWN;
+}
+
+void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i) {
+    if (i < 0 || i >= MAX_POOLS) return;
+    
+    PoolConfig *cfg = &GLOBAL_STATE->SYSTEM_MODULE.pools[i];
+    free(cfg->url);
+    free(cfg->user);
+    free(cfg->pass);
+    free(cfg->cert);
+    free(cfg->sv2_authority_pubkey);
+    
+    cfg->url = NULL;
+    cfg->user = NULL;
+    cfg->pass = NULL;
+    cfg->cert = NULL;
+    cfg->sv2_authority_pubkey = NULL;
+
+    char *json_str = nvs_config_get_string_indexed(NVS_CONFIG_POOL, i);
+    parse_pool_config_json(json_str, cfg, i);
+    free(json_str);
 }
