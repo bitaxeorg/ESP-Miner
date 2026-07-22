@@ -34,17 +34,17 @@ struct sv2_noise_ctx;
 
 typedef struct {
     char * url;
-    uint16_t port;
     char * user;
     char * pass;
-    stratum_protocol_t protocol;
-    uint16_t difficulty;
-    bool extranonce_subscribe;
-    uint16_t tls;
     char * cert;
-    bool decode_coinbase_tx;
-    uint16_t sv2_channel_type;
     char * sv2_authority_pubkey;
+    stratum_protocol_t protocol;
+    uint16_t port;
+    uint16_t difficulty;
+    uint16_t tls;
+    uint16_t sv2_channel_type;
+    bool decode_coinbase_tx;
+    bool extranonce_subscribe;
 } PoolConfig;
 
 #define HISTORY_LENGTH 100
@@ -60,67 +60,72 @@ typedef struct {
 
 typedef struct
 {
+    int64_t start_time;
+    uint32_t shares_accepted;
+    uint32_t shares_rejected;
     float current_hashrate;
     float hashrate_1m;
     float hashrate_10m;
     float hashrate_1h;
     float error_percentage;
-    int64_t start_time;
-    uint64_t shares_accepted;
-    uint64_t shares_rejected;
-    uint64_t work_received;
-    RejectedReasonStat rejected_reason_stats[10];
-    int rejected_reason_stats_count;
-    int screen_page;
-    uint64_t best_nonce_diff;
-    char best_diff_string[DIFF_STRING_SIZE];
-    uint64_t best_session_nonce_diff;
-    char best_session_diff_string[DIFF_STRING_SIZE];
-    int block_found;
-    bool show_new_block;
-    char * ssid;
-    char wifi_status[256];
-    char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
-    char ipv6_addr_str[64]; // IPv6 address string with zone identifier (INET6_ADDRSTRLEN=46 + % + interface=15)
-    char ap_ssid[12];
-    bool ap_enabled;
-    bool is_connected;
-    int identify_mode_time_ms;
-    PoolConfig pools[MAX_POOLS];
-    uint16_t primary_pool_index;
-    uint16_t secondary_pool_index;
-    bool use_fallback_stratum;
-    bool is_using_fallback;
     float response_time;
-    uint16_t response_share_batch;
     float process_time;
     float cpu_usage;
-    char pool_connection_info[64];
+    uint16_t power_fault;
+    uint16_t response_share_batch;
+    uint32_t lastClockSync;
+    uint32_t work_received;
+    int screen_page;
+    int rejected_reason_stats_count;
+    RejectedReasonStat rejected_reason_stats[10];
+
+    uint16_t primary_pool_index;
+    uint16_t secondary_pool_index;
+    PoolConfig pools[MAX_POOLS];
+
+    Scoreboard scoreboard;
+    uint64_t best_nonce_diff;
+    uint64_t best_session_nonce_diff;
+    int identify_mode_time_ms;
+    int block_found;
+
+    bool show_new_block;
+    bool ap_enabled;
+    bool is_connected;
+    bool use_fallback_stratum;
+    bool is_using_fallback;
     bool overheat_mode;
     bool mining_paused;
     bool pools_unavailable;
-    uint16_t power_fault;
-    uint32_t lastClockSync;
     bool is_screen_active;
     bool is_firmware_update;
-    char firmware_update_filename[20];
-    char firmware_update_status[20];
     bool hardware_fault;
-    char hardware_fault_msg[64];
+
     const char * asic_status;
     char * version;
     char * axeOSVersion;
-    Scoreboard scoreboard;
+    char * ssid;
+
+    char best_diff_string[DIFF_STRING_SIZE];
+    char best_session_diff_string[DIFF_STRING_SIZE];
+    char pool_connection_info[64];
+    char firmware_update_filename[20];
+    char firmware_update_status[20];
+    char hardware_fault_msg[64];
     char mdns_hostname[64];
     char full_hostname[70];
+    char wifi_status[256];
+    char ipv6_addr_str[64]; // IPv6 address string with zone identifier (INET6_ADDRSTRLEN=46 + % + interface=15)
+    char ip_addr_str[16]; // IP4ADDR_STRLEN_MAX
+    char ap_ssid[12];
 } SystemModule;
 
 typedef struct
 {
-    bool is_active;
     uint64_t accepted_count;
     uint64_t rejected_count;
     double hashes;
+    bool is_active;
     pthread_mutex_t lock;
 } SelfTestNonceMeasurement;
 
@@ -186,14 +191,14 @@ typedef struct
     bool filesystem_is_available;
 
     int block_height;
-    char scriptsig[128];
-    coinbase_output_t coinbase_outputs[MAX_COINBASE_TX_OUTPUTS];
     int coinbase_output_count;
+    uint64_t network_nonce_diff;
     uint64_t coinbase_value_total_satoshis;
     uint64_t coinbase_value_user_satoshis;
-    uint64_t network_nonce_diff;
-    char network_diff_string[DIFF_STRING_SIZE];
+    coinbase_output_t coinbase_outputs[MAX_COINBASE_TX_OUTPUTS];
+    char scriptsig[128];
     char block_signals[MAX_BLOCK_SIGNALS][MAX_BLOCK_SIGNAL_LEN];
+    char network_diff_string[DIFF_STRING_SIZE];
     int block_signals_count;
 } GlobalState;
 
