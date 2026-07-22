@@ -165,6 +165,11 @@ export class PoolComponent implements OnInit {
         this.previousPrim = info.primaryPoolIndex;
         this.previousSec = info.secondaryPoolIndex;
 
+        this.updatePoolDropdownOptions();
+        this.poolsArray.valueChanges.subscribe(() => {
+          this.updatePoolDropdownOptions();
+        });
+
         this.form.get('primaryPoolIndex')?.valueChanges.subscribe(primVal => {
           const secVal = this.form.get('secondaryPoolIndex')?.value;
           if (primVal === secVal) {
@@ -178,7 +183,7 @@ export class PoolComponent implements OnInit {
           const primVal = this.form.get('primaryPoolIndex')?.value;
           if (secVal === primVal) {
             this.form.get('primaryPoolIndex')?.setValue(this.previousSec, { emitEvent: false });
-            this.previousPrim = this.previousSec;
+            this.previousSec = secVal;
           }
           this.previousSec = secVal;
         });
@@ -189,9 +194,14 @@ export class PoolComponent implements OnInit {
     return this.form?.get('pools') as FormArray;
   }
 
-  get poolDropdownOptions(): IPoolDropdownOption[] {
-    if (!this.poolsArray) return [];
-    return this.poolsArray.controls.map((control) => {
+  public poolDropdownOptions: IPoolDropdownOption[] = [];
+
+  public updatePoolDropdownOptions(): void {
+    if (!this.poolsArray) {
+      this.poolDropdownOptions = [];
+      return;
+    }
+    const newOptions = this.poolsArray.controls.map((control) => {
       const id = control.get('id')?.value;
       const url = control.get('stratumURL')?.value || '';
       const proto = control.get('stratumProtocol')?.value || 'SV1';
@@ -201,6 +211,10 @@ export class PoolComponent implements OnInit {
         label: `Pool ${id + 1}: ${urlDisplay}`
       };
     });
+
+    if (JSON.stringify(newOptions) !== JSON.stringify(this.poolDropdownOptions)) {
+      this.poolDropdownOptions = newOptions;
+    }
   }
 
   setupTlsValidationForIndex(index: number) {
