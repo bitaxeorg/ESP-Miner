@@ -93,6 +93,9 @@ export class SystemApiService {
           { message: "Duplicate share", count: 2 }
         ],
         uptimeSeconds: 38,
+        totalUptimeSeconds: 123456,
+        totalHashes: 456789012345,
+        totalLog2Work: 38.729,
         smallCoreCount: 672,
         ASICModel: "BM1370" as any,
         primaryPoolIndex: 0,

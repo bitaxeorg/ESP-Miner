@@ -84,6 +84,7 @@ static float current_hashrate;
 static float current_power;
 static uint64_t current_difficulty;
 static float current_chip_temp;
+static uint32_t current_uptime_seconds;
 
 #define NOTIFICATION_SHARE_ACCEPTED (1 << 0)
 #define NOTIFICATION_SHARE_REJECTED (1 << 1)
@@ -662,27 +663,29 @@ void screen_button_press()
 static void uptime_update_cb(lv_timer_t * timer)
 {
     if (wifi_uptime_label) {
-        char uptime[50];
-        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time) / 1000000;
+        uint32_t uptime_seconds = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.start_time_us) / 1000000;
 
-        uint32_t days = uptime_seconds / (24 * 3600);
-        uptime_seconds %= (24 * 3600);
-        uint32_t hours = uptime_seconds / 3600;
-        uptime_seconds %= 3600;
-        uint32_t minutes = uptime_seconds / 60;
-        uptime_seconds %= 60;
+        if (current_uptime_seconds != uptime_seconds) {
+            current_uptime_seconds = uptime_seconds;
+            char uptime[50];
 
-        if (days > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "d %" PRIu32 "h %" PRIu32 "m %" PRIu32 "s", days, hours, minutes, uptime_seconds);
-        } else if (hours > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "h %" PRIu32 "m %" PRIu32 "s", hours, minutes, uptime_seconds);
-        } else if (minutes > 0) {
-            snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "m %" PRIu32 "s", minutes, uptime_seconds);
-        } else {
-            snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "s", uptime_seconds);
-        }
+            uint32_t days = uptime_seconds / (24 * 3600);
+            uptime_seconds %= (24 * 3600);
+            uint32_t hours = uptime_seconds / 3600;
+            uptime_seconds %= 3600;
+            uint32_t minutes = uptime_seconds / 60;
+            uptime_seconds %= 60;
 
-        if (strcmp(lv_label_get_text(wifi_uptime_label), uptime) != 0) {
+            if (days > 0) {
+                snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "d %" PRIu32 "h %" PRIu32 "m %" PRIu32 "s", days, hours, minutes, uptime_seconds);
+            } else if (hours > 0) {
+                snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "h %" PRIu32 "m %" PRIu32 "s", hours, minutes, uptime_seconds);
+            } else if (minutes > 0) {
+                snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "m %" PRIu32 "s", minutes, uptime_seconds);
+            } else {
+                snprintf(uptime, sizeof(uptime), "Uptime: %" PRIu32 "s", uptime_seconds);
+            }
+
             lv_label_set_text(wifi_uptime_label, uptime);
         }
     }

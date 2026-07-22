@@ -5,6 +5,7 @@
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "system_api_json.h"
+#include "system.h"
 #include "nvs_config.h"
 #include "sv2_protocol.h"
 #include "vcore.h"
@@ -87,7 +88,10 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
     cJSON_AddNumberToObject(root, "freeHeapSpiram", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     cJSON_AddNumberToObject(root, "minFreeHeap", esp_get_minimum_free_heap_size());
     cJSON_AddNumberToObject(root, "maxAllocHeap", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
-    cJSON_AddNumberToObject(root, "uptimeSeconds", (uint32_t)((esp_timer_get_time() - g->SYSTEM_MODULE.start_time) / 1000000));
+    cJSON_AddNumberToObject(root, "uptimeSeconds", g->SYSTEM_MODULE.uptime_seconds);
+    cJSON_AddNumberToObject(root, "totalUptimeSeconds", SYSTEM_noinit_get_total_uptime_seconds());
+    cJSON_AddNumberToObject(root, "totalHashes", SYSTEM_noinit_get_total_hashes());
+    cJSON_AddNumberToObject(root, "totalLog2Work", SYSTEM_noinit_get_total_log2_work());
     cJSON_AddFloatToObject(root, "cpuUsage", g->SYSTEM_MODULE.cpu_usage);
     cJSON_AddBoolToObject(root, "miningPaused", g->SYSTEM_MODULE.mining_paused);
     cJSON_AddNumberToObject(root, "overheat_mode", g->SYSTEM_MODULE.overheat_mode ? 1 : 0);

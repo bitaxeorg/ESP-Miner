@@ -19,6 +19,10 @@ void SYSTEM_notify_rejected_share(GlobalState * GLOBAL_STATE, char * error_msg);
 void SYSTEM_notify_found_nonce(GlobalState * GLOBAL_STATE, double diff, uint32_t target);
 void SYSTEM_notify_new_ntime(GlobalState * GLOBAL_STATE, uint32_t ntime);
 
+void SYSTEM_noinit_update(SystemModule * SYSTEM_MODULE);
+uint64_t SYSTEM_noinit_get_total_uptime_seconds();
+double SYSTEM_noinit_get_total_hashes();
+double SYSTEM_noinit_get_total_log2_work();
 stratum_protocol_t stratum_protocol_from_string(const char *s);
 sv2_channel_type_t sv2_channel_type_from_string(const char *s);
 void SYSTEM_load_pool_from_nvs(GlobalState * GLOBAL_STATE, int i);
