@@ -121,10 +121,11 @@ else()
         USES_TERMINAL
     )
 
-    # Collect all frontend source files to track dependencies
+    # Collect all frontend source files to track dependencies (excluding auto-generated code)
     file(GLOB_RECURSE WEB_UI_SOURCES
         "${WEB_SRC_DIR}/src/*.*"
     )
+    list(FILTER WEB_UI_SOURCES EXCLUDE REGEX "/generated/")
 
     # Also track build configuration files
     list(APPEND WEB_UI_SOURCES
