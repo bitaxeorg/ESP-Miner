@@ -88,6 +88,31 @@ static sv2_channel_type_t sv2_select_channel_type(GlobalState *GLOBAL_STATE, boo
     return type;
 }
 
+static bool add_active_job_id(uint32_t *active_job_ids, int *count, uint32_t job_id)
+{
+    for (int i = 0; i < *count; i++) {
+        if (active_job_ids[i] == job_id) {
+            return false;
+        }
+    }
+    if (*count < SV2_MAX_ACTIVE_JOB_IDS) {
+        active_job_ids[*count] = job_id;
+        (*count)++;
+    } else {
+        for (int i = 1; i < SV2_MAX_ACTIVE_JOB_IDS; i++) {
+            active_job_ids[i - 1] = active_job_ids[i];
+        }
+        active_job_ids[SV2_MAX_ACTIVE_JOB_IDS - 1] = job_id;
+    }
+    return true;
+}
+
+static void clear_active_job_ids(uint32_t *active_job_ids, int *count)
+{
+    memset(active_job_ids, 0, sizeof(uint32_t) * SV2_MAX_ACTIVE_JOB_IDS);
+    *count = 0;
+}
+
 void stratum_v2_close_connection(GlobalState *GLOBAL_STATE)
 {
     ESP_LOGE(TAG, "Shutting down SV2 connection and restarting...");
@@ -167,12 +192,20 @@ bool stratum_v2_is_extended_channel(GlobalState *GLOBAL_STATE)
            GLOBAL_STATE->sv2_conn->channel_type == SV2_CHANNEL_EXTENDED;
 }
 
-// Enqueue an sv2_job_t onto the stratum queue
 static void stratum_v2_enqueue_job(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
                                    uint32_t job_id, uint32_t version,
                                    const uint8_t merkle_root[32], const uint8_t prev_hash[32],
                                    uint32_t ntime, uint32_t nbits, bool clean_jobs)
 {
+    if (clean_jobs) {
+        clear_active_job_ids(conn->active_job_ids, &conn->active_job_ids_count);
+    }
+
+    if (!add_active_job_id(conn->active_job_ids, &conn->active_job_ids_count, job_id)) {
+        ESP_LOGW(TAG, "Ignoring duplicate V2 standard job %lu", job_id);
+        return;
+    }
+
     sv2_job_t *job = malloc(sizeof(sv2_job_t));
     if (!job) {
         ESP_LOGE(TAG, "Failed to allocate sv2_job_t");
@@ -207,6 +240,16 @@ static void stratum_v2_enqueue_job(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
 static void stratum_v2_enqueue_ext_job(GlobalState *GLOBAL_STATE, sv2_conn_t *conn,
                                         sv2_ext_job_t *job)
 {
+    if (job->clean_jobs) {
+        clear_active_job_ids(conn->active_job_ids, &conn->active_job_ids_count);
+    }
+
+    if (!add_active_job_id(conn->active_job_ids, &conn->active_job_ids_count, job->job_id)) {
+        ESP_LOGW(TAG, "Ignoring duplicate V2 extended job %lu", job->job_id);
+        sv2_ext_job_free(job);
+        return;
+    }
+
     GLOBAL_STATE->SYSTEM_MODULE.work_received++;
 
     SYSTEM_notify_new_ntime(GLOBAL_STATE, job->ntime);
@@ -872,6 +915,7 @@ void stratum_v2_task(void *pvParameters)
                 conn->extranonce_size = (uint8_t)extranonce_size;
                 conn->extranonce_prefix_len = extranonce_prefix_len;
                 memcpy(conn->extranonce_prefix, extranonce_prefix, extranonce_prefix_len);
+                GLOBAL_STATE->reset_extranonce2 = true;
 
                 ESP_LOGI(TAG, "Extended channel: extranonce_size=%d, prefix_len=%d",
                          extranonce_size, extranonce_prefix_len);
