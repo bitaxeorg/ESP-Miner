@@ -209,13 +209,13 @@
                         <form [formGroup]="form">
                             <div class="flex flex-nowrap justify-between mb-3">
                                 <app-dropdown
-                                    formControlName="chartY1Data"
-                                    [options]="chartDataSources"
+                                    formControlName="chartY1Unit"
+                                    [options]="chartUnitGroups"
                                     class="w-40 text-sm">
                                 </app-dropdown>
                                 <app-dropdown
-                                    formControlName="chartY2Data"
-                                    [options]="chartDataSources"
+                                    formControlName="chartY2Unit"
+                                    [options]="chartUnitGroups"
                                     class="w-40 text-sm">
                                 </app-dropdown>
                             </div>
