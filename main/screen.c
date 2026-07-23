@@ -688,13 +688,12 @@ static void uptime_update_cb(lv_timer_t * timer)
     }
 }
 
-esp_err_t screen_start(void * pvParameters)
+esp_err_t screen_start(GlobalState * GLOBAL_STATE)
 {
     if (lvgl_port_lock(0)) {
         // screen_chars = lv_display_get_horizontal_resolution(NULL) / 6;
         screen_lines = lv_display_get_vertical_resolution(NULL) / 8;
 
-        GLOBAL_STATE = (GlobalState *) pvParameters;
         SystemModule * SYSTEM_MODULE = &GLOBAL_STATE->SYSTEM_MODULE;
 
         if (SYSTEM_MODULE->is_screen_active) {

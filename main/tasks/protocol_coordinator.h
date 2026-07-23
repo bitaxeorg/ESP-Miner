@@ -1,7 +1,9 @@
 #ifndef PROTOCOL_COORDINATOR_H_
 #define PROTOCOL_COORDINATOR_H_
 
-#include "global_state.h"
+#include <stdbool.h>
+
+typedef struct GlobalState GlobalState;
 
 // Initialize the coordinator (call once from main before starting the task)
 void protocol_coordinator_init(GlobalState *gs);

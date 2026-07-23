@@ -4,6 +4,7 @@
 #include "esp_system.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
+#include "global_state.h"
 #include "system_api_json.h"
 #include "nvs_config.h"
 #include "sv2_protocol.h"
@@ -294,18 +295,18 @@ static void system_api_add_block_info(cJSON *root, GlobalState *g) {
     }
 }
 
-cJSON* system_api_get_full_json(GlobalState *g) {
-    if (!g) return NULL;
+cJSON* system_api_get_full_json(GlobalState * GLOBAL_STATE) {
+    if (!GLOBAL_STATE) return NULL;
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) return NULL;
 
-    system_api_add_telemetry(root, g);
-    system_api_add_config(root, g);
-    system_api_add_hashrate_monitor(root, g);
+    system_api_add_telemetry(root, GLOBAL_STATE);
+    system_api_add_config(root, GLOBAL_STATE);
+    system_api_add_hashrate_monitor(root, GLOBAL_STATE);
 
     // Arrays that involve global state loops (not simple addition)
-    system_api_add_rejected_reasons(root, g);
-    system_api_add_block_info(root, g);
+    system_api_add_rejected_reasons(root, GLOBAL_STATE);
+    system_api_add_block_info(root, GLOBAL_STATE);
 
     return root;
 }

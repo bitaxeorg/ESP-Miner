@@ -8,6 +8,8 @@
 #include "bm1370.h"
 
 #include "asic.h"
+#include "global_state.h"
+#include "mining.h"
 #include "device_config.h"
 #include "frequency_transition_bmXX.h"
 
@@ -62,7 +64,7 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
     return 0;
 }
 
-void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job)
+void ASIC_send_work(GlobalState * GLOBAL_STATE, bm_job * next_job)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:

@@ -6,10 +6,8 @@
 
 static const char * TAG = "filesystem";
 
-esp_err_t filesystem_init(void * pvParameters)
+esp_err_t filesystem_init(GlobalState * GLOBAL_STATE)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-
     esp_vfs_spiffs_conf_t conf = {.base_path = "", .partition_label = NULL, .max_files = 5, .format_if_mount_failed = false};
     esp_err_t ret = esp_vfs_spiffs_register(&conf);
 

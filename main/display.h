@@ -1,6 +1,12 @@
 #ifndef DISPLAY_H_
 #define DISPLAY_H_
 
+#include <stdint.h>
+#include <stdbool.h>
+#include "esp_err.h"
+
+typedef struct GlobalState GlobalState;
+
 #define DEFAULT_DISPLAY "SSD1306 (128x32)"
 #define LCD_SH1107_I2C_CMD                   0X00
 #define LCD_SH1107_PARAM_SET_DISP_OFFSET     0xD3
@@ -14,7 +20,7 @@ typedef enum
     SH1107,
 } Display;
 
-typedef struct {
+typedef struct DisplayConfig {
     const char * name;
     Display display;
     uint16_t h_res;
@@ -29,7 +35,7 @@ static const DisplayConfig display_configs[] = {
     { .name = "SH1107 (128x128)", .display = SH1107,  .h_res = 128, .v_res = 128, },
 };
 
-esp_err_t display_init(void * pvParameters);
+esp_err_t display_init(GlobalState * GLOBAL_STATE);
 esp_err_t display_on(bool display_on);
 const DisplayConfig * get_display_config(const char * name);
 

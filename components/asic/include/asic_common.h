@@ -20,7 +20,7 @@ typedef enum
     REGISTER_PLL_PARAM,      // PLL/clock config readback (BM1370)
 } register_type_t;
 
-typedef struct
+typedef struct task_result
 {
     // -- job result response
     uint8_t job_id;

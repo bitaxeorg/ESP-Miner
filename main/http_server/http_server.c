@@ -1702,10 +1702,8 @@ esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
     return ESP_OK;
 }
 
-esp_err_t start_rest_server(void * pvParameters)
+esp_err_t start_rest_server(GlobalState * GLOBAL_STATE)
 {
-    GLOBAL_STATE = (GlobalState *) pvParameters;
-    
     // Initialize the ASIC API with the global state
     asic_api_init(GLOBAL_STATE);
     const char * base_path = "";

@@ -4,6 +4,7 @@
 #include "global_state.h"
 #include <lwip/tcpip.h>
 #include "stratum_v1_task.h"
+#include "stratum_api.h"
 #include "stratum_socket.h"
 #include "protocol_coordinator.h"
 #include "connect.h"
@@ -11,7 +12,6 @@
 #include <esp_sntp.h>
 #include "esp_timer.h"
 #include "esp_transport.h"
-#include "esp_transport_tcp.h"
 #include <stdbool.h>
 #include <string.h>
 #include "utils.h"

@@ -1,4 +1,5 @@
 #include "asic_init.h"
+#include "global_state.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
