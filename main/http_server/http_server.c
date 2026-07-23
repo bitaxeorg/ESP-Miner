@@ -3,6 +3,8 @@
 #include <string.h>
 #include <limits.h>
 #include <sys/param.h>
+#include "mbedtls/sha256.h"
+#include "mbedtls/base64.h"
 #include <sys/stat.h>
 #include <esp_heap_caps.h>
 
@@ -37,6 +39,8 @@
 #include "display.h"
 #include "mdns.h"
 #include "http_server.h"
+#include "http_auth.h"
+#include "http_cors.h"
 #include "websocket.h"
 #include "websocket_log.h"
 #include "websocket_api.h"
@@ -46,7 +50,7 @@
 #include "utils.h"
 
 static const char * TAG = "http_server";
-static const char * CORS_TAG = "CORS";
+
 
 static const char * STATS_LABEL_HASHRATE = "hashrate";
 static const char * STATS_LABEL_HASHRATE_1m = "hashrate_1m";
@@ -123,8 +127,12 @@ DataSource strToDataSource(const char * sourceStr)
 
 static esp_err_t GET_system_logs(httpd_req_t *req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     httpd_resp_set_type(req, "text/plain");
@@ -151,7 +159,7 @@ static esp_err_t GET_system_logs(httpd_req_t *req)
     return res;
 }
 
-static GlobalState * GLOBAL_STATE;
+GlobalState * GLOBAL_STATE;
 static httpd_handle_t server = NULL;
 
 esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_len)
@@ -170,8 +178,12 @@ esp_err_t HTTP_send_json(httpd_req_t * req, const cJSON * item, int * prebuffer_
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     httpd_resp_set_type(req, "application/json");
@@ -229,204 +241,6 @@ typedef struct rest_server_context
 
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
-static esp_err_t ip_in_private_range(uint32_t address) {
-    uint32_t ip_address = ntohl(address);
-
-    // 10.0.0.0 - 10.255.255.255 (Class A)
-    if ((ip_address >= 0x0A000000) && (ip_address <= 0x0AFFFFFF)) {
-        return ESP_OK;
-    }
-
-    // 172.16.0.0 - 172.31.255.255 (Class B)
-    if ((ip_address >= 0xAC100000) && (ip_address <= 0xAC1FFFFF)) {
-        return ESP_OK;
-    }
-
-    // 192.168.0.0 - 192.168.255.255 (Class C)
-    if ((ip_address >= 0xC0A80000) && (ip_address <= 0xC0A8FFFF)) {
-        return ESP_OK;
-    }
-
-    return ESP_FAIL;
-}
-
-static uint32_t extract_origin_ip_addr(char *origin)
-{
-    char host_str[128];
-    uint32_t origin_ip_addr = 0;
-
-    // Find the start of the hostname in the Origin header
-    const char *prefix = "http://";
-    char *host_start = strstr(origin, prefix);
-    if (host_start) {
-        host_start += strlen(prefix); // Move past "http://"
-
-        // Extract the hostname portion (up to the next '/')
-        char *host_end = strchr(host_start, '/');
-        size_t host_len = host_end ? (size_t)(host_end - host_start) : strlen(host_start);
-        if (host_len < sizeof(host_str)) {
-            strncpy(host_str, host_start, host_len);
-            host_str[host_len] = '\0'; // Null-terminate the string
-
-            // Check if it's an IP address or hostname
-            struct in_addr addr;
-            if (inet_pton(AF_INET, host_str, &addr) == 1) {
-                origin_ip_addr = addr.s_addr;
-                ESP_LOGD(CORS_TAG, "Extracted IP address %lu", origin_ip_addr);
-            } else {
-                ESP_LOGD(CORS_TAG, "Origin contains hostname: %s (not an IP)", host_str);
-                // For hostnames, return 0 to indicate it's not an IP address
-                origin_ip_addr = 0;
-            }
-        } else {
-            ESP_LOGW(CORS_TAG, "Hostname string is too long: %s", host_start);
-        }
-    }
-
-    return origin_ip_addr;
-}
-
-// Helper function to normalize hostname by stripping ".local" suffix if present
-// This prevents Avahi from creating duplicate ".local.local" hostnames
-static void normalize_hostname(char *hostname, size_t max_len) {
-    if (hostname == NULL || strlen(hostname) == 0) {
-        return;
-    }
-
-    size_t len = strlen(hostname);
-    const char *suffix = ".local";
-    size_t suffix_len = strlen(suffix);
-
-    // Check if hostname ends with ".local" (case-insensitive)
-    if (len > suffix_len &&
-        strcasecmp(hostname + len - suffix_len, suffix) == 0) {
-        // Strip the ".local" suffix
-        hostname[len - suffix_len] = '\0';
-        ESP_LOGD(TAG, "Normalized hostname from '%s.local' to '%s'", hostname, hostname);
-    }
-}
-
-esp_err_t is_network_allowed(httpd_req_t * req)
-{
-    if (GLOBAL_STATE->SYSTEM_MODULE.ap_enabled == true) {
-        ESP_LOGI(CORS_TAG, "Device in AP mode. Allowing CORS.");
-        return ESP_OK;
-    }
-
-    int sockfd = httpd_req_to_sockfd(req);
-    char ipstr[INET6_ADDRSTRLEN];
-    struct sockaddr_in6 addr;   // esp_http_server uses IPv6 addressing
-    socklen_t addr_size = sizeof(addr);
-
-    if (getpeername(sockfd, (struct sockaddr *)&addr, &addr_size) < 0) {
-        ESP_LOGE(CORS_TAG, "Error getting client IP");
-        return ESP_FAIL;
-    }
-
-    uint32_t request_ip_addr = addr.sin6_addr.un.u32_addr[3];
-
-    // // Convert to IPv6 string
-    // inet_ntop(AF_INET, &addr.sin6_addr, ipstr, sizeof(ipstr));
-
-    // Convert to IPv4 string
-    inet_ntop(AF_INET, &request_ip_addr, ipstr, sizeof(ipstr));
-
-    // Attempt to get the Origin header.
-    char origin[128];
-    uint32_t origin_ip_addr;
-    if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK) {
-        ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
-        origin_ip_addr = extract_origin_ip_addr(origin);
-    } else {
-        ESP_LOGD(CORS_TAG, "No origin header found.");
-        origin_ip_addr = request_ip_addr;
-    }
-
-    if (origin_ip_addr != 0 && ip_in_private_range(origin_ip_addr) == ESP_OK && ip_in_private_range(request_ip_addr) == ESP_OK) {
-        ESP_LOGD(CORS_TAG, "Origin and IP both in private range. Allowing.");
-        return ESP_OK;
-    }
-    
-    // If origin contains hostname (origin_ip_addr == 0), proceed to hostname validation
-    if (origin_ip_addr == 0) {
-        ESP_LOGD(CORS_TAG, "Origin contains hostname, proceeding to hostname validation");
-    }
-
-    // Check if Origin header matches the avahi hostname or is a local-network hostname
-    if (httpd_req_get_hdr_value_len(req, "Origin") > 0) {
-        httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin));
-        ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
-
-        // Extract the host portion from the origin for local-hostname validation
-        char host_str[128] = {0};
-        const char *prefix = "http://";
-        char *host_start = strstr(origin, prefix);
-        bool is_local_hostname = false;
-        if (host_start) {
-            host_start += strlen(prefix);
-            // Strip port if present
-            char *colon = strchr(host_start, ':');
-            char *slash = strchr(host_start, '/');
-            size_t host_len = 0;
-            if (colon) {
-                host_len = colon - host_start;
-            } else if (slash) {
-                host_len = slash - host_start;
-            } else {
-                host_len = strlen(host_start);
-            }
-            if (host_len > 0 && host_len < sizeof(host_str)) {
-                strncpy(host_str, host_start, host_len);
-                host_str[host_len] = '\0';
-
-                // Allow any .local hostname (mDNS, inherently local network)
-                size_t hlen = strlen(host_str);
-                if (hlen > 6 && strcasecmp(host_str + hlen - 6, ".local") == 0) {
-                    is_local_hostname = true;
-                    ESP_LOGD(CORS_TAG, "Origin host '%s' is a .local mDNS hostname - allowing", host_str);
-                }
-                // Allow any bare hostname (no dots, only resolvable on local network)
-                else if (strchr(host_str, '.') == NULL) {
-                    is_local_hostname = true;
-                    ESP_LOGD(CORS_TAG, "Origin host '%s' is a bare local hostname - allowing", host_str);
-                }
-            }
-        }
-
-        if (is_local_hostname) {
-            ESP_LOGD(CORS_TAG, "Request from local hostname - allowing access");
-            return ESP_OK;
-        }
-
-        // Fall back to exact match against this device's configured hostname
-        char *hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
-        ESP_LOGD(CORS_TAG, "Configured hostname: %s", hostname);
-        // Match origin as http://<hostname>.local[:port] or http://<hostname>[:port]
-        const char *patterns[] = { "http://%s.local", "http://%s" };
-        bool matched = false;
-        for (int i = 0; i < 2 && !matched; i++) {
-            char expected[256];
-            snprintf(expected, sizeof(expected), patterns[i], hostname);
-            size_t len = strlen(expected);
-            // Origin must start with expected, followed by end-of-string or ':port'
-            if (strncmp(origin, expected, len) == 0 &&
-                (origin[len] == '\0' || origin[len] == ':')) {
-                matched = true;
-            }
-        }
-        free(hostname);
-        if (matched) {
-            ESP_LOGD(CORS_TAG, "Request from hostname - allowing access");
-            return ESP_OK;
-        }
-    } else {
-        ESP_LOGD(CORS_TAG, "No Origin header found");
-    }
-
-    ESP_LOGI(CORS_TAG, "Client is NOT in the private ip ranges or same range as server.");
-    return ESP_FAIL;
-}
-
 /* Function for stopping the webserver */
 void stop_webserver(httpd_handle_t server)
 {
@@ -460,33 +274,15 @@ static esp_err_t set_content_type_from_file(httpd_req_t * req, const char * file
     return httpd_resp_set_type(req, type);
 }
 
-esp_err_t set_cors_headers(httpd_req_t * req)
-{
-    esp_err_t err;
-
-    err = httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    if (err != ESP_OK) {
-        return ESP_FAIL;
-    }
-
-    err = httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    if (err != ESP_OK) {
-        return ESP_FAIL;
-    }
-
-    err = httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
-    if (err != ESP_OK) {
-        return ESP_FAIL;
-    }
-
-    return ESP_OK;
-}
-
 /* Recovery handler */
 static esp_err_t rest_recovery_handler(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     extern const unsigned char recovery_page_start[] asm("_binary_recovery_page_html_start");
@@ -500,19 +296,17 @@ static esp_err_t rest_recovery_handler(httpd_req_t * req)
 /* Send a 404 as JSON for unhandled api routes */
 static esp_err_t rest_api_common_handler(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     httpd_resp_set_status(req, "404 Not Found");
 
     httpd_resp_set_type(req, "application/json");
-
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
-        return ESP_OK;
-    }
 
     cJSON * root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "error", "unknown route");
@@ -601,13 +395,11 @@ static esp_err_t rest_common_get_handler(httpd_req_t * req)
 
 static esp_err_t handle_options_request(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
     }
 
-    // Set CORS headers for OPTIONS request
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
+    if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
 
@@ -788,7 +580,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
         old_hostname = nvs_config_get_string(NVS_CONFIG_HOSTNAME);
         char normalized_new_hostname[64];
         strlcpy(normalized_new_hostname, hostname_item->valuestring, sizeof(normalized_new_hostname));
-        normalize_hostname(normalized_new_hostname, sizeof(normalized_new_hostname));
+        http_cors_normalize_hostname(normalized_new_hostname, sizeof(normalized_new_hostname));
         if (strcmp(old_hostname, normalized_new_hostname) != 0) {
             hostname_changed = true;
             ESP_LOGI(TAG, "Hostname change detected: %s -> %s", old_hostname, hostname_item->valuestring);
@@ -917,7 +709,7 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
                     {
                         char normalized_hostname[64];
                         strlcpy(normalized_hostname, item->valuestring, sizeof(normalized_hostname));
-                        normalize_hostname(normalized_hostname, sizeof(normalized_hostname));
+                        http_cors_normalize_hostname(normalized_hostname, sizeof(normalized_hostname));
                         nvs_config_set_string(key, normalized_hostname);
                         update_mdns_hostname(normalized_hostname, GLOBAL_STATE);
                         ESP_LOGI(TAG, "Updated hostname to: %s", normalized_hostname);
@@ -984,13 +776,11 @@ bool check_settings_and_update(const cJSON * const root, char **redirect_url)
 
 static esp_err_t PATCH_update_settings(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
     }
 
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
+    if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
 
@@ -1068,13 +858,11 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
 
 static esp_err_t POST_identify(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
     }
 
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
+    if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
 
@@ -1105,13 +893,11 @@ static esp_err_t POST_identify(httpd_req_t * req)
 
 static esp_err_t POST_restart(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
     }
 
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
+    if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
 
@@ -1144,13 +930,11 @@ static esp_err_t POST_restart(httpd_req_t * req)
 
 static esp_err_t POST_dismiss_block_found(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
     }
 
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
+    if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
 
@@ -1275,12 +1059,11 @@ static esp_err_t DELETE_system_pool(httpd_req_t *req)
 
 static esp_err_t POST_mining_pause(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
     }
 
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
+    if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
 
@@ -1301,12 +1084,11 @@ static esp_err_t POST_mining_pause(httpd_req_t * req)
 
 static esp_err_t POST_mining_resume(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
     }
 
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
+    if (http_auth_validate(req) != ESP_OK) {
         return ESP_OK;
     }
 
@@ -1328,17 +1110,15 @@ static esp_err_t POST_mining_resume(httpd_req_t * req)
 /* Simple handler for getting system handler */
 static esp_err_t GET_system_info(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     httpd_resp_set_type(req, "application/json");
-
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
-        return ESP_OK;
-    }
 
     cJSON * root = system_api_get_full_json(GLOBAL_STATE);
 
@@ -1369,17 +1149,15 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
 static esp_err_t GET_system_statistics(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     httpd_resp_set_type(req, "application/json");
-
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
-        return ESP_OK;
-    }
 
     size_t bufLen = httpd_req_get_url_query_len(req) + 1;
     bool dataSelection[SRC_NONE] = {false};
@@ -1478,17 +1256,15 @@ static esp_err_t GET_system_statistics(httpd_req_t * req)
 
 static esp_err_t GET_scoreboard(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_OK;
     }
 
     httpd_resp_set_type(req, "application/json");
-
-    // Set CORS headers
-    if (set_cors_headers(req) != ESP_OK) {
-        httpd_resp_send_500(req);
-        return ESP_OK;
-    }
 
     Scoreboard *scoreboard = &GLOBAL_STATE->SYSTEM_MODULE.scoreboard;
     cJSON * root = cJSON_CreateArray();
@@ -1528,8 +1304,12 @@ static esp_err_t GET_scoreboard(httpd_req_t * req)
 
 esp_err_t POST_WWW_update(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_FAIL;
     }
 
     wifi_mode_t mode;
@@ -1612,8 +1392,12 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
  */
 esp_err_t POST_OTA_update(httpd_req_t * req)
 {
-    if (is_network_allowed(req) != ESP_OK) {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    if (http_cors_check(req) != ESP_OK) {
+        return ESP_OK;
+    }
+
+    if (http_auth_validate(req) != ESP_OK) {
+        return ESP_FAIL;
     }
 
     wifi_mode_t mode;

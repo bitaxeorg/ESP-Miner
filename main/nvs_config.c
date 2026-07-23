@@ -4,6 +4,7 @@
 #include "cJSON.h"
 #include <esp_err.h>
 #include "esp_log.h"
+#include "mbedtls/sha256.h"
 #include <nvs_flash.h>
 #include <nvs.h>
 #include <freertos/FreeRTOS.h>
@@ -54,6 +55,8 @@ static Settings settings[NVS_CONFIG_COUNT] = {
     [NVS_CONFIG_WIFI_SSID]                             = {.nvs_key_name = "wifissid",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_SSID},                .rest_name = "ssid",                               .min = 1,  .max = 32},
     [NVS_CONFIG_WIFI_PASS]                             = {.nvs_key_name = "wifipass",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_ESP_WIFI_PASSWORD},            .rest_name = "wifiPass",                           .min = 0,  .max = 63},
     [NVS_CONFIG_HOSTNAME]                              = {.nvs_key_name = "hostname",        .type = TYPE_STR,   .default_value = {.str = (char *)CONFIG_LWIP_LOCAL_HOSTNAME},          .rest_name = "hostname",                           .min = 1,  .max = 32},
+    [NVS_CONFIG_AXEOS_PASSWORD]                        = {.nvs_key_name = "axeospassword",   .type = TYPE_STR,   .default_value = {.str = ""},                                          .rest_name = "axeosPassword",                      .min = 0,  .max = 64},
+    [NVS_CONFIG_AUTH_READ_REQUIRED]                    = {.nvs_key_name = "authreadreq",     .type = TYPE_BOOL,  .default_value = {.b = false},                                         .rest_name = "authReadRequired",                   .min = 0,  .max = 1},
 
     [NVS_CONFIG_POOL]                                  = {.nvs_key_name = "pool",            .type = TYPE_STR,   .default_value = {.str = ""},                                          .rest_name = "pools",                              .min = 0,  .max = NVS_STR_LIMIT, .array_size = MAX_POOLS},
     [NVS_CONFIG_PRIMARY_POOL_INDEX]                    = {.nvs_key_name = "prim_idx",        .type = TYPE_U16,   .default_value = {.u16 = 0},                                           .rest_name = "primaryPoolIndex",                   .min = 0,  .max = MAX_POOLS - 1},
@@ -558,9 +561,21 @@ char *nvs_config_get_string_indexed(NvsConfigKey key, int index)
 void nvs_config_set_string(NvsConfigKey key, const char *value)
 {
     Settings *setting = nvs_config_get_settings(key);
-    if (!setting || setting->type != TYPE_STR || (setting->value[0].str && strcmp(setting->value[0].str, value) == 0)) return;
+    if (!setting || setting->type != TYPE_STR) return;
 
-    ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value) };
+    const char *final_val = value;
+    char hashed_hex[65] = {0};
+
+    if (key == NVS_CONFIG_AXEOS_PASSWORD && value && strlen(value) > 0) {
+        unsigned char hash[32];
+        mbedtls_sha256((const unsigned char *)value, strlen(value), hash, 0);
+        bin2hex(hash, 32, hashed_hex, sizeof(hashed_hex));
+        final_val = hashed_hex;
+    }
+
+    if (setting->value[0].str && strcmp(setting->value[0].str, final_val) == 0) return;
+
+    ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(final_val) };
     if (!update.value.str) return;
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
 }

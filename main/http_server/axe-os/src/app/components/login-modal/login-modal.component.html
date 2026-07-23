@@ -1,0 +1,19 @@
+<app-modal [headline]="'Authentication Required - ' + host" [closable]="false" [isVisible]="isVisible">
+  <div class="flex flex-col gap-3 pt-2">
+    <div *ngIf="error" class="text-red-500 mb-2 font-medium">
+      {{ error }}
+    </div>
+    <div class="flex flex-col gap-1">
+      <label for="username" class="font-medium">Username</label>
+      <input id="username" type="text" class="input-text w-full" [(ngModel)]="username" />
+    </div>
+    <div class="flex flex-col gap-1">
+      <label for="password" class="font-medium">Password</label>
+      <input id="password" type="password" class="input-text w-full" [(ngModel)]="password" (keydown.enter)="onSubmit()" />
+    </div>
+    <div class="flex justify-end gap-2 mt-3">
+      <button class="btn btn-secondary" (click)="onCancel()">Cancel</button>
+      <button class="btn" (click)="onSubmit()" [disabled]="!password">Login</button>
+    </div>
+  </div>
+</app-modal>

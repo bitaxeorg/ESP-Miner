@@ -224,6 +224,12 @@ static void system_api_add_config(cJSON *root, GlobalState *g) {
     cJSON_AddFloatToObject(root, "frequency", nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY));
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATISTICS_FREQUENCY));
     cJSON_AddNumberToObject(root, "statsLimit", MAX_STATISTICS_COUNT);
+
+    char *pass = nvs_config_get_string(NVS_CONFIG_AXEOS_PASSWORD);
+    bool is_pass_set = pass && (strlen(pass) > 0);
+    free(pass);
+    cJSON_AddNumberToObject(root, "authEnabled", is_pass_set ? 1 : 0);
+    cJSON_AddNumberToObject(root, "authReadRequired", nvs_config_get_bool(NVS_CONFIG_AUTH_READ_REQUIRED) ? 1 : 0);
 }
 
 static void system_api_add_hashrate_monitor(cJSON *root, GlobalState *g) {
